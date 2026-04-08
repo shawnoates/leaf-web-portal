@@ -98,7 +98,7 @@ export default function CityAutocomplete({
     }
 
     autocompleteRef.current.getPlacePredictions(
-      { input, types: ["(cities)"] },
+      { input, types: ["locality", "sublocality", "administrative_area_level_3"] },
       (predictions, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
           setSuggestions(predictions);

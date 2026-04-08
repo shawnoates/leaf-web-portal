@@ -13,6 +13,7 @@ import {
   MapPin,
 } from "lucide-react";
 import CityAutocomplete from "@/components/CityAutocomplete";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 // --- Constants ---
 
@@ -30,19 +31,19 @@ const TIERS = [
     value: "starter",
     label: "Starter",
     price: "Free",
-    features: ["5 AI-generated plans", "50 total RSVPs", "1 city", "Community calendar page"],
+    features: ["1 city", "5 AI plan ideas per week", "First 50 RSVPs free", "Leaf-branded calendar page", "Phone Number RSVP"],
   },
   {
     value: "growth",
     label: "Growth",
     price: "$29/mo",
-    features: ["Unlimited AI plans", "500 RSVPs/month", "1 city", "Custom brand color", "Priority support"],
+    features: ["1 city", "10 AI plan ideas per week", "Up to 500 RSVPs per month", "Custom branded page", "Phone Number RSVP", "Blacklist categories", "Day-of-week preferences"],
   },
   {
     value: "pro",
     label: "Pro",
     price: "$99/mo",
-    features: ["Unlimited AI plans", "Unlimited RSVPs", "Up to 5 cities", "Custom brand color", "Analytics dashboard", "Dedicated support"],
+    features: ["Up to 5 cities", "15 AI plan ideas per week", "Unlimited RSVPs", "Custom branded page", "Phone Number RSVP", "Analytics dashboard", "On-demand plan generation"],
   },
 ];
 
@@ -93,6 +94,10 @@ function SetupPageInner() {
   const [submitError, setSubmitError] = useState("");
   const [generationMessageIndex, setGenerationMessageIndex] = useState(0);
   const [generationDone, setGenerationDone] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [parseUser, setParseUser] = useState<any>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authError, setAuthError] = useState("");
 
   const updateForm = (updates: Partial<FormData>) => {
     setForm((prev) => ({ ...prev, ...updates }));
@@ -102,6 +107,18 @@ function SetupPageInner() {
     form.name.trim() !== "" &&
     form.orgType !== "" &&
     form.primaryCitySelected;
+
+  // Check for existing Parse session on mount
+  useEffect(() => {
+    const currentUser = Parse.User.current();
+    if (currentUser) {
+      currentUser.fetch().then((fetched: typeof Parse.User) => {
+        setParseUser(fetched);
+      }).catch(async () => {
+        try { await Parse.User.logOut(); } catch { /* ignore */ }
+      });
+    }
+  }, []);
 
   // Rotate generation status messages
   useEffect(() => {
@@ -114,7 +131,8 @@ function SetupPageInner() {
     return () => clearInterval(interval);
   }, [submitting]);
 
-  const handleGenerate = useCallback(async () => {
+  const startGeneration = useCallback(async () => {
+    setShowAuthModal(false);
     setSubmitting(true);
     setSubmitError("");
     setGenerationMessageIndex(0);
@@ -125,7 +143,7 @@ function SetupPageInner() {
         name: form.name,
         orgType: form.orgType,
         description: form.description,
-        cities: [form.primaryCity],
+        primaryCity: form.primaryCity,
         daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
         maxEvents: 5,
         capacityLimit: 50,
@@ -145,6 +163,28 @@ function SetupPageInner() {
       setSubmitting(false);
     }
   }, [form]);
+
+  const handleGenerateClick = useCallback(() => {
+    if (parseUser) {
+      // Already signed in — go straight to generation
+      startGeneration();
+    } else {
+      // Show auth modal
+      setShowAuthModal(true);
+    }
+  }, [parseUser, startGeneration]);
+
+  const handleSignIn = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (user: any) => {
+      setParseUser(user);
+      setAuthError("");
+      // Auto-start generation after sign-in
+      setShowAuthModal(false);
+      setTimeout(() => startGeneration(), 100);
+    },
+    [startGeneration]
+  );
 
   // Step 2: Success
   if (step === 2) {
@@ -440,7 +480,7 @@ function SetupPageInner() {
         {/* CTA */}
         <div className="flex justify-end pt-12 mt-12 border-t border-zinc-100">
           <button
-            onClick={handleGenerate}
+            onClick={handleGenerateClick}
             disabled={!canGenerate}
             className={`px-8 py-3.5 text-xs uppercase tracking-[0.2em] font-bold flex items-center gap-2 transition-colors ${
               canGenerate
@@ -452,6 +492,43 @@ function SetupPageInner() {
           </button>
         </div>
       </div>
+
+      {/* Auth Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setShowAuthModal(false)}
+          />
+          <div className="relative bg-white p-8 max-w-sm w-full mx-4 shadow-2xl">
+            <button
+              onClick={() => setShowAuthModal(false)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-light tracking-tight mb-2">
+                Sign in to continue
+              </h3>
+              <p className="text-sm text-zinc-500 font-light">
+                Sign in to create and manage your calendar.
+              </p>
+            </div>
+            <div className="flex justify-center">
+              <GoogleSignInButton
+                onSignIn={handleSignIn}
+                onError={(err) => setAuthError(err)}
+              />
+            </div>
+            {authError && (
+              <p className="text-sm text-red-600 mt-4 text-center">
+                {authError}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
