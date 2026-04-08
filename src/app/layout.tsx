@@ -8,9 +8,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Leaf — Community Calendars for Organizations",
+  title: "Leaf OS — Community Calendars for Organizations",
   description:
     "AI-powered community calendars that help organizations plan meaningful gatherings. Members host, people RSVP.",
+  icons: {
+    icon: "/favicon.png",
+    apple: "/favicon.png",
+  },
 };
 
 export default function RootLayout({
