@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Parse from "@/lib/parse-client";
+import Link from "next/link";
 import {
   Plus,
   Users,
@@ -19,6 +20,8 @@ import {
   Sparkles,
   Loader2,
   Lock,
+  MapPin,
+  Settings,
 } from "lucide-react";
 
 // --- Types ---
@@ -62,6 +65,7 @@ interface OrgData {
   orgType: string | null;
   memberCount: number;
   rsvpLimitReached: boolean;
+  isOwner: boolean;
   plans: Plan[];
   planIdeas: PlanIdea[];
 }
@@ -305,6 +309,7 @@ export default function OrgCalendarPage() {
         orgType: result.orgType || null,
         memberCount: result.memberCount || 0,
         rsvpLimitReached: result.rsvpLimitReached || false,
+        isOwner: result.isOwner || false,
         plans,
         planIdeas,
       });
@@ -399,6 +404,15 @@ export default function OrgCalendarPage() {
             <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
               {org.memberCount} followers
             </span>
+            {org.isOwner && (
+              <Link
+                href={`/dashboard/${org.objectId}`}
+                className="flex items-center gap-1.5 text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                Manage
+              </Link>
+            )}
           </div>
         </div>
       </nav>
@@ -423,10 +437,14 @@ export default function OrgCalendarPage() {
       {/* Plans Stream */}
       <main className="max-w-6xl mx-auto px-6 py-12">
         {org.plans.length === 0 ? (
-          <div className="py-24 text-center space-y-4">
+          <div className={`${org.planIdeas.length > 0 ? "py-12" : "py-24"} text-center space-y-4`}>
             <Calendar className="w-12 h-12 text-zinc-300 mx-auto" />
             <h3 className="text-xl font-light">No upcoming plans yet</h3>
-            <p className="text-zinc-400 text-sm">Check back soon for new events from {org.name}.</p>
+            <p className="text-zinc-400 text-sm">
+              {org.planIdeas.length > 0
+                ? "Browse curated plan ideas below and host one for your community."
+                : `Check back soon for new events from ${org.name}.`}
+            </p>
           </div>
         ) : (
           <div className="space-y-32">
@@ -501,7 +519,7 @@ export default function OrgCalendarPage() {
 
         {/* Plan Ideas Carousel */}
         {org.planIdeas.length > 0 && (
-          <section className="mt-48 mb-24 space-y-12">
+          <section className={`${org.plans.length > 0 ? "mt-48" : "mt-8"} mb-24 space-y-12`}>
             <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
               <div className="space-y-2">
                 <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold flex items-center gap-2">
@@ -543,14 +561,14 @@ export default function OrgCalendarPage() {
               {org.planIdeas.map((idea) => (
                 <div
                   key={idea.id}
-                  className={`min-w-[85vw] md:min-w-[380px] snap-start group ${org.rsvpLimitReached ? "cursor-default" : "cursor-pointer"}`}
+                  className={`min-w-[280px] max-w-[300px] snap-start group ${org.rsvpLimitReached ? "cursor-default" : "cursor-pointer"}`}
                   onClick={() => {
                     if (org.rsvpLimitReached) return;
                     setHostingIdea(idea);
                     setHostSubmitting(false);
                   }}
                 >
-                  <div className="aspect-[3/4] overflow-hidden bg-zinc-100 mb-6 relative">
+                  <div className="aspect-[4/5] overflow-hidden bg-zinc-100 mb-4 relative">
                     {idea.image ? (
                       <img
                         src={idea.image}
@@ -578,16 +596,19 @@ export default function OrgCalendarPage() {
                       )}
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
-                      {idea.category}
-                    </p>
-                    <h4 className={`text-xl font-light tracking-tight ${org.rsvpLimitReached ? "text-zinc-400" : "group-hover:italic"}`}>
+                  <div className="space-y-1.5">
+                    <h4 className={`text-base font-medium tracking-tight ${org.rsvpLimitReached ? "text-zinc-400" : "group-hover:italic"}`}>
                       {idea.title}
                     </h4>
                     <p className="text-sm text-zinc-500 font-light line-clamp-2 leading-relaxed">
                       {idea.description}
                     </p>
+                    {idea.location && (
+                      <p className="text-xs text-zinc-400 flex items-center gap-1 pt-1">
+                        <MapPin className="w-3 h-3 shrink-0" />
+                        {idea.location.name}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}

@@ -1,0 +1,140 @@
+"use client";
+
+import { Check, Plus } from "lucide-react";
+
+const TIERS = [
+  {
+    id: "starter",
+    name: "Starter",
+    price: "Free",
+    period: "",
+    description: "Try it out with your community",
+    features: [
+      "1 calendar",
+      "5 AI plan ideas per week",
+      "Up to 50 RSVPs",
+      "Schedule 2 weeks ahead",
+    ],
+  },
+  {
+    id: "growth",
+    name: "Growth",
+    price: "$29",
+    period: "/mo",
+    description: "For active organizations",
+    highlight: true,
+    features: [
+      "Up to 5 calendars",
+      "10 AI plan ideas per week",
+      "Up to 500 RSVPs/month",
+      "Unlimited scheduling",
+      "Custom branding",
+      "Day & category preferences",
+      "RSVP management",
+    ],
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    price: "$99",
+    period: "/mo",
+    description: "For multi-location organizations",
+    features: [
+      "Unlimited calendars",
+      "15 AI plan ideas per week",
+      "Unlimited RSVPs",
+      "Unlimited scheduling",
+      "Custom branding",
+      "All preferences",
+      "Analytics dashboard",
+      "On-demand generation",
+    ],
+  },
+];
+
+interface SubscriptionModalProps {
+  currentTier: string;
+  onSelect: (tier: string) => void;
+  onClose: () => void;
+  loading?: boolean;
+}
+
+export default function SubscriptionModal({
+  currentTier,
+  onSelect,
+  onClose,
+  loading = false,
+}: SubscriptionModalProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-3xl rounded-t-2xl md:rounded-xl p-6 md:p-10 max-h-[90vh] overflow-y-auto relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 rounded-full hover:bg-zinc-100 transition-colors"
+        >
+          <Plus className="w-6 h-6 rotate-45" />
+        </button>
+
+        <h2 className="text-2xl font-light tracking-tight mb-1">
+          Choose your plan
+        </h2>
+        <p className="text-sm text-zinc-500 mb-8">
+          Upgrade to unlock more features for your organization.
+        </p>
+
+        <div className="grid md:grid-cols-3 gap-4">
+          {TIERS.map((tier) => {
+            const isCurrent = tier.id === currentTier;
+            return (
+              <div
+                key={tier.id}
+                className={`border rounded-xl p-5 flex flex-col ${
+                  tier.highlight
+                    ? "border-zinc-900 ring-1 ring-zinc-900"
+                    : "border-zinc-200"
+                } ${isCurrent ? "bg-zinc-50" : ""}`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-sm font-bold uppercase tracking-widest">
+                    {tier.name}
+                  </h3>
+                  {tier.highlight && (
+                    <span className="text-[10px] font-bold uppercase tracking-widest bg-zinc-900 text-white px-2 py-0.5 rounded-full">
+                      Popular
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-baseline gap-0.5 mb-1">
+                  <span className="text-3xl font-light">{tier.price}</span>
+                  {tier.period && (
+                    <span className="text-sm text-zinc-400">{tier.period}</span>
+                  )}
+                </div>
+                <p className="text-xs text-zinc-500 mb-4">{tier.description}</p>
+                <ul className="space-y-2 mb-6 flex-1">
+                  {tier.features.map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-xs text-zinc-700">
+                      <Check className="w-3.5 h-3.5 text-zinc-400 shrink-0 mt-0.5" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  onClick={() => !isCurrent && onSelect(tier.id)}
+                  disabled={isCurrent || loading}
+                  className={`w-full py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg transition-colors ${
+                    isCurrent
+                      ? "bg-zinc-100 text-zinc-400 cursor-default"
+                      : "bg-zinc-900 text-white hover:bg-zinc-800"
+                  } disabled:opacity-50`}
+                >
+                  {isCurrent ? "Current Plan" : loading ? "Updating..." : `Switch to ${tier.name}`}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
