@@ -158,31 +158,21 @@ export default function GoogleSignInButton({
 
   if (signingIn) {
     return (
-      <div className="space-y-2">
-        <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
-          Sign in to continue
-        </label>
-        <div className="flex items-center gap-2 text-zinc-400 text-sm py-2">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Signing in...
-        </div>
+      <div className="flex items-center gap-2 text-zinc-400 text-sm py-2">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        Signing in...
       </div>
     );
   }
 
   return (
-    <div className="space-y-2">
-      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
-        Sign in to continue
-      </label>
-      <div ref={buttonRef}>
-        {!scriptReady && (
-          <div className="flex items-center gap-2 text-zinc-400 text-sm py-2">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Loading...
-          </div>
-        )}
-      </div>
+    <div ref={buttonRef}>
+      {!scriptReady && (
+        <div className="flex items-center gap-2 text-zinc-400 text-sm py-2">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Loading...
+        </div>
+      )}
     </div>
   );
 }

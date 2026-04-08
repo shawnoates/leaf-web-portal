@@ -22,8 +22,8 @@ const PRICING_TIERS = [
     highlight: false,
     features: [
       "1 city",
-      "5 AI plan ideas per week",
-      "First 50 RSVPs free",
+      "5 AI-generated plan ideas per week",
+      "Up to 50 RSVPs",
       "Leaf-branded calendar page",
       "Phone Number RSVP",
     ],
@@ -46,7 +46,7 @@ const PRICING_TIERS = [
     highlight: true,
     features: [
       "1 city",
-      "10 AI plan ideas per week",
+      "10 AI-generated plan ideas per week",
       "Up to 500 RSVPs per month",
       "Custom branded page",
       "Phone Number RSVP",
@@ -70,7 +70,7 @@ const PRICING_TIERS = [
     highlight: false,
     features: [
       "Up to 5 cities",
-      "15 AI plan ideas per week",
+      "15 AI-generated plan ideas per week",
       "Unlimited RSVPs",
       "Custom branded page",
       "Phone Number RSVP",

@@ -21,8 +21,10 @@ const ORG_TYPES = [
   { value: "church", label: "Church", emoji: "\u26ea" },
   { value: "gym", label: "Gym / Fitness", emoji: "\ud83c\udfcb\ufe0f" },
   { value: "company", label: "Company", emoji: "\ud83c\udfe2" },
+  { value: "brick_and_mortar", label: "Brick & Mortar", emoji: "\ud83c\udfea" },
   { value: "community", label: "Community Group", emoji: "\ud83c\udf1f" },
   { value: "school", label: "School / University", emoji: "\ud83c\udf93" },
+  { value: "consumer_brand", label: "Consumer Brand", emoji: "\ud83d\udce6" },
   { value: "other", label: "Other", emoji: "\ud83d\udccc" },
 ];
 
@@ -31,19 +33,19 @@ const TIERS = [
     value: "starter",
     label: "Starter",
     price: "Free",
-    features: ["1 city", "5 AI plan ideas per week", "First 50 RSVPs free", "Leaf-branded calendar page", "Phone Number RSVP"],
+    features: ["1 city", "5 AI-generated plan ideas per week", "Up to 50 RSVPs", "Leaf-branded calendar page", "Phone Number RSVP"],
   },
   {
     value: "growth",
     label: "Growth",
     price: "$29/mo",
-    features: ["1 city", "10 AI plan ideas per week", "Up to 500 RSVPs per month", "Custom branded page", "Phone Number RSVP", "Blacklist categories", "Day-of-week preferences"],
+    features: ["1 city", "10 AI-generated plan ideas per week", "Up to 500 RSVPs per month", "Custom branded page", "Phone Number RSVP", "Blacklist categories", "Day-of-week preferences"],
   },
   {
     value: "pro",
     label: "Pro",
     price: "$99/mo",
-    features: ["Up to 5 cities", "15 AI plan ideas per week", "Unlimited RSVPs", "Custom branded page", "Phone Number RSVP", "Analytics dashboard", "On-demand plan generation"],
+    features: ["Up to 5 cities", "15 AI-generated plan ideas per week", "Unlimited RSVPs", "Custom branded page", "Phone Number RSVP", "Analytics dashboard", "On-demand plan generation"],
   },
 ];
 
@@ -78,7 +80,7 @@ export default function SetupPage() {
 
 function SetupPageInner() {
   const searchParams = useSearchParams();
-  const initialTier = searchParams.get("tier") || "starter";
+  const initialTier = searchParams.get("tier") || "growth";
 
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>({
@@ -106,7 +108,8 @@ function SetupPageInner() {
   const canGenerate =
     form.name.trim() !== "" &&
     form.orgType !== "" &&
-    form.primaryCitySelected;
+    form.primaryCitySelected &&
+    form.description.trim() !== "";
 
   // Check for existing Parse session on mount
   useEffect(() => {
@@ -240,9 +243,8 @@ function SetupPageInner() {
         <nav className="w-full bg-white border-b border-zinc-100 px-6 py-6">
           <div className="max-w-3xl mx-auto flex justify-between items-center">
             <Link href="/organizations" className="flex items-center gap-3">
-              <span className="text-xl font-light tracking-[0.2em] uppercase">
-                Leaf
-              </span>
+              <img src="/leaf-logo-black.png" alt="Leaf" className="h-7" />
+              <span className="text-lg font-light tracking-[0.2em] uppercase">OS</span>
               <div className="h-4 w-px bg-zinc-200" />
               <span className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold">
                 Setup
@@ -371,9 +373,8 @@ function SetupPageInner() {
       <nav className="w-full bg-white border-b border-zinc-100 px-6 py-6">
         <div className="max-w-3xl mx-auto flex justify-between items-center">
           <Link href="/organizations" className="flex items-center gap-3">
-            <span className="text-xl font-light tracking-[0.2em] uppercase">
-              Leaf
-            </span>
+            <img src="/leaf-logo-black.png" alt="Leaf" className="h-7" />
+            <span className="text-lg font-light tracking-[0.2em] uppercase">OS</span>
             <div className="h-4 w-px bg-zinc-200" />
             <span className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold">
               Setup
@@ -409,7 +410,7 @@ function SetupPageInner() {
                 type="text"
                 value={form.name}
                 onChange={(e) => updateForm({ name: e.target.value })}
-                placeholder="e.g., Bridge Church"
+                placeholder="e.g., Yoga for Austin"
                 className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
               />
             </div>
@@ -419,7 +420,7 @@ function SetupPageInner() {
               <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
                 Organization Type
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {ORG_TYPES.map((type) => (
                   <button
                     key={type.value}
@@ -463,8 +464,7 @@ function SetupPageInner() {
             {/* Description (Optional) */}
             <div className="space-y-2">
               <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
-                Description{" "}
-                <span className="text-zinc-400 font-normal">(optional)</span>
+                Description
               </label>
               <textarea
                 value={form.description}
@@ -497,35 +497,87 @@ function SetupPageInner() {
       {showAuthModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
-            className="absolute inset-0 bg-black/40"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setShowAuthModal(false)}
           />
-          <div className="relative bg-white p-8 max-w-sm w-full mx-4 shadow-2xl">
-            <button
-              onClick={() => setShowAuthModal(false)}
-              className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <div className="text-center mb-6">
-              <h3 className="text-xl font-light tracking-tight mb-2">
-                Sign in to continue
-              </h3>
-              <p className="text-sm text-zinc-500 font-light">
-                Sign in to create and manage your calendar.
+          <div className="relative bg-white max-w-[820px] w-full mx-4 shadow-2xl overflow-hidden flex">
+            {/* Left panel — visual */}
+            <div className="hidden sm:flex w-[340px] shrink-0 bg-zinc-950 text-white flex-col justify-between p-10">
+              <div className="flex items-center gap-3">
+                <img src="/leaf-logo-white.svg" alt="Leaf" className="h-7" />
+                <span className="text-lg font-light tracking-[0.2em] uppercase">OS</span>
+              </div>
+              <div className="space-y-6">
+                <h3 className="text-3xl font-light leading-snug">
+                  Your AI-powered calendar awaits
+                </h3>
+                <div className="space-y-3">
+                  {[
+                    "AI-generated plan ideas",
+                    "One-tap phone number RSVP",
+                    "Shareable calendar link",
+                  ].map((item) => (
+                    <div key={item} className="flex items-center gap-3">
+                      <div className="w-5 h-5 rounded-full border border-zinc-600 flex items-center justify-center shrink-0">
+                        <Check className="w-3 h-3 text-zinc-400" />
+                      </div>
+                      <p className="text-sm text-zinc-400 font-light">
+                        {item}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="text-[11px] text-zinc-600">
+                Trusted by 1,800+ members across various local organizations
               </p>
             </div>
-            <div className="flex justify-center">
-              <GoogleSignInButton
-                onSignIn={handleSignIn}
-                onError={(err) => setAuthError(err)}
-              />
+
+            {/* Right panel — sign in */}
+            <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 py-12">
+              {/* Close button */}
+              <button
+                onClick={() => setShowAuthModal(false)}
+                className="absolute top-4 right-4 z-10 text-zinc-400 hover:text-zinc-900 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="space-y-8">
+                <div className="space-y-3">
+                  <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                    Almost there
+                  </p>
+                  <h3 className="text-2xl font-light tracking-tight">
+                    Sign in to create <br className="hidden sm:block" />
+                    your calendar
+                  </h3>
+                  <p className="text-sm text-zinc-500 font-light leading-relaxed">
+                    We&apos;ll link your account so you can manage plans, track RSVPs, and customize your page.
+                  </p>
+                </div>
+
+                {/* Google Sign In */}
+                <div>
+                  <GoogleSignInButton
+                    onSignIn={handleSignIn}
+                    onError={(err) => setAuthError(err)}
+                  />
+                </div>
+
+                {authError && (
+                  <p className="text-sm text-red-600">
+                    {authError}
+                  </p>
+                )}
+
+                <div className="pt-2 border-t border-zinc-100">
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
+                    By signing in, you agree to our Terms of Service and Privacy Policy. We&apos;ll never post without your permission.
+                  </p>
+                </div>
+              </div>
             </div>
-            {authError && (
-              <p className="text-sm text-red-600 mt-4 text-center">
-                {authError}
-              </p>
-            )}
           </div>
         </div>
       )}

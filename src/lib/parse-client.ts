@@ -8,7 +8,7 @@ const PARSE_JS_KEY = process.env.NEXT_PUBLIC_PARSE_JS_KEY || "";
 const PARSE_SERVER_URL =
   process.env.NEXT_PUBLIC_PARSE_SERVER_URL || "https://api.getleaflets.co/parse";
 
-if (typeof window !== "undefined" && !Parse.applicationId) {
+if (typeof window !== "undefined") {
   Parse.initialize(PARSE_APP_ID, PARSE_JS_KEY);
   Parse.serverURL = PARSE_SERVER_URL;
 }
