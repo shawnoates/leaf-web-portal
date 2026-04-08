@@ -17,6 +17,7 @@ import {
   X,
   Loader2,
 } from "lucide-react";
+import CityAutocomplete from "@/components/CityAutocomplete";
 
 // --- Constants ---
 
@@ -84,7 +85,9 @@ interface FormData {
   orgType: string;
   description: string;
   primaryCity: string;
+  primaryCitySelected: boolean;
   additionalCities: string[];
+  additionalCitiesSelected: boolean[];
   locationTypes: string[];
   daysOfWeek: number[];
   maxEvents: number;
@@ -155,7 +158,9 @@ function SetupPageInner() {
     orgType: "",
     description: "",
     primaryCity: "",
+    primaryCitySelected: false,
     additionalCities: [],
+    additionalCitiesSelected: [],
     locationTypes: [],
     daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
     maxEvents: 5,
@@ -183,7 +188,7 @@ function SetupPageInner() {
       case 0:
         return form.name.trim() && form.orgType;
       case 1:
-        return form.primaryCity.trim();
+        return form.primaryCity.trim() && form.primaryCitySelected;
       case 2:
         return form.daysOfWeek.length > 0;
       case 3:
@@ -380,10 +385,10 @@ function SetupPageInner() {
                 <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
                   Primary City
                 </label>
-                <input
-                  type="text"
+                <CityAutocomplete
                   value={form.primaryCity}
-                  onChange={(e) => updateForm({ primaryCity: e.target.value })}
+                  onChange={(val) => updateForm({ primaryCity: val, primaryCitySelected: false })}
+                  onSelect={(place) => updateForm({ primaryCity: place.description, primaryCitySelected: true })}
                   placeholder="e.g., Austin, TX"
                   className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
                 />
@@ -397,23 +402,33 @@ function SetupPageInner() {
                   </label>
                   {form.additionalCities.map((city, i) => (
                     <div key={i} className="flex gap-2">
-                      <input
-                        type="text"
-                        value={city}
-                        onChange={(e) => {
-                          const updated = [...form.additionalCities];
-                          updated[i] = e.target.value;
-                          updateForm({ additionalCities: updated });
-                        }}
-                        className="w-full border-b border-zinc-200 py-3 text-base font-light focus:outline-none focus:border-zinc-900"
-                      />
+                      <div className="flex-1">
+                        <CityAutocomplete
+                          value={city}
+                          onChange={(val) => {
+                            const updated = [...form.additionalCities];
+                            const selectedUpdated = [...form.additionalCitiesSelected];
+                            updated[i] = val;
+                            selectedUpdated[i] = false;
+                            updateForm({ additionalCities: updated, additionalCitiesSelected: selectedUpdated });
+                          }}
+                          onSelect={(place) => {
+                            const updated = [...form.additionalCities];
+                            const selectedUpdated = [...form.additionalCitiesSelected];
+                            updated[i] = place.description;
+                            selectedUpdated[i] = true;
+                            updateForm({ additionalCities: updated, additionalCitiesSelected: selectedUpdated });
+                          }}
+                          placeholder="e.g., Brooklyn, NY"
+                          className="w-full border-b border-zinc-200 py-3 text-base font-light focus:outline-none focus:border-zinc-900"
+                        />
+                      </div>
                       <button
                         type="button"
                         onClick={() =>
                           updateForm({
-                            additionalCities: form.additionalCities.filter(
-                              (_, j) => j !== i
-                            ),
+                            additionalCities: form.additionalCities.filter((_, j) => j !== i),
+                            additionalCitiesSelected: form.additionalCitiesSelected.filter((_, j) => j !== i),
                           })
                         }
                         className="text-zinc-400 hover:text-zinc-900"
@@ -428,6 +443,7 @@ function SetupPageInner() {
                       onClick={() =>
                         updateForm({
                           additionalCities: [...form.additionalCities, ""],
+                          additionalCitiesSelected: [...form.additionalCitiesSelected, false],
                         })
                       }
                       className="text-sm text-zinc-500 hover:text-zinc-900 flex items-center gap-1"

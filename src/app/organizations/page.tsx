@@ -173,9 +173,8 @@ export default function OrganizationsPage() {
         <nav className="absolute top-0 left-0 right-0 z-30 px-6 py-6">
           <div className="max-w-6xl mx-auto flex justify-between items-center">
             <Link href="/" className="flex items-center gap-3">
-              <span className="text-xl font-light tracking-[0.2em] uppercase text-white">
-                Leaf OS
-              </span>
+              <img src="/leaf-logo-white.svg" alt="Leaf" className="h-8" />
+              <span className="text-xl font-light tracking-[0.2em] uppercase text-white">OS</span>
             </Link>
             <div className="flex gap-6 items-center">
               <a
@@ -397,9 +396,10 @@ export default function OrganizationsPage() {
       <footer className="py-16 px-6 border-t border-zinc-100">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start gap-12">
           <div className="space-y-4">
-            <span className="text-lg font-light tracking-[0.2em] uppercase">
-              Leaf OS
-            </span>
+            <div className="flex items-center gap-3">
+              <img src="/leaf-logo-black.png" alt="Leaf" className="h-7" />
+              <span className="text-lg font-light tracking-[0.2em] uppercase">OS</span>
+            </div>
             <p className="text-zinc-400 text-sm font-light max-w-xs leading-relaxed">
               AI-powered community calendars that help organizations plan
               meaningful gatherings.
