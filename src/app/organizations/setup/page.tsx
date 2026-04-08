@@ -113,14 +113,16 @@ function SetupPageInner() {
 
   // Check for existing Parse session on mount
   useEffect(() => {
-    const currentUser = Parse.User.current();
-    if (currentUser) {
-      currentUser.fetch().then((fetched: typeof Parse.User) => {
-        setParseUser(fetched);
-      }).catch(async () => {
-        try { await Parse.User.logOut(); } catch { /* ignore */ }
-      });
-    }
+    try {
+      const currentUser = Parse.User.current();
+      if (currentUser) {
+        currentUser.fetch().then((fetched: typeof Parse.User) => {
+          setParseUser(fetched);
+        }).catch(async () => {
+          try { await Parse.User.logOut(); } catch { /* ignore */ }
+        });
+      }
+    } catch { /* Parse not initialized */ }
   }, []);
 
   // Rotate generation status messages

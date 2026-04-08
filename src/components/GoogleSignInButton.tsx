@@ -104,20 +104,22 @@ export default function GoogleSignInButton({
     }
 
     // Check for existing Parse session
-    const currentUser = Parse.User.current();
-    if (currentUser) {
-      currentUser.fetch().then((fetched: typeof Parse.User) => {
-        const name = fetched.get("full_name") || fetched.get("name") || "";
-        const email = fetched.get("email") || fetched.getEmail() || "";
-        if (name || email) {
-          setSignedInUser({ name, email });
-          onSignIn(fetched);
-        }
-      }).catch(async () => {
-        // Session expired or invalid auth — clear everything
-        try { await Parse.User.logOut(); } catch { /* ignore */ }
-      });
-    }
+    try {
+      const currentUser = Parse.User.current();
+      if (currentUser) {
+        currentUser.fetch().then((fetched: typeof Parse.User) => {
+          const name = fetched.get("full_name") || fetched.get("name") || "";
+          const email = fetched.get("email") || fetched.getEmail() || "";
+          if (name || email) {
+            setSignedInUser({ name, email });
+            onSignIn(fetched);
+          }
+        }).catch(async () => {
+          // Session expired or invalid auth — clear everything
+          try { await Parse.User.logOut(); } catch { /* ignore */ }
+        });
+      }
+    } catch { /* Parse not initialized */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
