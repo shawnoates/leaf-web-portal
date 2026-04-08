@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, useCallback } from "react";
 
 declare global {
   interface Window {
-    google?: typeof google;
     __googleMapsCallback?: () => void;
   }
 }
