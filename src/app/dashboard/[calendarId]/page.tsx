@@ -742,14 +742,15 @@ export default function OrgDashboardPage() {
         {activeTab === "settings" && (
           <div className="space-y-8">
             {/* Organization Logo (Growth/Pro) */}
-            <section className={`relative border border-zinc-200 rounded-xl p-6 ${!isGrowthPlus ? "opacity-40 pointer-events-none" : ""}`}>
+            <div className="relative">
               {!isGrowthPlus && (
-                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-auto cursor-pointer rounded-xl" onClick={() => setShowSubscription(true)}>
-                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest">
-                    <Lock className="w-3.5 h-3.5" /> Upgrade
+                <div className="absolute top-4 right-4 z-10" onClick={() => setShowSubscription(true)}>
+                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest cursor-pointer hover:bg-zinc-800 transition-colors">
+                    <Lock className="w-3 h-3" /> Upgrade
                   </div>
                 </div>
               )}
+            <section className={`border border-zinc-200 rounded-xl p-6 ${!isGrowthPlus ? "opacity-40 pointer-events-none" : ""}`}>
               <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Organization Logo</h2>
               <div className="flex items-center gap-6">
                 <div className="w-20 h-20 rounded-xl border border-zinc-200 overflow-hidden bg-zinc-50 flex items-center justify-center shrink-0">
@@ -778,16 +779,18 @@ export default function OrgDashboardPage() {
                 </div>
               </div>
             </section>
+            </div>
 
             {/* Brand Color (Growth/Pro) */}
-            <section className={`relative border border-zinc-200 rounded-xl p-6 ${!isGrowthPlus ? "opacity-40 pointer-events-none" : ""}`}>
+            <div className="relative">
               {!isGrowthPlus && (
-                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-auto cursor-pointer rounded-xl" onClick={() => setShowSubscription(true)}>
-                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest">
-                    <Lock className="w-3.5 h-3.5" /> Upgrade
+                <div className="absolute top-4 right-4 z-10" onClick={() => setShowSubscription(true)}>
+                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest cursor-pointer hover:bg-zinc-800 transition-colors">
+                    <Lock className="w-3 h-3" /> Upgrade
                   </div>
                 </div>
               )}
+            <section className={`border border-zinc-200 rounded-xl p-6 ${!isGrowthPlus ? "opacity-40 pointer-events-none" : ""}`}>
               <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Brand Color</h2>
               <div className="flex items-center gap-4">
                 <div
@@ -815,16 +818,10 @@ export default function OrgDashboardPage() {
                 </div>
               </div>
             </section>
+            </div>
 
-            {/* Photo Style (Growth/Pro) */}
-            <section className={`relative border border-zinc-200 rounded-xl p-6 ${!isGrowthPlus ? "opacity-40 pointer-events-none" : ""}`}>
-              {!isGrowthPlus && (
-                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-auto cursor-pointer rounded-xl" onClick={() => setShowSubscription(true)}>
-                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest">
-                    <Lock className="w-3.5 h-3.5" /> Upgrade
-                  </div>
-                </div>
-              )}
+            {/* Photo Style */}
+            <section className="border border-zinc-200 rounded-xl p-6">
               <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Photo Style</h2>
               <p className="text-xs text-zinc-500 mb-3">Control what kind of images AI selects for plan ideas.</p>
               <div className="flex gap-2">
