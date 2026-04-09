@@ -436,6 +436,7 @@ export default function OrgCalendarPage() {
   const [showFollowModal, setShowFollowModal] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
+  const [isInactive, setIsInactive] = useState<{ name: string } | null>(null);
 
   // Check cookie on mount
   useEffect(() => {
@@ -458,6 +459,13 @@ export default function OrgCalendarPage() {
     try {
       setLoading(true);
       const result = await Parse.Cloud.run("getOrgCalendarPage", { shareId });
+
+      // Handle inactive calendar
+      if (result.isInactive) {
+        setIsInactive({ name: result.name || "Calendar" });
+        setLoading(false);
+        return;
+      }
 
       // Transform API response to our OrgData shape
       const plans: Plan[] = (result.plans || []).map((p: Record<string, unknown>) => ({
@@ -633,6 +641,31 @@ export default function OrgCalendarPage() {
         <div className="text-center space-y-4">
           <Loader2 className="w-8 h-8 animate-spin mx-auto text-zinc-400" />
           <p className="text-sm text-zinc-400 uppercase tracking-widest">Loading calendar...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Inactive calendar state
+  if (isInactive) {
+    return (
+      <div className="min-h-screen">
+        <nav className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-zinc-100 px-6 py-8">
+          <div className="max-w-6xl mx-auto flex justify-between items-center">
+            <h1 className="text-2xl font-light tracking-[0.2em] uppercase">
+              {isInactive.name}
+            </h1>
+            <span className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold">
+              Calendar
+            </span>
+          </div>
+        </nav>
+        <div className="flex items-center justify-center px-6" style={{ minHeight: "calc(100vh - 100px)" }}>
+          <div className="text-center space-y-4 max-w-md">
+            <Calendar className="w-12 h-12 mx-auto text-zinc-300" />
+            <h2 className="text-2xl font-light">This calendar is currently inactive</h2>
+            <p className="text-zinc-400 text-sm">The calendar owner&apos;s plan does not include this calendar. Please check back later.</p>
+          </div>
         </div>
       </div>
     );
@@ -1032,9 +1065,6 @@ export default function OrgCalendarPage() {
               ) : (
                 <>
                   <div>
-                    <p className="text-[10px] tracking-[0.4em] uppercase font-bold text-zinc-400 mb-3">
-                      {hostingIdea.category}
-                    </p>
                     <h3 className="text-3xl font-light mb-2 italic">
                       Host this event
                     </h3>

@@ -13,13 +13,16 @@ import {
   ChevronRight,
   Download,
   ExternalLink,
+  Heart,
   ImagePlus,
+  Layers,
   Pencil,
   Plus,
   RefreshCw,
   Settings,
   Trash2,
   Users,
+  UserMinus,
   Lock,
   CreditCard,
 } from "lucide-react";
@@ -47,11 +50,19 @@ interface OrgDashboard {
   rsvpLimit: number | null;
   planIdeaCount: number;
   upcomingPlanCount: number;
+  followerCount: number;
   members: {
     objectId: string | null;
     name: string;
     email: string | null;
     status: string;
+    joinedAt: string;
+  }[];
+  followers: {
+    membershipId: string;
+    objectId: string | null;
+    name: string;
+    phone: string | null;
     joinedAt: string;
   }[];
   rsvps: {
@@ -68,6 +79,7 @@ interface OrgDashboard {
     shareId: string;
     city: string;
     isPrimary: boolean;
+    isActive: boolean;
   }[];
   calendarLimit: number | null;
 }
@@ -76,8 +88,10 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const TABS = [
   { id: "overview", label: "Overview", icon: Calendar },
+  { id: "calendars", label: "Calendars", icon: Layers },
   { id: "settings", label: "Settings", icon: Settings },
-  { id: "members", label: "Members", icon: Users },
+  { id: "members", label: "Users", icon: Users },
+  { id: "followers", label: "Followers", icon: Heart },
   { id: "subscription", label: "Subscription", icon: CreditCard },
 ];
 
@@ -412,7 +426,7 @@ export default function OrgDashboardPage() {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               const isLocked =
-                (tab.id === "settings" || tab.id === "members") && !isGrowthPlus;
+                (tab.id === "settings" || tab.id === "members" || tab.id === "followers") && !isGrowthPlus;
               return (
                 <button
                   key={tab.id}
@@ -535,83 +549,123 @@ export default function OrgDashboardPage() {
               </Link>
             </div>
 
-            {/* Calendars */}
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-                  Calendars ({dashboard.calendars.length}{dashboard.calendarLimit ? `/${dashboard.calendarLimit}` : ""})
-                </h2>
-                {isGrowthPlus && (
-                  <button
-                    onClick={() => {
-                      if (dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit) {
-                        setShowSubscription(true);
-                      } else {
-                        setShowAddCalendar(true);
-                      }
-                    }}
-                    className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
-                  >
-                    {dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit ? (
-                      <><Lock className="w-3.5 h-3.5" /> Upgrade to Add</>
-                    ) : (
-                      <><Plus className="w-3.5 h-3.5" /> Add Calendar</>
-                    )}
-                  </button>
-                )}
-              </div>
-              <div className="space-y-3">
-                {dashboard.calendars.map((cal) => (
-                  <div
-                    key={cal.objectId}
-                    className="border border-zinc-200 rounded-xl p-5 flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium">{cal.name}</h3>
-                        {cal.isPrimary && (
-                          <span className="text-[10px] font-bold uppercase tracking-widest bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">
-                            Primary
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-zinc-400">{cal.city || "No city set"}</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <button
-                        onClick={() => {
-                          if (isGrowthPlus) {
-                            setActiveTab("members");
-                          } else {
-                            setShowSubscription(true);
-                          }
-                        }}
-                        className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
-                      >
-                        <Users className="w-3 h-3" /> {String((cal as Record<string, unknown>).rsvpCount ?? 0)} RSVPs
-                      </button>
-                      <Link
-                        href={`/org/${cal.shareId}`}
-                        target="_blank"
-                        className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
-                      >
-                        View Calendar <ExternalLink className="w-3 h-3" />
-                      </Link>
-                      <Link
-                        href={`/dashboard/${cal.objectId}/plans`}
-                        className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
-                      >
-                        Manage Plans <ChevronRight className="w-3 h-3" />
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
           </div>
         )}
 
-        {/* Calendars tab removed — calendars now shown on Overview */}
+        {/* ──────── CALENDARS TAB ──────── */}
+        {activeTab === "calendars" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
+                Calendars ({dashboard.calendars.length}{dashboard.calendarLimit ? `/${dashboard.calendarLimit}` : ""})
+              </h2>
+              {isGrowthPlus && (
+                <button
+                  onClick={() => {
+                    if (dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit) {
+                      setShowSubscription(true);
+                    } else {
+                      setShowAddCalendar(true);
+                    }
+                  }}
+                  className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
+                >
+                  {dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit ? (
+                    <><Lock className="w-3.5 h-3.5" /> Upgrade to Add</>
+                  ) : (
+                    <><Plus className="w-3.5 h-3.5" /> Add Calendar</>
+                  )}
+                </button>
+              )}
+            </div>
+            <div className="space-y-3">
+              {dashboard.calendars.map((cal) => {
+                const activePlans = ((cal as Record<string, unknown>).activePlans as { objectId: string; title: string; date: string; hostName: string; rsvpCount: number }[]) || [];
+                const inactive = cal.isActive === false;
+                return (
+                  <div
+                    key={cal.objectId}
+                    className={`border rounded-xl p-5 ${inactive ? "border-zinc-100 bg-zinc-50 opacity-60" : "border-zinc-200"}`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className={`font-medium ${inactive ? "text-zinc-400" : ""}`}>{cal.name}</h3>
+                          {cal.isPrimary && (
+                            <span className="text-[10px] font-bold uppercase tracking-widest bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">
+                              Primary
+                            </span>
+                          )}
+                          {inactive && (
+                            <span className="text-[10px] font-bold uppercase tracking-widest bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-zinc-400">{cal.city || "No city set"}</p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        {inactive ? (
+                          <button
+                            onClick={() => setShowSubscription(true)}
+                            className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
+                          >
+                            <Lock className="w-3.5 h-3.5" /> Upgrade to Reactivate
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => {
+                                if (isGrowthPlus) {
+                                  setActiveTab("followers");
+                                } else {
+                                  setShowSubscription(true);
+                                }
+                              }}
+                              className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
+                            >
+                              <Users className="w-3 h-3" /> {String((cal as Record<string, unknown>).rsvpCount ?? 0)} RSVPs
+                            </button>
+                            <Link
+                              href={`/org/${cal.shareId}`}
+                              target="_blank"
+                              className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
+                            >
+                              View Calendar <ExternalLink className="w-3 h-3" />
+                            </Link>
+                            <Link
+                              href={`/dashboard/${cal.objectId}/plans`}
+                              className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
+                            >
+                              Manage Plans <ChevronRight className="w-3 h-3" />
+                            </Link>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {!inactive && activePlans.length > 0 && (
+                      <div className="border-t border-zinc-100 pt-3 space-y-2">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Active Plans</p>
+                        {activePlans.map((plan) => (
+                          <div key={plan.objectId} className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{plan.title}</span>
+                              <span className="text-zinc-400">&middot; Hosted by {plan.hostName}</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-zinc-400">
+                              <span>{new Date(plan.date).toLocaleDateString()}</span>
+                              <span>{plan.rsvpCount} RSVPs</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ──────── SETTINGS TAB (Growth/Pro) ──────── */}
         {activeTab === "settings" && isGrowthPlus && (
@@ -802,23 +856,20 @@ export default function OrgDashboardPage() {
               )}
             </section>
 
-            {/* RSVPs */}
+          </div>
+        )}
+
+        {/* ──────── FOLLOWERS TAB (Growth/Pro) ──────── */}
+        {activeTab === "followers" && isGrowthPlus && (
+          <div className="space-y-8">
             <section>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-                  RSVPs ({dashboard.rsvps.length})
+                  Followers ({dashboard.followers.length})
                 </h2>
-                {dashboard.rsvps.length > 0 && (
-                  <button
-                    onClick={exportRsvpsCsv}
-                    className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Export CSV
-                  </button>
-                )}
               </div>
-              {dashboard.rsvps.length === 0 ? (
-                <p className="text-sm text-zinc-400">No RSVPs yet.</p>
+              {dashboard.followers.length === 0 ? (
+                <p className="text-sm text-zinc-400">No followers yet. Share your public calendar page to get followers.</p>
               ) : (
                 <div className="border border-zinc-200 rounded-xl overflow-hidden">
                   <table className="w-full text-sm">
@@ -826,18 +877,38 @@ export default function OrgDashboardPage() {
                       <tr>
                         <th className="text-left px-4 py-3 font-bold">Name</th>
                         <th className="text-left px-4 py-3 font-bold">Phone</th>
-                        <th className="text-left px-4 py-3 font-bold">Plan</th>
-                        <th className="text-left px-4 py-3 font-bold">Date</th>
+                        <th className="text-left px-4 py-3 font-bold">Joined</th>
+                        <th className="text-right px-4 py-3 font-bold">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
-                      {dashboard.rsvps.map((r) => (
-                        <tr key={r.objectId}>
-                          <td className="px-4 py-3">{r.name}</td>
-                          <td className="px-4 py-3 text-zinc-400">{r.phone || "—"}</td>
-                          <td className="px-4 py-3">{r.planTitle}</td>
+                      {dashboard.followers.map((f) => (
+                        <tr key={f.membershipId}>
+                          <td className="px-4 py-3">{f.name}</td>
+                          <td className="px-4 py-3 text-zinc-400">{f.phone || "—"}</td>
                           <td className="px-4 py-3 text-zinc-400">
-                            {new Date(r.date).toLocaleDateString()}
+                            {new Date(f.joinedAt).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`Remove ${f.name} as a follower?`)) return;
+                                try {
+                                  await Parse.Cloud.run("removeFollower", {
+                                    membershipId: f.membershipId,
+                                    calendarId,
+                                  });
+                                  setDashboard((d) =>
+                                    d ? { ...d, followers: d.followers.filter((x) => x.membershipId !== f.membershipId), followerCount: d.followerCount - 1 } : d
+                                  );
+                                } catch (err) {
+                                  console.error("Failed to remove follower:", err);
+                                }
+                              }}
+                              className="text-zinc-300 hover:text-red-500 transition-colors"
+                            >
+                              <UserMinus className="w-4 h-4" />
+                            </button>
                           </td>
                         </tr>
                       ))}

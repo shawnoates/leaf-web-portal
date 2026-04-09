@@ -205,7 +205,7 @@ export default function OrganizationsPage() {
             <div className="max-w-3xl space-y-8">
               <h1 className="text-5xl md:text-7xl font-light tracking-tight leading-[1.05] text-white">
                 Your community,{" "}
-                <span className="italic">fully activated.</span>
+                <span className="italic">in motion.</span>
               </h1>
               <p className="text-xl text-white/70 font-light leading-relaxed max-w-xl">
                 Leaf generates personalized event ideas for your organization.

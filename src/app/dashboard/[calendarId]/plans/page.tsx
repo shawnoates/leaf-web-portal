@@ -132,17 +132,37 @@ export default function PlansPage() {
 
   async function handleRegenerate() {
     setRegenerating(true);
+    const startCount = planIdeas.length;
     try {
       await Parse.Cloud.run("generateCalendarPlansForOne", {
         calendarId,
         count: 3,
       });
-      setTimeout(() => {
-        fetchPlanIdeas();
-        setRegenerating(false);
-      }, 3000);
+      // Poll until new plans appear (generation runs in the background on the server)
+      const maxAttempts = 20;
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        try {
+          const dash = await Parse.Cloud.run("getOrgDashboard", { calendarId });
+          const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId: dash.shareId });
+          const ideas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; location: { name: string; address: string } | null }) => ({
+            objectId: idea.objectId,
+            title: idea.title,
+            description: idea.description,
+            date: idea.date,
+            location: idea.location,
+          }));
+          if (ideas.length > startCount) {
+            setPlanIdeas(ideas);
+            break;
+          }
+        } catch {
+          // Keep polling
+        }
+      }
     } catch (err) {
       console.error("Regenerate failed:", err);
+    } finally {
       setRegenerating(false);
     }
   }
