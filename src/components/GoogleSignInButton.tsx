@@ -160,7 +160,7 @@ export default function GoogleSignInButton({
 
   if (signingIn) {
     return (
-      <div className="flex items-center gap-2 text-zinc-400 text-sm py-2">
+      <div className="flex items-center justify-center gap-2 text-zinc-400 text-sm py-2">
         <Loader2 className="w-4 h-4 animate-spin" />
         Signing in...
       </div>
@@ -168,7 +168,7 @@ export default function GoogleSignInButton({
   }
 
   return (
-    <div ref={buttonRef}>
+    <div ref={buttonRef} className="flex justify-center">
       {!scriptReady && (
         <div className="flex items-center gap-2 text-zinc-400 text-sm py-2">
           <Loader2 className="w-4 h-4 animate-spin" />

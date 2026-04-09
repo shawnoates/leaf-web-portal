@@ -77,7 +77,6 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const TABS = [
   { id: "overview", label: "Overview", icon: Calendar },
-  { id: "calendars", label: "Calendars", icon: Sparkles },
   { id: "settings", label: "Settings", icon: Settings },
   { id: "members", label: "Members & RSVPs", icon: Users },
   { id: "subscription", label: "Subscription", icon: CreditCard },
@@ -469,6 +468,15 @@ export default function OrgDashboardPage() {
                       className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-none"
                     />
                   </div>
+                  {/* Danger Zone — only visible in edit mode */}
+                  <div className="pt-4 border-t border-red-100 mt-4">
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete Organization
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div>
@@ -513,82 +521,71 @@ export default function OrgDashboardPage() {
               )}
             </div>
 
-            {/* Danger Zone */}
-            <section className="border border-red-100 rounded-xl p-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-red-400 mb-2">Danger Zone</h2>
-              <p className="text-xs text-zinc-500 mb-4">Permanently delete this organization and all its data.</p>
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-600 border border-red-200 px-4 py-2 rounded-lg hover:bg-red-50 transition-colors"
-              >
-                <Trash2 className="w-4 h-4" /> Delete Organization
-              </button>
+            {/* Calendars */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
+                  Calendars ({dashboard.calendars.length}{dashboard.calendarLimit ? `/${dashboard.calendarLimit}` : ""})
+                </h2>
+                {isGrowthPlus && (
+                  <button
+                    onClick={() => {
+                      if (dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit) {
+                        setShowSubscription(true);
+                      } else {
+                        setShowAddCalendar(true);
+                      }
+                    }}
+                    className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
+                  >
+                    {dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit ? (
+                      <><Lock className="w-3.5 h-3.5" /> Upgrade to Add</>
+                    ) : (
+                      <><Plus className="w-3.5 h-3.5" /> Add Calendar</>
+                    )}
+                  </button>
+                )}
+              </div>
+              <div className="space-y-3">
+                {dashboard.calendars.map((cal) => (
+                  <div
+                    key={cal.objectId}
+                    className="border border-zinc-200 rounded-xl p-5 flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-medium">{cal.name}</h3>
+                        {cal.isPrimary && (
+                          <span className="text-[10px] font-bold uppercase tracking-widest bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">
+                            Primary
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-zinc-400">{cal.city || "No city set"}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Link
+                        href={`/org/${cal.shareId}`}
+                        target="_blank"
+                        className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
+                      >
+                        View <ExternalLink className="w-3 h-3" />
+                      </Link>
+                      <Link
+                        href={`/dashboard/${cal.objectId}/plans`}
+                        className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
+                      >
+                        Plans <ChevronRight className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </section>
           </div>
         )}
 
-        {/* ──────── CALENDARS TAB ──────── */}
-        {activeTab === "calendars" && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-                Calendars ({dashboard.calendars.length}{dashboard.calendarLimit ? `/${dashboard.calendarLimit}` : ""})
-              </h2>
-              <button
-                onClick={() => {
-                  if (dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit) {
-                    setShowSubscription(true);
-                  } else {
-                    setShowAddCalendar(true);
-                  }
-                }}
-                className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
-              >
-                {dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit ? (
-                  <><Lock className="w-3.5 h-3.5" /> Upgrade to Add</>
-                ) : (
-                  <><Plus className="w-3.5 h-3.5" /> Add Calendar</>
-                )}
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {dashboard.calendars.map((cal) => (
-                <div
-                  key={cal.objectId}
-                  className="border border-zinc-200 rounded-xl p-5 flex items-center justify-between"
-                >
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-medium">{cal.name}</h3>
-                      {cal.isPrimary && (
-                        <span className="text-[10px] font-bold uppercase tracking-widest bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">
-                          Primary
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-zinc-400">{cal.city || "No city set"}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Link
-                      href={`/org/${cal.shareId}`}
-                      target="_blank"
-                      className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
-                    >
-                      View <ExternalLink className="w-3 h-3" />
-                    </Link>
-                    <Link
-                      href={`/dashboard/${cal.objectId}/plans`}
-                      className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
-                    >
-                      Plans <ChevronRight className="w-3 h-3" />
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Calendars tab removed — calendars now shown on Overview */}
 
         {/* ──────── SETTINGS TAB (Growth/Pro) ──────── */}
         {activeTab === "settings" && isGrowthPlus && (
