@@ -403,13 +403,6 @@ export default function OrgDashboardPage() {
               {tierLabel} Plan &middot; {dashboard.memberCount} members
             </p>
           </div>
-          <Link
-            href={`/org/${dashboard.shareId}`}
-            target="_blank"
-            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors"
-          >
-            View Public Page <ExternalLink className="w-3.5 h-3.5" />
-          </Link>
         </div>
 
         {/* Tabs */}
