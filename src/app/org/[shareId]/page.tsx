@@ -69,6 +69,7 @@ interface OrgData {
   name: string;
   description: string;
   profilePhoto: string | null;
+  tier: string;
   brandColor: string | null;
   orgType: string | null;
   orgCity: string | null;
