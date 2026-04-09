@@ -26,6 +26,7 @@ import {
   UserMinus,
   Lock,
   CreditCard,
+  ExternalLink,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -66,6 +67,8 @@ interface OrgDashboard {
     objectId: string | null;
     name: string;
     phone: string | null;
+    calendarId: string | null;
+    calendarName: string | null;
     joinedAt: string;
   }[];
   rsvps: {
@@ -187,6 +190,7 @@ export default function OrgDashboardPage() {
   const [selectedActivePlan, setSelectedActivePlan] = useState<{ objectId: string; title: string; description: string; image: string | null; date: string; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string } | null } | null>(null);
 
   // Co-host invite
+  const [followerCalFilter, setFollowerCalFilter] = useState<string>("all");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
   const [inviting, setInviting] = useState(false);
@@ -997,28 +1001,86 @@ export default function OrgDashboardPage() {
         {activeTab === "followers" && (
           <div className="space-y-8">
             <section>
+              {(() => {
+                const filteredFollowers = followerCalFilter === "all"
+                  ? dashboard.followers
+                  : dashboard.followers.filter((f) => f.calendarId === followerCalFilter);
+                const calendarNames = [...new Map(dashboard.followers.filter((f) => f.calendarId).map((f) => [f.calendarId, f.calendarName])).entries()];
+                return (<>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-                  Followers ({dashboard.followers.length})
+                  Followers ({filteredFollowers.length})
                 </h2>
+                {dashboard.calendars.length > 1 && (
+                  <select
+                    value={followerCalFilter}
+                    onChange={(e) => setFollowerCalFilter(e.target.value)}
+                    className="text-xs border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 focus:outline-none focus:border-zinc-400"
+                  >
+                    <option value="all">All Calendars</option>
+                    {dashboard.calendars.filter((c) => c.isActive).map((cal) => (
+                      <option key={cal.objectId} value={cal.objectId}>{cal.name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
-              {dashboard.followers.length === 0 ? (
-                <p className="text-sm text-zinc-400">No followers yet. Share your public calendar page to get followers.</p>
+              {filteredFollowers.length === 0 ? (
+                <div className="border border-zinc-200 rounded-xl p-8 space-y-6">
+                  <div className="text-center">
+                    <h3 className="text-lg font-light text-zinc-900 mb-2">Share your calendar to get followers</h3>
+                    <p className="text-sm text-zinc-400">When people follow your calendar, they&apos;ll see your plans and get notified about upcoming events.</p>
+                  </div>
+                  <div className="space-y-3">
+                    {dashboard.calendars.filter((c) => c.isActive).map((cal) => (
+                      <div key={cal.objectId} className="bg-zinc-50 rounded-lg p-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-0.5">{cal.name}</p>
+                          <p className="text-sm font-mono text-zinc-900">os.joinleaf.com/org/{cal.shareId}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <a
+                            href={`/org/${cal.shareId}`}
+                            target="_blank"
+                            className="bg-zinc-900 text-white px-4 py-2 text-[10px] uppercase tracking-[0.2em] font-bold rounded-lg hover:bg-zinc-800 transition-colors flex items-center gap-1.5"
+                          >
+                            View <ExternalLink className="w-3 h-3" />
+                          </a>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`os.joinleaf.com/org/${cal.shareId}`);
+                              setToast("Link copied!");
+                              setTimeout(() => setToast(null), 2000);
+                            }}
+                            className="border border-zinc-200 px-4 py-2 text-[10px] uppercase tracking-[0.2em] font-bold rounded-lg hover:bg-white transition-colors flex items-center gap-1.5"
+                          >
+                            <Link2 className="w-3 h-3" /> Copy
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ) : (
                 <div className="border border-zinc-200 rounded-xl overflow-hidden">
                   <table className="w-full text-sm">
                     <thead className="bg-zinc-50 text-xs uppercase tracking-widest text-zinc-400">
                       <tr>
                         <th className="text-left px-4 py-3 font-bold">Name</th>
+                        {dashboard.calendars.length > 1 && followerCalFilter === "all" && (
+                          <th className="text-left px-4 py-3 font-bold">Calendar</th>
+                        )}
                         <th className="text-left px-4 py-3 font-bold">Phone</th>
                         <th className="text-left px-4 py-3 font-bold">Joined</th>
                         <th className="text-right px-4 py-3 font-bold">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
-                      {dashboard.followers.map((f) => (
+                      {filteredFollowers.map((f) => (
                         <tr key={f.membershipId}>
                           <td className="px-4 py-3">{f.name}</td>
+                          {dashboard.calendars.length > 1 && followerCalFilter === "all" && (
+                            <td className="px-4 py-3 text-zinc-400">{f.calendarName || "—"}</td>
+                          )}
                           <td className="px-4 py-3 text-zinc-400">{f.phone || "—"}</td>
                           <td className="px-4 py-3 text-zinc-400">
                             {new Date(f.joinedAt).toLocaleDateString()}
@@ -1050,6 +1112,8 @@ export default function OrgDashboardPage() {
                   </table>
                 </div>
               )}
+                </>);
+              })()}
             </section>
           </div>
         )}
