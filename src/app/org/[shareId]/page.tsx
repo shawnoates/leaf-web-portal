@@ -51,10 +51,15 @@ interface PlanIdea {
   date: string | null;
   icebreakerQuestion: string | null;
   suggestedCapacity: number | null;
-  location: {
-    name: string;
-    address: string;
-  } | null;
+  centroid: string | null;
+}
+
+interface NearbyVenue {
+  placeId: string;
+  name: string;
+  address: string;
+  rating: number | null;
+  photoUrl: string | null;
 }
 
 interface OrgData {
@@ -63,6 +68,7 @@ interface OrgData {
   description: string;
   brandColor: string | null;
   orgType: string | null;
+  orgCity: string | null;
   memberCount: number;
   rsvpLimitReached: boolean;
   isOwner: boolean;
@@ -262,6 +268,10 @@ export default function OrgCalendarPage() {
   const [hostingIdea, setHostingIdea] = useState<PlanIdea | null>(null);
   const [hostSuccess, setHostSuccess] = useState(false);
   const [hostSubmitting, setHostSubmitting] = useState(false);
+  const [hostNote, setHostNote] = useState("");
+  const [nearbyVenues, setNearbyVenues] = useState<NearbyVenue[]>([]);
+  const [venuesLoading, setVenuesLoading] = useState(false);
+  const [selectedVenue, setSelectedVenue] = useState<NearbyVenue | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchOrg = useCallback(async () => {
@@ -290,15 +300,12 @@ export default function OrgCalendarPage() {
         id: idea.objectId as string,
         title: idea.title as string || "Plan Idea",
         description: idea.description as string || "",
-        category: (idea.location as Record<string, string>)?.categoryAlias?.split(",")[0] || "Activity",
+        category: idea.category as string || "Activity",
         image: idea.image as string || "",
         date: idea.date as string || null,
         icebreakerQuestion: idea.icebreakerQuestion as string || null,
         suggestedCapacity: idea.suggestedCapacity as number || null,
-        location: idea.location ? {
-          name: (idea.location as Record<string, string>).name || "",
-          address: (idea.location as Record<string, string>).address || "",
-        } : null,
+        centroid: idea.centroid as string || null,
       }));
 
       setOrg({
@@ -307,6 +314,7 @@ export default function OrgCalendarPage() {
         description: result.description || "",
         brandColor: result.orgBrandColor || "#18181b",
         orgType: result.orgType || null,
+        orgCity: result.orgCity || null,
         memberCount: result.memberCount || 0,
         rsvpLimitReached: result.rsvpLimitReached || false,
         isOwner: result.isOwner || false,
@@ -323,6 +331,70 @@ export default function OrgCalendarPage() {
   useEffect(() => {
     if (shareId) fetchOrg();
   }, [shareId, fetchOrg]);
+
+  // Fetch nearby venues when host modal opens
+  useEffect(() => {
+    if (!hostingIdea || !org) return;
+    setNearbyVenues([]);
+    setSelectedVenue(null);
+    setVenuesLoading(true);
+
+    const searchCity = hostingIdea.centroid || org.orgCity || "";
+    const query = `${hostingIdea.category} in ${searchCity}`;
+
+    // Load Google Maps if not already loaded, then search
+    const doSearch = async () => {
+      try {
+        // Wait for Google Maps to be available
+        if (!window.google?.maps?.places) {
+          const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+          if (!key) { setVenuesLoading(false); return; }
+          // Check if already loading
+          if (!document.querySelector('script[src*="maps.googleapis.com"]')) {
+            await new Promise<void>((resolve) => {
+              (window as unknown as Record<string, unknown>).__venueSearchCallback = () => resolve();
+              const script = document.createElement("script");
+              script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&callback=__venueSearchCallback`;
+              script.async = true;
+              document.head.appendChild(script);
+            });
+          } else {
+            // Script exists, wait for it
+            await new Promise<void>((resolve) => {
+              const check = setInterval(() => {
+                if (window.google?.maps?.places) { clearInterval(check); resolve(); }
+              }, 100);
+            });
+          }
+        }
+
+        const service = new window.google.maps.places.PlacesService(
+          document.createElement("div")
+        );
+
+        service.textSearch(
+          { query, type: "establishment" },
+          (results, status) => {
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+              const venues: NearbyVenue[] = results.slice(0, 5).map((place) => ({
+                placeId: place.place_id || "",
+                name: place.name || "",
+                address: place.formatted_address || "",
+                rating: place.rating || null,
+                photoUrl: place.photos?.[0]?.getUrl({ maxWidth: 400 }) || null,
+              }));
+              setNearbyVenues(venues);
+            }
+            setVenuesLoading(false);
+          }
+        );
+      } catch {
+        setVenuesLoading(false);
+      }
+    };
+
+    doSearch();
+  }, [hostingIdea, org]);
 
   const scroll = (direction: "left" | "right") => {
     if (scrollRef.current) {
@@ -348,8 +420,18 @@ export default function OrgCalendarPage() {
         calendarPlanId: hostingIdea.id,
         date: dateInput.value,
         capacity: hostingIdea.suggestedCapacity || 20,
+        hostNote: hostNote.trim() || undefined,
+        venue: selectedVenue ? {
+          placeId: selectedVenue.placeId,
+          name: selectedVenue.name,
+          address: selectedVenue.address,
+          photoUrl: selectedVenue.photoUrl,
+          rating: selectedVenue.rating,
+        } : undefined,
       });
       setHostSuccess(true);
+      setHostNote("");
+      setSelectedVenue(null);
       // Refresh data to show the new plan
       fetchOrg();
       setTimeout(() => {
@@ -566,6 +648,8 @@ export default function OrgCalendarPage() {
                     if (org.rsvpLimitReached) return;
                     setHostingIdea(idea);
                     setHostSubmitting(false);
+                    setHostNote("");
+                    setSelectedVenue(null);
                   }}
                 >
                   <div className="aspect-[4/5] overflow-hidden bg-zinc-100 mb-4 relative">
@@ -603,12 +687,6 @@ export default function OrgCalendarPage() {
                     <p className="text-sm text-zinc-500 font-light line-clamp-2 leading-relaxed">
                       {idea.description}
                     </p>
-                    {idea.location && (
-                      <p className="text-xs text-zinc-400 flex items-center gap-1 pt-1">
-                        <MapPin className="w-3 h-3 shrink-0" />
-                        {idea.location.name}
-                      </p>
-                    )}
                   </div>
                 </div>
               ))}
@@ -770,15 +848,60 @@ export default function OrgCalendarPage() {
                     </p>
                   </div>
 
-                  {hostingIdea.location && (
-                    <div className="space-y-2">
-                      <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
-                        Venue
-                      </h4>
-                      <p className="text-sm text-zinc-700">{hostingIdea.location.name}</p>
-                      <p className="text-sm text-zinc-500">{hostingIdea.location.address}</p>
-                    </div>
-                  )}
+                  {/* Venue Carousel */}
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                      Choose a Venue
+                    </h4>
+                    {venuesLoading ? (
+                      <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                        {[0, 1, 2, 3, 4].map((i) => (
+                          <div key={i} className="min-w-[160px] h-[180px] bg-zinc-100 rounded-xl animate-pulse shrink-0" />
+                        ))}
+                      </div>
+                    ) : nearbyVenues.length > 0 ? (
+                      <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                        {nearbyVenues.map((venue) => (
+                          <button
+                            key={venue.placeId}
+                            type="button"
+                            onClick={() => setSelectedVenue(selectedVenue?.placeId === venue.placeId ? null : venue)}
+                            className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left ${
+                              selectedVenue?.placeId === venue.placeId
+                                ? "border-zinc-900 shadow-lg"
+                                : "border-zinc-200 hover:border-zinc-300"
+                            }`}
+                          >
+                            <div className="h-[100px] bg-zinc-100">
+                              {venue.photoUrl ? (
+                                <img src={venue.photoUrl} className="w-full h-full object-cover" alt={venue.name} />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <MapPin className="w-6 h-6 text-zinc-300" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="p-2.5">
+                              <p className="text-xs font-bold truncate">{venue.name}</p>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                {venue.rating && (
+                                  <span className="text-[10px] text-zinc-500">{venue.rating.toFixed(1)} &#9733;</span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-zinc-400 truncate mt-0.5">{venue.address}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-zinc-400 italic">No venues found nearby.</p>
+                    )}
+                    {selectedVenue && (
+                      <p className="text-xs text-zinc-600 flex items-center gap-1">
+                        <MapPin className="w-3 h-3" /> {selectedVenue.name} &mdash; {selectedVenue.address}
+                      </p>
+                    )}
+                  </div>
 
                   <form onSubmit={handleHostSubmit} className="space-y-8">
                     <div className="space-y-2">
@@ -791,6 +914,20 @@ export default function OrgCalendarPage() {
                         defaultValue={hostingIdea.date ? new Date(hostingIdea.date).toISOString().split("T")[0] : ""}
                         className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                        Host&apos;s Note
+                      </label>
+                      <textarea
+                        value={hostNote}
+                        onChange={(e) => setHostNote(e.target.value)}
+                        rows={3}
+                        maxLength={500}
+                        className="w-full border border-zinc-200 rounded-lg p-4 text-sm font-light focus:outline-none focus:border-zinc-900 transition-colors resize-none"
+                        placeholder="Add a personal note for attendees (optional)"
+                      />
+                      <p className="text-[10px] text-zinc-400 text-right">{hostNote.length}/500</p>
                     </div>
                     <div className="space-y-4">
                       <label className="text-[10px] tracking-[0.3em] uppercase font-bold">

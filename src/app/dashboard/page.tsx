@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
@@ -27,6 +28,7 @@ const TIER_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [user, setUser] = useState<Parse.User | null>(null);
   const [orgs, setOrgs] = useState<OrgSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,7 +55,13 @@ export default function DashboardPage() {
     setLoading(true);
     try {
       const result = await Parse.Cloud.run("getMyOrganizations");
-      setOrgs(result.organizations || []);
+      const organizations = result.organizations || [];
+      setOrgs(organizations);
+      // Single-org model: if user has exactly one org, go directly to it
+      if (organizations.length === 1) {
+        router.push(`/dashboard/${organizations[0].objectId}`);
+        return;
+      }
     } catch (error) {
       console.error("Failed to fetch organizations:", error);
     } finally {
@@ -76,10 +84,10 @@ export default function DashboardPage() {
         <div className="max-w-sm w-full text-center">
           <Calendar className="w-10 h-10 mx-auto mb-4 text-zinc-400" />
           <h1 className="text-2xl font-light tracking-tight mb-2">
-            Sign in to manage your organizations
+            Sign in to manage your organization
           </h1>
           <p className="text-sm text-zinc-500 mb-8">
-            Access your organization dashboard, edit calendars, and manage subscriptions.
+            Access your dashboard, edit calendars, and manage your subscription.
           </p>
           <GoogleSignInButton
             onSignIn={(u) => setUser(u)}
@@ -97,19 +105,21 @@ export default function DashboardPage() {
         <div className="max-w-4xl mx-auto px-6 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-light tracking-tight">
-              My Organizations
+              My Organization
             </h1>
             <p className="text-sm text-zinc-500 mt-0.5">
               Manage your calendars, plans, and subscriptions.
             </p>
           </div>
-          <Link
-            href="/organizations/setup"
-            className="flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors rounded-lg"
-          >
-            <Plus className="w-4 h-4" />
-            New Organization
-          </Link>
+          {orgs.length === 0 && !loading && (
+            <Link
+              href="/organizations/setup"
+              className="flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors rounded-lg"
+            >
+              <Plus className="w-4 h-4" />
+              New Organization
+            </Link>
+          )}
         </div>
       </header>
 
@@ -122,10 +132,10 @@ export default function DashboardPage() {
           <div className="text-center py-20">
             <Sparkles className="w-10 h-10 mx-auto mb-4 text-zinc-300" />
             <h2 className="text-xl font-light tracking-tight mb-2">
-              No organizations yet
+              No organization yet
             </h2>
             <p className="text-sm text-zinc-500 mb-6 max-w-xs mx-auto">
-              Create your first organization to start generating AI-powered plan ideas for your community.
+              Create your organization to start generating AI-powered plan ideas for your community.
             </p>
             <Link
               href="/organizations/setup"

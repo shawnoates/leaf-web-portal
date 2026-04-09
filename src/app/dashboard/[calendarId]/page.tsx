@@ -124,6 +124,12 @@ export default function OrgDashboardPage() {
   // Regenerate
   const [regenerating, setRegenerating] = useState(false);
 
+  // Co-host invite
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState("");
+
   useEffect(() => {
     try {
       const current = Parse.User.current();
@@ -268,6 +274,28 @@ export default function OrgDashboardPage() {
     } catch (err) {
       console.error("Regenerate failed:", err);
       setRegenerating(false);
+    }
+  }
+
+  async function handleInviteCoHost() {
+    if (!inviteEmail) return;
+    setInviting(true);
+    setInviteSuccess("");
+    try {
+      await Parse.Cloud.run("inviteCoHost", {
+        calendarId,
+        email: inviteEmail,
+        name: inviteName,
+      });
+      setInviteSuccess(`Invitation sent to ${inviteEmail}`);
+      setInviteEmail("");
+      setInviteName("");
+      fetchDashboard();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to send invite";
+      alert(message);
+    } finally {
+      setInviting(false);
     }
   }
 
@@ -653,6 +681,50 @@ export default function OrgDashboardPage() {
         {/* ──────── MEMBERS & RSVPs TAB (Growth/Pro) ──────── */}
         {activeTab === "members" && isGrowthPlus && (
           <div className="space-y-8">
+            {/* Invite Co-Host */}
+            <section className="border border-zinc-200 rounded-xl p-6">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                Invite Co-Host
+              </h2>
+              <p className="text-xs text-zinc-500 mb-4">
+                Co-hosts can create plans, view RSVPs, and help manage the calendar.
+              </p>
+              {inviteSuccess && (
+                <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg mb-4 text-sm">
+                  <Check className="w-4 h-4" /> {inviteSuccess}
+                </div>
+              )}
+              <div className="flex gap-3 items-end">
+                <div className="flex-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                    placeholder="cohost@example.com"
+                  />
+                </div>
+                <div className="w-40">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name (optional)</label>
+                  <input
+                    type="text"
+                    value={inviteName}
+                    onChange={(e) => setInviteName(e.target.value)}
+                    className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                    placeholder="Name"
+                  />
+                </div>
+                <button
+                  onClick={handleInviteCoHost}
+                  disabled={!inviteEmail || inviting}
+                  className="bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50 shrink-0"
+                >
+                  {inviting ? "Sending..." : "Send Invite"}
+                </button>
+              </div>
+            </section>
+
             {/* Members */}
             <section>
               <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">
