@@ -816,9 +816,12 @@ export default function OrgCalendarPage() {
                   </p>
 
                   {plan.hostNote && (
-                    <p className="text-sm text-zinc-400 italic border-l-2 border-zinc-200 pl-3 line-clamp-2">
-                      &ldquo;{plan.hostNote}&rdquo;
-                    </p>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Note from Host</p>
+                      <p className="text-sm text-zinc-400 italic border-l-2 border-zinc-200 pl-3 line-clamp-2">
+                        &ldquo;{plan.hostNote}&rdquo;
+                      </p>
+                    </div>
                   )}
 
                   <div className="pt-2 flex flex-col gap-6">

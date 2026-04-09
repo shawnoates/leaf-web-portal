@@ -6,7 +6,7 @@ import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import VenueSearch from "@/components/VenueSearch";
-import { ArrowLeft, Calendar, Check, MapPin, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, Calendar, Check, ImagePlus, MapPin, Plus, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
 
 interface Venue {
   name: string;
@@ -20,6 +20,15 @@ interface PlanIdea {
   description: string;
   date: string;
   location: { name: string; address: string } | null;
+}
+
+interface UpcomingPlan {
+  objectId: string;
+  title: string;
+  image: string | null;
+  expiryDate: string;
+  rsvpCount: number;
+  host: { name: string } | null;
 }
 
 export default function PlansPage() {
@@ -40,9 +49,14 @@ export default function PlansPage() {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [capacity, setCapacity] = useState("");
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isHosted, setIsHosted] = useState(true);
   const [creating, setCreating] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  // Upcoming plans (hosted)
+  const [upcomingPlans, setUpcomingPlans] = useState<UpcomingPlan[]>([]);
 
   // Plan ideas
   const [planIdeas, setPlanIdeas] = useState<PlanIdea[]>([]);
@@ -82,6 +96,16 @@ export default function PlansPage() {
       // First get the shareId
       const dash = await Parse.Cloud.run("getOrgDashboard", { calendarId });
       const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId: dash.shareId });
+      setUpcomingPlans(
+        (page.plans || []).map((p: { objectId: string; title: string; image: string | null; expiryDate: string; rsvpCount: number; host: { name: string } | null }) => ({
+          objectId: p.objectId,
+          title: p.title,
+          image: p.image,
+          expiryDate: p.expiryDate,
+          rsvpCount: p.rsvpCount,
+          host: p.host,
+        }))
+      );
       setPlanIdeas(
         (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; location: { name: string; address: string } | null }) => ({
           objectId: idea.objectId,
@@ -100,6 +124,10 @@ export default function PlansPage() {
 
   async function handleCreate() {
     if (!title || !date) return;
+    if (isHosted && !imageBase64) {
+      alert("Please upload a cover image for your plan.");
+      return;
+    }
     setCreating(true);
     try {
       await Parse.Cloud.run("createManualPlan", {
@@ -111,6 +139,7 @@ export default function PlansPage() {
         time: time || null,
         capacity: capacity ? parseInt(capacity) : null,
         isHosted,
+        imageBase64: imageBase64 || undefined,
       });
       setSuccess(true);
       setTitle("");
@@ -120,6 +149,8 @@ export default function PlansPage() {
       setDate("");
       setTime("");
       setCapacity("");
+      setImageBase64(null);
+      setImagePreview(null);
       fetchPlanIdeas();
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: unknown) {
@@ -175,6 +206,22 @@ export default function PlansPage() {
     } catch (err) {
       console.error("Failed to remove idea:", err);
     }
+  }
+
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image must be under 5MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setImagePreview(result);
+      setImageBase64(result.split(",")[1]);
+    };
+    reader.readAsDataURL(file);
   }
 
   // Date constraints
@@ -284,6 +331,29 @@ export default function PlansPage() {
             </div>
 
             <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">
+                Cover Image {isHosted && <span className="text-red-400">*</span>}
+              </label>
+              {imagePreview ? (
+                <div className="relative w-full h-40 rounded-lg overflow-hidden">
+                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => { setImagePreview(null); setImageBase64(null); }}
+                    className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-zinc-200 rounded-lg cursor-pointer hover:border-zinc-400 transition-colors">
+                  <ImagePlus className="w-6 h-6 text-zinc-300 mb-2" />
+                  <span className="text-xs text-zinc-400">Click to upload an image</span>
+                  <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+                </label>
+              )}
+            </div>
+
+            <div>
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Venue</label>
               <VenueSearch
                 value={venueQuery}
@@ -338,13 +408,45 @@ export default function PlansPage() {
 
             <button
               onClick={handleCreate}
-              disabled={!title || !date || creating}
+              disabled={!title || !date || creating || (isHosted && !imageBase64)}
               className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
             >
               {creating ? "Creating..." : isHosted ? "Create Upcoming Plan" : "Create Plan Idea"}
             </button>
           </div>
         </section>
+
+        {/* Upcoming Plans (Hosted) */}
+        {upcomingPlans.length > 0 && (
+          <section>
+            <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">
+              Upcoming Plans ({upcomingPlans.length})
+            </h2>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar">
+              {upcomingPlans.map((plan) => (
+                <div key={plan.objectId} className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52">
+                  {plan.image ? (
+                    <img src={plan.image} alt={plan.title} className="w-full h-28 object-cover" />
+                  ) : (
+                    <div className="w-full h-28 bg-zinc-100 flex items-center justify-center">
+                      <Calendar className="w-6 h-6 text-zinc-300" />
+                    </div>
+                  )}
+                  <div className="p-3">
+                    <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
+                    <p className="text-xs text-zinc-400 mb-1">
+                      {new Date(plan.expiryDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                    </p>
+                    <div className="flex items-center justify-between text-xs text-zinc-400">
+                      <span className="truncate">{plan.host?.name || "You"}</span>
+                      <span className="shrink-0 ml-2">{plan.rsvpCount} RSVPs</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Existing Plan Ideas */}
         <section>
