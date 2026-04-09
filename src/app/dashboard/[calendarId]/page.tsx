@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
@@ -13,10 +13,10 @@ import {
   ChevronRight,
   Clock,
   Download,
-  ExternalLink,
   Heart,
   ImagePlus,
   Layers,
+  Link2,
   Pencil,
   Plus,
   RefreshCw,
@@ -150,7 +150,38 @@ export default function OrgDashboardPage() {
   const [editingCalId, setEditingCalId] = useState<string | null>(null);
   const [editCalName, setEditCalName] = useState("");
   const [editCalDesc, setEditCalDesc] = useState("");
+  const [editCalSlug, setEditCalSlug] = useState("");
+  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
+  const [slugChecking, setSlugChecking] = useState(false);
   const [savingCal, setSavingCal] = useState(false);
+  const slugTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const originalSlugRef = useRef<string>("");
+
+  function handleSlugChange(raw: string) {
+    const cleaned = raw.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").slice(0, 40);
+    setEditCalSlug(cleaned);
+    setSlugAvailable(null);
+    if (slugTimerRef.current) clearTimeout(slugTimerRef.current);
+    if (cleaned === originalSlugRef.current) {
+      setSlugAvailable(null);
+      return;
+    }
+    if (cleaned.length < 3) {
+      setSlugAvailable(false);
+      return;
+    }
+    setSlugChecking(true);
+    slugTimerRef.current = setTimeout(async () => {
+      try {
+        const result = await Parse.Cloud.run("checkSlugAvailable", { slug: cleaned, excludeCalendarId: editingCalId });
+        setSlugAvailable(result.available);
+      } catch {
+        setSlugAvailable(null);
+      } finally {
+        setSlugChecking(false);
+      }
+    }, 400);
+  }
 
   // Plan detail modal
   const [selectedActivePlan, setSelectedActivePlan] = useState<{ objectId: string; title: string; description: string; image: string | null; date: string; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string } | null } | null>(null);
@@ -200,21 +231,27 @@ export default function OrgDashboardPage() {
     if (!editingCalId) return;
     setSavingCal(true);
     try {
-      await Parse.Cloud.run("updateCalendar", {
+      const params: Record<string, string> = {
         calendarId: editingCalId,
         name: editCalName,
         description: editCalDesc,
-      });
+      };
+      if (editCalSlug !== originalSlugRef.current) {
+        params.slug = editCalSlug;
+      }
+      const result = await Parse.Cloud.run("updateCalendar", params);
+      const newShareId = result.shareId;
       setDashboard((d) => d ? {
         ...d,
         calendars: d.calendars.map((c) =>
-          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc } : c
+          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId } : c
         ),
       } : d);
       setEditingCalId(null);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Failed to update calendar:", err);
-      alert("Failed to update calendar.");
+      const msg = err instanceof Error ? err.message : "Failed to update calendar.";
+      alert(msg);
     } finally {
       setSavingCal(false);
     }
@@ -622,6 +659,21 @@ export default function OrgDashboardPage() {
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className={`font-medium ${inactive ? "text-zinc-400" : ""}`}>{cal.name}</h3>
+                          {!inactive && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const url = `${window.location.origin}/org/${cal.shareId}`;
+                                navigator.clipboard.writeText(url);
+                                setToast("Link copied!");
+                                setTimeout(() => setToast(null), 2000);
+                              }}
+                              className="text-zinc-300 hover:text-zinc-600 transition-colors"
+                              title="Copy calendar link"
+                            >
+                              <Link2 className="w-4 h-4" />
+                            </button>
+                          )}
                           {cal.isPrimary && (
                             <span className="text-[10px] font-bold uppercase tracking-widest bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">
                               Primary
@@ -646,18 +698,11 @@ export default function OrgDashboardPage() {
                         ) : (
                           <>
                             <button
-                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); }}
+                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); }}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
                             >
                               <Pencil className="w-3 h-3" /> Edit
                             </button>
-                            <Link
-                              href={`/org/${cal.shareId}`}
-                              target="_blank"
-                              className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
-                            >
-                              View Calendar <ExternalLink className="w-3 h-3" />
-                            </Link>
                             <Link
                               href={`/dashboard/${cal.objectId}/plans`}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
@@ -1154,9 +1199,26 @@ export default function OrgDashboardPage() {
                   placeholder="What is this calendar about?"
                 />
               </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">URL Slug</label>
+                <div className="flex items-center gap-0">
+                  <span className="text-sm text-zinc-400 font-light whitespace-nowrap">os.joinleaf.com/org/</span>
+                  <input
+                    value={editCalSlug}
+                    onChange={(e) => handleSlugChange(e.target.value)}
+                    className="flex-1 border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 ml-1"
+                    placeholder="my-calendar"
+                  />
+                </div>
+                {editCalSlug && editCalSlug !== originalSlugRef.current && (
+                  <p className={`text-xs mt-1 ${slugChecking ? "text-zinc-400" : slugAvailable === true ? "text-green-600" : slugAvailable === false ? "text-red-500" : "text-zinc-400"}`}>
+                    {slugChecking ? "Checking..." : slugAvailable === true ? "Available!" : slugAvailable === false ? (editCalSlug.length < 3 ? "Must be at least 3 characters" : "Already taken") : ""}
+                  </p>
+                )}
+              </div>
               <button
                 onClick={handleSaveCalendar}
-                disabled={!editCalName || savingCal}
+                disabled={!editCalName || savingCal || (editCalSlug !== originalSlugRef.current && (slugAvailable === false || slugChecking))}
                 className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50 mt-2"
               >
                 {savingCal ? "Saving..." : "Save Changes"}
@@ -1225,6 +1287,26 @@ export default function OrgDashboardPage() {
                   )}
                 </div>
               )}
+
+              <div className="pt-8 border-t border-zinc-100">
+                <button
+                  onClick={async () => {
+                    if (!confirm("Delete this plan? This cannot be undone.")) return;
+                    try {
+                      await Parse.Cloud.run("removePlanFromCalendar", { eventGroupId: selectedActivePlan.objectId });
+                      setSelectedActivePlan(null);
+                      fetchDashboard();
+                    } catch (err) {
+                      console.error("Failed to delete plan:", err);
+                      alert("Failed to delete plan.");
+                    }
+                  }}
+                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Plan
+                </button>
+              </div>
             </div>
           </div>
         </div>
