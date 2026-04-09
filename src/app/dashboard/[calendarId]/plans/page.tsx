@@ -41,6 +41,9 @@ export default function PlansPage() {
   const [orgName, setOrgName] = useState("");
   const [tier, setTier] = useState("starter");
 
+  // Modal
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
   // Form
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -122,6 +125,19 @@ export default function PlansPage() {
     }
   }
 
+  function resetForm() {
+    setTitle("");
+    setDescription("");
+    setVenueQuery("");
+    setSelectedVenue(null);
+    setDate("");
+    setTime("");
+    setCapacity("");
+    setImageBase64(null);
+    setImagePreview(null);
+    setIsHosted(true);
+  }
+
   async function handleCreate() {
     if (!title || !date) return;
     if (isHosted && !imageBase64) {
@@ -142,17 +158,12 @@ export default function PlansPage() {
         imageBase64: imageBase64 || undefined,
       });
       setSuccess(true);
-      setTitle("");
-      setDescription("");
-      setVenueQuery("");
-      setSelectedVenue(null);
-      setDate("");
-      setTime("");
-      setCapacity("");
-      setImageBase64(null);
-      setImagePreview(null);
+      resetForm();
       fetchPlanIdeas();
-      setTimeout(() => setSuccess(false), 3000);
+      setTimeout(() => {
+        setSuccess(false);
+        setShowCreateModal(false);
+      }, 1500);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create plan";
       alert(message);
@@ -255,167 +266,27 @@ export default function PlansPage() {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="border-b border-zinc-100">
-        <div className="max-w-3xl mx-auto px-6 py-5 flex items-center gap-4">
-          <Link href={`/dashboard/${calendarId}`} className="p-2 hover:bg-zinc-50 rounded-full transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <h1 className="text-xl font-medium tracking-tight">Create & Manage Plans</h1>
-            <p className="text-xs text-zinc-400">{orgName}</p>
+        <div className="max-w-3xl mx-auto px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href={`/dashboard/${calendarId}`} className="p-2 hover:bg-zinc-50 rounded-full transition-colors">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div>
+              <h1 className="text-xl font-medium tracking-tight">Plans</h1>
+              <p className="text-xs text-zinc-400">{orgName}</p>
+            </div>
           </div>
+          <button
+            onClick={() => { resetForm(); setShowCreateModal(true); }}
+            className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New Plan
+          </button>
         </div>
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-8 space-y-10">
-        {/* Create Plan Form */}
-        <section className="border border-zinc-200 rounded-xl p-6 md:p-8">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-6">Create New Plan</h2>
-
-          {success && (
-            <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg mb-6 text-sm">
-              <Check className="w-4 h-4" /> Plan created successfully!
-            </div>
-          )}
-
-          <div className="space-y-5">
-            {/* Plan type toggle */}
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-3">Plan Type</label>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setIsHosted(true)}
-                  className={`flex-1 border rounded-lg p-4 text-left transition-all ${
-                    isHosted ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Calendar className="w-4 h-4" />
-                    <span className="text-sm font-medium">Upcoming Plan</span>
-                  </div>
-                  <p className="text-xs text-zinc-500">You host it, members RSVP</p>
-                </button>
-                <button
-                  onClick={() => setIsHosted(false)}
-                  className={`flex-1 border rounded-lg p-4 text-left transition-all ${
-                    !isHosted ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Sparkles className="w-4 h-4" />
-                    <span className="text-sm font-medium">Plan Idea</span>
-                  </div>
-                  <p className="text-xs text-zinc-500">Members can host this idea</p>
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Title</label>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
-                placeholder="Plan title"
-              />
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-                className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-none"
-                placeholder="What's this plan about?"
-              />
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">
-                Cover Image {isHosted && <span className="text-red-400">*</span>}
-              </label>
-              {imagePreview ? (
-                <div className="relative w-full h-40 rounded-lg overflow-hidden">
-                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                  <button
-                    onClick={() => { setImagePreview(null); setImageBase64(null); }}
-                    className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-zinc-200 rounded-lg cursor-pointer hover:border-zinc-400 transition-colors">
-                  <ImagePlus className="w-6 h-6 text-zinc-300 mb-2" />
-                  <span className="text-xs text-zinc-400">Click to upload an image</span>
-                  <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
-                </label>
-              )}
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Venue</label>
-              <VenueSearch
-                value={venueQuery}
-                onChange={setVenueQuery}
-                onSelect={(v) => { setSelectedVenue(v); setVenueQuery(v.name); }}
-                className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
-              />
-              {selectedVenue && (
-                <p className="text-xs text-zinc-400 mt-1 flex items-center gap-1">
-                  <MapPin className="w-3 h-3" /> {selectedVenue.address}
-                </p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Date</label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  min={today}
-                  max={maxDate}
-                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
-                />
-                {tier === "starter" && (
-                  <p className="text-[10px] text-amber-600 mt-1">Starter: 2 weeks ahead max</p>
-                )}
-              </div>
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Time</label>
-                <input
-                  type="time"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Capacity (optional)</label>
-              <input
-                type="number"
-                value={capacity}
-                onChange={(e) => setCapacity(e.target.value)}
-                className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 max-w-[120px]"
-                placeholder="—"
-                min="1"
-              />
-            </div>
-
-            <button
-              onClick={handleCreate}
-              disabled={!title || !date || creating || (isHosted && !imageBase64)}
-              className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
-            >
-              {creating ? "Creating..." : isHosted ? "Create Upcoming Plan" : "Create Plan Idea"}
-            </button>
-          </div>
-        </section>
-
         {/* Upcoming Plans (Hosted) */}
         {upcomingPlans.length > 0 && (
           <section>
@@ -505,6 +376,168 @@ export default function PlansPage() {
           )}
         </section>
       </main>
+
+      {/* Create Plan Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => { if (!creating) { setShowCreateModal(false); resetForm(); } }} />
+          <div className="relative bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl">
+            <div className="sticky top-0 bg-white border-b border-zinc-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">New Plan</h2>
+              <button
+                onClick={() => { if (!creating) { setShowCreateModal(false); resetForm(); } }}
+                className="p-1.5 hover:bg-zinc-100 rounded-full transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-5">
+              {success && (
+                <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg text-sm">
+                  <Check className="w-4 h-4" /> Plan created successfully!
+                </div>
+              )}
+
+              {/* Plan type toggle */}
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-3">Plan Type</label>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setIsHosted(true)}
+                    className={`flex-1 border rounded-lg p-3 text-left transition-all ${
+                      isHosted ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span className="text-sm font-medium">Upcoming Plan</span>
+                    </div>
+                    <p className="text-xs text-zinc-500">You host it, members RSVP</p>
+                  </button>
+                  <button
+                    onClick={() => setIsHosted(false)}
+                    className={`flex-1 border rounded-lg p-3 text-left transition-all ${
+                      !isHosted ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span className="text-sm font-medium">Plan Idea</span>
+                    </div>
+                    <p className="text-xs text-zinc-500">Members can host this idea</p>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Title</label>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
+                  placeholder="Plan title"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-none"
+                  placeholder="What's this plan about?"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">
+                  Cover Image {isHosted && <span className="text-red-400">*</span>}
+                </label>
+                {imagePreview ? (
+                  <div className="relative w-full h-36 rounded-lg overflow-hidden">
+                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => { setImagePreview(null); setImageBase64(null); }}
+                      className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-zinc-200 rounded-lg cursor-pointer hover:border-zinc-400 transition-colors">
+                    <ImagePlus className="w-6 h-6 text-zinc-300 mb-2" />
+                    <span className="text-xs text-zinc-400">Click to upload an image</span>
+                    <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+                  </label>
+                )}
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Venue</label>
+                <VenueSearch
+                  value={venueQuery}
+                  onChange={setVenueQuery}
+                  onSelect={(v) => { setSelectedVenue(v); setVenueQuery(v.name); }}
+                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                />
+                {selectedVenue && (
+                  <p className="text-xs text-zinc-400 mt-1 flex items-center gap-1">
+                    <MapPin className="w-3 h-3" /> {selectedVenue.address}
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    min={today}
+                    max={maxDate}
+                    className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                  />
+                  {tier === "starter" && (
+                    <p className="text-[10px] text-amber-600 mt-1">Starter: 2 weeks ahead max</p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Time</label>
+                  <input
+                    type="time"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Capacity (optional)</label>
+                <input
+                  type="number"
+                  value={capacity}
+                  onChange={(e) => setCapacity(e.target.value)}
+                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 max-w-[120px]"
+                  placeholder="—"
+                  min="1"
+                />
+              </div>
+
+              <button
+                onClick={handleCreate}
+                disabled={!title || !date || creating || (isHosted && !imageBase64)}
+                className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              >
+                {creating ? "Creating..." : isHosted ? "Create Upcoming Plan" : "Create Plan Idea"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
