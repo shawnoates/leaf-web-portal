@@ -613,6 +613,19 @@ export default function OrgDashboardPage() {
               ))}
             </div>
 
+            {/* Concierge Ad */}
+            <div className="border border-zinc-200 rounded-xl p-6 bg-gradient-to-br from-zinc-50 to-white">
+              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-zinc-400 mb-2">Coming Soon</p>
+              <h3 className="text-base font-medium text-zinc-900 mb-2">Want us to handle the hosting?</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed mb-4">
+                <strong className="text-zinc-700">Leaf Concierge.</strong> For organizations that want a thriving community on autopilot. Our expert coordinators will book the venues, find the hosts, and manage the logistics for your AI-generated plans.
+              </p>
+              <p className="text-xs text-zinc-500 mb-4">Starts with a 30-minute call with one of our event planners. Available as an add-on to any plan.</p>
+              <a href="mailto:shawn@getleaflets.co?subject=Leaf Concierge" className="inline-flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors">
+                Get in Touch
+              </a>
+            </div>
+
           </div>
         )}
 
