@@ -1111,9 +1111,6 @@ export default function OrgCalendarPage() {
                         defaultValue={hostingIdea.date ? new Date(hostingIdea.date).toISOString().split("T")[0] : ""}
                         className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
                       />
-                      {org.tier === "starter" && (
-                        <p className="text-[10px] text-amber-600">Free plan: up to 2 weeks ahead</p>
-                      )}
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
