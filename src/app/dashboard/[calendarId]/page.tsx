@@ -45,6 +45,7 @@ interface OrgDashboard {
   cities: string[];
   planIdeasPerWeek: number;
   website: string;
+  imageStyle: string;
   memberCount: number;
   totalRsvpCount: number;
   rsvpLimit: number | null;
@@ -121,6 +122,7 @@ export default function OrgDashboardPage() {
   const [settingsBrandColor, setSettingsBrandColor] = useState("#18181b");
   const [settingsLogoPreview, setSettingsLogoPreview] = useState<string | null>(null);
   const [settingsLogoBase64, setSettingsLogoBase64] = useState<string | null>(null);
+  const [settingsImageStyle, setSettingsImageStyle] = useState("default");
   const [settingsSaving, setSettingsSaving] = useState(false);
 
   // Toast
@@ -167,6 +169,7 @@ export default function OrgDashboardPage() {
       setDescValue(result.description);
       setSettingsDaysOfWeek(result.daysOfWeek);
       setSettingsBrandColor(result.brandColor);
+      setSettingsImageStyle(result.imageStyle || "default");
       setError(null);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to load dashboard";
@@ -206,6 +209,7 @@ export default function OrgDashboardPage() {
         calendarId,
         brandColor: settingsBrandColor,
         daysOfWeek: settingsDaysOfWeek,
+        imageStyle: settingsImageStyle,
       };
       if (settingsLogoBase64) {
         params.profilePhotoBase64 = settingsLogoBase64;
@@ -217,6 +221,7 @@ export default function OrgDashboardPage() {
           ...d,
           brandColor: settingsBrandColor,
           daysOfWeek: settingsDaysOfWeek,
+          imageStyle: settingsImageStyle,
           profilePhoto: settingsLogoPreview || d.profilePhoto,
         };
       });
@@ -728,6 +733,31 @@ export default function OrgDashboardPage() {
                     />
                   ))}
                 </div>
+              </div>
+            </section>
+
+            {/* Photo Style */}
+            <section className="border border-zinc-200 rounded-xl p-6">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Photo Style</h2>
+              <p className="text-xs text-zinc-500 mb-3">Control what kind of images AI selects for plan ideas.</p>
+              <div className="flex gap-2">
+                {([
+                  { id: "default", label: "Default" },
+                  { id: "no-people", label: "No People" },
+                  { id: "venue-focused", label: "Venue & Activity" },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setSettingsImageStyle(opt.id)}
+                    className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors ${
+                      settingsImageStyle === opt.id
+                        ? "bg-zinc-900 text-white"
+                        : "border border-zinc-200 text-zinc-400 hover:border-zinc-300"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
             </section>
 

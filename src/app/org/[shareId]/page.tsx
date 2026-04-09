@@ -42,6 +42,7 @@ interface Plan {
     name: string;
     address: string;
   } | null;
+  hostNote: string | null;
 }
 
 interface PlanIdea {
@@ -120,8 +121,10 @@ function AvatarStack({ count }: { count: number }) {
 function RsvpModal({
   plan,
   onClose,
+  brandColor,
 }: {
   plan: Plan;
+  brandColor?: string;
   onClose: () => void;
 }) {
   const [step, setStep] = useState<"form" | "submitting" | "success" | "error">("form");
@@ -206,7 +209,8 @@ function RsvpModal({
               <button
                 type="submit"
                 disabled={step === "submitting"}
-                className="w-full bg-zinc-900 text-white py-3.5 text-xs uppercase tracking-[0.2em] font-bold hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full text-white py-3.5 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-50"
+                style={{ backgroundColor: brandColor || "#18181b" }}
               >
                 {step === "submitting" ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -283,9 +287,11 @@ function FollowModal({
   calendarName,
   onClose,
   onFollowed,
+  brandColor,
 }: {
   calendarId: string;
   calendarName: string;
+  brandColor?: string;
   onClose: () => void;
   onFollowed: (name: string, phone: string) => void;
 }) {
@@ -372,7 +378,8 @@ function FollowModal({
               <button
                 type="submit"
                 disabled={step === "submitting" || !name || phone.replace(/\D/g, "").length < 10}
-                className="w-full bg-zinc-900 text-white py-3 text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                className="w-full text-white py-3 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: brandColor || "#18181b" }}
               >
                 {step === "submitting" ? (
                   <Loader2 className="w-4 h-4 animate-spin mx-auto" />
@@ -482,6 +489,7 @@ export default function OrgCalendarPage() {
           name: (p.location as Record<string, string>).name || "",
           address: (p.location as Record<string, string>).address || "",
         } : null,
+        hostNote: p.hostNote as string || null,
       }));
 
       const planIdeas: PlanIdea[] = (result.planIdeas || []).map((idea: Record<string, unknown>) => ({
@@ -792,7 +800,7 @@ export default function OrgCalendarPage() {
                     </h3>
                     <div className="pt-2">
                       <p className="text-[10px] tracking-[0.2em] uppercase text-zinc-900 font-bold flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-zinc-900" />
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: org.brandColor || "#18181b" }} />
                         Hosted by {plan.hostName}
                       </p>
                     </div>
@@ -807,12 +815,19 @@ export default function OrgCalendarPage() {
                     {plan.description}
                   </p>
 
+                  {plan.hostNote && (
+                    <p className="text-sm text-zinc-400 italic border-l-2 border-zinc-200 pl-3 line-clamp-2">
+                      &ldquo;{plan.hostNote}&rdquo;
+                    </p>
+                  )}
+
                   <div className="pt-2 flex flex-col gap-6">
                     <AvatarStack count={plan.attendeeCount} />
                     <div className="flex flex-col sm:flex-row gap-4">
                       <button
                         onClick={() => setSelectedEvent(plan)}
-                        className="bg-zinc-900 text-white px-6 py-3 text-xs uppercase tracking-widest font-medium hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
+                        className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+                        style={{ backgroundColor: org.brandColor || "#18181b" }}
                       >
                         View Details <ArrowUpRight className="w-4 h-4" />
                       </button>
@@ -833,10 +848,10 @@ export default function OrgCalendarPage() {
             <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
               <div className="space-y-2">
                 <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold flex items-center gap-2">
-                  <Sparkles className="w-3.5 h-3.5" /> Start Something New
+                  <Sparkles className="w-3.5 h-3.5" /> Be the Host
                 </p>
                 <h2 className="text-4xl font-light tracking-tight italic">
-                  Curated Plan Ideas
+                  Pick a Plan, Make It Happen
                 </h2>
               </div>
               <div className="flex gap-4">
@@ -1001,7 +1016,8 @@ export default function OrgCalendarPage() {
                         setRsvpPlan(selectedEvent);
                         setSelectedEvent(null);
                       }}
-                      className="flex-1 bg-zinc-900 text-white py-3 text-xs uppercase tracking-[0.2em] font-bold hover:bg-zinc-800 transition-colors"
+                      className="flex-1 text-white py-3 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90"
+                      style={{ backgroundColor: org.brandColor || "#18181b" }}
                     >
                       I&apos;m Attending
                     </button>
@@ -1018,7 +1034,7 @@ export default function OrgCalendarPage() {
 
       {/* RSVP Modal */}
       {rsvpPlan && (
-        <RsvpModal plan={rsvpPlan} onClose={() => setRsvpPlan(null)} />
+        <RsvpModal plan={rsvpPlan} onClose={() => setRsvpPlan(null)} brandColor={org.brandColor || undefined} />
       )}
 
       {/* Host Plan Idea Overlay */}
@@ -1180,7 +1196,8 @@ export default function OrgCalendarPage() {
                       <button
                         type="submit"
                         disabled={hostSubmitting}
-                        className="flex-1 bg-zinc-900 text-white py-3.5 text-xs uppercase tracking-[0.2em] font-bold hover:bg-zinc-800 transition-colors disabled:opacity-50 flex items-center justify-center"
+                        className="flex-1 text-white py-3.5 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center"
+                        style={{ backgroundColor: org.brandColor || "#18181b" }}
                       >
                         {hostSubmitting ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -1237,6 +1254,7 @@ export default function OrgCalendarPage() {
         <FollowModal
           calendarId={org.objectId}
           calendarName={org.name}
+          brandColor={org.brandColor || undefined}
           onClose={() => setShowFollowModal(false)}
           onFollowed={() => {
             setIsFollowing(true);
