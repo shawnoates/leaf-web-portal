@@ -503,25 +503,17 @@ export default function OrgDashboardPage() {
             {TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
-              const isLocked =
-                (tab.id === "members" || tab.id === "followers") && !isGrowthPlus;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => {
-                    if (isLocked) {
-                      setShowSubscription(true);
-                    } else {
-                      setActiveTab(tab.id);
-                    }
-                  }}
+                  onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium uppercase tracking-widest border-b-2 transition-colors whitespace-nowrap ${
                     isActive
                       ? "border-zinc-900 text-zinc-900"
                       : "border-transparent text-zinc-400 hover:text-zinc-600"
                   }`}
                 >
-                  {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
+                  <Icon className="w-3.5 h-3.5" />
                   {tab.label}
                 </button>
               );
@@ -750,11 +742,15 @@ export default function OrgDashboardPage() {
         {activeTab === "settings" && (
           <div className="space-y-8">
             {/* Organization Logo (Growth/Pro) */}
-            <section className={`border border-zinc-200 rounded-xl p-6 ${!isGrowthPlus ? "opacity-50 pointer-events-none" : ""}`}>
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">
-                Organization Logo
-                {!isGrowthPlus && <span className="ml-2 text-[10px] text-zinc-300 normal-case tracking-normal">Growth / Pro</span>}
-              </h2>
+            <section className={`relative border border-zinc-200 rounded-xl p-6 ${!isGrowthPlus ? "opacity-40 pointer-events-none" : ""}`}>
+              {!isGrowthPlus && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-auto cursor-pointer rounded-xl" onClick={() => setShowSubscription(true)}>
+                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest">
+                    <Lock className="w-3.5 h-3.5" /> Upgrade
+                  </div>
+                </div>
+              )}
+              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Organization Logo</h2>
               <div className="flex items-center gap-6">
                 <div className="w-20 h-20 rounded-xl border border-zinc-200 overflow-hidden bg-zinc-50 flex items-center justify-center shrink-0">
                   {settingsLogoPreview || dashboard.profilePhoto ? (
@@ -784,11 +780,15 @@ export default function OrgDashboardPage() {
             </section>
 
             {/* Brand Color (Growth/Pro) */}
-            <section className={`border border-zinc-200 rounded-xl p-6 ${!isGrowthPlus ? "opacity-50 pointer-events-none" : ""}`}>
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">
-                Brand Color
-                {!isGrowthPlus && <span className="ml-2 text-[10px] text-zinc-300 normal-case tracking-normal">Growth / Pro</span>}
-              </h2>
+            <section className={`relative border border-zinc-200 rounded-xl p-6 ${!isGrowthPlus ? "opacity-40 pointer-events-none" : ""}`}>
+              {!isGrowthPlus && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-auto cursor-pointer rounded-xl" onClick={() => setShowSubscription(true)}>
+                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest">
+                    <Lock className="w-3.5 h-3.5" /> Upgrade
+                  </div>
+                </div>
+              )}
+              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Brand Color</h2>
               <div className="flex items-center gap-4">
                 <div
                   className="w-10 h-10 rounded-lg border border-zinc-200"
@@ -817,11 +817,15 @@ export default function OrgDashboardPage() {
             </section>
 
             {/* Photo Style (Growth/Pro) */}
-            <section className={`border border-zinc-200 rounded-xl p-6 ${!isGrowthPlus ? "opacity-50 pointer-events-none" : ""}`}>
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">
-                Photo Style
-                {!isGrowthPlus && <span className="ml-2 text-[10px] text-zinc-300 normal-case tracking-normal">Growth / Pro</span>}
-              </h2>
+            <section className={`relative border border-zinc-200 rounded-xl p-6 ${!isGrowthPlus ? "opacity-40 pointer-events-none" : ""}`}>
+              {!isGrowthPlus && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-auto cursor-pointer rounded-xl" onClick={() => setShowSubscription(true)}>
+                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest">
+                    <Lock className="w-3.5 h-3.5" /> Upgrade
+                  </div>
+                </div>
+              )}
+              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Photo Style</h2>
               <p className="text-xs text-zinc-500 mb-3">Control what kind of images AI selects for plan ideas.</p>
               <div className="flex gap-2">
                 {([
@@ -884,7 +888,7 @@ export default function OrgDashboardPage() {
         )}
 
         {/* ──────── MEMBERS & RSVPs TAB (Growth/Pro) ──────── */}
-        {activeTab === "members" && isGrowthPlus && (
+        {activeTab === "members" && (
           <div className="space-y-8">
             {/* Invite Co-Host */}
             <section className="border border-zinc-200 rounded-xl p-6">
@@ -993,7 +997,7 @@ export default function OrgDashboardPage() {
         )}
 
         {/* ──────── FOLLOWERS TAB (Growth/Pro) ──────── */}
-        {activeTab === "followers" && isGrowthPlus && (
+        {activeTab === "followers" && (
           <div className="space-y-8">
             <section>
               <div className="flex items-center justify-between mb-4">
