@@ -108,6 +108,9 @@ export default function OrgDashboardPage() {
   const [settingsLogoBase64, setSettingsLogoBase64] = useState<string | null>(null);
   const [settingsSaving, setSettingsSaving] = useState(false);
 
+  // Toast
+  const [toast, setToast] = useState<string | null>(null);
+
   // Modals
   const [showAddCalendar, setShowAddCalendar] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
@@ -203,8 +206,12 @@ export default function OrgDashboardPage() {
         };
       });
       setSettingsLogoBase64(null);
+      setToast("Settings saved");
+      setTimeout(() => setToast(null), 3000);
     } catch (err) {
       console.error("Save settings failed:", err);
+      setToast("Failed to save settings");
+      setTimeout(() => setToast(null), 3000);
     } finally {
       setSettingsSaving(false);
     }
@@ -972,6 +979,13 @@ export default function OrgDashboardPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 text-white px-5 py-3 rounded-lg shadow-lg text-sm flex items-center gap-2 animate-fade-in">
+          <Check className="w-4 h-4" />
+          {toast}
         </div>
       )}
     </div>

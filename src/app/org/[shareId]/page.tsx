@@ -510,19 +510,9 @@ export default function OrgCalendarPage() {
 
       {/* Stream Header */}
       <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100">
-        <div className="space-y-2">
-          <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold">
-            Community Stream
-          </p>
-          <p className="text-zinc-400 text-xs italic">
-            Explore what&apos;s happening and discover new ideas.
-          </p>
-        </div>
-        <div className="flex gap-4">
-          <button className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400 hover:text-zinc-900 transition-colors">
-            <Calendar className="w-4 h-4" /> View Grid
-          </button>
-        </div>
+        <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold">
+          Upcoming Plans
+        </p>
       </div>
 
       {/* Plans Stream */}
