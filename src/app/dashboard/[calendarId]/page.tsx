@@ -8,7 +8,6 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import {
-  ArrowLeft,
   Calendar,
   Check,
   ChevronRight,
@@ -21,7 +20,6 @@ import {
   Trash2,
   Users,
   Lock,
-  Sparkles,
   CreditCard,
 } from "lucide-react";
 
@@ -120,8 +118,8 @@ export default function OrgDashboardPage() {
   const [newCalCitySelected, setNewCalCitySelected] = useState(false);
   const [addingCalendar, setAddingCalendar] = useState(false);
 
-  // Regenerate
-  const [regenerating, setRegenerating] = useState(false);
+  // Regenerate (per calendar)
+  const [regeneratingCalId, setRegeneratingCalId] = useState<string | null>(null);
 
   // Co-host invite
   const [inviteEmail, setInviteEmail] = useState("");
@@ -258,21 +256,21 @@ export default function OrgDashboardPage() {
     }
   }
 
-  async function handleRegenerate() {
-    setRegenerating(true);
+  async function handleRegenerate(targetCalendarId: string) {
+    setRegeneratingCalId(targetCalendarId);
     try {
       await Parse.Cloud.run("generateCalendarPlansForOne", {
-        calendarId,
+        calendarId: targetCalendarId,
         count: 3,
       });
       // Wait a moment for background generation
       setTimeout(() => {
         fetchDashboard();
-        setRegenerating(false);
+        setRegeneratingCalId(null);
       }, 3000);
     } catch (err) {
       console.error("Regenerate failed:", err);
-      setRegenerating(false);
+      setRegeneratingCalId(null);
     }
   }
 
@@ -363,9 +361,6 @@ export default function OrgDashboardPage() {
       {/* Header */}
       <header className="border-b border-zinc-100">
         <div className="max-w-5xl mx-auto px-6 py-5 flex items-center gap-4">
-          <Link href="/dashboard" className="p-2 hover:bg-zinc-50 rounded-full transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-medium tracking-tight truncate">{dashboard.name}</h1>
             <p className="text-xs text-zinc-400">
@@ -509,16 +504,6 @@ export default function OrgDashboardPage() {
               >
                 <Plus className="w-4 h-4" /> Create Plan
               </Link>
-              {isGrowthPlus && (
-                <button
-                  onClick={handleRegenerate}
-                  disabled={regenerating}
-                  className="flex items-center gap-2 border border-zinc-200 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:border-zinc-300 transition-colors disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-4 h-4 ${regenerating ? "animate-spin" : ""}`} />
-                  {regenerating ? "Generating..." : "Regenerate Ideas"}
-                </button>
-              )}
             </div>
 
             {/* Calendars */}
@@ -564,6 +549,14 @@ export default function OrgDashboardPage() {
                       <p className="text-xs text-zinc-400">{cal.city || "No city set"}</p>
                     </div>
                     <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => handleRegenerate(cal.objectId)}
+                        disabled={regeneratingCalId === cal.objectId}
+                        className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${regeneratingCalId === cal.objectId ? "animate-spin" : ""}`} />
+                        {regeneratingCalId === cal.objectId ? "Generating..." : "Regenerate"}
+                      </button>
                       <Link
                         href={`/org/${cal.shareId}`}
                         target="_blank"
@@ -646,22 +639,6 @@ export default function OrgDashboardPage() {
                   );
                 })}
               </div>
-            </section>
-
-            {/* Regenerate */}
-            <section className="border border-zinc-200 rounded-xl p-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-2">Plan Ideas</h2>
-              <p className="text-xs text-zinc-500 mb-4">
-                {dashboard.planIdeaCount} active plan ideas &middot; {dashboard.planIdeasPerWeek}/week
-              </p>
-              <button
-                onClick={handleRegenerate}
-                disabled={regenerating}
-                className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${regenerating ? "animate-spin" : ""}`} />
-                {regenerating ? "Generating new ideas..." : "Regenerate Plan Ideas"}
-              </button>
             </section>
 
             {/* Save */}
