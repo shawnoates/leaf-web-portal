@@ -6,7 +6,7 @@ import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import VenueSearch from "@/components/VenueSearch";
-import { ArrowLeft, Calendar, Check, ImagePlus, MapPin, Plus, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
+import { ArrowLeft, Calendar, Check, Clock, ImagePlus, MapPin, Plus, RefreshCw, Sparkles, Trash2, Users, X } from "lucide-react";
 
 interface Venue {
   name: string;
@@ -25,10 +25,13 @@ interface PlanIdea {
 interface UpcomingPlan {
   objectId: string;
   title: string;
+  description: string;
   image: string | null;
   expiryDate: string;
+  time: string | null;
   rsvpCount: number;
   host: { name: string } | null;
+  location: { name: string; address: string } | null;
 }
 
 export default function PlansPage() {
@@ -41,8 +44,9 @@ export default function PlansPage() {
   const [orgName, setOrgName] = useState("");
   const [tier, setTier] = useState("starter");
 
-  // Modal
+  // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<UpcomingPlan | null>(null);
 
   // Form
   const [title, setTitle] = useState("");
@@ -100,13 +104,16 @@ export default function PlansPage() {
       const dash = await Parse.Cloud.run("getOrgDashboard", { calendarId });
       const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId: dash.shareId });
       setUpcomingPlans(
-        (page.plans || []).map((p: { objectId: string; title: string; image: string | null; expiryDate: string; rsvpCount: number; host: { name: string } | null }) => ({
+        (page.plans || []).map((p: { objectId: string; title: string; description: string; image: string | null; expiryDate: string; time: string | null; rsvpCount: number; host: { name: string } | null; location: { name: string; address: string } | null }) => ({
           objectId: p.objectId,
           title: p.title,
+          description: p.description || "",
           image: p.image,
           expiryDate: p.expiryDate,
+          time: p.time,
           rsvpCount: p.rsvpCount,
           host: p.host,
+          location: p.location,
         }))
       );
       setPlanIdeas(
@@ -219,6 +226,18 @@ export default function PlansPage() {
     }
   }
 
+  async function handleDeletePlan(planId: string) {
+    if (!confirm("Delete this plan? This cannot be undone.")) return;
+    try {
+      await Parse.Cloud.run("removePlanFromCalendar", { eventGroupId: planId });
+      setSelectedPlan(null);
+      setUpcomingPlans((prev) => prev.filter((p) => p.objectId !== planId));
+    } catch (err) {
+      console.error("Failed to delete plan:", err);
+      alert("Failed to delete plan.");
+    }
+  }
+
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -295,7 +314,7 @@ export default function PlansPage() {
             </h2>
             <div className="flex gap-3 overflow-x-auto no-scrollbar">
               {upcomingPlans.map((plan) => (
-                <div key={plan.objectId} className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52">
+                <div key={plan.objectId} onClick={() => setSelectedPlan(plan)} className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer">
                   {plan.image ? (
                     <img src={plan.image} alt={plan.title} className="w-full h-28 object-cover" />
                   ) : (
@@ -355,7 +374,7 @@ export default function PlansPage() {
                     )}
                     <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-400">
                       {idea.date && (
-                        <span>{new Date(idea.date).toLocaleDateString()}</span>
+                        <span>Preferred: {new Date(idea.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
                       )}
                       {idea.location && (
                         <span className="flex items-center gap-1">
@@ -376,6 +395,80 @@ export default function PlansPage() {
           )}
         </section>
       </main>
+
+      {/* Plan Detail Modal */}
+      {selectedPlan && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-5xl md:h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl rounded-t-3xl md:rounded-none relative">
+            <button
+              onClick={() => setSelectedPlan(null)}
+              className="absolute top-6 right-6 z-50 p-2 rounded-full bg-white/20 text-white md:text-zinc-900 md:bg-transparent"
+            >
+              <Plus className="w-8 h-8 rotate-45" />
+            </button>
+
+            <div className="hidden md:block w-1/2 h-full bg-zinc-100">
+              {selectedPlan.image ? (
+                <img src={selectedPlan.image} className="w-full h-full object-cover" alt="" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Calendar className="w-20 h-20 text-zinc-300" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 md:p-16 space-y-12">
+              <div className="space-y-4">
+                <h2 className="text-4xl md:text-5xl font-light tracking-tighter">
+                  {selectedPlan.title}
+                </h2>
+                <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
+                  Hosted by {selectedPlan.host?.name || "You"}
+                </p>
+                <div className="flex gap-6 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">
+                  <span className="flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    {new Date(selectedPlan.expiryDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                    {selectedPlan.time && ` at ${selectedPlan.time}`}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <Users className="w-4 h-4" /> {selectedPlan.rsvpCount} attending
+                  </span>
+                </div>
+              </div>
+
+              {(selectedPlan.description || selectedPlan.location) && (
+                <div className="space-y-6">
+                  {selectedPlan.description && (
+                    <p className="text-xl font-light leading-relaxed text-zinc-600">
+                      {selectedPlan.description}
+                    </p>
+                  )}
+                  {selectedPlan.location && (
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                        Location
+                      </h4>
+                      <p className="text-sm text-zinc-700">{selectedPlan.location.name}</p>
+                      <p className="text-sm text-zinc-500">{selectedPlan.location.address}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="pt-8 border-t border-zinc-100">
+                <button
+                  onClick={() => handleDeletePlan(selectedPlan.objectId)}
+                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Plan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Plan Modal */}
       {showCreateModal && (

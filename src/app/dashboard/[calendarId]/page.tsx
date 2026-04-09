@@ -11,6 +11,7 @@ import {
   Calendar,
   Check,
   ChevronRight,
+  Clock,
   Download,
   ExternalLink,
   Heart,
@@ -78,6 +79,7 @@ interface OrgDashboard {
   calendars: {
     objectId: string;
     name: string;
+    description: string;
     shareId: string;
     city: string;
     isPrimary: boolean;
@@ -144,6 +146,15 @@ export default function OrgDashboardPage() {
   // Regenerate (per calendar)
   const [regeneratingCalId, setRegeneratingCalId] = useState<string | null>(null);
 
+  // Edit calendar
+  const [editingCalId, setEditingCalId] = useState<string | null>(null);
+  const [editCalName, setEditCalName] = useState("");
+  const [editCalDesc, setEditCalDesc] = useState("");
+  const [savingCal, setSavingCal] = useState(false);
+
+  // Plan detail modal
+  const [selectedActivePlan, setSelectedActivePlan] = useState<{ objectId: string; title: string; description: string; image: string | null; date: string; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string } | null } | null>(null);
+
   // Co-host invite
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
@@ -184,6 +195,30 @@ export default function OrgDashboardPage() {
   }, [user, fetchDashboard]);
 
   // ── Handlers ──
+
+  async function handleSaveCalendar() {
+    if (!editingCalId) return;
+    setSavingCal(true);
+    try {
+      await Parse.Cloud.run("updateCalendar", {
+        calendarId: editingCalId,
+        name: editCalName,
+        description: editCalDesc,
+      });
+      setDashboard((d) => d ? {
+        ...d,
+        calendars: d.calendars.map((c) =>
+          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc } : c
+        ),
+      } : d);
+      setEditingCalId(null);
+    } catch (err) {
+      console.error("Failed to update calendar:", err);
+      alert("Failed to update calendar.");
+    } finally {
+      setSavingCal(false);
+    }
+  }
 
   async function handleSaveOverview() {
     setSaving(true);
@@ -576,7 +611,7 @@ export default function OrgDashboardPage() {
             </div>
             <div className="space-y-3">
               {dashboard.calendars.map((cal) => {
-                const activePlans = ((cal as Record<string, unknown>).activePlans as { objectId: string; title: string; image: string | null; date: string; hostName: string; rsvpCount: number }[]) || [];
+                const activePlans = ((cal as Record<string, unknown>).activePlans as { objectId: string; title: string; description: string; image: string | null; date: string; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string } | null }[]) || [];
                 const inactive = cal.isActive === false;
                 return (
                   <div
@@ -611,16 +646,10 @@ export default function OrgDashboardPage() {
                         ) : (
                           <>
                             <button
-                              onClick={() => {
-                                if (isGrowthPlus) {
-                                  setActiveTab("followers");
-                                } else {
-                                  setShowSubscription(true);
-                                }
-                              }}
+                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); }}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
                             >
-                              <Users className="w-3 h-3" /> {String((cal as Record<string, unknown>).rsvpCount ?? 0)} RSVPs
+                              <Pencil className="w-3 h-3" /> Edit
                             </button>
                             <Link
                               href={`/org/${cal.shareId}`}
@@ -644,7 +673,7 @@ export default function OrgDashboardPage() {
                         <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-3">Active Plans</p>
                         <div className="flex gap-3 overflow-x-auto no-scrollbar">
                           {activePlans.map((plan) => (
-                            <div key={plan.objectId} className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52">
+                            <div key={plan.objectId} onClick={() => setSelectedActivePlan(plan)} className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer">
                               {plan.image ? (
                                 <img src={plan.image} alt={plan.title} className="w-full h-28 object-cover" />
                               ) : (
@@ -1095,6 +1124,112 @@ export default function OrgDashboardPage() {
           </div>
         </div>
       )}
+      {/* Edit Calendar Modal */}
+      {editingCalId && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-xl p-8 relative">
+            <button
+              onClick={() => setEditingCalId(null)}
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-zinc-100"
+            >
+              <Plus className="w-5 h-5 rotate-45" />
+            </button>
+            <h2 className="text-xl font-light tracking-tight mb-6">Edit Calendar</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name</label>
+                <input
+                  value={editCalName}
+                  onChange={(e) => setEditCalName(e.target.value)}
+                  className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
+                <textarea
+                  value={editCalDesc}
+                  onChange={(e) => setEditCalDesc(e.target.value)}
+                  rows={3}
+                  className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-none"
+                  placeholder="What is this calendar about?"
+                />
+              </div>
+              <button
+                onClick={handleSaveCalendar}
+                disabled={!editCalName || savingCal}
+                className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50 mt-2"
+              >
+                {savingCal ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active Plan Detail Modal */}
+      {selectedActivePlan && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-5xl md:h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl rounded-t-3xl md:rounded-none relative">
+            <button
+              onClick={() => setSelectedActivePlan(null)}
+              className="absolute top-6 right-6 z-50 p-2 rounded-full bg-white/20 text-white md:text-zinc-900 md:bg-transparent"
+            >
+              <Plus className="w-8 h-8 rotate-45" />
+            </button>
+
+            <div className="hidden md:block w-1/2 h-full bg-zinc-100">
+              {selectedActivePlan.image ? (
+                <img src={selectedActivePlan.image} className="w-full h-full object-cover" alt="" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Calendar className="w-20 h-20 text-zinc-300" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 md:p-16 space-y-12">
+              <div className="space-y-4">
+                <h2 className="text-4xl md:text-5xl font-light tracking-tighter">
+                  {selectedActivePlan.title}
+                </h2>
+                <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
+                  Hosted by {selectedActivePlan.hostName}
+                </p>
+                <div className="flex gap-6 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">
+                  <span className="flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    {new Date(selectedActivePlan.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                    {selectedActivePlan.time && ` at ${selectedActivePlan.time}`}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <Users className="w-4 h-4" /> {selectedActivePlan.rsvpCount} attending
+                  </span>
+                </div>
+              </div>
+
+              {(selectedActivePlan.description || selectedActivePlan.location) && (
+                <div className="space-y-6">
+                  {selectedActivePlan.description && (
+                    <p className="text-xl font-light leading-relaxed text-zinc-600">
+                      {selectedActivePlan.description}
+                    </p>
+                  )}
+                  {selectedActivePlan.location && (
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                        Location
+                      </h4>
+                      <p className="text-sm text-zinc-700">{selectedActivePlan.location.name}</p>
+                      <p className="text-sm text-zinc-500">{selectedActivePlan.location.address}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 text-white px-5 py-3 rounded-lg shadow-lg text-sm flex items-center gap-2 animate-fade-in">
