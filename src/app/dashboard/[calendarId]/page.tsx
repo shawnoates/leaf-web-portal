@@ -77,7 +77,7 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TABS = [
   { id: "overview", label: "Overview", icon: Calendar },
   { id: "settings", label: "Settings", icon: Settings },
-  { id: "members", label: "Members & RSVPs", icon: Users },
+  { id: "members", label: "Members", icon: Users },
   { id: "subscription", label: "Subscription", icon: CreditCard },
 ];
 
@@ -514,7 +514,7 @@ export default function OrgDashboardPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 { label: "Members", value: dashboard.memberCount },
-                { label: "RSVPs", value: `${dashboard.totalRsvpCount}${dashboard.rsvpLimit ? `/${dashboard.rsvpLimit}` : ""}` },
+                { label: "Plan RSVPs", value: `${dashboard.totalRsvpCount}${dashboard.rsvpLimit ? `/${dashboard.rsvpLimit}` : ""}` },
                 { label: "Active Plans", value: dashboard.upcomingPlanCount },
                 { label: "Plan Ideas", value: dashboard.planIdeaCount },
               ].map((stat) => (
@@ -577,19 +577,31 @@ export default function OrgDashboardPage() {
                       </div>
                       <p className="text-xs text-zinc-400">{cal.city || "No city set"}</p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={() => {
+                          if (isGrowthPlus) {
+                            setActiveTab("members");
+                          } else {
+                            setShowSubscription(true);
+                          }
+                        }}
+                        className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
+                      >
+                        <Users className="w-3 h-3" /> {String((cal as Record<string, unknown>).rsvpCount ?? 0)} RSVPs
+                      </button>
                       <Link
                         href={`/org/${cal.shareId}`}
                         target="_blank"
                         className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
                       >
-                        View <ExternalLink className="w-3 h-3" />
+                        View Calendar <ExternalLink className="w-3 h-3" />
                       </Link>
                       <Link
                         href={`/dashboard/${cal.objectId}/plans`}
                         className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
                       >
-                        Plans <ChevronRight className="w-3 h-3" />
+                        Manage Plans <ChevronRight className="w-3 h-3" />
                       </Link>
                     </div>
                   </div>

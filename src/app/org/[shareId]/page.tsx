@@ -66,6 +66,7 @@ interface OrgData {
   objectId: string;
   name: string;
   description: string;
+  profilePhoto: string | null;
   brandColor: string | null;
   orgType: string | null;
   orgCity: string | null;
@@ -312,6 +313,7 @@ export default function OrgCalendarPage() {
         objectId: result.objectId,
         name: result.name || "Organization",
         description: result.description || "",
+        profilePhoto: result.profilePhoto || null,
         brandColor: result.orgBrandColor || "#18181b",
         orgType: result.orgType || null,
         orgCity: result.orgCity || null,
@@ -474,6 +476,13 @@ export default function OrgCalendarPage() {
       <nav className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-zinc-100 px-6 py-8">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-4">
+            {org.profilePhoto && (
+              <img
+                src={org.profilePhoto}
+                alt={org.name}
+                className="w-9 h-9 rounded-full object-cover"
+              />
+            )}
             <h1 className="text-2xl font-light tracking-[0.2em] uppercase">
               {org.name}
             </h1>
