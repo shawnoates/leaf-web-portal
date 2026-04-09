@@ -6,7 +6,7 @@ import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import VenueSearch from "@/components/VenueSearch";
-import { ArrowLeft, Calendar, Check, MapPin, Plus, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, Calendar, Check, MapPin, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 
 interface Venue {
   name: string;
@@ -47,6 +47,7 @@ export default function PlansPage() {
   // Plan ideas
   const [planIdeas, setPlanIdeas] = useState<PlanIdea[]>([]);
   const [loadingIdeas, setLoadingIdeas] = useState(true);
+  const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     try {
@@ -126,6 +127,23 @@ export default function PlansPage() {
       alert(message);
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleRegenerate() {
+    setRegenerating(true);
+    try {
+      await Parse.Cloud.run("generateCalendarPlansForOne", {
+        calendarId,
+        count: 3,
+      });
+      setTimeout(() => {
+        fetchPlanIdeas();
+        setRegenerating(false);
+      }, 3000);
+    } catch (err) {
+      console.error("Regenerate failed:", err);
+      setRegenerating(false);
     }
   }
 
@@ -315,9 +333,19 @@ export default function PlansPage() {
 
         {/* Existing Plan Ideas */}
         <section>
-          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">
-            Active Plan Ideas ({planIdeas.length})
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
+              Active Plan Ideas ({planIdeas.length})
+            </h2>
+            <button
+              onClick={handleRegenerate}
+              disabled={regenerating}
+              className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
+              {regenerating ? "Generating..." : "Regenerate Ideas"}
+            </button>
+          </div>
 
           {loadingIdeas ? (
             <div className="flex items-center justify-center py-10">

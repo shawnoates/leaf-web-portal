@@ -287,8 +287,8 @@ export default function OrgCalendarPage() {
         time: p.expiryDate ? formatTime(p.expiryDate as string) : "",
         description: p.description as string || "",
         image: p.image as string || "",
-        hostName: p.hostName as string || (p.creator as Record<string, string>)?.firstName || "Community Member",
-        hostAvatar: (p.creator as Record<string, string>)?.profilePictureUrl || null,
+        hostName: (p.host as Record<string, string>)?.name || "Community Member",
+        hostAvatar: (p.host as Record<string, string>)?.profilePictureUrl || null,
         attendeeCount: (p.rsvpCount as number) || 0,
         location: p.location ? {
           name: (p.location as Record<string, string>).name || "",

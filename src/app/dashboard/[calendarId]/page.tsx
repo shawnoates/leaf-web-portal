@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Download,
   ExternalLink,
+  ImagePlus,
   Pencil,
   Plus,
   RefreshCw,
@@ -103,6 +104,8 @@ export default function OrgDashboardPage() {
   // Settings states
   const [settingsDaysOfWeek, setSettingsDaysOfWeek] = useState<number[]>([]);
   const [settingsBrandColor, setSettingsBrandColor] = useState("#18181b");
+  const [settingsLogoPreview, setSettingsLogoPreview] = useState<string | null>(null);
+  const [settingsLogoBase64, setSettingsLogoBase64] = useState<string | null>(null);
   const [settingsSaving, setSettingsSaving] = useState(false);
 
   // Modals
@@ -181,17 +184,43 @@ export default function OrgDashboardPage() {
   async function handleSaveSettings() {
     setSettingsSaving(true);
     try {
-      await Parse.Cloud.run("updateOrganization", {
+      const params: Record<string, unknown> = {
         calendarId,
         brandColor: settingsBrandColor,
         daysOfWeek: settingsDaysOfWeek,
+      };
+      if (settingsLogoBase64) {
+        params.profilePhotoBase64 = settingsLogoBase64;
+      }
+      await Parse.Cloud.run("updateOrganization", params);
+      setDashboard((d) => {
+        if (!d) return d;
+        return {
+          ...d,
+          brandColor: settingsBrandColor,
+          daysOfWeek: settingsDaysOfWeek,
+          profilePhoto: settingsLogoPreview || d.profilePhoto,
+        };
       });
-      setDashboard((d) => d ? { ...d, brandColor: settingsBrandColor, daysOfWeek: settingsDaysOfWeek } : d);
+      setSettingsLogoBase64(null);
     } catch (err) {
       console.error("Save settings failed:", err);
     } finally {
       setSettingsSaving(false);
     }
+  }
+
+  function handleLogoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setSettingsLogoPreview(result);
+      // Strip the data:image/...;base64, prefix for Parse
+      setSettingsLogoBase64(result.split(",")[1]);
+    };
+    reader.readAsDataURL(file);
   }
 
   async function handleAddCalendar() {
@@ -549,14 +578,6 @@ export default function OrgDashboardPage() {
                       <p className="text-xs text-zinc-400">{cal.city || "No city set"}</p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => handleRegenerate(cal.objectId)}
-                        disabled={regeneratingCalId === cal.objectId}
-                        className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 disabled:opacity-50"
-                      >
-                        <RefreshCw className={`w-3 h-3 ${regeneratingCalId === cal.objectId ? "animate-spin" : ""}`} />
-                        {regeneratingCalId === cal.objectId ? "Generating..." : "Regenerate"}
-                      </button>
                       <Link
                         href={`/org/${cal.shareId}`}
                         target="_blank"
@@ -583,6 +604,37 @@ export default function OrgDashboardPage() {
         {/* ──────── SETTINGS TAB (Growth/Pro) ──────── */}
         {activeTab === "settings" && isGrowthPlus && (
           <div className="space-y-8">
+            {/* Organization Logo */}
+            <section className="border border-zinc-200 rounded-xl p-6">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Organization Logo</h2>
+              <div className="flex items-center gap-6">
+                <div className="w-20 h-20 rounded-xl border border-zinc-200 overflow-hidden bg-zinc-50 flex items-center justify-center shrink-0">
+                  {settingsLogoPreview || dashboard.profilePhoto ? (
+                    <img
+                      src={settingsLogoPreview || dashboard.profilePhoto || ""}
+                      alt="Logo"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <ImagePlus className="w-6 h-6 text-zinc-300" />
+                  )}
+                </div>
+                <div>
+                  <label className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors cursor-pointer">
+                    <ImagePlus className="w-4 h-4" />
+                    {dashboard.profilePhoto || settingsLogoPreview ? "Change Logo" : "Upload Logo"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoSelect}
+                      className="hidden"
+                    />
+                  </label>
+                  <p className="text-xs text-zinc-400 mt-2">Square image recommended. Visible on your public calendar page.</p>
+                </div>
+              </div>
+            </section>
+
             {/* Brand Color */}
             <section className="border border-zinc-200 rounded-xl p-6">
               <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Brand Color</h2>
