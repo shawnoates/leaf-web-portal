@@ -8,6 +8,7 @@ import {
   Plus,
   Users,
   Clock,
+  Check,
   CheckCircle2,
   ArrowRight,
   Share2,
@@ -22,6 +23,7 @@ import {
   Lock,
   MapPin,
   Settings,
+  Heart,
 } from "lucide-react";
 
 // --- Types ---
@@ -255,6 +257,162 @@ function RsvpModal({
   );
 }
 
+// --- Cookie Helpers ---
+
+function setFollowerCookie(calendarId: string, name: string, phone: string) {
+  const data = JSON.stringify({ calendarId, name, phone });
+  const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `leaf_follower=${encodeURIComponent(data)}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+function getFollowerCookie(): { calendarId: string; name: string; phone: string } | null {
+  const match = document.cookie.match(/leaf_follower=([^;]+)/);
+  if (!match) return null;
+  try {
+    return JSON.parse(decodeURIComponent(match[1]));
+  } catch {
+    return null;
+  }
+}
+
+// --- Follow Modal ---
+
+function FollowModal({
+  calendarId,
+  calendarName,
+  onClose,
+  onFollowed,
+}: {
+  calendarId: string;
+  calendarName: string;
+  onClose: () => void;
+  onFollowed: (name: string, phone: string) => void;
+}) {
+  const [step, setStep] = useState<"form" | "submitting" | "success" | "error">("form");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const formatPhone = (value: string) => {
+    const cleaned = value.replace(/\D/g, "");
+    if (cleaned.length <= 3) return cleaned;
+    if (cleaned.length <= 6)
+      return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStep("submitting");
+    try {
+      await Parse.Cloud.run("followCalendarViaWeb", {
+        calendarId,
+        name,
+        phoneNumber: phone.replace(/\D/g, ""),
+      });
+      setFollowerCookie(calendarId, name, phone);
+      onFollowed(name, phone);
+      setStep("success");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to follow. Please try again.");
+      setStep("error");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-none p-8 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-900"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {step === "form" || step === "submitting" ? (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-2xl font-light tracking-tight">
+                Follow {calendarName}
+              </h3>
+              <p className="text-sm text-zinc-500 mt-1">
+                Get notified about new plans and events.
+              </p>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">
+                  Name
+                </label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
+                  placeholder="Your name"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">
+                  Phone
+                </label>
+                <div className="flex items-center border-b border-zinc-300">
+                  <Phone className="w-4 h-4 text-zinc-400 mr-2" />
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(formatPhone(e.target.value))}
+                    required
+                    type="tel"
+                    className="w-full py-2 text-lg font-light focus:outline-none"
+                    placeholder="555-123-4567"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={step === "submitting" || !name || phone.replace(/\D/g, "").length < 10}
+                className="w-full bg-zinc-900 text-white py-3 text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              >
+                {step === "submitting" ? (
+                  <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                ) : (
+                  "Follow"
+                )}
+              </button>
+            </form>
+          </div>
+        ) : step === "success" ? (
+          <div className="text-center py-8 space-y-4">
+            <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto">
+              <Check className="w-8 h-8 text-emerald-600" />
+            </div>
+            <h3 className="text-xl font-light">You&apos;re following!</h3>
+            <p className="text-sm text-zinc-500">
+              You&apos;ll be notified about new plans from {calendarName}.
+            </p>
+            <button
+              onClick={onClose}
+              className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <div className="text-center py-8 space-y-4">
+            <p className="text-red-600 text-sm">{errorMsg}</p>
+            <button
+              onClick={() => setStep("form")}
+              className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // --- Main Page ---
 
 export default function OrgCalendarPage() {
@@ -274,6 +432,26 @@ export default function OrgCalendarPage() {
   const [venuesLoading, setVenuesLoading] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<NearbyVenue | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [showFollowModal, setShowFollowModal] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+
+  // Check cookie on mount
+  useEffect(() => {
+    const cookie = getFollowerCookie();
+    if (cookie) {
+      setIsFollowing(true);
+    }
+  }, []);
+
+  // Set page title when org loads
+  useEffect(() => {
+    if (org) {
+      document.title = org.name;
+      setFollowerCount(org.memberCount);
+    }
+    return () => { document.title = "Leaf"; };
+  }, [org]);
 
   const fetchOrg = useCallback(async () => {
     try {
@@ -493,8 +671,24 @@ export default function OrgCalendarPage() {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
-              {org.memberCount} followers
+              {followerCount} followers
             </span>
+            {!org.isOwner && (
+              isFollowing ? (
+                <span className="flex items-center gap-1.5 text-[10px] tracking-[0.3em] uppercase font-bold text-emerald-600 border border-emerald-200 bg-emerald-50 px-3 py-1.5 rounded-full">
+                  <Check className="w-3.5 h-3.5" />
+                  Following
+                </span>
+              ) : (
+                <button
+                  onClick={() => setShowFollowModal(true)}
+                  className="flex items-center gap-1.5 text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
+                >
+                  <Heart className="w-3.5 h-3.5" />
+                  Follow
+                </button>
+              )
+            )}
             {org.isOwner && (
               <Link
                 href={`/dashboard/${org.objectId}`}
@@ -1003,6 +1197,20 @@ export default function OrgCalendarPage() {
           </div>
         </div>
       </footer>
+
+      {/* Follow Modal */}
+      {showFollowModal && (
+        <FollowModal
+          calendarId={org.objectId}
+          calendarName={org.name}
+          onClose={() => setShowFollowModal(false)}
+          onFollowed={() => {
+            setIsFollowing(true);
+            setFollowerCount((c) => c + 1);
+            setShowFollowModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }

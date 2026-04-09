@@ -150,12 +150,7 @@ export default function PlansPage() {
   async function handleRemoveIdea(ideaId: string) {
     if (!confirm("Remove this plan idea?")) return;
     try {
-      // Direct Parse update to set ideaStatus to "removed"
-      const CalendarGeneratedPlan = Parse.Object.extend("CalendarGeneratedPlan");
-      const idea = new CalendarGeneratedPlan();
-      idea.id = ideaId;
-      idea.set("ideaStatus", "removed");
-      await idea.save(null);
+      await Parse.Cloud.run("removePlanIdea", { ideaId, calendarId });
       setPlanIdeas((prev) => prev.filter((p) => p.objectId !== ideaId));
     } catch (err) {
       console.error("Failed to remove idea:", err);
