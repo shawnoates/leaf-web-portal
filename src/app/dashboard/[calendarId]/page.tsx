@@ -52,6 +52,7 @@ interface OrgDashboard {
   upcomingPlanCount: number;
   followerCount: number;
   members: {
+    membershipId: string;
     objectId: string | null;
     name: string;
     email: string | null;
@@ -89,10 +90,10 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TABS = [
   { id: "overview", label: "Overview", icon: Calendar },
   { id: "calendars", label: "Calendars", icon: Layers },
-  { id: "settings", label: "Settings", icon: Settings },
-  { id: "members", label: "Users", icon: Users },
   { id: "followers", label: "Followers", icon: Heart },
+  { id: "members", label: "Users", icon: Users },
   { id: "subscription", label: "Subscription", icon: CreditCard },
+  { id: "settings", label: "Settings", icon: Settings },
 ];
 
 // ── Component ──────────────────────────────────────────────────────────
@@ -527,26 +528,16 @@ export default function OrgDashboardPage() {
             {/* Quick Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: "Members", value: dashboard.memberCount },
+                { label: "Followers", value: dashboard.followerCount },
+                { label: "Calendars", value: dashboard.calendars.length },
                 { label: "Plan RSVPs", value: `${dashboard.totalRsvpCount}${dashboard.rsvpLimit ? `/${dashboard.rsvpLimit}` : ""}` },
                 { label: "Active Plans", value: dashboard.upcomingPlanCount },
-                { label: "Plan Ideas", value: dashboard.planIdeaCount },
               ].map((stat) => (
                 <div key={stat.label} className="border border-zinc-200 rounded-xl p-4">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">{stat.label}</p>
                   <p className="text-2xl font-light">{stat.value}</p>
                 </div>
               ))}
-            </div>
-
-            {/* Quick Actions */}
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href={`/dashboard/${calendarId}/plans`}
-                className="flex items-center gap-2 border border-zinc-200 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:border-zinc-300 transition-colors"
-              >
-                <Plus className="w-4 h-4" /> Create Plan
-              </Link>
             </div>
 
           </div>
@@ -580,7 +571,7 @@ export default function OrgDashboardPage() {
             </div>
             <div className="space-y-3">
               {dashboard.calendars.map((cal) => {
-                const activePlans = ((cal as Record<string, unknown>).activePlans as { objectId: string; title: string; date: string; hostName: string; rsvpCount: number }[]) || [];
+                const activePlans = ((cal as Record<string, unknown>).activePlans as { objectId: string; title: string; image: string | null; date: string; hostName: string; rsvpCount: number }[]) || [];
                 const inactive = cal.isActive === false;
                 return (
                   <div
@@ -644,20 +635,29 @@ export default function OrgDashboardPage() {
                       </div>
                     </div>
                     {!inactive && activePlans.length > 0 && (
-                      <div className="border-t border-zinc-100 pt-3 space-y-2">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Active Plans</p>
-                        {activePlans.map((plan) => (
-                          <div key={plan.objectId} className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{plan.title}</span>
-                              <span className="text-zinc-400">&middot; Hosted by {plan.hostName}</span>
+                      <div className="border-t border-zinc-100 pt-3">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-3">Active Plans</p>
+                        <div className="flex gap-3 overflow-x-auto no-scrollbar">
+                          {activePlans.map((plan) => (
+                            <div key={plan.objectId} className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52">
+                              {plan.image ? (
+                                <img src={plan.image} alt={plan.title} className="w-full h-28 object-cover" />
+                              ) : (
+                                <div className="w-full h-28 bg-zinc-100 flex items-center justify-center">
+                                  <Calendar className="w-6 h-6 text-zinc-300" />
+                                </div>
+                              )}
+                              <div className="p-3">
+                                <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
+                                <p className="text-xs text-zinc-400 mb-1">{new Date(plan.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</p>
+                                <div className="flex items-center justify-between text-xs text-zinc-400">
+                                  <span className="truncate">{plan.hostName}</span>
+                                  <span className="shrink-0 ml-2">{plan.rsvpCount} RSVPs</span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-3 text-zinc-400">
-                              <span>{new Date(plan.date).toLocaleDateString()}</span>
-                              <span>{plan.rsvpCount} RSVPs</span>
-                            </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -817,13 +817,13 @@ export default function OrgDashboardPage() {
               </div>
             </section>
 
-            {/* Members */}
+            {/* Users */}
             <section>
               <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">
-                Members ({dashboard.members.length})
+                Users ({dashboard.members.length})
               </h2>
               {dashboard.members.length === 0 ? (
-                <p className="text-sm text-zinc-400">No members yet.</p>
+                <p className="text-sm text-zinc-400">No users yet.</p>
               ) : (
                 <div className="border border-zinc-200 rounded-xl overflow-hidden">
                   <table className="w-full text-sm">
@@ -833,11 +833,12 @@ export default function OrgDashboardPage() {
                         <th className="text-left px-4 py-3 font-bold">Email</th>
                         <th className="text-left px-4 py-3 font-bold">Role</th>
                         <th className="text-left px-4 py-3 font-bold">Joined</th>
+                        <th className="px-4 py-3"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
                       {dashboard.members.map((m, i) => (
-                        <tr key={m.objectId || i}>
+                        <tr key={m.membershipId || i}>
                           <td className="px-4 py-3">{m.name}</td>
                           <td className="px-4 py-3 text-zinc-400">{m.email || "—"}</td>
                           <td className="px-4 py-3">
@@ -847,6 +848,25 @@ export default function OrgDashboardPage() {
                           </td>
                           <td className="px-4 py-3 text-zinc-400">
                             {new Date(m.joinedAt).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {m.status !== "Owned" && (
+                              <button
+                                onClick={async () => {
+                                  if (!confirm(`Remove ${m.name} from this calendar?`)) return;
+                                  try {
+                                    await Parse.Cloud.run("removeMember", { membershipId: m.membershipId, calendarId });
+                                    setDashboard((d) => d ? { ...d, members: d.members.filter((x) => x.membershipId !== m.membershipId) } : d);
+                                  } catch (err) {
+                                    console.error("Failed to remove member:", err);
+                                  }
+                                }}
+                                className="text-zinc-400 hover:text-red-500 transition-colors"
+                                title="Remove user"
+                              >
+                                <UserMinus className="w-4 h-4" />
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
