@@ -493,6 +493,7 @@ export default function OrgCalendarPage() {
         name: result.name || "Organization",
         description: result.description || "",
         profilePhoto: result.profilePhoto || null,
+        tier: result.orgSubscriptionTier || "starter",
         brandColor: result.orgBrandColor || "#18181b",
         orgType: result.orgType || null,
         orgCity: result.orgCity || null,
@@ -655,7 +656,7 @@ export default function OrgCalendarPage() {
       <nav className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-zinc-100 px-6 py-8">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-4">
-            {org.profilePhoto && (
+            {org.profilePhoto && org.tier !== "starter" && (
               <img
                 src={org.profilePhoto}
                 alt={org.name}
@@ -1105,9 +1106,14 @@ export default function OrgCalendarPage() {
                       <input
                         type="date"
                         required
+                        min={new Date().toISOString().split("T")[0]}
+                        max={org.tier === "starter" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] : undefined}
                         defaultValue={hostingIdea.date ? new Date(hostingIdea.date).toISOString().split("T")[0] : ""}
                         className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
                       />
+                      {org.tier === "starter" && (
+                        <p className="text-[10px] text-amber-600">Free plan: up to 2 weeks ahead</p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
