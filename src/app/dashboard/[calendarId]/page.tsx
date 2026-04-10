@@ -142,10 +142,10 @@ const BLACKLIST_PRESETS: string[] = [
 
 const TABS = [
   { id: "overview", label: "Overview", icon: Calendar },
-  { id: "analytics", label: "Analytics", icon: TrendingUp, proOnly: true },
   { id: "calendars", label: "Calendars", icon: Layers },
   { id: "followers", label: "Followers", icon: Heart },
   { id: "members", label: "Users", icon: Users },
+  { id: "analytics", label: "Analytics", icon: TrendingUp, proOnly: true },
   { id: "subscription", label: "Subscription", icon: CreditCard },
   { id: "settings", label: "Settings", icon: Settings },
 ];
@@ -921,24 +921,28 @@ export default function OrgDashboardPage() {
 
             {!analyticsLoading && !analyticsError && analytics && (
               <>
-                {/* Insights / recommendations */}
-                {analytics.insights.length > 0 && (
-                  <section className="space-y-3">
-                    {analytics.insights.map((ins, idx) => (
-                      <div
-                        key={idx}
-                        className="border border-emerald-200 bg-emerald-50/40 rounded-xl p-4 flex items-start gap-3"
-                      >
-                        <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center flex-shrink-0">
-                          <Sparkles className="w-4 h-4" />
+                {/* Insights / recommendations (no_growth lives on the Followers tab) */}
+                {(() => {
+                  const filtered = analytics.insights.filter((ins) => ins.type !== "no_growth");
+                  if (filtered.length === 0) return null;
+                  return (
+                    <section className="space-y-3">
+                      {filtered.map((ins, idx) => (
+                        <div
+                          key={idx}
+                          className="border border-emerald-200 bg-emerald-50/40 rounded-xl p-4 flex items-start gap-3"
+                        >
+                          <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center flex-shrink-0">
+                            <Sparkles className="w-4 h-4" />
+                          </div>
+                          <p className="text-sm text-zinc-700 leading-relaxed pt-1">
+                            {ins.message}
+                          </p>
                         </div>
-                        <p className="text-sm text-zinc-700 leading-relaxed pt-1">
-                          {ins.message}
-                        </p>
-                      </div>
-                    ))}
-                  </section>
-                )}
+                      ))}
+                    </section>
+                  );
+                })()}
 
                 {/* Growth headline stats */}
                 <section>
@@ -1709,7 +1713,22 @@ export default function OrgDashboardPage() {
                   ? dashboard.followers
                   : dashboard.followers.filter((f) => f.calendarId === followerCalFilter);
                 const calendarNames = [...new Map(dashboard.followers.filter((f) => f.calendarId).map((f) => [f.calendarId, f.calendarName])).entries()];
+                const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+                const newFollowersInRange = filteredFollowers.filter(
+                  (f) => f.joinedAt && new Date(f.joinedAt).getTime() >= thirtyDaysAgo
+                ).length;
+                const showNoGrowthCallout = filteredFollowers.length > 0 && newFollowersInRange === 0;
                 return (<>
+              {showNoGrowthCallout && (
+                <div className="border border-emerald-200 bg-emerald-50/40 rounded-xl p-4 flex items-start gap-3 mb-4">
+                  <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <p className="text-sm text-zinc-700 leading-relaxed pt-1">
+                    No new followers in the last 30 days. Share your calendar link to drive new sign-ups.
+                  </p>
+                </div>
+              )}
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
                   Followers ({filteredFollowers.length})
