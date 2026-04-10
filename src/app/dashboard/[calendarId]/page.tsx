@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
@@ -140,14 +140,16 @@ const TABS = [
 export default function OrgDashboardPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const calendarId = params.calendarId as string;
+  const initialTab = searchParams.get("tab") || "overview";
 
   const [user, setUser] = useState<Parse.User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [dashboard, setDashboard] = useState<OrgDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   // Edit states
   const [editName, setEditName] = useState(false);
@@ -976,14 +978,14 @@ export default function OrgDashboardPage() {
               )}
               <section className={`border border-zinc-200 rounded-xl p-6 space-y-8 ${!isGrowthPlus ? "opacity-40 pointer-events-none" : ""}`}>
                 <div>
-                  <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">AI Idea Generation</h2>
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Automated Plan Ideas</h2>
                   <p className="text-xs text-zinc-500 mt-1">Control how Leaf generates plan ideas for your community.</p>
                 </div>
 
                 {/* Preferred Days */}
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Preferred Days</h3>
-                  <p className="text-xs text-zinc-500 mb-3">AI will only schedule plans on these days.</p>
+                  <p className="text-xs text-zinc-500 mb-3">Automated scheduling will be limited to these timeframes.</p>
                   <div className="flex gap-2 flex-wrap">
                     {DAY_NAMES.map((day, i) => {
                       const active = settingsDaysOfWeek.includes(i);
@@ -1011,7 +1013,7 @@ export default function OrgDashboardPage() {
                 {/* Preferred Times */}
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Preferred Times</h3>
-                  <p className="text-xs text-zinc-500 mb-3">AI will only schedule plans during these windows.</p>
+                  <p className="text-xs text-zinc-500 mb-3">Suggested days & time will only fall during these designated windows.</p>
                   <div className="flex gap-2 flex-wrap">
                     {TIME_OF_DAY_OPTIONS.map((opt) => {
                       const active = settingsPreferredTimes.includes(opt.id);
@@ -1041,8 +1043,8 @@ export default function OrgDashboardPage() {
 
                 {/* Blacklisted Categories */}
                 <div>
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Blacklisted Venue Categories</h3>
-                  <p className="text-xs text-zinc-500 mb-3">AI will never suggest venues from these categories.</p>
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Excluded Venue Categories</h3>
+                  <p className="text-xs text-zinc-500 mb-3">These categories will be omitted from the suggestion engine.</p>
                   <div className="flex gap-2 flex-wrap">
                     {BLACKLIST_PRESETS.map((cat) => {
                       const active = settingsBlacklistCategories.includes(cat);

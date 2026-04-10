@@ -96,6 +96,9 @@ function SetupPageInner() {
     tier: initialTier,
   });
   const [shareId, setShareId] = useState("");
+  const [calendarId, setCalendarId] = useState("");
+  const [showCalendarInvite, setShowCalendarInvite] = useState(false);
+  const [pendingCalendarHref, setPendingCalendarHref] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [generationMessageIndex, setGenerationMessageIndex] = useState(0);
@@ -164,6 +167,7 @@ function SetupPageInner() {
         tier: form.tier,
       });
       setShareId(result.shareId);
+      setCalendarId(result.calendarId);
       setGenerationDone(true);
     } catch (err: unknown) {
       setSubmitError(
@@ -227,9 +231,61 @@ function SetupPageInner() {
     [startGeneration]
   );
 
+  // Shared: Calendar settings invite modal
+  const calendarInviteModal = showCalendarInvite && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={() => setShowCalendarInvite(false)}
+      />
+      <div className="relative bg-white max-w-md w-full mx-4 shadow-2xl">
+        <button
+          onClick={() => setShowCalendarInvite(false)}
+          className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900"
+          aria-label="Close"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        <div className="p-8 space-y-6">
+          <div className="w-14 h-14 border-2 border-zinc-900 rounded-full flex items-center justify-center mx-auto">
+            <Sparkles className="w-7 h-7" />
+          </div>
+          <div className="text-center space-y-2">
+            <h3 className="text-2xl font-light tracking-tight">
+              Make it your own first
+            </h3>
+            <p className="text-zinc-500 font-light">
+              Before sharing your calendar, take a moment to manage your settings —
+              tune your preferred days, times, blacklist categories, and brand.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 pt-2">
+            <Link
+              href={
+                calendarId
+                  ? `/dashboard/${calendarId}?tab=calendars`
+                  : pendingCalendarHref
+              }
+              className="bg-zinc-900 text-white px-6 py-3.5 text-xs uppercase tracking-[0.2em] font-bold text-center hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
+            >
+              Manage Calendar Settings <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href={pendingCalendarHref}
+              className="px-6 py-3 text-xs uppercase tracking-[0.2em] font-medium text-zinc-500 hover:text-zinc-900 text-center transition-colors"
+            >
+              Skip and view my calendar
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   // Step 2: Success
   if (step === 2) {
     return (
+      <>
       <div className="min-h-screen flex items-center justify-center px-6">
         <div className="max-w-lg w-full text-center space-y-8">
           <div className="w-20 h-20 border-2 border-zinc-900 rounded-full flex items-center justify-center mx-auto">
@@ -252,12 +308,15 @@ function SetupPageInner() {
             </p>
           </div>
           <div className="flex flex-col gap-4">
-            <Link
-              href={`/org/${shareId}`}
+            <button
+              onClick={() => {
+                setPendingCalendarHref(`/org/${shareId}`);
+                setShowCalendarInvite(true);
+              }}
               className="bg-zinc-900 text-white px-8 py-4 text-xs uppercase tracking-[0.3em] font-medium hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
             >
               View Your Calendar <ArrowRight className="w-4 h-4" />
-            </Link>
+            </button>
             <button
               onClick={() =>
                 navigator.clipboard.writeText(
@@ -271,12 +330,15 @@ function SetupPageInner() {
           </div>
         </div>
       </div>
+      {calendarInviteModal}
+      </>
     );
   }
 
   // Step 1: Generating + Pricing
   if (step === 1) {
     return (
+      <>
       <div className="min-h-screen">
         <nav className="w-full bg-white border-b border-zinc-100 px-6 py-6">
           <div className="max-w-3xl mx-auto flex justify-between items-center">
@@ -380,7 +442,10 @@ function SetupPageInner() {
           {/* Continue Button */}
           <div className="text-center pt-8">
             <button
-              onClick={() => setStep(2)}
+              onClick={() => {
+                setPendingCalendarHref(`/org/${shareId}`);
+                setShowCalendarInvite(true);
+              }}
               disabled={!generationDone}
               className={`px-12 py-4 text-xs uppercase tracking-[0.3em] font-bold inline-flex items-center gap-2 transition-colors ${
                 generationDone
@@ -401,6 +466,8 @@ function SetupPageInner() {
           </div>
         </div>
       </div>
+      {calendarInviteModal}
+      </>
     );
   }
 
@@ -573,7 +640,7 @@ function SetupPageInner() {
                 : "bg-zinc-200 text-zinc-400 cursor-not-allowed"
             }`}
           >
-            Generate My First Plans <Sparkles className="w-4 h-4" />
+            Create My First Calendar <Sparkles className="w-4 h-4" />
           </button>
         </div>
       </div>
