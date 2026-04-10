@@ -5,8 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
+import SubscriptionModal from "@/components/SubscriptionModal";
 import VenueSearch from "@/components/VenueSearch";
-import { ArrowLeft, Calendar, Check, Clock, ImagePlus, MapPin, Plus, RefreshCw, Sparkles, Trash2, Users, X } from "lucide-react";
+import { ArrowLeft, Calendar, Check, Clock, ImagePlus, Lock, MapPin, Plus, RefreshCw, Sparkles, Trash2, Users, X } from "lucide-react";
 
 interface Venue {
   name: string;
@@ -69,6 +70,10 @@ export default function PlansPage() {
   const [planIdeas, setPlanIdeas] = useState<PlanIdea[]>([]);
   const [loadingIdeas, setLoadingIdeas] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
+
+  // Upgrade gate
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
 
   useEffect(() => {
     try {
@@ -180,6 +185,11 @@ export default function PlansPage() {
   }
 
   async function handleRegenerate() {
+    // Starter tier can't regenerate ideas — show the upgrade modal instead.
+    if (tier === "starter") {
+      setShowUpgradeModal(true);
+      return;
+    }
     setRegenerating(true);
     const startCount = planIdeas.length;
     try {
@@ -213,6 +223,20 @@ export default function PlansPage() {
       console.error("Regenerate failed:", err);
     } finally {
       setRegenerating(false);
+    }
+  }
+
+  async function handleSubscriptionChange(newTier: string) {
+    setSubscriptionLoading(true);
+    try {
+      await Parse.Cloud.run("updateOrgSubscription", { calendarId, tier: newTier });
+      setTier(newTier);
+      setShowUpgradeModal(false);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to update subscription";
+      alert(message);
+    } finally {
+      setSubscriptionLoading(false);
     }
   }
 
@@ -349,7 +373,11 @@ export default function PlansPage() {
               disabled={regenerating}
               className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors disabled:opacity-50"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
+              {tier === "starter" ? (
+                <Lock className="w-3.5 h-3.5" />
+              ) : (
+                <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
+              )}
               {regenerating ? "Generating..." : "Regenerate Ideas"}
             </button>
           </div>
@@ -630,6 +658,16 @@ export default function PlansPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Upgrade Modal — shown when a starter user clicks Regenerate Ideas */}
+      {showUpgradeModal && (
+        <SubscriptionModal
+          currentTier={tier}
+          onSelect={handleSubscriptionChange}
+          onClose={() => setShowUpgradeModal(false)}
+          loading={subscriptionLoading}
+        />
       )}
     </div>
   );

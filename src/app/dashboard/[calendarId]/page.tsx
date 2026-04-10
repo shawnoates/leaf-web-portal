@@ -27,6 +27,7 @@ import {
   Lock,
   CreditCard,
   ExternalLink,
+  LogOut,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -42,6 +43,7 @@ interface OrgDashboard {
   bannerUrl: string | null;
   brandColor: string;
   daysOfWeek: number[];
+  preferredTimes: string[];
   blacklistCategories: string[];
   locationTypes: string[];
   cities: string[];
@@ -106,6 +108,24 @@ interface OrgDashboard {
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+const TIME_OF_DAY_OPTIONS: { id: string; label: string; hint: string }[] = [
+  { id: "morning", label: "Morning", hint: "6a – 12p" },
+  { id: "afternoon", label: "Afternoon", hint: "12p – 5p" },
+  { id: "evening", label: "Evening", hint: "5p – 9p" },
+  { id: "night", label: "Night", hint: "9p – late" },
+];
+
+const BLACKLIST_PRESETS: string[] = [
+  "Bars",
+  "Nightclubs",
+  "Casinos",
+  "Adult venues",
+  "Smoking lounges",
+  "Religious venues",
+  "Late-night venues",
+  "Fast food",
+];
+
 const TABS = [
   { id: "overview", label: "Overview", icon: Calendar },
   { id: "calendars", label: "Calendars", icon: Layers },
@@ -137,6 +157,8 @@ export default function OrgDashboardPage() {
 
   // Settings states
   const [settingsDaysOfWeek, setSettingsDaysOfWeek] = useState<number[]>([]);
+  const [settingsPreferredTimes, setSettingsPreferredTimes] = useState<string[]>([]);
+  const [settingsBlacklistCategories, setSettingsBlacklistCategories] = useState<string[]>([]);
   const [settingsBrandColor, setSettingsBrandColor] = useState("#18181b");
   const [settingsLogoPreview, setSettingsLogoPreview] = useState<string | null>(null);
   const [settingsLogoBase64, setSettingsLogoBase64] = useState<string | null>(null);
@@ -227,6 +249,8 @@ export default function OrgDashboardPage() {
       setNameValue(result.name);
       setDescValue(result.description);
       setSettingsDaysOfWeek(result.daysOfWeek);
+      setSettingsPreferredTimes(result.preferredTimes || []);
+      setSettingsBlacklistCategories(result.blacklistCategories || []);
       setSettingsBrandColor(result.brandColor);
       setSettingsImageStyle(result.imageStyle || "default");
       setError(null);
@@ -298,6 +322,8 @@ export default function OrgDashboardPage() {
         calendarId,
         brandColor: settingsBrandColor,
         daysOfWeek: settingsDaysOfWeek,
+        preferredTimes: settingsPreferredTimes,
+        blacklistCategories: settingsBlacklistCategories,
         imageStyle: settingsImageStyle,
       };
       if (settingsLogoBase64) {
@@ -310,6 +336,8 @@ export default function OrgDashboardPage() {
           ...d,
           brandColor: settingsBrandColor,
           daysOfWeek: settingsDaysOfWeek,
+          preferredTimes: settingsPreferredTimes,
+          blacklistCategories: settingsBlacklistCategories,
           imageStyle: settingsImageStyle,
           profilePhoto: settingsLogoPreview || d.profilePhoto,
         };
@@ -399,6 +427,15 @@ export default function OrgDashboardPage() {
       const message = err instanceof Error ? err.message : "Failed to delete";
       alert(message);
     }
+  }
+
+  async function handleLogout() {
+    try {
+      await Parse.User.logOut();
+    } catch {
+      // ignore
+    }
+    router.push("/dashboard");
   }
 
   async function handleRegenerate(targetCalendarId: string) {
@@ -510,6 +547,14 @@ export default function OrgDashboardPage() {
             <h1 className="text-xl font-medium tracking-tight truncate">{dashboard.name}</h1>
             <p className="text-xs text-zinc-400">{tierLabel} Plan</p>
           </div>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-zinc-400 hover:text-zinc-900 transition-colors shrink-0"
+            title="Log out"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Log out</span>
+          </button>
         </div>
 
         {/* Tabs */}
@@ -920,58 +965,134 @@ export default function OrgDashboardPage() {
             </section>
             </div>
 
-            {/* Photo Style */}
-            <section className="border border-zinc-200 rounded-xl p-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Photo Style</h2>
-              <p className="text-xs text-zinc-500 mb-3">Control what kind of images AI selects for plan ideas.</p>
-              <div className="flex gap-2">
-                {([
-                  { id: "default", label: "Default" },
-                  { id: "no-people", label: "No People" },
-                  { id: "venue-focused", label: "Venue & Activity" },
-                ] as const).map((opt) => (
-                  <button
-                    key={opt.id}
-                    onClick={() => setSettingsImageStyle(opt.id)}
-                    className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors ${
-                      settingsImageStyle === opt.id
-                        ? "bg-zinc-900 text-white"
-                        : "border border-zinc-200 text-zinc-400 hover:border-zinc-300"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </section>
+            {/* AI Idea Generation */}
+            <div className="relative">
+              {!isGrowthPlus && (
+                <div className="absolute top-4 right-4 z-10" onClick={() => setShowSubscription(true)}>
+                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest cursor-pointer hover:bg-zinc-800 transition-colors">
+                    <Lock className="w-3 h-3" /> Upgrade
+                  </div>
+                </div>
+              )}
+              <section className={`border border-zinc-200 rounded-xl p-6 space-y-8 ${!isGrowthPlus ? "opacity-40 pointer-events-none" : ""}`}>
+                <div>
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">AI Idea Generation</h2>
+                  <p className="text-xs text-zinc-500 mt-1">Control how Leaf generates plan ideas for your community.</p>
+                </div>
 
-            {/* Days of Week */}
-            <section className="border border-zinc-200 rounded-xl p-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Preferred Days</h2>
-              <p className="text-xs text-zinc-500 mb-3">AI will generate plans on these days.</p>
-              <div className="flex gap-2">
-                {DAY_NAMES.map((day, i) => {
-                  const active = settingsDaysOfWeek.includes(i);
-                  return (
-                    <button
-                      key={day}
-                      onClick={() => {
-                        setSettingsDaysOfWeek((prev) =>
-                          active ? prev.filter((d) => d !== i) : [...prev, i]
-                        );
-                      }}
-                      className={`w-12 h-10 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors ${
-                        active
-                          ? "bg-zinc-900 text-white"
-                          : "border border-zinc-200 text-zinc-400 hover:border-zinc-300"
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
+                {/* Preferred Days */}
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Preferred Days</h3>
+                  <p className="text-xs text-zinc-500 mb-3">AI will only schedule plans on these days.</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {DAY_NAMES.map((day, i) => {
+                      const active = settingsDaysOfWeek.includes(i);
+                      return (
+                        <button
+                          key={day}
+                          onClick={() => {
+                            setSettingsDaysOfWeek((prev) =>
+                              active ? prev.filter((d) => d !== i) : [...prev, i]
+                            );
+                          }}
+                          className={`w-12 h-10 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors ${
+                            active
+                              ? "bg-zinc-900 text-white"
+                              : "border border-zinc-200 text-zinc-400 hover:border-zinc-300"
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Preferred Times */}
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Preferred Times</h3>
+                  <p className="text-xs text-zinc-500 mb-3">AI will only schedule plans during these windows.</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {TIME_OF_DAY_OPTIONS.map((opt) => {
+                      const active = settingsPreferredTimes.includes(opt.id);
+                      return (
+                        <button
+                          key={opt.id}
+                          onClick={() => {
+                            setSettingsPreferredTimes((prev) =>
+                              active ? prev.filter((t) => t !== opt.id) : [...prev, opt.id]
+                            );
+                          }}
+                          className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors flex flex-col items-center gap-0.5 ${
+                            active
+                              ? "bg-zinc-900 text-white"
+                              : "border border-zinc-200 text-zinc-400 hover:border-zinc-300"
+                          }`}
+                        >
+                          <span>{opt.label}</span>
+                          <span className={`text-[9px] font-normal normal-case tracking-normal ${active ? "text-zinc-300" : "text-zinc-400"}`}>
+                            {opt.hint}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Blacklisted Categories */}
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Blacklisted Venue Categories</h3>
+                  <p className="text-xs text-zinc-500 mb-3">AI will never suggest venues from these categories.</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {BLACKLIST_PRESETS.map((cat) => {
+                      const active = settingsBlacklistCategories.includes(cat);
+                      return (
+                        <button
+                          key={cat}
+                          onClick={() => {
+                            setSettingsBlacklistCategories((prev) =>
+                              active ? prev.filter((c) => c !== cat) : [...prev, cat]
+                            );
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                            active
+                              ? "bg-red-600 text-white border border-red-600"
+                              : "border border-zinc-200 text-zinc-500 hover:border-zinc-300"
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Photo Style */}
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Photo Style</h3>
+                  <p className="text-xs text-zinc-500 mb-3">Control what kind of images AI selects for plan ideas.</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {([
+                      { id: "default", label: "Default" },
+                      { id: "no-people", label: "No People" },
+                      { id: "venue-focused", label: "Venue & Activity" },
+                    ] as const).map((opt) => (
+                      <button
+                        key={opt.id}
+                        onClick={() => setSettingsImageStyle(opt.id)}
+                        className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors ${
+                          settingsImageStyle === opt.id
+                            ? "bg-zinc-900 text-white"
+                            : "border border-zinc-200 text-zinc-400 hover:border-zinc-300"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            </div>
 
             {/* Save */}
             <button
