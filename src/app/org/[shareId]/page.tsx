@@ -708,6 +708,28 @@ export default function OrgCalendarPage() {
     if (shareId) fetchOrg();
   }, [shareId, fetchOrg]);
 
+  // Auto-open the plan details modal if the URL contains ?plan={eventGroupId}.
+  // This is the landing target for the /p/[eventGroupId] share page used by
+  // SMS notifications (e.g., approval SMS sent to a custom plan host).
+  // Read directly from window.location to avoid the Suspense requirement
+  // that next/navigation's useSearchParams imposes on this client page.
+  const [planQueryId, setPlanQueryId] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const id = new URLSearchParams(window.location.search).get("plan");
+    if (id) setPlanQueryId(id);
+  }, []);
+  const autoOpenedPlanRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!org || !planQueryId) return;
+    if (autoOpenedPlanRef.current === planQueryId) return;
+    const match = org.plans.find((p) => p.id === planQueryId);
+    if (match) {
+      setSelectedEvent(match);
+      autoOpenedPlanRef.current = planQueryId;
+    }
+  }, [org, planQueryId]);
+
   // Fetch nearby venues when either host modal or custom plan modal opens
   useEffect(() => {
     if (!org) return;
