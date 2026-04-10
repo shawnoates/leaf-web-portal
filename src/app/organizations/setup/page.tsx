@@ -11,6 +11,8 @@ import {
   X,
   Loader2,
   MapPin,
+  Globe,
+  Wand2,
 } from "lucide-react";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
@@ -62,6 +64,7 @@ const GENERATION_MESSAGES = [
 interface FormData {
   name: string;
   orgType: string;
+  website: string;
   description: string;
   primaryCity: string;
   primaryCitySelected: boolean;
@@ -86,6 +89,7 @@ function SetupPageInner() {
   const [form, setForm] = useState<FormData>({
     name: "",
     orgType: "",
+    website: "",
     description: "",
     primaryCity: "",
     primaryCitySelected: false,
@@ -96,6 +100,8 @@ function SetupPageInner() {
   const [submitError, setSubmitError] = useState("");
   const [generationMessageIndex, setGenerationMessageIndex] = useState(0);
   const [generationDone, setGenerationDone] = useState(false);
+  const [descGenerating, setDescGenerating] = useState(false);
+  const [descGenError, setDescGenError] = useState("");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [parseUser, setParseUser] = useState<any>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -148,6 +154,7 @@ function SetupPageInner() {
         name: form.name,
         orgType: form.orgType,
         description: form.description,
+        website: form.website.trim() || undefined,
         primaryCity: form.primaryCity,
         daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
         maxEvents: 5,
@@ -178,6 +185,35 @@ function SetupPageInner() {
       setShowAuthModal(true);
     }
   }, [parseUser, startGeneration]);
+
+  const handleGenerateDescription = useCallback(async () => {
+    if (!form.website.trim()) {
+      setDescGenError("Add your website URL first.");
+      return;
+    }
+    setDescGenerating(true);
+    setDescGenError("");
+    try {
+      const result = await Parse.Cloud.run("generateOrgDescriptionFromWebsite", {
+        website: form.website.trim(),
+        orgName: form.name.trim() || undefined,
+        orgType: form.orgType || undefined,
+      });
+      if (result?.description) {
+        updateForm({ description: result.description });
+      } else {
+        setDescGenError("Couldn't generate a description. Try a different URL.");
+      }
+    } catch (err: unknown) {
+      setDescGenError(
+        err instanceof Error
+          ? err.message
+          : "Couldn't generate a description. Try again or write one yourself."
+      );
+    } finally {
+      setDescGenerating(false);
+    }
+  }, [form.website, form.name, form.orgType]);
 
   const handleSignIn = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -463,11 +499,55 @@ function SetupPageInner() {
               />
             </div>
 
-            {/* Description (Optional) */}
+            {/* Website (Optional — used to auto-generate description) */}
             <div className="space-y-2">
-              <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
-                Description
+              <label className="text-[10px] tracking-[0.3em] uppercase font-bold flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5" />
+                Website <span className="text-zinc-400 normal-case font-normal">(optional)</span>
               </label>
+              <input
+                type="url"
+                value={form.website}
+                onChange={(e) => {
+                  updateForm({ website: e.target.value });
+                  if (descGenError) setDescGenError("");
+                }}
+                placeholder="e.g., https://yourorg.com"
+                className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
+              />
+              <p className="text-[11px] text-zinc-400">
+                Add your website and we&apos;ll draft a description for you.
+              </p>
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                  Description
+                </label>
+                <button
+                  type="button"
+                  onClick={handleGenerateDescription}
+                  disabled={descGenerating || !form.website.trim()}
+                  className={`flex items-center gap-1.5 text-[10px] tracking-[0.2em] uppercase font-bold transition-colors ${
+                    descGenerating || !form.website.trim()
+                      ? "text-zinc-300 cursor-not-allowed"
+                      : "text-zinc-500 hover:text-zinc-900"
+                  }`}
+                  title={form.website.trim() ? "Generate from website" : "Add a website URL above to enable"}
+                >
+                  {descGenerating ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="w-3.5 h-3.5" /> Generate from website
+                    </>
+                  )}
+                </button>
+              </div>
               <textarea
                 value={form.description}
                 onChange={(e) => updateForm({ description: e.target.value })}
@@ -475,6 +555,9 @@ function SetupPageInner() {
                 rows={3}
                 className="w-full border border-zinc-200 p-4 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors resize-none"
               />
+              {descGenError && (
+                <p className="text-[11px] text-red-500">{descGenError}</p>
+              )}
             </div>
           </div>
         </div>
