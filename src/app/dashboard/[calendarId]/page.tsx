@@ -89,6 +89,19 @@ interface OrgDashboard {
     isActive: boolean;
   }[];
   calendarLimit: number | null;
+  hostRequests: {
+    planId: string;
+    title: string;
+    image: string | null;
+    calendarName: string | null;
+    calendarId: string | null;
+    requesterName: string;
+    requesterPhone: string | null;
+    requestedDate: string | null;
+    requestedNote: string | null;
+    requestedVenue: { name: string; address: string } | null;
+    requestedAt: string | null;
+  }[];
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -530,6 +543,72 @@ export default function OrgDashboardPage() {
         {/* ──────── OVERVIEW TAB ──────── */}
         {activeTab === "overview" && (
           <div className="space-y-8">
+            {/* Pending Host Requests */}
+            {dashboard.hostRequests && dashboard.hostRequests.length > 0 && (
+              <section className="border border-amber-200 bg-amber-50/50 rounded-xl p-6">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-amber-600 mb-4">
+                  Pending Host Requests ({dashboard.hostRequests.length})
+                </h2>
+                <div className="space-y-4">
+                  {dashboard.hostRequests.map((req) => (
+                    <div key={req.planId} className="flex items-start gap-4 bg-white border border-zinc-200 rounded-lg p-4">
+                      {req.image && (
+                        <img src={req.image} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-zinc-900 truncate">{req.title}</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">
+                          <strong>{req.requesterName}</strong>
+                          {req.requesterPhone && <> &middot; {req.requesterPhone}</>}
+                          {req.calendarName && <> &middot; {req.calendarName}</>}
+                        </p>
+                        {req.requestedDate && (
+                          <p className="text-xs text-zinc-400 mt-0.5">
+                            <Clock className="w-3 h-3 inline mr-1" />
+                            {new Date(req.requestedDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                          </p>
+                        )}
+                        {req.requestedNote && (
+                          <p className="text-xs text-zinc-400 italic mt-1 truncate">&ldquo;{req.requestedNote}&rdquo;</p>
+                        )}
+                        {req.requestedVenue && (
+                          <p className="text-xs text-zinc-400 mt-0.5">{req.requestedVenue.name}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button
+                          onClick={async () => {
+                            try {
+                              await Parse.Cloud.run("approveHostRequest", { calendarPlanId: req.planId });
+                              setDashboard((d) => d ? { ...d, hostRequests: d.hostRequests.filter((r) => r.planId !== req.planId) } : d);
+                            } catch (err) {
+                              console.error("Failed to approve:", err);
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-emerald-700 transition-colors"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await Parse.Cloud.run("declineHostRequest", { calendarPlanId: req.planId });
+                              setDashboard((d) => d ? { ...d, hostRequests: d.hostRequests.filter((r) => r.planId !== req.planId) } : d);
+                            } catch (err) {
+                              console.error("Failed to decline:", err);
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-white text-zinc-600 text-[10px] font-bold uppercase tracking-widest rounded-lg border border-zinc-300 hover:bg-zinc-50 transition-colors"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* Name & Description */}
             <section className="border border-zinc-200 rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
