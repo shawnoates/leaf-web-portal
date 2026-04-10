@@ -508,9 +508,7 @@ export default function OrgDashboardPage() {
         <div className="max-w-5xl mx-auto px-6 py-5 flex items-center gap-4">
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-medium tracking-tight truncate">{dashboard.name}</h1>
-            <p className="text-xs text-zinc-400">
-              {tierLabel} Plan &middot; {dashboard.memberCount} members
-            </p>
+            <p className="text-xs text-zinc-400">{tierLabel} Plan</p>
           </div>
         </div>
 
