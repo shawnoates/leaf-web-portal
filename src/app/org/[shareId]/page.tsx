@@ -88,6 +88,45 @@ interface OrgData {
   isHost: boolean;
   plans: Plan[];
   planIdeas: PlanIdea[];
+  blacklistCategories: string[];
+}
+
+// Maps human-readable blacklist labels (set in the org dashboard) to Google
+// Places `types` strings and lowercase name keywords used to filter venue
+// search results. Categories without reliable Places types fall back to
+// keyword matching against the venue name.
+const BLACKLIST_TYPE_MAP: Record<string, { types: string[]; keywords: string[] }> = {
+  "Bars": { types: ["bar"], keywords: ["bar", "pub", "tavern", "brewery", "brewpub"] },
+  "Nightclubs": { types: ["night_club"], keywords: ["nightclub", "night club", "lounge", "club"] },
+  "Casinos": { types: ["casino"], keywords: ["casino"] },
+  "Adult venues": { types: [], keywords: ["adult", "strip", "gentlemen", "xxx"] },
+  "Smoking lounges": { types: [], keywords: ["hookah", "cigar", "smoke shop", "vape", "smoking"] },
+  "Religious venues": {
+    types: ["church", "synagogue", "mosque", "hindu_temple", "place_of_worship"],
+    keywords: ["church", "synagogue", "mosque", "temple", "chapel", "cathedral"],
+  },
+  "Late-night venues": { types: [], keywords: ["late night", "after hours"] },
+  "Fast food": {
+    types: ["meal_takeaway"],
+    keywords: ["mcdonald", "burger king", "wendy", "taco bell", "kfc", "subway", "chipotle", "popeyes", "arby", "sonic", "hardee", "carl's jr", "jack in the box", "white castle", "dairy queen", "fast food"],
+  },
+};
+
+function isVenueBlacklisted(
+  name: string,
+  types: string[],
+  blacklistCategories: string[]
+): boolean {
+  if (!blacklistCategories || blacklistCategories.length === 0) return false;
+  const lowerName = name.toLowerCase();
+  const typeSet = new Set(types);
+  for (const category of blacklistCategories) {
+    const entry = BLACKLIST_TYPE_MAP[category];
+    if (!entry) continue;
+    if (entry.types.some((t) => typeSet.has(t))) return true;
+    if (entry.keywords.some((k) => lowerName.includes(k))) return true;
+  }
+  return false;
 }
 
 // --- Helpers ---
@@ -696,6 +735,7 @@ export default function OrgCalendarPage() {
         isHost: result.isHost || false,
         plans,
         planIdeas,
+        blacklistCategories: result.orgBlacklistCategories || [],
       });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load calendar");
@@ -778,7 +818,11 @@ export default function OrgCalendarPage() {
           { query, type: "establishment" },
           (results, status) => {
             if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
-              const venues: NearbyVenue[] = results.slice(0, 5).map((place) => ({
+              const blacklist = org.blacklistCategories || [];
+              const filtered = results.filter((place) =>
+                !isVenueBlacklisted(place.name || "", place.types || [], blacklist)
+              );
+              const venues: NearbyVenue[] = filtered.slice(0, 5).map((place) => ({
                 placeId: place.place_id || "",
                 name: place.name || "",
                 address: place.formatted_address || "",
