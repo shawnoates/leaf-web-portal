@@ -434,9 +434,16 @@ export default function OrgCalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<Plan | null>(null);
   const [rsvpPlan, setRsvpPlan] = useState<Plan | null>(null);
   const [hostingIdea, setHostingIdea] = useState<PlanIdea | null>(null);
-  const [hostSuccess, setHostSuccess] = useState(false);
+  const [hostSuccess, setHostSuccess] = useState<boolean | "pending">(false);
   const [hostSubmitting, setHostSubmitting] = useState(false);
   const [hostNote, setHostNote] = useState("");
+  const [hostName, setHostName] = useState("");
+  const [hostPhone, setHostPhone] = useState("");
+  const [hostVerifyCode, setHostVerifyCode] = useState("");
+  const [hostPhoneVerified, setHostPhoneVerified] = useState(false);
+  const [hostVerifyStep, setHostVerifyStep] = useState<"phone" | "code" | "verified">("phone");
+  const [hostVerifySending, setHostVerifySending] = useState(false);
+  const [hostVerifyError, setHostVerifyError] = useState("");
   const [nearbyVenues, setNearbyVenues] = useState<NearbyVenue[]>([]);
   const [venuesLoading, setVenuesLoading] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<NearbyVenue | null>(null);
@@ -607,9 +614,61 @@ export default function OrgCalendarPage() {
     }
   };
 
+  const formatHostPhone = (value: string) => {
+    const cleaned = value.replace(/\D/g, "");
+    if (cleaned.length <= 3) return cleaned;
+    if (cleaned.length <= 6) return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+  };
+
+  const handleSendHostOTP = async () => {
+    const digits = hostPhone.replace(/\D/g, "");
+    if (digits.length < 10) {
+      setHostVerifyError("Please enter a valid phone number.");
+      return;
+    }
+    setHostVerifySending(true);
+    setHostVerifyError("");
+    try {
+      await Parse.Cloud.run("requestOTP", { phone: `+1${digits}` });
+      setHostVerifyStep("code");
+    } catch (err: unknown) {
+      setHostVerifyError(err instanceof Error ? err.message : "Failed to send code.");
+    } finally {
+      setHostVerifySending(false);
+    }
+  };
+
+  const handleVerifyHostOTP = async () => {
+    const digits = hostPhone.replace(/\D/g, "");
+    setHostVerifySending(true);
+    setHostVerifyError("");
+    try {
+      const result = await Parse.Cloud.run("verifyOTP", { phone: `+1${digits}`, code: hostVerifyCode });
+      if (result && typeof result === "object" && result.sessionToken) {
+        setHostPhoneVerified(true);
+        setHostVerifyStep("verified");
+      } else {
+        setHostVerifyError("Invalid code. Please try again.");
+      }
+    } catch (err: unknown) {
+      setHostVerifyError(err instanceof Error ? err.message : "Invalid code. Please try again.");
+    } finally {
+      setHostVerifySending(false);
+    }
+  };
+
   const handleHostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!hostingIdea) return;
+    const isOwnerOrHost = org && (org.isOwner || org.isHost);
+
+    // Non-owners must verify phone first
+    if (!isOwnerOrHost && !hostPhoneVerified) {
+      setHostVerifyError("Please verify your phone number first.");
+      return;
+    }
+
     setHostSubmitting(true);
 
     const form = e.target as HTMLFormElement;
@@ -618,11 +677,13 @@ export default function OrgCalendarPage() {
     const dateTime = `${dateInput.value}T${timeInput.value || "18:00"}`;
 
     try {
-      await Parse.Cloud.run("hostPlanIdea", {
+      const result = await Parse.Cloud.run("hostPlanIdea", {
         calendarPlanId: hostingIdea.id,
         date: dateTime,
         capacity: hostingIdea.suggestedCapacity || 20,
         hostNote: hostNote.trim() || undefined,
+        hostName: !isOwnerOrHost ? hostName.trim() : undefined,
+        hostPhone: !isOwnerOrHost ? `+1${hostPhone.replace(/\D/g, "")}` : undefined,
         venue: selectedVenue ? {
           placeId: selectedVenue.placeId,
           name: selectedVenue.name,
@@ -631,8 +692,13 @@ export default function OrgCalendarPage() {
           rating: selectedVenue.rating,
         } : undefined,
       });
-      setHostSuccess(true);
+      setHostSuccess(result?.pendingApproval ? "pending" : true);
       setHostNote("");
+      setHostName("");
+      setHostPhone("");
+      setHostVerifyCode("");
+      setHostPhoneVerified(false);
+      setHostVerifyStep("phone");
       setSelectedVenue(null);
       // Refresh data to show the new plan
       fetchOrg();
@@ -898,7 +964,14 @@ export default function OrgCalendarPage() {
                     if (org.rsvpLimitReached) return;
                     setHostingIdea(idea);
                     setHostSubmitting(false);
+                    setHostSuccess(false);
                     setHostNote("");
+                    setHostName("");
+                    setHostPhone("");
+                    setHostVerifyCode("");
+                    setHostPhoneVerified(false);
+                    setHostVerifyStep("phone");
+                    setHostVerifyError("");
                     setSelectedVenue(null);
                   }}
                 >
@@ -1079,8 +1152,11 @@ export default function OrgCalendarPage() {
                     <CheckCircle2 className="w-10 h-10" />
                   </div>
                   <h4 className="text-2xl font-light">
-                    Your plan is scheduled.
+                    {hostSuccess === "pending" ? "Request submitted!" : "Your plan is scheduled."}
                   </h4>
+                  {hostSuccess === "pending" && (
+                    <p className="text-sm text-zinc-500">The organizer will review your request and get back to you.</p>
+                  )}
                   <p className="text-zinc-400 uppercase tracking-widest text-[10px]">
                     Closing...
                   </p>
@@ -1152,6 +1228,93 @@ export default function OrgCalendarPage() {
                   </div>
 
                   <form onSubmit={handleHostSubmit} className="space-y-8">
+                    {/* Name & Phone for non-owners */}
+                    {!(org.isOwner || org.isHost) && (
+                      <>
+                        <div className="space-y-2">
+                          <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                            Your Name
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={hostName}
+                            onChange={(e) => setHostName(e.target.value)}
+                            placeholder="Full name"
+                            className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                            Phone Number
+                          </label>
+                          {hostVerifyStep === "phone" && (
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center flex-1 border-b border-zinc-300 focus-within:border-zinc-900 transition-colors">
+                                <Phone className="w-4 h-4 text-zinc-400 mr-2" />
+                                <input
+                                  type="tel"
+                                  required
+                                  value={hostPhone}
+                                  onChange={(e) => setHostPhone(formatHostPhone(e.target.value))}
+                                  placeholder="555-555-5555"
+                                  className="w-full py-4 text-xl font-light focus:outline-none"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={handleSendHostOTP}
+                                disabled={hostVerifySending || hostPhone.replace(/\D/g, "").length < 10}
+                                className="px-4 py-2.5 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 whitespace-nowrap"
+                              >
+                                {hostVerifySending ? "Sending..." : "Verify"}
+                              </button>
+                            </div>
+                          )}
+                          {hostVerifyStep === "code" && (
+                            <div className="space-y-3">
+                              <p className="text-xs text-zinc-500">Enter the 6-digit code sent to {hostPhone}</p>
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  maxLength={6}
+                                  value={hostVerifyCode}
+                                  onChange={(e) => setHostVerifyCode(e.target.value.replace(/\D/g, ""))}
+                                  placeholder="000000"
+                                  className="flex-1 border-b border-zinc-300 py-4 text-xl font-light tracking-[0.5em] text-center focus:outline-none focus:border-zinc-900 transition-colors"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleVerifyHostOTP}
+                                  disabled={hostVerifySending || hostVerifyCode.length < 6}
+                                  className="px-4 py-2.5 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                >
+                                  {hostVerifySending ? "Checking..." : "Confirm"}
+                                </button>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => { setHostVerifyStep("phone"); setHostVerifyCode(""); }}
+                                className="text-xs text-zinc-400 hover:text-zinc-900 underline"
+                              >
+                                Change number
+                              </button>
+                            </div>
+                          )}
+                          {hostVerifyStep === "verified" && (
+                            <div className="flex items-center gap-2 py-4">
+                              <Check className="w-4 h-4 text-emerald-600" />
+                              <span className="text-sm text-emerald-600 font-medium">{hostPhone} verified</span>
+                            </div>
+                          )}
+                          {hostVerifyError && (
+                            <p className="text-xs text-red-500 mt-1">{hostVerifyError}</p>
+                          )}
+                        </div>
+                      </>
+                    )}
+
                     <div className="space-y-2">
                       <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
                         Preferred Date
