@@ -131,10 +131,12 @@ function RsvpModal({
   plan,
   onClose,
   brandColor,
+  onRsvpSuccess,
 }: {
   plan: Plan;
   brandColor?: string;
   onClose: () => void;
+  onRsvpSuccess?: (planId: string, alreadyRsvpd: boolean) => void;
 }) {
   const verify = usePhoneVerify();
   const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
@@ -155,6 +157,9 @@ function RsvpModal({
       if (result && typeof result === "object" && typeof result.eventNotificationId === "string") {
         setNotificationId(result.eventNotificationId);
       }
+      const alreadyRsvpd =
+        result && typeof result === "object" && (result as { alreadyRsvpd?: boolean }).alreadyRsvpd === true;
+      onRsvpSuccess?.(plan.id, alreadyRsvpd);
       setFormStep("success");
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to RSVP. Please try again.");
