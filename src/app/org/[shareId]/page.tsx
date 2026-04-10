@@ -1367,8 +1367,12 @@ export default function OrgCalendarPage() {
               </h5>
               <div className="flex flex-col gap-2 text-sm text-zinc-500 mt-4">
                 <a href="#">About</a>
-                <a href="#">Safety</a>
-                <a href="#">Privacy</a>
+                <Link href="/safety" className="hover:text-zinc-900 transition-colors">
+                  Safety
+                </Link>
+                <Link href="/privacy" className="hover:text-zinc-900 transition-colors">
+                  Privacy
+                </Link>
               </div>
             </div>
             <div className="space-y-4">
@@ -1377,7 +1381,12 @@ export default function OrgCalendarPage() {
               </h5>
               <div className="flex flex-col gap-2 text-sm text-zinc-500 mt-4">
                 <a href="#">Instagram</a>
-                <a href="#">Contact</a>
+                <a
+                  href="mailto:team@getleaflets.co"
+                  className="hover:text-zinc-900 transition-colors"
+                >
+                  Contact
+                </a>
               </div>
             </div>
           </div>

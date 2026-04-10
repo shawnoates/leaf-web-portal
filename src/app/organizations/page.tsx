@@ -430,12 +430,12 @@ export default function OrganizationsPage() {
                 Legal
               </h5>
               <div className="flex flex-col gap-2 text-sm text-zinc-500 mt-4">
-                <a href="#" className="hover:text-zinc-900">
+                <Link href="/privacy" className="hover:text-zinc-900">
                   Privacy
-                </a>
-                <a href="#" className="hover:text-zinc-900">
-                  Terms
-                </a>
+                </Link>
+                <Link href="/safety" className="hover:text-zinc-900">
+                  Safety
+                </Link>
               </div>
             </div>
           </div>
