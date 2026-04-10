@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import Link from "next/link";
+import { QRCodeSVG } from "qrcode.react";
 import {
   Plus,
   Users,
@@ -25,6 +26,13 @@ import {
   Settings,
   Heart,
 } from "lucide-react";
+
+const APP_STORE_URL = "https://apps.apple.com/app/leaf";
+
+function isIOSDevice() {
+  if (typeof navigator === "undefined") return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
 
 // --- Types ---
 
@@ -131,23 +139,40 @@ function RsvpModal({
   const verify = usePhoneVerify();
   const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
   const [errorMsg, setErrorMsg] = useState("");
+  const [notificationId, setNotificationId] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!verify.isVerified) return;
     setFormStep("submitting");
     try {
-      await Parse.Cloud.run("rsvpToPlanViaWeb", {
+      const result = await Parse.Cloud.run("rsvpToPlanViaWeb", {
         phoneNumber: verify.phone.replace(/\D/g, ""),
         name: verify.name,
         eventGroupId: plan.id,
       });
       setVerifiedUserCookie(verify.name, verify.phone);
+      if (result && typeof result === "object" && typeof result.eventNotificationId === "string") {
+        setNotificationId(result.eventNotificationId);
+      }
       setFormStep("success");
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to RSVP. Please try again.");
       setFormStep("error");
     }
+  };
+
+  const deepLink = notificationId ? `leaf://planChat?planId=${notificationId}` : null;
+  const isIOS = isIOSDevice();
+
+  const handleIOSDeepLink = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!deepLink) return;
+    e.preventDefault();
+    window.location.href = deepLink;
+    // Fallback to App Store if the app isn't installed
+    setTimeout(() => {
+      window.location.href = APP_STORE_URL;
+    }, 1500);
   };
 
   return (
@@ -197,30 +222,62 @@ function RsvpModal({
             </button>
           </div>
         ) : (
-          <div className="py-8 text-center space-y-6">
-            <div className="w-16 h-16 border border-zinc-900 rounded-full flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-8 h-8" />
+          <div className="py-6 text-center space-y-5">
+            <div className="w-14 h-14 border border-zinc-900 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-7 h-7" />
             </div>
             <div>
               <h4 className="text-2xl font-light mb-2">You&apos;re in!</h4>
-              <p className="text-sm text-zinc-500">
-                We&apos;ll send a confirmation to your phone.
+              <p className="text-sm text-zinc-500 max-w-xs mx-auto">
+                Coordinate with the group. Join the Plan Chat.
               </p>
             </div>
-            <div className="pt-4 space-y-3">
+
+            {deepLink && isIOS && (
+              <div className="pt-2 space-y-3">
+                <a
+                  href={deepLink}
+                  onClick={handleIOSDeepLink}
+                  className="block w-full text-white py-3.5 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 rounded-lg"
+                  style={{ backgroundColor: brandColor || "#18181b" }}
+                >
+                  Join the Plan Chat
+                </a>
+                <p className="text-[11px] text-zinc-400">
+                  Don&apos;t have the app?{" "}
+                  <a href={APP_STORE_URL} className="underline hover:text-zinc-900">
+                    Download Leaf
+                  </a>
+                </p>
+              </div>
+            )}
+
+            {deepLink && !isIOS && (
+              <div className="pt-2 space-y-3">
+                <div className="inline-block bg-white p-3 rounded-lg border border-zinc-200">
+                  <QRCodeSVG value={deepLink} size={180} level="M" />
+                </div>
+                <p className="text-[11px] text-zinc-400">
+                  Scan with your phone to open the chat in the Leaf app
+                </p>
+              </div>
+            )}
+
+            {!deepLink && (
               <a
-                href="https://apps.apple.com/app/leaf"
-                className="block w-full border border-zinc-200 py-3 text-xs uppercase tracking-[0.2em] font-bold text-center hover:bg-zinc-50 transition-colors"
+                href={APP_STORE_URL}
+                className="block w-full border border-zinc-200 py-3 text-xs uppercase tracking-[0.2em] font-bold text-center hover:bg-zinc-50 transition-colors rounded-lg"
               >
                 Open in Leaf App
               </a>
-              <button
-                onClick={onClose}
-                className="text-sm text-zinc-400 hover:text-zinc-900"
-              >
-                Close
-              </button>
-            </div>
+            )}
+
+            <button
+              onClick={onClose}
+              className="text-sm text-zinc-400 hover:text-zinc-900"
+            >
+              Close
+            </button>
           </div>
         )}
       </div>
