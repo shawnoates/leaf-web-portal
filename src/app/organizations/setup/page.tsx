@@ -30,27 +30,6 @@ const ORG_TYPES = [
   { value: "other", label: "Other", emoji: "\ud83d\udccc" },
 ];
 
-const TIERS = [
-  {
-    value: "starter",
-    label: "Starter",
-    price: "Free",
-    features: ["1 city", "5 AI-generated plan ideas per week", "Up to 50 RSVPs", "Leaf-branded calendar page", "Phone Number RSVP"],
-  },
-  {
-    value: "growth",
-    label: "Growth",
-    price: "$29/mo",
-    features: ["1 city", "10 AI-generated plan ideas per week", "Up to 500 RSVPs per month", "Custom branded page", "Phone Number RSVP", "Blacklist categories", "Day-of-week preferences"],
-  },
-  {
-    value: "pro",
-    label: "Pro",
-    price: "$99/mo",
-    features: ["Up to 5 cities", "15 AI-generated plan ideas per week", "Unlimited RSVPs", "Custom branded page", "Phone Number RSVP", "Analytics dashboard", "On-demand plan generation"],
-  },
-];
-
 const GENERATION_MESSAGES = [
   "Finding venues near your city...",
   "Crafting plan ideas for your community...",
@@ -83,7 +62,13 @@ export default function SetupPage() {
 
 function SetupPageInner() {
   const searchParams = useSearchParams();
-  const initialTier = searchParams.get("tier") || "growth";
+  // Tier picked on the marketing pricing page (?tier=growth|pro). Defaults to
+  // "starter" so direct visits to /organizations/setup never accidentally enroll
+  // the user in a paid plan. If a paid tier is requested, we create the org as
+  // starter first, then redirect to Stripe Checkout to upgrade.
+  const requestedTier = searchParams.get("tier");
+  const initialTier =
+    requestedTier === "growth" || requestedTier === "pro" ? requestedTier : "starter";
 
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>({
@@ -97,12 +82,11 @@ function SetupPageInner() {
   });
   const [shareId, setShareId] = useState("");
   const [calendarId, setCalendarId] = useState("");
-  const [showCalendarInvite, setShowCalendarInvite] = useState(false);
-  const [pendingCalendarHref, setPendingCalendarHref] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [generationMessageIndex, setGenerationMessageIndex] = useState(0);
   const [generationDone, setGenerationDone] = useState(false);
+  const [redirectingToCheckout, setRedirectingToCheckout] = useState(false);
   const [descGenerating, setDescGenerating] = useState(false);
   const [descGenError, setDescGenError] = useState("");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -153,6 +137,9 @@ function SetupPageInner() {
     setStep(1);
 
     try {
+      // Always create the org as the free Starter tier. If the user came from
+      // the pricing page wanting Growth/Pro, we redirect them to Stripe Checkout
+      // immediately after creation; the webhook bumps the tier on payment.
       const result = await Parse.Cloud.run("createOrganization", {
         name: form.name,
         orgType: form.orgType,
@@ -164,11 +151,31 @@ function SetupPageInner() {
         capacityLimit: 50,
         vibes: [],
         blacklistCategories: [],
-        tier: form.tier,
+        tier: "starter",
       });
       setShareId(result.shareId);
       setCalendarId(result.calendarId);
       setGenerationDone(true);
+
+      // If a paid tier was requested, kick off Stripe Checkout
+      if (form.tier === "growth" || form.tier === "pro") {
+        setRedirectingToCheckout(true);
+        try {
+          const checkout = await Parse.Cloud.run("createOrgSubscriptionCheckout", {
+            calendarId: result.calendarId,
+            tier: form.tier,
+            returnUrl: `${window.location.origin}/dashboard/${result.calendarId}`,
+          });
+          if (checkout?.url) {
+            window.location.href = checkout.url;
+            return;
+          }
+        } catch (checkoutErr: unknown) {
+          // Don't block the success state — the org exists, user can upgrade later
+          console.error("Checkout redirect failed:", checkoutErr);
+          setRedirectingToCheckout(false);
+        }
+      }
     } catch (err: unknown) {
       setSubmitError(
         err instanceof Error
@@ -231,61 +238,9 @@ function SetupPageInner() {
     [startGeneration]
   );
 
-  // Shared: Calendar settings invite modal
-  const calendarInviteModal = showCalendarInvite && (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={() => setShowCalendarInvite(false)}
-      />
-      <div className="relative bg-white max-w-md w-full mx-4 shadow-2xl">
-        <button
-          onClick={() => setShowCalendarInvite(false)}
-          className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900"
-          aria-label="Close"
-        >
-          <X className="w-5 h-5" />
-        </button>
-        <div className="p-8 space-y-6">
-          <div className="w-14 h-14 border-2 border-zinc-900 rounded-full flex items-center justify-center mx-auto">
-            <Sparkles className="w-7 h-7" />
-          </div>
-          <div className="text-center space-y-2">
-            <h3 className="text-2xl font-light tracking-tight">
-              Make it your own first
-            </h3>
-            <p className="text-zinc-500 font-light">
-              Before sharing your calendar, take a moment to manage your settings —
-              tune your preferred days, times, blacklist categories, and brand.
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 pt-2">
-            <Link
-              href={
-                calendarId
-                  ? `/dashboard/${calendarId}?tab=calendars`
-                  : pendingCalendarHref
-              }
-              className="bg-zinc-900 text-white px-6 py-3.5 text-xs uppercase tracking-[0.2em] font-bold text-center hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
-            >
-              Manage Calendar Settings <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              href={pendingCalendarHref}
-              className="px-6 py-3 text-xs uppercase tracking-[0.2em] font-medium text-zinc-500 hover:text-zinc-900 text-center transition-colors"
-            >
-              Skip and view my calendar
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   // Step 2: Success
   if (step === 2) {
     return (
-      <>
       <div className="min-h-screen flex items-center justify-center px-6">
         <div className="max-w-lg w-full text-center space-y-8">
           <div className="w-20 h-20 border-2 border-zinc-900 rounded-full flex items-center justify-center mx-auto">
@@ -308,15 +263,12 @@ function SetupPageInner() {
             </p>
           </div>
           <div className="flex flex-col gap-4">
-            <button
-              onClick={() => {
-                setPendingCalendarHref(`/org/${shareId}`);
-                setShowCalendarInvite(true);
-              }}
+            <Link
+              href={`/org/${shareId}?welcome=1`}
               className="bg-zinc-900 text-white px-8 py-4 text-xs uppercase tracking-[0.3em] font-medium hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
             >
               View Your Calendar <ArrowRight className="w-4 h-4" />
-            </button>
+            </Link>
             <button
               onClick={() =>
                 navigator.clipboard.writeText(
@@ -330,15 +282,26 @@ function SetupPageInner() {
           </div>
         </div>
       </div>
-      {calendarInviteModal}
-      </>
     );
   }
 
-  // Step 1: Generating + Pricing
+  // Step 1: Generating / Success
   if (step === 1) {
+    const headline = redirectingToCheckout
+      ? "Redirecting to secure checkout..."
+      : generationDone
+        ? "Your calendar is ready!"
+        : "Generating your calendar...";
+
+    const subtext = redirectingToCheckout
+      ? "Hang tight — Stripe is loading your payment page."
+      : generationDone
+        ? `Created calendar for ${form.name}`
+        : GENERATION_MESSAGES[generationMessageIndex];
+
+    const showLoader = !generationDone || redirectingToCheckout;
+
     return (
-      <>
       <div className="min-h-screen">
         <nav className="w-full bg-white border-b border-zinc-100 px-6 py-6">
           <div className="max-w-3xl mx-auto flex justify-between items-center">
@@ -353,28 +316,19 @@ function SetupPageInner() {
           </div>
         </nav>
 
-        <div className="max-w-4xl mx-auto px-6 py-12">
-          {/* Generation Status */}
-          <div className="text-center mb-16">
+        <div className="max-w-2xl mx-auto px-6 py-20">
+          <div className="text-center mb-12">
             <div className="w-16 h-16 mx-auto mb-6 flex items-center justify-center">
-              {generationDone ? (
+              {showLoader ? (
+                <Loader2 className="w-12 h-12 animate-spin text-zinc-400" />
+              ) : (
                 <div className="w-16 h-16 border-2 border-zinc-900 rounded-full flex items-center justify-center">
                   <Check className="w-8 h-8" />
                 </div>
-              ) : (
-                <Loader2 className="w-12 h-12 animate-spin text-zinc-400" />
               )}
             </div>
-            <h2 className="text-3xl font-light tracking-tight mb-3">
-              {generationDone
-                ? "Your calendar is ready!"
-                : "Generating your calendar..."}
-            </h2>
-            <p className="text-zinc-500 font-light text-lg transition-opacity">
-              {generationDone
-                ? `Created calendar for ${form.name}`
-                : GENERATION_MESSAGES[generationMessageIndex]}
-            </p>
+            <h2 className="text-3xl font-light tracking-tight mb-3">{headline}</h2>
+            <p className="text-zinc-500 font-light text-lg transition-opacity">{subtext}</p>
           </div>
 
           {/* Error */}
@@ -393,81 +347,29 @@ function SetupPageInner() {
             </div>
           )}
 
-          {/* Pricing Tiers */}
-          <div className="space-y-4 mb-8">
-            <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-center text-zinc-400 mb-6">
-              Choose your plan — you can always change later
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {TIERS.map((tier) => (
-                <button
-                  key={tier.value}
-                  type="button"
-                  onClick={() => updateForm({ tier: tier.value })}
-                  className={`p-6 border text-left transition-all ${
-                    form.tier === tier.value
-                      ? "border-zinc-900 bg-zinc-50"
-                      : "border-zinc-100 hover:border-zinc-300"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="font-bold text-xs uppercase tracking-widest">
-                      {tier.label}
-                    </span>
-                    {form.tier === tier.value && (
-                      <div className="w-6 h-6 bg-zinc-900 text-white flex items-center justify-center">
-                        <Check className="w-3 h-3" />
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-2xl font-light block mb-4">
-                    {tier.price}
-                  </span>
-                  <ul className="space-y-2">
-                    {tier.features.map((feature) => (
-                      <li
-                        key={feature}
-                        className="text-xs text-zinc-500 flex items-start gap-2"
-                      >
-                        <Check className="w-3 h-3 mt-0.5 shrink-0 text-zinc-400" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Continue Button */}
-          <div className="text-center pt-8">
-            <button
-              onClick={() => {
-                setPendingCalendarHref(`/org/${shareId}`);
-                setShowCalendarInvite(true);
-              }}
-              disabled={!generationDone}
-              className={`px-12 py-4 text-xs uppercase tracking-[0.3em] font-bold inline-flex items-center gap-2 transition-colors ${
-                generationDone
-                  ? "bg-zinc-900 text-white hover:bg-zinc-800"
-                  : "bg-zinc-200 text-zinc-400 cursor-not-allowed"
-              }`}
-            >
-              {generationDone ? (
-                <>
-                  View Your Calendar <ArrowRight className="w-4 h-4" />
-                </>
-              ) : (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Generating...
-                </>
+          {/* Continue Button — only visible after generation is done and we're not redirecting */}
+          {generationDone && !redirectingToCheckout && (
+            <div className="text-center pt-4 space-y-4">
+              <Link
+                href={`/org/${shareId}?welcome=1`}
+                className="px-12 py-4 text-xs uppercase tracking-[0.3em] font-bold inline-flex items-center gap-2 transition-colors bg-zinc-900 text-white hover:bg-zinc-800"
+              >
+                View Your Calendar <ArrowRight className="w-4 h-4" />
+              </Link>
+              {calendarId && (
+                <div>
+                  <Link
+                    href={`/dashboard/${calendarId}`}
+                    className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400 hover:text-zinc-900"
+                  >
+                    Go to dashboard
+                  </Link>
+                </div>
               )}
-            </button>
-          </div>
+            </div>
+          )}
         </div>
       </div>
-      {calendarInviteModal}
-      </>
     );
   }
 

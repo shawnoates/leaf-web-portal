@@ -659,6 +659,7 @@ export default function OrgCalendarPage() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [isInactive, setIsInactive] = useState<{ name: string } | null>(null);
+  const [showWelcomeInvite, setShowWelcomeInvite] = useState(false);
 
   // Check cookie on mount
   useEffect(() => {
@@ -756,8 +757,10 @@ export default function OrgCalendarPage() {
   const [planQueryId, setPlanQueryId] = useState<string | null>(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const id = new URLSearchParams(window.location.search).get("plan");
+    const search = new URLSearchParams(window.location.search);
+    const id = search.get("plan");
     if (id) setPlanQueryId(id);
+    if (search.get("welcome") === "1") setShowWelcomeInvite(true);
   }, []);
   const autoOpenedPlanRef = useRef<string | null>(null);
   useEffect(() => {
@@ -1889,6 +1892,54 @@ export default function OrgCalendarPage() {
             setShowFollowModal(false);
           }}
         />
+      )}
+
+      {/* Welcome / "Make it your own" invite — shown after first calendar creation */}
+      {showWelcomeInvite && org.isOwner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowWelcomeInvite(false)}
+          />
+          <div className="relative bg-white max-w-md w-full mx-4 shadow-2xl">
+            <button
+              onClick={() => setShowWelcomeInvite(false)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="p-8 space-y-6">
+              <div className="w-14 h-14 border-2 border-zinc-900 rounded-full flex items-center justify-center mx-auto">
+                <Sparkles className="w-7 h-7" />
+              </div>
+              <div className="text-center space-y-2">
+                <h3 className="text-2xl font-light tracking-tight">
+                  Make it your own first
+                </h3>
+                <p className="text-zinc-500 font-light">
+                  Before sharing your calendar, take a moment to manage your
+                  settings — tune your preferred days, times, blacklist
+                  categories, and brand.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3 pt-2">
+                <Link
+                  href={`/dashboard/${org.objectId}?tab=calendars`}
+                  className="bg-zinc-900 text-white px-6 py-3.5 text-xs uppercase tracking-[0.2em] font-bold text-center hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
+                >
+                  Manage Calendar Settings <ArrowRight className="w-4 h-4" />
+                </Link>
+                <button
+                  onClick={() => setShowWelcomeInvite(false)}
+                  className="px-6 py-3 text-xs uppercase tracking-[0.2em] font-medium text-zinc-500 hover:text-zinc-900 text-center transition-colors"
+                >
+                  Skip and view my calendar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

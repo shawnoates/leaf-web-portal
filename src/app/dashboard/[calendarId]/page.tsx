@@ -28,7 +28,21 @@ import {
   CreditCard,
   ExternalLink,
   LogOut,
+  TrendingUp,
+  Sparkles,
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  Cell,
+} from "recharts";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -128,12 +142,57 @@ const BLACKLIST_PRESETS: string[] = [
 
 const TABS = [
   { id: "overview", label: "Overview", icon: Calendar },
+  { id: "analytics", label: "Analytics", icon: TrendingUp, proOnly: true },
   { id: "calendars", label: "Calendars", icon: Layers },
   { id: "followers", label: "Followers", icon: Heart },
   { id: "members", label: "Users", icon: Users },
   { id: "subscription", label: "Subscription", icon: CreditCard },
   { id: "settings", label: "Settings", icon: Settings },
 ];
+
+// ── Analytics types ────────────────────────────────────────────────────
+
+interface AnalyticsSeriesPoint {
+  date: string;
+  value: number;
+}
+
+interface OrgAnalytics {
+  range: string;
+  generatedAt: string;
+  growth: {
+    followerCount: number;
+    followersInRange: number;
+    followerDeltaPct: number;
+    memberCount: number;
+    membersInRange: number;
+    rsvpsInRange: number;
+    rsvpDeltaPct: number;
+    followerSeries: AnalyticsSeriesPoint[];
+    rsvpSeries: AnalyticsSeriesPoint[];
+  };
+  engagement: {
+    rsvpCount: number;
+    planCount: number;
+    rsvpRate: number;
+    repeatAttendeeCount: number;
+    uniqueRsvpUsersInRange: number;
+    repeatRate: number;
+    topPlans: { id: string; title: string; category: string; rsvpCount: number }[];
+  };
+  whatsWorking: {
+    weekdayDistribution: { day: string; value: number }[];
+    timeOfDayDistribution: { bucket: string; value: number }[];
+    topCategories: { category: string; plans: number; rsvps: number }[];
+  };
+  insights: {
+    type: string;
+    message: string;
+    actionLabel?: string;
+    actionDayIndex?: number;
+    actionTimeBucket?: string;
+  }[];
+}
 
 // ── Component ──────────────────────────────────────────────────────────
 
@@ -169,6 +228,12 @@ export default function OrgDashboardPage() {
 
   // Toast
   const [toast, setToast] = useState<string | null>(null);
+
+  // Analytics
+  const [analytics, setAnalytics] = useState<OrgAnalytics | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [analyticsRange, setAnalyticsRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
 
   // Modals
   const [showAddCalendar, setShowAddCalendar] = useState(false);
@@ -267,6 +332,36 @@ export default function OrgDashboardPage() {
   useEffect(() => {
     if (user) fetchDashboard();
   }, [user, fetchDashboard]);
+
+  // Analytics fetcher — Pro tier only
+  const fetchAnalytics = useCallback(
+    async (range: "7d" | "30d" | "90d" | "all") => {
+      if (!dashboard || dashboard.tier !== "pro") return;
+      setAnalyticsLoading(true);
+      setAnalyticsError(null);
+      try {
+        const result = await Parse.Cloud.run("getOrgAnalytics", {
+          calendarId,
+          range,
+        });
+        setAnalytics(result);
+      } catch (err: unknown) {
+        setAnalyticsError(
+          err instanceof Error ? err.message : "Failed to load analytics"
+        );
+      } finally {
+        setAnalyticsLoading(false);
+      }
+    },
+    [calendarId, dashboard]
+  );
+
+  // Auto-load analytics when the tab opens or range changes
+  useEffect(() => {
+    if (activeTab === "analytics" && dashboard?.tier === "pro") {
+      fetchAnalytics(analyticsRange);
+    }
+  }, [activeTab, analyticsRange, dashboard, fetchAnalytics]);
 
   // ── Handlers ──
 
@@ -396,9 +491,28 @@ export default function OrgDashboardPage() {
   async function handleSubscriptionChange(tier: string) {
     setSubscriptionLoading(true);
     try {
-      await Parse.Cloud.run("updateOrgSubscription", { calendarId, tier });
-      setShowSubscription(false);
-      fetchDashboard();
+      if (tier === "starter") {
+        // Downgrade to free — schedule Stripe cancel-at-period-end
+        if (!confirm("Switching to Starter will cancel your subscription at the end of the current billing period. Continue?")) {
+          setSubscriptionLoading(false);
+          return;
+        }
+        await Parse.Cloud.run("cancelOrgSubscription", { calendarId });
+        setShowSubscription(false);
+        fetchDashboard();
+      } else {
+        // Paid upgrade — open Stripe Checkout
+        const result = await Parse.Cloud.run("createOrgSubscriptionCheckout", {
+          calendarId,
+          tier,
+          returnUrl: `${window.location.origin}/dashboard/${calendarId}`,
+        });
+        if (result?.url) {
+          window.location.href = result.url;
+        } else {
+          throw new Error("Checkout session could not be created.");
+        }
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to update subscription";
       alert(message);
@@ -408,10 +522,10 @@ export default function OrgDashboardPage() {
   }
 
   async function handleCancelSubscription() {
-    if (!confirm("Are you sure you want to cancel your subscription? You will be downgraded to Starter (Free).")) return;
+    if (!confirm("Are you sure you want to cancel your subscription? You will be downgraded to Starter (Free) at the end of your current billing period.")) return;
     setSubscriptionLoading(true);
     try {
-      await Parse.Cloud.run("updateOrgSubscription", { calendarId, cancel: true });
+      await Parse.Cloud.run("cancelOrgSubscription", { calendarId });
       fetchDashboard();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to cancel";
@@ -565,10 +679,17 @@ export default function OrgDashboardPage() {
             {TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
+              const isLocked = tab.proOnly && dashboard.tier !== "pro";
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => {
+                    if (isLocked) {
+                      setShowSubscription(true);
+                    } else {
+                      setActiveTab(tab.id);
+                    }
+                  }}
                   className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium uppercase tracking-widest border-b-2 transition-colors whitespace-nowrap ${
                     isActive
                       ? "border-zinc-900 text-zinc-900"
@@ -577,6 +698,7 @@ export default function OrgDashboardPage() {
                 >
                   <Icon className="w-3.5 h-3.5" />
                   {tab.label}
+                  {isLocked && <Lock className="w-3 h-3 ml-0.5" />}
                 </button>
               );
             })}
@@ -756,6 +878,368 @@ export default function OrgDashboardPage() {
               </a>
             </div>
 
+          </div>
+        )}
+
+        {/* ──────── ANALYTICS TAB ──────── */}
+        {activeTab === "analytics" && dashboard.tier === "pro" && (
+          <div className="space-y-8">
+            {/* Range selector */}
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
+                Analytics
+              </h2>
+              <div className="flex gap-1 border border-zinc-200 rounded-lg p-0.5">
+                {(["7d", "30d", "90d", "all"] as const).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setAnalyticsRange(r)}
+                    className={`px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold rounded-md transition-colors ${
+                      analyticsRange === r
+                        ? "bg-zinc-900 text-white"
+                        : "text-zinc-500 hover:text-zinc-900"
+                    }`}
+                  >
+                    {r === "all" ? "All time" : `Last ${r}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {analyticsLoading && (
+              <div className="border border-zinc-200 rounded-xl p-12 flex items-center justify-center text-zinc-400 text-sm">
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Loading analytics…
+              </div>
+            )}
+
+            {analyticsError && !analyticsLoading && (
+              <div className="border border-red-200 bg-red-50 rounded-xl p-6 text-sm text-red-700">
+                {analyticsError}
+              </div>
+            )}
+
+            {!analyticsLoading && !analyticsError && analytics && (
+              <>
+                {/* Insights / recommendations */}
+                {analytics.insights.length > 0 && (
+                  <section className="space-y-3">
+                    {analytics.insights.map((ins, idx) => (
+                      <div
+                        key={idx}
+                        className="border border-emerald-200 bg-emerald-50/40 rounded-xl p-4 flex items-start gap-3"
+                      >
+                        <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center flex-shrink-0">
+                          <Sparkles className="w-4 h-4" />
+                        </div>
+                        <p className="text-sm text-zinc-700 leading-relaxed pt-1">
+                          {ins.message}
+                        </p>
+                      </div>
+                    ))}
+                  </section>
+                )}
+
+                {/* Growth headline stats */}
+                <section>
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-3">
+                    Growth
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                      {
+                        label: "Followers",
+                        value: analytics.growth.followerCount,
+                        delta: analytics.growth.followersInRange,
+                        deltaPct: analytics.growth.followerDeltaPct,
+                      },
+                      {
+                        label: "Members",
+                        value: analytics.growth.memberCount,
+                        delta: analytics.growth.membersInRange,
+                        deltaPct: null,
+                      },
+                      {
+                        label: "RSVPs",
+                        value: analytics.engagement.rsvpCount,
+                        delta: analytics.growth.rsvpsInRange,
+                        deltaPct: analytics.growth.rsvpDeltaPct,
+                      },
+                      {
+                        label: "Active Plans",
+                        value: analytics.engagement.planCount,
+                        delta: null,
+                        deltaPct: null,
+                      },
+                    ].map((stat) => (
+                      <div
+                        key={stat.label}
+                        className="border border-zinc-200 rounded-xl p-4"
+                      >
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">
+                          {stat.label}
+                        </p>
+                        <p className="text-2xl font-light">{stat.value}</p>
+                        {stat.delta != null && (
+                          <p
+                            className={`text-[11px] mt-1 ${
+                              stat.deltaPct == null
+                                ? "text-zinc-400"
+                                : stat.deltaPct >= 0
+                                ? "text-emerald-600"
+                                : "text-red-500"
+                            }`}
+                          >
+                            {stat.deltaPct == null
+                              ? `+${stat.delta} this period`
+                              : `${stat.deltaPct >= 0 ? "+" : ""}${stat.deltaPct}% vs prev`}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                {/* Followers over time */}
+                <section className="border border-zinc-200 rounded-xl p-6">
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                    Followers over time
+                  </h3>
+                  <div className="h-56 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={analytics.growth.followerSeries}>
+                        <CartesianGrid stroke="#f4f4f5" vertical={false} />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={(d) =>
+                            new Date(d).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })
+                          }
+                          minTickGap={30}
+                        />
+                        <YAxis
+                          tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                          tickLine={false}
+                          axisLine={false}
+                          allowDecimals={false}
+                          width={30}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            border: "1px solid #e4e4e7",
+                            borderRadius: 8,
+                            fontSize: 12,
+                          }}
+                          labelFormatter={(d) =>
+                            new Date(d).toLocaleDateString("en-US", {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                            })
+                          }
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="value"
+                          stroke="#18181b"
+                          strokeWidth={2}
+                          dot={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+
+                {/* RSVPs by day of week + time of day */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <section className="border border-zinc-200 rounded-xl p-6">
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                      RSVPs by day of week
+                    </h3>
+                    <div className="h-48 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analytics.whatsWorking.weekdayDistribution}>
+                          <CartesianGrid stroke="#f4f4f5" vertical={false} />
+                          <XAxis
+                            dataKey="day"
+                            tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <YAxis
+                            tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                            tickLine={false}
+                            axisLine={false}
+                            allowDecimals={false}
+                            width={30}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              border: "1px solid #e4e4e7",
+                              borderRadius: 8,
+                              fontSize: 12,
+                            }}
+                          />
+                          <Bar dataKey="value" fill="#18181b" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </section>
+
+                  <section className="border border-zinc-200 rounded-xl p-6">
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                      RSVPs by time of day
+                    </h3>
+                    <div className="h-48 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analytics.whatsWorking.timeOfDayDistribution}>
+                          <CartesianGrid stroke="#f4f4f5" vertical={false} />
+                          <XAxis
+                            dataKey="bucket"
+                            tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                            tickLine={false}
+                            axisLine={false}
+                            tickFormatter={(s: string) =>
+                              s.charAt(0).toUpperCase() + s.slice(1)
+                            }
+                          />
+                          <YAxis
+                            tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                            tickLine={false}
+                            axisLine={false}
+                            allowDecimals={false}
+                            width={30}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              border: "1px solid #e4e4e7",
+                              borderRadius: 8,
+                              fontSize: 12,
+                            }}
+                            labelFormatter={(s) => {
+                              const str = String(s ?? "");
+                              return str.charAt(0).toUpperCase() + str.slice(1);
+                            }}
+                          />
+                          <Bar dataKey="value" fill="#18181b" radius={[6, 6, 0, 0]}>
+                            {analytics.whatsWorking.timeOfDayDistribution.map((_, i) => (
+                              <Cell key={i} fill="#18181b" />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </section>
+                </div>
+
+                {/* Engagement summary */}
+                <section className="border border-zinc-200 rounded-xl p-6">
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                    Engagement
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest text-zinc-400 mb-1">
+                        Avg RSVPs / plan
+                      </p>
+                      <p className="text-2xl font-light">{analytics.engagement.rsvpRate}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest text-zinc-400 mb-1">
+                        Repeat attendees
+                      </p>
+                      <p className="text-2xl font-light">
+                        {analytics.engagement.repeatAttendeeCount}
+                        <span className="text-sm text-zinc-400 ml-1">
+                          / {analytics.engagement.uniqueRsvpUsersInRange}
+                        </span>
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest text-zinc-400 mb-1">
+                        Repeat rate
+                      </p>
+                      <p className="text-2xl font-light">
+                        {Math.round(analytics.engagement.repeatRate * 100)}%
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Top plans */}
+                {analytics.engagement.topPlans.length > 0 && (
+                  <section className="border border-zinc-200 rounded-xl p-6">
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                      Top plans
+                    </h3>
+                    <div className="space-y-2">
+                      {analytics.engagement.topPlans.map((p, i) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center gap-4 py-2 border-b border-zinc-100 last:border-0"
+                        >
+                          <span className="text-xs text-zinc-400 w-5">{i + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-zinc-900 truncate">{p.title}</p>
+                            <p className="text-[11px] text-zinc-400">{p.category}</p>
+                          </div>
+                          <span className="text-sm font-medium text-zinc-900">
+                            {p.rsvpCount} RSVP{p.rsvpCount === 1 ? "" : "s"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Top categories */}
+                {analytics.whatsWorking.topCategories.length > 0 && (
+                  <section className="border border-zinc-200 rounded-xl p-6">
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                      Top categories
+                    </h3>
+                    <div className="h-48 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={analytics.whatsWorking.topCategories}
+                          layout="vertical"
+                        >
+                          <CartesianGrid stroke="#f4f4f5" horizontal={false} />
+                          <XAxis
+                            type="number"
+                            tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                            tickLine={false}
+                            axisLine={false}
+                            allowDecimals={false}
+                          />
+                          <YAxis
+                            type="category"
+                            dataKey="category"
+                            tick={{ fill: "#71717a", fontSize: 11 }}
+                            tickLine={false}
+                            axisLine={false}
+                            width={100}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              border: "1px solid #e4e4e7",
+                              borderRadius: 8,
+                              fontSize: 12,
+                            }}
+                          />
+                          <Bar dataKey="rsvps" fill="#18181b" radius={[0, 6, 6, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </section>
+                )}
+              </>
+            )}
           </div>
         )}
 

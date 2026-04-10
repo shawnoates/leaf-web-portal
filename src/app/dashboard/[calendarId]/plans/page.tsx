@@ -229,9 +229,27 @@ export default function PlansPage() {
   async function handleSubscriptionChange(newTier: string) {
     setSubscriptionLoading(true);
     try {
-      await Parse.Cloud.run("updateOrgSubscription", { calendarId, tier: newTier });
-      setTier(newTier);
-      setShowUpgradeModal(false);
+      if (newTier === "starter") {
+        if (!confirm("Switching to Starter will cancel your subscription at the end of the current billing period. Continue?")) {
+          setSubscriptionLoading(false);
+          return;
+        }
+        await Parse.Cloud.run("cancelOrgSubscription", { calendarId });
+        setTier("starter");
+        setShowUpgradeModal(false);
+      } else {
+        // Paid upgrade — open Stripe Checkout
+        const result = await Parse.Cloud.run("createOrgSubscriptionCheckout", {
+          calendarId,
+          tier: newTier,
+          returnUrl: `${window.location.origin}/dashboard/${calendarId}/plans`,
+        });
+        if (result?.url) {
+          window.location.href = result.url;
+        } else {
+          throw new Error("Checkout session could not be created.");
+        }
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to update subscription";
       alert(message);
