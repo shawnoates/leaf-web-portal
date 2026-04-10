@@ -606,6 +606,15 @@ export default function OrgCalendarPage() {
   const [nearbyVenues, setNearbyVenues] = useState<NearbyVenue[]>([]);
   const [venuesLoading, setVenuesLoading] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<NearbyVenue | null>(null);
+  // Custom plan creation state
+  const [creatingCustomPlan, setCreatingCustomPlan] = useState(false);
+  const [customTitle, setCustomTitle] = useState("");
+  const [customDescription, setCustomDescription] = useState("");
+  const [customCategory, setCustomCategory] = useState("");
+  const [customCapacity, setCustomCapacity] = useState("");
+  const [customSubmitting, setCustomSubmitting] = useState(false);
+  const [customSuccess, setCustomSuccess] = useState(false);
+  const customVerify = usePhoneVerify();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showFollowModal, setShowFollowModal] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -699,15 +708,19 @@ export default function OrgCalendarPage() {
     if (shareId) fetchOrg();
   }, [shareId, fetchOrg]);
 
-  // Fetch nearby venues when host modal opens
+  // Fetch nearby venues when either host modal or custom plan modal opens
   useEffect(() => {
-    if (!hostingIdea || !org) return;
+    if (!org) return;
+    if (!hostingIdea && !creatingCustomPlan) return;
     setNearbyVenues([]);
     setSelectedVenue(null);
     setVenuesLoading(true);
 
-    const searchCity = hostingIdea.centroid || org.orgCity || "";
-    const query = `${hostingIdea.category} in ${searchCity}`;
+    const searchCity = hostingIdea?.centroid || org.orgCity || "";
+    const searchCategory = hostingIdea
+      ? hostingIdea.category
+      : (customCategory.trim() || "places");
+    const query = `${searchCategory} in ${searchCity}`;
 
     // Load Google Maps if not already loaded, then search
     const doSearch = async () => {
@@ -761,7 +774,7 @@ export default function OrgCalendarPage() {
     };
 
     doSearch();
-  }, [hostingIdea, org]);
+  }, [hostingIdea, creatingCustomPlan, customCategory, org]);
 
   const scroll = (direction: "left" | "right") => {
     if (scrollRef.current) {
@@ -817,6 +830,52 @@ export default function OrgCalendarPage() {
     } catch (err) {
       console.error("Failed to host plan idea:", err);
       setHostSubmitting(false);
+    }
+  };
+
+  const handleCustomPlanSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!org) return;
+    if (!customVerify.isVerified) return;
+    if (!selectedVenue) return;
+    if (!customTitle.trim() || !customDescription.trim()) return;
+
+    setCustomSubmitting(true);
+
+    const form = e.target as HTMLFormElement;
+    const dateInput = form.querySelector('input[type="date"]') as HTMLInputElement;
+    const timeInput = form.querySelector('input[type="time"]') as HTMLInputElement;
+    const dateTime = `${dateInput.value}T${timeInput.value || "18:00"}`;
+
+    try {
+      await Parse.Cloud.run("requestCustomPlanViaWeb", {
+        shareId,
+        name: customVerify.name.trim(),
+        phoneNumber: `+1${customVerify.phone.replace(/\D/g, "")}`,
+        title: customTitle.trim(),
+        description: customDescription.trim(),
+        date: dateTime,
+        venue: {
+          placeId: selectedVenue.placeId,
+          name: selectedVenue.name,
+          address: selectedVenue.address,
+          photoUrl: selectedVenue.photoUrl,
+          rating: selectedVenue.rating,
+        },
+        capacity: customCapacity ? parseInt(customCapacity, 10) : undefined,
+        hostNote: hostNote.trim() || undefined,
+      });
+      setVerifiedUserCookie(customVerify.name, customVerify.phone);
+      setCustomSuccess(true);
+      setHostNote("");
+      setSelectedVenue(null);
+      setTimeout(() => {
+        setCreatingCustomPlan(false);
+        setCustomSuccess(false);
+      }, 2500);
+    } catch (err) {
+      console.error("Failed to submit custom plan:", err);
+      setCustomSubmitting(false);
     }
   };
 
@@ -1101,6 +1160,50 @@ export default function OrgCalendarPage() {
                   </div>
                 </div>
               ))}
+              {/* Custom plan card — let community members propose their own */}
+              {!org.rsvpLimitReached && (
+                <div
+                  className="min-w-[280px] max-w-[300px] snap-start group cursor-pointer"
+                  onClick={() => {
+                    setCreatingCustomPlan(true);
+                    setCustomTitle("");
+                    setCustomDescription("");
+                    setCustomCategory("");
+                    setCustomCapacity("");
+                    setHostNote("");
+                    setSelectedVenue(null);
+                    setCustomSubmitting(false);
+                    setCustomSuccess(false);
+                  }}
+                >
+                  <div className="aspect-[4/5] overflow-hidden mb-4 relative rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white transition-all group-hover:shadow-lg group-hover:border-emerald-300">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center space-y-4">
+                      <div className="w-14 h-14 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                        <Plus className="w-7 h-7" />
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-emerald-700">
+                          Be the Host
+                        </p>
+                        <h4 className="text-lg font-medium tracking-tight text-zinc-900">
+                          Propose Your Own Plan
+                        </h4>
+                        <p className="text-xs text-zinc-500 leading-relaxed font-light">
+                          Have an idea for the community? Submit it and the organizer will review.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <h4 className="text-base font-medium tracking-tight group-hover:italic">
+                      Custom Plan
+                    </h4>
+                    <p className="text-sm text-zinc-500 font-light line-clamp-2 leading-relaxed">
+                      Pitch a date, venue, and details — pending organizer approval.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -1427,6 +1530,243 @@ export default function OrgCalendarPage() {
         </div>
       )}
 
+      {/* Custom Plan Request Overlay */}
+      {creatingCustomPlan && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-3xl md:h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-t-3xl md:rounded-none relative">
+            <button
+              onClick={() => {
+                setCreatingCustomPlan(false);
+                setCustomSuccess(false);
+              }}
+              className="absolute top-6 right-6 z-50 p-2 rounded-full text-zinc-900"
+            >
+              <Plus className="w-8 h-8 rotate-45" />
+            </button>
+
+            <div className="flex-1 overflow-y-auto p-8 md:p-16 space-y-8">
+              {customSuccess ? (
+                <div className="py-20 text-center space-y-6">
+                  <div className="w-20 h-20 border border-zinc-900 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-10 h-10" />
+                  </div>
+                  <h4 className="text-2xl font-light">Request submitted!</h4>
+                  <p className="text-sm text-zinc-500 max-w-sm mx-auto">
+                    The organizer will review your custom plan and get back to you.
+                  </p>
+                  <p className="text-zinc-400 uppercase tracking-widest text-[10px]">
+                    Closing...
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-emerald-700 flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5" /> Be the Host
+                    </p>
+                    <h3 className="text-3xl font-light italic">Propose a custom plan</h3>
+                    <p className="text-zinc-500 font-light">
+                      Bring something new to {org.name}. The organizer will review and approve.
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleCustomPlanSubmit} className="space-y-8">
+                    <div className="space-y-2">
+                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                        Plan Title
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={200}
+                        value={customTitle}
+                        onChange={(e) => setCustomTitle(e.target.value)}
+                        placeholder="e.g. Saturday Morning Trail Run"
+                        className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                        Description
+                      </label>
+                      <textarea
+                        required
+                        rows={3}
+                        maxLength={2000}
+                        value={customDescription}
+                        onChange={(e) => setCustomDescription(e.target.value)}
+                        placeholder="What is this plan about? Who is it for?"
+                        className="w-full border border-zinc-200 rounded-lg p-4 text-sm font-light focus:outline-none focus:border-zinc-900 transition-colors resize-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                          Date
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          min={new Date().toISOString().split("T")[0]}
+                          max={org.tier === "starter" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] : undefined}
+                          className="w-full border-b border-zinc-300 py-4 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                          Start Time
+                        </label>
+                        <input
+                          type="time"
+                          required
+                          defaultValue="18:00"
+                          className="w-full border-b border-zinc-300 py-4 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Venue search */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                        Venue Type / Search
+                      </label>
+                      <input
+                        type="text"
+                        value={customCategory}
+                        onChange={(e) => setCustomCategory(e.target.value)}
+                        placeholder="e.g. coffee shop, park, brewery"
+                        className="w-full border-b border-zinc-300 py-3 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                      />
+                      <p className="text-[11px] text-zinc-400">
+                        We&apos;ll search nearby venues in {org.orgCity || "your area"}.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                        Choose a Venue <span className="text-red-500">*</span>
+                      </label>
+                      {venuesLoading ? (
+                        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                          {[0, 1, 2, 3, 4].map((i) => (
+                            <div key={i} className="min-w-[160px] h-[180px] bg-zinc-100 rounded-xl animate-pulse shrink-0" />
+                          ))}
+                        </div>
+                      ) : nearbyVenues.length > 0 ? (
+                        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                          {nearbyVenues.map((venue) => (
+                            <button
+                              key={venue.placeId}
+                              type="button"
+                              onClick={() => setSelectedVenue(selectedVenue?.placeId === venue.placeId ? null : venue)}
+                              className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left ${
+                                selectedVenue?.placeId === venue.placeId
+                                  ? "border-zinc-900 shadow-lg"
+                                  : "border-zinc-200 hover:border-zinc-300"
+                              }`}
+                            >
+                              <div className="h-[100px] bg-zinc-100">
+                                {venue.photoUrl ? (
+                                  <img src={venue.photoUrl} className="w-full h-full object-cover" alt={venue.name} />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <MapPin className="w-6 h-6 text-zinc-300" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="p-2.5">
+                                <p className="text-xs font-bold truncate">{venue.name}</p>
+                                {venue.rating && (
+                                  <span className="text-[10px] text-zinc-500">{venue.rating.toFixed(1)} &#9733;</span>
+                                )}
+                                <p className="text-[10px] text-zinc-400 truncate mt-0.5">{venue.address}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-zinc-400 italic">
+                          {customCategory ? "No venues found. Try a different search." : "Type a venue type above to search."}
+                        </p>
+                      )}
+                      {selectedVenue && (
+                        <p className="text-xs text-zinc-600 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> {selectedVenue.name} &mdash; {selectedVenue.address}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                          Capacity <span className="text-zinc-400 normal-case">(optional)</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="500"
+                          value={customCapacity}
+                          onChange={(e) => setCustomCapacity(e.target.value)}
+                          placeholder="e.g. 20"
+                          className="w-full border-b border-zinc-300 py-3 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                        Host&apos;s Note <span className="text-zinc-400 normal-case">(optional)</span>
+                      </label>
+                      <textarea
+                        value={hostNote}
+                        onChange={(e) => setHostNote(e.target.value)}
+                        rows={3}
+                        maxLength={500}
+                        className="w-full border border-zinc-200 rounded-lg p-4 text-sm font-light focus:outline-none focus:border-zinc-900 transition-colors resize-none"
+                        placeholder="Add a personal note for attendees"
+                      />
+                      <p className="text-[10px] text-zinc-400 text-right">{hostNote.length}/500</p>
+                    </div>
+
+                    <PhoneVerifyFields verify={customVerify} />
+
+                    <div className="pt-4 flex gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setCreatingCustomPlan(false)}
+                        className="flex-1 text-xs uppercase tracking-widest font-medium text-zinc-500 hover:text-zinc-900 py-3"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={
+                          customSubmitting ||
+                          !customVerify.isVerified ||
+                          !selectedVenue ||
+                          !customTitle.trim() ||
+                          !customDescription.trim()
+                        }
+                        className="flex-1 text-white py-3.5 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center"
+                        style={{ backgroundColor: org.brandColor || "#18181b" }}
+                      >
+                        {customSubmitting ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          "Submit for Approval"
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
       <footer className="py-24 px-6 border-t border-zinc-100">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start gap-12">
@@ -1458,7 +1798,6 @@ export default function OrgCalendarPage() {
                 Connect
               </h5>
               <div className="flex flex-col gap-2 text-sm text-zinc-500 mt-4">
-                <a href="#">Instagram</a>
                 <a
                   href="mailto:team@getleaflets.co"
                   className="hover:text-zinc-900 transition-colors"
