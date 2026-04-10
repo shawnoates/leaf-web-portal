@@ -77,6 +77,7 @@ interface OrgData {
   memberCount: number;
   rsvpLimitReached: boolean;
   isOwner: boolean;
+  isHost: boolean;
   plans: Plan[];
   planIdeas: PlanIdea[];
 }
@@ -516,6 +517,7 @@ export default function OrgCalendarPage() {
         memberCount: result.memberCount || 0,
         rsvpLimitReached: result.rsvpLimitReached || false,
         isOwner: result.isOwner || false,
+        isHost: result.isHost || false,
         plans,
         planIdeas,
       });
@@ -612,11 +614,13 @@ export default function OrgCalendarPage() {
 
     const form = e.target as HTMLFormElement;
     const dateInput = form.querySelector('input[type="date"]') as HTMLInputElement;
+    const timeInput = form.querySelector('input[type="time"]') as HTMLInputElement;
+    const dateTime = `${dateInput.value}T${timeInput.value || "18:00"}`;
 
     try {
       await Parse.Cloud.run("hostPlanIdea", {
         calendarPlanId: hostingIdea.id,
-        date: dateInput.value,
+        date: dateTime,
         capacity: hostingIdea.suggestedCapacity || 20,
         hostNote: hostNote.trim() || undefined,
         venue: selectedVenue ? {
@@ -1163,6 +1167,17 @@ export default function OrgCalendarPage() {
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                        Start Time
+                      </label>
+                      <input
+                        type="time"
+                        required
+                        defaultValue="18:00"
+                        className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
                         Host&apos;s Note
                       </label>
                       <textarea
@@ -1205,7 +1220,7 @@ export default function OrgCalendarPage() {
                         {hostSubmitting ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
-                          "Confirm Launch"
+                          org.isOwner || org.isHost ? "Host Plan" : "Request to Host"
                         )}
                       </button>
                     </div>
