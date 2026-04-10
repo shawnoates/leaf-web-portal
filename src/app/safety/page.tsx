@@ -276,7 +276,7 @@ export default function SafetyPage() {
       <footer className="border-t border-zinc-100 py-12 px-6 mt-12">
         <div className="max-w-3xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <p className="text-xs text-zinc-400">
-            © {new Date().getFullYear()} Leaflets. All rights reserved.
+            © {new Date().getFullYear()} Leaf by One Common LLC
           </p>
           <div className="flex gap-6 text-xs text-zinc-500">
             <Link href="/safety" className="hover:text-zinc-900 transition-colors">
