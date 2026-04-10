@@ -128,32 +128,25 @@ function RsvpModal({
   brandColor?: string;
   onClose: () => void;
 }) {
-  const [step, setStep] = useState<"form" | "submitting" | "success" | "error">("form");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const verify = usePhoneVerify();
+  const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
   const [errorMsg, setErrorMsg] = useState("");
-
-  const formatPhone = (value: string) => {
-    const cleaned = value.replace(/\D/g, "");
-    if (cleaned.length <= 3) return cleaned;
-    if (cleaned.length <= 6)
-      return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
-    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStep("submitting");
+    if (!verify.isVerified) return;
+    setFormStep("submitting");
     try {
       await Parse.Cloud.run("rsvpToPlanViaWeb", {
-        phoneNumber: phone.replace(/\D/g, ""),
-        name,
+        phoneNumber: verify.phone.replace(/\D/g, ""),
+        name: verify.name,
         eventGroupId: plan.id,
       });
-      setStep("success");
+      setVerifiedUserCookie(verify.name, verify.phone);
+      setFormStep("success");
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to RSVP. Please try again.");
-      setStep("error");
+      setFormStep("error");
     }
   };
 
@@ -167,7 +160,7 @@ function RsvpModal({
           <X className="w-5 h-5" />
         </button>
 
-        {step === "form" || step === "submitting" ? (
+        {formStep === "form" || formStep === "submitting" ? (
           <div className="space-y-6">
             <div>
               <h3 className="text-2xl font-light tracking-tight">
@@ -178,42 +171,14 @@ function RsvpModal({
               </p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2">
-                <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
-                  Your Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Full name"
-                  className="w-full border-b border-zinc-300 py-3 text-lg font-light focus:outline-none focus:border-zinc-900 transition-colors"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
-                  Phone Number
-                </label>
-                <div className="flex items-center border-b border-zinc-300 focus-within:border-zinc-900 transition-colors">
-                  <Phone className="w-4 h-4 text-zinc-400 mr-2" />
-                  <input
-                    type="tel"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(formatPhone(e.target.value))}
-                    placeholder="555-555-5555"
-                    className="w-full py-3 text-lg font-light focus:outline-none"
-                  />
-                </div>
-              </div>
+              <PhoneVerifyFields verify={verify} />
               <button
                 type="submit"
-                disabled={step === "submitting"}
+                disabled={formStep === "submitting" || !verify.isVerified || !verify.name}
                 className="w-full text-white py-3.5 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-50"
                 style={{ backgroundColor: brandColor || "#18181b" }}
               >
-                {step === "submitting" ? (
+                {formStep === "submitting" ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <>Confirm RSVP <ArrowRight className="w-4 h-4" /></>
@@ -221,11 +186,11 @@ function RsvpModal({
               </button>
             </form>
           </div>
-        ) : step === "error" ? (
+        ) : formStep === "error" ? (
           <div className="py-8 text-center space-y-6">
             <p className="text-red-600 text-sm">{errorMsg}</p>
             <button
-              onClick={() => setStep("form")}
+              onClick={() => setFormStep("form")}
               className="text-sm text-zinc-500 hover:text-zinc-900 underline"
             >
               Try Again
@@ -265,6 +230,30 @@ function RsvpModal({
 
 // --- Cookie Helpers ---
 
+// --- Verified User Cookie (shared across Follow, RSVP, Host) ---
+
+interface VerifiedUser {
+  name: string;
+  phone: string; // formatted like 555-555-5555
+}
+
+function setVerifiedUserCookie(name: string, phone: string) {
+  const data = JSON.stringify({ name, phone });
+  const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `leaf_verified_user=${encodeURIComponent(data)}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+function getVerifiedUserCookie(): VerifiedUser | null {
+  const match = document.cookie.match(/leaf_verified_user=([^;]+)/);
+  if (!match) return null;
+  try {
+    return JSON.parse(decodeURIComponent(match[1]));
+  } catch {
+    return null;
+  }
+}
+
+// Keep legacy follower cookie for backward compat
 function setFollowerCookie(calendarId: string, name: string, phone: string) {
   const data = JSON.stringify({ calendarId, name, phone });
   const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
@@ -279,6 +268,155 @@ function getFollowerCookie(): { calendarId: string; name: string; phone: string 
   } catch {
     return null;
   }
+}
+
+// --- Shared phone format helper ---
+function formatPhoneNumber(value: string) {
+  const cleaned = value.replace(/\D/g, "");
+  if (cleaned.length <= 3) return cleaned;
+  if (cleaned.length <= 6) return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
+  return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+}
+
+// --- Phone Verify Hook ---
+function usePhoneVerify() {
+  const cached = getVerifiedUserCookie();
+  const [name, setName] = useState(cached?.name || "");
+  const [phone, setPhone] = useState(cached?.phone || "");
+  const [code, setCode] = useState("");
+  const [step, setStep] = useState<"phone" | "code" | "verified">(cached ? "verified" : "phone");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const isVerified = step === "verified";
+
+  const sendOTP = async () => {
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 10) { setError("Please enter a valid phone number."); return; }
+    setSending(true);
+    setError("");
+    try {
+      await Parse.Cloud.run("requestOTP", { phone: `+1${digits}` });
+      setStep("code");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to send code.");
+    } finally { setSending(false); }
+  };
+
+  const verifyOTP = async () => {
+    const digits = phone.replace(/\D/g, "");
+    setSending(true);
+    setError("");
+    try {
+      const result = await Parse.Cloud.run("verifyOTP", { phone: `+1${digits}`, code });
+      if (result && typeof result === "object" && result.sessionToken) {
+        setStep("verified");
+        setVerifiedUserCookie(name, phone);
+      } else {
+        setError("Invalid code. Please try again.");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Invalid code. Please try again.");
+    } finally { setSending(false); }
+  };
+
+  const reset = () => {
+    setStep("phone");
+    setCode("");
+    setError("");
+  };
+
+  return { name, setName, phone, setPhone, code, setCode, step, isVerified, sending, error, sendOTP, verifyOTP, reset };
+}
+
+// --- Shared Phone Verify Fields Component ---
+
+function PhoneVerifyFields({ verify }: { verify: ReturnType<typeof usePhoneVerify> }) {
+  return (
+    <>
+      <div className="space-y-2">
+        <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+          Your Name
+        </label>
+        <input
+          type="text"
+          required
+          value={verify.name}
+          onChange={(e) => verify.setName(e.target.value)}
+          placeholder="Full name"
+          disabled={verify.isVerified}
+          className="w-full border-b border-zinc-300 py-3 text-lg font-light focus:outline-none focus:border-zinc-900 transition-colors disabled:text-zinc-500"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+          Phone Number
+        </label>
+        {verify.step === "phone" && (
+          <div className="flex items-center gap-3">
+            <div className="flex items-center flex-1 border-b border-zinc-300 focus-within:border-zinc-900 transition-colors">
+              <Phone className="w-4 h-4 text-zinc-400 mr-2" />
+              <input
+                type="tel"
+                required
+                value={verify.phone}
+                onChange={(e) => verify.setPhone(formatPhoneNumber(e.target.value))}
+                placeholder="555-555-5555"
+                className="w-full py-3 text-lg font-light focus:outline-none"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={verify.sendOTP}
+              disabled={verify.sending || verify.phone.replace(/\D/g, "").length < 10 || !verify.name}
+              className="px-4 py-2.5 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 whitespace-nowrap"
+            >
+              {verify.sending ? "Sending..." : "Verify"}
+            </button>
+          </div>
+        )}
+        {verify.step === "code" && (
+          <div className="space-y-3">
+            <p className="text-xs text-zinc-500">Enter the 6-digit code sent to {verify.phone}</p>
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={verify.code}
+                onChange={(e) => verify.setCode(e.target.value.replace(/\D/g, ""))}
+                placeholder="000000"
+                className="flex-1 border-b border-zinc-300 py-3 text-lg font-light tracking-[0.5em] text-center focus:outline-none focus:border-zinc-900 transition-colors"
+              />
+              <button
+                type="button"
+                onClick={verify.verifyOTP}
+                disabled={verify.sending || verify.code.length < 6}
+                className="px-4 py-2.5 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 whitespace-nowrap"
+              >
+                {verify.sending ? "Checking..." : "Confirm"}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={verify.reset}
+              className="text-xs text-zinc-400 hover:text-zinc-900 underline"
+            >
+              Change number
+            </button>
+          </div>
+        )}
+        {verify.step === "verified" && (
+          <div className="flex items-center gap-2 py-3">
+            <Check className="w-4 h-4 text-emerald-600" />
+            <span className="text-sm text-emerald-600 font-medium">{verify.phone} verified</span>
+          </div>
+        )}
+        {verify.error && (
+          <p className="text-xs text-red-500 mt-1">{verify.error}</p>
+        )}
+      </div>
+    </>
+  );
 }
 
 // --- Follow Modal ---
@@ -296,34 +434,27 @@ function FollowModal({
   onClose: () => void;
   onFollowed: (name: string, phone: string) => void;
 }) {
-  const [step, setStep] = useState<"form" | "submitting" | "success" | "error">("form");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const verify = usePhoneVerify();
+  const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
   const [errorMsg, setErrorMsg] = useState("");
-
-  const formatPhone = (value: string) => {
-    const cleaned = value.replace(/\D/g, "");
-    if (cleaned.length <= 3) return cleaned;
-    if (cleaned.length <= 6)
-      return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
-    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStep("submitting");
+    if (!verify.isVerified) return;
+    setFormStep("submitting");
     try {
       await Parse.Cloud.run("followCalendarViaWeb", {
         calendarId,
-        name,
-        phoneNumber: phone.replace(/\D/g, ""),
+        name: verify.name,
+        phoneNumber: verify.phone.replace(/\D/g, ""),
       });
-      setFollowerCookie(calendarId, name, phone);
-      onFollowed(name, phone);
-      setStep("success");
+      setFollowerCookie(calendarId, verify.name, verify.phone);
+      setVerifiedUserCookie(verify.name, verify.phone);
+      onFollowed(verify.name, verify.phone);
+      setFormStep("success");
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to follow. Please try again.");
-      setStep("error");
+      setFormStep("error");
     }
   };
 
@@ -337,7 +468,7 @@ function FollowModal({
           <X className="w-5 h-5" />
         </button>
 
-        {step === "form" || step === "submitting" ? (
+        {formStep === "form" || formStep === "submitting" ? (
           <div className="space-y-6">
             <div>
               <h3 className="text-2xl font-light tracking-tight">
@@ -348,41 +479,14 @@ function FollowModal({
               </p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">
-                  Name
-                </label>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
-                  placeholder="Your name"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">
-                  Phone
-                </label>
-                <div className="flex items-center border-b border-zinc-300">
-                  <Phone className="w-4 h-4 text-zinc-400 mr-2" />
-                  <input
-                    value={phone}
-                    onChange={(e) => setPhone(formatPhone(e.target.value))}
-                    required
-                    type="tel"
-                    className="w-full py-2 text-lg font-light focus:outline-none"
-                    placeholder="555-123-4567"
-                  />
-                </div>
-              </div>
+              <PhoneVerifyFields verify={verify} />
               <button
                 type="submit"
-                disabled={step === "submitting" || !name || phone.replace(/\D/g, "").length < 10}
+                disabled={formStep === "submitting" || !verify.isVerified || !verify.name}
                 className="w-full text-white py-3 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-90 disabled:opacity-50"
                 style={{ backgroundColor: brandColor || "#18181b" }}
               >
-                {step === "submitting" ? (
+                {formStep === "submitting" ? (
                   <Loader2 className="w-4 h-4 animate-spin mx-auto" />
                 ) : (
                   "Follow"
@@ -390,7 +494,7 @@ function FollowModal({
               </button>
             </form>
           </div>
-        ) : step === "success" ? (
+        ) : formStep === "success" ? (
           <div className="text-center py-8 space-y-4">
             <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto">
               <Check className="w-8 h-8 text-emerald-600" />
@@ -410,7 +514,7 @@ function FollowModal({
           <div className="text-center py-8 space-y-4">
             <p className="text-red-600 text-sm">{errorMsg}</p>
             <button
-              onClick={() => setStep("form")}
+              onClick={() => setFormStep("form")}
               className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900"
             >
               Try Again
@@ -437,13 +541,7 @@ export default function OrgCalendarPage() {
   const [hostSuccess, setHostSuccess] = useState<boolean | "pending">(false);
   const [hostSubmitting, setHostSubmitting] = useState(false);
   const [hostNote, setHostNote] = useState("");
-  const [hostName, setHostName] = useState("");
-  const [hostPhone, setHostPhone] = useState("");
-  const [hostVerifyCode, setHostVerifyCode] = useState("");
-  const [hostPhoneVerified, setHostPhoneVerified] = useState(false);
-  const [hostVerifyStep, setHostVerifyStep] = useState<"phone" | "code" | "verified">("phone");
-  const [hostVerifySending, setHostVerifySending] = useState(false);
-  const [hostVerifyError, setHostVerifyError] = useState("");
+  const hostVerify = usePhoneVerify();
   const [nearbyVenues, setNearbyVenues] = useState<NearbyVenue[]>([]);
   const [venuesLoading, setVenuesLoading] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<NearbyVenue | null>(null);
@@ -614,60 +712,13 @@ export default function OrgCalendarPage() {
     }
   };
 
-  const formatHostPhone = (value: string) => {
-    const cleaned = value.replace(/\D/g, "");
-    if (cleaned.length <= 3) return cleaned;
-    if (cleaned.length <= 6) return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
-    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
-  };
-
-  const handleSendHostOTP = async () => {
-    const digits = hostPhone.replace(/\D/g, "");
-    if (digits.length < 10) {
-      setHostVerifyError("Please enter a valid phone number.");
-      return;
-    }
-    setHostVerifySending(true);
-    setHostVerifyError("");
-    try {
-      await Parse.Cloud.run("requestOTP", { phone: `+1${digits}` });
-      setHostVerifyStep("code");
-    } catch (err: unknown) {
-      setHostVerifyError(err instanceof Error ? err.message : "Failed to send code.");
-    } finally {
-      setHostVerifySending(false);
-    }
-  };
-
-  const handleVerifyHostOTP = async () => {
-    const digits = hostPhone.replace(/\D/g, "");
-    setHostVerifySending(true);
-    setHostVerifyError("");
-    try {
-      const result = await Parse.Cloud.run("verifyOTP", { phone: `+1${digits}`, code: hostVerifyCode });
-      if (result && typeof result === "object" && result.sessionToken) {
-        setHostPhoneVerified(true);
-        setHostVerifyStep("verified");
-      } else {
-        setHostVerifyError("Invalid code. Please try again.");
-      }
-    } catch (err: unknown) {
-      setHostVerifyError(err instanceof Error ? err.message : "Invalid code. Please try again.");
-    } finally {
-      setHostVerifySending(false);
-    }
-  };
-
   const handleHostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!hostingIdea) return;
     const isOwnerOrHost = org && (org.isOwner || org.isHost);
 
     // Non-owners must verify phone first
-    if (!isOwnerOrHost && !hostPhoneVerified) {
-      setHostVerifyError("Please verify your phone number first.");
-      return;
-    }
+    if (!isOwnerOrHost && !hostVerify.isVerified) return;
 
     setHostSubmitting(true);
 
@@ -682,8 +733,8 @@ export default function OrgCalendarPage() {
         date: dateTime,
         capacity: hostingIdea.suggestedCapacity || 20,
         hostNote: hostNote.trim() || undefined,
-        hostName: !isOwnerOrHost ? hostName.trim() : undefined,
-        hostPhone: !isOwnerOrHost ? `+1${hostPhone.replace(/\D/g, "")}` : undefined,
+        hostName: !isOwnerOrHost ? hostVerify.name.trim() : undefined,
+        hostPhone: !isOwnerOrHost ? `+1${hostVerify.phone.replace(/\D/g, "")}` : undefined,
         venue: selectedVenue ? {
           placeId: selectedVenue.placeId,
           name: selectedVenue.name,
@@ -694,11 +745,6 @@ export default function OrgCalendarPage() {
       });
       setHostSuccess(result?.pendingApproval ? "pending" : true);
       setHostNote("");
-      setHostName("");
-      setHostPhone("");
-      setHostVerifyCode("");
-      setHostPhoneVerified(false);
-      setHostVerifyStep("phone");
       setSelectedVenue(null);
       // Refresh data to show the new plan
       fetchOrg();
@@ -966,12 +1012,6 @@ export default function OrgCalendarPage() {
                     setHostSubmitting(false);
                     setHostSuccess(false);
                     setHostNote("");
-                    setHostName("");
-                    setHostPhone("");
-                    setHostVerifyCode("");
-                    setHostPhoneVerified(false);
-                    setHostVerifyStep("phone");
-                    setHostVerifyError("");
                     setSelectedVenue(null);
                   }}
                 >
@@ -1230,89 +1270,7 @@ export default function OrgCalendarPage() {
                   <form onSubmit={handleHostSubmit} className="space-y-8">
                     {/* Name & Phone for non-owners */}
                     {!(org.isOwner || org.isHost) && (
-                      <>
-                        <div className="space-y-2">
-                          <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
-                            Your Name
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            value={hostName}
-                            onChange={(e) => setHostName(e.target.value)}
-                            placeholder="Full name"
-                            className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
-                            Phone Number
-                          </label>
-                          {hostVerifyStep === "phone" && (
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center flex-1 border-b border-zinc-300 focus-within:border-zinc-900 transition-colors">
-                                <Phone className="w-4 h-4 text-zinc-400 mr-2" />
-                                <input
-                                  type="tel"
-                                  required
-                                  value={hostPhone}
-                                  onChange={(e) => setHostPhone(formatHostPhone(e.target.value))}
-                                  placeholder="555-555-5555"
-                                  className="w-full py-4 text-xl font-light focus:outline-none"
-                                />
-                              </div>
-                              <button
-                                type="button"
-                                onClick={handleSendHostOTP}
-                                disabled={hostVerifySending || hostPhone.replace(/\D/g, "").length < 10}
-                                className="px-4 py-2.5 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 whitespace-nowrap"
-                              >
-                                {hostVerifySending ? "Sending..." : "Verify"}
-                              </button>
-                            </div>
-                          )}
-                          {hostVerifyStep === "code" && (
-                            <div className="space-y-3">
-                              <p className="text-xs text-zinc-500">Enter the 6-digit code sent to {hostPhone}</p>
-                              <div className="flex items-center gap-3">
-                                <input
-                                  type="text"
-                                  inputMode="numeric"
-                                  maxLength={6}
-                                  value={hostVerifyCode}
-                                  onChange={(e) => setHostVerifyCode(e.target.value.replace(/\D/g, ""))}
-                                  placeholder="000000"
-                                  className="flex-1 border-b border-zinc-300 py-4 text-xl font-light tracking-[0.5em] text-center focus:outline-none focus:border-zinc-900 transition-colors"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={handleVerifyHostOTP}
-                                  disabled={hostVerifySending || hostVerifyCode.length < 6}
-                                  className="px-4 py-2.5 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 whitespace-nowrap"
-                                >
-                                  {hostVerifySending ? "Checking..." : "Confirm"}
-                                </button>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => { setHostVerifyStep("phone"); setHostVerifyCode(""); }}
-                                className="text-xs text-zinc-400 hover:text-zinc-900 underline"
-                              >
-                                Change number
-                              </button>
-                            </div>
-                          )}
-                          {hostVerifyStep === "verified" && (
-                            <div className="flex items-center gap-2 py-4">
-                              <Check className="w-4 h-4 text-emerald-600" />
-                              <span className="text-sm text-emerald-600 font-medium">{hostPhone} verified</span>
-                            </div>
-                          )}
-                          {hostVerifyError && (
-                            <p className="text-xs text-red-500 mt-1">{hostVerifyError}</p>
-                          )}
-                        </div>
-                      </>
+                      <PhoneVerifyFields verify={hostVerify} />
                     )}
 
                     <div className="space-y-2">
@@ -1376,7 +1334,7 @@ export default function OrgCalendarPage() {
                       </button>
                       <button
                         type="submit"
-                        disabled={hostSubmitting}
+                        disabled={hostSubmitting || (!(org.isOwner || org.isHost) && !hostVerify.isVerified)}
                         className="flex-1 text-white py-3.5 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center"
                         style={{ backgroundColor: org.brandColor || "#18181b" }}
                       >
