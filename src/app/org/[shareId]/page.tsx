@@ -152,14 +152,13 @@ function RsvpModal({
         phoneNumber: verify.phone.replace(/\D/g, ""),
         name: verify.name,
         eventGroupId: plan.id,
-      });
+      }) as { eventNotificationId?: string; alreadyRsvpd?: boolean } | null | undefined;
+      console.log("[RSVP] result:", result);
       setVerifiedUserCookie(verify.name, verify.phone);
-      if (result && typeof result === "object" && typeof result.eventNotificationId === "string") {
+      if (result?.eventNotificationId) {
         setNotificationId(result.eventNotificationId);
       }
-      const alreadyRsvpd =
-        result && typeof result === "object" && (result as { alreadyRsvpd?: boolean }).alreadyRsvpd === true;
-      onRsvpSuccess?.(plan.id, alreadyRsvpd);
+      onRsvpSuccess?.(plan.id, result?.alreadyRsvpd === true);
       setFormStep("success");
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to RSVP. Please try again.");
@@ -652,7 +651,8 @@ export default function OrgCalendarPage() {
         image: p.image as string || "",
         hostName: (p.host as Record<string, string>)?.name || "Community Member",
         hostAvatar: (p.host as Record<string, string>)?.profilePictureUrl || null,
-        attendeeCount: (p.rsvpCount as number) || 0,
+        // rsvpCount tracks RSVPs only; the host is always attending so add 1
+        attendeeCount: ((p.rsvpCount as number) || 0) + 1,
         location: p.location ? {
           name: (p.location as Record<string, string>).name || "",
           address: (p.location as Record<string, string>).address || "",
@@ -1212,7 +1212,23 @@ export default function OrgCalendarPage() {
 
       {/* RSVP Modal */}
       {rsvpPlan && (
-        <RsvpModal plan={rsvpPlan} onClose={() => setRsvpPlan(null)} brandColor={org.brandColor || undefined} />
+        <RsvpModal
+          plan={rsvpPlan}
+          onClose={() => setRsvpPlan(null)}
+          brandColor={org.brandColor || undefined}
+          onRsvpSuccess={(planId, alreadyRsvpd) => {
+            if (alreadyRsvpd) return;
+            setOrg((prev) => prev ? {
+              ...prev,
+              plans: prev.plans.map((p) =>
+                p.id === planId ? { ...p, attendeeCount: p.attendeeCount + 1 } : p
+              ),
+            } : prev);
+            setSelectedEvent((prev) =>
+              prev && prev.id === planId ? { ...prev, attendeeCount: prev.attendeeCount + 1 } : prev
+            );
+          }}
+        />
       )}
 
       {/* Host Plan Idea Overlay */}
