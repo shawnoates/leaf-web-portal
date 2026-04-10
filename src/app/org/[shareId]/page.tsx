@@ -920,25 +920,11 @@ export default function OrgCalendarPage() {
                         Hosted by {plan.hostName}
                       </p>
                     </div>
-                    {plan.location && (
-                      <p className="text-xs text-zinc-400">
-                        {plan.location.name}
-                      </p>
-                    )}
                   </div>
 
                   <p className="text-zinc-500 leading-relaxed font-light text-lg line-clamp-3">
                     {plan.description}
                   </p>
-
-                  {plan.hostNote && (
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Note from Host</p>
-                      <p className="text-sm text-zinc-400 italic border-l-2 border-zinc-200 pl-3 line-clamp-2">
-                        &ldquo;{plan.hostNote}&rdquo;
-                      </p>
-                    </div>
-                  )}
 
                   <div className="pt-2 flex flex-col gap-6">
                     <AvatarStack count={plan.attendeeCount} />
@@ -1105,6 +1091,16 @@ export default function OrgCalendarPage() {
                 <p className="text-xl font-light leading-relaxed text-zinc-600">
                   {selectedEvent.description}
                 </p>
+                {selectedEvent.hostNote && (
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                      Note from Host
+                    </h4>
+                    <p className="text-sm text-zinc-400 italic border-l-2 border-zinc-200 pl-3">
+                      &ldquo;{selectedEvent.hostNote}&rdquo;
+                    </p>
+                  </div>
+                )}
                 {selectedEvent.location && (
                   <div className="space-y-2">
                     <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
