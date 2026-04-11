@@ -1851,6 +1851,30 @@ export default function OrgCalendarPage() {
         </div>
       )}
 
+      {/* Create Your Own Calendar CTA */}
+      <section className="py-20 md:py-24 px-6 border-t border-zinc-100 bg-zinc-50/60">
+        <div className="max-w-3xl mx-auto text-center space-y-6">
+          <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400">
+            Powered by Leaf
+          </p>
+          <h2 className="text-3xl md:text-4xl font-light tracking-tight leading-tight">
+            Want a calendar like this for your community?
+          </h2>
+          <p className="text-zinc-500 font-light leading-relaxed max-w-xl mx-auto">
+            Leaf gives you an AI-powered calendar that helps your people show
+            up — without spending your week chasing logistics.
+          </p>
+          <div className="pt-2">
+            <a
+              href="https://www.os.joinleaf.com/organizations/setup"
+              className="inline-flex items-center gap-2 bg-zinc-900 text-white px-8 py-4 text-xs uppercase tracking-[0.2em] font-bold hover:bg-zinc-800 transition-colors"
+            >
+              Create Your Own Calendar <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="py-24 px-6 border-t border-zinc-100">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start gap-12">
