@@ -6,6 +6,7 @@ import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import { Calendar, Sparkles } from "lucide-react";
+import { getRandomStreakQuote, type StreakQuote } from "@/lib/streak-quotes";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -13,6 +14,9 @@ export default function DashboardPage() {
   const [hasOrg, setHasOrg] = useState(false);
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
+  // Pick once on mount so SSR/CSR match and the quote doesn't flicker between renders.
+  const [quote, setQuote] = useState<StreakQuote | null>(null);
+  useEffect(() => { setQuote(getRandomStreakQuote()); }, []);
 
   useEffect(() => {
     try {
@@ -60,19 +64,57 @@ export default function DashboardPage() {
   // Not signed in
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6">
-        <div className="max-w-sm w-full text-center">
-          <Calendar className="w-10 h-10 mx-auto mb-4 text-zinc-400" />
-          <h1 className="text-2xl font-light tracking-tight mb-2">
-            Sign in to manage your organization
-          </h1>
-          <p className="text-sm text-zinc-500 mb-8">
-            Access your dashboard, edit calendars, and manage your subscription.
-          </p>
-          <GoogleSignInButton
-            onSignIn={(u) => setUser(u)}
-            onError={(err) => console.error("Sign-in error:", err)}
+      <div className="min-h-screen flex">
+        {/* Left visual panel — desktop only */}
+        <div className="hidden md:flex relative w-1/2 lg:w-3/5 overflow-hidden bg-zinc-900">
+          <video
+            className="absolute inset-0 w-full h-full object-cover opacity-60 scale-105"
+            src="/dashboard-hero.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            poster="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&q=80&w=2000"
           />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/30 via-black/50 to-black/80" />
+          <div className="relative z-10 flex flex-col justify-between p-12 lg:p-16 text-white w-full">
+            <Link href="/" className="flex items-center gap-3">
+              <img src="/leaf-logo-white.svg" alt="Leaf" className="h-7" />
+              <span className="text-lg font-light tracking-[0.2em] uppercase">OS</span>
+            </Link>
+            <div className="space-y-6 max-w-md min-h-[180px]">
+              {quote && (
+                <>
+                  <p className="text-3xl lg:text-4xl font-light tracking-tight leading-tight">
+                    &ldquo;{quote.quote}&rdquo;
+                  </p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-white/60">
+                    — {quote.author}
+                  </p>
+                </>
+              )}
+            </div>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-white/50">
+              Leaf OS · For Organizations
+            </p>
+          </div>
+        </div>
+
+        {/* Right sign-in panel */}
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 bg-white">
+          <div className="max-w-sm w-full text-center">
+            <Calendar className="w-10 h-10 mx-auto mb-4 text-zinc-400 md:hidden" />
+            <h1 className="text-2xl font-light tracking-tight mb-2">
+              Sign in to manage your organization
+            </h1>
+            <p className="text-sm text-zinc-500 mb-8">
+              Access your dashboard, edit calendars, and manage your subscription.
+            </p>
+            <GoogleSignInButton
+              onSignIn={(u) => setUser(u)}
+              onError={(err) => console.error("Sign-in error:", err)}
+            />
+          </div>
         </div>
       </div>
     );

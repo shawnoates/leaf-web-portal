@@ -1853,7 +1853,9 @@ export default function OrgCalendarPage() {
                 Platform
               </h5>
               <div className="flex flex-col gap-2 text-sm text-zinc-500 mt-4">
-                <a href="#">About</a>
+                <Link href="/about" className="hover:text-zinc-900 transition-colors">
+                  About
+                </Link>
                 <Link href="/safety" className="hover:text-zinc-900 transition-colors">
                   Safety
                 </Link>
