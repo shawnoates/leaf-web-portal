@@ -652,7 +652,7 @@ export default function OrgCalendarPage() {
   const [customCategory, setCustomCategory] = useState("");
   const [customCapacity, setCustomCapacity] = useState("");
   const [customSubmitting, setCustomSubmitting] = useState(false);
-  const [customSuccess, setCustomSuccess] = useState(false);
+  const [customSuccess, setCustomSuccess] = useState<false | true | "published">(false);
   const customVerify = usePhoneVerify();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showFollowModal, setShowFollowModal] = useState(false);
@@ -905,7 +905,8 @@ export default function OrgCalendarPage() {
   const handleCustomPlanSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!org) return;
-    if (!customVerify.isVerified) return;
+    const isOwnerOrHost = org.isOwner || org.isHost;
+    if (!isOwnerOrHost && !customVerify.isVerified) return;
     if (!selectedVenue) return;
     if (!customTitle.trim() || !customDescription.trim()) return;
 
@@ -917,10 +918,10 @@ export default function OrgCalendarPage() {
     const dateTime = `${dateInput.value}T${timeInput.value || "18:00"}`;
 
     try {
-      await Parse.Cloud.run("requestCustomPlanViaWeb", {
+      const result = await Parse.Cloud.run("requestCustomPlanViaWeb", {
         shareId,
-        name: customVerify.name.trim(),
-        phoneNumber: `+1${customVerify.phone.replace(/\D/g, "")}`,
+        name: isOwnerOrHost ? undefined : customVerify.name.trim(),
+        phoneNumber: isOwnerOrHost ? undefined : `+1${customVerify.phone.replace(/\D/g, "")}`,
         title: customTitle.trim(),
         description: customDescription.trim(),
         date: dateTime,
@@ -934,10 +935,16 @@ export default function OrgCalendarPage() {
         capacity: customCapacity ? parseInt(customCapacity, 10) : undefined,
         hostNote: hostNote.trim() || undefined,
       });
-      setVerifiedUserCookie(customVerify.name, customVerify.phone);
-      setCustomSuccess(true);
+      if (!isOwnerOrHost) {
+        setVerifiedUserCookie(customVerify.name, customVerify.phone);
+      }
+      setCustomSuccess(result?.pendingApproval === false ? "published" : true);
       setHostNote("");
       setSelectedVenue(null);
+      // Refresh so a newly published plan shows up immediately.
+      if (result?.pendingApproval === false) {
+        fetchOrg();
+      }
       setTimeout(() => {
         setCreatingCustomPlan(false);
         setCustomSuccess(false);
@@ -1619,9 +1626,13 @@ export default function OrgCalendarPage() {
                   <div className="w-20 h-20 border border-zinc-900 rounded-full flex items-center justify-center mx-auto">
                     <CheckCircle2 className="w-10 h-10" />
                   </div>
-                  <h4 className="text-2xl font-light">Request submitted!</h4>
+                  <h4 className="text-2xl font-light">
+                    {customSuccess === "published" ? "Plan published!" : "Request submitted!"}
+                  </h4>
                   <p className="text-sm text-zinc-500 max-w-sm mx-auto">
-                    The organizer will review your custom plan and get back to you.
+                    {customSuccess === "published"
+                      ? "Your plan is live. Followers will see it on the calendar."
+                      : "The organizer will review your custom plan and get back to you."}
                   </p>
                   <p className="text-zinc-400 uppercase tracking-widest text-[10px]">
                     Closing...
@@ -1635,7 +1646,9 @@ export default function OrgCalendarPage() {
                     </p>
                     <h3 className="text-3xl font-light italic">Propose a custom plan</h3>
                     <p className="text-zinc-500 font-light">
-                      Bring something new to {org.name}. The organizer will review and approve.
+                      {org.isOwner || org.isHost
+                        ? `Create a new plan for ${org.name}. It will go live immediately.`
+                        : `Bring something new to ${org.name}. The organizer will review and approve.`}
                     </p>
                   </div>
 
@@ -1799,7 +1812,9 @@ export default function OrgCalendarPage() {
                       <p className="text-[10px] text-zinc-400 text-right">{hostNote.length}/500</p>
                     </div>
 
-                    <PhoneVerifyFields verify={customVerify} />
+                    {!(org.isOwner || org.isHost) && (
+                      <PhoneVerifyFields verify={customVerify} />
+                    )}
 
                     <div className="pt-4 flex gap-4">
                       <button
@@ -1813,7 +1828,7 @@ export default function OrgCalendarPage() {
                         type="submit"
                         disabled={
                           customSubmitting ||
-                          !customVerify.isVerified ||
+                          (!(org.isOwner || org.isHost) && !customVerify.isVerified) ||
                           !selectedVenue ||
                           !customTitle.trim() ||
                           !customDescription.trim()
@@ -1824,7 +1839,7 @@ export default function OrgCalendarPage() {
                         {customSubmitting ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
-                          "Submit for Approval"
+                          org.isOwner || org.isHost ? "Create Plan" : "Submit for Approval"
                         )}
                       </button>
                     </div>
