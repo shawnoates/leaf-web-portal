@@ -1007,17 +1007,17 @@ export default function OrgCalendarPage() {
   return (
     <div className="min-h-screen">
       {/* Navigation */}
-      <nav className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-zinc-100 px-6 py-8">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-4">
+      <nav className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-zinc-100 px-6 py-6 md:py-8">
+        <div className="max-w-6xl mx-auto flex justify-between items-center gap-3">
+          <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
             {org.profilePhoto && org.tier !== "starter" && (
               <img
                 src={org.profilePhoto}
                 alt={org.name}
-                className="w-9 h-9 rounded-full object-cover"
+                className="w-9 h-9 rounded-full object-cover shrink-0"
               />
             )}
-            <h1 className="text-2xl font-light tracking-[0.2em] uppercase">
+            <h1 className="text-base md:text-2xl font-light tracking-[0.15em] md:tracking-[0.2em] uppercase truncate">
               {org.name}
             </h1>
             <div className="h-4 w-px bg-zinc-200 hidden md:block" />
@@ -1025,8 +1025,8 @@ export default function OrgCalendarPage() {
               Calendar
             </span>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+          <div className="flex items-center gap-4 shrink-0">
+            <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400 hidden sm:inline">
               {followerCount} followers
             </span>
             {!org.isOwner && (
