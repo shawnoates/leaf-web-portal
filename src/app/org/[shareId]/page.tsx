@@ -89,6 +89,7 @@ interface OrgData {
   plans: Plan[];
   planIdeas: PlanIdea[];
   blacklistCategories: string[];
+  excludeKeywords: string[];
 }
 
 // Maps human-readable blacklist labels (set in the org dashboard) to Google
@@ -115,16 +116,25 @@ const BLACKLIST_TYPE_MAP: Record<string, { types: string[]; keywords: string[] }
 function isVenueBlacklisted(
   name: string,
   types: string[],
-  blacklistCategories: string[]
+  blacklistCategories: string[],
+  excludeKeywords?: string[]
 ): boolean {
-  if (!blacklistCategories || blacklistCategories.length === 0) return false;
   const lowerName = name.toLowerCase();
-  const typeSet = new Set(types);
-  for (const category of blacklistCategories) {
-    const entry = BLACKLIST_TYPE_MAP[category];
-    if (!entry) continue;
-    if (entry.types.some((t) => typeSet.has(t))) return true;
-    if (entry.keywords.some((k) => lowerName.includes(k))) return true;
+  // Check preset category blacklist
+  if (blacklistCategories && blacklistCategories.length > 0) {
+    const typeSet = new Set(types);
+    for (const category of blacklistCategories) {
+      const entry = BLACKLIST_TYPE_MAP[category];
+      if (!entry) continue;
+      if (entry.types.some((t) => typeSet.has(t))) return true;
+      if (entry.keywords.some((k) => lowerName.includes(k))) return true;
+    }
+  }
+  // Check custom excluded keywords
+  if (excludeKeywords && excludeKeywords.length > 0) {
+    for (const kw of excludeKeywords) {
+      if (lowerName.includes(kw.toLowerCase())) return true;
+    }
   }
   return false;
 }
@@ -737,6 +747,7 @@ export default function OrgCalendarPage() {
         plans,
         planIdeas,
         blacklistCategories: result.orgBlacklistCategories || [],
+        excludeKeywords: result.orgExcludeKeywords || [],
       });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load calendar");
@@ -822,8 +833,9 @@ export default function OrgCalendarPage() {
           (results, status) => {
             if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
               const blacklist = org.blacklistCategories || [];
+              const kwBlacklist = org.excludeKeywords || [];
               const filtered = results.filter((place) =>
-                !isVenueBlacklisted(place.name || "", place.types || [], blacklist)
+                !isVenueBlacklisted(place.name || "", place.types || [], blacklist, kwBlacklist)
               );
               const venues: NearbyVenue[] = filtered.slice(0, 5).map((place) => ({
                 placeId: place.place_id || "",

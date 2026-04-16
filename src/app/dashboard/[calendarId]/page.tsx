@@ -30,6 +30,7 @@ import {
   LogOut,
   TrendingUp,
   Sparkles,
+  Code,
 } from "lucide-react";
 import {
   LineChart,
@@ -59,6 +60,7 @@ interface OrgDashboard {
   daysOfWeek: number[];
   preferredTimes: string[];
   blacklistCategories: string[];
+  excludeKeywords: string[];
   locationTypes: string[];
   cities: string[];
   planIdeasPerWeek: number;
@@ -220,6 +222,8 @@ export default function OrgDashboardPage() {
   const [settingsDaysOfWeek, setSettingsDaysOfWeek] = useState<number[]>([]);
   const [settingsPreferredTimes, setSettingsPreferredTimes] = useState<string[]>([]);
   const [settingsBlacklistCategories, setSettingsBlacklistCategories] = useState<string[]>([]);
+  const [settingsExcludeKeywords, setSettingsExcludeKeywords] = useState<string[]>([]);
+  const [excludeKeywordInput, setExcludeKeywordInput] = useState("");
   const [settingsBrandColor, setSettingsBrandColor] = useState("#18181b");
   const [settingsLogoPreview, setSettingsLogoPreview] = useState<string | null>(null);
   const [settingsLogoBase64, setSettingsLogoBase64] = useState<string | null>(null);
@@ -228,6 +232,7 @@ export default function OrgDashboardPage() {
 
   // Toast
   const [toast, setToast] = useState<string | null>(null);
+  const [embedCalId, setEmbedCalId] = useState<string | null>(null);
 
   // Analytics
   const [analytics, setAnalytics] = useState<OrgAnalytics | null>(null);
@@ -318,6 +323,7 @@ export default function OrgDashboardPage() {
       setSettingsDaysOfWeek(result.daysOfWeek);
       setSettingsPreferredTimes(result.preferredTimes || []);
       setSettingsBlacklistCategories(result.blacklistCategories || []);
+      setSettingsExcludeKeywords(result.excludeKeywords || []);
       setSettingsBrandColor(result.brandColor);
       setSettingsImageStyle(result.imageStyle || "default");
       setError(null);
@@ -421,6 +427,7 @@ export default function OrgDashboardPage() {
         daysOfWeek: settingsDaysOfWeek,
         preferredTimes: settingsPreferredTimes,
         blacklistCategories: settingsBlacklistCategories,
+        excludeKeywords: settingsExcludeKeywords,
         imageStyle: settingsImageStyle,
       };
       if (settingsLogoBase64) {
@@ -435,6 +442,7 @@ export default function OrgDashboardPage() {
           daysOfWeek: settingsDaysOfWeek,
           preferredTimes: settingsPreferredTimes,
           blacklistCategories: settingsBlacklistCategories,
+          excludeKeywords: settingsExcludeKeywords,
           imageStyle: settingsImageStyle,
           profilePhoto: settingsLogoPreview || d.profilePhoto,
         };
@@ -1287,19 +1295,31 @@ export default function OrgDashboardPage() {
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className={`font-medium ${inactive ? "text-zinc-400" : ""}`}>{cal.name}</h3>
                           {!inactive && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const url = `${window.location.origin}/org/${cal.shareId}`;
-                                navigator.clipboard.writeText(url);
-                                setToast("Link copied!");
-                                setTimeout(() => setToast(null), 2000);
-                              }}
-                              className="text-zinc-300 hover:text-zinc-600 transition-colors"
-                              title="Copy calendar link"
-                            >
-                              <Link2 className="w-4 h-4" />
-                            </button>
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const url = `${window.location.origin}/org/${cal.shareId}`;
+                                  navigator.clipboard.writeText(url);
+                                  setToast("Link copied!");
+                                  setTimeout(() => setToast(null), 2000);
+                                }}
+                                className="text-zinc-300 hover:text-zinc-600 transition-colors"
+                                title="Copy calendar link"
+                              >
+                                <Link2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEmbedCalId(embedCalId === cal.objectId ? null : cal.objectId);
+                                }}
+                                className="text-zinc-300 hover:text-zinc-600 transition-colors"
+                                title="Get embed code"
+                              >
+                                <Code className="w-4 h-4" />
+                              </button>
+                            </>
                           )}
                           {cal.isPrimary && (
                             <span className="text-[10px] font-bold uppercase tracking-widest bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">
@@ -1363,6 +1383,26 @@ export default function OrgDashboardPage() {
                               </div>
                             </div>
                           ))}
+                        </div>
+                      </div>
+                    )}
+                    {embedCalId === cal.objectId && (
+                      <div className="border-t border-zinc-100 pt-3 mt-3">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-2">Embed on Your Website</p>
+                        <p className="text-xs text-zinc-500 mb-3">Copy this code and paste it into your website&apos;s HTML to show upcoming events.</p>
+                        <div className="relative">
+                          <pre className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 pr-20 text-xs text-zinc-600 overflow-x-auto whitespace-pre-wrap break-all">{`<iframe src="${typeof window !== "undefined" ? window.location.origin : ""}/embed/${cal.shareId}" width="100%" height="400" frameborder="0" style="border:none;border-radius:12px;"></iframe>`}</pre>
+                          <button
+                            onClick={() => {
+                              const snippet = `<iframe src="${window.location.origin}/embed/${cal.shareId}" width="100%" height="400" frameborder="0" style="border:none;border-radius:12px;"></iframe>`;
+                              navigator.clipboard.writeText(snippet);
+                              setToast("Embed code copied!");
+                              setTimeout(() => setToast(null), 2000);
+                            }}
+                            className="absolute top-2 right-2 text-[10px] bg-zinc-900 text-white px-3 py-1.5 rounded-lg hover:bg-zinc-800 transition-colors font-bold uppercase tracking-widest"
+                          >
+                            Copy
+                          </button>
                         </div>
                       </div>
                     )}
@@ -1555,6 +1595,63 @@ export default function OrgDashboardPage() {
                       );
                     })}
                   </div>
+                </div>
+
+                {/* Excluded Keywords */}
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Excluded Keywords</h3>
+                  <p className="text-xs text-zinc-500 mb-3">AI won&apos;t suggest plans involving these topics (e.g. wine, drinking, gambling).</p>
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      value={excludeKeywordInput}
+                      onChange={(e) => setExcludeKeywordInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const kw = excludeKeywordInput.trim().toLowerCase();
+                          if (kw && !settingsExcludeKeywords.includes(kw)) {
+                            setSettingsExcludeKeywords((prev) => [...prev, kw]);
+                          }
+                          setExcludeKeywordInput("");
+                        }
+                      }}
+                      placeholder="Type a keyword and press Enter"
+                      className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-400 transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const kw = excludeKeywordInput.trim().toLowerCase();
+                        if (kw && !settingsExcludeKeywords.includes(kw)) {
+                          setSettingsExcludeKeywords((prev) => [...prev, kw]);
+                        }
+                        setExcludeKeywordInput("");
+                      }}
+                      className="px-4 py-2 bg-zinc-900 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {settingsExcludeKeywords.length > 0 && (
+                    <div className="flex gap-2 flex-wrap">
+                      {settingsExcludeKeywords.map((kw) => (
+                        <span
+                          key={kw}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-600 text-white"
+                        >
+                          {kw}
+                          <button
+                            type="button"
+                            onClick={() => setSettingsExcludeKeywords((prev) => prev.filter((k) => k !== kw))}
+                            className="hover:text-red-200 transition-colors"
+                          >
+                            &times;
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Photo Style */}
