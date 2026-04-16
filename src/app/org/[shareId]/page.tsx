@@ -1017,7 +1017,7 @@ export default function OrgCalendarPage() {
                 className="w-9 h-9 rounded-full object-cover shrink-0"
               />
             )}
-            <h1 className="text-base md:text-2xl font-light tracking-[0.15em] md:tracking-[0.2em] uppercase truncate">
+            <h1 className="text-sm md:text-2xl font-light tracking-[0.1em] md:tracking-[0.2em] uppercase line-clamp-2 md:truncate">
               {org.name}
             </h1>
             <div className="h-4 w-px bg-zinc-200 hidden md:block" />
