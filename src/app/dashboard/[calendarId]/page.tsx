@@ -261,6 +261,8 @@ export default function OrgDashboardPage() {
   const [editCalName, setEditCalName] = useState("");
   const [editCalDesc, setEditCalDesc] = useState("");
   const [editCalSlug, setEditCalSlug] = useState("");
+  const [editCalCity, setEditCalCity] = useState("");
+  const [editCalCitySelected, setEditCalCitySelected] = useState(false);
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [slugChecking, setSlugChecking] = useState(false);
   const [savingCal, setSavingCal] = useState(false);
@@ -383,12 +385,15 @@ export default function OrgDashboardPage() {
       if (editCalSlug !== originalSlugRef.current) {
         params.slug = editCalSlug;
       }
+      if (editCalCitySelected && editCalCity) {
+        params.city = editCalCity;
+      }
       const result = await Parse.Cloud.run("updateCalendar", params);
       const newShareId = result.shareId;
       setDashboard((d) => d ? {
         ...d,
         calendars: d.calendars.map((c) =>
-          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId } : c
+          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId, city: editCalCity || c.city } : c
         ),
       } : d);
       setEditingCalId(null);
@@ -1345,7 +1350,7 @@ export default function OrgDashboardPage() {
                         ) : (
                           <>
                             <button
-                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); }}
+                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); setEditCalCity(cal.city || ""); setEditCalCitySelected(false); }}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
                             >
                               <Pencil className="w-3 h-3" /> Edit
@@ -2109,6 +2114,18 @@ export default function OrgDashboardPage() {
                   </p>
                 )}
               </div>
+              {dashboard?.tier === "pro" && (
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">City</label>
+                  <CityAutocomplete
+                    value={editCalCity}
+                    onChange={(v) => { setEditCalCity(v); setEditCalCitySelected(false); }}
+                    onSelect={(place) => { setEditCalCity(place.description); setEditCalCitySelected(true); }}
+                    className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
+                    placeholder="Enter a city"
+                  />
+                </div>
+              )}
               <button
                 onClick={handleSaveCalendar}
                 disabled={!editCalName || savingCal || (editCalSlug !== originalSlugRef.current && (slugAvailable === false || slugChecking))}
