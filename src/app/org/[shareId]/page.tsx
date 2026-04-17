@@ -354,6 +354,7 @@ function setVerifiedUserCookie(name: string, phone: string) {
 }
 
 function getVerifiedUserCookie(): VerifiedUser | null {
+  if (typeof document === "undefined") return null;
   const match = document.cookie.match(/leaf_verified_user=([^;]+)/);
   if (!match) return null;
   try {
@@ -371,6 +372,7 @@ function setFollowerCookie(calendarId: string, name: string, phone: string) {
 }
 
 function getFollowerCookie(): { calendarId: string; name: string; phone: string } | null {
+  if (typeof document === "undefined") return null;
   const match = document.cookie.match(/leaf_follower=([^;]+)/);
   if (!match) return null;
   try {
