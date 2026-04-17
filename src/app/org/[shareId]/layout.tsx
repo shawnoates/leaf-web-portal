@@ -8,6 +8,8 @@ type OrgShareInfo = {
   bannerUrl?: string | null;
   orgType?: string | null;
   orgCity?: string | null;
+  plans?: { image?: string }[];
+  planIdeas?: { image?: string }[];
 };
 
 async function fetchOrgShareInfo(shareId: string): Promise<OrgShareInfo | null> {
@@ -50,9 +52,11 @@ export async function generateMetadata({
       ? descParts.join(" · ")
       : `Follow ${title} on Leaf to see upcoming plans and RSVP.`);
 
-  // Prefer the banner image (wider, better for link previews) with the
-  // profile photo as fallback.
-  const imageUrl = info.bannerUrl || info.profilePhoto || null;
+  // Prefer the banner image (wider, better for link previews), then profile
+  // photo, then the first plan or idea image as fallback.
+  const firstPlanImage = info.plans?.find((p) => p.image)?.image;
+  const firstIdeaImage = info.planIdeas?.find((p) => p.image)?.image;
+  const imageUrl = info.bannerUrl || info.profilePhoto || firstPlanImage || firstIdeaImage || null;
   const ogImages = imageUrl ? [{ url: imageUrl }] : undefined;
 
   return {
