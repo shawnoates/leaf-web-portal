@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Parse from "@/lib/parse-client";
-import { Users, Calendar, MapPin, Loader2 } from "lucide-react";
+import { Users, Calendar, ArrowUpRight, Loader2 } from "lucide-react";
 
 // --- Types ---
 
@@ -31,7 +31,7 @@ interface EmbedData {
 function formatDate(isoDate: string): string {
   const date = new Date(isoDate);
   return date.toLocaleDateString("en-US", {
-    weekday: "short",
+    weekday: "long",
     month: "short",
     day: "numeric",
   });
@@ -103,7 +103,7 @@ export default function EmbedCalendarPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="flex items-center justify-center py-24">
         <Loader2 className="w-5 h-5 animate-spin text-zinc-400" />
       </div>
     );
@@ -111,8 +111,8 @@ export default function EmbedCalendarPage() {
 
   if (error || !data) {
     return (
-      <div className="text-center py-12 px-4">
-        <Calendar className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
+      <div className="text-center py-24 px-6">
+        <Calendar className="w-12 h-12 text-zinc-300 mx-auto mb-3" />
         <p className="text-sm text-zinc-500">
           {error || "Calendar not found."}
         </p>
@@ -124,72 +124,114 @@ export default function EmbedCalendarPage() {
 
   if (data.plans.length === 0) {
     return (
-      <div className="px-4 py-8">
-        <div className="text-center py-8">
-          <Calendar className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
-          <p className="text-sm text-zinc-500">No upcoming events</p>
-          <a
-            href={orgUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-zinc-400 hover:text-zinc-600 mt-2 inline-block"
-          >
-            View calendar on Leaf
-          </a>
-        </div>
+      <div className="px-6 py-24 text-center space-y-4">
+        <Calendar className="w-12 h-12 text-zinc-300 mx-auto" />
+        <h3 className="text-xl font-light">No upcoming plans yet</h3>
+        <p className="text-zinc-400 text-sm">
+          Check back soon for new events.
+        </p>
+        <a
+          href={orgUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-zinc-400 hover:text-zinc-600 inline-block mt-2"
+        >
+          View full calendar
+        </a>
         <PoweredByLeaf />
       </div>
     );
   }
 
   return (
-    <div className="px-4 py-4 space-y-3">
-      {data.plans.map((plan) => (
-        <a
-          key={plan.id}
-          href={orgUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex gap-3 p-3 border border-zinc-100 rounded-xl hover:border-zinc-200 hover:shadow-sm transition-all group cursor-pointer"
-        >
-          <div className="w-20 h-20 rounded-lg overflow-hidden bg-zinc-100 shrink-0">
-            {plan.image ? (
-              <img
-                src={plan.image}
-                alt={plan.title}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-zinc-300" />
-              </div>
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-medium text-sm tracking-tight truncate group-hover:text-zinc-700">
-              {plan.title}
-            </h3>
-            <p
-              className="text-xs font-bold uppercase tracking-wider mt-0.5"
-              style={{ color: data.brandColor }}
+    <div className="max-w-6xl mx-auto px-6">
+      {/* Stream Header */}
+      <div className="pt-8 pb-4 border-b border-zinc-100">
+        <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold">
+          Upcoming Plans
+        </p>
+      </div>
+
+      {/* Plans Stream */}
+      <div className="py-12 space-y-24">
+        {data.plans.map((plan, index) => (
+          <article
+            key={plan.id}
+            className={`group flex flex-col md:flex-row gap-8 md:gap-12 md:items-center ${
+              index % 2 !== 0 ? "md:flex-row-reverse" : ""
+            }`}
+          >
+            {/* Image */}
+            <a
+              href={orgUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full md:w-3/5 aspect-[16/10] overflow-hidden bg-zinc-100 shadow-sm block"
             >
-              {plan.date} &middot; {plan.time}
-            </p>
-            <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-400">
-              {plan.location && (
-                <span className="flex items-center gap-1 truncate">
-                  <MapPin className="w-3 h-3 shrink-0" />
-                  <span className="truncate">{plan.location.name}</span>
-                </span>
+              {plan.image ? (
+                <img
+                  src={plan.image}
+                  alt={plan.title}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Calendar className="w-16 h-16 text-zinc-300" />
+                </div>
               )}
-              <span className="flex items-center gap-1 shrink-0">
-                <Users className="w-3 h-3" />
-                {plan.attendeeCount}
-              </span>
+            </a>
+
+            {/* Details */}
+            <div className="w-full md:w-2/5 space-y-6">
+              <div className="space-y-2">
+                <p className="text-[11px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                  {plan.date} &bull; {plan.time}
+                </p>
+                <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
+                  {plan.title}
+                </h3>
+                <div className="pt-2">
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-zinc-900 font-bold flex items-center gap-2">
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: data.brandColor }}
+                    />
+                    Hosted by {plan.hostName}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-zinc-500 leading-relaxed font-light text-lg line-clamp-3">
+                {plan.description}
+              </p>
+
+              <div className="pt-2 flex flex-col gap-6">
+                {/* Attendee count */}
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 ring-2 ring-white">
+                    <Users className="w-3.5 h-3.5 text-zinc-500" />
+                  </div>
+                  <span className="text-[10px] tracking-widest uppercase font-bold text-zinc-400">
+                    {plan.attendeeCount} Attending
+                  </span>
+                </div>
+
+                {/* CTA */}
+                <a
+                  href={orgUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2 w-fit"
+                  style={{ backgroundColor: data.brandColor }}
+                >
+                  View Details <ArrowUpRight className="w-4 h-4" />
+                </a>
+              </div>
             </div>
-          </div>
-        </a>
-      ))}
+          </article>
+        ))}
+      </div>
+
       <PoweredByLeaf />
     </div>
   );
@@ -197,12 +239,12 @@ export default function EmbedCalendarPage() {
 
 function PoweredByLeaf() {
   return (
-    <div className="text-center pt-2 pb-1">
+    <div className="text-center py-6 border-t border-zinc-100">
       <a
         href="https://os.joinleaf.com"
         target="_blank"
         rel="noopener noreferrer"
-        className="text-[10px] tracking-wider uppercase text-zinc-300 hover:text-zinc-400 transition-colors"
+        className="text-[10px] tracking-[0.3em] uppercase text-zinc-300 hover:text-zinc-400 transition-colors"
       >
         Powered by Leaf
       </a>
