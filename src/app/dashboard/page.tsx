@@ -48,6 +48,13 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error("Failed to fetch organization:", error);
+      // Invalid or expired session — log out so the sign-in page shows
+      try {
+        await Parse.User.logOut();
+      } catch {
+        // ignore logout errors
+      }
+      setUser(null);
     } finally {
       setLoading(false);
     }
