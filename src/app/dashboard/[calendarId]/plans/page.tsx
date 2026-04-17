@@ -121,15 +121,20 @@ export default function PlansPage() {
           location: p.location,
         }))
       );
-      setPlanIdeas(
-        (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; location: { name: string; address: string } | null }) => ({
-          objectId: idea.objectId,
-          title: idea.title,
-          description: idea.description,
-          date: idea.date,
-          location: idea.location,
-        }))
-      );
+      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; location: { name: string; address: string } | null }) => ({
+        objectId: idea.objectId,
+        title: idea.title,
+        description: idea.description,
+        date: idea.date,
+        location: idea.location,
+      }));
+      // Deduplicate by title (backend may return duplicate plan ideas)
+      const seen = new Set<string>();
+      setPlanIdeas(allIdeas.filter((idea: PlanIdea) => {
+        if (seen.has(idea.title)) return false;
+        seen.add(idea.title);
+        return true;
+      }));
     } catch {
       // Failed
     } finally {
@@ -204,13 +209,19 @@ export default function PlansPage() {
         try {
           const dash = await Parse.Cloud.run("getOrgDashboard", { calendarId });
           const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId: dash.shareId });
-          const ideas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; location: { name: string; address: string } | null }) => ({
+          const rawIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; location: { name: string; address: string } | null }) => ({
             objectId: idea.objectId,
             title: idea.title,
             description: idea.description,
             date: idea.date,
             location: idea.location,
           }));
+          const seenTitles = new Set<string>();
+          const ideas = rawIdeas.filter((idea: PlanIdea) => {
+            if (seenTitles.has(idea.title)) return false;
+            seenTitles.add(idea.title);
+            return true;
+          });
           if (ideas.length > startCount) {
             setPlanIdeas(ideas);
             break;
