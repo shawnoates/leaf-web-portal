@@ -43,7 +43,7 @@ const PRICING_TIERS = [
     name: "The Social",
     price: "$4.99",
     period: "/mo",
-    description: "For the individual connector who wants a premium look and the app chat",
+    description: "For the individual connector who wants more control and a premium look",
     cta: "Start with The Social",
     highlight: true,
     features: [
