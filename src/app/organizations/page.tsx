@@ -14,10 +14,11 @@ import {
 
 const PRICING_TIERS = [
   {
+    id: "starter",
     name: "Starter",
     price: "Free",
     period: "",
-    description: "Try it out with your community",
+    description: "For the casual host",
     cta: "Get Started Free",
     highlight: false,
     features: [
@@ -38,16 +39,17 @@ const PRICING_TIERS = [
     ],
   },
   {
-    name: "Growth",
-    price: "$29",
+    id: "growth",
+    name: "The Social",
+    price: "$4.99",
     period: "/mo",
-    description: "For active single-location organizations",
-    cta: "Start with Growth",
+    description: "For the individual connector who wants a premium look and the app chat",
+    cta: "Start with The Social",
     highlight: true,
     features: [
       "1 city",
       "10 AI-generated plan ideas per week",
-      "Up to 500 RSVPs per month",
+      "Unlimited RSVPs",
       "Custom branded page",
       "Phone Number RSVP",
       "Blacklist categories",
@@ -62,11 +64,12 @@ const PRICING_TIERS = [
     ],
   },
   {
-    name: "Pro",
-    price: "$99",
+    id: "pro",
+    name: "The Organizer",
+    price: "$29.99",
     period: "/mo",
-    description: "For multi-location organizations",
-    cta: "Start with Pro",
+    description: "For building a brand, managing co-hosts, and scaling your community",
+    cta: "Start with The Organizer",
     highlight: false,
     features: [
       "Up to 5 cities",
@@ -362,7 +365,7 @@ export default function OrganizationsPage() {
                   ))}
                 </div>
                 <Link
-                  href={`/organizations/setup?tier=${tier.name.toLowerCase()}`}
+                  href={`/organizations/setup?tier=${tier.id}`}
                   className={`w-full py-3.5 text-xs uppercase tracking-[0.2em] font-bold text-center flex items-center justify-center gap-2 transition-colors ${
                     tier.highlight
                       ? "bg-zinc-900 text-white hover:bg-zinc-800"

@@ -8,7 +8,7 @@ const TIERS = [
     name: "Starter",
     price: "Free",
     period: "",
-    description: "Try it out with your community",
+    description: "For the casual host",
     features: [
       "1 calendar",
       "5 AI plan ideas per week",
@@ -18,15 +18,15 @@ const TIERS = [
   },
   {
     id: "growth",
-    name: "Growth",
-    price: "$29",
+    name: "The Social",
+    price: "$4.99",
     period: "/mo",
-    description: "For active organizations",
+    description: "For the individual connector who wants a premium look and the app chat",
     highlight: true,
     features: [
       "Up to 5 calendars",
       "10 AI plan ideas per week",
-      "Up to 500 RSVPs/month",
+      "Unlimited RSVPs",
       "Unlimited scheduling",
       "Custom branding",
       "Day & category preferences",
@@ -35,10 +35,10 @@ const TIERS = [
   },
   {
     id: "pro",
-    name: "Pro",
-    price: "$99",
+    name: "The Organizer",
+    price: "$29.99",
     period: "/mo",
-    description: "For multi-location organizations",
+    description: "For building a brand, managing co-hosts, and scaling your community",
     features: [
       "Unlimited calendars",
       "15 AI plan ideas per week",

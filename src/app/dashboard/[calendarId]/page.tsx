@@ -658,7 +658,7 @@ export default function OrgDashboardPage() {
   }
 
   const isGrowthPlus = dashboard.tier === "growth" || dashboard.tier === "pro";
-  const tierLabel = dashboard.tier === "pro" ? "Pro" : dashboard.tier === "growth" ? "Growth" : "Starter";
+  const tierLabel = dashboard.tier === "pro" ? "The Organizer" : dashboard.tier === "growth" ? "The Social" : "Starter";
 
   // ── Render ──
 
@@ -1947,8 +1947,8 @@ export default function OrgDashboardPage() {
                 {dashboard.tier === "starter"
                   ? "Free — basic features"
                   : dashboard.tier === "growth"
-                  ? "$29/month — enhanced features"
-                  : "$99/month — full features"}
+                  ? "$4.99/month — premium look & app chat"
+                  : "$29.99/month — full features"}
               </p>
             </section>
 
