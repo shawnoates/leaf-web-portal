@@ -242,7 +242,7 @@ export default function OrganizationsPage() {
               How It Works
             </p>
             <h2 className="text-4xl font-light tracking-tight italic">
-              Three steps to a thriving calendar
+              A thriving community, starts with a living calendar
             </h2>
           </div>
           <div className="grid md:grid-cols-3 gap-16">
