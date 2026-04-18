@@ -791,14 +791,26 @@ export default function OrgCalendarPage() {
   useEffect(() => {
     if (!org) return;
     if (!hostingIdea && !creatingCustomPlan) return;
-    setNearbyVenues([]);
-    setSelectedVenue(null);
-    setVenuesLoading(true);
 
     const searchCity = hostingIdea?.centroid || org.orgCity || "";
     const searchCategory = hostingIdea
       ? hostingIdea.category
-      : (customCategory.trim() || "places");
+      : (customCategory.trim() || "");
+
+    // Don't search until the user has typed something (custom plan) or a category exists (plan idea)
+    if (!searchCategory) {
+      setNearbyVenues([]);
+      setVenuesLoading(false);
+      return;
+    }
+
+    setNearbyVenues([]);
+    setSelectedVenue(null);
+    setVenuesLoading(true);
+
+    // Debounce custom plan searches so we don't fire on every keystroke
+    const debounceMs = hostingIdea ? 0 : 400;
+    const timer = setTimeout(() => {
 
     // Load Google Maps if not already loaded, then search
     const doSearch = async () => {
@@ -888,6 +900,9 @@ export default function OrgCalendarPage() {
     };
 
     doSearch();
+
+    }, debounceMs); // end setTimeout
+    return () => clearTimeout(timer);
   }, [hostingIdea, creatingCustomPlan, customCategory, org]);
 
   const scroll = (direction: "left" | "right") => {
