@@ -25,6 +25,7 @@ import {
   MapPin,
   Settings,
   Heart,
+  Check,
 } from "lucide-react";
 
 const APP_STORE_URL = "https://apps.apple.com/app/leaf";
@@ -672,6 +673,7 @@ export default function OrgCalendarPage() {
   const [followerCount, setFollowerCount] = useState(0);
   const [isInactive, setIsInactive] = useState<{ name: string } | null>(null);
   const [showWelcomeInvite, setShowWelcomeInvite] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   // Check cookie on mount
   useEffect(() => {
@@ -934,6 +936,13 @@ export default function OrgCalendarPage() {
       setHostSuccess(result?.pendingApproval ? "pending" : true);
       setHostNote("");
       setSelectedVenue(null);
+      // Auto-follow visual update for non-owners/hosts
+      if (!isOwnerOrHost && !isFollowing && org) {
+        setIsFollowing(true);
+        setFollowerCount((c) => c + 1);
+        setToast(`You're now following ${org.name}`);
+        setTimeout(() => setToast(null), 3000);
+      }
       // Refresh data to show the new plan
       fetchOrg();
       setTimeout(() => {
@@ -985,6 +994,13 @@ export default function OrgCalendarPage() {
       setCustomSuccess(result?.pendingApproval === false ? "published" : true);
       setHostNote("");
       setSelectedVenue(null);
+      // Auto-follow visual update for non-owners/hosts
+      if (!isOwnerOrHost && !isFollowing && org) {
+        setIsFollowing(true);
+        setFollowerCount((c) => c + 1);
+        setToast(`You're now following ${org.name}`);
+        setTimeout(() => setToast(null), 3000);
+      }
       // Refresh so a newly published plan shows up immediately.
       if (result?.pendingApproval === false) {
         fetchOrg();
@@ -2020,6 +2036,14 @@ export default function OrgCalendarPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 text-white px-5 py-3 rounded-lg shadow-lg text-sm flex items-center gap-2 animate-fade-in">
+          <Check className="w-4 h-4" />
+          {toast}
         </div>
       )}
     </div>
