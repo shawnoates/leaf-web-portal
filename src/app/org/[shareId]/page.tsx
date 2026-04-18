@@ -25,6 +25,7 @@ import {
   MapPin,
   Settings,
   Heart,
+  AlertTriangle,
 } from "lucide-react";
 
 const APP_STORE_URL = "https://apps.apple.com/app/leaf";
@@ -71,6 +72,7 @@ interface NearbyVenue {
   address: string;
   rating: number | null;
   photoUrl: string | null;
+  flagged?: boolean;
 }
 
 interface OrgData {
@@ -842,7 +844,6 @@ export default function OrgCalendarPage() {
         // (25km / ~15mi radius so Brooklyn-based orgs can find Manhattan venues, etc.)
         let searchRequest: google.maps.places.TextSearchRequest = {
           query: searchCategory,
-          type: "establishment",
         };
 
         if (searchCity) {
@@ -879,15 +880,13 @@ export default function OrgCalendarPage() {
             if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
               const blacklist = org.blacklistCategories || [];
               const kwBlacklist = org.excludeKeywords || [];
-              const filtered = results.filter((place) =>
-                !isVenueBlacklisted(place.name || "", place.types || [], blacklist, kwBlacklist)
-              );
-              const venues: NearbyVenue[] = filtered.slice(0, 5).map((place) => ({
+              const venues: NearbyVenue[] = results.slice(0, 8).map((place) => ({
                 placeId: place.place_id || "",
                 name: place.name || "",
                 address: place.formatted_address || "",
                 rating: place.rating || null,
                 photoUrl: place.photos?.[0]?.getUrl({ maxWidth: 400 }) || null,
+                flagged: isVenueBlacklisted(place.name || "", place.types || [], blacklist, kwBlacklist),
               }));
               setNearbyVenues(venues);
             }
@@ -1557,12 +1556,19 @@ export default function OrgCalendarPage() {
                             key={venue.placeId}
                             type="button"
                             onClick={() => setSelectedVenue(selectedVenue?.placeId === venue.placeId ? null : venue)}
-                            className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left ${
+                            className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left relative ${
                               selectedVenue?.placeId === venue.placeId
                                 ? "border-zinc-900 shadow-lg"
-                                : "border-zinc-200 hover:border-zinc-300"
+                                : venue.flagged
+                                  ? "border-amber-300 hover:border-amber-400"
+                                  : "border-zinc-200 hover:border-zinc-300"
                             }`}
                           >
+                            {venue.flagged && (
+                              <div className="absolute top-1.5 right-1.5 bg-amber-500 text-white rounded-full p-0.5 z-10">
+                                <AlertTriangle className="w-3 h-3" />
+                              </div>
+                            )}
                             <div className="h-[100px] bg-zinc-100">
                               {venue.photoUrl ? (
                                 <img src={venue.photoUrl} className="w-full h-full object-cover" alt={venue.name} />
@@ -1588,9 +1594,16 @@ export default function OrgCalendarPage() {
                       <p className="text-sm text-zinc-400 italic">No venues found nearby.</p>
                     )}
                     {selectedVenue && (
-                      <p className="text-xs text-zinc-600 flex items-center gap-1">
-                        <MapPin className="w-3 h-3" /> {selectedVenue.name} &mdash; {selectedVenue.address}
-                      </p>
+                      <div>
+                        <p className="text-xs text-zinc-600 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> {selectedVenue.name} &mdash; {selectedVenue.address}
+                        </p>
+                        {selectedVenue.flagged && (
+                          <p className="text-[11px] text-amber-600 flex items-center gap-1 mt-1.5">
+                            <AlertTriangle className="w-3 h-3 shrink-0" /> This venue type is restricted by the admin. Your request will need approval.
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -1817,12 +1830,19 @@ export default function OrgCalendarPage() {
                               key={venue.placeId}
                               type="button"
                               onClick={() => setSelectedVenue(selectedVenue?.placeId === venue.placeId ? null : venue)}
-                              className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left ${
+                              className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left relative ${
                                 selectedVenue?.placeId === venue.placeId
                                   ? "border-zinc-900 shadow-lg"
-                                  : "border-zinc-200 hover:border-zinc-300"
+                                  : venue.flagged
+                                    ? "border-amber-300 hover:border-amber-400"
+                                    : "border-zinc-200 hover:border-zinc-300"
                               }`}
                             >
+                              {venue.flagged && (
+                                <div className="absolute top-1.5 right-1.5 bg-amber-500 text-white rounded-full p-0.5 z-10">
+                                  <AlertTriangle className="w-3 h-3" />
+                                </div>
+                              )}
                               <div className="h-[100px] bg-zinc-100">
                                 {venue.photoUrl ? (
                                   <img src={venue.photoUrl} className="w-full h-full object-cover" alt={venue.name} />
@@ -1848,9 +1868,16 @@ export default function OrgCalendarPage() {
                         </p>
                       )}
                       {selectedVenue && (
-                        <p className="text-xs text-zinc-600 flex items-center gap-1">
-                          <MapPin className="w-3 h-3" /> {selectedVenue.name} &mdash; {selectedVenue.address}
-                        </p>
+                        <div>
+                          <p className="text-xs text-zinc-600 flex items-center gap-1">
+                            <MapPin className="w-3 h-3" /> {selectedVenue.name} &mdash; {selectedVenue.address}
+                          </p>
+                          {selectedVenue.flagged && (
+                            <p className="text-[11px] text-amber-600 flex items-center gap-1 mt-1.5">
+                              <AlertTriangle className="w-3 h-3 shrink-0" /> This venue type is restricted by the admin. Your request will need approval.
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
 
