@@ -667,6 +667,9 @@ export default function OrgCalendarPage() {
   const [customCapacity, setCustomCapacity] = useState("");
   const [customSubmitting, setCustomSubmitting] = useState(false);
   const [customSuccess, setCustomSuccess] = useState<false | true | "published">(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+  const [unsplashPhotos, setUnsplashPhotos] = useState<{ id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]>([]);
+  const [unsplashLoading, setUnsplashLoading] = useState(false);
   const customVerify = usePhoneVerify();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showFollowModal, setShowFollowModal] = useState(false);
@@ -904,6 +907,47 @@ export default function OrgCalendarPage() {
     return () => clearTimeout(timer);
   }, [hostingIdea, creatingCustomPlan, customCategory, org]);
 
+  // Fetch Unsplash images when venue is selected and title is typed
+  useEffect(() => {
+    if (!selectedVenue || !customTitle.trim() || !creatingCustomPlan) {
+      setUnsplashPhotos([]);
+      return;
+    }
+
+    const unsplashKey = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
+    if (!unsplashKey) return;
+
+    setUnsplashLoading(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const query = encodeURIComponent(customTitle.trim());
+        const res = await fetch(
+          `https://api.unsplash.com/search/photos?query=${query}&per_page=4&orientation=landscape`,
+          { headers: { Authorization: `Client-ID ${unsplashKey}` } }
+        );
+        if (!res.ok) throw new Error("Unsplash fetch failed");
+        const data = await res.json();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const photos = (data.results || []).map((photo: any) => ({
+          id: photo.id as string,
+          url: photo.urls.regular as string,
+          thumbUrl: photo.urls.small as string,
+          alt: (photo.alt_description || customTitle.trim()) as string,
+          photographerName: photo.user.name as string,
+          photographerUrl: photo.user.links.html as string,
+        }));
+        setUnsplashPhotos(photos);
+      } catch {
+        setUnsplashPhotos([]);
+      } finally {
+        setUnsplashLoading(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [customTitle, selectedVenue, creatingCustomPlan]);
+
   const scroll = (direction: "left" | "right") => {
     if (scrollRef.current) {
       const { scrollLeft, clientWidth } = scrollRef.current;
@@ -1000,6 +1044,7 @@ export default function OrgCalendarPage() {
         },
         capacity: customCapacity ? parseInt(customCapacity, 10) : undefined,
         hostNote: hostNote.trim() || undefined,
+        imageUrl: selectedImageUrl || undefined,
       });
       if (!isOwnerOrHost) {
         setVerifiedUserCookie(customVerify.name, customVerify.phone);
@@ -1007,6 +1052,8 @@ export default function OrgCalendarPage() {
       setCustomSuccess(result?.pendingApproval === false ? "published" : true);
       setHostNote("");
       setSelectedVenue(null);
+      setSelectedImageUrl(null);
+      setUnsplashPhotos([]);
       // Auto-follow visual update for non-owners/hosts
       if (!isOwnerOrHost && !isFollowing && org) {
         setIsFollowing(true);
@@ -1701,6 +1748,8 @@ export default function OrgCalendarPage() {
               onClick={() => {
                 setCreatingCustomPlan(false);
                 setCustomSuccess(false);
+                setSelectedImageUrl(null);
+                setUnsplashPhotos([]);
               }}
               className="absolute top-6 right-6 z-50 p-2 rounded-full text-zinc-900"
             >
@@ -1880,6 +1929,97 @@ export default function OrgCalendarPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Cover Image Picker */}
+                    {selectedVenue && customTitle.trim() && (
+                      <div className="space-y-3">
+                        <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                          Cover Image
+                        </label>
+                        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                          {/* Venue photo option */}
+                          {selectedVenue.photoUrl && (
+                            <button
+                              key="venue-photo"
+                              type="button"
+                              onClick={() => setSelectedImageUrl(
+                                selectedImageUrl === selectedVenue.photoUrl ? null : selectedVenue.photoUrl!
+                              )}
+                              className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left relative ${
+                                selectedImageUrl === selectedVenue.photoUrl
+                                  ? "border-zinc-900 shadow-lg"
+                                  : "border-zinc-200 hover:border-zinc-300"
+                              }`}
+                            >
+                              {selectedImageUrl === selectedVenue.photoUrl && (
+                                <div className="absolute top-1.5 right-1.5 bg-zinc-900 text-white rounded-full p-0.5 z-10">
+                                  <Check className="w-3 h-3" />
+                                </div>
+                              )}
+                              <div className="h-[100px] bg-zinc-100">
+                                <img src={selectedVenue.photoUrl} className="w-full h-full object-cover" alt={selectedVenue.name} />
+                              </div>
+                              <div className="p-2">
+                                <p className="text-[10px] font-bold text-zinc-600 truncate">Venue Photo</p>
+                                <p className="text-[9px] text-zinc-400 truncate">{selectedVenue.name}</p>
+                              </div>
+                            </button>
+                          )}
+
+                          {/* Unsplash skeleton loaders */}
+                          {unsplashLoading && [0, 1, 2, 3].map((i) => (
+                            <div key={`skel-${i}`} className="min-w-[160px] h-[140px] bg-zinc-100 rounded-xl animate-pulse shrink-0" />
+                          ))}
+
+                          {/* Unsplash results */}
+                          {!unsplashLoading && unsplashPhotos.map((photo) => (
+                            <button
+                              key={photo.id}
+                              type="button"
+                              onClick={() => setSelectedImageUrl(
+                                selectedImageUrl === photo.url ? null : photo.url
+                              )}
+                              className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left relative ${
+                                selectedImageUrl === photo.url
+                                  ? "border-zinc-900 shadow-lg"
+                                  : "border-zinc-200 hover:border-zinc-300"
+                              }`}
+                            >
+                              {selectedImageUrl === photo.url && (
+                                <div className="absolute top-1.5 right-1.5 bg-zinc-900 text-white rounded-full p-0.5 z-10">
+                                  <Check className="w-3 h-3" />
+                                </div>
+                              )}
+                              <div className="h-[100px] bg-zinc-100">
+                                <img src={photo.thumbUrl} className="w-full h-full object-cover" alt={photo.alt} />
+                              </div>
+                              <div className="p-2">
+                                <p className="text-[10px] text-zinc-400 truncate">
+                                  by{" "}
+                                  <a
+                                    href={`${photo.photographerUrl}?utm_source=leaf&utm_medium=referral`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline hover:text-zinc-600"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {photo.photographerName}
+                                  </a>
+                                </p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                        {unsplashPhotos.length > 0 && (
+                          <p className="text-[9px] text-zinc-300">
+                            Photos from{" "}
+                            <a href="https://unsplash.com/?utm_source=leaf&utm_medium=referral" target="_blank" rel="noopener noreferrer" className="underline">
+                              Unsplash
+                            </a>
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
