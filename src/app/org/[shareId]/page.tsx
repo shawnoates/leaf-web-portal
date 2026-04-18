@@ -798,7 +798,6 @@ export default function OrgCalendarPage() {
     const searchCategory = hostingIdea
       ? hostingIdea.category
       : (customCategory.trim() || "places");
-    const query = `${searchCategory} in ${searchCity}`;
 
     // Load Google Maps if not already loaded, then search
     const doSearch = async () => {
@@ -826,12 +825,43 @@ export default function OrgCalendarPage() {
           }
         }
 
+        // Geocode the city to get coordinates for location-biased search
+        // (25km / ~15mi radius so Brooklyn-based orgs can find Manhattan venues, etc.)
+        let searchRequest: google.maps.places.TextSearchRequest = {
+          query: searchCategory,
+          type: "establishment",
+        };
+
+        if (searchCity) {
+          try {
+            const geocoder = new window.google.maps.Geocoder();
+            const geoResult = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
+              geocoder.geocode({ address: searchCity }, (results, status) => {
+                if (status === window.google.maps.GeocoderStatus.OK && results?.length) {
+                  resolve(results);
+                } else {
+                  reject(new Error("Geocode failed"));
+                }
+              });
+            });
+            const loc = geoResult[0].geometry.location;
+            searchRequest = {
+              ...searchRequest,
+              location: loc,
+              radius: 25000, // 25km (~15 miles)
+            };
+          } catch {
+            // Geocode failed — fall back to city name in query text
+            searchRequest.query = `${searchCategory} in ${searchCity}`;
+          }
+        }
+
         const service = new window.google.maps.places.PlacesService(
           document.createElement("div")
         );
 
         service.textSearch(
-          { query, type: "establishment" },
+          searchRequest,
           (results, status) => {
             if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
               const blacklist = org.blacklistCategories || [];
