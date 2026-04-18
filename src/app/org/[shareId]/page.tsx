@@ -25,7 +25,6 @@ import {
   MapPin,
   Settings,
   Heart,
-  Check,
 } from "lucide-react";
 
 const APP_STORE_URL = "https://apps.apple.com/app/leaf";
