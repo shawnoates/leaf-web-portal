@@ -914,30 +914,15 @@ export default function OrgCalendarPage() {
       return;
     }
 
-    const unsplashKey = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
-    if (!unsplashKey) return;
-
     setUnsplashLoading(true);
 
     const timer = setTimeout(async () => {
       try {
         const query = encodeURIComponent(customTitle.trim());
-        const res = await fetch(
-          `https://api.unsplash.com/search/photos?query=${query}&per_page=4&orientation=landscape`,
-          { headers: { Authorization: `Client-ID ${unsplashKey}` } }
-        );
+        const res = await fetch(`/api/unsplash?query=${query}`);
         if (!res.ok) throw new Error("Unsplash fetch failed");
         const data = await res.json();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const photos = (data.results || []).map((photo: any) => ({
-          id: photo.id as string,
-          url: photo.urls.regular as string,
-          thumbUrl: photo.urls.small as string,
-          alt: (photo.alt_description || customTitle.trim()) as string,
-          photographerName: photo.user.name as string,
-          photographerUrl: photo.user.links.html as string,
-        }));
-        setUnsplashPhotos(photos);
+        setUnsplashPhotos(data.results || []);
       } catch {
         setUnsplashPhotos([]);
       } finally {
