@@ -2201,20 +2201,20 @@ export default function OrgDashboardPage() {
               <div className="pt-8 border-t border-zinc-100">
                 <button
                   onClick={async () => {
-                    if (!confirm("Delete this plan? This cannot be undone.")) return;
+                    if (!confirm("Cancel this plan? Attendees will be notified. This cannot be undone.")) return;
                     try {
                       await Parse.Cloud.run("removePlanFromCalendar", { eventGroupId: selectedActivePlan.objectId });
                       setSelectedActivePlan(null);
                       fetchDashboard();
                     } catch (err) {
-                      console.error("Failed to delete plan:", err);
-                      alert("Failed to delete plan.");
+                      console.error("Failed to cancel plan:", err);
+                      alert("Failed to cancel plan.");
                     }
                   }}
                   className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Delete Plan
+                  Cancel Plan
                 </button>
               </div>
             </div>
