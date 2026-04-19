@@ -956,7 +956,11 @@ export default function OrgCalendarPage() {
     const form = e.target as HTMLFormElement;
     const dateInput = form.querySelector('input[type="date"]') as HTMLInputElement;
     const timeInput = form.querySelector('input[type="time"]') as HTMLInputElement;
-    const dateTime = `${dateInput.value}T${timeInput.value || "18:00"}`;
+    const offset = new Date().getTimezoneOffset();
+    const sign = offset <= 0 ? "+" : "-";
+    const absH = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
+    const absM = String(Math.abs(offset) % 60).padStart(2, "0");
+    const dateTime = `${dateInput.value}T${timeInput.value || "18:00"}${sign}${absH}:${absM}`;
 
     try {
       const result = await Parse.Cloud.run("hostPlanIdea", {
@@ -1009,7 +1013,13 @@ export default function OrgCalendarPage() {
     const form = e.target as HTMLFormElement;
     const dateInput = form.querySelector('input[type="date"]') as HTMLInputElement;
     const timeInput = form.querySelector('input[type="time"]') as HTMLInputElement;
-    const dateTime = `${dateInput.value}T${timeInput.value || "18:00"}`;
+    // Append local timezone offset so the server stores the correct UTC time
+    // (e.g. "2026-09-13T18:00" + "-04:00" for Eastern Daylight Time)
+    const offset = new Date().getTimezoneOffset();
+    const sign = offset <= 0 ? "+" : "-";
+    const absH = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
+    const absM = String(Math.abs(offset) % 60).padStart(2, "0");
+    const dateTime = `${dateInput.value}T${timeInput.value || "18:00"}${sign}${absH}:${absM}`;
 
     try {
       const result = await Parse.Cloud.run("requestCustomPlanViaWeb", {
