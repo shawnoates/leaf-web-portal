@@ -918,11 +918,10 @@ export default function OrgCalendarPage() {
 
     const timer = setTimeout(async () => {
       try {
-        const query = encodeURIComponent(customTitle.trim());
-        const res = await fetch(`/api/unsplash?query=${query}`);
-        if (!res.ok) throw new Error("Unsplash fetch failed");
-        const data = await res.json();
-        setUnsplashPhotos(data.results || []);
+        const results = await Parse.Cloud.run("searchUnsplashPhotos", {
+          query: customTitle.trim(),
+        });
+        setUnsplashPhotos(results || []);
       } catch {
         setUnsplashPhotos([]);
       } finally {
