@@ -677,7 +677,21 @@ export default function OrgCalendarPage() {
   const [followerCount, setFollowerCount] = useState(0);
   const [isInactive, setIsInactive] = useState<{ name: string } | null>(null);
   const [showWelcomeInvite, setShowWelcomeInvite] = useState(false);
+  const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  const handleSharePlan = useCallback(async (planId: string, planTitle: string) => {
+    const url = `https://os.joinleaf.com/p/${planId}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: planTitle, url });
+      } catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(url);
+      setCopiedPlanId(planId);
+      setTimeout(() => setCopiedPlanId(null), 2000);
+    }
+  }, []);
 
   // Check cookie on mount
   useEffect(() => {
@@ -1247,8 +1261,11 @@ export default function OrgCalendarPage() {
                       >
                         View Details <ArrowUpRight className="w-4 h-4" />
                       </button>
-                      <button className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors">
-                        <Share2 className="w-5 h-5" />
+                      <button
+                        onClick={() => handleSharePlan(plan.id, plan.title)}
+                        className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative"
+                      >
+                        {copiedPlanId === plan.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
                       </button>
                     </div>
                   </div>
@@ -1492,8 +1509,11 @@ export default function OrgCalendarPage() {
                     >
                       I&apos;m Attending
                     </button>
-                    <button className="border border-zinc-200 px-5 hover:bg-zinc-50 transition-colors">
-                      <Share2 className="w-5 h-5" />
+                    <button
+                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
+                      className="border border-zinc-200 px-5 hover:bg-zinc-50 transition-colors"
+                    >
+                      {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
                     </button>
                   </div>
                 )}
