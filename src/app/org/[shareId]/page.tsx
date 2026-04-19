@@ -1950,12 +1950,8 @@ export default function OrgCalendarPage() {
                                   <Check className="w-3 h-3" />
                                 </div>
                               )}
-                              <div className="h-[100px] bg-zinc-100">
+                              <div className="h-[120px] bg-zinc-100">
                                 <img src={selectedVenue.photoUrl} className="w-full h-full object-cover" alt={selectedVenue.name} />
-                              </div>
-                              <div className="p-2">
-                                <p className="text-[10px] font-bold text-zinc-600 truncate">Venue Photo</p>
-                                <p className="text-[9px] text-zinc-400 truncate">{selectedVenue.name}</p>
                               </div>
                             </button>
                           )}
@@ -1984,34 +1980,38 @@ export default function OrgCalendarPage() {
                                   <Check className="w-3 h-3" />
                                 </div>
                               )}
-                              <div className="h-[100px] bg-zinc-100">
+                              <div className="h-[120px] bg-zinc-100">
                                 <img src={photo.thumbUrl} className="w-full h-full object-cover" alt={photo.alt} />
-                              </div>
-                              <div className="p-2">
-                                <p className="text-[10px] text-zinc-400 truncate">
-                                  by{" "}
-                                  <a
-                                    href={`${photo.photographerUrl}?utm_source=leaf&utm_medium=referral`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="underline hover:text-zinc-600"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {photo.photographerName}
-                                  </a>
-                                </p>
                               </div>
                             </button>
                           ))}
                         </div>
-                        {unsplashPhotos.length > 0 && (
-                          <p className="text-[9px] text-zinc-300">
-                            Photos from{" "}
-                            <a href="https://unsplash.com/?utm_source=leaf&utm_medium=referral" target="_blank" rel="noopener noreferrer" className="underline">
-                              Unsplash
-                            </a>
-                          </p>
-                        )}
+                        {(() => {
+                          const selected = unsplashPhotos.find(p => p.url === selectedImageUrl);
+                          if (!selected) return null;
+                          return (
+                            <p className="text-[10px] text-zinc-400">
+                              Photo by{" "}
+                              <a
+                                href={`${selected.photographerUrl}?utm_source=leaf&utm_medium=referral`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline hover:text-zinc-600"
+                              >
+                                {selected.photographerName}
+                              </a>
+                              {" / "}
+                              <a
+                                href="https://unsplash.com/?utm_source=leaf&utm_medium=referral"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline hover:text-zinc-600"
+                              >
+                                Unsplash
+                              </a>
+                            </p>
+                          );
+                        })()}
                       </div>
                     )}
 
