@@ -377,7 +377,7 @@ export default function PlansPage() {
       <header className="border-b border-zinc-100">
         <div className="max-w-3xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href={`/dashboard/${calendarId}`} className="p-2 hover:bg-zinc-50 rounded-full transition-colors">
+            <Link href={`/dashboard/${calendarId}?tab=calendars`} className="p-2 hover:bg-zinc-50 rounded-full transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div>

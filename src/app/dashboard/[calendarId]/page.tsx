@@ -8,6 +8,7 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import MarketplaceTab, { type MarketplaceEvent } from "@/components/MarketplaceTab";
+import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
 import {
   Calendar,
   Check,
@@ -299,6 +300,10 @@ export default function OrgDashboardPage() {
 
   // Plan detail modal
   const [selectedActivePlan, setSelectedActivePlan] = useState<{ objectId: string; title: string; description: string; image: string | null; date: string; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string } | null } | null>(null);
+
+  // Create plan modal (used by marketplace + duplicate)
+  const [createPlanPrefill, setCreatePlanPrefill] = useState<CreatePlanPrefill | null>(null);
+  const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
 
   // Co-host invite
   const [followerCalFilter, setFollowerCalFilter] = useState<string>("all");
@@ -1427,15 +1432,16 @@ export default function OrgDashboardPage() {
           <MarketplaceTab
             calendarId={calendarId}
             onAddEvent={(event: MarketplaceEvent) => {
-              const params = new URLSearchParams({
-                prefillTitle: event.title,
-                prefillDescription: event.description,
-                prefillVenue: event.venue ? JSON.stringify(event.venue) : "",
-                prefillDate: event.suggestedDate || "",
-                prefillTime: event.suggestedTime || "",
-                prefillCapacity: event.capacityMax?.toString() || "",
+              setCreatePlanPrefill({
+                title: event.title,
+                description: event.description,
+                venue: event.venue,
+                date: event.suggestedDate || "",
+                time: event.suggestedTime || "",
+                capacity: event.capacityMax?.toString() || "",
+                imageUrl: event.image,
               });
-              router.push(`/dashboard/${calendarId}/plans?${params.toString()}`);
+              setShowCreatePlanModal(true);
             }}
           />
         )}
@@ -2248,7 +2254,23 @@ export default function OrgDashboardPage() {
                 </div>
               )}
 
-              <div className="pt-8 border-t border-zinc-100">
+              <div className="pt-8 border-t border-zinc-100 flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    setCreatePlanPrefill({
+                      title: selectedActivePlan.title,
+                      description: selectedActivePlan.description,
+                      venue: selectedActivePlan.location,
+                      imageUrl: selectedActivePlan.image,
+                    });
+                    setSelectedActivePlan(null);
+                    setShowCreatePlanModal(true);
+                  }}
+                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Duplicate Plan
+                </button>
                 <button
                   onClick={async () => {
                     if (!confirm("Cancel this plan? Attendees will be notified. This cannot be undone.")) return;
@@ -2270,6 +2292,17 @@ export default function OrgDashboardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Create Plan Modal (marketplace + duplicate) */}
+      {showCreatePlanModal && (
+        <CreatePlanModal
+          calendarId={calendarId}
+          tier={dashboard.tier}
+          prefill={createPlanPrefill}
+          onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); }}
+          onCreated={() => fetchDashboard()}
+        />
       )}
 
       {/* Toast */}
