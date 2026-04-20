@@ -416,10 +416,18 @@ export default function MarketplaceTab({ calendarId, city, onAddEvent }: Marketp
             <div className="text-center py-16 space-y-3">
               <Sparkles className="w-8 h-8 text-zinc-300 mx-auto" />
               <p className="text-sm font-medium text-zinc-500">
-                {hasFilters ? "No events match your filters" : "No events found for your area"}
+                {!city
+                  ? "Set a city on your calendar to discover events"
+                  : hasFilters
+                  ? "No events match your filters"
+                  : "No events found for your area"}
               </p>
               <p className="text-xs text-zinc-400">
-                {hasFilters ? "Try adjusting your filters." : "Check back later for new ideas."}
+                {!city
+                  ? "Go to Calendars and add a city to get started."
+                  : hasFilters
+                  ? "Try adjusting your filters."
+                  : "Check back later for new ideas."}
               </p>
               {hasFilters && (
                 <button
