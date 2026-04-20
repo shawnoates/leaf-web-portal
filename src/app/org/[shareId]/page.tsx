@@ -90,6 +90,8 @@ interface OrgData {
   isHost: boolean;
   plans: Plan[];
   planIdeas: PlanIdea[];
+  hidePlanIdeas: boolean;
+  hideCustomPlans: boolean;
   blacklistCategories: string[];
   excludeKeywords: string[];
 }
@@ -787,6 +789,8 @@ export default function OrgCalendarPage() {
         isHost: result.isHost || false,
         plans,
         planIdeas,
+        hidePlanIdeas: result.hidePlanIdeas || false,
+        hideCustomPlans: result.hideCustomPlans || false,
         blacklistCategories: result.orgBlacklistCategories || [],
         excludeKeywords: result.orgExcludeKeywords || [],
       });
@@ -1300,7 +1304,7 @@ export default function OrgCalendarPage() {
         )}
 
         {/* Plan Ideas Carousel */}
-        {org.planIdeas.length > 0 && (
+        {org.planIdeas.length > 0 && !org.hidePlanIdeas && (
           <section className={`${org.plans.length > 0 ? "mt-48" : "mt-8"} mb-24 space-y-12`}>
             <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
               <div className="space-y-2">
@@ -1392,7 +1396,7 @@ export default function OrgCalendarPage() {
                 </div>
               ))}
               {/* Custom plan card — let community members propose their own */}
-              {!org.rsvpLimitReached && (
+              {!org.rsvpLimitReached && !org.hideCustomPlans && (
                 <div
                   className="min-w-[280px] max-w-[300px] snap-start group cursor-pointer"
                   onClick={() => {

@@ -68,6 +68,8 @@ interface OrgDashboard {
   planIdeasPerWeek: number;
   website: string;
   imageStyle: string;
+  hidePlanIdeas: boolean;
+  hideCustomPlans: boolean;
   memberCount: number;
   totalRsvpCount: number;
   rsvpLimit: number | null;
@@ -230,6 +232,8 @@ export default function OrgDashboardPage() {
   const [settingsLogoPreview, setSettingsLogoPreview] = useState<string | null>(null);
   const [settingsLogoBase64, setSettingsLogoBase64] = useState<string | null>(null);
   const [settingsImageStyle, setSettingsImageStyle] = useState("default");
+  const [settingsHidePlanIdeas, setSettingsHidePlanIdeas] = useState(false);
+  const [settingsHideCustomPlans, setSettingsHideCustomPlans] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsSection, setSettingsSection] = useState<"general" | "subscription">("general");
 
@@ -335,6 +339,8 @@ export default function OrgDashboardPage() {
       setSettingsExcludeKeywords(result.excludeKeywords || []);
       setSettingsBrandColor(result.brandColor);
       setSettingsImageStyle(result.imageStyle || "default");
+      setSettingsHidePlanIdeas(result.hidePlanIdeas || false);
+      setSettingsHideCustomPlans(result.hideCustomPlans || false);
       setError(null);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to load dashboard";
@@ -441,6 +447,8 @@ export default function OrgDashboardPage() {
         blacklistCategories: settingsBlacklistCategories,
         excludeKeywords: settingsExcludeKeywords,
         imageStyle: settingsImageStyle,
+        hidePlanIdeas: settingsHidePlanIdeas,
+        hideCustomPlans: settingsHideCustomPlans,
       };
       if (settingsLogoBase64) {
         params.profilePhotoBase64 = settingsLogoBase64;
@@ -456,6 +464,8 @@ export default function OrgDashboardPage() {
           blacklistCategories: settingsBlacklistCategories,
           excludeKeywords: settingsExcludeKeywords,
           imageStyle: settingsImageStyle,
+          hidePlanIdeas: settingsHidePlanIdeas,
+          hideCustomPlans: settingsHideCustomPlans,
           profilePhoto: settingsLogoPreview || d.profilePhoto,
         };
       });
@@ -1737,6 +1747,53 @@ export default function OrgDashboardPage() {
                     ))}
                   </div>
                 </div>
+              </section>
+            </div>
+
+            {/* Calendar Page Visibility (Pro only) */}
+            <div className="relative">
+              {dashboard.tier !== "pro" && (
+                <div className="absolute top-4 right-4 z-10" onClick={() => setShowSubscription(true)}>
+                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest cursor-pointer hover:bg-zinc-800 transition-colors">
+                    <Lock className="w-3 h-3" /> Upgrade
+                  </div>
+                </div>
+              )}
+              <section className={`border border-zinc-200 rounded-xl p-6 space-y-6 ${dashboard.tier !== "pro" ? "opacity-40 pointer-events-none" : ""}`}>
+                <div>
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Calendar Page Visibility</h2>
+                  <p className="text-xs text-zinc-500 mt-1">Control which sections appear on your public calendar page.</p>
+                </div>
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <p className="text-sm font-medium">Show Plan Ideas</p>
+                    <p className="text-xs text-zinc-500">Let members browse and host AI-generated plan ideas.</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!settingsHidePlanIdeas}
+                    onClick={() => setSettingsHidePlanIdeas((v) => !v)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${!settingsHidePlanIdeas ? "bg-zinc-900" : "bg-zinc-200"}`}
+                  >
+                    <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${!settingsHidePlanIdeas ? "translate-x-6" : "translate-x-1"}`} />
+                  </button>
+                </label>
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <p className="text-sm font-medium">Show Custom Plan Proposals</p>
+                    <p className="text-xs text-zinc-500">Let members propose their own plan ideas for your review.</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!settingsHideCustomPlans}
+                    onClick={() => setSettingsHideCustomPlans((v) => !v)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${!settingsHideCustomPlans ? "bg-zinc-900" : "bg-zinc-200"}`}
+                  >
+                    <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${!settingsHideCustomPlans ? "translate-x-6" : "translate-x-1"}`} />
+                  </button>
+                </label>
               </section>
             </div>
 
