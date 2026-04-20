@@ -194,7 +194,7 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
       {section === "discover" && (
         <>
           {/* Category filters + refresh */}
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
             <div className="flex gap-2 overflow-x-auto no-scrollbar">
               {CATEGORIES.map((cat) => (
                 <button
