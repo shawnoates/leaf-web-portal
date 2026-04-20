@@ -1365,7 +1365,7 @@ export default function OrgDashboardPage() {
                               <Pencil className="w-3 h-3" /> Edit
                             </button>
                             <Link
-                              href={`/dashboard/${cal.objectId}/plans`}
+                              href={`/dashboard/${cal.objectId}/plans?orgId=${calendarId}`}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
                             >
                               Manage Plans <ChevronRight className="w-3 h-3" />
@@ -1924,18 +1924,16 @@ export default function OrgDashboardPage() {
                 <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
                   Followers ({filteredFollowers.length})
                 </h2>
-                {dashboard.calendars.length > 1 && (
-                  <select
-                    value={followerCalFilter}
-                    onChange={(e) => setFollowerCalFilter(e.target.value)}
-                    className="text-xs border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 focus:outline-none focus:border-zinc-400"
-                  >
-                    <option value="all">All Calendars</option>
-                    {dashboard.calendars.filter((c) => c.isActive).map((cal) => (
-                      <option key={cal.objectId} value={cal.objectId}>{cal.name}</option>
-                    ))}
-                  </select>
-                )}
+                <select
+                  value={followerCalFilter}
+                  onChange={(e) => setFollowerCalFilter(e.target.value)}
+                  className="text-xs border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 focus:outline-none focus:border-zinc-400"
+                >
+                  <option value="all">All Calendars</option>
+                  {dashboard.calendars.filter((c) => c.isActive).map((cal) => (
+                    <option key={cal.objectId} value={cal.objectId}>{cal.name}</option>
+                  ))}
+                </select>
               </div>
               {filteredFollowers.length === 0 ? (
                 <div className="border border-zinc-200 rounded-xl p-8 space-y-6">
