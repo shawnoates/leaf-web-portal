@@ -9,10 +9,7 @@ import {
   Clock,
   Calendar,
   Sparkles,
-  Ticket,
-  Film,
-  Globe,
-  Handshake,
+  ExternalLink,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -24,6 +21,7 @@ export interface MarketplaceEvent {
   category: string;
   image: string | null;
   source: string;
+  url: string | null;
   venue: { name: string; address: string } | null;
   suggestedDate: string | null;
   suggestedTime: string | null;
@@ -47,7 +45,7 @@ interface MarketplaceTabProps {
 
 // ── Constants ──────────────────────────────────────────────────────────
 
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 const CATEGORIES = [
   { id: "all", label: "All" },
@@ -59,18 +57,34 @@ const CATEGORIES = [
   { id: "outdoors", label: "Outdoors" },
 ];
 
+const DAY_CHIPS = [
+  { id: "Monday", label: "Mon" },
+  { id: "Tuesday", label: "Tue" },
+  { id: "Wednesday", label: "Wed" },
+  { id: "Thursday", label: "Thu" },
+  { id: "Friday", label: "Fri" },
+  { id: "Saturday", label: "Sat" },
+  { id: "Sunday", label: "Sun" },
+];
+
+const TIME_CHIPS = [
+  { id: "morning", label: "Morning" },
+  { id: "afternoon", label: "Afternoon" },
+  { id: "evening", label: "Evening" },
+  { id: "night", label: "Night" },
+];
+
+const SIZE_CHIPS = [
+  { id: "small", label: "2–10", min: 0, max: 10 },
+  { id: "medium", label: "10–25", min: 10, max: 25 },
+  { id: "large", label: "25+", min: 25, max: Infinity },
+];
+
 const SOURCE_LABELS: Record<string, string> = {
   ticketmaster: "Ticketmaster",
   tmdb: "Now Showing",
   firecrawl: "Local Find",
   gemini: "AI Suggestion",
-};
-
-const SOURCE_ICONS: Record<string, typeof Ticket> = {
-  ticketmaster: Ticket,
-  tmdb: Film,
-  firecrawl: Globe,
-  gemini: Sparkles,
 };
 
 // ── Cache helpers ──────────────────────────────────────────────────────
@@ -95,8 +109,17 @@ function setCachedEvents(calendarId: string, events: MarketplaceEvent[], smartDa
       timestamp: Date.now(),
     }));
   } catch {
-    // sessionStorage quota exceeded — ignore
+    // quota exceeded
   }
+}
+
+// ── Filter helpers ─────────────────────────────────────────────────────
+
+function toggleSet<T>(set: Set<T>, value: T): Set<T> {
+  const next = new Set(set);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  return next;
 }
 
 // ── Component ──────────────────────────────────────────────────────────
@@ -107,11 +130,17 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
   const [smartDateTime, setSmartDateTime] = useState<SmartDateTime | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState("all");
   const initialLoadDone = useRef(false);
 
+  // Filters
+  const [category, setCategory] = useState("all");
+  const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
+  const [selectedTimes, setSelectedTimes] = useState<Set<string>>(new Set());
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+
+  const hasFilters = category !== "all" || selectedDays.size > 0 || selectedTimes.size > 0 || selectedSize !== null;
+
   const fetchEvents = useCallback(async (useCache = false) => {
-    // Check cache first
     if (useCache) {
       const cached = getCachedEvents(calendarId);
       if (cached) {
@@ -125,9 +154,7 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
     setLoading(true);
     setError(null);
     try {
-      const result = await Parse.Cloud.run("getMarketplaceEvents", {
-        calendarId,
-      });
+      const result = await Parse.Cloud.run("getMarketplaceEvents", { calendarId });
       const fetchedEvents = result.events || [];
       const fetchedSmartDT = result.smartDateTime || null;
       setEvents(fetchedEvents);
@@ -144,12 +171,11 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
   useEffect(() => {
     if (section === "discover" && !initialLoadDone.current) {
       initialLoadDone.current = true;
-      fetchEvents(true); // try cache on initial load
+      fetchEvents(true);
     }
   }, [fetchEvents, section]);
 
   const handleAddEvent = (event: MarketplaceEvent) => {
-    // Apply smart date/time for events without specific dates
     const enriched = { ...event };
     if (!enriched.suggestedDate && smartDateTime) {
       enriched.suggestedDate = smartDateTime.date;
@@ -160,9 +186,37 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
     onAddEvent(enriched);
   };
 
-  const filtered = filter === "all"
-    ? events
-    : events.filter((e) => e.category === filter);
+  // Apply filters
+  const filtered = events.filter((e) => {
+    // Category filter
+    if (category !== "all" && e.category !== category) return false;
+    // Day filter
+    if (selectedDays.size > 0) {
+      const eventDays = e.suggestedDays || [];
+      if (eventDays.length > 0 && !eventDays.some((d) => selectedDays.has(d))) return false;
+    }
+    // Time filter
+    if (selectedTimes.size > 0) {
+      const eventTimes = e.suggestedTimes || [];
+      if (eventTimes.length > 0 && !eventTimes.some((t) => selectedTimes.has(t))) return false;
+    }
+    // Size filter
+    if (selectedSize) {
+      const sizeConfig = SIZE_CHIPS.find((s) => s.id === selectedSize);
+      if (sizeConfig) {
+        const cap = e.capacityMax || e.capacityMin;
+        if (cap && (cap < sizeConfig.min || cap > sizeConfig.max)) return false;
+      }
+    }
+    return true;
+  });
+
+  const clearFilters = () => {
+    setCategory("all");
+    setSelectedDays(new Set());
+    setSelectedTimes(new Set());
+    setSelectedSize(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -193,23 +247,88 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
       {/* ──── Discover Section ──── */}
       {section === "discover" && (
         <>
-          {/* Category filters + refresh */}
-          <div className="flex items-center gap-4">
-            <div className="flex gap-2 overflow-x-auto no-scrollbar">
-              {CATEGORIES.map((cat) => (
+          {/* Category filters */}
+          <div className="flex gap-2 overflow-x-auto no-scrollbar">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setCategory(cat.id)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
+                  category === cat.id
+                    ? "bg-zinc-900 text-white"
+                    : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Day / Time / Size filters */}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            {/* Day of week */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest mr-1">Day</span>
+              {DAY_CHIPS.map((d) => (
                 <button
-                  key={cat.id}
-                  onClick={() => setFilter(cat.id)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
-                    filter === cat.id
+                  key={d.id}
+                  onClick={() => setSelectedDays(toggleSet(selectedDays, d.id))}
+                  className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${
+                    selectedDays.has(d.id)
                       ? "bg-zinc-900 text-white"
-                      : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+                      : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200"
                   }`}
                 >
-                  {cat.label}
+                  {d.label}
                 </button>
               ))}
             </div>
+
+            {/* Time of day */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest mr-1">Time</span>
+              {TIME_CHIPS.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setSelectedTimes(toggleSet(selectedTimes, t.id))}
+                  className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${
+                    selectedTimes.has(t.id)
+                      ? "bg-zinc-900 text-white"
+                      : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Group size */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest mr-1">Size</span>
+              {SIZE_CHIPS.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setSelectedSize(selectedSize === s.id ? null : s.id)}
+                  className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${
+                    selectedSize === s.id
+                      ? "bg-zinc-900 text-white"
+                      : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Clear filters */}
+            {hasFilters && (
+              <button
+                onClick={clearFilters}
+                className="text-[10px] font-medium text-zinc-400 hover:text-zinc-600 underline"
+              >
+                Clear
+              </button>
+            )}
           </div>
 
           {/* Loading skeleton */}
@@ -246,17 +365,19 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
             <div className="text-center py-16 space-y-3">
               <Sparkles className="w-8 h-8 text-zinc-300 mx-auto" />
               <p className="text-sm font-medium text-zinc-500">
-                No events found for your area
+                {hasFilters ? "No events match your filters" : "No events found for your area"}
               </p>
               <p className="text-xs text-zinc-400">
-                Try a different category or refresh to get new ideas.
+                {hasFilters ? "Try adjusting your filters." : "Check back later for new ideas."}
               </p>
-              <button
-                onClick={() => fetchEvents(false)}
-                className="mt-2 text-xs font-medium text-zinc-600 hover:text-zinc-900 underline"
-              >
-                Refresh
-              </button>
+              {hasFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="mt-2 text-xs font-medium text-zinc-600 hover:text-zinc-900 underline"
+                >
+                  Clear filters
+                </button>
+              )}
             </div>
           )}
 
@@ -264,7 +385,6 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
           {!loading && !error && filtered.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filtered.map((event) => {
-                const SourceIcon = SOURCE_ICONS[event.source] || Sparkles;
                 const sourceLabel = SOURCE_LABELS[event.source] || event.source;
                 const capacityStr =
                   event.capacityMin && event.capacityMax
@@ -288,22 +408,16 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
                   >
                     {/* Image */}
                     {event.image ? (
-                      <div className="relative h-40 overflow-hidden">
+                      <div className="h-40 overflow-hidden">
                         <img
                           src={event.image}
                           alt={event.title}
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         />
-                        <div className="absolute top-2 left-2">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium bg-white/90 backdrop-blur-sm rounded-full text-zinc-700">
-                            <SourceIcon className="w-3 h-3" />
-                            {sourceLabel}
-                          </span>
-                        </div>
                       </div>
                     ) : (
                       <div className="h-40 bg-zinc-50 flex items-center justify-center">
-                        <SourceIcon className="w-8 h-8 text-zinc-300" />
+                        <Sparkles className="w-8 h-8 text-zinc-300" />
                       </div>
                     )}
 
@@ -316,6 +430,17 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
                         <p className="text-xs text-zinc-400 mt-1 line-clamp-2">
                           {event.description}
                         </p>
+                        {event.url && (
+                          <a
+                            href={event.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            View on {sourceLabel}
+                          </a>
+                        )}
                       </div>
 
                       {/* Metadata */}
@@ -346,11 +471,8 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
                         )}
                       </div>
 
-                      {/* Category pill + Add button */}
-                      <div className="flex items-center justify-between pt-1">
-                        <span className="text-[10px] font-medium uppercase tracking-widest text-zinc-400 bg-zinc-50 px-2 py-0.5 rounded-full">
-                          {event.category}
-                        </span>
+                      {/* Add button */}
+                      <div className="flex items-center justify-end pt-1">
                         <button
                           onClick={() => handleAddEvent(event)}
                           className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 transition-colors"
