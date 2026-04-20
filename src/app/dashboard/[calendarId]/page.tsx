@@ -95,6 +95,7 @@ interface OrgDashboard {
   }[];
   rsvps: {
     objectId: string;
+    eventGroupId: string | null;
     name: string;
     phone: string | null;
     planTitle: string;
@@ -1579,6 +1580,23 @@ export default function OrgDashboardPage() {
                   <p className="text-xs text-zinc-500 mt-1">Control how Leaf generates plan ideas for your community.</p>
                 </div>
 
+                {/* Show Plan Ideas Toggle */}
+                <label className="flex items-center justify-between cursor-pointer border-b border-zinc-100 pb-8">
+                  <div>
+                    <p className="text-sm font-medium">Show Plan Ideas</p>
+                    <p className="text-xs text-zinc-500">Let members browse and host AI-generated plan ideas.</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!settingsHidePlanIdeas}
+                    onClick={() => setSettingsHidePlanIdeas((v) => !v)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${!settingsHidePlanIdeas ? "bg-zinc-900" : "bg-zinc-200"}`}
+                  >
+                    <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${!settingsHidePlanIdeas ? "translate-x-6" : "translate-x-1"}`} />
+                  </button>
+                </label>
+
                 {/* Preferred Days */}
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Preferred Days</h3>
@@ -1750,7 +1768,7 @@ export default function OrgDashboardPage() {
               </section>
             </div>
 
-            {/* Calendar Page Visibility (Pro only) */}
+            {/* Custom Plan Proposals (Pro only) */}
             <div className="relative">
               {dashboard.tier !== "pro" && (
                 <div className="absolute top-4 right-4 z-10" onClick={() => setShowSubscription(true)}>
@@ -1759,30 +1777,11 @@ export default function OrgDashboardPage() {
                   </div>
                 </div>
               )}
-              <section className={`border border-zinc-200 rounded-xl p-6 space-y-6 ${dashboard.tier !== "pro" ? "opacity-40 pointer-events-none" : ""}`}>
-                <div>
-                  <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Calendar Page Visibility</h2>
-                  <p className="text-xs text-zinc-500 mt-1">Control which sections appear on your public calendar page.</p>
-                </div>
+              <section className={`border border-zinc-200 rounded-xl p-6 ${dashboard.tier !== "pro" ? "opacity-40 pointer-events-none" : ""}`}>
                 <label className="flex items-center justify-between cursor-pointer">
                   <div>
-                    <p className="text-sm font-medium">Show Plan Ideas</p>
-                    <p className="text-xs text-zinc-500">Let members browse and host AI-generated plan ideas.</p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={!settingsHidePlanIdeas}
-                    onClick={() => setSettingsHidePlanIdeas((v) => !v)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${!settingsHidePlanIdeas ? "bg-zinc-900" : "bg-zinc-200"}`}
-                  >
-                    <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${!settingsHidePlanIdeas ? "translate-x-6" : "translate-x-1"}`} />
-                  </button>
-                </label>
-                <label className="flex items-center justify-between cursor-pointer">
-                  <div>
-                    <p className="text-sm font-medium">Show Custom Plan Proposals</p>
-                    <p className="text-xs text-zinc-500">Let members propose their own plan ideas for your review.</p>
+                    <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Custom Plan Proposals</h2>
+                    <p className="text-xs text-zinc-500 mt-1">Let members propose their own plan ideas for your review.</p>
                   </div>
                   <button
                     type="button"
@@ -2329,6 +2328,38 @@ export default function OrgDashboardPage() {
                   )}
                 </div>
               )}
+
+              {/* RSVPs */}
+              {(() => {
+                const planRsvps = dashboard.rsvps.filter((r) => r.eventGroupId === selectedActivePlan.objectId);
+                return planRsvps.length > 0 ? (
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                      Attendees ({planRsvps.length})
+                    </h4>
+                    <div className="border border-zinc-200 rounded-xl overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-zinc-50 text-left">
+                          <tr>
+                            <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Name</th>
+                            <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Phone</th>
+                            <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Source</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100">
+                          {planRsvps.map((r) => (
+                            <tr key={r.objectId}>
+                              <td className="px-4 py-2.5">{r.name}</td>
+                              <td className="px-4 py-2.5 text-zinc-400">{r.phone || "—"}</td>
+                              <td className="px-4 py-2.5 text-zinc-400">{r.source}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
 
               <div className="pt-8 border-t border-zinc-100 flex items-center justify-between">
                 <button

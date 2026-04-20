@@ -2142,14 +2142,14 @@ export default function OrgCalendarPage() {
               Powered by Leaf
             </p>
             <p className="text-sm text-zinc-600 font-light">
-              Bring your own community together.
+              Create a free social calendar for your community.
             </p>
           </div>
           <a
             href="https://www.os.joinleaf.com/organizations/setup"
             className="inline-flex items-center gap-2 bg-zinc-900 text-white px-6 py-3 text-[10px] uppercase tracking-[0.2em] font-bold hover:bg-zinc-800 transition-colors shrink-0"
           >
-            Create Your Own Calendar <ArrowRight className="w-3.5 h-3.5" />
+            Get Started — It&apos;s Free <ArrowRight className="w-3.5 h-3.5" />
           </a>
         </div>
       </section>
