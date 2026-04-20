@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Parse from "@/lib/parse-client";
 import {
-  RefreshCw,
   Plus,
   MapPin,
   Users,
@@ -34,12 +33,21 @@ export interface MarketplaceEvent {
   suggestedTimes: string[];
 }
 
+interface SmartDateTime {
+  date: string;
+  day: string;
+  time: string;
+  basedOnPastPlans: number;
+}
+
 interface MarketplaceTabProps {
   calendarId: string;
   onAddEvent: (event: MarketplaceEvent) => void;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────
+
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 const CATEGORIES = [
   { id: "all", label: "All" },
@@ -65,37 +73,92 @@ const SOURCE_ICONS: Record<string, typeof Ticket> = {
   gemini: Sparkles,
 };
 
+// ── Cache helpers ──────────────────────────────────────────────────────
+
+function getCachedEvents(calendarId: string): { events: MarketplaceEvent[]; smartDateTime: SmartDateTime | null } | null {
+  try {
+    const raw = sessionStorage.getItem(`marketplace-${calendarId}`);
+    if (!raw) return null;
+    const cached = JSON.parse(raw);
+    if (Date.now() - cached.timestamp > CACHE_TTL_MS) return null;
+    return { events: cached.events, smartDateTime: cached.smartDateTime };
+  } catch {
+    return null;
+  }
+}
+
+function setCachedEvents(calendarId: string, events: MarketplaceEvent[], smartDateTime: SmartDateTime | null) {
+  try {
+    sessionStorage.setItem(`marketplace-${calendarId}`, JSON.stringify({
+      events,
+      smartDateTime,
+      timestamp: Date.now(),
+    }));
+  } catch {
+    // sessionStorage quota exceeded — ignore
+  }
+}
+
 // ── Component ──────────────────────────────────────────────────────────
 
 export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTabProps) {
   const [section, setSection] = useState<"discover" | "collabs">("discover");
   const [events, setEvents] = useState<MarketplaceEvent[]>([]);
+  const [smartDateTime, setSmartDateTime] = useState<SmartDateTime | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
+  const initialLoadDone = useRef(false);
 
-  const fetchEvents = useCallback(async () => {
+  const fetchEvents = useCallback(async (useCache = false) => {
+    // Check cache first
+    if (useCache) {
+      const cached = getCachedEvents(calendarId);
+      if (cached) {
+        setEvents(cached.events);
+        setSmartDateTime(cached.smartDateTime);
+        setLoading(false);
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
     try {
       const result = await Parse.Cloud.run("getMarketplaceEvents", {
         calendarId,
-        category: filter === "all" ? undefined : filter,
       });
-      setEvents(result.events || []);
+      const fetchedEvents = result.events || [];
+      const fetchedSmartDT = result.smartDateTime || null;
+      setEvents(fetchedEvents);
+      setSmartDateTime(fetchedSmartDT);
+      setCachedEvents(calendarId, fetchedEvents, fetchedSmartDT);
     } catch {
       setError("Couldn\u2019t load marketplace events. Try again.");
       setEvents([]);
     } finally {
       setLoading(false);
     }
-  }, [calendarId, filter]);
+  }, [calendarId]);
 
   useEffect(() => {
-    if (section === "discover") {
-      fetchEvents();
+    if (section === "discover" && !initialLoadDone.current) {
+      initialLoadDone.current = true;
+      fetchEvents(true); // try cache on initial load
     }
   }, [fetchEvents, section]);
+
+  const handleAddEvent = (event: MarketplaceEvent) => {
+    // Apply smart date/time for events without specific dates
+    const enriched = { ...event };
+    if (!enriched.suggestedDate && smartDateTime) {
+      enriched.suggestedDate = smartDateTime.date;
+    }
+    if (!enriched.suggestedTime && smartDateTime) {
+      enriched.suggestedTime = smartDateTime.time;
+    }
+    onAddEvent(enriched);
+  };
 
   const filtered = filter === "all"
     ? events
@@ -147,14 +210,6 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
                 </button>
               ))}
             </div>
-            <button
-              onClick={fetchEvents}
-              disabled={loading}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-700 transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-              Refresh
-            </button>
           </div>
 
           {/* Loading skeleton */}
@@ -178,7 +233,7 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
             <div className="text-center py-16 space-y-4">
               <p className="text-sm text-zinc-400">{error}</p>
               <button
-                onClick={fetchEvents}
+                onClick={() => fetchEvents(false)}
                 className="text-xs font-medium text-zinc-600 hover:text-zinc-900 underline"
               >
                 Try again
@@ -197,7 +252,7 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
                 Try a different category or refresh to get new ideas.
               </p>
               <button
-                onClick={fetchEvents}
+                onClick={() => fetchEvents(false)}
                 className="mt-2 text-xs font-medium text-zinc-600 hover:text-zinc-900 underline"
               >
                 Refresh
@@ -213,7 +268,7 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
                 const sourceLabel = SOURCE_LABELS[event.source] || event.source;
                 const capacityStr =
                   event.capacityMin && event.capacityMax
-                    ? `${event.capacityMin}–${event.capacityMax}`
+                    ? `${event.capacityMin}\u2013${event.capacityMax}`
                     : event.capacityMax
                     ? `Up to ${event.capacityMax}`
                     : event.capacityMin
@@ -297,7 +352,7 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
                           {event.category}
                         </span>
                         <button
-                          onClick={() => onAddEvent(event)}
+                          onClick={() => handleAddEvent(event)}
                           className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 transition-colors"
                         >
                           <Plus className="w-3 h-3" />

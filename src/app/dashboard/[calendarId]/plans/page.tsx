@@ -100,6 +100,7 @@ export default function PlansPage() {
         try {
           const v = JSON.parse(venueStr);
           setSelectedVenue({ name: v.name, address: v.address, placeId: "" });
+          setVenueQuery(v.name);
         } catch {
           // Invalid venue JSON
         }
