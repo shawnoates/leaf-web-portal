@@ -17,7 +17,7 @@ function mapCategory(categories: { alias: string; title: string }[]): string {
 export async function GET(request: NextRequest) {
   const city = request.nextUrl.searchParams.get("city");
   if (!city || !YELP_API_KEY) {
-    return NextResponse.json({ events: [], trendingVenues: [] });
+    return NextResponse.json({ events: [], trendingVenues: [], debug: { hasKey: !!YELP_API_KEY, city } });
   }
 
   const headers = {
