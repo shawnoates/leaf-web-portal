@@ -7,7 +7,7 @@ import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import VenueSearch from "@/components/VenueSearch";
-import { ArrowLeft, Calendar, Check, Clock, ImagePlus, Lock, MapPin, Plus, RefreshCw, Sparkles, Trash2, Users, X } from "lucide-react";
+import { ArrowLeft, Calendar, Check, Clock, Copy, ImagePlus, Lock, MapPin, Plus, RefreshCw, Sparkles, Trash2, Users, X } from "lucide-react";
 
 interface Venue {
   name: string;
@@ -315,6 +315,19 @@ export default function PlansPage() {
     }
   }
 
+  function handleDuplicatePlan() {
+    if (!selectedPlan) return;
+    resetForm();
+    setTitle(selectedPlan.title);
+    setDescription(selectedPlan.description || "");
+    if (selectedPlan.location) {
+      setSelectedVenue({ name: selectedPlan.location.name, address: selectedPlan.location.address, placeId: "" });
+      setVenueQuery(selectedPlan.location.name);
+    }
+    setSelectedPlan(null);
+    setShowCreateModal(true);
+  }
+
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -537,7 +550,14 @@ export default function PlansPage() {
                 </div>
               )}
 
-              <div className="pt-8 border-t border-zinc-100">
+              <div className="pt-8 border-t border-zinc-100 flex items-center justify-between">
+                <button
+                  onClick={handleDuplicatePlan}
+                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+                >
+                  <Copy className="w-4 h-4" />
+                  Duplicate Plan
+                </button>
                 <button
                   onClick={() => handleDeletePlan(selectedPlan.objectId)}
                   className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"

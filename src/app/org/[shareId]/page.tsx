@@ -701,6 +701,25 @@ export default function OrgCalendarPage() {
     }
   }, []);
 
+  async function handleUnfollow() {
+    if (!org) return;
+    if (!confirm("Unfollow this calendar? You will no longer receive notifications about new plans.")) return;
+    const cookie = getFollowerCookie();
+    if (!cookie?.phone) return;
+    try {
+      await Parse.Cloud.run("unfollowCalendarViaWeb", {
+        calendarId: org.objectId,
+        phoneNumber: cookie.phone,
+      });
+      setIsFollowing(false);
+      setFollowerCount((c) => Math.max(0, c - 1));
+      // Clear the follower cookie
+      document.cookie = "leaf_follower=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    } catch (err) {
+      console.error("Failed to unfollow:", err);
+    }
+  }
+
   // Set page title when org loads
   useEffect(() => {
     if (org) {
@@ -1159,10 +1178,15 @@ export default function OrgCalendarPage() {
             </span>
             {!org.isOwner && (
               isFollowing ? (
-                <span className="flex items-center gap-1.5 text-[10px] tracking-[0.3em] uppercase font-bold text-emerald-600 border border-emerald-200 bg-emerald-50 px-3 py-1.5 rounded-full">
-                  <Check className="w-3.5 h-3.5" />
-                  Following
-                </span>
+                <button
+                  onClick={handleUnfollow}
+                  className="flex items-center gap-1.5 text-[10px] tracking-[0.3em] uppercase font-bold text-emerald-600 border border-emerald-200 bg-emerald-50 hover:bg-red-50 hover:border-red-200 hover:text-red-600 px-3 py-1.5 rounded-full transition-colors group"
+                >
+                  <Check className="w-3.5 h-3.5 group-hover:hidden" />
+                  <X className="w-3.5 h-3.5 hidden group-hover:block" />
+                  <span className="group-hover:hidden">Following</span>
+                  <span className="hidden group-hover:inline">Unfollow</span>
+                </button>
               ) : (
                 <button
                   onClick={() => setShowFollowModal(true)}
