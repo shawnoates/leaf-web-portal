@@ -198,12 +198,6 @@ export default function OrganizationsPage() {
                 Pricing
               </a>
               <Link
-                href="/dashboard"
-                className="text-[10px] tracking-[0.3em] uppercase font-bold text-white/60 hover:text-white transition-colors"
-              >
-                Dashboard
-              </Link>
-              <Link
                 href={isLoggedIn ? "/dashboard" : "/organizations/setup"}
                 className="bg-white text-zinc-900 px-5 py-2.5 text-[10px] uppercase tracking-[0.2em] font-bold hover:bg-white/90 transition-colors"
               >
