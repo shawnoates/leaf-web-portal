@@ -1291,9 +1291,10 @@ export default function OrgCalendarPage() {
                       </button>
                       <button
                         onClick={() => handleSharePlan(plan.id, plan.title)}
-                        className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative"
+                        className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center gap-2"
                       >
                         {copiedPlanId === plan.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                        <span className="text-xs font-bold uppercase tracking-widest">Share</span>
                       </button>
                     </div>
                   </div>
@@ -1539,9 +1540,10 @@ export default function OrgCalendarPage() {
                     </button>
                     <button
                       onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
-                      className="border border-zinc-200 px-5 hover:bg-zinc-50 transition-colors"
+                      className="border border-zinc-200 px-5 hover:bg-zinc-50 transition-colors flex items-center gap-2"
                     >
                       {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                      <span className="text-xs font-bold uppercase tracking-widest">Share</span>
                     </button>
                   </div>
                 )}

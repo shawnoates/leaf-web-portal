@@ -14,6 +14,7 @@ import {
   Check,
   ChevronRight,
   Clock,
+  Copy,
   Download,
   Heart,
   ImagePlus,
@@ -2317,7 +2318,7 @@ export default function OrgDashboardPage() {
                     {selectedActivePlan.time && ` at ${selectedActivePlan.time}`}
                   </span>
                   <span className="flex items-center gap-2">
-                    <Users className="w-4 h-4" /> {selectedActivePlan.rsvpCount} attending
+                    <Users className="w-4 h-4" /> {planRsvpsLoading ? selectedActivePlan.rsvpCount : planRsvps.length} RSVP{planRsvps.length === 1 ? "" : "s"}
                   </span>
                 </div>
               </div>
@@ -2388,7 +2389,7 @@ export default function OrgDashboardPage() {
                   }}
                   className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Copy className="w-4 h-4" />
                   Duplicate Plan
                 </button>
                 <button
