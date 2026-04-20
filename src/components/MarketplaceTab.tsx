@@ -52,16 +52,6 @@ interface MarketplaceTabProps {
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
-const CATEGORIES = [
-  { id: "all", label: "All" },
-  { id: "dining", label: "Dining" },
-  { id: "sports", label: "Sports" },
-  { id: "music", label: "Music" },
-  { id: "arts", label: "Arts" },
-  { id: "nightlife", label: "Nightlife" },
-  { id: "outdoors", label: "Outdoors" },
-];
-
 const SOURCE_LABELS: Record<string, string> = {
   ticketmaster_direct: "Events",
   yelp: "Places",
@@ -235,7 +225,6 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
 
   // Filters
   const [sourceFilter, setSourceFilter] = useState("recommended");
-  const [category, setCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -337,26 +326,18 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
     onAddEvent(event);
   };
 
-  // Apply source filter, then recommendation or category filters
+  // Apply source filter or recommendation
   const filtered = useMemo(() => {
-    let result = events;
-
-    // Source filter
     if (sourceFilter === "recommended" && orgSettings) {
-      return getRecommended(result, orgSettings);
+      return getRecommended(events, orgSettings);
     }
 
     if (sourceFilter !== "all" && sourceFilter !== "recommended") {
-      result = result.filter((e) => e.source === sourceFilter);
+      return events.filter((e) => e.source === sourceFilter);
     }
 
-    // Category filter
-    if (category !== "all") {
-      result = result.filter((e) => e.category === category);
-    }
-
-    return result;
-  }, [events, sourceFilter, orgSettings, category]);
+    return events;
+  }, [events, sourceFilter, orgSettings]);
 
   const isRecommended = sourceFilter === "recommended";
 
@@ -427,25 +408,6 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
             ))}
           </div>
 
-          {/* Category filter (hide when Recommended is active) */}
-          {!isRecommended && (
-            <div className="flex gap-2 overflow-x-auto no-scrollbar">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => setCategory(cat.id)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
-                    category === cat.id
-                      ? "bg-zinc-900 text-white"
-                      : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-          )}
-
           {/* Loading skeleton */}
           {loading && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -482,14 +444,14 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
               <p className="text-sm font-medium text-zinc-500">
                 {!city
                   ? "Set a city on your calendar to discover events"
-                  : category !== "all" || sourceFilter !== "all"
+                  : sourceFilter !== "all"
                   ? "No events match your filters"
                   : "No events found for your area"}
               </p>
               <p className="text-xs text-zinc-400">
                 {!city
                   ? "Go to Calendars and add a city to get started."
-                  : category !== "all" || sourceFilter !== "all"
+                  : sourceFilter !== "all"
                   ? "Try adjusting your filters."
                   : "Check back later for new ideas."}
               </p>
