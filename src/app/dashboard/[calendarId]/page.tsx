@@ -146,10 +146,10 @@ const BLACKLIST_PRESETS: string[] = [
 const TABS = [
   { id: "overview", label: "Overview", icon: Calendar },
   { id: "calendars", label: "Calendars", icon: Layers },
-  { id: "marketplace", label: "Marketplace", icon: Ticket, growthOnly: true },
   { id: "followers", label: "Followers", icon: Heart },
   { id: "members", label: "Users", icon: Users },
   { id: "analytics", label: "Analytics", icon: TrendingUp, proOnly: true },
+  { id: "marketplace", label: "Marketplace", icon: Ticket, growthOnly: true },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
