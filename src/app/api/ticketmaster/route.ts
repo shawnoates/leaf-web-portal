@@ -18,7 +18,7 @@ function mapCategory(segment: string, genre?: string): string {
 export async function GET(request: NextRequest) {
   const city = request.nextUrl.searchParams.get("city");
   if (!city || !TICKETMASTER_API_KEY) {
-    return NextResponse.json({ events: [], debug: { hasKey: !!TICKETMASTER_API_KEY, city } });
+    return NextResponse.json({ events: [] });
   }
 
   try {
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     );
 
     if (!res.ok) {
-      return NextResponse.json({ events: [], debug: { status: res.status, statusText: res.statusText } });
+      return NextResponse.json({ events: [] });
     }
 
     const data = await res.json();

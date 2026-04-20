@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import Parse from "@/lib/parse-client";
 import {
   Plus,
   MapPin,
@@ -10,6 +11,7 @@ import {
   Sparkles,
   ExternalLink,
   TrendingUp,
+  Star,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -31,15 +33,26 @@ export interface MarketplaceEvent {
   suggestedTimes: string[];
 }
 
+export interface OrgSettings {
+  name: string;
+  description: string;
+  orgType: string | null;
+  calendarDescription: string;
+  blacklistCategories: string[];
+  excludeKeywords: string[];
+  daysOfWeek: number[];
+  preferredTimes: string[];
+}
+
 interface MarketplaceTabProps {
   calendarId: string;
   city?: string;
+  orgSettings?: OrgSettings;
   onAddEvent: (event: MarketplaceEvent) => void;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────
 
-// Cache events for 24 hours so content stays fresh weekly
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const CATEGORIES = [
@@ -79,7 +92,40 @@ const SOURCE_LABELS: Record<string, string> = {
   ticketmaster_direct: "Ticketmaster",
   yelp: "Yelp",
   yelp_venue: "Trending Spot",
-  stubhub: "StubHub",
+  tmdb: "Now Showing",
+  firecrawl: "Local Find",
+};
+
+const SOURCE_FILTERS = [
+  { id: "recommended", label: "Recommended" },
+  { id: "all", label: "All" },
+  { id: "ticketmaster_direct", label: "Ticketmaster" },
+  { id: "yelp", label: "Yelp" },
+  { id: "tmdb", label: "Movies" },
+  { id: "firecrawl", label: "Local Finds" },
+];
+
+// Day index to name mapping for recommendation scoring
+const DAY_INDEX_TO_NAME: Record<number, string> = {
+  0: "Sunday",
+  1: "Monday",
+  2: "Tuesday",
+  3: "Wednesday",
+  4: "Thursday",
+  5: "Friday",
+  6: "Saturday",
+};
+
+// Blacklist category mapping (org settings use specific names, events use generic)
+const BLACKLIST_MAP: Record<string, string[]> = {
+  "Bars": ["nightlife"],
+  "Nightclubs": ["nightlife"],
+  "Casinos": ["nightlife"],
+  "Adult venues": ["nightlife"],
+  "Smoking lounges": ["nightlife"],
+  "Late-night venues": ["nightlife"],
+  "Fast food": ["dining"],
+  "Religious venues": [],
 };
 
 // ── Cache helpers ──────────────────────────────────────────────────────
@@ -126,9 +172,60 @@ function deduplicateEvents(events: MarketplaceEvent[]): MarketplaceEvent[] {
   return Array.from(seen.values());
 }
 
+// ── Recommendation scoring ───────────────────────────────────────────
+
+function scoreEvent(event: MarketplaceEvent, settings: OrgSettings): number | null {
+  // Exclude blacklisted categories
+  for (const blacklisted of settings.blacklistCategories) {
+    const mappedCategories = BLACKLIST_MAP[blacklisted] || [];
+    if (mappedCategories.includes(event.category)) return null;
+  }
+
+  // Exclude events matching exclude keywords
+  const titleLower = event.title.toLowerCase();
+  const descLower = event.description.toLowerCase();
+  for (const keyword of settings.excludeKeywords) {
+    const kw = keyword.toLowerCase();
+    if (titleLower.includes(kw) || descLower.includes(kw)) return null;
+  }
+
+  let score = 1;
+
+  // Boost for matching preferred days
+  if (settings.daysOfWeek.length > 0 && event.suggestedDays.length > 0) {
+    const preferredDayNames = settings.daysOfWeek.map((i) => DAY_INDEX_TO_NAME[i]).filter(Boolean);
+    if (event.suggestedDays.some((d) => preferredDayNames.includes(d))) {
+      score += 2;
+    }
+  }
+
+  // Boost for matching preferred times
+  if (settings.preferredTimes.length > 0 && event.suggestedTimes.length > 0) {
+    if (event.suggestedTimes.some((t) => settings.preferredTimes.includes(t))) {
+      score += 2;
+    }
+  }
+
+  return score;
+}
+
+function getRecommended(events: MarketplaceEvent[], settings: OrgSettings): MarketplaceEvent[] {
+  const scored: { event: MarketplaceEvent; score: number }[] = [];
+
+  for (const event of events) {
+    const s = scoreEvent(event, settings);
+    if (s !== null) {
+      scored.push({ event, score: s });
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, 10).map((s) => s.event);
+}
+
 // ── Component ──────────────────────────────────────────────────────────
 
-export default function MarketplaceTab({ calendarId, city, onAddEvent }: MarketplaceTabProps) {
+export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEvent }: MarketplaceTabProps) {
   const [section, setSection] = useState<"discover" | "collabs">("discover");
   const [events, setEvents] = useState<MarketplaceEvent[]>([]);
   const [trendingVenues, setTrendingVenues] = useState<MarketplaceEvent[]>([]);
@@ -137,6 +234,7 @@ export default function MarketplaceTab({ calendarId, city, onAddEvent }: Marketp
   const initialLoadDone = useRef(false);
 
   // Filters
+  const [sourceFilter, setSourceFilter] = useState("recommended");
   const [category, setCategory] = useState("all");
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
   const [selectedTimes, setSelectedTimes] = useState<Set<string>>(new Set());
@@ -145,19 +243,14 @@ export default function MarketplaceTab({ calendarId, city, onAddEvent }: Marketp
   const hasFilters = category !== "all" || selectedDays.size > 0 || selectedTimes.size > 0 || selectedSize !== null;
 
   const fetchFromServer = useCallback(async () => {
-    if (!city) {
-      setEvents([]);
-      setTrendingVenues([]);
-      return;
-    }
+    const cityParam = city ? `?city=${encodeURIComponent(city)}` : "";
 
-    const cityParam = `?city=${encodeURIComponent(city)}`;
-
-    // Fetch from all API routes in parallel
-    const [yelpResult, stubhubResult, ticketmasterResult] = await Promise.allSettled([
-      fetch(`/api/yelp${cityParam}`).then((r) => r.json()),
-      fetch(`/api/stubhub${cityParam}`).then((r) => r.json()),
-      fetch(`/api/ticketmaster${cityParam}`).then((r) => r.json()),
+    // Fetch from all 4 sources in parallel
+    const [yelpResult, ticketmasterResult, tmdbResult, parseResult] = await Promise.allSettled([
+      city ? fetch(`/api/yelp${cityParam}`).then((r) => r.json()) : Promise.resolve({ events: [], trendingVenues: [] }),
+      city ? fetch(`/api/ticketmaster${cityParam}`).then((r) => r.json()) : Promise.resolve({ events: [] }),
+      fetch("/api/tmdb").then((r) => r.json()),
+      Parse.Cloud.run("getMarketplaceEvents", { calendarId }),
     ]);
 
     let allEvents: MarketplaceEvent[] = [];
@@ -168,12 +261,20 @@ export default function MarketplaceTab({ calendarId, city, onAddEvent }: Marketp
       allTrendingVenues = yelpResult.value.trendingVenues || [];
     }
 
-    if (stubhubResult.status === "fulfilled") {
-      allEvents.push(...(stubhubResult.value.events || []));
-    }
-
     if (ticketmasterResult.status === "fulfilled") {
       allEvents.push(...(ticketmasterResult.value.events || []));
+    }
+
+    if (tmdbResult.status === "fulfilled") {
+      allEvents.push(...(tmdbResult.value.events || []));
+    }
+
+    // From Parse, only take firecrawl (scraped) events
+    if (parseResult.status === "fulfilled") {
+      const scraped = (parseResult.value.events || []).filter(
+        (e: MarketplaceEvent) => e.source === "firecrawl"
+      );
+      allEvents.push(...scraped);
     }
 
     allEvents = deduplicateEvents(allEvents);
@@ -220,26 +321,53 @@ export default function MarketplaceTab({ calendarId, city, onAddEvent }: Marketp
     onAddEvent(event);
   };
 
-  // Apply filters
-  const filtered = events.filter((e) => {
-    if (category !== "all" && e.category !== category) return false;
+  // Apply source filter, then recommendation or category/day/time/size filters
+  const filtered = useMemo(() => {
+    let result = events;
+
+    // Source filter
+    if (sourceFilter === "recommended" && orgSettings) {
+      return getRecommended(result, orgSettings);
+    }
+
+    if (sourceFilter !== "all" && sourceFilter !== "recommended") {
+      result = result.filter((e) => e.source === sourceFilter);
+    }
+
+    // Category filter
+    if (category !== "all") {
+      result = result.filter((e) => e.category === category);
+    }
+
+    // Day filter
     if (selectedDays.size > 0) {
-      const eventDays = e.suggestedDays || [];
-      if (eventDays.length > 0 && !eventDays.some((d) => selectedDays.has(d))) return false;
+      result = result.filter((e) => {
+        const eventDays = e.suggestedDays || [];
+        return eventDays.length === 0 || eventDays.some((d) => selectedDays.has(d));
+      });
     }
+
+    // Time filter
     if (selectedTimes.size > 0) {
-      const eventTimes = e.suggestedTimes || [];
-      if (eventTimes.length > 0 && !eventTimes.some((t) => selectedTimes.has(t))) return false;
+      result = result.filter((e) => {
+        const eventTimes = e.suggestedTimes || [];
+        return eventTimes.length === 0 || eventTimes.some((t) => selectedTimes.has(t));
+      });
     }
+
+    // Size filter
     if (selectedSize) {
       const sizeConfig = SIZE_CHIPS.find((s) => s.id === selectedSize);
       if (sizeConfig) {
-        const cap = e.capacityMax || e.capacityMin;
-        if (cap && (cap < sizeConfig.min || cap > sizeConfig.max)) return false;
+        result = result.filter((e) => {
+          const cap = e.capacityMax || e.capacityMin;
+          return !cap || (cap >= sizeConfig.min && cap <= sizeConfig.max);
+        });
       }
     }
-    return true;
-  });
+
+    return result;
+  }, [events, sourceFilter, orgSettings, category, selectedDays, selectedTimes, selectedSize]);
 
   const clearFilters = () => {
     setCategory("all");
@@ -247,6 +375,8 @@ export default function MarketplaceTab({ calendarId, city, onAddEvent }: Marketp
     setSelectedTimes(new Set());
     setSelectedSize(null);
   };
+
+  const isRecommended = sourceFilter === "recommended";
 
   return (
     <div className="space-y-6">
@@ -277,8 +407,26 @@ export default function MarketplaceTab({ calendarId, city, onAddEvent }: Marketp
       {/* ──── Discover Section ──── */}
       {section === "discover" && (
         <>
-          {/* Trending Locations */}
-          {!loading && trendingVenues.length > 0 && (
+          {/* Source filter chips */}
+          <div className="flex gap-2 overflow-x-auto no-scrollbar">
+            {SOURCE_FILTERS.map((sf) => (
+              <button
+                key={sf.id}
+                onClick={() => setSourceFilter(sf.id)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors flex items-center gap-1 ${
+                  sourceFilter === sf.id
+                    ? "bg-zinc-900 text-white"
+                    : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+                }`}
+              >
+                {sf.id === "recommended" && <Star className="w-3 h-3" />}
+                {sf.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Trending Locations (hide when Recommended is active) */}
+          {!isRecommended && !loading && trendingVenues.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-zinc-500" />
@@ -320,67 +468,70 @@ export default function MarketplaceTab({ calendarId, city, onAddEvent }: Marketp
             </div>
           )}
 
-          {/* Category filters */}
-          <div className="flex gap-2 overflow-x-auto no-scrollbar">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setCategory(cat.id)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
-                  category === cat.id
-                    ? "bg-zinc-900 text-white"
-                    : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
+          {/* Category + sub-filters (hide when Recommended is active) */}
+          {!isRecommended && (
+            <>
+              <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setCategory(cat.id)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
+                      category === cat.id
+                        ? "bg-zinc-900 text-white"
+                        : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
 
-          {/* Sub-filters */}
-          <div className="flex items-center gap-3">
-            <select
-              value={selectedDays.size === 1 ? [...selectedDays][0] : ""}
-              onChange={(e) => setSelectedDays(e.target.value ? new Set([e.target.value]) : new Set())}
-              className="text-xs font-medium text-zinc-500 bg-zinc-100 border-0 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-zinc-300 appearance-none cursor-pointer"
-            >
-              <option value="">Any Day</option>
-              {DAY_CHIPS.map((d) => (
-                <option key={d.id} value={d.id}>{d.label}</option>
-              ))}
-            </select>
+              <div className="flex items-center gap-3">
+                <select
+                  value={selectedDays.size === 1 ? [...selectedDays][0] : ""}
+                  onChange={(e) => setSelectedDays(e.target.value ? new Set([e.target.value]) : new Set())}
+                  className="text-xs font-medium text-zinc-500 bg-zinc-100 border-0 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-zinc-300 appearance-none cursor-pointer"
+                >
+                  <option value="">Any Day</option>
+                  {DAY_CHIPS.map((d) => (
+                    <option key={d.id} value={d.id}>{d.label}</option>
+                  ))}
+                </select>
 
-            <select
-              value={selectedTimes.size === 1 ? [...selectedTimes][0] : ""}
-              onChange={(e) => setSelectedTimes(e.target.value ? new Set([e.target.value]) : new Set())}
-              className="text-xs font-medium text-zinc-500 bg-zinc-100 border-0 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-zinc-300 appearance-none cursor-pointer"
-            >
-              <option value="">Any Time</option>
-              {TIME_CHIPS.map((t) => (
-                <option key={t.id} value={t.id}>{t.label}</option>
-              ))}
-            </select>
+                <select
+                  value={selectedTimes.size === 1 ? [...selectedTimes][0] : ""}
+                  onChange={(e) => setSelectedTimes(e.target.value ? new Set([e.target.value]) : new Set())}
+                  className="text-xs font-medium text-zinc-500 bg-zinc-100 border-0 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-zinc-300 appearance-none cursor-pointer"
+                >
+                  <option value="">Any Time</option>
+                  {TIME_CHIPS.map((t) => (
+                    <option key={t.id} value={t.id}>{t.label}</option>
+                  ))}
+                </select>
 
-            <select
-              value={selectedSize || ""}
-              onChange={(e) => setSelectedSize(e.target.value || null)}
-              className="text-xs font-medium text-zinc-500 bg-zinc-100 border-0 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-zinc-300 appearance-none cursor-pointer"
-            >
-              <option value="">Any Size</option>
-              {SIZE_CHIPS.map((s) => (
-                <option key={s.id} value={s.id}>{s.label} people</option>
-              ))}
-            </select>
+                <select
+                  value={selectedSize || ""}
+                  onChange={(e) => setSelectedSize(e.target.value || null)}
+                  className="text-xs font-medium text-zinc-500 bg-zinc-100 border-0 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-zinc-300 appearance-none cursor-pointer"
+                >
+                  <option value="">Any Size</option>
+                  {SIZE_CHIPS.map((s) => (
+                    <option key={s.id} value={s.id}>{s.label} people</option>
+                  ))}
+                </select>
 
-            {hasFilters && (
-              <button
-                onClick={clearFilters}
-                className="text-[10px] font-medium text-zinc-400 hover:text-zinc-600 underline"
-              >
-                Clear
-              </button>
-            )}
-          </div>
+                {hasFilters && (
+                  <button
+                    onClick={clearFilters}
+                    className="text-[10px] font-medium text-zinc-400 hover:text-zinc-600 underline"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Loading skeleton */}
           {loading && (
@@ -418,14 +569,14 @@ export default function MarketplaceTab({ calendarId, city, onAddEvent }: Marketp
               <p className="text-sm font-medium text-zinc-500">
                 {!city
                   ? "Set a city on your calendar to discover events"
-                  : hasFilters
+                  : hasFilters || sourceFilter !== "all"
                   ? "No events match your filters"
                   : "No events found for your area"}
               </p>
               <p className="text-xs text-zinc-400">
                 {!city
                   ? "Go to Calendars and add a city to get started."
-                  : hasFilters
+                  : hasFilters || sourceFilter !== "all"
                   ? "Try adjusting your filters."
                   : "Check back later for new ideas."}
               </p>
@@ -440,11 +591,22 @@ export default function MarketplaceTab({ calendarId, city, onAddEvent }: Marketp
             </div>
           )}
 
-          {/* Popular Events heading */}
+          {/* Section heading */}
           {!loading && !error && filtered.length > 0 && (
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-zinc-500" />
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Popular Events</h3>
+              {isRecommended ? (
+                <>
+                  <Star className="w-4 h-4 text-zinc-500" />
+                  <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Recommended for You</h3>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-zinc-500" />
+                  <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
+                    {sourceFilter === "all" ? "All Events" : SOURCE_LABELS[sourceFilter] || "Events"}
+                  </h3>
+                </>
+              )}
             </div>
           )}
 

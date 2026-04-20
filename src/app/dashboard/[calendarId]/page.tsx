@@ -7,7 +7,7 @@ import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import SubscriptionModal from "@/components/SubscriptionModal";
-import MarketplaceTab, { type MarketplaceEvent } from "@/components/MarketplaceTab";
+import MarketplaceTab, { type MarketplaceEvent, type OrgSettings } from "@/components/MarketplaceTab";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
 import {
   Calendar,
@@ -1456,6 +1456,16 @@ export default function OrgDashboardPage() {
           <MarketplaceTab
             calendarId={calendarId}
             city={dashboard.calendars.find((c) => c.objectId === calendarId)?.city}
+            orgSettings={{
+              name: dashboard.name,
+              description: dashboard.description,
+              orgType: dashboard.orgType,
+              calendarDescription: dashboard.calendars.find((c) => c.objectId === calendarId)?.description || "",
+              blacklistCategories: dashboard.blacklistCategories,
+              excludeKeywords: dashboard.excludeKeywords,
+              daysOfWeek: dashboard.daysOfWeek,
+              preferredTimes: dashboard.preferredTimes,
+            } satisfies OrgSettings}
             onAddEvent={(event: MarketplaceEvent) => {
               setCreatePlanPrefill({
                 title: event.title,
