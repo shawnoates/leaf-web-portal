@@ -305,6 +305,18 @@ export default function OrgDashboardPage() {
 
   // Plan detail modal
   const [selectedActivePlan, setSelectedActivePlan] = useState<{ objectId: string; title: string; description: string; image: string | null; date: string; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string } | null } | null>(null);
+  const [planRsvps, setPlanRsvps] = useState<{ name: string; phone: string | null; source: string }[]>([]);
+  const [planRsvpsLoading, setPlanRsvpsLoading] = useState(false);
+
+  // Fetch RSVPs when plan detail modal opens
+  useEffect(() => {
+    if (!selectedActivePlan) { setPlanRsvps([]); return; }
+    setPlanRsvpsLoading(true);
+    Parse.Cloud.run("getPlanRsvps", { eventGroupId: selectedActivePlan.objectId })
+      .then((result: { name: string; phone: string | null; source: string }[]) => setPlanRsvps(result || []))
+      .catch(() => setPlanRsvps([]))
+      .finally(() => setPlanRsvpsLoading(false));
+  }, [selectedActivePlan]);
 
   // Create plan modal (used by marketplace + duplicate)
   const [createPlanPrefill, setCreatePlanPrefill] = useState<CreatePlanPrefill | null>(null);
@@ -2330,36 +2342,37 @@ export default function OrgDashboardPage() {
               )}
 
               {/* RSVPs */}
-              {(() => {
-                const planRsvps = dashboard.rsvps.filter((r) => r.eventGroupId === selectedActivePlan.objectId);
-                return planRsvps.length > 0 ? (
-                  <div className="space-y-3">
-                    <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
-                      Attendees ({planRsvps.length})
-                    </h4>
-                    <div className="border border-zinc-200 rounded-xl overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead className="bg-zinc-50 text-left">
-                          <tr>
-                            <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Name</th>
-                            <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Phone</th>
-                            <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Source</th>
+              <div className="space-y-3">
+                <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                  Attendees {!planRsvpsLoading && `(${planRsvps.length})`}
+                </h4>
+                {planRsvpsLoading ? (
+                  <p className="text-sm text-zinc-400">Loading...</p>
+                ) : planRsvps.length > 0 ? (
+                  <div className="border border-zinc-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-zinc-50 text-left">
+                        <tr>
+                          <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Name</th>
+                          <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Phone</th>
+                          <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Source</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100">
+                        {planRsvps.map((r, i) => (
+                          <tr key={i}>
+                            <td className="px-4 py-2.5">{r.name}</td>
+                            <td className="px-4 py-2.5 text-zinc-400">{r.phone || "—"}</td>
+                            <td className="px-4 py-2.5 text-zinc-400">{r.source}</td>
                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-100">
-                          {planRsvps.map((r) => (
-                            <tr key={r.objectId}>
-                              <td className="px-4 py-2.5">{r.name}</td>
-                              <td className="px-4 py-2.5 text-zinc-400">{r.phone || "—"}</td>
-                              <td className="px-4 py-2.5 text-zinc-400">{r.source}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                ) : null;
-              })()}
+                ) : (
+                  <p className="text-sm text-zinc-400">No RSVPs yet.</p>
+                )}
+              </div>
 
               <div className="pt-8 border-t border-zinc-100 flex items-center justify-between">
                 <button
