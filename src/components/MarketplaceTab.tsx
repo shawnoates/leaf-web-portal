@@ -68,47 +68,26 @@ const SOURCE_FILTERS = [
   { id: "firecrawl", label: "Local Finds" },
 ];
 
-// Day index to name mapping for recommendation scoring
-const DAY_INDEX_TO_NAME: Record<number, string> = {
-  0: "Sunday",
-  1: "Monday",
-  2: "Tuesday",
-  3: "Wednesday",
-  4: "Thursday",
-  5: "Friday",
-  6: "Saturday",
-};
-
-// Blacklist category mapping (org settings use specific names, events use generic)
-const BLACKLIST_MAP: Record<string, string[]> = {
-  "Bars": ["nightlife"],
-  "Nightclubs": ["nightlife"],
-  "Casinos": ["nightlife"],
-  "Adult venues": ["nightlife"],
-  "Smoking lounges": ["nightlife"],
-  "Late-night venues": ["nightlife"],
-  "Fast food": ["dining"],
-  "Religious venues": [],
-};
 
 // ── Cache helpers ──────────────────────────────────────────────────────
 
-function getCachedEvents(calendarId: string): { events: MarketplaceEvent[]; stale: boolean } | null {
+function getCachedEvents(calendarId: string): { events: MarketplaceEvent[]; recommendedIds: string[] | null; stale: boolean } | null {
   try {
     const raw = localStorage.getItem(`marketplace-${calendarId}`);
     if (!raw) return null;
     const cached = JSON.parse(raw);
     const stale = Date.now() - cached.timestamp > CACHE_TTL_MS;
-    return { events: cached.events, stale };
+    return { events: cached.events, recommendedIds: cached.recommendedIds || null, stale };
   } catch {
     return null;
   }
 }
 
-function setCachedEvents(calendarId: string, events: MarketplaceEvent[]) {
+function setCachedEvents(calendarId: string, events: MarketplaceEvent[], recommendedIds?: string[] | null) {
   try {
     localStorage.setItem(`marketplace-${calendarId}`, JSON.stringify({
       events,
+      recommendedIds: recommendedIds || null,
       timestamp: Date.now(),
     }));
   } catch {
@@ -129,83 +108,24 @@ function deduplicateEvents(events: MarketplaceEvent[]): MarketplaceEvent[] {
   return Array.from(seen.values());
 }
 
-// ── Recommendation scoring ───────────────────────────────────────────
+// ── Fallback recommendation (round-robin without AI) ─────────────────
 
-// Solo/non-group activities that don't make good plan ideas
-const SOLO_KEYWORDS = [
-  "gym", "personal training", "crossfit", "pilates", "yoga studio",
-  "tanning", "nail salon", "hair salon", "barbershop", "spa",
-  "chiropractor", "dentist", "doctor", "urgent care", "pharmacy",
-  "laundromat", "dry cleaning", "auto repair", "storage",
-];
-
-function scoreEvent(event: MarketplaceEvent, settings: OrgSettings): number | null {
-  const titleLower = event.title.toLowerCase();
-  const descLower = event.description.toLowerCase();
-
-  // Exclude solo/non-group activities
-  for (const kw of SOLO_KEYWORDS) {
-    if (titleLower.includes(kw) || descLower.includes(kw)) return null;
-  }
-
-  // Exclude blacklisted categories
-  for (const blacklisted of settings.blacklistCategories) {
-    const mappedCategories = BLACKLIST_MAP[blacklisted] || [];
-    if (mappedCategories.includes(event.category)) return null;
-  }
-
-  // Exclude events matching exclude keywords
-  for (const keyword of settings.excludeKeywords) {
-    const kw = keyword.toLowerCase();
-    if (titleLower.includes(kw) || descLower.includes(kw)) return null;
-  }
-
-  let score = 1;
-
-  // Boost for matching preferred days
-  if (settings.daysOfWeek.length > 0 && event.suggestedDays.length > 0) {
-    const preferredDayNames = settings.daysOfWeek.map((i) => DAY_INDEX_TO_NAME[i]).filter(Boolean);
-    if (event.suggestedDays.some((d) => preferredDayNames.includes(d))) {
-      score += 2;
-    }
-  }
-
-  // Boost for matching preferred times
-  if (settings.preferredTimes.length > 0 && event.suggestedTimes.length > 0) {
-    if (event.suggestedTimes.some((t) => settings.preferredTimes.includes(t))) {
-      score += 2;
-    }
-  }
-
-  return score;
-}
-
-function getRecommended(events: MarketplaceEvent[], settings: OrgSettings): MarketplaceEvent[] {
-  // Group by source, score within each group
-  const bySource = new Map<string, { event: MarketplaceEvent; score: number }[]>();
-
+function getFallbackRecommended(events: MarketplaceEvent[]): MarketplaceEvent[] {
+  const bySource = new Map<string, MarketplaceEvent[]>();
   for (const event of events) {
-    const s = scoreEvent(event, settings);
-    if (s === null) continue;
-    const sourceKey = event.source === "yelp_venue" ? "yelp" : event.source;
-    if (!bySource.has(sourceKey)) bySource.set(sourceKey, []);
-    bySource.get(sourceKey)!.push({ event, score: s });
+    const key = event.source === "yelp_venue" ? "yelp" : event.source;
+    if (!bySource.has(key)) bySource.set(key, []);
+    bySource.get(key)!.push(event);
   }
 
-  // Sort each source by score
-  for (const items of bySource.values()) {
-    items.sort((a, b) => b.score - a.score);
-  }
-
-  // Round-robin pick from each source to ensure diversity
-  const sources = Array.from(bySource.entries());
+  const sources = Array.from(bySource.values());
   const result: MarketplaceEvent[] = [];
   let round = 0;
 
-  while (result.length < 10 && sources.some(([, items]) => items.length > round)) {
-    for (const [, items] of sources) {
+  while (result.length < 10 && sources.some((items) => items.length > round)) {
+    for (const items of sources) {
       if (round < items.length && result.length < 10) {
-        result.push(items[round].event);
+        result.push(items[round]);
       }
     }
     round++;
@@ -219,6 +139,8 @@ function getRecommended(events: MarketplaceEvent[], settings: OrgSettings): Mark
 export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEvent }: MarketplaceTabProps) {
   const [section, setSection] = useState<"discover" | "collabs">("discover");
   const [events, setEvents] = useState<MarketplaceEvent[]>([]);
+  const [recommendedIds, setRecommendedIds] = useState<string[] | null>(null);
+  const [loadingRecs, setLoadingRecs] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const initialLoadDone = useRef(false);
@@ -271,14 +193,49 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
     // Only cache non-search results
     if (!query) {
       setCachedEvents(calendarId, allEvents);
+      // Fetch AI recommendations in background
+      if (orgSettings && allEvents.length > 0) {
+        fetchRecommendations(allEvents);
+      }
     }
-  }, [calendarId, city]);
+  }, [calendarId, city]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchRecommendations = useCallback(async (eventsToRank: MarketplaceEvent[]) => {
+    if (!orgSettings || eventsToRank.length === 0) return;
+    setLoadingRecs(true);
+    try {
+      const res = await fetch("/api/recommend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          events: eventsToRank.map((e) => ({
+            id: e.id,
+            title: e.title,
+            description: e.description,
+            source: e.source,
+          })),
+          orgSettings,
+        }),
+      });
+      const data = await res.json();
+      const ids: string[] = data.recommendedIds || [];
+      if (ids.length > 0) {
+        setRecommendedIds(ids);
+        setCachedEvents(calendarId, eventsToRank, ids);
+      }
+    } catch {
+      // Silently fall back to round-robin
+    } finally {
+      setLoadingRecs(false);
+    }
+  }, [calendarId, orgSettings]);
 
   const fetchEvents = useCallback(async (useCache = false, query?: string) => {
     if (useCache && !query) {
       const cached = getCachedEvents(calendarId);
       if (cached) {
         setEvents(cached.events);
+        setRecommendedIds(cached.recommendedIds);
         setLoading(false);
         if (cached.stale) {
           fetchFromServer().catch(() => {});
@@ -328,16 +285,25 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
 
   // Apply source filter or recommendation
   const filtered = useMemo(() => {
-    if (sourceFilter === "recommended" && orgSettings) {
-      return getRecommended(events, orgSettings);
+    if (sourceFilter === "recommended") {
+      // Use Gemini recommendations if available
+      if (recommendedIds && recommendedIds.length > 0) {
+        const idSet = new Set(recommendedIds);
+        const byId = new Map(events.map((e) => [e.id, e]));
+        return recommendedIds
+          .filter((id) => byId.has(id))
+          .map((id) => byId.get(id)!);
+      }
+      // Fallback to round-robin
+      return getFallbackRecommended(events);
     }
 
-    if (sourceFilter !== "all" && sourceFilter !== "recommended") {
+    if (sourceFilter !== "all") {
       return events.filter((e) => e.source === sourceFilter);
     }
 
     return events;
-  }, [events, sourceFilter, orgSettings]);
+  }, [events, sourceFilter, recommendedIds]);
 
   const isRecommended = sourceFilter === "recommended";
 
@@ -409,7 +375,7 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
           </div>
 
           {/* Loading skeleton */}
-          {loading && (
+          {(loading || (loadingRecs && isRecommended && !recommendedIds)) && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[1, 2, 3, 4].map((i) => (
                 <div key={i} className="border border-zinc-100 rounded-lg overflow-hidden animate-pulse">

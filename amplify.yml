@@ -6,7 +6,7 @@ frontend:
         - npm ci
     build:
       commands:
-        - env | grep -E '^(YELP_API_KEY|STUBHUB_CLIENT_ID|STUBHUB_CLIENT_SECRET|TICKETMASTER_API_KEY|UNSPLASH_ACCESS_KEY|TMDB_API_KEY)=' >> .env.production
+        - env | grep -E '^(YELP_API_KEY|STUBHUB_CLIENT_ID|STUBHUB_CLIENT_SECRET|TICKETMASTER_API_KEY|UNSPLASH_ACCESS_KEY|TMDB_API_KEY|GEMINI_API_KEY)=' >> .env.production
         - npm run build
   artifacts:
     baseDirectory: .next
