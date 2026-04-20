@@ -323,15 +323,11 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
           <p className="text-sm text-zinc-500 leading-relaxed mb-4">
             Team up with other community groups to co-host events, share audiences, and grow together.
           </p>
-          <ul className="space-y-2 mb-5 list-disc list-inside">
+          <ul className="space-y-2 list-disc list-inside">
             <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Joint Events</strong> — Co-host plans with other groups to double the energy and reach.</li>
             <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Cross-Promotion</strong> — Feature your events on partner community calendars automatically.</li>
             <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Shared Audiences</strong> — Tap into new members from communities that complement yours.</li>
           </ul>
-          <div className="inline-flex items-center gap-2 bg-zinc-200 text-zinc-500 px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest cursor-default">
-            <Handshake className="w-4 h-4" />
-            Stay Tuned
-          </div>
         </div>
       )}
     </div>
