@@ -141,7 +141,23 @@ function deduplicateEvents(events: MarketplaceEvent[]): MarketplaceEvent[] {
 
 // ── Recommendation scoring ───────────────────────────────────────────
 
+// Solo/non-group activities that don't make good plan ideas
+const SOLO_KEYWORDS = [
+  "gym", "personal training", "crossfit", "pilates", "yoga studio",
+  "tanning", "nail salon", "hair salon", "barbershop", "spa",
+  "chiropractor", "dentist", "doctor", "urgent care", "pharmacy",
+  "laundromat", "dry cleaning", "auto repair", "storage",
+];
+
 function scoreEvent(event: MarketplaceEvent, settings: OrgSettings): number | null {
+  const titleLower = event.title.toLowerCase();
+  const descLower = event.description.toLowerCase();
+
+  // Exclude solo/non-group activities
+  for (const kw of SOLO_KEYWORDS) {
+    if (titleLower.includes(kw) || descLower.includes(kw)) return null;
+  }
+
   // Exclude blacklisted categories
   for (const blacklisted of settings.blacklistCategories) {
     const mappedCategories = BLACKLIST_MAP[blacklisted] || [];
@@ -149,8 +165,6 @@ function scoreEvent(event: MarketplaceEvent, settings: OrgSettings): number | nu
   }
 
   // Exclude events matching exclude keywords
-  const titleLower = event.title.toLowerCase();
-  const descLower = event.description.toLowerCase();
   for (const keyword of settings.excludeKeywords) {
     const kw = keyword.toLowerCase();
     if (titleLower.includes(kw) || descLower.includes(kw)) return null;
@@ -234,7 +248,7 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
 
     // Fetch from all 4 sources in parallel
     const [yelpResult, ticketmasterResult, tmdbResult, parseResult] = await Promise.allSettled([
-      city ? fetch(`/api/yelp${qs}`).then((r) => r.json()) : Promise.resolve({ events: [], trendingVenues: [] }),
+      city ? fetch(`/api/yelp${qs}`).then((r) => r.json()) : Promise.resolve({ events: [] }),
       city ? fetch(`/api/ticketmaster${qs}`).then((r) => r.json()) : Promise.resolve({ events: [] }),
       fetch(`/api/tmdb${query ? `?q=${encodeURIComponent(query)}` : ""}`).then((r) => r.json()),
       query ? Promise.resolve({ events: [] }) : Parse.Cloud.run("getMarketplaceEvents", { calendarId }),
