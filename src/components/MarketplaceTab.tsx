@@ -63,8 +63,8 @@ const CATEGORIES = [
 ];
 
 const SOURCE_LABELS: Record<string, string> = {
-  ticketmaster_direct: "Ticketmaster",
-  yelp: "Yelp",
+  ticketmaster_direct: "Events",
+  yelp: "Places",
   tmdb: "Now Showing",
   firecrawl: "Local Find",
 };
@@ -72,8 +72,8 @@ const SOURCE_LABELS: Record<string, string> = {
 const SOURCE_FILTERS = [
   { id: "recommended", label: "Recommended" },
   { id: "all", label: "All" },
-  { id: "ticketmaster_direct", label: "Ticketmaster" },
-  { id: "yelp", label: "Yelp" },
+  { id: "ticketmaster_direct", label: "Events" },
+  { id: "yelp", label: "Places" },
   { id: "tmdb", label: "Movies" },
   { id: "firecrawl", label: "Local Finds" },
 ];
