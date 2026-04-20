@@ -10,6 +10,7 @@ import {
   Calendar,
   Sparkles,
   ExternalLink,
+  TrendingUp,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -40,6 +41,7 @@ interface SmartDateTime {
 
 interface MarketplaceTabProps {
   calendarId: string;
+  city?: string;
   onAddEvent: (event: MarketplaceEvent) => void;
 }
 
@@ -82,29 +84,40 @@ const SIZE_CHIPS = [
 
 const SOURCE_LABELS: Record<string, string> = {
   ticketmaster: "Ticketmaster",
+  ticketmaster_direct: "Ticketmaster",
   tmdb: "Now Showing",
   firecrawl: "Local Find",
   gemini: "AI Suggestion",
+  yelp: "Yelp",
+  yelp_venue: "Trending Spot",
+  stubhub: "StubHub",
 };
 
 // ── Cache helpers ──────────────────────────────────────────────────────
 
-function getCachedEvents(calendarId: string): { events: MarketplaceEvent[]; smartDateTime: SmartDateTime | null; stale: boolean } | null {
+interface CachedData {
+  events: MarketplaceEvent[];
+  trendingVenues: MarketplaceEvent[];
+  smartDateTime: SmartDateTime | null;
+}
+
+function getCachedEvents(calendarId: string): CachedData & { stale: boolean } | null {
   try {
     const raw = sessionStorage.getItem(`marketplace-${calendarId}`);
     if (!raw) return null;
     const cached = JSON.parse(raw);
     const stale = Date.now() - cached.timestamp > CACHE_TTL_MS;
-    return { events: cached.events, smartDateTime: cached.smartDateTime, stale };
+    return { events: cached.events, trendingVenues: cached.trendingVenues || [], smartDateTime: cached.smartDateTime, stale };
   } catch {
     return null;
   }
 }
 
-function setCachedEvents(calendarId: string, events: MarketplaceEvent[], smartDateTime: SmartDateTime | null) {
+function setCachedEvents(calendarId: string, events: MarketplaceEvent[], trendingVenues: MarketplaceEvent[], smartDateTime: SmartDateTime | null) {
   try {
     sessionStorage.setItem(`marketplace-${calendarId}`, JSON.stringify({
       events,
+      trendingVenues,
       smartDateTime,
       timestamp: Date.now(),
     }));
@@ -113,11 +126,25 @@ function setCachedEvents(calendarId: string, events: MarketplaceEvent[], smartDa
   }
 }
 
+// ── Dedup helper ──────────────────────────────────────────────────────
+
+function deduplicateEvents(events: MarketplaceEvent[]): MarketplaceEvent[] {
+  const seen = new Map<string, MarketplaceEvent>();
+  for (const event of events) {
+    const key = event.title.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 40);
+    if (!seen.has(key)) {
+      seen.set(key, event);
+    }
+  }
+  return Array.from(seen.values());
+}
+
 // ── Component ──────────────────────────────────────────────────────────
 
-export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTabProps) {
+export default function MarketplaceTab({ calendarId, city, onAddEvent }: MarketplaceTabProps) {
   const [section, setSection] = useState<"discover" | "collabs">("discover");
   const [events, setEvents] = useState<MarketplaceEvent[]>([]);
+  const [trendingVenues, setTrendingVenues] = useState<MarketplaceEvent[]>([]);
   const [smartDateTime, setSmartDateTime] = useState<SmartDateTime | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,23 +159,56 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
   const hasFilters = category !== "all" || selectedDays.size > 0 || selectedTimes.size > 0 || selectedSize !== null;
 
   const fetchFromServer = useCallback(async () => {
-    const result = await Parse.Cloud.run("getMarketplaceEvents", { calendarId });
-    const fetchedEvents = result.events || [];
-    const fetchedSmartDT = result.smartDateTime || null;
-    setEvents(fetchedEvents);
+    const cityParam = city ? `?city=${encodeURIComponent(city)}` : "";
+
+    // Fetch from all sources in parallel
+    const [parseResult, yelpResult, stubhubResult, ticketmasterResult] = await Promise.allSettled([
+      Parse.Cloud.run("getMarketplaceEvents", { calendarId }),
+      city ? fetch(`/api/yelp${cityParam}`).then((r) => r.json()) : Promise.resolve({ events: [], trendingVenues: [] }),
+      city ? fetch(`/api/stubhub${cityParam}`).then((r) => r.json()) : Promise.resolve({ events: [] }),
+      city ? fetch(`/api/ticketmaster${cityParam}`).then((r) => r.json()) : Promise.resolve({ events: [] }),
+    ]);
+
+    // Collect events from all successful sources
+    let allEvents: MarketplaceEvent[] = [];
+    let allTrendingVenues: MarketplaceEvent[] = [];
+    let fetchedSmartDT: SmartDateTime | null = null;
+
+    if (parseResult.status === "fulfilled") {
+      allEvents.push(...(parseResult.value.events || []));
+      fetchedSmartDT = parseResult.value.smartDateTime || null;
+    }
+
+    if (yelpResult.status === "fulfilled") {
+      allEvents.push(...(yelpResult.value.events || []));
+      allTrendingVenues = yelpResult.value.trendingVenues || [];
+    }
+
+    if (stubhubResult.status === "fulfilled") {
+      allEvents.push(...(stubhubResult.value.events || []));
+    }
+
+    if (ticketmasterResult.status === "fulfilled") {
+      allEvents.push(...(ticketmasterResult.value.events || []));
+    }
+
+    // Deduplicate (e.g. ticketmaster from Parse + direct route)
+    allEvents = deduplicateEvents(allEvents);
+
+    setEvents(allEvents);
+    setTrendingVenues(allTrendingVenues);
     setSmartDateTime(fetchedSmartDT);
-    setCachedEvents(calendarId, fetchedEvents, fetchedSmartDT);
-  }, [calendarId]);
+    setCachedEvents(calendarId, allEvents, allTrendingVenues, fetchedSmartDT);
+  }, [calendarId, city]);
 
   const fetchEvents = useCallback(async (useCache = false) => {
     if (useCache) {
       const cached = getCachedEvents(calendarId);
       if (cached) {
-        // Show cached data immediately
         setEvents(cached.events);
+        setTrendingVenues(cached.trendingVenues);
         setSmartDateTime(cached.smartDateTime);
         setLoading(false);
-        // If stale, revalidate silently in the background
         if (cached.stale) {
           fetchFromServer().catch(() => {});
         }
@@ -188,19 +248,15 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
 
   // Apply filters
   const filtered = events.filter((e) => {
-    // Category filter
     if (category !== "all" && e.category !== category) return false;
-    // Day filter
     if (selectedDays.size > 0) {
       const eventDays = e.suggestedDays || [];
       if (eventDays.length > 0 && !eventDays.some((d) => selectedDays.has(d))) return false;
     }
-    // Time filter
     if (selectedTimes.size > 0) {
       const eventTimes = e.suggestedTimes || [];
       if (eventTimes.length > 0 && !eventTimes.some((t) => selectedTimes.has(t))) return false;
     }
-    // Size filter
     if (selectedSize) {
       const sizeConfig = SIZE_CHIPS.find((s) => s.id === selectedSize);
       if (sizeConfig) {
@@ -247,6 +303,49 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
       {/* ──── Discover Section ──── */}
       {section === "discover" && (
         <>
+          {/* Trending Locations */}
+          {!loading && trendingVenues.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-zinc-500" />
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Trending Locations</h3>
+              </div>
+              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                {trendingVenues.slice(0, 8).map((venue) => (
+                  <div
+                    key={venue.id}
+                    className="flex-shrink-0 w-48 border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-300 transition-colors group cursor-pointer"
+                    onClick={() => handleAddEvent(venue)}
+                  >
+                    {venue.image ? (
+                      <div className="h-24 overflow-hidden">
+                        <img
+                          src={venue.image}
+                          alt={venue.title}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-24 bg-zinc-50 flex items-center justify-center">
+                        <MapPin className="w-5 h-5 text-zinc-300" />
+                      </div>
+                    )}
+                    <div className="p-2.5">
+                      <p className="text-xs font-medium text-zinc-900 line-clamp-1">{venue.title}</p>
+                      <p className="text-[10px] text-zinc-400 line-clamp-1 mt-0.5">{venue.description}</p>
+                      {venue.venue && (
+                        <p className="text-[10px] text-zinc-400 mt-1 flex items-center gap-0.5">
+                          <MapPin className="w-2.5 h-2.5" />
+                          {venue.venue.address.split(",")[0]}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Category filters */}
           <div className="flex gap-2 overflow-x-auto no-scrollbar">
             {CATEGORIES.map((cat) => (
@@ -359,6 +458,14 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
             </div>
           )}
 
+          {/* Popular Events heading */}
+          {!loading && !error && filtered.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-zinc-500" />
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Popular Events</h3>
+            </div>
+          )}
+
           {/* Event cards grid */}
           {!loading && !error && filtered.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -386,16 +493,22 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
                   >
                     {/* Image */}
                     {event.image ? (
-                      <div className="h-40 overflow-hidden">
+                      <div className="h-40 overflow-hidden relative">
                         <img
                           src={event.image}
                           alt={event.title}
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         />
+                        <span className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[9px] font-semibold text-zinc-600 px-2 py-0.5 rounded-full">
+                          {sourceLabel}
+                        </span>
                       </div>
                     ) : (
-                      <div className="h-40 bg-zinc-50 flex items-center justify-center">
+                      <div className="h-40 bg-zinc-50 flex items-center justify-center relative">
                         <Sparkles className="w-8 h-8 text-zinc-300" />
+                        <span className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[9px] font-semibold text-zinc-600 px-2 py-0.5 rounded-full">
+                          {sourceLabel}
+                        </span>
                       </div>
                     )}
 

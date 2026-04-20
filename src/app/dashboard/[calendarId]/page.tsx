@@ -1455,6 +1455,7 @@ export default function OrgDashboardPage() {
         {activeTab === "marketplace" && (
           <MarketplaceTab
             calendarId={calendarId}
+            city={dashboard.calendars.find((c) => c.objectId === calendarId)?.city}
             onAddEvent={(event: MarketplaceEvent) => {
               setCreatePlanPrefill({
                 title: event.title,
