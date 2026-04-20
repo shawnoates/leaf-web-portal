@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
@@ -38,6 +38,7 @@ interface UpcomingPlan {
 export default function PlansPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const calendarId = params.calendarId as string;
 
   const [user, setUser] = useState<Parse.User | null>(null);
@@ -84,6 +85,28 @@ export default function PlansPage() {
     }
     setAuthChecked(true);
   }, []);
+
+  // Pre-fill form from marketplace event (URL params)
+  useEffect(() => {
+    const prefillTitle = searchParams.get("prefillTitle");
+    if (prefillTitle) {
+      setTitle(prefillTitle);
+      setDescription(searchParams.get("prefillDescription") || "");
+      setDate(searchParams.get("prefillDate") || "");
+      setTime(searchParams.get("prefillTime") || "");
+      setCapacity(searchParams.get("prefillCapacity") || "");
+      const venueStr = searchParams.get("prefillVenue");
+      if (venueStr) {
+        try {
+          const v = JSON.parse(venueStr);
+          setSelectedVenue({ name: v.name, address: v.address, placeId: "" });
+        } catch {
+          // Invalid venue JSON
+        }
+      }
+      setShowCreateModal(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!user) return;

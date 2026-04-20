@@ -7,6 +7,7 @@ import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import SubscriptionModal from "@/components/SubscriptionModal";
+import MarketplaceTab, { type MarketplaceEvent } from "@/components/MarketplaceTab";
 import {
   Calendar,
   Check,
@@ -25,12 +26,12 @@ import {
   Users,
   UserMinus,
   Lock,
-  CreditCard,
   ExternalLink,
   LogOut,
   TrendingUp,
   Sparkles,
   Code,
+  Ticket,
 } from "lucide-react";
 import {
   LineChart,
@@ -145,10 +146,10 @@ const BLACKLIST_PRESETS: string[] = [
 const TABS = [
   { id: "overview", label: "Overview", icon: Calendar },
   { id: "calendars", label: "Calendars", icon: Layers },
+  { id: "marketplace", label: "Marketplace", icon: Ticket, growthOnly: true },
   { id: "followers", label: "Followers", icon: Heart },
   { id: "members", label: "Users", icon: Users },
   { id: "analytics", label: "Analytics", icon: TrendingUp, proOnly: true },
-  { id: "subscription", label: "Subscription", icon: CreditCard },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
@@ -229,6 +230,7 @@ export default function OrgDashboardPage() {
   const [settingsLogoBase64, setSettingsLogoBase64] = useState<string | null>(null);
   const [settingsImageStyle, setSettingsImageStyle] = useState("default");
   const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<"general" | "subscription">("general");
 
   // Toast
   const [toast, setToast] = useState<string | null>(null);
@@ -692,7 +694,9 @@ export default function OrgDashboardPage() {
             {TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
-              const isLocked = tab.proOnly && dashboard.tier !== "pro";
+              const isLocked =
+                (tab.proOnly && dashboard.tier !== "pro") ||
+                ((tab as { growthOnly?: boolean }).growthOnly && dashboard.tier === "starter");
               return (
                 <button
                   key={tab.id}
@@ -1418,9 +1422,53 @@ export default function OrgDashboardPage() {
           </div>
         )}
 
+        {/* ──────── MARKETPLACE TAB ──────── */}
+        {activeTab === "marketplace" && (
+          <MarketplaceTab
+            calendarId={calendarId}
+            onAddEvent={(event: MarketplaceEvent) => {
+              const params = new URLSearchParams({
+                prefillTitle: event.title,
+                prefillDescription: event.description,
+                prefillVenue: event.venue ? JSON.stringify(event.venue) : "",
+                prefillDate: event.suggestedDate || "",
+                prefillTime: event.suggestedTime || "",
+                prefillCapacity: event.capacityMax?.toString() || "",
+              });
+              router.push(`/dashboard/${calendarId}/plans?${params.toString()}`);
+            }}
+          />
+        )}
+
         {/* ──────── SETTINGS TAB ──────── */}
         {activeTab === "settings" && (
-          <div className="space-y-8">
+          <div className="space-y-6">
+            {/* Settings sub-tabs */}
+            <div className="flex gap-1 border-b border-zinc-100">
+              <button
+                onClick={() => setSettingsSection("general")}
+                className={`px-4 py-2 text-xs font-medium uppercase tracking-widest border-b-2 transition-colors ${
+                  settingsSection === "general"
+                    ? "border-zinc-900 text-zinc-900"
+                    : "border-transparent text-zinc-400 hover:text-zinc-600"
+                }`}
+              >
+                General
+              </button>
+              <button
+                onClick={() => setSettingsSection("subscription")}
+                className={`px-4 py-2 text-xs font-medium uppercase tracking-widest border-b-2 transition-colors ${
+                  settingsSection === "subscription"
+                    ? "border-zinc-900 text-zinc-900"
+                    : "border-transparent text-zinc-400 hover:text-zinc-600"
+                }`}
+              >
+                Subscription
+              </button>
+            </div>
+
+            {settingsSection === "general" && (
+            <div className="space-y-8">
             {/* Organization Logo (Growth/Pro) */}
             <div className="relative">
               {!isGrowthPlus && (
@@ -1694,6 +1742,41 @@ export default function OrgDashboardPage() {
             >
               {settingsSaving ? "Saving..." : "Save Settings"}
             </button>
+            </div>
+            )}
+
+            {settingsSection === "subscription" && (
+            <div className="space-y-8">
+              <section className="border border-zinc-200 rounded-xl p-6">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-2">Current Plan</h2>
+                <p className="text-2xl font-light mb-1">{tierLabel}</p>
+                <p className="text-xs text-zinc-500">
+                  {dashboard.tier === "starter"
+                    ? "Free — basic features"
+                    : dashboard.tier === "growth"
+                    ? "$4.99/month — premium look & app chat"
+                    : "$29.99/month — full features"}
+                </p>
+              </section>
+
+              <button
+                onClick={() => setShowSubscription(true)}
+                className="bg-zinc-900 text-white px-6 py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
+              >
+                {dashboard.tier === "starter" ? "Upgrade Plan" : "Change Plan"}
+              </button>
+
+              {dashboard.tier !== "starter" && (
+                <button
+                  onClick={handleCancelSubscription}
+                  disabled={subscriptionLoading}
+                  className="block text-xs text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
+                >
+                  Cancel Subscription
+                </button>
+              )}
+            </div>
+            )}
           </div>
         )}
 
@@ -1942,39 +2025,6 @@ export default function OrgDashboardPage() {
           </div>
         )}
 
-        {/* ──────── SUBSCRIPTION TAB ──────── */}
-        {activeTab === "subscription" && (
-          <div className="space-y-8">
-            <section className="border border-zinc-200 rounded-xl p-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-2">Current Plan</h2>
-              <p className="text-2xl font-light mb-1">{tierLabel}</p>
-              <p className="text-xs text-zinc-500">
-                {dashboard.tier === "starter"
-                  ? "Free — basic features"
-                  : dashboard.tier === "growth"
-                  ? "$4.99/month — premium look & app chat"
-                  : "$29.99/month — full features"}
-              </p>
-            </section>
-
-            <button
-              onClick={() => setShowSubscription(true)}
-              className="bg-zinc-900 text-white px-6 py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
-            >
-              {dashboard.tier === "starter" ? "Upgrade Plan" : "Change Plan"}
-            </button>
-
-            {dashboard.tier !== "starter" && (
-              <button
-                onClick={handleCancelSubscription}
-                disabled={subscriptionLoading}
-                className="block text-xs text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
-              >
-                Cancel Subscription
-              </button>
-            )}
-          </div>
-        )}
       </main>
 
       {/* ──────── MODALS ──────── */}
