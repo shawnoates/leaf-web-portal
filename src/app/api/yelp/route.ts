@@ -59,8 +59,9 @@ export async function GET(request: NextRequest) {
 
   const termParam = query ? `&term=${encodeURIComponent(query)}` : "";
 
+  // Match iOS app: 40km radius, best_match sort, fetch 20 to allow post-filtering
   const res = await fetch(
-    `https://api.yelp.com/v3/businesses/search?location=${encodeURIComponent(city)}${query ? termParam : `&categories=${GROUP_CATEGORIES}`}&sort_by=rating&limit=10`,
+    `https://api.yelp.com/v3/businesses/search?location=${encodeURIComponent(city)}${query ? termParam : `&categories=${GROUP_CATEGORIES}`}&sort_by=best_match&radius=40000&limit=20`,
     { headers }
   );
 
@@ -70,7 +71,11 @@ export async function GET(request: NextRequest) {
 
   const data = await res.json();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const businesses: any[] = data.businesses || [];
+  const businesses: any[] = (data.businesses || [])
+    // Post-filter: rating >= 3.0 and must not be permanently closed
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((b: any) => (b.rating ?? 0) >= 3.0 && !b.is_closed)
+    .slice(0, 10);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const events = businesses.map((b: any) => ({
