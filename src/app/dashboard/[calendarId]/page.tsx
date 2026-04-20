@@ -2187,6 +2187,27 @@ export default function OrgDashboardPage() {
               >
                 {savingCal ? "Saving..." : "Save Changes"}
               </button>
+
+              {/* Delete calendar — only for non-primary sub-calendars */}
+              {!dashboard.calendars.find((c) => c.objectId === editingCalId)?.isPrimary && (
+                <button
+                  onClick={async () => {
+                    const calName = dashboard.calendars.find((c) => c.objectId === editingCalId)?.name || "this calendar";
+                    if (!confirm(`Permanently delete "${calName}"? This will remove all its plans, followers, and data. This cannot be undone.`)) return;
+                    try {
+                      await Parse.Cloud.run("deleteCalendar", { calendarId: editingCalId, orgId: calendarId });
+                      setEditingCalId(null);
+                      fetchDashboard();
+                    } catch (err) {
+                      console.error("Failed to delete calendar:", err);
+                      alert(err instanceof Error ? err.message : "Failed to delete calendar.");
+                    }
+                  }}
+                  className="w-full text-center py-2 mt-3 text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
+                >
+                  Delete Calendar
+                </button>
+              )}
             </div>
           </div>
         </div>
