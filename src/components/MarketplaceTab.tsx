@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import Parse from "@/lib/parse-client";
 import {
   Plus,
   MapPin,
@@ -32,13 +31,6 @@ export interface MarketplaceEvent {
   suggestedTimes: string[];
 }
 
-interface SmartDateTime {
-  date: string;
-  day: string;
-  time: string;
-  basedOnPastPlans: number;
-}
-
 interface MarketplaceTabProps {
   calendarId: string;
   city?: string;
@@ -47,7 +39,8 @@ interface MarketplaceTabProps {
 
 // ── Constants ──────────────────────────────────────────────────────────
 
-const CACHE_TTL_MS = 5 * 60 * 1000;
+// Cache events for 24 hours so content stays fresh weekly
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const CATEGORIES = [
   { id: "all", label: "All" },
@@ -83,11 +76,7 @@ const SIZE_CHIPS = [
 ];
 
 const SOURCE_LABELS: Record<string, string> = {
-  ticketmaster: "Ticketmaster",
   ticketmaster_direct: "Ticketmaster",
-  tmdb: "Now Showing",
-  firecrawl: "Local Find",
-  gemini: "AI Suggestion",
   yelp: "Yelp",
   yelp_venue: "Trending Spot",
   stubhub: "StubHub",
@@ -98,27 +87,25 @@ const SOURCE_LABELS: Record<string, string> = {
 interface CachedData {
   events: MarketplaceEvent[];
   trendingVenues: MarketplaceEvent[];
-  smartDateTime: SmartDateTime | null;
 }
 
 function getCachedEvents(calendarId: string): CachedData & { stale: boolean } | null {
   try {
-    const raw = sessionStorage.getItem(`marketplace-${calendarId}`);
+    const raw = localStorage.getItem(`marketplace-${calendarId}`);
     if (!raw) return null;
     const cached = JSON.parse(raw);
     const stale = Date.now() - cached.timestamp > CACHE_TTL_MS;
-    return { events: cached.events, trendingVenues: cached.trendingVenues || [], smartDateTime: cached.smartDateTime, stale };
+    return { events: cached.events, trendingVenues: cached.trendingVenues || [], stale };
   } catch {
     return null;
   }
 }
 
-function setCachedEvents(calendarId: string, events: MarketplaceEvent[], trendingVenues: MarketplaceEvent[], smartDateTime: SmartDateTime | null) {
+function setCachedEvents(calendarId: string, events: MarketplaceEvent[], trendingVenues: MarketplaceEvent[]) {
   try {
-    sessionStorage.setItem(`marketplace-${calendarId}`, JSON.stringify({
+    localStorage.setItem(`marketplace-${calendarId}`, JSON.stringify({
       events,
       trendingVenues,
-      smartDateTime,
       timestamp: Date.now(),
     }));
   } catch {
@@ -145,7 +132,6 @@ export default function MarketplaceTab({ calendarId, city, onAddEvent }: Marketp
   const [section, setSection] = useState<"discover" | "collabs">("discover");
   const [events, setEvents] = useState<MarketplaceEvent[]>([]);
   const [trendingVenues, setTrendingVenues] = useState<MarketplaceEvent[]>([]);
-  const [smartDateTime, setSmartDateTime] = useState<SmartDateTime | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const initialLoadDone = useRef(false);
@@ -159,25 +145,23 @@ export default function MarketplaceTab({ calendarId, city, onAddEvent }: Marketp
   const hasFilters = category !== "all" || selectedDays.size > 0 || selectedTimes.size > 0 || selectedSize !== null;
 
   const fetchFromServer = useCallback(async () => {
-    const cityParam = city ? `?city=${encodeURIComponent(city)}` : "";
+    if (!city) {
+      setEvents([]);
+      setTrendingVenues([]);
+      return;
+    }
 
-    // Fetch from all sources in parallel
-    const [parseResult, yelpResult, stubhubResult, ticketmasterResult] = await Promise.allSettled([
-      Parse.Cloud.run("getMarketplaceEvents", { calendarId }),
-      city ? fetch(`/api/yelp${cityParam}`).then((r) => r.json()) : Promise.resolve({ events: [], trendingVenues: [] }),
-      city ? fetch(`/api/stubhub${cityParam}`).then((r) => r.json()) : Promise.resolve({ events: [] }),
-      city ? fetch(`/api/ticketmaster${cityParam}`).then((r) => r.json()) : Promise.resolve({ events: [] }),
+    const cityParam = `?city=${encodeURIComponent(city)}`;
+
+    // Fetch from all API routes in parallel
+    const [yelpResult, stubhubResult, ticketmasterResult] = await Promise.allSettled([
+      fetch(`/api/yelp${cityParam}`).then((r) => r.json()),
+      fetch(`/api/stubhub${cityParam}`).then((r) => r.json()),
+      fetch(`/api/ticketmaster${cityParam}`).then((r) => r.json()),
     ]);
 
-    // Collect events from all successful sources
     let allEvents: MarketplaceEvent[] = [];
     let allTrendingVenues: MarketplaceEvent[] = [];
-    let fetchedSmartDT: SmartDateTime | null = null;
-
-    if (parseResult.status === "fulfilled") {
-      allEvents.push(...(parseResult.value.events || []));
-      fetchedSmartDT = parseResult.value.smartDateTime || null;
-    }
 
     if (yelpResult.status === "fulfilled") {
       allEvents.push(...(yelpResult.value.events || []));
@@ -192,13 +176,11 @@ export default function MarketplaceTab({ calendarId, city, onAddEvent }: Marketp
       allEvents.push(...(ticketmasterResult.value.events || []));
     }
 
-    // Deduplicate (e.g. ticketmaster from Parse + direct route)
     allEvents = deduplicateEvents(allEvents);
 
     setEvents(allEvents);
     setTrendingVenues(allTrendingVenues);
-    setSmartDateTime(fetchedSmartDT);
-    setCachedEvents(calendarId, allEvents, allTrendingVenues, fetchedSmartDT);
+    setCachedEvents(calendarId, allEvents, allTrendingVenues);
   }, [calendarId, city]);
 
   const fetchEvents = useCallback(async (useCache = false) => {
@@ -207,7 +189,6 @@ export default function MarketplaceTab({ calendarId, city, onAddEvent }: Marketp
       if (cached) {
         setEvents(cached.events);
         setTrendingVenues(cached.trendingVenues);
-        setSmartDateTime(cached.smartDateTime);
         setLoading(false);
         if (cached.stale) {
           fetchFromServer().catch(() => {});
@@ -236,14 +217,7 @@ export default function MarketplaceTab({ calendarId, city, onAddEvent }: Marketp
   }, [fetchEvents, section]);
 
   const handleAddEvent = (event: MarketplaceEvent) => {
-    const enriched = { ...event };
-    if (!enriched.suggestedDate && smartDateTime) {
-      enriched.suggestedDate = smartDateTime.date;
-    }
-    if (!enriched.suggestedTime && smartDateTime) {
-      enriched.suggestedTime = smartDateTime.time;
-    }
-    onAddEvent(enriched);
+    onAddEvent(event);
   };
 
   // Apply filters
