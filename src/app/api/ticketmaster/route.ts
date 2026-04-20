@@ -17,13 +17,15 @@ function mapCategory(segment: string, genre?: string): string {
 
 export async function GET(request: NextRequest) {
   const city = request.nextUrl.searchParams.get("city");
+  const query = request.nextUrl.searchParams.get("q");
   if (!city || !TICKETMASTER_API_KEY) {
     return NextResponse.json({ events: [] });
   }
 
   try {
+    const keywordParam = query ? `&keyword=${encodeURIComponent(query)}` : "";
     const res = await fetch(
-      `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TICKETMASTER_API_KEY}&city=${encodeURIComponent(city)}&size=10&sort=relevance,desc`,
+      `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TICKETMASTER_API_KEY}&city=${encodeURIComponent(city)}&size=10&sort=relevance,desc${keywordParam}`,
       { headers: { Accept: "application/json" } }
     );
 

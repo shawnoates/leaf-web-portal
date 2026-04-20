@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "";
 
@@ -24,16 +24,19 @@ const GENRE_MAP: Record<number, string> = {
   37: "outdoors",   // Western
 };
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   if (!TMDB_API_KEY) {
     return NextResponse.json({ events: [] });
   }
 
+  const query = request.nextUrl.searchParams.get("q");
+
   try {
-    const res = await fetch(
-      `https://api.themoviedb.org/3/movie/now_playing?api_key=${TMDB_API_KEY}&region=US&page=1`,
-      { headers: { Accept: "application/json" } }
-    );
+    const url = query
+      ? `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&page=1`
+      : `https://api.themoviedb.org/3/movie/now_playing?api_key=${TMDB_API_KEY}&region=US&page=1`;
+
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
 
     if (!res.ok) {
       return NextResponse.json({ events: [] });
@@ -42,7 +45,7 @@ export async function GET() {
     const data = await res.json();
     const movies = (data.results || [])
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .filter((m: any) => m.vote_average >= 6.0)
+      .filter((m: any) => query || m.vote_average >= 6.0)
       .slice(0, 10);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -12,6 +12,7 @@ import {
   ExternalLink,
   TrendingUp,
   Star,
+  Search,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -210,17 +211,37 @@ function scoreEvent(event: MarketplaceEvent, settings: OrgSettings): number | nu
 }
 
 function getRecommended(events: MarketplaceEvent[], settings: OrgSettings): MarketplaceEvent[] {
-  const scored: { event: MarketplaceEvent; score: number }[] = [];
+  // Group by source, score within each group
+  const bySource = new Map<string, { event: MarketplaceEvent; score: number }[]>();
 
   for (const event of events) {
     const s = scoreEvent(event, settings);
-    if (s !== null) {
-      scored.push({ event, score: s });
-    }
+    if (s === null) continue;
+    const sourceKey = event.source === "yelp_venue" ? "yelp" : event.source;
+    if (!bySource.has(sourceKey)) bySource.set(sourceKey, []);
+    bySource.get(sourceKey)!.push({ event, score: s });
   }
 
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, 10).map((s) => s.event);
+  // Sort each source by score
+  for (const items of bySource.values()) {
+    items.sort((a, b) => b.score - a.score);
+  }
+
+  // Round-robin pick from each source to ensure diversity
+  const sources = Array.from(bySource.entries());
+  const result: MarketplaceEvent[] = [];
+  let round = 0;
+
+  while (result.length < 10 && sources.some(([, items]) => items.length > round)) {
+    for (const [, items] of sources) {
+      if (round < items.length && result.length < 10) {
+        result.push(items[round].event);
+      }
+    }
+    round++;
+  }
+
+  return result;
 }
 
 // ── Component ──────────────────────────────────────────────────────────
@@ -239,18 +260,24 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
   const [selectedTimes, setSelectedTimes] = useState<Set<string>>(new Set());
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hasFilters = category !== "all" || selectedDays.size > 0 || selectedTimes.size > 0 || selectedSize !== null;
 
-  const fetchFromServer = useCallback(async () => {
-    const cityParam = city ? `?city=${encodeURIComponent(city)}` : "";
+  const fetchFromServer = useCallback(async (query?: string) => {
+    const params = new URLSearchParams();
+    if (city) params.set("city", city);
+    if (query) params.set("q", query);
+    const qs = params.toString() ? `?${params.toString()}` : "";
 
     // Fetch from all 4 sources in parallel
     const [yelpResult, ticketmasterResult, tmdbResult, parseResult] = await Promise.allSettled([
-      city ? fetch(`/api/yelp${cityParam}`).then((r) => r.json()) : Promise.resolve({ events: [], trendingVenues: [] }),
-      city ? fetch(`/api/ticketmaster${cityParam}`).then((r) => r.json()) : Promise.resolve({ events: [] }),
-      fetch("/api/tmdb").then((r) => r.json()),
-      Parse.Cloud.run("getMarketplaceEvents", { calendarId }),
+      city ? fetch(`/api/yelp${qs}`).then((r) => r.json()) : Promise.resolve({ events: [], trendingVenues: [] }),
+      city ? fetch(`/api/ticketmaster${qs}`).then((r) => r.json()) : Promise.resolve({ events: [] }),
+      fetch(`/api/tmdb${query ? `?q=${encodeURIComponent(query)}` : ""}`).then((r) => r.json()),
+      query ? Promise.resolve({ events: [] }) : Parse.Cloud.run("getMarketplaceEvents", { calendarId }),
     ]);
 
     let allEvents: MarketplaceEvent[] = [];
@@ -281,11 +308,14 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
 
     setEvents(allEvents);
     setTrendingVenues(allTrendingVenues);
-    setCachedEvents(calendarId, allEvents, allTrendingVenues);
+    // Only cache non-search results
+    if (!query) {
+      setCachedEvents(calendarId, allEvents, allTrendingVenues);
+    }
   }, [calendarId, city]);
 
-  const fetchEvents = useCallback(async (useCache = false) => {
-    if (useCache) {
+  const fetchEvents = useCallback(async (useCache = false, query?: string) => {
+    if (useCache && !query) {
       const cached = getCachedEvents(calendarId);
       if (cached) {
         setEvents(cached.events);
@@ -301,7 +331,7 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
     setLoading(true);
     setError(null);
     try {
-      await fetchFromServer();
+      await fetchFromServer(query);
     } catch {
       setError("Couldn\u2019t load marketplace events. Try again.");
       setEvents([]);
@@ -316,6 +346,22 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
       fetchEvents(true);
     }
   }, [fetchEvents, section]);
+
+  const handleSearch = useCallback((value: string) => {
+    setSearchInput(value);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+
+    searchTimeout.current = setTimeout(() => {
+      const trimmed = value.trim();
+      setSearchQuery(trimmed);
+      if (trimmed) {
+        setSourceFilter("all");
+        fetchEvents(false, trimmed);
+      } else {
+        fetchEvents(true);
+      }
+    }, 500);
+  }, [fetchEvents]);
 
   const handleAddEvent = (event: MarketplaceEvent) => {
     onAddEvent(event);
@@ -407,6 +453,26 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
       {/* ──── Discover Section ──── */}
       {section === "discover" && (
         <>
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Search events, venues, movies..."
+              className="w-full pl-10 pr-4 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-300 focus:border-transparent placeholder:text-zinc-400"
+            />
+            {searchInput && (
+              <button
+                onClick={() => handleSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-zinc-600"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
           {/* Source filter chips */}
           <div className="flex gap-2 overflow-x-auto no-scrollbar">
             {SOURCE_FILTERS.map((sf) => (
@@ -594,7 +660,14 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
           {/* Section heading */}
           {!loading && !error && filtered.length > 0 && (
             <div className="flex items-center gap-2">
-              {isRecommended ? (
+              {searchQuery ? (
+                <>
+                  <Search className="w-4 h-4 text-zinc-500" />
+                  <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
+                    Results for &ldquo;{searchQuery}&rdquo;
+                  </h3>
+                </>
+              ) : isRecommended ? (
                 <>
                   <Star className="w-4 h-4 text-zinc-500" />
                   <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Recommended for You</h3>

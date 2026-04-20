@@ -16,6 +16,7 @@ function mapCategory(categories: { alias: string; title: string }[]): string {
 
 export async function GET(request: NextRequest) {
   const city = request.nextUrl.searchParams.get("city");
+  const query = request.nextUrl.searchParams.get("q");
   if (!city || !YELP_API_KEY) {
     return NextResponse.json({ events: [], trendingVenues: [] });
   }
@@ -25,16 +26,20 @@ export async function GET(request: NextRequest) {
     Accept: "application/json",
   };
 
+  const termParam = query ? `&term=${encodeURIComponent(query)}` : "";
+
   // Fetch popular activities/entertainment AND trending restaurants/venues in parallel
   const [activitiesRes, venuesRes] = await Promise.allSettled([
     fetch(
-      `https://api.yelp.com/v3/businesses/search?location=${encodeURIComponent(city)}&categories=arts,musicvenues,fitness,nightlife,active&sort_by=rating&limit=10`,
+      `https://api.yelp.com/v3/businesses/search?location=${encodeURIComponent(city)}${query ? termParam : "&categories=arts,musicvenues,fitness,nightlife,active"}&sort_by=rating&limit=10`,
       { headers }
     ),
-    fetch(
-      `https://api.yelp.com/v3/businesses/search?location=${encodeURIComponent(city)}&categories=restaurants,bars,cafes&sort_by=rating&limit=10`,
-      { headers }
-    ),
+    query
+      ? Promise.resolve(new Response(JSON.stringify({ businesses: [] })))
+      : fetch(
+          `https://api.yelp.com/v3/businesses/search?location=${encodeURIComponent(city)}&categories=restaurants,bars,cafes&sort_by=rating&limit=10`,
+          { headers }
+        ),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
