@@ -89,13 +89,13 @@ const SOURCE_LABELS: Record<string, string> = {
 
 // ── Cache helpers ──────────────────────────────────────────────────────
 
-function getCachedEvents(calendarId: string): { events: MarketplaceEvent[]; smartDateTime: SmartDateTime | null } | null {
+function getCachedEvents(calendarId: string): { events: MarketplaceEvent[]; smartDateTime: SmartDateTime | null; stale: boolean } | null {
   try {
     const raw = sessionStorage.getItem(`marketplace-${calendarId}`);
     if (!raw) return null;
     const cached = JSON.parse(raw);
-    if (Date.now() - cached.timestamp > CACHE_TTL_MS) return null;
-    return { events: cached.events, smartDateTime: cached.smartDateTime };
+    const stale = Date.now() - cached.timestamp > CACHE_TTL_MS;
+    return { events: cached.events, smartDateTime: cached.smartDateTime, stale };
   } catch {
     return null;
   }
@@ -131,13 +131,27 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
 
   const hasFilters = category !== "all" || selectedDays.size > 0 || selectedTimes.size > 0 || selectedSize !== null;
 
+  const fetchFromServer = useCallback(async () => {
+    const result = await Parse.Cloud.run("getMarketplaceEvents", { calendarId });
+    const fetchedEvents = result.events || [];
+    const fetchedSmartDT = result.smartDateTime || null;
+    setEvents(fetchedEvents);
+    setSmartDateTime(fetchedSmartDT);
+    setCachedEvents(calendarId, fetchedEvents, fetchedSmartDT);
+  }, [calendarId]);
+
   const fetchEvents = useCallback(async (useCache = false) => {
     if (useCache) {
       const cached = getCachedEvents(calendarId);
       if (cached) {
+        // Show cached data immediately
         setEvents(cached.events);
         setSmartDateTime(cached.smartDateTime);
         setLoading(false);
+        // If stale, revalidate silently in the background
+        if (cached.stale) {
+          fetchFromServer().catch(() => {});
+        }
         return;
       }
     }
@@ -145,19 +159,14 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
     setLoading(true);
     setError(null);
     try {
-      const result = await Parse.Cloud.run("getMarketplaceEvents", { calendarId });
-      const fetchedEvents = result.events || [];
-      const fetchedSmartDT = result.smartDateTime || null;
-      setEvents(fetchedEvents);
-      setSmartDateTime(fetchedSmartDT);
-      setCachedEvents(calendarId, fetchedEvents, fetchedSmartDT);
+      await fetchFromServer();
     } catch {
       setError("Couldn\u2019t load marketplace events. Try again.");
       setEvents([]);
     } finally {
       setLoading(false);
     }
-  }, [calendarId]);
+  }, [calendarId, fetchFromServer]);
 
   useEffect(() => {
     if (section === "discover" && !initialLoadDone.current) {

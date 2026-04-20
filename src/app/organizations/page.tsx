@@ -1,4 +1,8 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import Parse from "@/lib/parse-client";
 import {
   Sparkles,
   Calendar,
@@ -153,6 +157,13 @@ const FEATURES = [
 ];
 
 export default function OrganizationsPage() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const currentUser = Parse.User.current();
+    setIsLoggedIn(!!currentUser);
+  }, []);
+
   return (
     <div className="min-h-screen">
       {/* Hero with background video */}
@@ -193,10 +204,10 @@ export default function OrganizationsPage() {
                 Dashboard
               </Link>
               <Link
-                href="/organizations/setup"
+                href={isLoggedIn ? "/dashboard" : "/organizations/setup"}
                 className="bg-white text-zinc-900 px-5 py-2.5 text-[10px] uppercase tracking-[0.2em] font-bold hover:bg-white/90 transition-colors"
               >
-                Get Started
+                {isLoggedIn ? "Dashboard" : "Get Started"}
               </Link>
             </div>
           </div>
@@ -217,10 +228,10 @@ export default function OrganizationsPage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Link
-                  href="/organizations/setup"
+                  href={isLoggedIn ? "/dashboard" : "/organizations/setup"}
                   className="bg-white text-zinc-900 px-8 py-4 text-xs uppercase tracking-[0.3em] font-medium hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
                 >
-                  Get Started Free <ArrowRight className="w-4 h-4" />
+                  {isLoggedIn ? "Dashboard" : "Get Started Free"} <ArrowRight className="w-4 h-4" />
                 </Link>
                 <a
                   href="#how-it-works"
@@ -393,10 +404,10 @@ export default function OrganizationsPage() {
             are generated instantly.
           </p>
           <Link
-            href="/organizations/setup"
+            href={isLoggedIn ? "/dashboard" : "/organizations/setup"}
             className="inline-flex bg-zinc-900 text-white px-10 py-4 text-xs uppercase tracking-[0.3em] font-medium hover:bg-zinc-800 transition-colors items-center gap-2"
           >
-            Get Started Free <ArrowRight className="w-4 h-4" />
+            {isLoggedIn ? "Dashboard" : "Get Started Free"} <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
