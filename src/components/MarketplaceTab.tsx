@@ -113,15 +113,6 @@ function setCachedEvents(calendarId: string, events: MarketplaceEvent[], smartDa
   }
 }
 
-// ── Filter helpers ─────────────────────────────────────────────────────
-
-function toggleSet<T>(set: Set<T>, value: T): Set<T> {
-  const next = new Set(set);
-  if (next.has(value)) next.delete(value);
-  else next.add(value);
-  return next;
-}
-
 // ── Component ──────────────────────────────────────────────────────────
 
 export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTabProps) {
@@ -264,63 +255,41 @@ export default function MarketplaceTab({ calendarId, onAddEvent }: MarketplaceTa
             ))}
           </div>
 
-          {/* Day / Time / Size filters */}
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            {/* Day of week */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest mr-1">Day</span>
+          {/* Sub-filters */}
+          <div className="flex items-center gap-3">
+            <select
+              value={selectedDays.size === 1 ? [...selectedDays][0] : ""}
+              onChange={(e) => setSelectedDays(e.target.value ? new Set([e.target.value]) : new Set())}
+              className="text-xs font-medium text-zinc-500 bg-zinc-100 border-0 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-zinc-300 appearance-none cursor-pointer"
+            >
+              <option value="">Any Day</option>
               {DAY_CHIPS.map((d) => (
-                <button
-                  key={d.id}
-                  onClick={() => setSelectedDays(toggleSet(selectedDays, d.id))}
-                  className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${
-                    selectedDays.has(d.id)
-                      ? "bg-zinc-900 text-white"
-                      : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200"
-                  }`}
-                >
-                  {d.label}
-                </button>
+                <option key={d.id} value={d.id}>{d.label}</option>
               ))}
-            </div>
+            </select>
 
-            {/* Time of day */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest mr-1">Time</span>
+            <select
+              value={selectedTimes.size === 1 ? [...selectedTimes][0] : ""}
+              onChange={(e) => setSelectedTimes(e.target.value ? new Set([e.target.value]) : new Set())}
+              className="text-xs font-medium text-zinc-500 bg-zinc-100 border-0 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-zinc-300 appearance-none cursor-pointer"
+            >
+              <option value="">Any Time</option>
               {TIME_CHIPS.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setSelectedTimes(toggleSet(selectedTimes, t.id))}
-                  className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${
-                    selectedTimes.has(t.id)
-                      ? "bg-zinc-900 text-white"
-                      : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200"
-                  }`}
-                >
-                  {t.label}
-                </button>
+                <option key={t.id} value={t.id}>{t.label}</option>
               ))}
-            </div>
+            </select>
 
-            {/* Group size */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest mr-1">Size</span>
+            <select
+              value={selectedSize || ""}
+              onChange={(e) => setSelectedSize(e.target.value || null)}
+              className="text-xs font-medium text-zinc-500 bg-zinc-100 border-0 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-zinc-300 appearance-none cursor-pointer"
+            >
+              <option value="">Any Size</option>
               {SIZE_CHIPS.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedSize(selectedSize === s.id ? null : s.id)}
-                  className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${
-                    selectedSize === s.id
-                      ? "bg-zinc-900 text-white"
-                      : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200"
-                  }`}
-                >
-                  {s.label}
-                </button>
+                <option key={s.id} value={s.id}>{s.label} people</option>
               ))}
-            </div>
+            </select>
 
-            {/* Clear filters */}
             {hasFilters && (
               <button
                 onClick={clearFilters}
