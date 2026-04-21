@@ -52,6 +52,8 @@ export default function PhoneVerificationModal({ onVerified, onClose }: PhoneVer
     setError("");
     try {
       await Parse.Cloud.run("verifyPhoneForUser", { phone: `+1${digits}`, code });
+      // Refresh the local cached user so leafAppConnected persists across page reloads
+      await Parse.User.current()?.fetch();
       setStep("done");
       onVerified();
     } catch (err: unknown) {
