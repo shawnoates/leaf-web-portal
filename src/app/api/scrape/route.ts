@@ -23,11 +23,14 @@ export async function GET(request: NextRequest) {
   });
 
   if (!res.ok) {
+    const text = await res.text();
+    console.error("[/api/scrape] Parse error:", res.status, text);
     return NextResponse.json({ events: [] });
   }
 
   const data = await res.json();
   const results = data.result || [];
+  console.log(`[/api/scrape] city="${city}" → ${results.length} scraped events`);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const events = results.map((e: any) => ({
