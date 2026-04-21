@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from "react";
 import {
   Plus,
   MapPin,
@@ -146,6 +146,50 @@ function getFallbackRecommended(events: MarketplaceEvent[]): MarketplaceEvent[] 
 
   return result;
 }
+
+// ── Venue photo (lazy Google Places lookup) ─────────────────────────────
+
+const venuePhotoCache = new Map<string, string | null>();
+
+const VenuePhoto = memo(function VenuePhoto({ venue, alt }: { venue: { name: string; address: string }; alt: string }) {
+  const [url, setUrl] = useState<string | null | undefined>(() => {
+    const key = `${venue.name} ${venue.address}`;
+    return venuePhotoCache.has(key) ? venuePhotoCache.get(key) : undefined;
+  });
+
+  useEffect(() => {
+    if (url !== undefined) return; // already resolved
+    const key = `${venue.name} ${venue.address}`;
+    fetch(`/api/places-photo?query=${encodeURIComponent(key)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        venuePhotoCache.set(key, data.url);
+        setUrl(data.url);
+      })
+      .catch(() => {
+        venuePhotoCache.set(key, null);
+        setUrl(null);
+      });
+  }, [venue.name, venue.address, url]);
+
+  if (url) {
+    return (
+      <img src={url} alt={alt} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+    );
+  }
+
+  if (url === undefined) {
+    // Loading shimmer
+    return <div className="w-full h-full bg-zinc-100 animate-pulse" />;
+  }
+
+  // No photo found
+  return (
+    <div className="w-full h-full bg-zinc-50 flex items-center justify-center">
+      <MapPin className="w-8 h-8 text-zinc-300" />
+    </div>
+  );
+});
 
 // ── Component ──────────────────────────────────────────────────────────
 
@@ -473,25 +517,24 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
                       className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-300 transition-colors group"
                     >
                       {/* Image */}
-                      {event.image ? (
-                        <div className="h-40 overflow-hidden relative">
+                      <div className="h-40 overflow-hidden relative">
+                        {event.image ? (
                           <img
                             src={event.image}
                             alt={displayTitle}
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                           />
-                          <span className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[9px] font-semibold text-zinc-600 px-2 py-0.5 rounded-full">
-                            {sourceLabel}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="h-40 bg-zinc-50 flex items-center justify-center relative">
-                          <Sparkles className="w-8 h-8 text-zinc-300" />
-                          <span className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[9px] font-semibold text-zinc-600 px-2 py-0.5 rounded-full">
-                            {sourceLabel}
-                          </span>
-                        </div>
-                      )}
+                        ) : event.venue ? (
+                          <VenuePhoto venue={event.venue} alt={displayTitle || ""} />
+                        ) : (
+                          <div className="w-full h-full bg-zinc-50 flex items-center justify-center">
+                            <Sparkles className="w-8 h-8 text-zinc-300" />
+                          </div>
+                        )}
+                        <span className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[9px] font-semibold text-zinc-600 px-2 py-0.5 rounded-full">
+                          {sourceLabel}
+                        </span>
+                      </div>
 
                       {/* Content */}
                       <div className="p-4 space-y-3">
