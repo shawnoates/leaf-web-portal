@@ -9,6 +9,7 @@ import CityAutocomplete from "@/components/CityAutocomplete";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import MarketplaceTab, { type MarketplaceEvent, type OrgSettings } from "@/components/MarketplaceTab";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
+import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import {
   Calendar,
   Check,
@@ -34,6 +35,7 @@ import {
   Sparkles,
   Code,
   Ticket,
+  Phone,
 } from "lucide-react";
 import {
   LineChart,
@@ -323,6 +325,10 @@ export default function OrgDashboardPage() {
   const [createPlanPrefill, setCreatePlanPrefill] = useState<CreatePlanPrefill | null>(null);
   const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
 
+  // Phone verification
+  const [userPhone, setUserPhone] = useState<string | null>(null);
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+
   // Co-host invite
   const [followerCalFilter, setFollowerCalFilter] = useState<string>("all");
   const [inviteEmail, setInviteEmail] = useState("");
@@ -333,7 +339,10 @@ export default function OrgDashboardPage() {
   useEffect(() => {
     try {
       const current = Parse.User.current();
-      if (current) setUser(current);
+      if (current) {
+        setUser(current);
+        setUserPhone(current.get("phone") || null);
+      }
     } catch {
       // No session
     }
@@ -779,6 +788,24 @@ export default function OrgDashboardPage() {
           </nav>
         </div>
       </header>
+
+      {/* Phone verification banner */}
+      {!userPhone && (
+        <div className="max-w-5xl mx-auto px-6 pt-4">
+          <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <Phone className="w-4 h-4 text-amber-600 shrink-0" />
+            <p className="text-xs text-amber-800 flex-1">
+              <span className="font-medium">Connect your phone</span> to manage plans from the Leaf app and get RSVP notifications.
+            </p>
+            <button
+              onClick={() => setShowPhoneModal(true)}
+              className="text-xs font-medium text-amber-700 hover:text-amber-900 underline shrink-0"
+            >
+              Verify now
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-5xl mx-auto px-6 py-8">
         {/* ──────── OVERVIEW TAB ──────── */}
@@ -1496,6 +1523,12 @@ export default function OrgDashboardPage() {
               preferredTimes: dashboard.preferredTimes,
             } satisfies OrgSettings}
             onAddEvent={(event: MarketplaceEvent) => {
+              // Gate: require phone verification before creating plans
+              if (!userPhone) {
+                setShowPhoneModal(true);
+                return;
+              }
+
               // Use plan title/description when available (Yelp in recommended view)
               const title = event.planTitle || event.title;
               const description = event.planDescription || event.description;
@@ -2442,6 +2475,10 @@ export default function OrgDashboardPage() {
               <div className="pt-8 border-t border-zinc-100 flex items-center justify-between">
                 <button
                   onClick={() => {
+                    if (!userPhone) {
+                      setShowPhoneModal(true);
+                      return;
+                    }
                     setCreatePlanPrefill({
                       title: selectedActivePlan.title,
                       description: selectedActivePlan.description,
@@ -2487,6 +2524,14 @@ export default function OrgDashboardPage() {
           prefill={createPlanPrefill}
           onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); }}
           onCreated={() => fetchDashboard()}
+        />
+      )}
+
+      {/* Phone Verification Modal */}
+      {showPhoneModal && (
+        <PhoneVerificationModal
+          onVerified={(phone) => { setUserPhone(phone); setShowPhoneModal(false); }}
+          onClose={() => setShowPhoneModal(false)}
         />
       )}
 
