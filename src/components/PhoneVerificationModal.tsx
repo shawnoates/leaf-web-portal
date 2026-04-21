@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import Parse from "@/lib/parse-client";
-import { X, Phone, ShieldCheck } from "lucide-react";
+import { X, Phone, ShieldCheck, Smartphone } from "lucide-react";
 
 interface PhoneVerificationModalProps {
-  onVerified: (phone: string) => void;
+  onVerified: () => void;
   onClose: () => void;
 }
 
 export default function PhoneVerificationModal({ onVerified, onClose }: PhoneVerificationModalProps) {
-  const [step, setStep] = useState<"phone" | "code" | "done">("phone");
+  const [step, setStep] = useState<"phone" | "code" | "done" | "not_found">("phone");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [sending, setSending] = useState(false);
@@ -52,22 +52,13 @@ export default function PhoneVerificationModal({ onVerified, onClose }: PhoneVer
     try {
       await Parse.Cloud.run("verifyPhoneForUser", { phone: `+1${digits}`, code });
       setStep("done");
-      onVerified(`+1${digits}`);
+      onVerified();
     } catch (err: unknown) {
-      // Fallback: try the existing verifyOTP and then update user manually
-      try {
-        await Parse.Cloud.run("verifyOTP", { phone: `+1${digits}`, code });
-        // Update the current user's phone
-        const user = Parse.User.current();
-        if (user) {
-          user.set("phone", `+1${digits}`);
-          user.set("lookup_phone", `+1${digits}`);
-          await user.save();
-        }
-        setStep("done");
-        onVerified(`+1${digits}`);
-      } catch (innerErr: unknown) {
-        setError(innerErr instanceof Error ? innerErr.message : "Invalid code. Please try again.");
+      const message = err instanceof Error ? err.message : "Verification failed.";
+      if (message.includes("No Leaf app account found")) {
+        setStep("not_found");
+      } else {
+        setError(message);
       }
     } finally {
       setSending(false);
@@ -88,16 +79,16 @@ export default function PhoneVerificationModal({ onVerified, onClose }: PhoneVer
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-zinc-100 rounded-full flex items-center justify-center">
-                <Phone className="w-5 h-5 text-zinc-600" />
+                <Smartphone className="w-5 h-5 text-zinc-600" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-zinc-900">Verify your phone</h3>
-                <p className="text-xs text-zinc-500">Connect your account to the Leaf app</p>
+                <h3 className="text-sm font-semibold text-zinc-900">Connect to Leaf app</h3>
+                <p className="text-xs text-zinc-500">Verify the phone number linked to your Leaf app account</p>
               </div>
             </div>
 
             <p className="text-xs text-zinc-500 leading-relaxed">
-              Adding your phone number lets you manage plans from the Leaf mobile app and receive notifications when members RSVP.
+              Enter the phone number you use in the Leaf mobile app. We&apos;ll verify it and connect your accounts.
             </p>
 
             <div>
@@ -173,13 +164,39 @@ export default function PhoneVerificationModal({ onVerified, onClose }: PhoneVer
             <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mx-auto">
               <ShieldCheck className="w-6 h-6 text-green-600" />
             </div>
-            <h3 className="text-sm font-semibold text-zinc-900">Phone verified</h3>
-            <p className="text-xs text-zinc-500">Your account is now connected to the Leaf app.</p>
+            <h3 className="text-sm font-semibold text-zinc-900">Connected to Leaf app</h3>
+            <p className="text-xs text-zinc-500">Your web account is now linked to your Leaf app account.</p>
             <button
               onClick={onClose}
               className="px-4 py-2 text-xs font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 transition-colors"
             >
               Done
+            </button>
+          </div>
+        )}
+
+        {step === "not_found" && (
+          <div className="text-center space-y-3 py-4">
+            <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto">
+              <Smartphone className="w-6 h-6 text-amber-600" />
+            </div>
+            <h3 className="text-sm font-semibold text-zinc-900">No Leaf app account found</h3>
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              We couldn&apos;t find a Leaf app account with this phone number. Download the app and create an account first, then come back to connect.
+            </p>
+            <a
+              href="https://apps.apple.com/us/app/leaf-build-your-community/id1040588046"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-4 py-2 text-xs font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 transition-colors"
+            >
+              Download Leaf App
+            </a>
+            <button
+              onClick={() => { setStep("phone"); setCode(""); setError(""); }}
+              className="block w-full text-xs text-zinc-400 hover:text-zinc-600 mt-1"
+            >
+              Try a different number
             </button>
           </div>
         )}

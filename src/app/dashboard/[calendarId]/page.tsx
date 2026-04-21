@@ -36,6 +36,7 @@ import {
   Code,
   Ticket,
   Phone,
+  Smartphone,
 } from "lucide-react";
 import {
   LineChart,
@@ -59,6 +60,7 @@ interface OrgDashboard {
   shareId: string;
   orgType: string | null;
   tier: string;
+  isOwner: boolean;
   profilePhoto: string | null;
   bannerUrl: string | null;
   brandColor: string;
@@ -154,10 +156,10 @@ const TABS = [
   { id: "overview", label: "Overview", icon: Calendar },
   { id: "calendars", label: "Calendars", icon: Layers },
   { id: "followers", label: "Followers", icon: Heart },
-  { id: "members", label: "Users", icon: Users },
+  { id: "members", label: "Users", icon: Users, ownerOnly: true },
   { id: "analytics", label: "Analytics", icon: TrendingUp, proOnly: true },
   { id: "marketplace", label: "Marketplace", icon: Ticket, growthOnly: true },
-  { id: "settings", label: "Settings", icon: Settings },
+  { id: "settings", label: "Settings", icon: Settings, ownerOnly: true },
 ];
 
 // ── Analytics types ────────────────────────────────────────────────────
@@ -325,9 +327,10 @@ export default function OrgDashboardPage() {
   const [createPlanPrefill, setCreatePlanPrefill] = useState<CreatePlanPrefill | null>(null);
   const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
 
-  // Phone verification
-  const [userPhone, setUserPhone] = useState<string | null>(null);
+  // Leaf app connection (explicit OTP verification, not auto-populated from phone field)
+  const [leafAppConnected, setLeafAppConnected] = useState(false);
   const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [phoneJustVerified, setPhoneJustVerified] = useState(false);
 
   // Co-host invite
   const [followerCalFilter, setFollowerCalFilter] = useState<string>("all");
@@ -341,7 +344,7 @@ export default function OrgDashboardPage() {
       const current = Parse.User.current();
       if (current) {
         setUser(current);
-        setUserPhone(current.get("phone") || null);
+        setLeafAppConnected(current.get("leafAppConnected") === true);
       }
     } catch {
       // No session
@@ -758,6 +761,7 @@ export default function OrgDashboardPage() {
         <div className="max-w-5xl mx-auto px-6">
           <nav className="flex gap-1 -mb-px overflow-x-auto no-scrollbar">
             {TABS.map((tab) => {
+              if (tab.ownerOnly && !dashboard.isOwner) return null;
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               const isLocked =
@@ -789,19 +793,35 @@ export default function OrgDashboardPage() {
         </div>
       </header>
 
-      {/* Phone verification banner */}
-      {!userPhone && (
+      {/* Leaf app connection banner (owner only) */}
+      {dashboard.isOwner && !leafAppConnected && (
         <div className="max-w-5xl mx-auto px-6 pt-4">
           <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
             <Phone className="w-4 h-4 text-amber-600 shrink-0" />
             <p className="text-xs text-amber-800 flex-1">
-              <span className="font-medium">Connect your phone</span> to manage plans from the Leaf app and get RSVP notifications.
+              <span className="font-medium">Connect to Leaf app</span> to manage plans from the mobile app and get RSVP notifications.
             </p>
             <button
               onClick={() => setShowPhoneModal(true)}
               className="text-xs font-medium text-amber-700 hover:text-amber-900 underline shrink-0"
             >
-              Verify now
+              Connect now
+            </button>
+          </div>
+        </div>
+      )}
+      {dashboard.isOwner && phoneJustVerified && leafAppConnected && (
+        <div className="max-w-5xl mx-auto px-6 pt-4">
+          <div className="flex items-center gap-3 px-4 py-3 bg-green-50 border border-green-200 rounded-lg">
+            <Check className="w-4 h-4 text-green-600 shrink-0" />
+            <p className="text-xs text-green-800 flex-1">
+              <span className="font-medium">Connected to Leaf app</span>
+            </p>
+            <button
+              onClick={() => setPhoneJustVerified(false)}
+              className="text-xs text-green-600 hover:text-green-800 shrink-0"
+            >
+              Dismiss
             </button>
           </div>
         </div>
@@ -1523,8 +1543,8 @@ export default function OrgDashboardPage() {
               preferredTimes: dashboard.preferredTimes,
             } satisfies OrgSettings}
             onAddEvent={(event: MarketplaceEvent) => {
-              // Gate: require phone verification before creating plans
-              if (!userPhone) {
+              // Gate: require Leaf app connection before creating plans
+              if (!leafAppConnected) {
                 setShowPhoneModal(true);
                 return;
               }
@@ -1596,6 +1616,28 @@ export default function OrgDashboardPage() {
 
             {settingsSection === "general" && (
             <div className="space-y-8">
+            {/* Phone / Leaf App Connection */}
+            <div className="flex items-center justify-between py-3 border-b border-zinc-100">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-3.5 h-3.5 text-zinc-400" />
+                <span className="text-xs text-zinc-500">Connected to Leaf app</span>
+                <a href="https://apps.apple.com/us/app/leaf-build-your-community/id1040588046" target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-400 hover:text-zinc-600 underline">Visit App Store</a>
+              </div>
+              {leafAppConnected ? (
+                <div className="flex items-center gap-1.5">
+                  <Check className="w-3 h-3 text-green-600" />
+                  <span className="text-xs text-green-700">Phone number verified</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowPhoneModal(true)}
+                  className="text-xs text-zinc-500 hover:text-zinc-900 underline"
+                >
+                  Connect phone
+                </button>
+              )}
+            </div>
+
             {/* Organization Logo (Growth/Pro) */}
             <div className="relative">
               {!isGrowthPlus && (
@@ -2475,7 +2517,7 @@ export default function OrgDashboardPage() {
               <div className="pt-8 border-t border-zinc-100 flex items-center justify-between">
                 <button
                   onClick={() => {
-                    if (!userPhone) {
+                    if (!leafAppConnected) {
                       setShowPhoneModal(true);
                       return;
                     }
@@ -2530,7 +2572,7 @@ export default function OrgDashboardPage() {
       {/* Phone Verification Modal */}
       {showPhoneModal && (
         <PhoneVerificationModal
-          onVerified={(phone) => { setUserPhone(phone); setShowPhoneModal(false); }}
+          onVerified={() => { setLeafAppConnected(true); setShowPhoneModal(false); setPhoneJustVerified(true); }}
           onClose={() => setShowPhoneModal(false)}
         />
       )}
