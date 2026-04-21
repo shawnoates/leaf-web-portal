@@ -1511,10 +1511,10 @@ export default function OrgCalendarPage() {
                     </h4>
                     {selectedEvent.location.isPrivate ? (
                       <>
-                        <p className="text-sm text-zinc-700">
-                          {selectedEvent.location.neighborhood || "Location shared after RSVP"}
-                        </p>
-                        <p className="text-[10px] text-zinc-400">Exact venue shared when you RSVP</p>
+                        {selectedEvent.location.neighborhood && (
+                          <p className="text-sm text-zinc-700">{selectedEvent.location.neighborhood}</p>
+                        )}
+                        <p className="text-sm text-zinc-400">RSVP to see exact location</p>
                       </>
                     ) : (
                       <>
