@@ -306,6 +306,20 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             />
           </div>
 
+          {isHosted && (
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Host Note (optional)</label>
+              <textarea
+                value={hostNote}
+                onChange={(e) => setHostNote(e.target.value)}
+                rows={2}
+                maxLength={500}
+                className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-none"
+                placeholder="A note for attendees (visible in the plan)"
+              />
+            </div>
+          )}
+
           <button
             onClick={handleCreate}
             disabled={!title || !date || creating || (isHosted && !imageBase64 && !prefill?.imageUrl)}
