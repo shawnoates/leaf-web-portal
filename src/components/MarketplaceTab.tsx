@@ -112,7 +112,7 @@ function deduplicateEvents(events: MarketplaceEvent[]): MarketplaceEvent[] {
 
 // ── Fallback recommendation (balanced across key sources) ────────────
 
-const PRIORITY_SOURCES = ["ticketmaster_direct", "firecrawl", "tmdb"];
+const PRIORITY_SOURCES = ["ticketmaster_direct", "yelp", "tmdb", "firecrawl"];
 
 function getFallbackRecommended(events: MarketplaceEvent[]): MarketplaceEvent[] {
   const bySource = new Map<string, MarketplaceEvent[]>();

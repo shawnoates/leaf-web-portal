@@ -41,7 +41,7 @@ Excluded keywords: ${excludedKeywords}
 Below are available events/activities from various sources. Pick up to 10 recommendations for this organization's weekly suggestions.
 
 SOURCE DIVERSITY requirement:
-- You MUST include items from multiple sources. Aim for a balanced mix across: ticketmaster_direct (live events), firecrawl (local finds), and tmdb (movies).
+- You MUST include items from multiple sources. Aim for a balanced mix across: ticketmaster_direct (live events), yelp (places/activities), tmdb (movies), and firecrawl (local finds).
 - Include at least 2-3 from each available source when possible.
 - Do NOT let one source dominate the list.
 
