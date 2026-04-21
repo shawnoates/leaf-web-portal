@@ -30,13 +30,15 @@ export interface CreatePlanPrefill {
 
 interface CreatePlanModalProps {
   calendarId: string;
+  calendars?: { objectId: string; name: string }[];
   tier: string;
   prefill?: CreatePlanPrefill | null;
   onClose: () => void;
   onCreated: () => void;
 }
 
-export default function CreatePlanModal({ calendarId, tier, prefill, onClose, onCreated }: CreatePlanModalProps) {
+export default function CreatePlanModal({ calendarId, calendars, tier, prefill, onClose, onCreated }: CreatePlanModalProps) {
+  const [selectedCalendarId, setSelectedCalendarId] = useState(calendarId);
   const [title, setTitle] = useState(prefill?.title || "");
   const [description, setDescription] = useState(prefill?.description || "");
   const [venueQuery, setVenueQuery] = useState(prefill?.venue?.name || "");
@@ -48,6 +50,7 @@ export default function CreatePlanModal({ calendarId, tier, prefill, onClose, on
   const [capacity, setCapacity] = useState(prefill?.capacity || "");
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(prefill?.imageUrl || null);
+  const [hostNote, setHostNote] = useState("");
   const [isHosted, setIsHosted] = useState(true);
   const [creating, setCreating] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -101,7 +104,7 @@ export default function CreatePlanModal({ calendarId, tier, prefill, onClose, on
     setCreating(true);
     try {
       await Parse.Cloud.run("createManualPlan", {
-        calendarId,
+        calendarId: selectedCalendarId,
         title,
         description,
         venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
@@ -111,6 +114,7 @@ export default function CreatePlanModal({ calendarId, tier, prefill, onClose, on
         isHosted,
         imageBase64: imageBase64 || undefined,
         imageUrl: !imageBase64 && prefill?.imageUrl ? prefill.imageUrl : undefined,
+        hostNote: isHosted && hostNote.trim() ? hostNote.trim() : undefined,
       });
       setSuccess(true);
       onCreated();
@@ -150,6 +154,22 @@ export default function CreatePlanModal({ calendarId, tier, prefill, onClose, on
           {success && (
             <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg text-sm">
               <Check className="w-4 h-4" /> Plan created successfully!
+            </div>
+          )}
+
+          {/* Calendar selector (only when multiple calendars) */}
+          {calendars && calendars.length > 1 && (
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Calendar</label>
+              <select
+                value={selectedCalendarId}
+                onChange={(e) => setSelectedCalendarId(e.target.value)}
+                className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 bg-transparent"
+              >
+                {calendars.map((cal) => (
+                  <option key={cal.objectId} value={cal.objectId}>{cal.name}</option>
+                ))}
+              </select>
             </div>
           )}
 

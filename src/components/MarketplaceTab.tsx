@@ -507,7 +507,7 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filtered.slice(0, visibleCount).map((event) => {
                   const sourceLabel = SOURCE_LABELS[event.source] || event.source;
-                  const showPlan = isRecommended && event.planTitle;
+                  const showPlan = event.planTitle && (isRecommended || event.source === "firecrawl");
                   const displayTitle = showPlan ? event.planTitle : event.title;
                   const displayDescription = showPlan ? event.planDescription : event.description;
 

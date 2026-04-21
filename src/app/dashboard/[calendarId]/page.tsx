@@ -2562,6 +2562,7 @@ export default function OrgDashboardPage() {
       {showCreatePlanModal && (
         <CreatePlanModal
           calendarId={calendarId}
+          calendars={dashboard.calendars.map((c) => ({ objectId: c.objectId, name: c.name }))}
           tier={dashboard.tier}
           prefill={createPlanPrefill}
           onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); }}
