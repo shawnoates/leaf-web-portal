@@ -34,20 +34,16 @@ export async function GET(request: NextRequest) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const events = results.map((e: any) => ({
-    id: `scrape-${e.objectId}`,
+    id: `scrape-${e.id}`,
     title: e.name || "Untitled",
-    description: e.eventDescription || "",
+    description: e.description || "",
     category: e.categoryId || "arts",
     image: e.imageURL || null,
     source: "firecrawl",
     url: e.eventURL || null,
-    venue:
-      e.venue || e.formattedAddress
-        ? {
-            name: e.venue || "",
-            address: e.formattedAddress || "",
-          }
-        : null,
+    venue: e.venue
+      ? { name: e.name || "", address: e.venue }
+      : null,
     suggestedDate: e.date || null,
     suggestedTime: e.time || null,
     capacityMin: null,
