@@ -46,6 +46,7 @@ interface MarketplaceTabProps {
   calendarId: string;
   city?: string;
   orgSettings?: OrgSettings;
+  prefetchedEvents?: MarketplaceEvent[] | null;
   onAddEvent: (event: MarketplaceEvent) => void;
 }
 
@@ -148,14 +149,14 @@ function getFallbackRecommended(events: MarketplaceEvent[]): MarketplaceEvent[] 
 
 // ── Component ──────────────────────────────────────────────────────────
 
-export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEvent }: MarketplaceTabProps) {
+export default function MarketplaceTab({ calendarId, city, orgSettings, prefetchedEvents, onAddEvent }: MarketplaceTabProps) {
   const [section, setSection] = useState<"discover" | "collabs">("discover");
-  const [events, setEvents] = useState<MarketplaceEvent[]>([]);
+  const [events, setEvents] = useState<MarketplaceEvent[]>(prefetchedEvents || []);
   const [recommendedIds, setRecommendedIds] = useState<string[] | null>(null);
   const [loadingRecs, setLoadingRecs] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!prefetchedEvents);
   const [error, setError] = useState<string | null>(null);
-  const initialLoadDone = useRef(false);
+  const initialLoadDone = useRef(!!prefetchedEvents);
 
   // Filters
   const [sourceFilter, setSourceFilter] = useState("recommended");
@@ -271,6 +272,13 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
       fetchEvents(true);
     }
   }, [fetchEvents, section]);
+
+  // Trigger recommendations for prefetched data
+  useEffect(() => {
+    if (prefetchedEvents && prefetchedEvents.length > 0 && orgSettings && !recommendedIds) {
+      fetchRecommendations(prefetchedEvents);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = useCallback((value: string) => {
     setSearchInput(value);

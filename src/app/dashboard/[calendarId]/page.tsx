@@ -368,6 +368,34 @@ export default function OrgDashboardPage() {
     if (user) fetchDashboard();
   }, [user, fetchDashboard]);
 
+  // Prefetch marketplace data as soon as dashboard is available
+  const [prefetchedMarketplace, setPrefetchedMarketplace] = useState<MarketplaceEvent[] | null>(null);
+  const marketplacePrefetched = useRef(false);
+
+  useEffect(() => {
+    if (!dashboard || marketplacePrefetched.current) return;
+    marketplacePrefetched.current = true;
+
+    const city = dashboard.calendars.find((c) => c.objectId === calendarId)?.city;
+    const params = new URLSearchParams();
+    if (city) params.set("city", city);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+
+    Promise.allSettled([
+      city ? fetch(`/api/yelp${qs}`).then((r) => r.json()) : Promise.resolve({ events: [] }),
+      city ? fetch(`/api/ticketmaster${qs}`).then((r) => r.json()) : Promise.resolve({ events: [] }),
+      fetch("/api/tmdb").then((r) => r.json()),
+      city ? fetch(`/api/scrape?city=${encodeURIComponent(city)}`).then((r) => r.json()) : Promise.resolve({ events: [] }),
+    ]).then(([yelp, tm, tmdb, scrape]) => {
+      const all: MarketplaceEvent[] = [];
+      if (yelp.status === "fulfilled") all.push(...(yelp.value.events || []));
+      if (tm.status === "fulfilled") all.push(...(tm.value.events || []));
+      if (tmdb.status === "fulfilled") all.push(...(tmdb.value.events || []));
+      if (scrape.status === "fulfilled") all.push(...(scrape.value.events || []));
+      setPrefetchedMarketplace(all);
+    });
+  }, [dashboard, calendarId]);
+
   // Analytics fetcher — Pro tier only
   const fetchAnalytics = useCallback(
     async (range: "7d" | "30d" | "90d" | "all") => {
@@ -1456,6 +1484,7 @@ export default function OrgDashboardPage() {
           <MarketplaceTab
             calendarId={calendarId}
             city={dashboard.calendars.find((c) => c.objectId === calendarId)?.city}
+            prefetchedEvents={prefetchedMarketplace}
             orgSettings={{
               name: dashboard.name,
               description: dashboard.description,
