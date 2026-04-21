@@ -797,9 +797,9 @@ export default function OrgDashboardPage() {
       {dashboard.isOwner && !leafAppConnected && (
         <div className="max-w-5xl mx-auto px-6 pt-4">
           <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <Phone className="w-4 h-4 text-amber-600 shrink-0" />
+            <Smartphone className="w-4 h-4 text-amber-600 shrink-0" />
             <p className="text-xs text-amber-800 flex-1">
-              <span className="font-medium">Connect to Leaf app</span> to manage plans from the mobile app and get RSVP notifications.
+              <span className="font-medium">Connect to Leaf app</span> to manage plans, chat with attendees, and get RSVP notifications.
             </p>
             <button
               onClick={() => setShowPhoneModal(true)}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Parse from "@/lib/parse-client";
 import { X, Phone, ShieldCheck, Smartphone } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 
 interface PhoneVerificationModalProps {
   onVerified: () => void;
@@ -176,25 +177,27 @@ export default function PhoneVerificationModal({ onVerified, onClose }: PhoneVer
         )}
 
         {step === "not_found" && (
-          <div className="text-center space-y-3 py-4">
-            <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto">
-              <Smartphone className="w-6 h-6 text-amber-600" />
-            </div>
+          <div className="text-center space-y-4 py-4">
             <h3 className="text-sm font-semibold text-zinc-900">No Leaf app account found</h3>
             <p className="text-xs text-zinc-500 leading-relaxed">
-              We couldn&apos;t find a Leaf app account with this phone number. Download the app and create an account first, then come back to connect.
+              We couldn&apos;t find a Leaf app account with this phone number. Scan the QR code to download the app and create an account, then come back to connect.
             </p>
-            <a
-              href="https://apps.apple.com/us/app/leaf-build-your-community/id1040588046"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block px-4 py-2 text-xs font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 transition-colors"
-            >
-              Download Leaf App
-            </a>
+            <div className="flex justify-center">
+              <a
+                href="https://apps.apple.com/us/app/leaf-build-your-community/id1040588046"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <QRCodeSVG
+                  value="https://apps.apple.com/us/app/leaf-build-your-community/id1040588046"
+                  size={140}
+                  level="M"
+                />
+              </a>
+            </div>
             <button
               onClick={() => { setStep("phone"); setCode(""); setError(""); }}
-              className="block w-full text-xs text-zinc-400 hover:text-zinc-600 mt-1"
+              className="text-xs text-zinc-500 hover:text-zinc-900 underline"
             >
               Try a different number
             </button>
