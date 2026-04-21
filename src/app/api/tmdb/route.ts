@@ -36,16 +36,26 @@ export async function GET(request: NextRequest) {
       ? `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&page=1`
       : `https://api.themoviedb.org/3/movie/now_playing?api_key=${TMDB_API_KEY}&region=US&page=1`;
 
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    const res = await fetch(url, { headers: { Accept: "application/json" }, next: { revalidate: 21600 } });
 
     if (!res.ok) {
       return NextResponse.json({ events: [] });
     }
 
     const data = await res.json();
+
+    // Only show movies released in the last 6 months (relevant for "Now Showing")
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const cutoff = sixMonthsAgo.toISOString().slice(0, 10);
+
     const movies = (data.results || [])
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .filter((m: any) => query || m.vote_average >= 6.0)
+      .filter((m: any) => {
+        if (query && m.release_date && m.release_date < cutoff) return false;
+        if (!query && m.vote_average < 6.0) return false;
+        return true;
+      })
       .slice(0, 10);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

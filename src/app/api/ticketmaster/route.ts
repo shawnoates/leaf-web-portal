@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   try {
     const keywordParam = query ? `&keyword=${encodeURIComponent(query)}` : "";
     const res = await fetch(
-      `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TICKETMASTER_API_KEY}&city=${encodeURIComponent(city)}&size=10&sort=relevance,desc${keywordParam}`,
+      `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TICKETMASTER_API_KEY}&city=${encodeURIComponent(city)}&radius=30&unit=miles&size=15&sort=date,asc${keywordParam}`,
       { headers: { Accept: "application/json" } }
     );
 

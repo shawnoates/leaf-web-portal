@@ -38,16 +38,23 @@ Calendar: ${orgSettings.calendarDescription || "General"}
 Excluded venue categories: ${excludedCategories}
 Excluded keywords: ${excludedKeywords}
 
-Below are available events/activities from various sources. Pick the 10 most relevant ones for this organization's members to attend together as a group activity. Consider:
-- The org's values, mission, and audience
-- What would make a fun, appropriate group outing for these members
+Below are available events/activities from various sources. Pick the 10 most relevant ones for this organization's members to attend together as a group activity.
+
+IMPORTANT filtering rules:
+- The org type is CRITICAL. A church group should not get pop concerts, nightclub events, or anything misaligned with their faith/values. A men's group should get male-friendly activities. A youth group needs age-appropriate options. Always filter through the lens of WHO these members are.
+- Strictly exclude anything matching the excluded categories or keywords.
+- Exclude events that would be inappropriate, awkward, or irrelevant for this specific group's identity and purpose.
+
+Then from the remaining appropriate options, rank by:
+- What would make a fun, engaging group outing for these specific members
 - Variety across different types of activities
-- Exclude anything that conflicts with the org's values or excluded categories/keywords
+- Accessibility for a group (not solo-oriented experiences)
 
 Events:
 ${eventList}
 
-Return ONLY a JSON array of the selected event IDs in ranked order (best first). Example: ["tm-123", "yelp-456", "tmdb-789"]`;
+Return ONLY a JSON array of the selected event IDs in ranked order (best first). Example: ["tm-123", "yelp-456", "tmdb-789"]
+If fewer than 10 events are appropriate, return only the appropriate ones.`;
 
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({
