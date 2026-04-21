@@ -38,7 +38,12 @@ Calendar: ${orgSettings.calendarDescription || "General"}
 Excluded venue categories: ${excludedCategories}
 Excluded keywords: ${excludedKeywords}
 
-Below are available events/activities from various sources. Pick the 10 most relevant ones for this organization's members to attend together as a group activity.
+Below are available events/activities from various sources. Pick up to 10 recommendations for this organization's weekly suggestions.
+
+SOURCE DIVERSITY requirement:
+- You MUST include items from multiple sources. Aim for a balanced mix across: ticketmaster_direct (live events), firecrawl (local finds), and tmdb (movies).
+- Include at least 2-3 from each available source when possible.
+- Do NOT let one source dominate the list.
 
 IMPORTANT filtering rules:
 - The org type is CRITICAL. A church group should not get pop concerts, nightclub events, or anything misaligned with their faith/values. A men's group should get male-friendly activities. A youth group needs age-appropriate options. Always filter through the lens of WHO these members are.

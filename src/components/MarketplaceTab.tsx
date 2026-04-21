@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import Parse from "@/lib/parse-client";
 import {
   Plus,
   MapPin,
@@ -17,6 +16,8 @@ export interface MarketplaceEvent {
   id: string;
   title: string;
   description: string;
+  planTitle?: string;
+  planDescription?: string;
   category: string;
   image: string | null;
   source: string;
@@ -108,7 +109,9 @@ function deduplicateEvents(events: MarketplaceEvent[]): MarketplaceEvent[] {
   return Array.from(seen.values());
 }
 
-// ── Fallback recommendation (round-robin without AI) ─────────────────
+// ── Fallback recommendation (balanced across key sources) ────────────
+
+const PRIORITY_SOURCES = ["ticketmaster_direct", "firecrawl", "tmdb"];
 
 function getFallbackRecommended(events: MarketplaceEvent[]): MarketplaceEvent[] {
   const bySource = new Map<string, MarketplaceEvent[]>();
@@ -118,17 +121,26 @@ function getFallbackRecommended(events: MarketplaceEvent[]): MarketplaceEvent[] 
     bySource.get(key)!.push(event);
   }
 
-  const sources = Array.from(bySource.values());
   const result: MarketplaceEvent[] = [];
-  let round = 0;
 
-  while (result.length < 10 && sources.some((items) => items.length > round)) {
-    for (const items of sources) {
-      if (round < items.length && result.length < 10) {
+  // First pass: take up to 3 from each priority source (round-robin)
+  for (let round = 0; round < 3 && result.length < 10; round++) {
+    for (const src of PRIORITY_SOURCES) {
+      const items = bySource.get(src);
+      if (items && round < items.length && result.length < 10) {
         result.push(items[round]);
       }
     }
-    round++;
+  }
+
+  // Fill remaining slots from any source (including yelp)
+  const usedIds = new Set(result.map((e) => e.id));
+  for (const event of events) {
+    if (result.length >= 10) break;
+    if (!usedIds.has(event.id)) {
+      result.push(event);
+      usedIds.add(event.id);
+    }
   }
 
   return result;
@@ -150,6 +162,7 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [visibleCount, setVisibleCount] = useState(10);
 
   const fetchFromServer = useCallback(async (query?: string) => {
     const params = new URLSearchParams();
@@ -158,11 +171,11 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
     const qs = params.toString() ? `?${params.toString()}` : "";
 
     // Fetch from all 4 sources in parallel
-    const [yelpResult, ticketmasterResult, tmdbResult, parseResult] = await Promise.allSettled([
+    const [yelpResult, ticketmasterResult, tmdbResult, scrapeResult] = await Promise.allSettled([
       city ? fetch(`/api/yelp${qs}`).then((r) => r.json()) : Promise.resolve({ events: [] }),
       city ? fetch(`/api/ticketmaster${qs}`).then((r) => r.json()) : Promise.resolve({ events: [] }),
       fetch(`/api/tmdb${query ? `?q=${encodeURIComponent(query)}` : ""}`).then((r) => r.json()),
-      query ? Promise.resolve({ events: [] }) : Parse.Cloud.run("getMarketplaceEvents", { calendarId }),
+      city && !query ? fetch(`/api/scrape?city=${encodeURIComponent(city)}`).then((r) => r.json()) : Promise.resolve({ events: [] }),
     ]);
 
     let allEvents: MarketplaceEvent[] = [];
@@ -179,12 +192,8 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
       allEvents.push(...(tmdbResult.value.events || []));
     }
 
-    // From Parse, only take firecrawl (scraped) events
-    if (parseResult.status === "fulfilled") {
-      const scraped = (parseResult.value.events || []).filter(
-        (e: MarketplaceEvent) => e.source === "firecrawl"
-      );
-      allEvents.push(...scraped);
+    if (scrapeResult.status === "fulfilled") {
+      allEvents.push(...(scrapeResult.value.events || []));
     }
 
     allEvents = deduplicateEvents(allEvents);
@@ -270,6 +279,7 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
     searchTimeout.current = setTimeout(() => {
       const trimmed = value.trim();
       setSearchQuery(trimmed);
+      setVisibleCount(10);
       if (trimmed) {
         setSourceFilter("all");
         fetchEvents(false, trimmed);
@@ -361,7 +371,7 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
             {SOURCE_FILTERS.map((sf) => (
               <button
                 key={sf.id}
-                onClick={() => setSourceFilter(sf.id)}
+                onClick={() => { setSourceFilter(sf.id); setVisibleCount(10); }}
                 className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors flex items-center gap-1 ${
                   sourceFilter === sf.id
                     ? "bg-zinc-900 text-white"
@@ -427,118 +437,124 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
           {/* Section heading */}
           {!loading && !error && filtered.length > 0 && (
             <div className="flex items-center gap-2">
-              {searchQuery ? (
-                <>
-                  <Search className="w-4 h-4 text-zinc-500" />
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
-                    Results for &ldquo;{searchQuery}&rdquo;
-                  </h3>
-                </>
-              ) : isRecommended ? (
-                <>
-                  <Star className="w-4 h-4 text-zinc-500" />
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Recommended for You</h3>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 text-zinc-500" />
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
-                    {sourceFilter === "all" ? "All Events" : SOURCE_LABELS[sourceFilter] || "Events"}
-                  </h3>
-                </>
-              )}
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
+                {searchQuery
+                  ? `Results for \u201c${searchQuery}\u201d`
+                  : isRecommended
+                  ? "Recommended for You"
+                  : sourceFilter === "all"
+                  ? "All"
+                  : SOURCE_LABELS[sourceFilter] || "Events"}
+              </h3>
             </div>
           )}
 
           {/* Event cards grid */}
           {!loading && !error && filtered.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filtered.map((event) => {
-                const sourceLabel = SOURCE_LABELS[event.source] || event.source;
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filtered.slice(0, visibleCount).map((event) => {
+                  const sourceLabel = SOURCE_LABELS[event.source] || event.source;
+                  const showPlan = isRecommended && event.planTitle;
+                  const displayTitle = showPlan ? event.planTitle : event.title;
+                  const displayDescription = showPlan ? event.planDescription : event.description;
 
-                return (
-                  <div
-                    key={event.id}
-                    className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-300 transition-colors group"
-                  >
-                    {/* Image */}
-                    {event.image ? (
-                      <div className="h-40 overflow-hidden relative">
-                        <img
-                          src={event.image}
-                          alt={event.title}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                        <span className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[9px] font-semibold text-zinc-600 px-2 py-0.5 rounded-full">
-                          {sourceLabel}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="h-40 bg-zinc-50 flex items-center justify-center relative">
-                        <Sparkles className="w-8 h-8 text-zinc-300" />
-                        <span className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[9px] font-semibold text-zinc-600 px-2 py-0.5 rounded-full">
-                          {sourceLabel}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Content */}
-                    <div className="p-4 space-y-3">
-                      <div>
-                        <h3 className="text-sm font-medium text-zinc-900 line-clamp-1">
-                          {event.title}
-                        </h3>
-                        <p className="text-xs text-zinc-400 mt-1 line-clamp-2">
-                          {event.description}
-                        </p>
-                        {event.url && (
-                          <a
-                            href={event.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-medium text-blue-600 hover:text-blue-800 transition-colors"
-                          >
-                            <ExternalLink className="w-3 h-3" />
-                            View details
-                          </a>
-                        )}
-                      </div>
-
-                      {/* Metadata */}
-                      {event.venue && (
-                        <div className="text-[10px] text-zinc-400 uppercase tracking-widest space-y-0.5">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {event.venue.name}
+                  return (
+                    <div
+                      key={event.id}
+                      className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-300 transition-colors group"
+                    >
+                      {/* Image */}
+                      {event.image ? (
+                        <div className="h-40 overflow-hidden relative">
+                          <img
+                            src={event.image}
+                            alt={displayTitle}
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                          <span className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[9px] font-semibold text-zinc-600 px-2 py-0.5 rounded-full">
+                            {sourceLabel}
                           </span>
-                          {event.venue.address && (
-                            <a
-                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.venue.address)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="block pl-4 normal-case text-blue-600 hover:text-blue-800 transition-colors"
-                            >
-                              {event.venue.address}
-                            </a>
-                          )}
+                        </div>
+                      ) : (
+                        <div className="h-40 bg-zinc-50 flex items-center justify-center relative">
+                          <Sparkles className="w-8 h-8 text-zinc-300" />
+                          <span className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[9px] font-semibold text-zinc-600 px-2 py-0.5 rounded-full">
+                            {sourceLabel}
+                          </span>
                         </div>
                       )}
 
-                      {/* Add button */}
-                      <div className="flex items-center justify-end pt-1">
-                        <button
-                          onClick={() => handleAddEvent(event)}
-                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 transition-colors"
-                        >
-                          <Plus className="w-3 h-3" />
-                          Add to Calendar
-                        </button>
+                      {/* Content */}
+                      <div className="p-4 space-y-3">
+                        <div>
+                          <h3 className="text-sm font-medium text-zinc-900 line-clamp-1">
+                            {displayTitle}
+                          </h3>
+                          <p className="text-xs text-zinc-400 mt-1 line-clamp-2">
+                            {displayDescription}
+                          </p>
+                          {event.url && (
+                            <a
+                              href={event.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              View details
+                            </a>
+                          )}
+                        </div>
+
+                        {/* Metadata */}
+                        {event.venue && (
+                          <div className="text-[10px] text-zinc-400 uppercase tracking-widest space-y-0.5">
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {event.venue.name}
+                            </span>
+                            {event.venue.address && (
+                              <a
+                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.venue.address)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block pl-4 normal-case text-blue-600 hover:text-blue-800 transition-colors"
+                              >
+                                {event.venue.address}
+                              </a>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Add button */}
+                        <div className="flex items-center justify-end pt-1">
+                          <button
+                            onClick={() => handleAddEvent(event)}
+                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 transition-colors"
+                          >
+                            <Plus className="w-3 h-3" />
+                            Add to Calendar
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+
+              {/* Load more */}
+              {filtered.length > visibleCount && (
+                <div className="flex justify-center pt-2">
+                  <button
+                    onClick={() => setVisibleCount((c) => c + 10)}
+                    className="px-5 py-2 text-xs font-medium text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition-colors"
+                  >
+                    Load more
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
