@@ -116,6 +116,7 @@ interface OrgDashboard {
     isPrimary: boolean;
     isActive: boolean;
     calendarImage: string | null;
+    hideVenueUntilRsvp: boolean;
   }[];
   calendarLimit: number | null;
   hostRequests: {
@@ -283,6 +284,7 @@ export default function OrgDashboardPage() {
   const [editCalImagePreview, setEditCalImagePreview] = useState<string | null>(null);
   const [editCalImageBase64, setEditCalImageBase64] = useState<string | null>(null);
   const [editCalRemoveImage, setEditCalRemoveImage] = useState(false);
+  const [editCalHideVenue, setEditCalHideVenue] = useState(true);
   const slugTimerRef = useRef<NodeJS.Timeout | null>(null);
   const originalSlugRef = useRef<string>("");
 
@@ -464,13 +466,14 @@ export default function OrgDashboardPage() {
       } else if (editCalRemoveImage) {
         params.removeImage = true;
       }
+      params.hideVenueUntilRsvp = editCalHideVenue;
       const result = await Parse.Cloud.run("updateCalendar", params);
       const newShareId = result.shareId;
       const newCalImage = editCalRemoveImage ? null : (editCalImagePreview || null);
       setDashboard((d) => d ? {
         ...d,
         calendars: d.calendars.map((c) =>
-          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId, city: editCalCity || c.city, calendarImage: editCalImageBase64 ? newCalImage : (editCalRemoveImage ? null : c.calendarImage) } : c
+          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId, city: editCalCity || c.city, calendarImage: editCalImageBase64 ? newCalImage : (editCalRemoveImage ? null : c.calendarImage), hideVenueUntilRsvp: editCalHideVenue } : c
         ),
       } : d);
       setEditingCalId(null);
@@ -1477,7 +1480,7 @@ export default function OrgDashboardPage() {
                         ) : (
                           <>
                             <button
-                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); setEditCalCity(cal.city || ""); setEditCalCitySelected(false); setEditCalImagePreview(cal.calendarImage || null); setEditCalImageBase64(null); setEditCalRemoveImage(false); }}
+                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); setEditCalCity(cal.city || ""); setEditCalCitySelected(false); setEditCalImagePreview(cal.calendarImage || null); setEditCalImageBase64(null); setEditCalRemoveImage(false); setEditCalHideVenue(cal.hideVenueUntilRsvp !== false); }}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
                             >
                               <Pencil className="w-3 h-3" /> Edit
@@ -2453,6 +2456,21 @@ export default function OrgDashboardPage() {
                   />
                 </div>
               )}
+              {/* Venue privacy toggle */}
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <p className="text-xs font-medium text-zinc-700">Hide venue until RSVP</p>
+                  <p className="text-[10px] text-zinc-400">Show only neighborhood on public page</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditCalHideVenue(!editCalHideVenue)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${editCalHideVenue ? "bg-zinc-900" : "bg-zinc-200"}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalHideVenue ? "left-5" : "left-0.5"}`} />
+                </button>
+              </div>
+
               <button
                 onClick={handleSaveCalendar}
                 disabled={!editCalName || savingCal || (editCalSlug !== originalSlugRef.current && (slugAvailable === false || slugChecking))}
@@ -2630,6 +2648,7 @@ export default function OrgDashboardPage() {
           calendars={dashboard.calendars.map((c) => ({ objectId: c.objectId, name: c.name }))}
           tier={dashboard.tier}
           prefill={createPlanPrefill}
+          hideVenueDefault={dashboard.calendars.find((c) => c.objectId === calendarId)?.hideVenueUntilRsvp}
           onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); }}
           onCreated={() => fetchDashboard()}
         />

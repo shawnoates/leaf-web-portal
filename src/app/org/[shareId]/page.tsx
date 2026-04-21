@@ -48,8 +48,10 @@ interface Plan {
   hostAvatar: string | null;
   attendeeCount: number;
   location: {
-    name: string;
-    address: string;
+    name: string | null;
+    address: string | null;
+    neighborhood?: string | null;
+    isPrivate?: boolean;
   } | null;
   hostNote: string | null;
 }
@@ -1507,8 +1509,19 @@ export default function OrgCalendarPage() {
                     <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
                       Location
                     </h4>
-                    <p className="text-sm text-zinc-700">{selectedEvent.location.name}</p>
-                    <p className="text-sm text-zinc-500">{selectedEvent.location.address}</p>
+                    {selectedEvent.location.isPrivate ? (
+                      <>
+                        <p className="text-sm text-zinc-700">
+                          {selectedEvent.location.neighborhood || "Location shared after RSVP"}
+                        </p>
+                        <p className="text-[10px] text-zinc-400">Exact venue shared when you RSVP</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-zinc-700">{selectedEvent.location.name}</p>
+                        <p className="text-sm text-zinc-500">{selectedEvent.location.address}</p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>

@@ -33,12 +33,14 @@ interface CreatePlanModalProps {
   calendars?: { objectId: string; name: string }[];
   tier: string;
   prefill?: CreatePlanPrefill | null;
+  hideVenueDefault?: boolean;
   onClose: () => void;
   onCreated: () => void;
 }
 
-export default function CreatePlanModal({ calendarId, calendars, tier, prefill, onClose, onCreated }: CreatePlanModalProps) {
+export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, onClose, onCreated }: CreatePlanModalProps) {
   const [selectedCalendarId, setSelectedCalendarId] = useState(calendarId);
+  const [hideVenue, setHideVenue] = useState(hideVenueDefault ?? true);
   const [title, setTitle] = useState(prefill?.title || "");
   const [description, setDescription] = useState(prefill?.description || "");
   const [venueQuery, setVenueQuery] = useState(prefill?.venue?.name || "");
@@ -115,6 +117,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
         imageBase64: imageBase64 || undefined,
         imageUrl: !imageBase64 && prefill?.imageUrl ? prefill.imageUrl : undefined,
         hostNote: isHosted && hostNote.trim() ? hostNote.trim() : undefined,
+        hideVenueUntilRsvp: hideVenue,
       });
       setSuccess(true);
       onCreated();
@@ -319,6 +322,21 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
               />
             </div>
           )}
+
+          {/* Venue privacy toggle */}
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <p className="text-xs font-medium text-zinc-700">Hide venue until RSVP</p>
+              <p className="text-[10px] text-zinc-400">Only show neighborhood on public page</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setHideVenue(!hideVenue)}
+              className={`relative w-10 h-5 rounded-full transition-colors ${hideVenue ? "bg-zinc-900" : "bg-zinc-200"}`}
+            >
+              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${hideVenue ? "left-5" : "left-0.5"}`} />
+            </button>
+          </div>
 
           <button
             onClick={handleCreate}
