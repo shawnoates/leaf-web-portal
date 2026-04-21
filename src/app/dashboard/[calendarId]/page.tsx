@@ -1496,12 +1496,36 @@ export default function OrgDashboardPage() {
               preferredTimes: dashboard.preferredTimes,
             } satisfies OrgSettings}
             onAddEvent={(event: MarketplaceEvent) => {
+              // Use plan title/description when available (Yelp in recommended view)
+              const title = event.planTitle || event.title;
+              const description = event.planDescription || event.description;
+
+              // Build a suggested date from suggestedDays (find the next matching day)
+              let date = event.suggestedDate || "";
+              if (!date && event.suggestedDays?.length > 0) {
+                const dayMap: Record<string, number> = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+                const targetDay = dayMap[event.suggestedDays[0]];
+                if (targetDay !== undefined) {
+                  const d = new Date();
+                  const diff = (targetDay - d.getDay() + 7) % 7 || 7;
+                  d.setDate(d.getDate() + diff);
+                  date = d.toISOString().slice(0, 10);
+                }
+              }
+
+              // Build a suggested time from suggestedTimes
+              let time = event.suggestedTime || "";
+              if (!time && event.suggestedTimes?.length > 0) {
+                const timeMap: Record<string, string> = { morning: "10:00 AM", afternoon: "2:00 PM", evening: "7:00 PM", night: "9:00 PM" };
+                time = timeMap[event.suggestedTimes[0]] || "";
+              }
+
               setCreatePlanPrefill({
-                title: event.title,
-                description: event.description,
+                title,
+                description,
                 venue: event.venue,
-                date: event.suggestedDate || "",
-                time: event.suggestedTime || "",
+                date,
+                time,
                 capacity: event.capacityMax?.toString() || "",
                 imageUrl: event.image,
               });

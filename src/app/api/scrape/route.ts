@@ -11,9 +11,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ events: [] });
   }
 
+  // Match the base city name (before the comma), same logic as getScrapedEvents cloud function
+  const baseName = city.split(",")[0].trim();
+
   const res = await fetch(
     `${PARSE_SERVER_URL}/classes/ScrapedEvent?${new URLSearchParams({
-      where: JSON.stringify({ cityName: city }),
+      where: JSON.stringify({ cityName: { $regex: `^${baseName}` } }),
       limit: "20",
       order: "-createdAt",
     })}`,
