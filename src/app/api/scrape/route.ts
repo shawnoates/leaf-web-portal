@@ -11,30 +11,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ events: [] });
   }
 
-  // Match the base city name (before the comma), same logic as getScrapedEvents cloud function
-  const baseName = city.split(",")[0].trim();
-
-  const res = await fetch(
-    `${PARSE_SERVER_URL}/classes/ScrapedEvent?${new URLSearchParams({
-      where: JSON.stringify({ cityName: { $regex: `^${baseName}` } }),
-      limit: "20",
-      order: "-createdAt",
-    })}`,
-    {
-      headers: {
-        "X-Parse-Application-Id": PARSE_APP_ID,
-        "X-Parse-Javascript-Key": PARSE_JS_KEY,
-      },
-    }
-  );
+  // Call the existing getScrapedEvents cloud function (uses masterKey server-side)
+  const res = await fetch(`${PARSE_SERVER_URL}/functions/getScrapedEvents`, {
+    method: "POST",
+    headers: {
+      "X-Parse-Application-Id": PARSE_APP_ID,
+      "X-Parse-Javascript-Key": PARSE_JS_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ cityName: city, limit: 20 }),
+  });
 
   if (!res.ok) {
     return NextResponse.json({ events: [] });
   }
 
   const data = await res.json();
+  const results = data.result || [];
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const events = (data.results || []).map((e: any) => ({
+  const events = results.map((e: any) => ({
     id: `scrape-${e.objectId}`,
     title: e.name || "Untitled",
     description: e.eventDescription || "",
