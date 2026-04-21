@@ -2,34 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 const YELP_API_KEY = process.env.YELP_API_KEY || "";
 
-// Group-friendly activity categories (things you'd invite friends to)
+// Categories people would actually want to visit as a group
 const GROUP_CATEGORIES = [
-  "escapegames",
-  "bowling",
-  "arcades",
-  "axethrowing",
-  "karaoke",
-  "gokarts",
-  "teambuilding",
-  "tours",
-  "amusementparks",
-  "trampoline",
-  "paintball",
-  "laser_tag",
-  "mini_golf",
-  "boating",
-  "climbing",
-  "surfing",
-  "skating",
-  "arts",
-  "musicvenues",
-  "comedyclubs",
+  "restaurants",
+  "bars",
   "museums",
-  "galleries",
-  "theaters",
-  "winetastingroom",
-  "cookingclasses",
-  "pottery",
+  "parks",
 ].join(",");
 
 // Map Yelp categories to app categories

@@ -499,18 +499,28 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, onAddEve
                             className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-medium text-blue-600 hover:text-blue-800 transition-colors"
                           >
                             <ExternalLink className="w-3 h-3" />
-                            View on {sourceLabel}
+                            View details
                           </a>
                         )}
                       </div>
 
                       {/* Metadata */}
                       {event.venue && (
-                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-zinc-400 uppercase tracking-widest">
+                        <div className="text-[10px] text-zinc-400 uppercase tracking-widest space-y-0.5">
                           <span className="flex items-center gap-1">
                             <MapPin className="w-3 h-3" />
                             {event.venue.name}
                           </span>
+                          {event.venue.address && (
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.venue.address)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block pl-4 normal-case text-blue-600 hover:text-blue-800 transition-colors"
+                            >
+                              {event.venue.address}
+                            </a>
+                          )}
                         </div>
                       )}
 

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
-import { Calendar, Sparkles } from "lucide-react";
+import { Calendar } from "lucide-react";
 import { getRandomStreakQuote, type StreakQuote } from "@/lib/streak-quotes";
 
 export default function DashboardPage() {
@@ -46,6 +46,8 @@ export default function DashboardPage() {
         router.push(`/dashboard/${organizations[0].objectId}`);
         return;
       }
+      // New user with no org — send straight to setup
+      router.push("/organizations/setup");
     } catch (error) {
       console.error("Failed to fetch organization:", error);
       // Invalid or expired session — log out so the sign-in page shows
@@ -136,20 +138,8 @@ export default function DashboardPage() {
             <div className="w-6 h-6 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin" />
           </div>
         ) : (
-          <div className="text-center py-20">
-            <Sparkles className="w-10 h-10 mx-auto mb-4 text-zinc-300" />
-            <h2 className="text-xl font-light tracking-tight mb-2">
-              No organization yet
-            </h2>
-            <p className="text-sm text-zinc-500 mb-6 max-w-xs mx-auto">
-              Create your organization to start generating AI-powered plan ideas for your community.
-            </p>
-            <Link
-              href="/organizations/setup"
-              className="inline-flex items-center gap-2 bg-zinc-900 text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors rounded-lg"
-            >
-              Create Organization
-            </Link>
+          <div className="flex items-center justify-center py-20">
+            <div className="w-6 h-6 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin" />
           </div>
         )}
       </main>
