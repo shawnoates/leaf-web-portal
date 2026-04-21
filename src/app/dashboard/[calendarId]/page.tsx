@@ -115,6 +115,7 @@ interface OrgDashboard {
     city: string;
     isPrimary: boolean;
     isActive: boolean;
+    calendarImage: string | null;
   }[];
   calendarLimit: number | null;
   hostRequests: {
@@ -279,6 +280,9 @@ export default function OrgDashboardPage() {
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [slugChecking, setSlugChecking] = useState(false);
   const [savingCal, setSavingCal] = useState(false);
+  const [editCalImagePreview, setEditCalImagePreview] = useState<string | null>(null);
+  const [editCalImageBase64, setEditCalImageBase64] = useState<string | null>(null);
+  const [editCalRemoveImage, setEditCalRemoveImage] = useState(false);
   const slugTimerRef = useRef<NodeJS.Timeout | null>(null);
   const originalSlugRef = useRef<string>("");
 
@@ -444,7 +448,7 @@ export default function OrgDashboardPage() {
     if (!editingCalId) return;
     setSavingCal(true);
     try {
-      const params: Record<string, string> = {
+      const params: Record<string, string | boolean> = {
         calendarId: editingCalId,
         name: editCalName,
         description: editCalDesc,
@@ -455,12 +459,18 @@ export default function OrgDashboardPage() {
       if (editCalCitySelected && editCalCity) {
         params.city = editCalCity;
       }
+      if (editCalImageBase64) {
+        params.imageBase64 = editCalImageBase64;
+      } else if (editCalRemoveImage) {
+        params.removeImage = true;
+      }
       const result = await Parse.Cloud.run("updateCalendar", params);
       const newShareId = result.shareId;
+      const newCalImage = editCalRemoveImage ? null : (editCalImagePreview || null);
       setDashboard((d) => d ? {
         ...d,
         calendars: d.calendars.map((c) =>
-          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId, city: editCalCity || c.city } : c
+          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId, city: editCalCity || c.city, calendarImage: editCalImageBase64 ? newCalImage : (editCalRemoveImage ? null : c.calendarImage) } : c
         ),
       } : d);
       setEditingCalId(null);
@@ -1404,7 +1414,15 @@ export default function OrgDashboardPage() {
                     className={`border rounded-xl p-5 ${inactive ? "border-zinc-100 bg-zinc-50 opacity-60" : "border-zinc-200"}`}
                   >
                     <div className="flex items-center justify-between mb-3">
-                      <div>
+                      <div className="flex items-center gap-3">
+                        {cal.calendarImage ? (
+                          <img src={cal.calendarImage} alt={cal.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0">
+                            <Calendar className="w-5 h-5 text-zinc-300" />
+                          </div>
+                        )}
+                        <div>
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className={`font-medium ${inactive ? "text-zinc-400" : ""}`}>{cal.name}</h3>
                           {!inactive && (
@@ -1446,6 +1464,7 @@ export default function OrgDashboardPage() {
                           )}
                         </div>
                         <p className="text-xs text-zinc-400">{cal.city || "No city set"}</p>
+                        </div>
                       </div>
                       <div className="flex items-center gap-4">
                         {inactive ? (
@@ -1458,7 +1477,7 @@ export default function OrgDashboardPage() {
                         ) : (
                           <>
                             <button
-                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); setEditCalCity(cal.city || ""); setEditCalCitySelected(false); }}
+                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); setEditCalCity(cal.city || ""); setEditCalCitySelected(false); setEditCalImagePreview(cal.calendarImage || null); setEditCalImageBase64(null); setEditCalRemoveImage(false); }}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
                             >
                               <Pencil className="w-3 h-3" /> Edit
@@ -2341,6 +2360,52 @@ export default function OrgDashboardPage() {
             </button>
             <h2 className="text-xl font-light tracking-tight mb-6">Edit Calendar</h2>
             <div className="space-y-4">
+              {/* Calendar image */}
+              <div className="flex items-center gap-4">
+                <div className="relative group">
+                  {editCalImagePreview ? (
+                    <img src={editCalImagePreview} alt="Calendar" className="w-16 h-16 rounded-xl object-cover" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl bg-zinc-100 flex items-center justify-center">
+                      <ImagePlus className="w-6 h-6 text-zinc-300" />
+                    </div>
+                  )}
+                  <label className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                    <ImagePlus className="w-5 h-5 text-white" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5MB"); return; }
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          const result = reader.result as string;
+                          setEditCalImagePreview(result);
+                          setEditCalImageBase64(result.split(",")[1]);
+                          setEditCalRemoveImage(false);
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </label>
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-zinc-500">Calendar image</p>
+                  <p className="text-[10px] text-zinc-400">Overrides org logo on public page</p>
+                  {editCalImagePreview && (
+                    <button
+                      onClick={() => { setEditCalImagePreview(null); setEditCalImageBase64(null); setEditCalRemoveImage(true); }}
+                      className="text-[10px] text-red-500 hover:text-red-700 mt-1"
+                    >
+                      Remove image
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name</label>
                 <input
