@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import Link from "next/link";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Plus,
@@ -754,6 +755,8 @@ export default function OrgCalendarPage() {
   const [showPlanIdeaPopup, setShowPlanIdeaPopup] = useState(false);
   const [popupIdea, setPopupIdea] = useState<PlanIdea | null>(null);
   const [isInactive, setIsInactive] = useState<{ name: string } | null>(null);
+  const [showHostLogin, setShowHostLogin] = useState(false);
+  const [parseUser, setParseUser] = useState<Parse.User | null>(null);
   const [showWelcomeInvite, setShowWelcomeInvite] = useState(false);
   const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -813,6 +816,14 @@ export default function OrgCalendarPage() {
     if (cookie) {
       setIsFollowing(true);
     }
+  }, []);
+
+  // Check for existing Parse session (returning owner/host from dashboard)
+  useEffect(() => {
+    try {
+      const current = Parse.User.current();
+      if (current) setParseUser(current);
+    } catch { /* no session */ }
   }, []);
 
   // Timed follow popup
@@ -1434,7 +1445,7 @@ export default function OrgCalendarPage() {
                 </button>
               )
             )}
-            {org.isOwner && (
+            {(org.isOwner || org.isHost) ? (
               <Link
                 href={`/dashboard/${org.objectId}`}
                 className="flex items-center gap-1.5 text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
@@ -1442,7 +1453,14 @@ export default function OrgCalendarPage() {
                 <Settings className="w-3.5 h-3.5" />
                 Manage
               </Link>
-            )}
+            ) : !parseUser ? (
+              <button
+                onClick={() => setShowHostLogin(true)}
+                className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400 hover:text-zinc-900 transition-colors hidden sm:inline"
+              >
+                Host login
+              </button>
+            ) : null}
           </div>
         </div>
       </nav>
@@ -2539,6 +2557,41 @@ export default function OrgCalendarPage() {
             setShowFollowModal(false);
           }}
         />
+      )}
+
+      {/* Host Login Modal */}
+      {showHostLogin && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-sm rounded-t-2xl md:rounded-xl p-8 relative">
+            <button
+              onClick={() => setShowHostLogin(false)}
+              className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-900"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-xl font-light tracking-tight">Host Login</h3>
+                <p className="text-sm text-zinc-500 mt-1">
+                  Sign in to manage this calendar.
+                </p>
+              </div>
+              <GoogleSignInButton
+                onSignIn={(u) => {
+                  setParseUser(u as unknown as Parse.User);
+                  setShowHostLogin(false);
+                  fetchOrg();
+                  const name = (u as unknown as Parse.User)?.get?.("full_name") || (u as unknown as Parse.User)?.get?.("name") || "";
+                  if (name) {
+                    setToast(`Signed in as ${name}`);
+                    setTimeout(() => setToast(null), 3000);
+                  }
+                }}
+                onError={(err) => console.error("Sign-in error:", err)}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Welcome / "Make it your own" invite — shown after first calendar creation */}
