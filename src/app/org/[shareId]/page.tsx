@@ -45,6 +45,7 @@ interface Plan {
   time: string;
   description: string;
   image: string;
+  hostId: string | null;
   hostName: string;
   hostAvatar: string | null;
   attendeeCount: number;
@@ -268,7 +269,7 @@ function RsvpModal({
                 RSVP for {plan.title}
               </h3>
               <p className="text-sm text-zinc-500 mt-1">
-                {plan.date} at {plan.time}
+                {plan.date}{plan.time ? ` at ${plan.time}` : ""}
               </p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -763,6 +764,7 @@ export default function OrgCalendarPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [rsvpedPlanIds, setRsvpedPlanIds] = useState<Set<string>>(new Set());
   const [cancellingRsvp, setCancellingRsvp] = useState<string | null>(null);
+  const [cancellingPlan, setCancellingPlan] = useState(false);
 
   const handleSharePlan = useCallback(async (planId: string, planTitle: string) => {
     const url = `https://os.joinleaf.com/p/${planId}`;
@@ -808,6 +810,25 @@ export default function OrgCalendarPage() {
       alert(err instanceof Error ? err.message : "Failed to cancel RSVP.");
     } finally {
       setCancellingRsvp(null);
+    }
+  }
+
+  async function handleCancelPlan(planId: string) {
+    if (!confirm("Cancel this plan? All attendees will be notified.")) return;
+    setCancellingPlan(true);
+    try {
+      await Parse.Cloud.run("removePlanFromCalendar", { eventGroupId: planId });
+      setOrg((prev) => prev ? {
+        ...prev,
+        plans: prev.plans.filter((p) => p.id !== planId),
+      } : prev);
+      setSelectedEvent(null);
+      setToast("Plan cancelled");
+      setTimeout(() => setToast(null), 3000);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to cancel plan.");
+    } finally {
+      setCancellingPlan(false);
     }
   }
 
@@ -988,6 +1009,7 @@ export default function OrgCalendarPage() {
         time: p.time ? normalizeTimeString(p.time as string) : (p.expiryDate ? formatTime(p.expiryDate as string) : ""),
         description: p.description as string || "",
         image: p.image as string || "",
+        hostId: (p.host as Record<string, string>)?.objectId || null,
         hostName: (p.host as Record<string, string>)?.name || "Community Member",
         hostAvatar: (p.host as Record<string, string>)?.profilePictureUrl || null,
         // rsvpCount tracks RSVPs only; the host is always attending so add 1
@@ -1548,7 +1570,7 @@ export default function OrgCalendarPage() {
                 <div className="w-full md:w-2/5 space-y-6">
                   <div className="space-y-2">
                     <p className="text-[11px] tracking-[0.3em] uppercase font-bold text-zinc-400">
-                      {plan.date} &bull; {plan.time}
+                      {plan.date}{plan.time ? <> &bull; {plan.time}</> : ""}
                     </p>
                     <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
                       {plan.title}
@@ -1783,7 +1805,7 @@ export default function OrgCalendarPage() {
                 </p>
                 <div className="flex gap-6 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">
                   <span className="flex items-center gap-2">
-                    <Clock className="w-4 h-4" /> {selectedEvent.date} at {selectedEvent.time}
+                    <Clock className="w-4 h-4" /> {selectedEvent.date}{selectedEvent.time ? ` at ${selectedEvent.time}` : ""}
                   </span>
                   <span className="flex items-center gap-2">
                     <Users className="w-4 h-4" /> {selectedEvent.attendeeCount} attending
@@ -1885,6 +1907,16 @@ export default function OrgCalendarPage() {
                       <span className="text-xs font-bold uppercase tracking-widest">Share</span>
                     </button>
                   </div>
+                )}
+                {/* Cancel Plan — visible to the plan host or calendar owner/co-host */}
+                {parseUser && (selectedEvent.hostId === parseUser.id || org.isOwner || org.isHost) && (
+                  <button
+                    onClick={() => handleCancelPlan(selectedEvent.id)}
+                    disabled={cancellingPlan}
+                    className="text-xs text-red-400 hover:text-red-600 transition-colors pt-2 disabled:opacity-50"
+                  >
+                    {cancellingPlan ? "Cancelling..." : "Cancel this plan"}
+                  </button>
                 )}
               </div>
             </div>

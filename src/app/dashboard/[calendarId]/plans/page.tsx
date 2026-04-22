@@ -14,6 +14,7 @@ interface PlanIdea {
   title: string;
   description: string;
   date: string;
+  image: string | null;
   location: { name: string; address: string } | null;
 }
 
@@ -145,11 +146,12 @@ export default function PlansPage() {
           location: p.location,
         }))
       );
-      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; location: { name: string; address: string } | null }) => ({
+      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null }) => ({
         objectId: idea.objectId,
         title: idea.title,
         description: idea.description,
         date: idea.date,
+        image: idea.image || null,
         location: idea.location,
       }));
       // Deduplicate by title (backend may return duplicate plan ideas)
@@ -191,11 +193,12 @@ export default function PlansPage() {
         try {
           const dash = await Parse.Cloud.run("getOrgDashboard", { calendarId });
           const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId: dash.shareId });
-          const rawIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; location: { name: string; address: string } | null }) => ({
+          const rawIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null }) => ({
             objectId: idea.objectId,
             title: idea.title,
             description: idea.description,
             date: idea.date,
+            image: idea.image || null,
             location: idea.location,
           }));
           const seenTitles = new Set<string>();
@@ -410,12 +413,25 @@ export default function PlansPage() {
               {planIdeas.map((idea) => (
                 <div
                   key={idea.objectId}
-                  className="border border-zinc-200 rounded-xl p-4 flex items-start justify-between"
+                  className="border border-zinc-200 rounded-xl overflow-hidden flex items-stretch cursor-pointer hover:border-zinc-400 transition-colors"
+                  onClick={() => {
+                    setCreatePlanPrefill({
+                      title: idea.title,
+                      description: idea.description,
+                      date: idea.date ? new Date(idea.date).toISOString().split("T")[0] : "",
+                      time: "",
+                      capacity: "",
+                      venue: idea.location || null,
+                      imageUrl: idea.image || undefined,
+                    });
+                    setEditingPlanId(null);
+                    setShowCreateModal(true);
+                  }}
                 >
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 p-4">
                     <h3 className="font-medium text-sm truncate">{idea.title}</h3>
                     {idea.description && (
-                      <p className="text-xs text-zinc-500 line-clamp-1 mt-0.5">{idea.description}</p>
+                      <p className="text-xs text-zinc-500 line-clamp-2 mt-0.5">{idea.description}</p>
                     )}
                     <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-400">
                       {idea.date && (
@@ -428,9 +444,14 @@ export default function PlansPage() {
                       )}
                     </div>
                   </div>
+                  {idea.image && (
+                    <div className="w-24 shrink-0 bg-zinc-100">
+                      <img src={idea.image} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  )}
                   <button
-                    onClick={() => handleRemoveIdea(idea.objectId)}
-                    className="p-2 text-zinc-300 hover:text-red-500 transition-colors shrink-0"
+                    onClick={(e) => { e.stopPropagation(); handleRemoveIdea(idea.objectId); }}
+                    className="p-3 text-zinc-300 hover:text-red-500 transition-colors shrink-0 self-start"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
