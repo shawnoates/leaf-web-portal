@@ -87,6 +87,7 @@ interface OrgDashboard {
     name: string;
     email: string | null;
     status: string;
+    leafAppConnected?: boolean;
     joinedAt: string;
   }[];
   followers: {
@@ -2089,9 +2090,16 @@ export default function OrgDashboardPage() {
                           <td className="px-4 py-3">{m.name}</td>
                           <td className="px-4 py-3 text-zinc-400">{m.email || "—"}</td>
                           <td className="px-4 py-3">
-                            <span className="text-xs bg-zinc-100 px-2 py-0.5 rounded-full">
-                              {m.status}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs bg-zinc-100 px-2 py-0.5 rounded-full">
+                                {m.status}
+                              </span>
+                              {m.leafAppConnected && (
+                                <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
+                                  Synced to app
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-zinc-400">
                             {new Date(m.joinedAt).toLocaleDateString()}
@@ -2599,48 +2607,46 @@ export default function OrgDashboardPage() {
               </div>
 
               <div className="pt-8 border-t border-zinc-100 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => {
-                      if (!leafAppConnected) {
-                        setShowPhoneModal(true);
-                        return;
-                      }
-                      setCreatePlanPrefill({
-                        title: selectedActivePlan.title,
-                        description: selectedActivePlan.description,
-                        venue: selectedActivePlan.location,
-                        imageUrl: selectedActivePlan.image,
-                      });
-                      setSelectedActivePlan(null);
-                      setShowCreatePlanModal(true);
-                    }}
-                    className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
-                  >
-                    <Copy className="w-4 h-4" />
-                    Duplicate
-                  </button>
-                  <button
-                    onClick={() => {
-                      const planDate = selectedActivePlan.date ? new Date(selectedActivePlan.date).toISOString().split("T")[0] : "";
-                      setEditingPlanId(selectedActivePlan.objectId);
-                      setCreatePlanPrefill({
-                        title: selectedActivePlan.title,
-                        description: selectedActivePlan.description,
-                        venue: selectedActivePlan.location,
-                        date: planDate,
-                        time: selectedActivePlan.time || "",
-                        imageUrl: selectedActivePlan.image,
-                      });
-                      setSelectedActivePlan(null);
-                      setShowCreatePlanModal(true);
-                    }}
-                    className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
-                  >
-                    <Pencil className="w-4 h-4" />
-                    Edit
-                  </button>
-                </div>
+                <button
+                  onClick={() => {
+                    if (!leafAppConnected) {
+                      setShowPhoneModal(true);
+                      return;
+                    }
+                    setCreatePlanPrefill({
+                      title: selectedActivePlan.title,
+                      description: selectedActivePlan.description,
+                      venue: selectedActivePlan.location,
+                      imageUrl: selectedActivePlan.image,
+                    });
+                    setSelectedActivePlan(null);
+                    setShowCreatePlanModal(true);
+                  }}
+                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+                >
+                  <Copy className="w-4 h-4" />
+                  Duplicate
+                </button>
+                <button
+                  onClick={() => {
+                    const planDate = selectedActivePlan.date ? new Date(selectedActivePlan.date).toISOString().split("T")[0] : "";
+                    setEditingPlanId(selectedActivePlan.objectId);
+                    setCreatePlanPrefill({
+                      title: selectedActivePlan.title,
+                      description: selectedActivePlan.description,
+                      venue: selectedActivePlan.location,
+                      date: planDate,
+                      time: selectedActivePlan.time || "",
+                      imageUrl: selectedActivePlan.image,
+                    });
+                    setSelectedActivePlan(null);
+                    setShowCreatePlanModal(true);
+                  }}
+                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+                >
+                  <Pencil className="w-4 h-4" />
+                  Edit
+                </button>
                 <button
                   onClick={async () => {
                     if (!confirm("Cancel this plan? Attendees will be notified. This cannot be undone.")) return;

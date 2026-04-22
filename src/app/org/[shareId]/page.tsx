@@ -691,6 +691,8 @@ export default function OrgCalendarPage() {
   const [showFollowModal, setShowFollowModal] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
+  const [showFollowPopup, setShowFollowPopup] = useState(false);
+  const [followPopupLoading, setFollowPopupLoading] = useState(false);
   const [isInactive, setIsInactive] = useState<{ name: string } | null>(null);
   const [showWelcomeInvite, setShowWelcomeInvite] = useState(false);
   const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
@@ -716,6 +718,61 @@ export default function OrgCalendarPage() {
       setIsFollowing(true);
     }
   }, []);
+
+  // Timed follow popup
+  useEffect(() => {
+    if (!org) return;
+    // Suppress: already following, owner/host, or recently dismissed
+    if (isFollowing) return;
+    if (org.isOwner || org.isHost) return;
+    const dismissKey = `leaf_follow_dismiss_${org.objectId}`;
+    try {
+      const dismissed = localStorage.getItem(dismissKey);
+      if (dismissed && Date.now() - parseInt(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
+    } catch { /* localStorage unavailable */ }
+    const timer = setTimeout(() => setShowFollowPopup(true), 5000);
+    return () => clearTimeout(timer);
+  }, [org, isFollowing]);
+
+  function dismissFollowPopup() {
+    setShowFollowPopup(false);
+    if (org) {
+      try { localStorage.setItem(`leaf_follow_dismiss_${org.objectId}`, String(Date.now())); } catch { /* */ }
+    }
+  }
+
+  async function handlePopupFollow() {
+    if (!org) return;
+    const cached = getVerifiedUserCookie();
+    if (cached?.name && cached?.phone) {
+      // One-tap follow for returning verified users
+      setFollowPopupLoading(true);
+      try {
+        await Parse.Cloud.run("followCalendarViaWeb", {
+          calendarId: org.objectId,
+          name: cached.name,
+          phoneNumber: cached.phone.replace(/\D/g, ""),
+        });
+        setFollowerCookie(org.objectId, cached.name, cached.phone);
+        setVerifiedUserCookie(cached.name, cached.phone);
+        setIsFollowing(true);
+        setFollowerCount((c) => c + 1);
+        setShowFollowPopup(false);
+        setToast(`You're now following ${org.name}`);
+        setTimeout(() => setToast(null), 3000);
+      } catch {
+        // Fallback to full modal if one-tap fails
+        setShowFollowPopup(false);
+        setShowFollowModal(true);
+      } finally {
+        setFollowPopupLoading(false);
+      }
+    } else {
+      // New visitor — open full follow modal
+      setShowFollowPopup(false);
+      setShowFollowModal(true);
+    }
+  }
 
   async function handleUnfollow() {
     if (!org) return;
@@ -2285,6 +2342,48 @@ export default function OrgCalendarPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Follow Popup */}
+      {showFollowPopup && org && (
+        <div
+          className="fixed bottom-6 right-6 left-6 md:left-auto md:w-80 z-40"
+          style={{ animation: "slideUp 0.3s ease-out" }}
+        >
+          <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 p-4">
+            <button
+              onClick={dismissFollowPopup}
+              className="absolute top-3 right-3 p-1 text-zinc-300 hover:text-zinc-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-3 mb-3 pr-6">
+              {org.profilePhoto ? (
+                <img src={org.profilePhoto} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center shrink-0">
+                  <Calendar className="w-5 h-5 text-zinc-400" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-zinc-900 truncate">{org.name}</p>
+                <p className="text-xs text-zinc-500">Get notified about new plans</p>
+              </div>
+            </div>
+            <button
+              onClick={handlePopupFollow}
+              disabled={followPopupLoading}
+              className="w-full py-2.5 text-xs font-bold uppercase tracking-widest text-white rounded-lg transition-opacity hover:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: org.brandColor || "#18181b" }}
+            >
+              {followPopupLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+              ) : (
+                "Follow"
+              )}
+            </button>
           </div>
         </div>
       )}
