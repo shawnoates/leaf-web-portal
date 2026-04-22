@@ -2707,8 +2707,7 @@ export default function OrgCalendarPage() {
               </div>
             )}
             <div className="p-4">
-              <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold flex items-center gap-1.5 mb-1.5">
-                <Sparkles className="w-3 h-3" />
+              <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold mb-1.5">
                 {popupIdea.category}
               </p>
               <h4 className="text-sm font-medium tracking-tight text-zinc-900 mb-3 pr-6">
