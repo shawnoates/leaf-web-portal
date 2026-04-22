@@ -59,6 +59,9 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [creating, setCreating] = useState(false);
   const [success, setSuccess] = useState(false);
   const [loadingImage, setLoadingImage] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+  const [unsplashPhotos, setUnsplashPhotos] = useState<{ id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]>([]);
+  const [unsplashLoading, setUnsplashLoading] = useState(false);
 
   // If prefill has an image URL, fetch and convert to base64
   useEffect(() => {
@@ -83,6 +86,28 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     }
   }, [prefill?.imageUrl, imageBase64]);
 
+  // Fetch Unsplash photo suggestions when title changes
+  useEffect(() => {
+    if (!title.trim()) {
+      setUnsplashPhotos([]);
+      return;
+    }
+    setUnsplashLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await Parse.Cloud.run("searchUnsplashPhotos", {
+          query: title.trim(),
+        });
+        setUnsplashPhotos(results || []);
+      } catch {
+        setUnsplashPhotos([]);
+      } finally {
+        setUnsplashLoading(false);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [title]);
+
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -95,13 +120,14 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       const result = reader.result as string;
       setImagePreview(result);
       setImageBase64(result.split(",")[1]);
+      setSelectedImageUrl(null);
     };
     reader.readAsDataURL(file);
   }
 
   async function handleCreate() {
     if (!title || !date) return;
-    if (!editMode && isHosted && !imageBase64 && !prefill?.imageUrl) {
+    if (!editMode && isHosted && !imageBase64 && !prefill?.imageUrl && !selectedImageUrl) {
       alert("Please upload a cover image for your plan.");
       return;
     }
@@ -115,7 +141,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           date: `${date}T${time || "12:00"}:00`,
           time: time || null,
           imageBase64: imageBase64 || undefined,
-          imageUrl: !imageBase64 && prefill?.imageUrl ? prefill.imageUrl : undefined,
+          imageUrl: !imageBase64 ? (selectedImageUrl || prefill?.imageUrl || undefined) : undefined,
           venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
           capacity: capacity ? parseInt(capacity) : null,
           hostNote: hostNote.trim() || undefined,
@@ -131,7 +157,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           capacity: capacity ? parseInt(capacity) : null,
           isHosted,
           imageBase64: imageBase64 || undefined,
-          imageUrl: !imageBase64 && prefill?.imageUrl ? prefill.imageUrl : undefined,
+          imageUrl: !imageBase64 ? (selectedImageUrl || prefill?.imageUrl || undefined) : undefined,
           hostNote: isHosted && hostNote.trim() ? hostNote.trim() : undefined,
           hideVenueUntilRsvp: hideVenue,
         });
@@ -249,16 +275,16 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">
               Cover Image {isHosted && <span className="text-red-400">*</span>}
             </label>
-            {imagePreview ? (
+            {imagePreview || selectedImageUrl ? (
               <div className="relative w-full h-36 rounded-lg overflow-hidden">
-                <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                <img src={imagePreview || selectedImageUrl || ""} alt="Preview" className="w-full h-full object-cover" />
                 {loadingImage && (
                   <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   </div>
                 )}
                 <button
-                  onClick={() => { setImagePreview(null); setImageBase64(null); }}
+                  onClick={() => { setImagePreview(null); setImageBase64(null); setSelectedImageUrl(null); }}
                   className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
                 >
                   <X className="w-4 h-4" />
@@ -270,6 +296,57 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                 <span className="text-xs text-zinc-400">Click to upload an image</span>
                 <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
               </label>
+            )}
+
+            {/* Photo suggestions from Unsplash */}
+            {(unsplashLoading || unsplashPhotos.length > 0) && (
+              <div className="mt-3 space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Photo suggestions</p>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {unsplashLoading && [0, 1, 2, 3].map((i) => (
+                    <div key={`skel-${i}`} className="min-w-[120px] h-[80px] bg-zinc-100 rounded-lg animate-pulse shrink-0" />
+                  ))}
+                  {!unsplashLoading && unsplashPhotos.map((photo) => (
+                    <button
+                      key={photo.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedImageUrl(selectedImageUrl === photo.url ? null : photo.url);
+                        setImagePreview(null);
+                        setImageBase64(null);
+                      }}
+                      className={`min-w-[120px] max-w-[120px] h-[80px] shrink-0 rounded-lg overflow-hidden border-2 transition-all relative ${
+                        selectedImageUrl === photo.url
+                          ? "border-zinc-900 shadow-lg"
+                          : "border-zinc-200 hover:border-zinc-300"
+                      }`}
+                    >
+                      {selectedImageUrl === photo.url && (
+                        <div className="absolute top-1 right-1 bg-zinc-900 text-white rounded-full p-0.5 z-10">
+                          <Check className="w-2.5 h-2.5" />
+                        </div>
+                      )}
+                      <img src={photo.thumbUrl} className="w-full h-full object-cover" alt={photo.alt} />
+                    </button>
+                  ))}
+                </div>
+                {(() => {
+                  const selected = unsplashPhotos.find(p => p.url === selectedImageUrl);
+                  if (!selected) return null;
+                  return (
+                    <p className="text-[10px] text-zinc-400">
+                      Photo by{" "}
+                      <a href={`${selected.photographerUrl}?utm_source=leaf&utm_medium=referral`} target="_blank" rel="noopener noreferrer" className="underline hover:text-zinc-600">
+                        {selected.photographerName}
+                      </a>
+                      {" / "}
+                      <a href="https://unsplash.com/?utm_source=leaf&utm_medium=referral" target="_blank" rel="noopener noreferrer" className="underline hover:text-zinc-600">
+                        Unsplash
+                      </a>
+                    </p>
+                  );
+                })()}
+              </div>
             )}
           </div>
 
@@ -357,7 +434,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
 
           <button
             onClick={handleCreate}
-            disabled={!title || !date || creating || (!editMode && isHosted && !imageBase64 && !prefill?.imageUrl)}
+            disabled={!title || !date || creating || (!editMode && isHosted && !imageBase64 && !prefill?.imageUrl && !selectedImageUrl)}
             className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
           >
             {creating ? (editMode ? "Saving..." : "Creating...") : editMode ? "Save Changes" : isHosted ? "Create Upcoming Plan" : "Create Plan Idea"}
