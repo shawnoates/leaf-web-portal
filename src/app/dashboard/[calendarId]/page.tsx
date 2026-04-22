@@ -1097,22 +1097,22 @@ export default function OrgDashboardPage() {
             {migrationResult ? (
               <div className="border border-green-200 bg-green-50 rounded-xl p-4 text-xs text-green-700 space-y-2">
                 <p className="font-medium">
-                  Fixed: {migrationResult.fixed} | Status corrected: {migrationResult.statusFixed || 0} | Already OK: {migrationResult.skipped} | Cleaned: {migrationResult.cleaned}
+                  {migrationResult.fixed} fixed | {migrationResult.statusFixed || 0} status corrected | {migrationResult.skipped} already OK
                 </p>
-                <p>Target: {migrationResult.targetUserId} | App: {migrationResult.appUserId || "NONE"} | Calendars: {migrationResult.calendarsFound}</p>
+                <p>iOS sees {migrationResult.iosCurrentCount} current plans (of {migrationResult.iosTotalCount} total notifs). {migrationResult.total} plans on {migrationResult.calendarsFound} calendars.</p>
                 {migrationResult.plans?.length > 0 && (
                   <div className="mt-2 border-t border-green-200 pt-2">
-                    <p className="font-medium mb-1">Plans on your calendars:</p>
+                    <p className="font-medium mb-1">Plans on your calendars (notifications):</p>
                     {migrationResult.plans.map((p: any, i: number) => (
-                      <p key={i} className="text-[10px] font-mono">{p.title} — {p.action} {p.status ? `(${p.status})` : ""} host:{p.hostId || "?"}</p>
+                      <p key={i} className="text-[10px] font-mono">{p.title} — {p.action} {p.status ? `(${p.status})` : ""} host:{p.host} [{p.notifs}]</p>
                     ))}
                   </div>
                 )}
-                {migrationResult.iosVisible?.length > 0 && (
+                {migrationResult.iosCurrentPlans?.length > 0 && (
                   <div className="mt-2 border-t border-green-200 pt-2">
-                    <p className="font-medium mb-1">What iOS app sees ({migrationResult.iosVisible.length} plans):</p>
-                    {migrationResult.iosVisible.map((p: any, i: number) => (
-                      <p key={i} className="text-[10px] font-mono">{p.title} — {p.status} {p.cancelled ? "CANCELLED" : ""} exp:{p.expiryDate}</p>
+                    <p className="font-medium mb-1">iOS current plans ({migrationResult.iosCurrentPlans.length}):</p>
+                    {migrationResult.iosCurrentPlans.map((p: any, i: number) => (
+                      <p key={i} className="text-[10px] font-mono">{p.title} — {p.status} exp:{p.expiry}</p>
                     ))}
                   </div>
                 )}
