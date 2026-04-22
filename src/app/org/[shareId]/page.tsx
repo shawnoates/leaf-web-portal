@@ -744,12 +744,15 @@ export default function OrgCalendarPage() {
   const [unsplashLoading, setUnsplashLoading] = useState(false);
   const customVerify = usePhoneVerify();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const ctaSectionRef = useRef<HTMLDivElement>(null);
   const [showFollowModal, setShowFollowModal] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followRequestPending, setFollowRequestPending] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [showFollowPopup, setShowFollowPopup] = useState(false);
   const [followPopupLoading, setFollowPopupLoading] = useState(false);
+  const [showPlanIdeaPopup, setShowPlanIdeaPopup] = useState(false);
+  const [popupIdea, setPopupIdea] = useState<PlanIdea | null>(null);
   const [isInactive, setIsInactive] = useState<{ name: string } | null>(null);
   const [showWelcomeInvite, setShowWelcomeInvite] = useState(false);
   const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
@@ -831,6 +834,46 @@ export default function OrgCalendarPage() {
     setShowFollowPopup(false);
     if (org) {
       try { localStorage.setItem(`leaf_follow_dismiss_${org.objectId}`, String(Date.now())); } catch { /* */ }
+    }
+  }
+
+  // Scroll-triggered plan idea popup for followers
+  useEffect(() => {
+    if (!org) return;
+    if (!isFollowing) return;
+    if (org.isOwner || org.isHost) return;
+    if (org.planIdeas.length === 0 || org.hidePlanIdeas) return;
+    if (org.rsvpLimitReached) return;
+    const dismissKey = `leaf_idea_popup_dismiss_${org.objectId}`;
+    try {
+      const dismissed = localStorage.getItem(dismissKey);
+      if (dismissed && Date.now() - parseInt(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
+    } catch { /* localStorage unavailable */ }
+
+    const randomIdea = org.planIdeas[Math.floor(Math.random() * org.planIdeas.length)];
+    setPopupIdea(randomIdea);
+
+    const target = ctaSectionRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShowPlanIdeaPopup(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [org, isFollowing]);
+
+  function dismissPlanIdeaPopup() {
+    setShowPlanIdeaPopup(false);
+    if (org) {
+      try { localStorage.setItem(`leaf_idea_popup_dismiss_${org.objectId}`, String(Date.now())); } catch { /* */ }
     }
   }
 
@@ -2411,7 +2454,7 @@ export default function OrgCalendarPage() {
       )}
 
       {/* Create Your Own Calendar CTA */}
-      <section className="py-10 px-6 border-t border-zinc-100 bg-zinc-50/60">
+      <section ref={ctaSectionRef} className="py-10 px-6 border-t border-zinc-100 bg-zinc-50/60">
         <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-center sm:text-left">
             <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 mb-1">
@@ -2584,6 +2627,61 @@ export default function OrgCalendarPage() {
                 "Follow"
               )}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Plan Idea Popup for Followers */}
+      {showPlanIdeaPopup && popupIdea && org && (
+        <div
+          className="fixed bottom-6 right-6 left-6 md:left-auto md:w-80 z-40"
+          style={{ animation: "slideUp 0.3s ease-out" }}
+        >
+          <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 overflow-hidden">
+            <button
+              onClick={dismissPlanIdeaPopup}
+              className="absolute top-3 right-3 z-10 p-1 text-zinc-300 hover:text-zinc-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            {popupIdea.image && (
+              <div className="h-28 w-full overflow-hidden">
+                <img
+                  src={popupIdea.image}
+                  alt={popupIdea.title}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            <div className="p-4">
+              <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold flex items-center gap-1.5 mb-1.5">
+                <Sparkles className="w-3 h-3" />
+                {popupIdea.category}
+              </p>
+              <h4 className="text-sm font-medium tracking-tight text-zinc-900 mb-3 pr-6">
+                {popupIdea.title}
+              </h4>
+              <button
+                onClick={() => {
+                  dismissPlanIdeaPopup();
+                  setHostingIdea(popupIdea);
+                  setHostSubmitting(false);
+                  setHostSuccess(false);
+                  setHostNote("");
+                  setSelectedVenue(null);
+                }}
+                className="w-full py-2.5 text-xs font-bold uppercase tracking-widest text-white rounded-lg transition-opacity hover:opacity-90"
+                style={{ backgroundColor: org.brandColor || "#18181b" }}
+              >
+                Host This Plan
+              </button>
+              <button
+                onClick={dismissPlanIdeaPopup}
+                className="w-full mt-2 py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors"
+              >
+                Not now
+              </button>
+            </div>
           </div>
         </div>
       )}
