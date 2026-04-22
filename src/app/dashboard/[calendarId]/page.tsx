@@ -2656,27 +2656,39 @@ export default function OrgDashboardPage() {
                 <button
                   type="button"
                   onClick={() => { setEditingCalId(null); setActiveTab("settings"); }}
-                  className="text-[10px] text-zinc-400 hover:text-zinc-600 transition-colors underline -mt-2"
+                  className="text-[10px] text-zinc-400 hover:text-zinc-600 transition-colors underline -mt-2.5"
                 >
                   Automated plan idea settings
                 </button>
               )}
               {/* Custom Plan Proposals toggle */}
-              <div className={`flex items-center justify-between py-2 ${dashboard.tier !== "pro" ? "opacity-40 pointer-events-none" : ""}`}>
-                <div>
-                  <p className="text-xs font-medium text-zinc-700">Custom plan proposals</p>
-                  <p className="text-[10px] text-zinc-400">Let members propose their own plan ideas for your review</p>
+              {dashboard.tier === "pro" ? (
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <p className="text-xs font-medium text-zinc-700">Custom plan proposals</p>
+                    <p className="text-[10px] text-zinc-400">Let members propose their own plan ideas for your review</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditCalHideCustomPlans(!editCalHideCustomPlans)}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${!editCalHideCustomPlans ? "bg-zinc-900" : "bg-zinc-200"}`}
+                  >
+                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${!editCalHideCustomPlans ? "left-5" : "left-0.5"}`} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setEditCalHideCustomPlans(!editCalHideCustomPlans)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${!editCalHideCustomPlans ? "bg-zinc-900" : "bg-zinc-200"}`}
-                >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${!editCalHideCustomPlans ? "left-5" : "left-0.5"}`} />
-                </button>
-              </div>
-              {dashboard.tier !== "pro" && (
-                <p className="text-[10px] text-zinc-400 -mt-2">Pro plan required for custom plan proposals</p>
+              ) : (
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <p className="text-xs font-medium text-zinc-400">Custom plan proposals</p>
+                    <p className="text-[10px] text-zinc-300">Let members propose their own plan ideas for your review</p>
+                  </div>
+                  <button
+                    onClick={() => setShowSubscription(true)}
+                    className="flex items-center gap-1.5 bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
+                  >
+                    <Lock className="w-3 h-3" /> Upgrade
+                  </button>
+                </div>
               )}
 
               <button
