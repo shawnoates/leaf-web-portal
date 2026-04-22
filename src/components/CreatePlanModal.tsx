@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Parse from "@/lib/parse-client";
 import VenueSearch from "@/components/VenueSearch";
 import {
@@ -63,9 +63,11 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [unsplashPhotos, setUnsplashPhotos] = useState<{ id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]>([]);
   const [unsplashLoading, setUnsplashLoading] = useState(false);
 
-  // If prefill has an image URL, fetch and convert to base64
+  // If prefill has an image URL, fetch and convert to base64 (once on mount)
+  const prefillImageLoaded = useRef(false);
   useEffect(() => {
-    if (prefill?.imageUrl && !imageBase64) {
+    if (prefill?.imageUrl && !prefillImageLoaded.current) {
+      prefillImageLoaded.current = true;
       setLoadingImage(true);
       fetch(prefill.imageUrl)
         .then((res) => res.blob())
@@ -84,7 +86,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           setLoadingImage(false);
         });
     }
-  }, [prefill?.imageUrl, imageBase64]);
+  }, [prefill?.imageUrl]);
 
   // Fetch Unsplash photo suggestions when title changes
   useEffect(() => {
