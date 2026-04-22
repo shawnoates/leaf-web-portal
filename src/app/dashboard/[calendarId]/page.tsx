@@ -270,6 +270,10 @@ export default function OrgDashboardPage() {
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsSection, setSettingsSection] = useState<"general" | "subscription">("general");
 
+  // Migration
+  const [migrating, setMigrating] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<{ fixed: number; skipped: number; total: number } | null>(null);
+
   // Toast
   const [toast, setToast] = useState<string | null>(null);
   const [embedCalId, setEmbedCalId] = useState<string | null>(null);
@@ -1087,6 +1091,28 @@ export default function OrgDashboardPage() {
                 </div>
               ))}
             </div>
+
+            {/* One-time migration for plans missing iOS visibility */}
+            {migrationResult ? (
+              <div className="border border-green-200 bg-green-50 rounded-xl p-4 text-xs text-green-700">
+                Migration complete: {migrationResult.fixed} plans fixed, {migrationResult.skipped} already OK, {migrationResult.total} scanned.
+              </div>
+            ) : (
+              <button
+                onClick={async () => {
+                  setMigrating(true);
+                  try {
+                    const r = await Parse.Cloud.run("migrateManualPlans") as { fixed: number; skipped: number; total: number };
+                    setMigrationResult(r);
+                  } catch (e) { console.error(e); alert("Migration failed — see console"); }
+                  setMigrating(false);
+                }}
+                disabled={migrating}
+                className="border border-amber-200 bg-amber-50 rounded-xl p-4 text-xs text-amber-700 hover:bg-amber-100 transition-colors w-full text-left"
+              >
+                {migrating ? "Migrating plans..." : "⚠️ Migrate existing plans for iOS visibility (one-time)"}
+              </button>
+            )}
 
             {/* Concierge Ad */}
             <div className="border border-emerald-200 rounded-xl p-6 bg-gradient-to-br from-emerald-50/60 to-white">
