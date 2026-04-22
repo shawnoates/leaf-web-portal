@@ -129,6 +129,8 @@ interface OrgDashboard {
     calendarImage: string | null;
     hideVenueUntilRsvp: boolean;
     isPrivate: boolean;
+    hidePlanIdeas: boolean;
+    hideCustomPlans: boolean;
     pendingFollowerCount: number;
   }[];
   calendarLimit: number | null;
@@ -144,6 +146,16 @@ interface OrgDashboard {
     requestedNote: string | null;
     requestedVenue: { name: string; address: string } | null;
     requestedAt: string | null;
+  }[];
+  pendingRsvpRequests: {
+    notificationId: string;
+    eventGroupId: string | null;
+    name: string;
+    phone: string | null;
+    planTitle: string;
+    planImage: string | null;
+    rsvpNote: string | null;
+    requestedAt: string;
   }[];
 }
 
@@ -299,6 +311,8 @@ export default function OrgDashboardPage() {
   const [editCalRemoveImage, setEditCalRemoveImage] = useState(false);
   const [editCalHideVenue, setEditCalHideVenue] = useState(true);
   const [editCalIsPrivate, setEditCalIsPrivate] = useState(false);
+  const [editCalHidePlanIdeas, setEditCalHidePlanIdeas] = useState(false);
+  const [editCalHideCustomPlans, setEditCalHideCustomPlans] = useState(false);
   const slugTimerRef = useRef<NodeJS.Timeout | null>(null);
   const originalSlugRef = useRef<string>("");
 
@@ -330,7 +344,7 @@ export default function OrgDashboardPage() {
 
   // Plan detail modal
   const [selectedActivePlan, setSelectedActivePlan] = useState<{ objectId: string; title: string; description: string; image: string | null; date: string; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string } | null } | null>(null);
-  const [planRsvps, setPlanRsvps] = useState<{ name: string; phone: string | null; source: string }[]>([]);
+  const [planRsvps, setPlanRsvps] = useState<{ notificationId: string; name: string; phone: string | null; source: string; status: string; rsvpNote: string | null }[]>([]);
   const [planRsvpsLoading, setPlanRsvpsLoading] = useState(false);
 
   // Fetch RSVPs when plan detail modal opens
@@ -338,7 +352,7 @@ export default function OrgDashboardPage() {
     if (!selectedActivePlan) { setPlanRsvps([]); return; }
     setPlanRsvpsLoading(true);
     Parse.Cloud.run("getPlanRsvps", { eventGroupId: selectedActivePlan.objectId })
-      .then((result: { name: string; phone: string | null; source: string }[]) => setPlanRsvps(result || []))
+      .then((result: { notificationId: string; name: string; phone: string | null; source: string; status: string; rsvpNote: string | null }[]) => setPlanRsvps(result || []))
       .catch(() => setPlanRsvps([]))
       .finally(() => setPlanRsvpsLoading(false));
   }, [selectedActivePlan]);
@@ -483,13 +497,15 @@ export default function OrgDashboardPage() {
       }
       params.hideVenueUntilRsvp = editCalHideVenue;
       params.isPrivate = editCalIsPrivate;
+      params.hidePlanIdeas = editCalHidePlanIdeas;
+      params.hideCustomPlans = editCalHideCustomPlans;
       const result = await Parse.Cloud.run("updateCalendar", params);
       const newShareId = result.shareId;
       const newCalImage = editCalRemoveImage ? null : (editCalImagePreview || null);
       setDashboard((d) => d ? {
         ...d,
         calendars: d.calendars.map((c) =>
-          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId, city: editCalCity || c.city, calendarImage: editCalImageBase64 ? newCalImage : (editCalRemoveImage ? null : c.calendarImage), hideVenueUntilRsvp: editCalHideVenue, isPrivate: editCalIsPrivate } : c
+          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId, city: editCalCity || c.city, calendarImage: editCalImageBase64 ? newCalImage : (editCalRemoveImage ? null : c.calendarImage), hideVenueUntilRsvp: editCalHideVenue, isPrivate: editCalIsPrivate, hidePlanIdeas: editCalHidePlanIdeas, hideCustomPlans: editCalHideCustomPlans } : c
         ),
       } : d);
       setEditingCalId(null);
@@ -530,8 +546,6 @@ export default function OrgDashboardPage() {
         blacklistCategories: settingsBlacklistCategories,
         excludeKeywords: settingsExcludeKeywords,
         imageStyle: settingsImageStyle,
-        hidePlanIdeas: settingsHidePlanIdeas,
-        hideCustomPlans: settingsHideCustomPlans,
       };
       if (settingsLogoBase64) {
         params.profilePhotoBase64 = settingsLogoBase64;
@@ -547,8 +561,6 @@ export default function OrgDashboardPage() {
           blacklistCategories: settingsBlacklistCategories,
           excludeKeywords: settingsExcludeKeywords,
           imageStyle: settingsImageStyle,
-          hidePlanIdeas: settingsHidePlanIdeas,
-          hideCustomPlans: settingsHideCustomPlans,
           profilePhoto: settingsLogoPreview || d.profilePhoto,
         };
       });
@@ -916,6 +928,68 @@ export default function OrgDashboardPage() {
                             try {
                               await Parse.Cloud.run("declineHostRequest", { calendarPlanId: req.planId });
                               setDashboard((d) => d ? { ...d, hostRequests: d.hostRequests.filter((r) => r.planId !== req.planId) } : d);
+                            } catch (err) {
+                              console.error("Failed to decline:", err);
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-white text-zinc-600 text-[10px] font-bold uppercase tracking-widest rounded-lg border border-zinc-300 hover:bg-zinc-50 transition-colors"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Pending Attendance Requests */}
+            {dashboard.pendingRsvpRequests && dashboard.pendingRsvpRequests.length > 0 && (
+              <section className="border border-amber-200 bg-amber-50/50 rounded-xl p-6">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-amber-600 mb-4">
+                  Pending Attendance Requests ({dashboard.pendingRsvpRequests.length})
+                </h2>
+                <div className="space-y-4">
+                  {dashboard.pendingRsvpRequests.map((req) => (
+                    <div key={req.notificationId} className="flex items-start gap-4 bg-white border border-zinc-200 rounded-lg p-4">
+                      {req.planImage && (
+                        <img src={req.planImage} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-zinc-900 truncate">{req.planTitle}</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">
+                          <strong>{req.name}</strong>
+                          {req.phone && <> &middot; {req.phone}</>}
+                        </p>
+                        {req.rsvpNote && (
+                          <p className="text-xs text-zinc-400 italic mt-1 truncate">&ldquo;{req.rsvpNote}&rdquo;</p>
+                        )}
+                        {req.requestedAt && (
+                          <p className="text-xs text-zinc-400 mt-0.5">
+                            <Clock className="w-3 h-3 inline mr-1" />
+                            {new Date(req.requestedAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button
+                          onClick={async () => {
+                            try {
+                              await Parse.Cloud.run("approveRsvpRequest", { notificationId: req.notificationId });
+                              setDashboard((d) => d ? { ...d, pendingRsvpRequests: d.pendingRsvpRequests.filter((r) => r.notificationId !== req.notificationId) } : d);
+                            } catch (err) {
+                              console.error("Failed to approve:", err);
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-emerald-700 transition-colors"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await Parse.Cloud.run("declineRsvpRequest", { notificationId: req.notificationId });
+                              setDashboard((d) => d ? { ...d, pendingRsvpRequests: d.pendingRsvpRequests.filter((r) => r.notificationId !== req.notificationId) } : d);
                             } catch (err) {
                               console.error("Failed to decline:", err);
                             }
@@ -1501,7 +1575,7 @@ export default function OrgDashboardPage() {
                         ) : (
                           <>
                             <button
-                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); setEditCalCity(cal.city || ""); setEditCalCitySelected(false); setEditCalImagePreview(cal.calendarImage || null); setEditCalImageBase64(null); setEditCalRemoveImage(false); setEditCalHideVenue(cal.hideVenueUntilRsvp !== false); setEditCalIsPrivate(cal.isPrivate || false); }}
+                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); setEditCalCity(cal.city || ""); setEditCalCitySelected(false); setEditCalImagePreview(cal.calendarImage || null); setEditCalImageBase64(null); setEditCalRemoveImage(false); setEditCalHideVenue(cal.hideVenueUntilRsvp !== false); setEditCalIsPrivate(cal.isPrivate || false); setEditCalHidePlanIdeas(cal.hidePlanIdeas || false); setEditCalHideCustomPlans(cal.hideCustomPlans || false); }}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
                             >
                               <Pencil className="w-3 h-3" /> Edit
@@ -1775,23 +1849,6 @@ export default function OrgDashboardPage() {
                   <p className="text-xs text-zinc-500 mt-1">Control how Leaf generates plan ideas for your community.</p>
                 </div>
 
-                {/* Show Plan Ideas Toggle */}
-                <label className="flex items-center justify-between cursor-pointer border-b border-zinc-100 pb-8">
-                  <div>
-                    <p className="text-sm font-medium">Show Plan Ideas</p>
-                    <p className="text-xs text-zinc-500">Let members browse and host AI-generated plan ideas.</p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={!settingsHidePlanIdeas}
-                    onClick={() => setSettingsHidePlanIdeas((v) => !v)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${!settingsHidePlanIdeas ? "bg-zinc-900" : "bg-zinc-200"}`}
-                  >
-                    <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${!settingsHidePlanIdeas ? "translate-x-6" : "translate-x-1"}`} />
-                  </button>
-                </label>
-
                 {/* Preferred Days */}
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Preferred Days</h3>
@@ -1960,34 +2017,6 @@ export default function OrgDashboardPage() {
                     ))}
                   </div>
                 </div>
-              </section>
-            </div>
-
-            {/* Custom Plan Proposals (Pro only) */}
-            <div className="relative">
-              {dashboard.tier !== "pro" && (
-                <div className="absolute top-4 right-4 z-10" onClick={() => setShowSubscription(true)}>
-                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest cursor-pointer hover:bg-zinc-800 transition-colors">
-                    <Lock className="w-3 h-3" /> Upgrade
-                  </div>
-                </div>
-              )}
-              <section className={`border border-zinc-200 rounded-xl p-6 ${dashboard.tier !== "pro" ? "opacity-40 pointer-events-none" : ""}`}>
-                <label className="flex items-center justify-between cursor-pointer">
-                  <div>
-                    <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Custom Plan Proposals</h2>
-                    <p className="text-xs text-zinc-500 mt-1">Let members propose their own plan ideas for your review.</p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={!settingsHideCustomPlans}
-                    onClick={() => setSettingsHideCustomPlans((v) => !v)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${!settingsHideCustomPlans ? "bg-zinc-900" : "bg-zinc-200"}`}
-                  >
-                    <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${!settingsHideCustomPlans ? "translate-x-6" : "translate-x-1"}`} />
-                  </button>
-                </label>
               </section>
             </div>
 
@@ -2609,6 +2638,46 @@ export default function OrgDashboardPage() {
                   <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalIsPrivate ? "left-5" : "left-0.5"}`} />
                 </button>
               </div>
+              {/* Show Plan Ideas toggle */}
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <p className="text-xs font-medium text-zinc-700">Show plan ideas</p>
+                  <p className="text-[10px] text-zinc-400">Let members browse and host AI-generated plan ideas</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditCalHidePlanIdeas(!editCalHidePlanIdeas)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${!editCalHidePlanIdeas ? "bg-zinc-900" : "bg-zinc-200"}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${!editCalHidePlanIdeas ? "left-5" : "left-0.5"}`} />
+                </button>
+              </div>
+              {!editCalHidePlanIdeas && (
+                <button
+                  type="button"
+                  onClick={() => { setEditingCalId(null); setActiveTab("settings"); }}
+                  className="text-[10px] text-zinc-400 hover:text-zinc-600 transition-colors underline -mt-2"
+                >
+                  Automated plan idea settings
+                </button>
+              )}
+              {/* Custom Plan Proposals toggle */}
+              <div className={`flex items-center justify-between py-2 ${dashboard.tier !== "pro" ? "opacity-40 pointer-events-none" : ""}`}>
+                <div>
+                  <p className="text-xs font-medium text-zinc-700">Custom plan proposals</p>
+                  <p className="text-[10px] text-zinc-400">Let members propose their own plan ideas for your review</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditCalHideCustomPlans(!editCalHideCustomPlans)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${!editCalHideCustomPlans ? "bg-zinc-900" : "bg-zinc-200"}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${!editCalHideCustomPlans ? "left-5" : "left-0.5"}`} />
+                </button>
+              </div>
+              {dashboard.tier !== "pro" && (
+                <p className="text-[10px] text-zinc-400 -mt-2">Pro plan required for custom plan proposals</p>
+              )}
 
               <button
                 onClick={handleSaveCalendar}
@@ -2706,7 +2775,12 @@ export default function OrgDashboardPage() {
               {/* RSVPs */}
               <div className="space-y-3">
                 <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
-                  Attendees {!planRsvpsLoading && `(${planRsvps.length})`}
+                  Attendees {!planRsvpsLoading && `(${planRsvps.filter(r => r.status === "Accepted").length})`}
+                  {!planRsvpsLoading && planRsvps.some(r => r.status === "pendingRsvp") && (
+                    <span className="text-amber-500 ml-2">
+                      {planRsvps.filter(r => r.status === "pendingRsvp").length} pending
+                    </span>
+                  )}
                 </h4>
                 {planRsvpsLoading ? (
                   <p className="text-sm text-zinc-400">Loading...</p>
@@ -2717,15 +2791,61 @@ export default function OrgDashboardPage() {
                         <tr>
                           <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Name</th>
                           <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Phone</th>
-                          <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Source</th>
+                          <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Status</th>
+                          <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-100">
                         {planRsvps.map((r, i) => (
                           <tr key={i}>
-                            <td className="px-4 py-2.5">{r.name}</td>
+                            <td className="px-4 py-2.5">
+                              <div>{r.name}</div>
+                              {r.rsvpNote && (
+                                <p className="text-[11px] text-zinc-400 italic truncate max-w-[200px]">&ldquo;{r.rsvpNote}&rdquo;</p>
+                              )}
+                            </td>
                             <td className="px-4 py-2.5 text-zinc-400">{r.phone || "—"}</td>
-                            <td className="px-4 py-2.5 text-zinc-400">{r.source}</td>
+                            <td className="px-4 py-2.5">
+                              {r.status === "pendingRsvp" ? (
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Pending</span>
+                              ) : (
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Confirmed</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              {r.status === "pendingRsvp" && (
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        await Parse.Cloud.run("approveRsvpRequest", { notificationId: r.notificationId });
+                                        setPlanRsvps((prev) => prev.map((rsvp) => rsvp.notificationId === r.notificationId ? { ...rsvp, status: "Accepted" } : rsvp));
+                                        setDashboard((d) => d ? { ...d, pendingRsvpRequests: d.pendingRsvpRequests.filter((pr) => pr.notificationId !== r.notificationId) } : d);
+                                      } catch (err) {
+                                        console.error("Failed to approve:", err);
+                                      }
+                                    }}
+                                    className="px-2 py-1 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest rounded hover:bg-emerald-700 transition-colors"
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        await Parse.Cloud.run("declineRsvpRequest", { notificationId: r.notificationId });
+                                        setPlanRsvps((prev) => prev.filter((rsvp) => rsvp.notificationId !== r.notificationId));
+                                        setDashboard((d) => d ? { ...d, pendingRsvpRequests: d.pendingRsvpRequests.filter((pr) => pr.notificationId !== r.notificationId) } : d);
+                                      } catch (err) {
+                                        console.error("Failed to decline:", err);
+                                      }
+                                    }}
+                                    className="px-2 py-1 bg-white text-zinc-600 text-[10px] font-bold uppercase tracking-widest rounded border border-zinc-300 hover:bg-zinc-50 transition-colors"
+                                  >
+                                    Decline
+                                  </button>
+                                </div>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

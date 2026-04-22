@@ -56,6 +56,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [imagePreview, setImagePreview] = useState<string | null>(prefill?.imageUrl || null);
   const [hostNote, setHostNote] = useState("");
   const [isHosted, setIsHosted] = useState(true);
+  const [requireApproval, setRequireApproval] = useState(false);
   const [creating, setCreating] = useState(false);
   const [success, setSuccess] = useState(false);
   const [loadingImage, setLoadingImage] = useState(false);
@@ -147,6 +148,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
           capacity: capacity ? parseInt(capacity) : null,
           hostNote: hostNote.trim() || undefined,
+          requireApproval,
         });
       } else {
         await Parse.Cloud.run("createManualPlan", {
@@ -162,6 +164,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           imageUrl: !imageBase64 ? (selectedImageUrl || prefill?.imageUrl || undefined) : undefined,
           hostNote: isHosted && hostNote.trim() ? hostNote.trim() : undefined,
           hideVenueUntilRsvp: hideVenue,
+          requireApproval: isHosted ? requireApproval : undefined,
         });
       }
       setSuccess(true);
@@ -433,6 +436,23 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
               <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${hideVenue ? "left-5" : "left-0.5"}`} />
             </button>
           </div>
+
+          {/* Require approval toggle */}
+          {isHosted && (
+            <div className="flex items-center justify-between py-1">
+              <div>
+                <p className="text-xs font-medium text-zinc-700">Require approval to attend</p>
+                <p className="text-[10px] text-zinc-400">Visitors must be approved before confirming</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRequireApproval(!requireApproval)}
+                className={`relative w-10 h-5 rounded-full transition-colors ${requireApproval ? "bg-zinc-900" : "bg-zinc-200"}`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${requireApproval ? "left-5" : "left-0.5"}`} />
+              </button>
+            </div>
+          )}
 
           <button
             onClick={handleCreate}

@@ -493,7 +493,12 @@ export default function PlansPage() {
                   <span className="flex items-center gap-2">
                     <Clock className="w-4 h-4" />
                     {new Date(selectedPlan.expiryDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-                    {selectedPlan.time && ` at ${selectedPlan.time}`}
+                    {(() => {
+                      if (selectedPlan.time) return ` at ${selectedPlan.time}`;
+                      const d = new Date(selectedPlan.expiryDate);
+                      if (d.getHours() || d.getMinutes()) return ` at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+                      return null;
+                    })()}
                   </span>
                   <span className="flex items-center gap-2">
                     <Users className="w-4 h-4" /> {selectedPlan.rsvpCount} attending

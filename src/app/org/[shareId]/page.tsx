@@ -56,6 +56,7 @@ interface Plan {
     isPrivate?: boolean;
   } | null;
   hostNote: string | null;
+  requireApproval?: boolean;
 }
 
 interface PlanIdea {
@@ -209,12 +210,14 @@ function RsvpModal({
   plan: Plan;
   brandColor?: string;
   onClose: () => void;
-  onRsvpSuccess?: (planId: string, alreadyRsvpd: boolean) => void;
+  onRsvpSuccess?: (planId: string, alreadyRsvpd: boolean, pendingApproval?: boolean) => void;
 }) {
   const verify = usePhoneVerify();
   const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
   const [errorMsg, setErrorMsg] = useState("");
   const [notificationId, setNotificationId] = useState<string | null>(null);
+  const [rsvpNote, setRsvpNote] = useState("");
+  const [isPendingResult, setIsPendingResult] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -225,13 +228,17 @@ function RsvpModal({
         phoneNumber: verify.phone.replace(/\D/g, ""),
         name: verify.name,
         eventGroupId: plan.id,
-      }) as { eventNotificationId?: string; alreadyRsvpd?: boolean } | null | undefined;
+        rsvpNote: plan.requireApproval && rsvpNote.trim() ? rsvpNote.trim() : undefined,
+      }) as { eventNotificationId?: string; alreadyRsvpd?: boolean; pendingApproval?: boolean } | null | undefined;
       console.log("[RSVP] result:", result);
       setVerifiedUserCookie(verify.name, verify.phone);
       if (result?.eventNotificationId) {
         setNotificationId(result.eventNotificationId);
       }
-      onRsvpSuccess?.(plan.id, result?.alreadyRsvpd === true);
+      if (result?.pendingApproval) {
+        setIsPendingResult(true);
+      }
+      onRsvpSuccess?.(plan.id, result?.alreadyRsvpd === true, result?.pendingApproval);
       setFormStep("success");
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to RSVP. Please try again.");
@@ -266,7 +273,7 @@ function RsvpModal({
           <div className="space-y-6">
             <div>
               <h3 className="text-2xl font-light tracking-tight">
-                RSVP for {plan.title}
+                {plan.requireApproval ? "Request to Attend" : "RSVP for"} {plan.title}
               </h3>
               <p className="text-sm text-zinc-500 mt-1">
                 {plan.date}{plan.time ? ` at ${plan.time}` : ""}
@@ -274,6 +281,20 @@ function RsvpModal({
             </div>
             <form onSubmit={handleSubmit} className="space-y-5">
               <PhoneVerifyFields verify={verify} />
+              {plan.requireApproval && (
+                <div>
+                  <label className="text-xs font-medium text-zinc-700 block mb-1">Note for the host (optional)</label>
+                  <textarea
+                    value={rsvpNote}
+                    onChange={(e) => setRsvpNote(e.target.value)}
+                    maxLength={200}
+                    rows={2}
+                    className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-none"
+                    placeholder="Tell the host a bit about yourself..."
+                  />
+                  <p className="text-[10px] text-zinc-400 text-right mt-0.5">{rsvpNote.length}/200</p>
+                </div>
+              )}
               <button
                 type="submit"
                 disabled={formStep === "submitting" || !verify.isVerified || !verify.name}
@@ -282,6 +303,8 @@ function RsvpModal({
               >
                 {formStep === "submitting" ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
+                ) : plan.requireApproval ? (
+                  <>Submit Request <ArrowRight className="w-4 h-4" /></>
                 ) : (
                   <>Confirm RSVP <ArrowRight className="w-4 h-4" /></>
                 )}
@@ -300,17 +323,19 @@ function RsvpModal({
           </div>
         ) : (
           <div className="py-6 text-center space-y-5">
-            <div className="w-14 h-14 border border-zinc-900 rounded-full flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-7 h-7" />
+            <div className={`w-14 h-14 border ${isPendingResult ? "border-amber-500" : "border-zinc-900"} rounded-full flex items-center justify-center mx-auto`}>
+              {isPendingResult ? <Clock className="w-7 h-7 text-amber-500" /> : <CheckCircle2 className="w-7 h-7" />}
             </div>
             <div>
-              <h4 className="text-2xl font-light mb-2">You&apos;re in!</h4>
+              <h4 className="text-2xl font-light mb-2">{isPendingResult ? "Request Sent!" : "You\u0027re in!"}</h4>
               <p className="text-sm text-zinc-500 max-w-xs mx-auto">
-                Coordinate with the group. Join the Plan Chat.
+                {isPendingResult
+                  ? "You\u0027ll receive a text when your request is approved."
+                  : "Coordinate with the group. Join the Plan Chat."}
               </p>
             </div>
 
-            {deepLink && isIOS && (
+            {!isPendingResult && deepLink && isIOS && (
               <div className="pt-2 space-y-3">
                 <a
                   href={deepLink}
@@ -329,7 +354,7 @@ function RsvpModal({
               </div>
             )}
 
-            {deepLink && !isIOS && (
+            {!isPendingResult && deepLink && !isIOS && (
               <div className="pt-2 space-y-3">
                 <div className="inline-block bg-white p-3 rounded-lg border border-zinc-200">
                   <QRCodeSVG value={deepLink} size={180} level="M" />
@@ -340,7 +365,7 @@ function RsvpModal({
               </div>
             )}
 
-            {!deepLink && (
+            {!isPendingResult && !deepLink && (
               <a
                 href={APP_STORE_URL}
                 className="block w-full border border-zinc-200 py-3 text-xs uppercase tracking-[0.2em] font-bold text-center hover:bg-zinc-50 transition-colors rounded-lg"
@@ -429,6 +454,31 @@ function removeRsvpCookie(eventGroupId: string) {
   const ids = getRsvpCookieIds().filter((id) => id !== eventGroupId);
   const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
   document.cookie = `leaf_rsvps=${encodeURIComponent(JSON.stringify(ids))}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+// --- Pending RSVP cookie helpers ---
+function getPendingRsvpCookieIds(): string[] {
+  if (typeof document === "undefined") return [];
+  const match = document.cookie.match(/leaf_pending_rsvps=([^;]+)/);
+  if (!match) return [];
+  try {
+    return JSON.parse(decodeURIComponent(match[1]));
+  } catch {
+    return [];
+  }
+}
+
+function addPendingRsvpCookie(eventGroupId: string) {
+  const ids = getPendingRsvpCookieIds();
+  if (!ids.includes(eventGroupId)) ids.push(eventGroupId);
+  const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `leaf_pending_rsvps=${encodeURIComponent(JSON.stringify(ids))}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+function removePendingRsvpCookie(eventGroupId: string) {
+  const ids = getPendingRsvpCookieIds().filter((id) => id !== eventGroupId);
+  const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `leaf_pending_rsvps=${encodeURIComponent(JSON.stringify(ids))}; expires=${expires}; path=/; SameSite=Lax`;
 }
 
 // --- Shared phone format helper ---
@@ -763,6 +813,7 @@ export default function OrgCalendarPage() {
   const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [rsvpedPlanIds, setRsvpedPlanIds] = useState<Set<string>>(new Set());
+  const [pendingRsvpIds, setPendingRsvpIds] = useState<Set<string>>(new Set());
   const [cancellingRsvp, setCancellingRsvp] = useState<string | null>(null);
   const [cancellingPlan, setCancellingPlan] = useState(false);
 
@@ -985,6 +1036,8 @@ export default function OrgCalendarPage() {
   useEffect(() => {
     const ids = getRsvpCookieIds();
     if (ids.length > 0) setRsvpedPlanIds(new Set(ids));
+    const pendingIds = getPendingRsvpCookieIds();
+    if (pendingIds.length > 0) setPendingRsvpIds(new Set(pendingIds));
   }, []);
 
   const fetchOrg = useCallback(async () => {
@@ -1021,6 +1074,7 @@ export default function OrgCalendarPage() {
           isPrivate: (p.location as Record<string, unknown>).isPrivate as boolean || false,
         } : null,
         hostNote: p.hostNote as string || null,
+        requireApproval: p.requireApproval as boolean || false,
       }));
 
       const planIdeas: PlanIdea[] = (result.planIdeas || []).map((idea: Record<string, unknown>) => ({
@@ -1590,11 +1644,15 @@ export default function OrgCalendarPage() {
                   <div className="pt-2 flex flex-col gap-6">
                     <div className="flex items-center gap-3">
                       <AvatarStack count={plan.attendeeCount} />
-                      {rsvpedPlanIds.has(plan.id) && (
+                      {pendingRsvpIds.has(plan.id) ? (
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500 flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Pending
+                        </span>
+                      ) : rsvpedPlanIds.has(plan.id) ? (
                         <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
                           <Check className="w-3 h-3" /> Attending
                         </span>
-                      )}
+                      ) : null}
                     </div>
                     <div className="flex flex-col sm:flex-row gap-4">
                       {rsvpedPlanIds.has(plan.id) ? (
@@ -1832,13 +1890,13 @@ export default function OrgCalendarPage() {
                     <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
                       Location
                     </h4>
-                    {selectedEvent.location.isPrivate || (!selectedEvent.location.name && !selectedEvent.location.address) ? (
+                    {selectedEvent.location.isPrivate || (!selectedEvent.location.name && !selectedEvent.location.address) || (selectedEvent.requireApproval && !rsvpedPlanIds.has(selectedEvent.id)) ? (
                       <>
                         {selectedEvent.location.neighborhood && (
                           <p className="text-sm text-zinc-700">{selectedEvent.location.neighborhood}</p>
                         )}
                         <p className="text-sm text-zinc-400 flex items-center gap-1.5">
-                          <Lock className="w-3 h-3" /> Location revealed after RSVP
+                          <Lock className="w-3 h-3" /> Location revealed after {selectedEvent.requireApproval ? "approval" : "RSVP"}
                         </p>
                       </>
                     ) : (
@@ -1863,6 +1921,20 @@ export default function OrgCalendarPage() {
                     <p className="text-xs text-zinc-400 text-center">
                       This calendar has reached its RSVP limit. Please contact the organization administrator.
                     </p>
+                  </div>
+                ) : pendingRsvpIds.has(selectedEvent.id) ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-center gap-2 py-2">
+                      <Clock className="w-4 h-4 text-amber-500" />
+                      <span className="text-xs font-bold uppercase tracking-widest text-amber-500">Request Pending</span>
+                    </div>
+                    <button
+                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
+                      className="border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                      {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                      <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                    </button>
                   </div>
                 ) : rsvpedPlanIds.has(selectedEvent.id) ? (
                   <div className="flex flex-col gap-3">
@@ -1897,7 +1969,7 @@ export default function OrgCalendarPage() {
                       className="flex-1 text-white py-3 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90"
                       style={{ backgroundColor: org.brandColor || "#18181b" }}
                     >
-                      I&apos;m Attending
+                      {selectedEvent.requireApproval ? "Request to Attend" : "I\u0027m Attending"}
                     </button>
                     <button
                       onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
@@ -1930,7 +2002,12 @@ export default function OrgCalendarPage() {
           plan={rsvpPlan}
           onClose={() => setRsvpPlan(null)}
           brandColor={org.brandColor || undefined}
-          onRsvpSuccess={(planId, alreadyRsvpd) => {
+          onRsvpSuccess={(planId, alreadyRsvpd, pendingApproval) => {
+            if (pendingApproval) {
+              addPendingRsvpCookie(planId);
+              setPendingRsvpIds((prev) => new Set([...prev, planId]));
+              return;
+            }
             addRsvpCookie(planId);
             setRsvpedPlanIds((prev) => new Set([...prev, planId]));
             if (alreadyRsvpd) return;
