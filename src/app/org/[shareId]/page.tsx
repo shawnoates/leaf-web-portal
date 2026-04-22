@@ -80,6 +80,7 @@ interface NearbyVenue {
 
 interface OrgData {
   objectId: string;
+  parentOrgId: string | null;
   name: string;
   description: string;
   profilePhoto: string | null;
@@ -1012,6 +1013,7 @@ export default function OrgCalendarPage() {
 
       setOrg({
         objectId: result.objectId,
+        parentOrgId: result.parentOrgId || null,
         name: result.name || "Organization",
         description: result.description || "",
         profilePhoto: result.profilePhoto || null,
@@ -1447,7 +1449,7 @@ export default function OrgCalendarPage() {
             )}
             {(org.isOwner || org.isHost) ? (
               <Link
-                href={`/dashboard/${org.objectId}`}
+                href={`/dashboard/${org.parentOrgId || org.objectId}`}
                 className="flex items-center gap-1.5 text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
               >
                 <Settings className="w-3.5 h-3.5" />
@@ -2625,7 +2627,7 @@ export default function OrgCalendarPage() {
               </div>
               <div className="flex flex-col gap-3 pt-2">
                 <Link
-                  href={`/dashboard/${org.objectId}?tab=calendars`}
+                  href={`/dashboard/${org.parentOrgId || org.objectId}?tab=calendars`}
                   className="bg-zinc-900 text-white px-6 py-3.5 text-xs uppercase tracking-[0.2em] font-bold text-center hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
                 >
                   Manage Calendar Settings <ArrowRight className="w-4 h-4" />
