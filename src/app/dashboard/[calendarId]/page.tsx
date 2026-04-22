@@ -807,8 +807,8 @@ export default function OrgDashboardPage() {
         </div>
       </header>
 
-      {/* Leaf app connection banner (owner only) */}
-      {dashboard.isOwner && !leafAppConnected && (
+      {/* Leaf app connection banner (owners and co-hosts) */}
+      {!leafAppConnected && (
         <div className="max-w-5xl mx-auto px-6 pt-4">
           <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
             <Smartphone className="w-4 h-4 text-amber-600 shrink-0" />
@@ -824,7 +824,7 @@ export default function OrgDashboardPage() {
           </div>
         </div>
       )}
-      {dashboard.isOwner && phoneJustVerified && leafAppConnected && (
+      {phoneJustVerified && leafAppConnected && (
         <div className="max-w-5xl mx-auto px-6 pt-4">
           <div className="flex items-center gap-3 px-4 py-3 bg-green-50 border border-green-200 rounded-lg">
             <Check className="w-4 h-4 text-green-600 shrink-0" />

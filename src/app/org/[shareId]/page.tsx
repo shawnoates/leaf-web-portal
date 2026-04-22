@@ -165,6 +165,18 @@ function formatTime(isoDate: string): string {
   });
 }
 
+/** Normalize a time string to 12-hour format (e.g. "19:00" → "7:00 PM") */
+function normalizeTimeString(time: string): string {
+  // Already in 12-hour format like "7:00 PM"
+  if (/[APap][Mm]/.test(time)) return time;
+  // 24-hour format like "19:00"
+  const [h, m] = time.split(":").map(Number);
+  if (isNaN(h)) return time;
+  const period = h >= 12 ? "PM" : "AM";
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(m || 0).padStart(2, "0")} ${period}`;
+}
+
 // --- Components ---
 
 function AvatarStack({ count }: { count: number }) {
@@ -750,7 +762,7 @@ export default function OrgCalendarPage() {
         id: p.objectId as string,
         title: p.title as string || "Untitled Plan",
         date: p.expiryDate ? formatDate(p.expiryDate as string) : "",
-        time: p.expiryDate ? formatTime(p.expiryDate as string) : "",
+        time: p.time ? normalizeTimeString(p.time as string) : (p.expiryDate ? formatTime(p.expiryDate as string) : ""),
         description: p.description as string || "",
         image: p.image as string || "",
         hostName: (p.host as Record<string, string>)?.name || "Community Member",
