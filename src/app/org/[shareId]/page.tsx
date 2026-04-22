@@ -96,6 +96,9 @@ interface OrgData {
   hideCustomPlans: boolean;
   blacklistCategories: string[];
   excludeKeywords: string[];
+  isPrivate?: boolean;
+  isFollower?: boolean;
+  followRequestPending?: boolean;
 }
 
 // Maps human-readable blacklist labels (set in the org dashboard) to Google
@@ -400,6 +403,31 @@ function getFollowerCookie(): { calendarId: string; name: string; phone: string 
   }
 }
 
+// --- RSVP cookie helpers ---
+function getRsvpCookieIds(): string[] {
+  if (typeof document === "undefined") return [];
+  const match = document.cookie.match(/leaf_rsvps=([^;]+)/);
+  if (!match) return [];
+  try {
+    return JSON.parse(decodeURIComponent(match[1]));
+  } catch {
+    return [];
+  }
+}
+
+function addRsvpCookie(eventGroupId: string) {
+  const ids = getRsvpCookieIds();
+  if (!ids.includes(eventGroupId)) ids.push(eventGroupId);
+  const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `leaf_rsvps=${encodeURIComponent(JSON.stringify(ids))}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+function removeRsvpCookie(eventGroupId: string) {
+  const ids = getRsvpCookieIds().filter((id) => id !== eventGroupId);
+  const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `leaf_rsvps=${encodeURIComponent(JSON.stringify(ids))}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
 // --- Shared phone format helper ---
 function formatPhoneNumber(value: string) {
   const cleaned = value.replace(/\D/g, "");
@@ -557,15 +585,17 @@ function FollowModal({
   onClose,
   onFollowed,
   brandColor,
+  isPrivate,
 }: {
   calendarId: string;
   calendarName: string;
   brandColor?: string;
   onClose: () => void;
-  onFollowed: (name: string, phone: string) => void;
+  onFollowed: (name: string, phone: string, pending?: boolean) => void;
+  isPrivate?: boolean;
 }) {
   const verify = usePhoneVerify();
-  const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
+  const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "pending" | "error">("form");
   const [errorMsg, setErrorMsg] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -573,15 +603,21 @@ function FollowModal({
     if (!verify.isVerified) return;
     setFormStep("submitting");
     try {
-      await Parse.Cloud.run("followCalendarViaWeb", {
+      const followResult = await Parse.Cloud.run("followCalendarViaWeb", {
         calendarId,
         name: verify.name,
         phoneNumber: verify.phone.replace(/\D/g, ""),
       });
       setFollowerCookie(calendarId, verify.name, verify.phone);
       setVerifiedUserCookie(verify.name, verify.phone);
-      onFollowed(verify.name, verify.phone);
-      setFormStep("success");
+      localStorage.setItem("leaf_follower_phone", verify.phone.replace(/\D/g, ""));
+      if (followResult.pending) {
+        onFollowed(verify.name, verify.phone, true);
+        setFormStep("pending");
+      } else {
+        onFollowed(verify.name, verify.phone, false);
+        setFormStep("success");
+      }
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to follow. Please try again.");
       setFormStep("error");
@@ -602,10 +638,12 @@ function FollowModal({
           <div className="space-y-6">
             <div>
               <h3 className="text-2xl font-light tracking-tight">
-                Follow {calendarName}
+                {isPrivate ? "Request to Follow" : "Follow"} {calendarName}
               </h3>
               <p className="text-sm text-zinc-500 mt-1">
-                Get notified about new plans and events.
+                {isPrivate
+                  ? "This is a private calendar. The host will review your request."
+                  : "Get notified about new plans and events."}
               </p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -618,6 +656,8 @@ function FollowModal({
               >
                 {formStep === "submitting" ? (
                   <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                ) : isPrivate ? (
+                  "Request to Follow"
                 ) : (
                   "Follow"
                 )}
@@ -632,6 +672,22 @@ function FollowModal({
             <h3 className="text-xl font-light">You&apos;re following!</h3>
             <p className="text-sm text-zinc-500">
               You&apos;ll be notified about new plans from {calendarName}.
+            </p>
+            <button
+              onClick={onClose}
+              className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900"
+            >
+              Done
+            </button>
+          </div>
+        ) : formStep === "pending" ? (
+          <div className="text-center py-8 space-y-4">
+            <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto">
+              <Clock className="w-8 h-8 text-amber-600" />
+            </div>
+            <h3 className="text-xl font-light">Request Sent!</h3>
+            <p className="text-sm text-zinc-500">
+              The host will review your request. You&apos;ll receive a text when approved.
             </p>
             <button
               onClick={onClose}
@@ -690,6 +746,7 @@ export default function OrgCalendarPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showFollowModal, setShowFollowModal] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [followRequestPending, setFollowRequestPending] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [showFollowPopup, setShowFollowPopup] = useState(false);
   const [followPopupLoading, setFollowPopupLoading] = useState(false);
@@ -697,6 +754,8 @@ export default function OrgCalendarPage() {
   const [showWelcomeInvite, setShowWelcomeInvite] = useState(false);
   const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [rsvpedPlanIds, setRsvpedPlanIds] = useState<Set<string>>(new Set());
+  const [cancellingRsvp, setCancellingRsvp] = useState<string | null>(null);
 
   const handleSharePlan = useCallback(async (planId: string, planTitle: string) => {
     const url = `https://os.joinleaf.com/p/${planId}`;
@@ -710,6 +769,40 @@ export default function OrgCalendarPage() {
       setTimeout(() => setCopiedPlanId(null), 2000);
     }
   }, []);
+
+  async function handleCancelRsvp(planId: string) {
+    if (!confirm("Cancel your RSVP? The host will be notified.")) return;
+    const cached = getVerifiedUserCookie();
+    if (!cached?.phone) return;
+    setCancellingRsvp(planId);
+    try {
+      await Parse.Cloud.run("cancelRsvpViaWeb", {
+        phoneNumber: cached.phone.replace(/\D/g, ""),
+        eventGroupId: planId,
+      });
+      removeRsvpCookie(planId);
+      setRsvpedPlanIds((prev) => {
+        const next = new Set(prev);
+        next.delete(planId);
+        return next;
+      });
+      setOrg((prev) => prev ? {
+        ...prev,
+        plans: prev.plans.map((p) =>
+          p.id === planId ? { ...p, attendeeCount: Math.max(0, p.attendeeCount - 1) } : p
+        ),
+      } : prev);
+      setSelectedEvent((prev) =>
+        prev && prev.id === planId ? { ...prev, attendeeCount: Math.max(0, prev.attendeeCount - 1) } : prev
+      );
+      setToast("RSVP cancelled");
+      setTimeout(() => setToast(null), 3000);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to cancel RSVP.");
+    } finally {
+      setCancellingRsvp(null);
+    }
+  }
 
   // Check cookie on mount
   useEffect(() => {
@@ -748,18 +841,26 @@ export default function OrgCalendarPage() {
       // One-tap follow for returning verified users
       setFollowPopupLoading(true);
       try {
-        await Parse.Cloud.run("followCalendarViaWeb", {
+        const followResult = await Parse.Cloud.run("followCalendarViaWeb", {
           calendarId: org.objectId,
           name: cached.name,
           phoneNumber: cached.phone.replace(/\D/g, ""),
         });
         setFollowerCookie(org.objectId, cached.name, cached.phone);
         setVerifiedUserCookie(cached.name, cached.phone);
-        setIsFollowing(true);
-        setFollowerCount((c) => c + 1);
-        setShowFollowPopup(false);
-        setToast(`You're now following ${org.name}`);
-        setTimeout(() => setToast(null), 3000);
+        localStorage.setItem("leaf_follower_phone", cached.phone.replace(/\D/g, ""));
+        if (followResult.pending) {
+          setFollowRequestPending(true);
+          setShowFollowPopup(false);
+          setToast("Request sent! You\u2019ll be notified when approved.");
+          setTimeout(() => setToast(null), 3000);
+        } else {
+          setIsFollowing(true);
+          setFollowerCount((c) => c + 1);
+          setShowFollowPopup(false);
+          setToast(`You're now following ${org.name}`);
+          setTimeout(() => setToast(null), 3000);
+        }
       } catch {
         // Fallback to full modal if one-tap fails
         setShowFollowPopup(false);
@@ -798,14 +899,24 @@ export default function OrgCalendarPage() {
     if (org) {
       document.title = org.name;
       setFollowerCount(org.memberCount);
+      if (org.followRequestPending) setFollowRequestPending(true);
+      if (org.isFollower) setIsFollowing(true);
     }
     return () => { document.title = "Leaf"; };
   }, [org]);
 
+  // Initialize RSVP state from cookie
+  useEffect(() => {
+    const ids = getRsvpCookieIds();
+    if (ids.length > 0) setRsvpedPlanIds(new Set(ids));
+  }, []);
+
   const fetchOrg = useCallback(async () => {
     try {
       setLoading(true);
-      const result = await Parse.Cloud.run("getOrgCalendarPage", { shareId });
+      // Pass phone number if available (from previous follow or localStorage) for private calendar access
+      const storedPhone = typeof window !== "undefined" ? localStorage.getItem("leaf_follower_phone") : null;
+      const result = await Parse.Cloud.run("getOrgCalendarPage", { shareId, phoneNumber: storedPhone || undefined });
 
       // Handle inactive calendar
       if (result.isInactive) {
@@ -864,6 +975,9 @@ export default function OrgCalendarPage() {
         hideCustomPlans: result.hideCustomPlans || false,
         blacklistCategories: result.orgBlacklistCategories || [],
         excludeKeywords: result.orgExcludeKeywords || [],
+        isPrivate: result.isPrivate || false,
+        isFollower: result.isFollower || false,
+        followRequestPending: result.followRequestPending || false,
       });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load calendar");
@@ -1251,7 +1365,7 @@ export default function OrgCalendarPage() {
             <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400 hidden sm:inline">
               {followerCount} followers
             </span>
-            {!org.isOwner && (
+            {!org.isOwner && !org.isHost && (
               isFollowing ? (
                 <button
                   onClick={handleUnfollow}
@@ -1262,13 +1376,18 @@ export default function OrgCalendarPage() {
                   <span className="group-hover:hidden">Following</span>
                   <span className="hidden group-hover:inline">Unfollow</span>
                 </button>
+              ) : followRequestPending ? (
+                <span className="flex items-center gap-1.5 text-[10px] tracking-[0.3em] uppercase font-bold text-amber-600 border border-amber-200 bg-amber-50 px-3 py-1.5 rounded-full">
+                  <Clock className="w-3.5 h-3.5" />
+                  Pending
+                </span>
               ) : (
                 <button
                   onClick={() => setShowFollowModal(true)}
                   className="flex items-center gap-1.5 text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
                 >
                   <Heart className="w-3.5 h-3.5" />
-                  Follow
+                  {org.isPrivate ? "Request to Follow" : "Follow"}
                 </button>
               )
             )}
@@ -1285,6 +1404,37 @@ export default function OrgCalendarPage() {
         </div>
       </nav>
 
+      {/* Private calendar gate */}
+      {org.isPrivate && !org.isFollower && !org.isOwner && !org.isHost ? (
+        <main className="max-w-6xl mx-auto px-6 py-24">
+          <div className="max-w-md mx-auto text-center space-y-6">
+            <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto">
+              <Lock className="w-8 h-8 text-zinc-400" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-light tracking-tight mb-2">This is a private calendar</h2>
+              <p className="text-sm text-zinc-500">
+                Request to follow to see upcoming plans and ideas.
+              </p>
+            </div>
+            {followRequestPending || org.followRequestPending ? (
+              <div className="flex items-center justify-center gap-2 py-3 px-6 bg-amber-50 border border-amber-200 rounded-lg">
+                <Clock className="w-4 h-4 text-amber-600" />
+                <span className="text-sm text-amber-700 font-medium">Request pending</span>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowFollowModal(true)}
+                className="text-white px-8 py-3 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-90 rounded-lg"
+                style={{ backgroundColor: org.brandColor || "#18181b" }}
+              >
+                Request to Follow
+              </button>
+            )}
+          </div>
+        </main>
+      ) : (
+      <>
       {/* Stream Header */}
       <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100">
         <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold">
@@ -1351,15 +1501,32 @@ export default function OrgCalendarPage() {
                   </p>
 
                   <div className="pt-2 flex flex-col gap-6">
-                    <AvatarStack count={plan.attendeeCount} />
+                    <div className="flex items-center gap-3">
+                      <AvatarStack count={plan.attendeeCount} />
+                      {rsvpedPlanIds.has(plan.id) && (
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Attending
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-col sm:flex-row gap-4">
-                      <button
-                        onClick={() => setSelectedEvent(plan)}
-                        className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
-                        style={{ backgroundColor: org.brandColor || "#18181b" }}
-                      >
-                        View Details <ArrowUpRight className="w-4 h-4" />
-                      </button>
+                      {rsvpedPlanIds.has(plan.id) ? (
+                        <button
+                          onClick={() => handleCancelRsvp(plan.id)}
+                          disabled={cancellingRsvp === plan.id}
+                          className="border border-red-200 text-red-600 px-6 py-3 text-xs uppercase tracking-widest font-medium hover:bg-red-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {cancellingRsvp === plan.id ? "Cancelling..." : "Cancel RSVP"}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setSelectedEvent(plan)}
+                          className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+                          style={{ backgroundColor: org.brandColor || "#18181b" }}
+                        >
+                          View Details <ArrowUpRight className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleSharePlan(plan.id, plan.title)}
                         className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
@@ -1608,6 +1775,29 @@ export default function OrgCalendarPage() {
                       This calendar has reached its RSVP limit. Please contact the organization administrator.
                     </p>
                   </div>
+                ) : rsvpedPlanIds.has(selectedEvent.id) ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-center gap-2 py-2">
+                      <Check className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">You&apos;re Attending</span>
+                    </div>
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => handleCancelRsvp(selectedEvent.id)}
+                        disabled={cancellingRsvp === selectedEvent.id}
+                        className="flex-1 border border-red-200 text-red-600 py-3 text-xs uppercase tracking-[0.2em] font-bold hover:bg-red-50 transition-colors disabled:opacity-50"
+                      >
+                        {cancellingRsvp === selectedEvent.id ? "Cancelling..." : "Cancel RSVP"}
+                      </button>
+                      <button
+                        onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
+                        className="border border-zinc-200 px-5 hover:bg-zinc-50 transition-colors flex items-center gap-2"
+                      >
+                        {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                        <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="flex gap-4">
                     <button
@@ -1642,6 +1832,8 @@ export default function OrgCalendarPage() {
           onClose={() => setRsvpPlan(null)}
           brandColor={org.brandColor || undefined}
           onRsvpSuccess={(planId, alreadyRsvpd) => {
+            addRsvpCookie(planId);
+            setRsvpedPlanIds((prev) => new Set([...prev, planId]));
             if (alreadyRsvpd) return;
             setOrg((prev) => prev ? {
               ...prev,
@@ -2238,6 +2430,9 @@ export default function OrgCalendarPage() {
         </div>
       </section>
 
+      </>
+      )}
+
       {/* Footer */}
       <footer className="py-24 px-6 border-t border-zinc-100">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start gap-12">
@@ -2289,10 +2484,15 @@ export default function OrgCalendarPage() {
           calendarId={org.objectId}
           calendarName={org.name}
           brandColor={org.brandColor || undefined}
+          isPrivate={org.isPrivate}
           onClose={() => setShowFollowModal(false)}
-          onFollowed={() => {
-            setIsFollowing(true);
-            setFollowerCount((c) => c + 1);
+          onFollowed={(_name, _phone, pending) => {
+            if (pending) {
+              setFollowRequestPending(true);
+            } else {
+              setIsFollowing(true);
+              setFollowerCount((c) => c + 1);
+            }
             setShowFollowModal(false);
           }}
         />

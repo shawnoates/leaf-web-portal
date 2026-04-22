@@ -108,6 +108,16 @@ interface OrgDashboard {
     date: string;
     source: string;
   }[];
+  pendingFollowerCount: number;
+  pendingFollowers: {
+    membershipId: string;
+    objectId: string | null;
+    name: string;
+    phone: string | null;
+    calendarId: string | null;
+    calendarName: string | null;
+    requestedAt: string;
+  }[];
   calendars: {
     objectId: string;
     name: string;
@@ -118,6 +128,8 @@ interface OrgDashboard {
     isActive: boolean;
     calendarImage: string | null;
     hideVenueUntilRsvp: boolean;
+    isPrivate: boolean;
+    pendingFollowerCount: number;
   }[];
   calendarLimit: number | null;
   hostRequests: {
@@ -286,6 +298,7 @@ export default function OrgDashboardPage() {
   const [editCalImageBase64, setEditCalImageBase64] = useState<string | null>(null);
   const [editCalRemoveImage, setEditCalRemoveImage] = useState(false);
   const [editCalHideVenue, setEditCalHideVenue] = useState(true);
+  const [editCalIsPrivate, setEditCalIsPrivate] = useState(false);
   const slugTimerRef = useRef<NodeJS.Timeout | null>(null);
   const originalSlugRef = useRef<string>("");
 
@@ -341,7 +354,7 @@ export default function OrgDashboardPage() {
   const [phoneJustVerified, setPhoneJustVerified] = useState(false);
 
   // Co-host invite
-  const [followerCalFilter, setFollowerCalFilter] = useState<string>("all");
+  const [followerCalFilter, setFollowerCalFilter] = useState<string>(searchParams.get("filterCal") || "all");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
   const [inviting, setInviting] = useState(false);
@@ -469,13 +482,14 @@ export default function OrgDashboardPage() {
         params.removeImage = true;
       }
       params.hideVenueUntilRsvp = editCalHideVenue;
+      params.isPrivate = editCalIsPrivate;
       const result = await Parse.Cloud.run("updateCalendar", params);
       const newShareId = result.shareId;
       const newCalImage = editCalRemoveImage ? null : (editCalImagePreview || null);
       setDashboard((d) => d ? {
         ...d,
         calendars: d.calendars.map((c) =>
-          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId, city: editCalCity || c.city, calendarImage: editCalImageBase64 ? newCalImage : (editCalRemoveImage ? null : c.calendarImage), hideVenueUntilRsvp: editCalHideVenue } : c
+          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId, city: editCalCity || c.city, calendarImage: editCalImageBase64 ? newCalImage : (editCalRemoveImage ? null : c.calendarImage), hideVenueUntilRsvp: editCalHideVenue, isPrivate: editCalIsPrivate } : c
         ),
       } : d);
       setEditingCalId(null);
@@ -800,6 +814,11 @@ export default function OrgDashboardPage() {
                 >
                   <Icon className="w-3.5 h-3.5" />
                   {tab.label}
+                  {tab.id === "followers" && dashboard.pendingFollowerCount > 0 && (
+                    <span className="bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[18px] text-center">
+                      {dashboard.pendingFollowerCount}
+                    </span>
+                  )}
                   {isLocked && <Lock className="w-3 h-3 ml-0.5" />}
                 </button>
               );
@@ -1482,7 +1501,7 @@ export default function OrgDashboardPage() {
                         ) : (
                           <>
                             <button
-                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); setEditCalCity(cal.city || ""); setEditCalCitySelected(false); setEditCalImagePreview(cal.calendarImage || null); setEditCalImageBase64(null); setEditCalRemoveImage(false); setEditCalHideVenue(cal.hideVenueUntilRsvp !== false); }}
+                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); setEditCalCity(cal.city || ""); setEditCalCitySelected(false); setEditCalImagePreview(cal.calendarImage || null); setEditCalImageBase64(null); setEditCalRemoveImage(false); setEditCalHideVenue(cal.hideVenueUntilRsvp !== false); setEditCalIsPrivate(cal.isPrivate || false); }}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
                             >
                               <Pencil className="w-3 h-3" /> Edit
@@ -2137,6 +2156,113 @@ export default function OrgDashboardPage() {
         {/* ──────── FOLLOWERS TAB (Growth/Pro) ──────── */}
         {activeTab === "followers" && (
           <div className="space-y-8">
+            {/* Calendar filter — shared by pending + approved sections */}
+            {dashboard.calendars.length > 1 && (
+              <div className="flex justify-end">
+                <select
+                  value={followerCalFilter}
+                  onChange={(e) => setFollowerCalFilter(e.target.value)}
+                  className="text-xs border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 focus:outline-none focus:border-zinc-400"
+                >
+                  <option value="all">All Calendars</option>
+                  {dashboard.calendars.filter((c) => c.isActive).map((cal) => (
+                    <option key={cal.objectId} value={cal.objectId}>{cal.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {/* Pending follow requests */}
+            {(() => {
+              const filteredPending = followerCalFilter === "all"
+                ? dashboard.pendingFollowers
+                : dashboard.pendingFollowers.filter((pf) => pf.calendarId === followerCalFilter);
+              if (filteredPending.length === 0) return null;
+              return (
+              <section>
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                  Pending Requests ({filteredPending.length})
+                </h2>
+                <div className="border border-amber-200 bg-amber-50/40 rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-amber-50 text-xs uppercase tracking-widest text-zinc-400">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-bold">Name</th>
+                        {dashboard.calendars.length > 1 && followerCalFilter === "all" && (
+                          <th className="text-left px-4 py-3 font-bold">Calendar</th>
+                        )}
+                        <th className="text-left px-4 py-3 font-bold">Requested</th>
+                        <th className="text-right px-4 py-3 font-bold">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-amber-100">
+                      {filteredPending.map((pf) => (
+                        <tr key={pf.membershipId}>
+                          <td className="px-4 py-3">{pf.name}</td>
+                          {dashboard.calendars.length > 1 && followerCalFilter === "all" && (
+                            <td className="px-4 py-3 text-zinc-400">{pf.calendarName || "—"}</td>
+                          )}
+                          <td className="px-4 py-3 text-zinc-400">
+                            {new Date(pf.requestedAt).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-3 text-right flex items-center justify-end gap-2">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await Parse.Cloud.run("approveFollowerRequest", {
+                                    calendarId: pf.calendarId || calendarId,
+                                    membershipId: pf.membershipId,
+                                  });
+                                  setDashboard((d) => d ? {
+                                    ...d,
+                                    pendingFollowers: d.pendingFollowers.filter((x) => x.membershipId !== pf.membershipId),
+                                    pendingFollowerCount: d.pendingFollowerCount - 1,
+                                    followers: [...d.followers, { membershipId: pf.membershipId, objectId: pf.objectId, name: pf.name, phone: pf.phone, calendarId: pf.calendarId, calendarName: pf.calendarName, joinedAt: new Date().toISOString() }],
+                                    followerCount: d.followerCount + 1,
+                                    calendars: d.calendars.map((c) => c.objectId === pf.calendarId ? { ...c, pendingFollowerCount: Math.max(0, c.pendingFollowerCount - 1) } : c),
+                                  } : d);
+                                  setToast("Follower approved!");
+                                  setTimeout(() => setToast(null), 2000);
+                                } catch (err) {
+                                  console.error("Failed to approve follower:", err);
+                                  alert(err instanceof Error ? err.message : "Failed to approve.");
+                                }
+                              }}
+                              className="bg-zinc-900 text-white px-3 py-1.5 text-[10px] uppercase tracking-[0.15em] font-bold rounded-lg hover:bg-zinc-800 transition-colors"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await Parse.Cloud.run("rejectFollowerRequest", {
+                                    calendarId: pf.calendarId || calendarId,
+                                    membershipId: pf.membershipId,
+                                  });
+                                  setDashboard((d) => d ? {
+                                    ...d,
+                                    pendingFollowers: d.pendingFollowers.filter((x) => x.membershipId !== pf.membershipId),
+                                    pendingFollowerCount: d.pendingFollowerCount - 1,
+                                    calendars: d.calendars.map((c) => c.objectId === pf.calendarId ? { ...c, pendingFollowerCount: Math.max(0, c.pendingFollowerCount - 1) } : c),
+                                  } : d);
+                                  setToast("Request rejected.");
+                                  setTimeout(() => setToast(null), 2000);
+                                } catch (err) {
+                                  console.error("Failed to reject follower:", err);
+                                }
+                              }}
+                              className="text-zinc-300 hover:text-red-500 transition-colors text-[10px] uppercase tracking-[0.15em] font-bold px-3 py-1.5 border border-zinc-200 rounded-lg hover:border-red-200"
+                            >
+                              Reject
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              );
+            })()}
             <section>
               {(() => {
                 const filteredFollowers = followerCalFilter === "all"
@@ -2163,16 +2289,6 @@ export default function OrgDashboardPage() {
                 <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
                   Followers ({filteredFollowers.length})
                 </h2>
-                <select
-                  value={followerCalFilter}
-                  onChange={(e) => setFollowerCalFilter(e.target.value)}
-                  className="text-xs border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 focus:outline-none focus:border-zinc-400"
-                >
-                  <option value="all">All Calendars</option>
-                  {dashboard.calendars.filter((c) => c.isActive).map((cal) => (
-                    <option key={cal.objectId} value={cal.objectId}>{cal.name}</option>
-                  ))}
-                </select>
               </div>
               {filteredFollowers.length === 0 ? (
                 <div className="border border-zinc-200 rounded-xl p-8 space-y-6">
@@ -2363,7 +2479,7 @@ export default function OrgDashboardPage() {
       {/* Edit Calendar Modal */}
       {editingCalId && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-xl p-8 relative">
+          <div className="bg-white w-full max-w-lg rounded-t-2xl md:rounded-xl p-8 relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setEditingCalId(null)}
               className="absolute top-4 right-4 p-2 rounded-full hover:bg-zinc-100"
@@ -2477,6 +2593,20 @@ export default function OrgDashboardPage() {
                   className={`relative w-10 h-5 rounded-full transition-colors ${editCalHideVenue ? "bg-zinc-900" : "bg-zinc-200"}`}
                 >
                   <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalHideVenue ? "left-5" : "left-0.5"}`} />
+                </button>
+              </div>
+              {/* Private calendar toggle */}
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <p className="text-xs font-medium text-zinc-700">Private calendar</p>
+                  <p className="text-[10px] text-zinc-400">Visitors must request to follow before seeing plans</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditCalIsPrivate(!editCalIsPrivate)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${editCalIsPrivate ? "bg-zinc-900" : "bg-zinc-200"}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalIsPrivate ? "left-5" : "left-0.5"}`} />
                 </button>
               </div>
 
