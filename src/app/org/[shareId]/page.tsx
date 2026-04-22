@@ -993,8 +993,10 @@ export default function OrgCalendarPage() {
         // rsvpCount tracks RSVPs only; the host is always attending so add 1
         attendeeCount: ((p.rsvpCount as number) || 0) + 1,
         location: p.location ? {
-          name: (p.location as Record<string, string>).name || "",
-          address: (p.location as Record<string, string>).address || "",
+          name: (p.location as Record<string, unknown>).name as string | null,
+          address: (p.location as Record<string, unknown>).address as string | null,
+          neighborhood: (p.location as Record<string, unknown>).neighborhood as string | null || null,
+          isPrivate: (p.location as Record<string, unknown>).isPrivate as boolean || false,
         } : null,
         hostNote: p.hostNote as string || null,
       }));
@@ -1752,7 +1754,7 @@ export default function OrgCalendarPage() {
           <div className="bg-white w-full max-w-5xl md:h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl rounded-t-3xl md:rounded-none relative">
             <button
               onClick={() => setSelectedEvent(null)}
-              className="absolute top-6 right-6 z-50 p-2 rounded-full bg-white/20 text-white md:text-zinc-900 md:bg-transparent"
+              className="absolute top-4 right-4 z-50 p-2 rounded-full bg-zinc-100 text-zinc-600 md:bg-transparent md:text-zinc-900"
             >
               <Plus className="w-8 h-8 rotate-45" />
             </button>
@@ -1808,12 +1810,14 @@ export default function OrgCalendarPage() {
                     <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
                       Location
                     </h4>
-                    {selectedEvent.location.isPrivate ? (
+                    {selectedEvent.location.isPrivate || (!selectedEvent.location.name && !selectedEvent.location.address) ? (
                       <>
                         {selectedEvent.location.neighborhood && (
                           <p className="text-sm text-zinc-700">{selectedEvent.location.neighborhood}</p>
                         )}
-                        <p className="text-sm text-zinc-400">RSVP to see exact location</p>
+                        <p className="text-sm text-zinc-400 flex items-center gap-1.5">
+                          <Lock className="w-3 h-3" /> Location revealed after RSVP
+                        </p>
                       </>
                     ) : (
                       <>
