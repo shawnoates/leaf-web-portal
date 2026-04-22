@@ -34,11 +34,13 @@ interface CreatePlanModalProps {
   tier: string;
   prefill?: CreatePlanPrefill | null;
   hideVenueDefault?: boolean;
+  editMode?: boolean;
+  eventGroupId?: string;
   onClose: () => void;
   onCreated: () => void;
 }
 
-export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, onClose, onCreated }: CreatePlanModalProps) {
+export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, editMode, eventGroupId, onClose, onCreated }: CreatePlanModalProps) {
   const [selectedCalendarId, setSelectedCalendarId] = useState(calendarId);
   const [hideVenue, setHideVenue] = useState(hideVenueDefault ?? true);
   const [title, setTitle] = useState(prefill?.title || "");
@@ -99,26 +101,41 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
 
   async function handleCreate() {
     if (!title || !date) return;
-    if (isHosted && !imageBase64 && !prefill?.imageUrl) {
+    if (!editMode && isHosted && !imageBase64 && !prefill?.imageUrl) {
       alert("Please upload a cover image for your plan.");
       return;
     }
     setCreating(true);
     try {
-      await Parse.Cloud.run("createManualPlan", {
-        calendarId: selectedCalendarId,
-        title,
-        description,
-        venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
-        date: `${date}T${time || "12:00"}:00`,
-        time: time || null,
-        capacity: capacity ? parseInt(capacity) : null,
-        isHosted,
-        imageBase64: imageBase64 || undefined,
-        imageUrl: !imageBase64 && prefill?.imageUrl ? prefill.imageUrl : undefined,
-        hostNote: isHosted && hostNote.trim() ? hostNote.trim() : undefined,
-        hideVenueUntilRsvp: hideVenue,
-      });
+      if (editMode && eventGroupId) {
+        await Parse.Cloud.run("updatePlanDetails", {
+          eventGroupId,
+          title,
+          description,
+          date: `${date}T${time || "12:00"}:00`,
+          time: time || null,
+          imageBase64: imageBase64 || undefined,
+          imageUrl: !imageBase64 && prefill?.imageUrl ? prefill.imageUrl : undefined,
+          venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
+          capacity: capacity ? parseInt(capacity) : null,
+          hostNote: hostNote.trim() || undefined,
+        });
+      } else {
+        await Parse.Cloud.run("createManualPlan", {
+          calendarId: selectedCalendarId,
+          title,
+          description,
+          venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
+          date: `${date}T${time || "12:00"}:00`,
+          time: time || null,
+          capacity: capacity ? parseInt(capacity) : null,
+          isHosted,
+          imageBase64: imageBase64 || undefined,
+          imageUrl: !imageBase64 && prefill?.imageUrl ? prefill.imageUrl : undefined,
+          hostNote: isHosted && hostNote.trim() ? hostNote.trim() : undefined,
+          hideVenueUntilRsvp: hideVenue,
+        });
+      }
       setSuccess(true);
       onCreated();
       setTimeout(() => {
@@ -126,7 +143,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
         onClose();
       }, 1500);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to create plan";
+      const message = err instanceof Error ? err.message : editMode ? "Failed to update plan" : "Failed to create plan";
       alert(message);
     } finally {
       setCreating(false);
@@ -144,7 +161,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       <div className="absolute inset-0 bg-black/40" onClick={() => { if (!creating) onClose(); }} />
       <div className="relative bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl">
         <div className="sticky top-0 bg-white border-b border-zinc-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">New Plan</h2>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{editMode ? "Edit Plan" : "New Plan"}</h2>
           <button
             onClick={() => { if (!creating) onClose(); }}
             className="p-1.5 hover:bg-zinc-100 rounded-full transition-colors"
@@ -156,12 +173,12 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
         <div className="px-6 py-5 space-y-5">
           {success && (
             <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg text-sm">
-              <Check className="w-4 h-4" /> Plan created successfully!
+              <Check className="w-4 h-4" /> {editMode ? "Plan updated!" : "Plan created successfully!"}
             </div>
           )}
 
-          {/* Calendar selector (only when multiple calendars) */}
-          {calendars && calendars.length > 1 && (
+          {/* Calendar selector (only when multiple calendars, hidden in edit mode) */}
+          {!editMode && calendars && calendars.length > 1 && (
             <div>
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Calendar</label>
               <select
@@ -176,8 +193,8 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             </div>
           )}
 
-          {/* Plan type toggle */}
-          <div>
+          {/* Plan type toggle (hidden in edit mode) */}
+          {!editMode && <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-3">Plan Type</label>
             <div className="flex gap-3">
               <button
@@ -205,7 +222,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                 <p className="text-xs text-zinc-500">Members can host this idea</p>
               </button>
             </div>
-          </div>
+          </div>}
 
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Title</label>
@@ -340,10 +357,10 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
 
           <button
             onClick={handleCreate}
-            disabled={!title || !date || creating || (isHosted && !imageBase64 && !prefill?.imageUrl)}
+            disabled={!title || !date || creating || (!editMode && isHosted && !imageBase64 && !prefill?.imageUrl)}
             className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
           >
-            {creating ? "Creating..." : isHosted ? "Create Upcoming Plan" : "Create Plan Idea"}
+            {creating ? (editMode ? "Saving..." : "Creating...") : editMode ? "Save Changes" : isHosted ? "Create Upcoming Plan" : "Create Plan Idea"}
           </button>
         </div>
       </div>

@@ -332,6 +332,7 @@ export default function OrgDashboardPage() {
   // Create plan modal (used by marketplace + duplicate)
   const [createPlanPrefill, setCreatePlanPrefill] = useState<CreatePlanPrefill | null>(null);
   const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
 
   // Leaf app connection (explicit OTP verification, not auto-populated from phone field)
   const [leafAppConnected, setLeafAppConnected] = useState(false);
@@ -2598,26 +2599,48 @@ export default function OrgDashboardPage() {
               </div>
 
               <div className="pt-8 border-t border-zinc-100 flex items-center justify-between">
-                <button
-                  onClick={() => {
-                    if (!leafAppConnected) {
-                      setShowPhoneModal(true);
-                      return;
-                    }
-                    setCreatePlanPrefill({
-                      title: selectedActivePlan.title,
-                      description: selectedActivePlan.description,
-                      venue: selectedActivePlan.location,
-                      imageUrl: selectedActivePlan.image,
-                    });
-                    setSelectedActivePlan(null);
-                    setShowCreatePlanModal(true);
-                  }}
-                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
-                >
-                  <Copy className="w-4 h-4" />
-                  Duplicate Plan
-                </button>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => {
+                      if (!leafAppConnected) {
+                        setShowPhoneModal(true);
+                        return;
+                      }
+                      setCreatePlanPrefill({
+                        title: selectedActivePlan.title,
+                        description: selectedActivePlan.description,
+                        venue: selectedActivePlan.location,
+                        imageUrl: selectedActivePlan.image,
+                      });
+                      setSelectedActivePlan(null);
+                      setShowCreatePlanModal(true);
+                    }}
+                    className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+                  >
+                    <Copy className="w-4 h-4" />
+                    Duplicate
+                  </button>
+                  <button
+                    onClick={() => {
+                      const planDate = selectedActivePlan.date ? new Date(selectedActivePlan.date).toISOString().split("T")[0] : "";
+                      setEditingPlanId(selectedActivePlan.objectId);
+                      setCreatePlanPrefill({
+                        title: selectedActivePlan.title,
+                        description: selectedActivePlan.description,
+                        venue: selectedActivePlan.location,
+                        date: planDate,
+                        time: selectedActivePlan.time || "",
+                        imageUrl: selectedActivePlan.image,
+                      });
+                      setSelectedActivePlan(null);
+                      setShowCreatePlanModal(true);
+                    }}
+                    className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+                  >
+                    <Pencil className="w-4 h-4" />
+                    Edit
+                  </button>
+                </div>
                 <button
                   onClick={async () => {
                     if (!confirm("Cancel this plan? Attendees will be notified. This cannot be undone.")) return;
@@ -2649,7 +2672,9 @@ export default function OrgDashboardPage() {
           tier={dashboard.tier}
           prefill={createPlanPrefill}
           hideVenueDefault={dashboard.calendars.find((c) => c.objectId === calendarId)?.hideVenueUntilRsvp}
-          onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); }}
+          editMode={!!editingPlanId}
+          eventGroupId={editingPlanId || undefined}
+          onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); setEditingPlanId(null); }}
           onCreated={() => fetchDashboard()}
         />
       )}
