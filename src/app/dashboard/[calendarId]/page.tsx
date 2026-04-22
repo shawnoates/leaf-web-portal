@@ -1097,7 +1097,7 @@ export default function OrgDashboardPage() {
             {migrationResult ? (
               <div className="border border-green-200 bg-green-50 rounded-xl p-4 text-xs text-green-700 space-y-2">
                 <p className="font-medium">
-                  {migrationResult.fixed} fixed | {migrationResult.statusFixed || 0} status corrected | {migrationResult.skipped} already OK
+                  {migrationResult.fixed} fixed | {migrationResult.reverted || 0} reverted | {migrationResult.skipped} already OK
                 </p>
                 <p>iOS sees {migrationResult.iosCurrentCount} current plans (of {migrationResult.iosTotalCount} total notifs). {migrationResult.total} plans on {migrationResult.calendarsFound} calendars.</p>
                 {migrationResult.plans?.length > 0 && (
