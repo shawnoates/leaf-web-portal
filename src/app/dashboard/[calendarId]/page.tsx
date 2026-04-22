@@ -272,7 +272,7 @@ export default function OrgDashboardPage() {
 
   // Migration
   const [migrating, setMigrating] = useState(false);
-  const [migrationResult, setMigrationResult] = useState<{ fixed: number; skipped: number; flagsFixed: number; total: number } | null>(null);
+  const [migrationResult, setMigrationResult] = useState<{ cleaned: number; fixed: number; skipped: number; flagsFixed: number; total: number } | null>(null);
 
   // Toast
   const [toast, setToast] = useState<string | null>(null);
@@ -1095,14 +1095,14 @@ export default function OrgDashboardPage() {
             {/* One-time migration for plans missing iOS visibility */}
             {migrationResult ? (
               <div className="border border-green-200 bg-green-50 rounded-xl p-4 text-xs text-green-700">
-                Migration complete: {migrationResult.fixed} plans restored, {migrationResult.flagsFixed} flags updated, {migrationResult.skipped} already OK, {migrationResult.total} scanned.
+                Done — {migrationResult.cleaned} wrong removed, {migrationResult.fixed} restored, {migrationResult.skipped} already OK. Refresh your app.
               </div>
             ) : (
               <button
                 onClick={async () => {
                   setMigrating(true);
                   try {
-                    const r = await Parse.Cloud.run("migrateManualPlans") as { fixed: number; skipped: number; flagsFixed: number; total: number };
+                    const r = await Parse.Cloud.run("migrateManualPlans") as { cleaned: number; fixed: number; skipped: number; flagsFixed: number; total: number };
                     setMigrationResult(r);
                   } catch (e) { console.error(e); alert("Migration failed — see console"); }
                   setMigrating(false);
@@ -2687,35 +2687,20 @@ export default function OrgDashboardPage() {
                   Automated plan idea settings
                 </button>
               )}
-              {/* Custom Plan Proposals toggle */}
-              {dashboard.tier === "pro" ? (
-                <div className="flex items-center justify-between py-2">
-                  <div>
-                    <p className="text-xs font-medium text-zinc-700">Custom plan proposals</p>
-                    <p className="text-[10px] text-zinc-400">Let members propose their own plan ideas for your review</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setEditCalHideCustomPlans(!editCalHideCustomPlans)}
-                    className={`relative w-10 h-5 rounded-full transition-colors ${!editCalHideCustomPlans ? "bg-zinc-900" : "bg-zinc-200"}`}
-                  >
-                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${!editCalHideCustomPlans ? "left-5" : "left-0.5"}`} />
-                  </button>
+              {/* Hide Custom Plan Proposals toggle */}
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <p className="text-xs font-medium text-zinc-700">Hide custom plan proposals</p>
+                  <p className="text-[10px] text-zinc-400">Prevent members from proposing their own plan ideas</p>
                 </div>
-              ) : (
-                <div className="flex items-center justify-between py-2">
-                  <div>
-                    <p className="text-xs font-medium text-zinc-400">Custom plan proposals</p>
-                    <p className="text-[10px] text-zinc-300">Let members propose their own plan ideas for your review</p>
-                  </div>
-                  <button
-                    onClick={() => setShowSubscription(true)}
-                    className="flex items-center gap-1.5 bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
-                  >
-                    <Lock className="w-3 h-3" /> Upgrade
-                  </button>
-                </div>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setEditCalHideCustomPlans(!editCalHideCustomPlans)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${editCalHideCustomPlans ? "bg-zinc-900" : "bg-zinc-200"}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalHideCustomPlans ? "left-5" : "left-0.5"}`} />
+                </button>
+              </div>
 
               <button
                 onClick={handleSaveCalendar}
