@@ -34,6 +34,9 @@ export default function PlansPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const calendarId = params.calendarId as string;
+  // For child calendars, orgId (parent org) is passed as a query param.
+  // Use it for getOrgDashboard calls; use calendarId for plan operations.
+  const orgId = searchParams.get("orgId") || calendarId;
 
   const [user, setUser] = useState<Parse.User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
@@ -102,8 +105,15 @@ export default function PlansPage() {
 
   async function fetchOrgInfo() {
     try {
-      const result = await Parse.Cloud.run("getOrgDashboard", { calendarId });
-      setOrgName(result.name);
+      const result = await Parse.Cloud.run("getOrgDashboard", { calendarId: orgId });
+      // If viewing a child calendar, find its name from the calendars list
+      if (orgId !== calendarId && result.calendars) {
+        const child = result.calendars.find((c: { objectId: string; name: string }) => c.objectId === calendarId);
+        if (child) setOrgName(child.name);
+        else setOrgName(result.name);
+      } else {
+        setOrgName(result.name);
+      }
       setTier(result.tier);
     } catch {
       // Failed to load
@@ -114,9 +124,14 @@ export default function PlansPage() {
     setLoadingIdeas(true);
     try {
       // Use getOrgCalendarPage to get plan ideas for this calendar
-      // First get the shareId
-      const dash = await Parse.Cloud.run("getOrgDashboard", { calendarId });
-      const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId: dash.shareId });
+      // First get the shareId (for child calendars, find it in the calendars list)
+      const dash = await Parse.Cloud.run("getOrgDashboard", { calendarId: orgId });
+      let shareId = dash.shareId;
+      if (orgId !== calendarId && dash.calendars) {
+        const child = dash.calendars.find((c: { objectId: string; shareId: string }) => c.objectId === calendarId);
+        if (child) shareId = child.shareId;
+      }
+      const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId });
       setUpcomingPlans(
         (page.plans || []).map((p: { objectId: string; title: string; description: string; image: string | null; expiryDate: string; time: string | null; rsvpCount: number; host: { name: string } | null; location: { name: string; address: string } | null }) => ({
           objectId: p.objectId,
