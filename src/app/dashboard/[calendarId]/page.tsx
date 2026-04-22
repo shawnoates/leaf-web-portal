@@ -272,7 +272,7 @@ export default function OrgDashboardPage() {
 
   // Migration
   const [migrating, setMigrating] = useState(false);
-  const [migrationResult, setMigrationResult] = useState<{ cleaned: number; fixed: number; skipped: number; flagsFixed: number; total: number } | null>(null);
+  const [migrationResult, setMigrationResult] = useState<{ cleaned: number; fixed: number; skipped: number; flagsFixed: number; total: number; webUserId?: string; appUserId?: string | null; targetUserId?: string; calendarsFound?: number } | null>(null);
 
   // Toast
   const [toast, setToast] = useState<string | null>(null);
@@ -1095,14 +1095,15 @@ export default function OrgDashboardPage() {
             {/* One-time migration for plans missing iOS visibility */}
             {migrationResult ? (
               <div className="border border-green-200 bg-green-50 rounded-xl p-4 text-xs text-green-700">
-                Done — {migrationResult.cleaned} wrong removed, {migrationResult.fixed} restored, {migrationResult.skipped} already OK. Refresh your app.
+                Done — {migrationResult.cleaned} wrong removed, {migrationResult.fixed} restored, {migrationResult.skipped} already OK.
+                <br />Web: {migrationResult.webUserId} | App: {migrationResult.appUserId || "NOT LINKED"} | Target: {migrationResult.targetUserId} | Calendars: {migrationResult.calendarsFound} | Plans: {migrationResult.total}
               </div>
             ) : (
               <button
                 onClick={async () => {
                   setMigrating(true);
                   try {
-                    const r = await Parse.Cloud.run("migrateManualPlans") as { cleaned: number; fixed: number; skipped: number; flagsFixed: number; total: number };
+                    const r = await Parse.Cloud.run("migrateManualPlans") as { cleaned: number; fixed: number; skipped: number; flagsFixed: number; total: number; webUserId?: string; appUserId?: string | null; targetUserId?: string; calendarsFound?: number };
                     setMigrationResult(r);
                   } catch (e) { console.error(e); alert("Migration failed — see console"); }
                   setMigrating(false);
