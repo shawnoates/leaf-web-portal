@@ -1104,7 +1104,7 @@ export default function OrgDashboardPage() {
                   <div className="mt-2 border-t border-green-200 pt-2">
                     <p className="font-medium mb-1">Plans on your calendars (notifications):</p>
                     {migrationResult.plans.map((p: any, i: number) => (
-                      <p key={i} className="text-[10px] font-mono">{p.title} — {p.action} {p.status ? `(${p.status})` : ""} host:{p.host} [{p.notifs}]</p>
+                      <p key={i} className="text-[10px] font-mono">{p.title} — {p.action} {p.status ? `(${p.status})` : ""} host:{p.host} creator:{p.creator || "?"} [{p.notifs}]</p>
                     ))}
                   </div>
                 )}
