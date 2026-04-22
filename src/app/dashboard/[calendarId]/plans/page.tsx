@@ -413,7 +413,7 @@ export default function PlansPage() {
               {planIdeas.map((idea) => (
                 <div
                   key={idea.objectId}
-                  className="border border-zinc-200 rounded-xl overflow-hidden flex items-stretch cursor-pointer hover:border-zinc-400 transition-colors"
+                  className="border border-zinc-200 rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:border-zinc-400 transition-colors"
                   onClick={() => {
                     setCreatePlanPrefill({
                       title: idea.title,
@@ -428,10 +428,13 @@ export default function PlansPage() {
                     setShowCreateModal(true);
                   }}
                 >
-                  <div className="flex-1 min-w-0 p-4">
+                  {idea.image && (
+                    <img src={idea.image} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
                     <h3 className="font-medium text-sm truncate">{idea.title}</h3>
                     {idea.description && (
-                      <p className="text-xs text-zinc-500 line-clamp-2 mt-0.5">{idea.description}</p>
+                      <p className="text-xs text-zinc-500 line-clamp-1 mt-0.5">{idea.description}</p>
                     )}
                     <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-400">
                       {idea.date && (
@@ -444,11 +447,6 @@ export default function PlansPage() {
                       )}
                     </div>
                   </div>
-                  {idea.image && (
-                    <div className="w-24 shrink-0 bg-zinc-100">
-                      <img src={idea.image} alt="" className="w-full h-full object-cover" />
-                    </div>
-                  )}
                   <button
                     onClick={(e) => { e.stopPropagation(); handleRemoveIdea(idea.objectId); }}
                     className="p-3 text-zinc-300 hover:text-red-500 transition-colors shrink-0 self-start"
