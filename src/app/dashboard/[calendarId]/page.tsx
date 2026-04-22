@@ -272,7 +272,7 @@ export default function OrgDashboardPage() {
 
   // Migration
   const [migrating, setMigrating] = useState(false);
-  const [migrationResult, setMigrationResult] = useState<{ fixed: number; skipped: number; total: number } | null>(null);
+  const [migrationResult, setMigrationResult] = useState<{ fixed: number; skipped: number; flagsFixed: number; total: number } | null>(null);
 
   // Toast
   const [toast, setToast] = useState<string | null>(null);
@@ -1095,14 +1095,14 @@ export default function OrgDashboardPage() {
             {/* One-time migration for plans missing iOS visibility */}
             {migrationResult ? (
               <div className="border border-green-200 bg-green-50 rounded-xl p-4 text-xs text-green-700">
-                Migration complete: {migrationResult.fixed} plans fixed, {migrationResult.skipped} already OK, {migrationResult.total} scanned.
+                Migration complete: {migrationResult.fixed} plans restored, {migrationResult.flagsFixed} flags updated, {migrationResult.skipped} already OK, {migrationResult.total} scanned.
               </div>
             ) : (
               <button
                 onClick={async () => {
                   setMigrating(true);
                   try {
-                    const r = await Parse.Cloud.run("migrateManualPlans") as { fixed: number; skipped: number; total: number };
+                    const r = await Parse.Cloud.run("migrateManualPlans") as { fixed: number; skipped: number; flagsFixed: number; total: number };
                     setMigrationResult(r);
                   } catch (e) { console.error(e); alert("Migration failed — see console"); }
                   setMigrating(false);
@@ -1110,7 +1110,7 @@ export default function OrgDashboardPage() {
                 disabled={migrating}
                 className="border border-amber-200 bg-amber-50 rounded-xl p-4 text-xs text-amber-700 hover:bg-amber-100 transition-colors w-full text-left"
               >
-                {migrating ? "Migrating plans..." : "⚠️ Migrate existing plans for iOS visibility (one-time)"}
+                {migrating ? "Migrating plans..." : "⚠️ Restore plans to iOS app (one-time)"}
               </button>
             )}
 
