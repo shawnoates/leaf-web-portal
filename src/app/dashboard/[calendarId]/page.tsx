@@ -272,7 +272,8 @@ export default function OrgDashboardPage() {
 
   // Migration
   const [migrating, setMigrating] = useState(false);
-  const [migrationResult, setMigrationResult] = useState<{ cleaned: number; fixed: number; skipped: number; flagsFixed: number; total: number; webUserId?: string; appUserId?: string | null; targetUserId?: string; calendarsFound?: number } | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [migrationResult, setMigrationResult] = useState<any>(null);
 
   // Toast
   const [toast, setToast] = useState<string | null>(null);
@@ -1094,17 +1095,37 @@ export default function OrgDashboardPage() {
 
             {/* One-time migration for plans missing iOS visibility */}
             {migrationResult ? (
-              <div className="border border-green-200 bg-green-50 rounded-xl p-4 text-xs text-green-700">
-                Done — {migrationResult.cleaned} wrong removed, {migrationResult.fixed} restored, {migrationResult.skipped} already OK.
-                <br />Web: {migrationResult.webUserId} | App: {migrationResult.appUserId || "NOT LINKED"} | Target: {migrationResult.targetUserId} | Calendars: {migrationResult.calendarsFound} | Plans: {migrationResult.total}
+              <div className="border border-green-200 bg-green-50 rounded-xl p-4 text-xs text-green-700 space-y-2">
+                <p className="font-medium">
+                  Fixed: {migrationResult.fixed} | Status corrected: {migrationResult.statusFixed || 0} | Already OK: {migrationResult.skipped} | Cleaned: {migrationResult.cleaned}
+                </p>
+                <p>Target: {migrationResult.targetUserId} | App: {migrationResult.appUserId || "NONE"} | Calendars: {migrationResult.calendarsFound}</p>
+                {migrationResult.plans?.length > 0 && (
+                  <div className="mt-2 border-t border-green-200 pt-2">
+                    <p className="font-medium mb-1">Plans on your calendars:</p>
+                    {migrationResult.plans.map((p: any, i: number) => (
+                      <p key={i} className="text-[10px] font-mono">{p.title} — {p.action} {p.status ? `(${p.status})` : ""} host:{p.hostId || "?"}</p>
+                    ))}
+                  </div>
+                )}
+                {migrationResult.iosVisible?.length > 0 && (
+                  <div className="mt-2 border-t border-green-200 pt-2">
+                    <p className="font-medium mb-1">What iOS app sees ({migrationResult.iosVisible.length} plans):</p>
+                    {migrationResult.iosVisible.map((p: any, i: number) => (
+                      <p key={i} className="text-[10px] font-mono">{p.title} — {p.status} {p.cancelled ? "CANCELLED" : ""} exp:{p.expiryDate}</p>
+                    ))}
+                  </div>
+                )}
+                <button onClick={() => setMigrationResult(null)} className="text-green-600 underline text-[10px] mt-1">Run again</button>
               </div>
             ) : (
               <button
                 onClick={async () => {
                   setMigrating(true);
                   try {
-                    const r = await Parse.Cloud.run("migrateManualPlans") as { cleaned: number; fixed: number; skipped: number; flagsFixed: number; total: number; webUserId?: string; appUserId?: string | null; targetUserId?: string; calendarsFound?: number };
+                    const r = await Parse.Cloud.run("migrateManualPlans");
                     setMigrationResult(r);
+                    console.log("Migration result:", r);
                   } catch (e) { console.error(e); alert("Migration failed — see console"); }
                   setMigrating(false);
                 }}
