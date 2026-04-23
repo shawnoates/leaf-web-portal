@@ -1056,9 +1056,11 @@ export default function OrgCalendarPage() {
   const fetchOrg = useCallback(async () => {
     try {
       setLoading(true);
-      // Pass phone number if available (from previous follow or localStorage) for private calendar access
+      // Pass phone number if available for private calendar access & RSVP sync
       const storedPhone = typeof window !== "undefined" ? localStorage.getItem("leaf_follower_phone") : null;
-      const result = await Parse.Cloud.run("getOrgCalendarPage", { shareId, phoneNumber: storedPhone || undefined });
+      const cachedUser = typeof window !== "undefined" ? getVerifiedUserCookie() : null;
+      const phoneNumber = storedPhone || cachedUser?.phone?.replace(/\D/g, "") || undefined;
+      const result = await Parse.Cloud.run("getOrgCalendarPage", { shareId, phoneNumber });
 
       // Handle inactive calendar
       if (result.isInactive) {
