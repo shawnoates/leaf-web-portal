@@ -1741,10 +1741,10 @@ export default function OrgCalendarPage() {
             <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
               <div className="space-y-2">
                 <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold flex items-center gap-2">
-                  <Sparkles className="w-3.5 h-3.5" /> Be the Host
+                  <Sparkles className="w-3.5 h-3.5" /> Get Involved
                 </p>
                 <h2 className="text-4xl font-light tracking-tight italic">
-                  Pick a Plan, Make It Happen
+                  Host Something for the Community
                 </h2>
               </div>
               <div className="flex gap-4">
@@ -1850,13 +1850,13 @@ export default function OrgCalendarPage() {
                       </div>
                       <div className="space-y-2">
                         <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-emerald-700">
-                          Be the Host
+                          Your Idea
                         </p>
                         <h4 className="text-lg font-medium tracking-tight text-zinc-900">
-                          Propose Your Own Plan
+                          Suggest a Plan
                         </h4>
                         <p className="text-xs text-zinc-500 leading-relaxed font-light">
-                          Have an idea for the community? Submit it and the organizer will review.
+                          Have something in mind? Share your idea and we'll review it.
                         </p>
                       </div>
                     </div>
