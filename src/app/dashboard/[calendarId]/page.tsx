@@ -616,7 +616,7 @@ export default function OrgDashboardPage() {
     }
   }
 
-  async function handleSubscriptionChange(tier: string) {
+  async function handleSubscriptionChange(tier: string, billingPeriod: "monthly" | "yearly" = "monthly") {
     setSubscriptionLoading(true);
     try {
       if (tier === "starter") {
@@ -633,6 +633,7 @@ export default function OrgDashboardPage() {
         const result = await Parse.Cloud.run("createOrgSubscriptionCheckout", {
           calendarId,
           tier,
+          billingPeriod,
           returnUrl: `${window.location.origin}/dashboard/${calendarId}`,
         });
         if (result?.url) {

@@ -222,7 +222,7 @@ export default function PlansPage() {
     }
   }
 
-  async function handleSubscriptionChange(newTier: string) {
+  async function handleSubscriptionChange(newTier: string, billingPeriod: "monthly" | "yearly" = "monthly") {
     setSubscriptionLoading(true);
     try {
       if (newTier === "starter") {
@@ -238,6 +238,7 @@ export default function PlansPage() {
         const result = await Parse.Cloud.run("createOrgSubscriptionCheckout", {
           calendarId,
           tier: newTier,
+          billingPeriod,
           returnUrl: `${window.location.origin}/dashboard/${calendarId}/plans`,
         });
         if (result?.url) {

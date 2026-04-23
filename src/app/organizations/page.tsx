@@ -28,7 +28,7 @@ const PRICING_TIERS = [
     cta: "Get Started Free",
     highlight: false,
     features: [
-      "1 city",
+      "1 calendar",
       "5 AI-generated plan ideas per week",
       "Up to 50 RSVPs",
       "Leaf-branded calendar page",
@@ -56,7 +56,7 @@ const PRICING_TIERS = [
     cta: "Start with The Social",
     highlight: true,
     features: [
-      "1 city",
+      "1 calendar",
       "10 AI-generated plan ideas per week",
       "Unlimited RSVPs",
       "Custom branded page",
@@ -418,7 +418,7 @@ export default function OrganizationsPage() {
                   ))}
                 </div>
                 <Link
-                  href={`/organizations/setup?tier=${tier.id}`}
+                  href={`/organizations/setup?tier=${tier.id}&billingPeriod=${billingPeriod}`}
                   className={`w-full py-3.5 text-xs uppercase tracking-[0.2em] font-bold text-center flex items-center justify-center gap-2 transition-colors ${
                     tier.highlight
                       ? "bg-zinc-900 text-white hover:bg-zinc-800"

@@ -63,7 +63,7 @@ const TIERS = [
 
 interface SubscriptionModalProps {
   currentTier: string;
-  onSelect: (tier: string) => void;
+  onSelect: (tier: string, billingPeriod: "monthly" | "yearly") => void;
   onClose: () => void;
   loading?: boolean;
 }
@@ -162,7 +162,7 @@ export default function SubscriptionModal({
                   ))}
                 </ul>
                 <button
-                  onClick={() => !isCurrent && onSelect(tier.id)}
+                  onClick={() => !isCurrent && onSelect(tier.id, billingPeriod)}
                   disabled={isCurrent || loading}
                   className={`w-full py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg transition-colors ${
                     isCurrent

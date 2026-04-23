@@ -69,6 +69,9 @@ function SetupPageInner() {
   const requestedTier = searchParams.get("tier");
   const initialTier =
     requestedTier === "growth" || requestedTier === "pro" ? requestedTier : "starter";
+  const requestedBillingPeriod = searchParams.get("billingPeriod");
+  const initialBillingPeriod: "monthly" | "yearly" =
+    requestedBillingPeriod === "yearly" ? "yearly" : "monthly";
 
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>({
@@ -164,6 +167,7 @@ function SetupPageInner() {
           const checkout = await Parse.Cloud.run("createOrgSubscriptionCheckout", {
             calendarId: result.calendarId,
             tier: form.tier,
+            billingPeriod: initialBillingPeriod,
             returnUrl: `${window.location.origin}/dashboard/${result.calendarId}`,
           });
           if (checkout?.url) {
