@@ -1113,6 +1113,27 @@ export default function OrgCalendarPage() {
         isFollower: result.isFollower || false,
         followRequestPending: result.followRequestPending || false,
       });
+
+      // Sync RSVP cookies with backend data (handles admin-removed RSVPs)
+      if (result.userRsvpPlanIds && Array.isArray(result.userRsvpPlanIds)) {
+        const confirmedIds = new Set(result.userRsvpPlanIds.filter((r: { status: string }) => r.status === "Accepted").map((r: { planId: string }) => r.planId));
+        const pendingIds = new Set(result.userRsvpPlanIds.filter((r: { status: string }) => r.status === "pendingRsvp").map((r: { planId: string }) => r.planId));
+
+        // Remove stale cookies for RSVPs that no longer exist
+        for (const id of getRsvpCookieIds()) {
+          if (!confirmedIds.has(id)) removeRsvpCookie(id);
+        }
+        for (const id of getPendingRsvpCookieIds()) {
+          if (!pendingIds.has(id)) removePendingRsvpCookie(id);
+        }
+
+        // Add missing cookies for RSVPs the backend knows about
+        for (const id of confirmedIds) addRsvpCookie(id);
+        for (const id of pendingIds) addPendingRsvpCookie(id);
+
+        setRsvpedPlanIds(confirmedIds);
+        setPendingRsvpIds(pendingIds);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load calendar");
     } finally {
