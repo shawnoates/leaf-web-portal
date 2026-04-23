@@ -858,7 +858,20 @@ export default function OrgCalendarPage() {
       setToast("RSVP cancelled");
       setTimeout(() => setToast(null), 3000);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to cancel RSVP.");
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("No RSVP found")) {
+        // RSVP was already removed (e.g. by admin) — clean up local state
+        removeRsvpCookie(planId);
+        setRsvpedPlanIds((prev) => {
+          const next = new Set(prev);
+          next.delete(planId);
+          return next;
+        });
+        setToast("RSVP was already removed");
+        setTimeout(() => setToast(null), 3000);
+      } else {
+        alert(msg || "Failed to cancel RSVP.");
+      }
     } finally {
       setCancellingRsvp(null);
     }

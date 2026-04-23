@@ -271,9 +271,7 @@ export default function OrgDashboardPage() {
   const [settingsSection, setSettingsSection] = useState<"general" | "subscription">("general");
 
   // Migration
-  const [migrating, setMigrating] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [migrationResult, setMigrationResult] = useState<any>(null);
 
   // Toast
   const [toast, setToast] = useState<string | null>(null);
@@ -1092,49 +1090,6 @@ export default function OrgDashboardPage() {
                 </div>
               ))}
             </div>
-
-            {/* One-time migration for plans missing iOS visibility */}
-            {migrationResult ? (
-              <div className="border border-green-200 bg-green-50 rounded-xl p-4 text-xs text-green-700 space-y-2">
-                <p className="font-medium">
-                  {migrationResult.fixed} fixed | {migrationResult.statusFixed || 0} status corrected | {migrationResult.deduped || 0} deduped | {migrationResult.skipped} already OK | {migrationResult.flagsFixed || 0} flags
-                </p>
-                <p>iOS sees {migrationResult.iosCurrentCount} current plans (of {migrationResult.iosTotalCount} total notifs). {migrationResult.total} plans on {migrationResult.calendarsFound} calendars.</p>
-                {migrationResult.plans?.length > 0 && (
-                  <div className="mt-2 border-t border-green-200 pt-2">
-                    <p className="font-medium mb-1">Plans on your calendars (notifications):</p>
-                    {migrationResult.plans.map((p: any, i: number) => (
-                      <p key={i} className="text-[10px] font-mono">{p.title} — {p.action} {p.status ? `(${p.status})` : ""} host:{p.host} creator:{p.creator || "?"} [{p.notifs}]</p>
-                    ))}
-                  </div>
-                )}
-                {migrationResult.iosCurrentPlans?.length > 0 && (
-                  <div className="mt-2 border-t border-green-200 pt-2">
-                    <p className="font-medium mb-1">iOS current plans ({migrationResult.iosCurrentPlans.length}):</p>
-                    {migrationResult.iosCurrentPlans.map((p: any, i: number) => (
-                      <p key={i} className="text-[10px] font-mono">{p.title} — {p.status} exp:{p.expiry}</p>
-                    ))}
-                  </div>
-                )}
-                <button onClick={() => setMigrationResult(null)} className="text-green-600 underline text-[10px] mt-1">Run again</button>
-              </div>
-            ) : (
-              <button
-                onClick={async () => {
-                  setMigrating(true);
-                  try {
-                    const r = await Parse.Cloud.run("migrateManualPlans");
-                    setMigrationResult(r);
-                    console.log("Migration result:", r);
-                  } catch (e) { console.error(e); alert("Migration failed — see console"); }
-                  setMigrating(false);
-                }}
-                disabled={migrating}
-                className="border border-amber-200 bg-amber-50 rounded-xl p-4 text-xs text-amber-700 hover:bg-amber-100 transition-colors w-full text-left"
-              >
-                {migrating ? "Migrating plans..." : "⚠️ Restore plans to iOS app (one-time)"}
-              </button>
-            )}
 
             {/* Concierge Ad */}
             <div className="border border-emerald-200 rounded-xl p-6 bg-gradient-to-br from-emerald-50/60 to-white">
