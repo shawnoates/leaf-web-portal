@@ -61,6 +61,7 @@ interface OrgDashboard {
   orgType: string | null;
   tier: string;
   subscriptionStatus: string | null;
+  subscriptionCancelAt: number | null;
   isOwner: boolean;
   profilePhoto: string | null;
   bannerUrl: string | null;
@@ -2130,7 +2131,7 @@ export default function OrgDashboardPage() {
                   <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
                     <p className="text-sm font-medium text-amber-800">Subscription cancelling</p>
                     <p className="text-xs text-amber-600 mt-0.5">
-                      Your plan remains active until {cancelAt ? new Date(cancelAt * 1000).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "the end of your billing period"}. After that, you&apos;ll be downgraded to the Starter (Free) plan.
+                      Your plan remains active until {(cancelAt || dashboard.subscriptionCancelAt) ? new Date((cancelAt || dashboard.subscriptionCancelAt!) * 1000).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "the end of your billing period"}. After that, you&apos;ll be downgraded to the Starter (Free) plan.
                     </p>
                   </div>
                 )}
