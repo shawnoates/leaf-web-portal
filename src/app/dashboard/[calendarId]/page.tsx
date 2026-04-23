@@ -1656,7 +1656,7 @@ export default function OrgDashboardPage() {
                                 <p className="text-xs text-zinc-400 mb-1">{new Date(plan.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</p>
                                 <div className="flex items-center justify-between text-xs text-zinc-400">
                                   <span className="truncate">{plan.hostName}</span>
-                                  {plan.rsvpCount > 0 && <span className="shrink-0 ml-2">{plan.rsvpCount} RSVPs</span>}
+                                  <span className="shrink-0 ml-2">{plan.rsvpCount} RSVPs</span>
                                 </div>
                               </div>
                             </div>
