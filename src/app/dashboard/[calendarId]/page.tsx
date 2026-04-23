@@ -2157,7 +2157,7 @@ export default function OrgDashboardPage() {
                             {new Date(m.joinedAt).toLocaleDateString()}
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {m.status !== "Owned" && (
+                            {m.status !== "Owned" && m.status !== "Owner" && (
                               <button
                                 onClick={async () => {
                                   if (!confirm(`Remove ${m.name} from this calendar?`)) return;
