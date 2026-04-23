@@ -20,8 +20,10 @@ const PRICING_TIERS = [
   {
     id: "starter",
     name: "Starter",
-    price: "Free",
-    period: "",
+    monthlyPrice: "Free",
+    yearlyPrice: "Free",
+    monthlyPeriod: "",
+    yearlyPeriod: "",
     description: "For the casual host",
     cta: "Get Started Free",
     highlight: false,
@@ -45,8 +47,11 @@ const PRICING_TIERS = [
   {
     id: "growth",
     name: "The Social",
-    price: "$4.99",
-    period: "/mo",
+    monthlyPrice: "$4.99",
+    yearlyPrice: "$49.99",
+    monthlyPeriod: "/mo",
+    yearlyPeriod: "/yr",
+    yearlySavings: "Save 17%",
     description: "For the individual connector who wants more control and a premium look",
     cta: "Start with The Social",
     highlight: true,
@@ -70,8 +75,11 @@ const PRICING_TIERS = [
   {
     id: "pro",
     name: "The Organizer",
-    price: "$29.99",
-    period: "/mo",
+    monthlyPrice: "$9.99",
+    yearlyPrice: "$99.99",
+    monthlyPeriod: "/mo",
+    yearlyPeriod: "/yr",
+    yearlySavings: "Save 17%",
     description: "For building a brand, managing co-hosts, and scaling your community",
     cta: "Start with The Organizer",
     highlight: false,
@@ -158,6 +166,7 @@ const FEATURES = [
 
 export default function OrganizationsPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly");
 
   useEffect(() => {
     const currentUser = Parse.User.current();
@@ -314,16 +323,42 @@ export default function OrganizationsPage() {
       {/* Pricing */}
       <section id="pricing" className="bg-zinc-50 py-32">
         <div className="max-w-6xl mx-auto px-6">
-          <div className="mb-20 text-center">
+          <div className="mb-12 text-center">
             <p className="text-[10px] tracking-[0.4em] uppercase text-zinc-400 font-bold mb-4">
               Pricing
             </p>
-            <h2 className="text-4xl font-light tracking-tight italic">
+            <h2 className="text-4xl font-light tracking-tight italic mb-8">
               Start free, grow when ready
             </h2>
+            {/* Billing period toggle */}
+            <div className="inline-flex items-center gap-1 bg-zinc-100 rounded-full p-1">
+              <button
+                onClick={() => setBillingPeriod("monthly")}
+                className={`px-5 py-2 text-xs font-bold uppercase tracking-[0.15em] rounded-full transition-colors ${
+                  billingPeriod === "monthly"
+                    ? "bg-zinc-900 text-white"
+                    : "text-zinc-500 hover:text-zinc-700"
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingPeriod("yearly")}
+                className={`px-5 py-2 text-xs font-bold uppercase tracking-[0.15em] rounded-full transition-colors ${
+                  billingPeriod === "yearly"
+                    ? "bg-zinc-900 text-white"
+                    : "text-zinc-500 hover:text-zinc-700"
+                }`}
+              >
+                Yearly
+              </button>
+            </div>
           </div>
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {PRICING_TIERS.map((tier) => (
+            {PRICING_TIERS.map((tier) => {
+              const price = billingPeriod === "yearly" ? tier.yearlyPrice : tier.monthlyPrice;
+              const period = billingPeriod === "yearly" ? tier.yearlyPeriod : tier.monthlyPeriod;
+              return (
               <div
                 key={tier.name}
                 className={`bg-white p-8 flex flex-col ${
@@ -343,14 +378,19 @@ export default function OrganizationsPage() {
                   </h3>
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-light tracking-tight">
-                      {tier.price}
+                      {price}
                     </span>
-                    {tier.period && (
+                    {period && (
                       <span className="text-zinc-400 text-sm">
-                        {tier.period}
+                        {period}
                       </span>
                     )}
                   </div>
+                  {billingPeriod === "yearly" && tier.yearlySavings && (
+                    <span className="text-xs text-green-600 font-medium mt-1 inline-block">
+                      {tier.yearlySavings}
+                    </span>
+                  )}
                   <p className="text-sm text-zinc-500 font-light mt-2">
                     {tier.description}
                   </p>
@@ -388,7 +428,8 @@ export default function OrganizationsPage() {
                   {tier.cta} <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>

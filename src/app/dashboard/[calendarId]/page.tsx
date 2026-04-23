@@ -2044,7 +2044,7 @@ export default function OrgDashboardPage() {
                     ? "Free — basic features"
                     : dashboard.tier === "growth"
                     ? "$4.99/month — premium look & app chat"
-                    : "$29.99/month — full features"}
+                    : "$9.99/month — full features"}
                 </p>
               </section>
 

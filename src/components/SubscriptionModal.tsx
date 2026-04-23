@@ -1,13 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { Check, Plus } from "lucide-react";
 
 const TIERS = [
   {
     id: "starter",
     name: "Starter",
-    price: "Free",
-    period: "",
+    monthlyPrice: "Free",
+    yearlyPrice: "Free",
+    monthlyPeriod: "",
+    yearlyPeriod: "",
     description: "For the casual host",
     features: [
       "1 calendar",
@@ -19,12 +22,15 @@ const TIERS = [
   {
     id: "growth",
     name: "The Social",
-    price: "$4.99",
-    period: "/mo",
+    monthlyPrice: "$4.99",
+    yearlyPrice: "$49.99",
+    monthlyPeriod: "/mo",
+    yearlyPeriod: "/yr",
+    yearlySavings: "Save 17%",
     description: "For the individual connector who wants more control and a premium look",
     highlight: true,
     features: [
-      "Up to 5 calendars",
+      "1 calendar",
       "10 AI plan ideas per week",
       "Unlimited RSVPs",
       "Unlimited scheduling",
@@ -36,8 +42,11 @@ const TIERS = [
   {
     id: "pro",
     name: "The Organizer",
-    price: "$29.99",
-    period: "/mo",
+    monthlyPrice: "$9.99",
+    yearlyPrice: "$99.99",
+    monthlyPeriod: "/mo",
+    yearlyPeriod: "/yr",
+    yearlySavings: "Save 17%",
     description: "For building a brand, managing co-hosts, and scaling your community",
     features: [
       "Unlimited calendars",
@@ -65,6 +74,8 @@ export default function SubscriptionModal({
   onClose,
   loading = false,
 }: SubscriptionModalProps) {
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly");
+
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
       <div className="bg-white w-full max-w-3xl rounded-t-2xl md:rounded-xl p-6 md:p-10 max-h-[90vh] overflow-y-auto relative">
@@ -78,13 +89,39 @@ export default function SubscriptionModal({
         <h2 className="text-2xl font-light tracking-tight mb-1">
           Choose your plan
         </h2>
-        <p className="text-sm text-zinc-500 mb-8">
+        <p className="text-sm text-zinc-500 mb-4">
           Upgrade to unlock more features for your organization.
         </p>
+
+        {/* Billing period toggle */}
+        <div className="flex items-center justify-center gap-2 mb-8">
+          <button
+            onClick={() => setBillingPeriod("monthly")}
+            className={`px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-full transition-colors ${
+              billingPeriod === "monthly"
+                ? "bg-zinc-900 text-white"
+                : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+            }`}
+          >
+            Monthly
+          </button>
+          <button
+            onClick={() => setBillingPeriod("yearly")}
+            className={`px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-full transition-colors ${
+              billingPeriod === "yearly"
+                ? "bg-zinc-900 text-white"
+                : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+            }`}
+          >
+            Yearly
+          </button>
+        </div>
 
         <div className="grid md:grid-cols-3 gap-4">
           {TIERS.map((tier) => {
             const isCurrent = tier.id === currentTier;
+            const price = billingPeriod === "yearly" ? tier.yearlyPrice : tier.monthlyPrice;
+            const period = billingPeriod === "yearly" ? tier.yearlyPeriod : tier.monthlyPeriod;
             return (
               <div
                 key={tier.id}
@@ -105,11 +142,16 @@ export default function SubscriptionModal({
                   )}
                 </div>
                 <div className="flex items-baseline gap-0.5 mb-1">
-                  <span className="text-3xl font-light">{tier.price}</span>
-                  {tier.period && (
-                    <span className="text-sm text-zinc-400">{tier.period}</span>
+                  <span className="text-3xl font-light">{price}</span>
+                  {period && (
+                    <span className="text-sm text-zinc-400">{period}</span>
                   )}
                 </div>
+                {billingPeriod === "yearly" && tier.yearlySavings && (
+                  <span className="text-xs text-green-600 font-medium mb-1">
+                    {tier.yearlySavings}
+                  </span>
+                )}
                 <p className="text-xs text-zinc-500 mb-4">{tier.description}</p>
                 <ul className="space-y-2 mb-6 flex-1">
                   {tier.features.map((f) => (
