@@ -1656,7 +1656,7 @@ export default function OrgDashboardPage() {
                                 <p className="text-xs text-zinc-400 mb-1">{new Date(plan.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</p>
                                 <div className="flex items-center justify-between text-xs text-zinc-400">
                                   <span className="truncate">{plan.hostName}</span>
-                                  <span className="shrink-0 ml-2">{plan.rsvpCount} RSVPs</span>
+                                  {plan.rsvpCount > 0 && <span className="shrink-0 ml-2">{plan.rsvpCount} RSVPs</span>}
                                 </div>
                               </div>
                             </div>
@@ -2858,7 +2858,7 @@ export default function OrgDashboardPage() {
                               )}
                             </td>
                             <td className="px-4 py-2.5">
-                              {r.status === "pendingRsvp" && (
+                              {r.status === "pendingRsvp" ? (
                                 <div className="flex gap-2">
                                   <button
                                     onClick={async () => {
@@ -2889,6 +2889,22 @@ export default function OrgDashboardPage() {
                                     Decline
                                   </button>
                                 </div>
+                              ) : (
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm(`Remove ${r.name} from this plan?`)) return;
+                                    try {
+                                      await Parse.Cloud.run("removeAttendeeFromPlan", { notificationId: r.notificationId });
+                                      setPlanRsvps((prev) => prev.filter((rsvp) => rsvp.notificationId !== r.notificationId));
+                                    } catch (err) {
+                                      console.error("Failed to remove attendee:", err);
+                                      alert("Failed to remove attendee.");
+                                    }
+                                  }}
+                                  className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
+                                >
+                                  Remove
+                                </button>
                               )}
                             </td>
                           </tr>
