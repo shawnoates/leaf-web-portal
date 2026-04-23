@@ -208,8 +208,12 @@ interface OrgAnalytics {
     membersInRange: number;
     rsvpsInRange: number;
     rsvpDeltaPct: number;
+    pageViewCount: number;
+    pageViewsInRange: number;
+    pageViewDeltaPct: number;
     followerSeries: AnalyticsSeriesPoint[];
     rsvpSeries: AnalyticsSeriesPoint[];
+    pageViewSeries: AnalyticsSeriesPoint[];
   };
   engagement: {
     rsvpCount: number;
@@ -283,6 +287,7 @@ export default function OrgDashboardPage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [analyticsRange, setAnalyticsRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
+  const [analyticsCalFilter, setAnalyticsCalFilter] = useState<string>("all");
 
   // Modals
   const [showAddCalendar, setShowAddCalendar] = useState(false);
@@ -450,14 +455,16 @@ export default function OrgDashboardPage() {
 
   // Analytics fetcher — Pro tier only
   const fetchAnalytics = useCallback(
-    async (range: "7d" | "30d" | "90d" | "all") => {
+    async (range: "7d" | "30d" | "90d" | "all", calFilter?: string) => {
       if (!dashboard || dashboard.tier !== "pro") return;
       setAnalyticsLoading(true);
       setAnalyticsError(null);
       try {
+        const filterCal = calFilter ?? analyticsCalFilter;
         const result = await Parse.Cloud.run("getOrgAnalytics", {
           calendarId,
           range,
+          ...(filterCal !== "all" ? { filterCalendarId: filterCal } : {}),
         });
         setAnalytics(result);
       } catch (err: unknown) {
@@ -468,15 +475,15 @@ export default function OrgDashboardPage() {
         setAnalyticsLoading(false);
       }
     },
-    [calendarId, dashboard]
+    [calendarId, dashboard, analyticsCalFilter]
   );
 
-  // Auto-load analytics when the tab opens or range changes
+  // Auto-load analytics when the tab opens, range changes, or calendar filter changes
   useEffect(() => {
     if (activeTab === "analytics" && dashboard?.tier === "pro") {
       fetchAnalytics(analyticsRange);
     }
-  }, [activeTab, analyticsRange, dashboard, fetchAnalytics]);
+  }, [activeTab, analyticsRange, analyticsCalFilter, dashboard, fetchAnalytics]);
 
   // ── Handlers ──
 
@@ -1120,11 +1127,25 @@ export default function OrgDashboardPage() {
         {/* ──────── ANALYTICS TAB ──────── */}
         {activeTab === "analytics" && dashboard.tier === "pro" && (
           <div className="space-y-8">
-            {/* Range selector */}
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-                Analytics
-              </h2>
+            {/* Range selector + calendar filter */}
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
+                  Analytics
+                </h2>
+                {dashboard.calendars.length > 1 && (
+                  <select
+                    value={analyticsCalFilter}
+                    onChange={(e) => setAnalyticsCalFilter(e.target.value)}
+                    className="text-xs border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 focus:outline-none focus:border-zinc-400"
+                  >
+                    <option value="all">All Calendars</option>
+                    {dashboard.calendars.filter((c) => c.isActive).map((cal) => (
+                      <option key={cal.objectId} value={cal.objectId}>{cal.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
               <div className="flex gap-1 border border-zinc-200 rounded-lg p-0.5">
                 {(["7d", "30d", "90d", "all"] as const).map((r) => (
                   <button
@@ -1185,8 +1206,14 @@ export default function OrgDashboardPage() {
                   <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-3">
                     Growth
                   </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                     {[
+                      {
+                        label: "Page Views",
+                        value: analytics.growth.pageViewCount,
+                        delta: analytics.growth.pageViewsInRange,
+                        deltaPct: analytics.growth.pageViewDeltaPct,
+                      },
                       {
                         label: "Followers",
                         value: analytics.growth.followerCount,
@@ -1291,6 +1318,55 @@ export default function OrgDashboardPage() {
                           dot={false}
                         />
                       </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+
+                {/* Page views over time */}
+                <section className="border border-zinc-200 rounded-xl p-6">
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                    Page views over time
+                  </h3>
+                  <div className="h-56 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={analytics.growth.pageViewSeries}>
+                        <CartesianGrid stroke="#f4f4f5" vertical={false} />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={(d) =>
+                            new Date(d).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })
+                          }
+                          minTickGap={30}
+                        />
+                        <YAxis
+                          tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                          tickLine={false}
+                          axisLine={false}
+                          allowDecimals={false}
+                          width={30}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            border: "1px solid #e4e4e7",
+                            borderRadius: 8,
+                            fontSize: 12,
+                          }}
+                          labelFormatter={(d) =>
+                            new Date(d).toLocaleDateString("en-US", {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                            })
+                          }
+                        />
+                        <Bar dataKey="value" fill="#18181b" radius={[4, 4, 0, 0]} />
+                      </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </section>

@@ -1053,7 +1053,7 @@ export default function OrgCalendarPage() {
     if (pendingIds.length > 0) setPendingRsvpIds(new Set(pendingIds));
   }, []);
 
-  const fetchOrg = useCallback(async () => {
+  const fetchOrg = useCallback(async (retried = false) => {
     try {
       setLoading(true);
       // Pass phone number if available for private calendar access & RSVP sync
@@ -1061,6 +1061,11 @@ export default function OrgCalendarPage() {
       const cachedUser = typeof window !== "undefined" ? getVerifiedUserCookie() : null;
       const phoneNumber = storedPhone || cachedUser?.phone?.replace(/\D/g, "") || undefined;
       const result = await Parse.Cloud.run("getOrgCalendarPage", { shareId, phoneNumber });
+
+      // Record page view (fire-and-forget)
+      if (result.objectId) {
+        Parse.Cloud.run("recordCalendarPageView", { calendarId: result.objectId }).catch(() => {});
+      }
 
       // Handle inactive calendar
       if (result.isInactive) {
@@ -1150,7 +1155,14 @@ export default function OrgCalendarPage() {
         setPendingRsvpIds(pendingIds);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load calendar");
+      const msg = err instanceof Error ? err.message : String(err);
+      // Stale Parse session token — clear it and retry once
+      if (msg.toLowerCase().includes("invalid session") && !retried) {
+        retried = true;
+        try { await Parse.User.logOut(); } catch { /* ignore */ }
+        return fetchOrg();
+      }
+      setError(msg || "Failed to load calendar");
     } finally {
       setLoading(false);
     }
