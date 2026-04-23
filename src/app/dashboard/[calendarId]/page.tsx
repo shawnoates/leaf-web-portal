@@ -60,6 +60,7 @@ interface OrgDashboard {
   shareId: string;
   orgType: string | null;
   tier: string;
+  subscriptionStatus: string | null;
   isOwner: boolean;
   profilePhoto: string | null;
   bannerUrl: string | null;
@@ -288,6 +289,7 @@ export default function OrgDashboardPage() {
   const [showSubscription, setShowSubscription] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [cancelAt, setCancelAt] = useState<number | null>(null);
 
   // Add calendar form
   const [newCalName, setNewCalName] = useState("");
@@ -654,7 +656,8 @@ export default function OrgDashboardPage() {
     if (!confirm("Are you sure you want to cancel your subscription? You will be downgraded to Starter (Free) at the end of your current billing period.")) return;
     setSubscriptionLoading(true);
     try {
-      await Parse.Cloud.run("cancelOrgSubscription", { calendarId });
+      const result = await Parse.Cloud.run("cancelOrgSubscription", { calendarId });
+      if (result.cancelAt) setCancelAt(result.cancelAt);
       fetchDashboard();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to cancel";
@@ -2044,9 +2047,17 @@ export default function OrgDashboardPage() {
                   {dashboard.tier === "starter"
                     ? "Free — basic features"
                     : dashboard.tier === "growth"
-                    ? "$4.99/month — premium look & app chat"
+                    ? "$4.99/month — premium features"
                     : "$9.99/month — full features"}
                 </p>
+                {dashboard.subscriptionStatus === "cancelling" && (
+                  <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                    <p className="text-sm font-medium text-amber-800">Subscription cancelling</p>
+                    <p className="text-xs text-amber-600 mt-0.5">
+                      Your plan remains active until {cancelAt ? new Date(cancelAt * 1000).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "the end of your billing period"}. After that, you&apos;ll be downgraded to the Starter (Free) plan.
+                    </p>
+                  </div>
+                )}
               </section>
 
               <button
@@ -2056,7 +2067,7 @@ export default function OrgDashboardPage() {
                 {dashboard.tier === "starter" ? "Upgrade Plan" : "Change Plan"}
               </button>
 
-              {dashboard.tier !== "starter" && (
+              {dashboard.tier !== "starter" && dashboard.subscriptionStatus !== "cancelling" && (
                 <button
                   onClick={handleCancelSubscription}
                   disabled={subscriptionLoading}
