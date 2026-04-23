@@ -1131,8 +1131,8 @@ export default function OrgCalendarPage() {
 
       // Sync RSVP cookies with backend data (handles admin-removed RSVPs)
       if (result.userRsvpPlanIds && Array.isArray(result.userRsvpPlanIds)) {
-        const confirmedIds = new Set(result.userRsvpPlanIds.filter((r: { status: string }) => r.status === "Accepted").map((r: { planId: string }) => r.planId));
-        const pendingIds = new Set(result.userRsvpPlanIds.filter((r: { status: string }) => r.status === "pendingRsvp").map((r: { planId: string }) => r.planId));
+        const confirmedIds = new Set<string>(result.userRsvpPlanIds.filter((r: { status: string }) => r.status === "Accepted").map((r: { planId: string }) => r.planId));
+        const pendingIds = new Set<string>(result.userRsvpPlanIds.filter((r: { status: string }) => r.status === "pendingRsvp").map((r: { planId: string }) => r.planId));
 
         // Remove stale cookies for RSVPs that no longer exist
         for (const id of getRsvpCookieIds()) {
