@@ -29,19 +29,14 @@ const PRICING_TIERS = [
     highlight: false,
     features: [
       "1 calendar",
-      "5 AI-generated plan ideas per week",
+      "5 AI plan ideas per week",
       "Up to 50 RSVPs",
-      "Leaf-branded calendar page",
-      "Phone Number RSVP",
+      "Automated follower notifications",
+      "Access to local events database",
     ],
     excluded: [
-      "Blacklist categories",
-      "Day-of-week preferences",
-      "Capacity constraints",
-      "Max events control",
-      "Location type preferences",
+      "Custom plan idea preferences",
       "Analytics",
-      "On-demand generation",
     ],
   },
   {
@@ -57,19 +52,16 @@ const PRICING_TIERS = [
     highlight: true,
     features: [
       "1 calendar",
-      "10 AI-generated plan ideas per week",
+      "10 AI plan ideas per week",
       "Unlimited RSVPs",
-      "Custom branded page",
-      "Phone Number RSVP",
-      "Blacklist categories",
-      "Day-of-week preferences",
-      "Capacity constraints",
-      "Max events control",
+      "Automated follower notifications",
+      "Access to local events database",
+      "Unlimited scheduling",
+      "Custom branding",
+      "Custom plan idea preferences",
     ],
     excluded: [
-      "Location type preferences",
       "Analytics",
-      "On-demand generation",
     ],
   },
   {
@@ -84,18 +76,15 @@ const PRICING_TIERS = [
     cta: "Start with The Organizer",
     highlight: false,
     features: [
-      "Up to 5 cities",
-      "15 AI-generated plan ideas per week",
+      "5 calendars",
+      "15 AI plan ideas per week",
       "Unlimited RSVPs",
-      "Custom branded page",
-      "Phone Number RSVP",
-      "Blacklist categories",
-      "Day-of-week preferences",
-      "Capacity constraints",
-      "Max events control",
-      "Location type preferences per city",
+      "Automated follower notifications",
+      "Access to local events database",
+      "Unlimited scheduling",
+      "Custom branding",
+      "Advanced plan idea preferences",
       "Analytics dashboard",
-      "On-demand plan generation",
     ],
     excluded: [],
   },
@@ -418,18 +407,68 @@ export default function OrganizationsPage() {
                   ))}
                 </div>
                 <Link
-                  href={`/organizations/setup?tier=${tier.id}&billingPeriod=${billingPeriod}`}
+                  href={isLoggedIn ? "/dashboard" : `/organizations/setup?tier=${tier.id}&billingPeriod=${billingPeriod}`}
                   className={`w-full py-3.5 text-xs uppercase tracking-[0.2em] font-bold text-center flex items-center justify-center gap-2 transition-colors ${
                     tier.highlight
                       ? "bg-zinc-900 text-white hover:bg-zinc-800"
                       : "border border-zinc-200 text-zinc-900 hover:bg-zinc-50"
                   }`}
                 >
-                  {tier.cta} <ChevronRight className="w-3.5 h-3.5" />
+                  {isLoggedIn ? "Go to Dashboard" : tier.cta} <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
               );
             })}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="py-24">
+        <div className="max-w-3xl mx-auto px-6">
+          <p className="text-[10px] tracking-[0.4em] uppercase text-zinc-400 font-bold mb-4 text-center">
+            FAQ
+          </p>
+          <h2 className="text-3xl font-light tracking-tight italic mb-12 text-center">
+            Common questions
+          </h2>
+          <div className="space-y-8">
+            <div>
+              <h3 className="text-sm font-bold mb-1">What are AI plan ideas?</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                Every week, Leaf automatically generates personalized event ideas for your calendar based on your location, vibe, and preferences. These include real venues, smart timing, and images — ready for you or your members to host.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold mb-1">What is the events database?</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                The events database gives you access to local events happening in your area. Browse concerts, shows, festivals, and more — then turn them into plans for your community with one tap.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold mb-1">Can I switch plans later?</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                Yes. You can upgrade or downgrade at any time from your dashboard. If you upgrade, you'll be charged the new rate immediately. If you downgrade, your current plan stays active until the end of the billing period.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold mb-1">What counts as an RSVP?</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                An RSVP is counted each time someone confirms attendance to one of your plans. On the Starter plan, you get up to 50 RSVPs total. Growth and Organizer plans have unlimited RSVPs.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold mb-1">Do my members need to download the app?</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                No. Anyone can RSVP to your plans with just their phone number — no app download required. They'll receive SMS confirmations and reminders automatically.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold mb-1">What does custom branding include?</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                On Growth and Organizer plans, you can upload your own logo and set a brand color for your calendar page. This replaces the default Leaf branding so your community sees your identity.
+              </p>
+            </div>
           </div>
         </div>
       </section>

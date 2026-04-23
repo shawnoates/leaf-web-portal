@@ -16,7 +16,8 @@ const TIERS = [
       "1 calendar",
       "5 AI plan ideas per week",
       "Up to 50 RSVPs",
-      "Schedule 2 weeks ahead",
+      "Automated follower notifications",
+      "Access to local events database",
     ],
   },
   {
@@ -33,10 +34,11 @@ const TIERS = [
       "1 calendar",
       "10 AI plan ideas per week",
       "Unlimited RSVPs",
+      "Automated follower notifications",
+      "Access to local events database",
       "Unlimited scheduling",
       "Custom branding",
-      "Day & category preferences",
-      "RSVP management",
+      "Custom plan idea preferences",
     ],
   },
   {
@@ -49,14 +51,15 @@ const TIERS = [
     yearlySavings: "Save 17%",
     description: "For building a brand, managing co-hosts, and scaling your community",
     features: [
-      "Unlimited calendars",
+      "5 calendars",
       "15 AI plan ideas per week",
       "Unlimited RSVPs",
+      "Automated follower notifications",
+      "Access to local events database",
       "Unlimited scheduling",
       "Custom branding",
-      "All preferences",
+      "Advanced plan idea preferences",
       "Analytics dashboard",
-      "On-demand generation",
     ],
   },
 ];
@@ -164,7 +167,7 @@ export default function SubscriptionModal({
                 <button
                   onClick={() => !isCurrent && onSelect(tier.id, billingPeriod)}
                   disabled={isCurrent || loading}
-                  className={`w-full py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg transition-colors ${
+                  className={`w-full py-2.5 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors ${
                     isCurrent
                       ? "bg-zinc-100 text-zinc-400 cursor-default"
                       : "bg-zinc-900 text-white hover:bg-zinc-800"
