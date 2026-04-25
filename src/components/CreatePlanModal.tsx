@@ -40,6 +40,21 @@ interface CreatePlanModalProps {
   onCreated: () => void;
 }
 
+// Convert display time ("6:30 PM") to 24h format ("18:30") for <input type="time">
+function toTimeInputValue(t?: string | null): string {
+  if (!t) return "";
+  // Already in HH:MM format
+  if (/^\d{2}:\d{2}$/.test(t)) return t;
+  const match = t.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return t;
+  let h = parseInt(match[1], 10);
+  const m = match[2];
+  const ampm = match[3].toUpperCase();
+  if (ampm === "PM" && h < 12) h += 12;
+  if (ampm === "AM" && h === 12) h = 0;
+  return `${String(h).padStart(2, "0")}:${m}`;
+}
+
 export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, editMode, eventGroupId, onClose, onCreated }: CreatePlanModalProps) {
   const [selectedCalendarId, setSelectedCalendarId] = useState(calendarId);
   const [hideVenue, setHideVenue] = useState(hideVenueDefault ?? true);
@@ -50,7 +65,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     prefill?.venue ? { name: prefill.venue.name, address: prefill.venue.address, placeId: "" } : null
   );
   const [date, setDate] = useState(prefill?.date || "");
-  const [time, setTime] = useState(prefill?.time || "");
+  const [time, setTime] = useState(toTimeInputValue(prefill?.time));
   const [capacity, setCapacity] = useState(prefill?.capacity || "");
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(prefill?.imageUrl || null);
