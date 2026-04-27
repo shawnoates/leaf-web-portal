@@ -198,7 +198,7 @@ export default function OrganizationsPage() {
               {!isLoggedIn && (
                 <Link
                   href="/dashboard"
-                  className="text-[10px] tracking-[0.3em] uppercase font-bold text-white/60 hover:text-white transition-colors hidden sm:block"
+                  className="text-[10px] tracking-[0.3em] uppercase font-bold text-white/60 hover:text-white transition-colors"
                 >
                   Sign In
                 </Link>

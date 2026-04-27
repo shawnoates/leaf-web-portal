@@ -1544,7 +1544,7 @@ export default function OrgCalendarPage() {
             </span>
           </div>
           <div className="flex items-center gap-4 shrink-0">
-            <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400 hidden sm:inline">
+            <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
               {followerCount} followers
             </span>
             {!org.isOwner && !org.isHost && (
