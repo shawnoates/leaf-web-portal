@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Parse from "@/lib/parse-client";
+import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import VenueSearch from "@/components/VenueSearch";
 import {
   Calendar,
@@ -126,21 +127,21 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     return () => clearTimeout(timer);
   }, [title]);
 
-  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
       alert("Image must be under 5MB");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setImagePreview(result);
-      setImageBase64(result.split(",")[1]);
+    try {
+      const { preview, base64 } = await processImageFile(file);
+      setImagePreview(preview);
+      setImageBase64(base64);
       setSelectedImageUrl(null);
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      alert("Could not process this image. Please try a different file.");
+    }
   }
 
   async function handleCreate() {
@@ -314,7 +315,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
               <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-zinc-200 rounded-lg cursor-pointer hover:border-zinc-400 transition-colors">
                 <ImagePlus className="w-6 h-6 text-zinc-300 mb-2" />
                 <span className="text-xs text-zinc-400">Click to upload an image</span>
-                <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+                <input type="file" accept={IMAGE_ACCEPT} onChange={handleImageSelect} className="hidden" />
               </label>
             )}
 

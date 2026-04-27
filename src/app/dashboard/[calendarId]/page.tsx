@@ -10,6 +10,7 @@ import SubscriptionModal from "@/components/SubscriptionModal";
 import MarketplaceTab, { type MarketplaceEvent, type OrgSettings } from "@/components/MarketplaceTab";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
+import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import {
   Calendar,
   Check,
@@ -616,17 +617,16 @@ export default function OrgDashboardPage() {
     }
   }
 
-  function handleLogoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleLogoSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setSettingsLogoPreview(result);
-      // Strip the data:image/...;base64, prefix for Parse
-      setSettingsLogoBase64(result.split(",")[1]);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const { preview, base64 } = await processImageFile(file);
+      setSettingsLogoPreview(preview);
+      setSettingsLogoBase64(base64);
+    } catch {
+      alert("Could not process this image. Please try a different file.");
+    }
   }
 
   async function handleAddCalendar() {
@@ -1895,7 +1895,7 @@ export default function OrgDashboardPage() {
                     {dashboard.profilePhoto || settingsLogoPreview ? "Change Logo" : "Upload Logo"}
                     <input
                       type="file"
-                      accept="image/*"
+                      accept={IMAGE_ACCEPT}
                       onChange={handleLogoSelect}
                       className="hidden"
                     />
@@ -2650,20 +2650,20 @@ export default function OrgDashboardPage() {
                     <ImagePlus className="w-5 h-5 text-white" />
                     <input
                       type="file"
-                      accept="image/*"
+                      accept={IMAGE_ACCEPT}
                       className="hidden"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
                         if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5MB"); return; }
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          const result = reader.result as string;
-                          setEditCalImagePreview(result);
-                          setEditCalImageBase64(result.split(",")[1]);
+                        try {
+                          const { preview, base64 } = await processImageFile(file);
+                          setEditCalImagePreview(preview);
+                          setEditCalImageBase64(base64);
                           setEditCalRemoveImage(false);
-                        };
-                        reader.readAsDataURL(file);
+                        } catch {
+                          alert("Could not process this image. Please try a different file.");
+                        }
                       }}
                     />
                   </label>
