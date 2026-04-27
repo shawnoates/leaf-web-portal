@@ -7,7 +7,7 @@ import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
-import { ArrowLeft, Calendar, Clock, Copy, Lock, MapPin, Pencil, Plus, RefreshCw, Trash2, Users } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Copy, Lock, MapPin, Pencil, Plus, RefreshCw, Settings, Trash2, Users } from "lucide-react";
 
 interface PlanIdea {
   objectId: string;
@@ -57,6 +57,7 @@ export default function PlansPage() {
   const [planIdeas, setPlanIdeas] = useState<PlanIdea[]>([]);
   const [loadingIdeas, setLoadingIdeas] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
+  const [hidePlanIdeas, setHidePlanIdeas] = useState(false);
 
   // Upgrade gate
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -107,13 +108,19 @@ export default function PlansPage() {
   async function fetchOrgInfo() {
     try {
       const result = await Parse.Cloud.run("getOrgDashboard", { calendarId: orgId });
-      // If viewing a child calendar, find its name from the calendars list
+      // If viewing a child calendar, find its name and settings from the calendars list
       if (orgId !== calendarId && result.calendars) {
-        const child = result.calendars.find((c: { objectId: string; name: string }) => c.objectId === calendarId);
-        if (child) setOrgName(child.name);
-        else setOrgName(result.name);
+        const child = result.calendars.find((c: { objectId: string; name: string; hidePlanIdeas?: boolean }) => c.objectId === calendarId);
+        if (child) {
+          setOrgName(child.name);
+          setHidePlanIdeas(child.hidePlanIdeas || false);
+        } else {
+          setOrgName(result.name);
+          setHidePlanIdeas(result.hidePlanIdeas || false);
+        }
       } else {
         setOrgName(result.name);
+        setHidePlanIdeas(result.hidePlanIdeas || false);
       }
       setTier(result.tier);
     } catch {
@@ -389,21 +396,34 @@ export default function PlansPage() {
             <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
               Active Plan Ideas ({planIdeas.length})
             </h2>
-            <button
-              onClick={handleRegenerate}
-              disabled={regenerating}
-              className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors disabled:opacity-50"
-            >
-              {tier === "starter" ? (
-                <Lock className="w-3.5 h-3.5" />
-              ) : (
-                <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
-              )}
-              {regenerating ? "Generating..." : "Regenerate Ideas"}
-            </button>
+            {!hidePlanIdeas && (
+              <button
+                onClick={handleRegenerate}
+                disabled={regenerating}
+                className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors disabled:opacity-50"
+              >
+                {tier === "starter" ? (
+                  <Lock className="w-3.5 h-3.5" />
+                ) : (
+                  <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
+                )}
+                {regenerating ? "Generating..." : "Regenerate Ideas"}
+              </button>
+            )}
           </div>
 
-          {loadingIdeas ? (
+          {hidePlanIdeas ? (
+            <div className="border border-zinc-200 rounded-xl p-6 text-center space-y-3">
+              <p className="text-sm text-zinc-500">Plan ideas are turned off for this calendar.</p>
+              <Link
+                href={`/dashboard/${searchParams.get("orgId") || calendarId}?tab=calendars`}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 transition-colors"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                Calendar settings
+              </Link>
+            </div>
+          ) : loadingIdeas ? (
             <div className="flex items-center justify-center py-10">
               <div className="w-5 h-5 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin" />
             </div>
