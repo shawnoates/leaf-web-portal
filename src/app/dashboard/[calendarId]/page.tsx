@@ -2874,8 +2874,8 @@ export default function OrgDashboardPage() {
                 {planRsvpsLoading ? (
                   <p className="text-sm text-zinc-400">Loading...</p>
                 ) : planRsvps.length > 0 ? (
-                  <div className="border border-zinc-200 rounded-xl overflow-hidden">
-                    <table className="w-full text-sm">
+                  <div className="border border-zinc-200 rounded-xl overflow-x-auto">
+                    <table className="w-full text-sm min-w-0">
                       <thead className="bg-zinc-50 text-left">
                         <tr>
                           <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Name</th>
