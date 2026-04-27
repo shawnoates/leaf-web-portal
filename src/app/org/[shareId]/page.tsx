@@ -1840,8 +1840,65 @@ export default function OrgCalendarPage() {
         )}
 
         {/* Plan Ideas Carousel */}
+        {/* Custom plan proposal — independent of plan ideas */}
+        {!org.rsvpLimitReached && !org.hideCustomPlans && (
+          <section className={`${org.plans.length > 0 ? "mt-48" : "mt-8"} ${org.planIdeas.length > 0 && !org.hidePlanIdeas ? "mb-12" : "mb-24"} space-y-12`}>
+            <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
+              <div className="space-y-2">
+                <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold flex items-center gap-2">
+                  <Plus className="w-3.5 h-3.5" /> Suggest a Plan
+                </p>
+                <h2 className="text-4xl font-light tracking-tight italic">
+                  Have Something in Mind?
+                </h2>
+              </div>
+            </div>
+            <div
+              className="cursor-pointer max-w-[300px]"
+              onClick={() => {
+                setCreatingCustomPlan(true);
+                setCustomTitle("");
+                setCustomDescription("");
+                setCustomCategory("");
+                setCustomCapacity("");
+                setHostNote("");
+                setSelectedVenue(null);
+                setCustomSubmitting(false);
+                setCustomSuccess(false);
+              }}
+            >
+              <div className="aspect-[4/5] overflow-hidden mb-4 relative rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white transition-all hover:shadow-lg hover:border-emerald-300">
+                <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center space-y-4">
+                  <div className="w-14 h-14 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-md hover:scale-110 transition-transform">
+                    <Plus className="w-7 h-7" />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-emerald-700">
+                      Your Idea
+                    </p>
+                    <h4 className="text-lg font-medium tracking-tight text-zinc-900">
+                      Suggest a Plan
+                    </h4>
+                    <p className="text-xs text-zinc-500 leading-relaxed font-light">
+                      Have something in mind? Share your idea and we&apos;ll review it.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <h4 className="text-base font-medium tracking-tight hover:italic">
+                  Custom Plan
+                </h4>
+                <p className="text-sm text-zinc-500 font-light line-clamp-2 leading-relaxed">
+                  Pitch a date, venue, and details — pending organizer approval.
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
         {org.planIdeas.length > 0 && !org.hidePlanIdeas && (
-          <section className={`${org.plans.length > 0 ? "mt-48" : "mt-8"} mb-24 space-y-12`}>
+          <section className={`${!org.hideCustomPlans && !org.rsvpLimitReached ? "mt-12" : org.plans.length > 0 ? "mt-48" : "mt-8"} mb-24 space-y-12`}>
             <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
               <div className="space-y-2">
                 <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold flex items-center gap-2">
@@ -1880,8 +1937,6 @@ export default function OrgCalendarPage() {
               ref={scrollRef}
               className="flex gap-8 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-8"
             >
-              {/* Custom plan card — let community members propose their own */}
-              {!org.rsvpLimitReached && !org.hideCustomPlans && (
                 <div
                   className="min-w-[280px] max-w-[300px] snap-start group cursor-pointer"
                   onClick={() => {
@@ -1923,7 +1978,6 @@ export default function OrgCalendarPage() {
                     </p>
                   </div>
                 </div>
-              )}
               {org.planIdeas.map((idea) => (
                 <div
                   key={idea.id}
@@ -2944,7 +2998,7 @@ export default function OrgCalendarPage() {
               )}
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-zinc-900 truncate">{org.name}</p>
-                <p className="text-xs text-zinc-500">Get notified about new plans</p>
+                <p className="text-xs text-zinc-500">{org.isPrivate ? "Request access to see plans" : "Get notified about new plans"}</p>
               </div>
             </div>
             <button
@@ -2956,7 +3010,7 @@ export default function OrgCalendarPage() {
               {followPopupLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin mx-auto" />
               ) : (
-                "Follow"
+                org.isPrivate ? "Request to Follow" : "Follow"
               )}
             </button>
           </div>
