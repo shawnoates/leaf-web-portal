@@ -427,6 +427,32 @@ export default function OrgDashboardPage() {
     if (user) fetchDashboard();
   }, [user, fetchDashboard]);
 
+  // Auto-open Edit Calendar modal when ?editCal=<id> is in the URL
+  useEffect(() => {
+    if (!dashboard) return;
+    const editCalParam = searchParams.get("editCal");
+    if (!editCalParam) return;
+    const cal = dashboard.calendars.find((c) => c.objectId === editCalParam);
+    if (cal) {
+      setEditingCalId(cal.objectId);
+      setEditCalName(cal.name);
+      setEditCalDesc(cal.description || "");
+      setEditCalSlug(cal.shareId || "");
+      originalSlugRef.current = cal.shareId || "";
+      setSlugAvailable(null);
+      setEditCalCity(cal.city || "");
+      setEditCalCitySelected(false);
+      setEditCalImagePreview(cal.calendarImage || null);
+      setEditCalImageBase64(null);
+      setEditCalRemoveImage(false);
+      setEditCalHideVenue(cal.hideVenueUntilRsvp !== false);
+      setEditCalIsPrivate(cal.isPrivate || false);
+      setEditCalHidePlanIdeas(cal.hidePlanIdeas || false);
+      setEditCalHideCustomPlans(cal.hideCustomPlans || false);
+      setActiveTab("calendars");
+    }
+  }, [dashboard, searchParams]);
+
   // Prefetch marketplace data as soon as dashboard is available
   const [prefetchedMarketplace, setPrefetchedMarketplace] = useState<MarketplaceEvent[] | null>(null);
   const marketplacePrefetched = useRef(false);

@@ -416,7 +416,7 @@ export default function PlansPage() {
             <div className="border border-zinc-200 rounded-xl p-6 text-center space-y-3">
               <p className="text-sm text-zinc-500">Plan ideas are turned off for this calendar.</p>
               <Link
-                href={`/dashboard/${searchParams.get("orgId") || calendarId}?tab=calendars`}
+                href={`/dashboard/${searchParams.get("orgId") || calendarId}?tab=calendars&editCal=${calendarId}`}
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 transition-colors"
               >
                 <Settings className="w-3.5 h-3.5" />
