@@ -1535,9 +1535,14 @@ export default function OrgCalendarPage() {
                 className="w-9 h-9 rounded-lg object-contain shrink-0"
               />
             )}
-            <h1 className="text-sm md:text-2xl font-light tracking-[0.1em] md:tracking-[0.2em] uppercase line-clamp-2 md:truncate">
-              {org.name}
-            </h1>
+            <div className="min-w-0">
+              <h1 className="text-sm md:text-2xl font-light tracking-[0.1em] md:tracking-[0.2em] uppercase line-clamp-2 md:truncate">
+                {org.name}
+              </h1>
+              <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                {followerCount} followers
+              </span>
+            </div>
             <div className="h-4 w-px bg-zinc-200 hidden md:block" />
             <span className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold hidden md:block">
               Calendar
@@ -1579,9 +1584,6 @@ export default function OrgCalendarPage() {
                 Manage
               </Link>
             )}
-            <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
-              {followerCount} followers
-            </span>
             {!org.isOwner && !org.isHost && !parseUser && (
               <button
                 onClick={() => setShowHostLogin(true)}
