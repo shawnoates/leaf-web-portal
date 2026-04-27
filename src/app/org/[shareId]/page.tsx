@@ -1543,10 +1543,8 @@ export default function OrgCalendarPage() {
               Calendar
             </span>
           </div>
-          <div className="flex items-center gap-4 shrink-0">
-            <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
-              {followerCount} followers
-            </span>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <div className="flex items-center gap-4">
             {!org.isOwner && !org.isHost && (
               isFollowing ? (
                 <button
@@ -1589,6 +1587,10 @@ export default function OrgCalendarPage() {
                 Host login
               </button>
             ) : null}
+            </div>
+            <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+              {followerCount} followers
+            </span>
           </div>
         </div>
       </nav>

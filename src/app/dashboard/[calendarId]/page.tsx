@@ -1595,8 +1595,8 @@ export default function OrgDashboardPage() {
                     key={cal.objectId}
                     className={`border rounded-xl p-5 ${inactive ? "border-zinc-100 bg-zinc-50 opacity-60" : "border-zinc-200"}`}
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         {cal.calendarImage ? (
                           <img src={cal.calendarImage} alt={cal.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
                         ) : (
@@ -1604,8 +1604,8 @@ export default function OrgDashboardPage() {
                             <Calendar className="w-5 h-5 text-zinc-300" />
                           </div>
                         )}
-                        <div>
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
                           <h3 className={`font-medium ${inactive ? "text-zinc-400" : ""}`}>{cal.name}</h3>
                           {!inactive && (
                             <>
@@ -1648,7 +1648,7 @@ export default function OrgDashboardPage() {
                         <p className="text-xs text-zinc-400">{cal.city || "No city set"}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-4 shrink-0 pl-[52px] sm:pl-0">
                         {inactive ? (
                           <button
                             onClick={() => setShowSubscription(true)}
