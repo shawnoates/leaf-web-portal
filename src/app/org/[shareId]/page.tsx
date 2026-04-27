@@ -219,6 +219,40 @@ function RsvpModal({
   const [rsvpNote, setRsvpNote] = useState("");
   const [isPendingResult, setIsPendingResult] = useState(false);
 
+  // Override sendOTP to check existing RSVP first (skip OTP if already RSVP'd)
+  const originalSendOTP = verify.sendOTP;
+  const sendOTPWithRsvpCheck = async () => {
+    const digits = verify.phone.replace(/\D/g, "");
+    if (digits.length < 10) { originalSendOTP(); return; }
+    verify.setSending(true);
+    try {
+      const check = await Parse.Cloud.run("checkRsvpByPhone", {
+        phoneNumber: digits,
+        eventGroupId: plan.id,
+      }) as { hasRsvp: boolean; status: string | null; name: string | null } | null;
+      if (check?.hasRsvp) {
+        // Already RSVP'd — restore state without OTP
+        const isPending = check.status === "pendingRsvp";
+        if (isPending) {
+          setIsPendingResult(true);
+          addPendingRsvpCookie(plan.id);
+        } else {
+          addRsvpCookie(plan.id);
+        }
+        localStorage.setItem("leaf_follower_phone", digits);
+        // Do NOT set leaf_verified_user cookie — cancel will require OTP
+        onRsvpSuccess?.(plan.id, true, isPending);
+        setFormStep("success");
+        verify.setSending(false);
+        return;
+      }
+    } catch {
+      // Check failed — fall through to normal OTP flow
+    }
+    verify.setSending(false);
+    await originalSendOTP();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!verify.isVerified) return;
@@ -280,7 +314,7 @@ function RsvpModal({
               </p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-5">
-              <PhoneVerifyFields verify={verify} />
+              <PhoneVerifyFields verify={verify} onSendOTP={sendOTPWithRsvpCheck} />
               {plan.requireApproval && (
                 <div>
                   <label className="text-xs font-medium text-zinc-700 block mb-1">Note for the host (optional)</label>
@@ -536,12 +570,12 @@ function usePhoneVerify() {
     setError("");
   };
 
-  return { name, setName, phone, setPhone, code, setCode, step, isVerified, sending, error, sendOTP, verifyOTP, reset };
+  return { name, setName, phone, setPhone, code, setCode, step, isVerified, sending, setSending, error, sendOTP, verifyOTP, reset };
 }
 
 // --- Shared Phone Verify Fields Component ---
 
-function PhoneVerifyFields({ verify }: { verify: ReturnType<typeof usePhoneVerify> }) {
+function PhoneVerifyFields({ verify, onSendOTP }: { verify: ReturnType<typeof usePhoneVerify>; onSendOTP?: () => void }) {
   return (
     <>
       <div className="space-y-2">
@@ -577,7 +611,7 @@ function PhoneVerifyFields({ verify }: { verify: ReturnType<typeof usePhoneVerif
             </div>
             <button
               type="button"
-              onClick={verify.sendOTP}
+              onClick={onSendOTP || verify.sendOTP}
               disabled={verify.sending || verify.phone.replace(/\D/g, "").length < 10 || !verify.name}
               className="px-4 py-2.5 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 whitespace-nowrap"
             >
@@ -627,6 +661,71 @@ function PhoneVerifyFields({ verify }: { verify: ReturnType<typeof usePhoneVerif
         )}
       </div>
     </>
+  );
+}
+
+// --- Cancel RSVP Modal (requires OTP when user hasn't verified in this session) ---
+
+function CancelRsvpModal({
+  planId,
+  planTitle,
+  onClose,
+  onCancelled,
+}: {
+  planId: string;
+  planTitle: string;
+  onClose: () => void;
+  onCancelled: (planId: string) => void;
+}) {
+  const verify = usePhoneVerify();
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleCancel = async () => {
+    if (!verify.isVerified) return;
+    setCancelling(true);
+    setError("");
+    try {
+      await Parse.Cloud.run("cancelRsvpViaWeb", {
+        phoneNumber: verify.phone.replace(/\D/g, ""),
+        eventGroupId: planId,
+      });
+      setVerifiedUserCookie(verify.name, verify.phone);
+      onCancelled(planId);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to cancel RSVP.");
+      setCancelling(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-none p-8 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-900"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-2xl font-light tracking-tight">Cancel RSVP</h3>
+            <p className="text-sm text-zinc-500 mt-1">
+              Verify your phone to cancel your RSVP for {planTitle}
+            </p>
+          </div>
+          <PhoneVerifyFields verify={verify} />
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          <button
+            onClick={handleCancel}
+            disabled={!verify.isVerified || cancelling}
+            className="w-full border border-red-200 text-red-600 py-3.5 text-xs uppercase tracking-[0.2em] font-bold hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm Cancellation"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -815,6 +914,7 @@ export default function OrgCalendarPage() {
   const [rsvpedPlanIds, setRsvpedPlanIds] = useState<Set<string>>(new Set());
   const [pendingRsvpIds, setPendingRsvpIds] = useState<Set<string>>(new Set());
   const [cancellingRsvp, setCancellingRsvp] = useState<string | null>(null);
+  const [cancelRsvpModalPlan, setCancelRsvpModalPlan] = useState<{ id: string; title: string } | null>(null);
   const [cancellingPlan, setCancellingPlan] = useState(false);
 
   const handleSharePlan = useCallback(async (planId: string, planTitle: string) => {
@@ -831,50 +931,51 @@ export default function OrgCalendarPage() {
   }, []);
 
   async function handleCancelRsvp(planId: string) {
-    if (!confirm("Cancel your RSVP? The host will be notified.")) return;
     const cached = getVerifiedUserCookie();
-    if (!cached?.phone) return;
+    if (!cached?.phone) {
+      // No OTP-verified session — open CancelRsvpModal to require OTP first
+      const plan = org?.plans.find((p) => p.id === planId);
+      setCancelRsvpModalPlan({ id: planId, title: plan?.title || "this plan" });
+      return;
+    }
+    if (!confirm("Cancel your RSVP? The host will be notified.")) return;
     setCancellingRsvp(planId);
     try {
       await Parse.Cloud.run("cancelRsvpViaWeb", {
         phoneNumber: cached.phone.replace(/\D/g, ""),
         eventGroupId: planId,
       });
-      removeRsvpCookie(planId);
-      setRsvpedPlanIds((prev) => {
-        const next = new Set(prev);
-        next.delete(planId);
-        return next;
-      });
-      setOrg((prev) => prev ? {
-        ...prev,
-        plans: prev.plans.map((p) =>
-          p.id === planId ? { ...p, attendeeCount: Math.max(0, p.attendeeCount - 1) } : p
-        ),
-      } : prev);
-      setSelectedEvent((prev) =>
-        prev && prev.id === planId ? { ...prev, attendeeCount: Math.max(0, prev.attendeeCount - 1) } : prev
-      );
-      setToast("RSVP cancelled");
-      setTimeout(() => setToast(null), 3000);
+      completeCancelRsvp(planId);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("No RSVP found")) {
-        // RSVP was already removed (e.g. by admin) — clean up local state
-        removeRsvpCookie(planId);
-        setRsvpedPlanIds((prev) => {
-          const next = new Set(prev);
-          next.delete(planId);
-          return next;
-        });
-        setToast("RSVP was already removed");
-        setTimeout(() => setToast(null), 3000);
+        completeCancelRsvp(planId, "RSVP was already removed");
       } else {
         alert(msg || "Failed to cancel RSVP.");
       }
     } finally {
       setCancellingRsvp(null);
     }
+  }
+
+  function completeCancelRsvp(planId: string, message?: string) {
+    removeRsvpCookie(planId);
+    setRsvpedPlanIds((prev) => {
+      const next = new Set(prev);
+      next.delete(planId);
+      return next;
+    });
+    setOrg((prev) => prev ? {
+      ...prev,
+      plans: prev.plans.map((p) =>
+        p.id === planId ? { ...p, attendeeCount: Math.max(0, p.attendeeCount - 1) } : p
+      ),
+    } : prev);
+    setSelectedEvent((prev) =>
+      prev && prev.id === planId ? { ...prev, attendeeCount: Math.max(0, prev.attendeeCount - 1) } : prev
+    );
+    setToast(message || "RSVP cancelled");
+    setTimeout(() => setToast(null), 3000);
   }
 
   async function handleCancelPlan(planId: string) {
@@ -1779,6 +1880,50 @@ export default function OrgCalendarPage() {
               ref={scrollRef}
               className="flex gap-8 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-8"
             >
+              {/* Custom plan card — let community members propose their own */}
+              {!org.rsvpLimitReached && !org.hideCustomPlans && (
+                <div
+                  className="min-w-[280px] max-w-[300px] snap-start group cursor-pointer"
+                  onClick={() => {
+                    setCreatingCustomPlan(true);
+                    setCustomTitle("");
+                    setCustomDescription("");
+                    setCustomCategory("");
+                    setCustomCapacity("");
+                    setHostNote("");
+                    setSelectedVenue(null);
+                    setCustomSubmitting(false);
+                    setCustomSuccess(false);
+                  }}
+                >
+                  <div className="aspect-[4/5] overflow-hidden mb-4 relative rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white transition-all group-hover:shadow-lg group-hover:border-emerald-300">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center space-y-4">
+                      <div className="w-14 h-14 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                        <Plus className="w-7 h-7" />
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-emerald-700">
+                          Your Idea
+                        </p>
+                        <h4 className="text-lg font-medium tracking-tight text-zinc-900">
+                          Suggest a Plan
+                        </h4>
+                        <p className="text-xs text-zinc-500 leading-relaxed font-light">
+                          Have something in mind? Share your idea and we'll review it.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <h4 className="text-base font-medium tracking-tight group-hover:italic">
+                      Custom Plan
+                    </h4>
+                    <p className="text-sm text-zinc-500 font-light line-clamp-2 leading-relaxed">
+                      Pitch a date, venue, and details — pending organizer approval.
+                    </p>
+                  </div>
+                </div>
+              )}
               {org.planIdeas.map((idea) => (
                 <div
                   key={idea.id}
@@ -1830,50 +1975,6 @@ export default function OrgCalendarPage() {
                   </div>
                 </div>
               ))}
-              {/* Custom plan card — let community members propose their own */}
-              {!org.rsvpLimitReached && !org.hideCustomPlans && (
-                <div
-                  className="min-w-[280px] max-w-[300px] snap-start group cursor-pointer"
-                  onClick={() => {
-                    setCreatingCustomPlan(true);
-                    setCustomTitle("");
-                    setCustomDescription("");
-                    setCustomCategory("");
-                    setCustomCapacity("");
-                    setHostNote("");
-                    setSelectedVenue(null);
-                    setCustomSubmitting(false);
-                    setCustomSuccess(false);
-                  }}
-                >
-                  <div className="aspect-[4/5] overflow-hidden mb-4 relative rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white transition-all group-hover:shadow-lg group-hover:border-emerald-300">
-                    <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center space-y-4">
-                      <div className="w-14 h-14 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
-                        <Plus className="w-7 h-7" />
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-emerald-700">
-                          Your Idea
-                        </p>
-                        <h4 className="text-lg font-medium tracking-tight text-zinc-900">
-                          Suggest a Plan
-                        </h4>
-                        <p className="text-xs text-zinc-500 leading-relaxed font-light">
-                          Have something in mind? Share your idea and we'll review it.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <h4 className="text-base font-medium tracking-tight group-hover:italic">
-                      Custom Plan
-                    </h4>
-                    <p className="text-sm text-zinc-500 font-light line-clamp-2 leading-relaxed">
-                      Pitch a date, venue, and details — pending organizer approval.
-                    </p>
-                  </div>
-                </div>
-              )}
             </div>
           </section>
         )}
@@ -2071,6 +2172,18 @@ export default function OrgCalendarPage() {
             setSelectedEvent((prev) =>
               prev && prev.id === planId ? { ...prev, attendeeCount: prev.attendeeCount + 1 } : prev
             );
+          }}
+        />
+      )}
+
+      {cancelRsvpModalPlan && (
+        <CancelRsvpModal
+          planId={cancelRsvpModalPlan.id}
+          planTitle={cancelRsvpModalPlan.title}
+          onClose={() => setCancelRsvpModalPlan(null)}
+          onCancelled={(planId) => {
+            setCancelRsvpModalPlan(null);
+            completeCancelRsvp(planId);
           }}
         />
       )}

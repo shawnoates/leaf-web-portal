@@ -413,6 +413,7 @@ export default function OrgDashboardPage() {
       setSettingsImageStyle(result.imageStyle || "default");
       setSettingsHidePlanIdeas(result.hidePlanIdeas || false);
       setSettingsHideCustomPlans(result.hideCustomPlans || false);
+      if (result.leafAppConnected) setLeafAppConnected(true);
       setError(null);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to load dashboard";
