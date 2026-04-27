@@ -1543,8 +1543,7 @@ export default function OrgCalendarPage() {
               Calendar
             </span>
           </div>
-          <div className="flex flex-col items-end gap-1 shrink-0">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
             {!org.isOwner && !org.isHost && (
               isFollowing ? (
                 <button
@@ -1571,7 +1570,7 @@ export default function OrgCalendarPage() {
                 </button>
               )
             )}
-            {(org.isOwner || org.isHost) ? (
+            {(org.isOwner || org.isHost) && (
               <Link
                 href={`/dashboard/${org.parentOrgId || org.objectId}`}
                 className="flex items-center gap-1.5 text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
@@ -1579,18 +1578,18 @@ export default function OrgCalendarPage() {
                 <Settings className="w-3.5 h-3.5" />
                 Manage
               </Link>
-            ) : !parseUser ? (
-              <button
-                onClick={() => setShowHostLogin(true)}
-                className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400 hover:text-zinc-900 transition-colors hidden sm:inline"
-              >
-                Host login
-              </button>
-            ) : null}
-            </div>
+            )}
             <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
               {followerCount} followers
             </span>
+            {!org.isOwner && !org.isHost && !parseUser && (
+              <button
+                onClick={() => setShowHostLogin(true)}
+                className="text-[9px] tracking-[0.2em] uppercase text-zinc-300 hover:text-zinc-500 transition-colors"
+              >
+                Host login
+              </button>
+            )}
           </div>
         </div>
       </nav>
