@@ -1633,7 +1633,7 @@ export default function OrgCalendarPage() {
               <img
                 src={org.profilePhoto}
                 alt={org.name}
-                className="w-9 h-9 rounded-lg object-contain shrink-0"
+                className="w-10 h-10 md:w-12 md:h-12 rounded-lg object-cover shrink-0 self-stretch"
               />
             )}
             <div className="min-w-0">
