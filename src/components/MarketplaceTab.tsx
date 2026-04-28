@@ -209,6 +209,30 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [visibleCount, setVisibleCount] = useState(10);
 
+  // Fetch Unsplash images for events missing images (fire-and-forget enrichment)
+  const enrichWithUnsplash = useCallback(async (allEvents: MarketplaceEvent[]) => {
+    const needImages = allEvents.filter(e => !e.image && !e.venue);
+    if (needImages.length === 0) return;
+    // Limit to 4 lookups to stay within rate limits
+    const batch = needImages.slice(0, 4);
+    const results = await Promise.allSettled(
+      batch.map(e =>
+        fetch(`/api/unsplash?query=${encodeURIComponent(e.title)}`)
+          .then(r => r.json())
+          .then(data => ({ id: e.id, url: data.results?.[0]?.url || null }))
+      )
+    );
+    const imageMap = new Map<string, string>();
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value.url) {
+        imageMap.set(r.value.id, r.value.url);
+      }
+    }
+    if (imageMap.size > 0) {
+      setEvents(prev => prev.map(e => imageMap.has(e.id) ? { ...e, image: imageMap.get(e.id)! } : e));
+    }
+  }, []);
+
   const fetchFromServer = useCallback(async (query?: string) => {
     const params = new URLSearchParams();
     if (city) params.set("city", city);
@@ -244,6 +268,8 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
     allEvents = deduplicateEvents(allEvents);
 
     setEvents(allEvents);
+    // Enrich events missing images with Unsplash (background)
+    enrichWithUnsplash(allEvents);
     // Only cache non-search results
     if (!query) {
       setCachedEvents(calendarId, allEvents);

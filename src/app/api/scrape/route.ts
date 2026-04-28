@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     source: "firecrawl",
     url: e.eventURL || null,
     venue: e.venue
-      ? { name: e.name || "", address: e.venue }
+      ? { name: e.venue, address: e.formattedAddress || e.venue }
       : null,
     suggestedDate: e.date || null,
     suggestedTime: e.time || null,
