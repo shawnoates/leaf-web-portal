@@ -3044,7 +3044,7 @@ export default function OrgDashboardPage() {
                 </button>
                 <button
                   onClick={() => {
-                    const planDate = selectedActivePlan.date ? new Date(selectedActivePlan.date).toISOString().split("T")[0] : "";
+                    const planDate = selectedActivePlan.date ? (() => { const d = new Date(selectedActivePlan.date); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })() : "";
                     setEditingPlanId(selectedActivePlan.objectId);
                     setCreatePlanPrefill({
                       title: selectedActivePlan.title,

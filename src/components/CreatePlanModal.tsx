@@ -152,12 +152,20 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     }
     setCreating(true);
     try {
+      // Append local timezone offset so the server stores the correct UTC time
+      // (e.g. "2026-04-28T18:00:00" + "-04:00" for Eastern Daylight Time)
+      const offset = new Date().getTimezoneOffset();
+      const sign = offset <= 0 ? "+" : "-";
+      const absH = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
+      const absM = String(Math.abs(offset) % 60).padStart(2, "0");
+      const tzSuffix = `${sign}${absH}:${absM}`;
+
       if (editMode && eventGroupId) {
         await Parse.Cloud.run("updatePlanDetails", {
           eventGroupId,
           title,
           description,
-          date: `${date}T${time || "12:00"}:00`,
+          date: `${date}T${time || "12:00"}:00${tzSuffix}`,
           time: time || null,
           imageBase64: imageBase64 || undefined,
           imageUrl: !imageBase64 ? (selectedImageUrl || prefill?.imageUrl || undefined) : undefined,
@@ -172,7 +180,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           title,
           description,
           venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
-          date: `${date}T${time || "12:00"}:00`,
+          date: `${date}T${time || "12:00"}:00${tzSuffix}`,
           time: time || null,
           capacity: capacity ? parseInt(capacity) : null,
           isHosted,

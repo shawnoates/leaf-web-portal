@@ -299,7 +299,7 @@ export default function PlansPage() {
 
   function handleEditPlan() {
     if (!selectedPlan) return;
-    const planDate = selectedPlan.expiryDate ? new Date(selectedPlan.expiryDate).toISOString().split("T")[0] : "";
+    const planDate = selectedPlan.expiryDate ? (() => { const d = new Date(selectedPlan.expiryDate); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })() : "";
     setCreatePlanPrefill({
       title: selectedPlan.title,
       description: selectedPlan.description,
