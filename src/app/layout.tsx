@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import UserActivityBeacon from "@/components/UserActivityBeacon";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -25,6 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans bg-white text-zinc-900 selection:bg-zinc-200">
+        <UserActivityBeacon />
         {children}
       </body>
     </html>
