@@ -63,6 +63,7 @@ interface OrgDashboard {
   tier: string;
   subscriptionStatus: string | null;
   subscriptionCancelAt: number | null;
+  billingInterval: string | null; // "month" or "year"
   isOwner: boolean;
   profilePhoto: string | null;
   bannerUrl: string | null;
@@ -2151,8 +2152,8 @@ export default function OrgDashboardPage() {
                   {dashboard.tier === "starter"
                     ? "Free — basic features"
                     : dashboard.tier === "growth"
-                    ? "$4.99/month — premium features"
-                    : "$9.99/month — full features"}
+                    ? dashboard.billingInterval === "year" ? "$49.99/year — premium features" : "$4.99/month — premium features"
+                    : dashboard.billingInterval === "year" ? "$99.99/year — full features" : "$9.99/month — full features"}
                 </p>
                 {dashboard.subscriptionStatus === "cancelling" && (
                   <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
