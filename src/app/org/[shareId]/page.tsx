@@ -27,6 +27,8 @@ import {
   Settings,
   Heart,
   AlertTriangle,
+  MessageCircle,
+  EyeOff,
 } from "lucide-react";
 
 const APP_STORE_URL = "https://apps.apple.com/app/leaf";
@@ -218,6 +220,7 @@ function RsvpModal({
   const [notificationId, setNotificationId] = useState<string | null>(null);
   const [rsvpNote, setRsvpNote] = useState("");
   const [isPendingResult, setIsPendingResult] = useState(false);
+  const [sharePhone, setSharePhone] = useState(true);
 
   // Override sendOTP to check existing RSVP first (skip OTP if already RSVP'd)
   const originalSendOTP = verify.sendOTP;
@@ -263,6 +266,7 @@ function RsvpModal({
         name: verify.name,
         eventGroupId: plan.id,
         rsvpNote: plan.requireApproval && rsvpNote.trim() ? rsvpNote.trim() : undefined,
+        sharePhoneWithHost: sharePhone,
       }) as { eventNotificationId?: string; alreadyRsvpd?: boolean; pendingApproval?: boolean } | null | undefined;
       console.log("[RSVP] result:", result);
       setVerifiedUserCookie(verify.name, verify.phone);
@@ -315,6 +319,17 @@ function RsvpModal({
             </div>
             <form onSubmit={handleSubmit} className="space-y-5">
               <PhoneVerifyFields verify={verify} onSendOTP={sendOTPWithRsvpCheck} />
+              {verify.isVerified && (
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={sharePhone}
+                    onChange={(e) => setSharePhone(e.target.checked)}
+                    className="w-4 h-4 accent-zinc-900 rounded"
+                  />
+                  <span className="text-xs text-zinc-600">Share phone number with host</span>
+                </label>
+              )}
               {plan.requireApproval && (
                 <div>
                   <label className="text-xs font-medium text-zinc-700 block mb-1">Note for the host (optional)</label>
@@ -913,6 +928,9 @@ export default function OrgCalendarPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [rsvpedPlanIds, setRsvpedPlanIds] = useState<Set<string>>(new Set());
   const [pendingRsvpIds, setPendingRsvpIds] = useState<Set<string>>(new Set());
+  const [hostedPlanIds, setHostedPlanIds] = useState<Set<string>>(new Set());
+  const [attendees, setAttendees] = useState<Array<{ name: string; phone: string | null; sharePhoneWithHost: boolean; status: string }>>([]);
+  const [loadingAttendees, setLoadingAttendees] = useState(false);
   const [cancellingRsvp, setCancellingRsvp] = useState<string | null>(null);
   const [cancelRsvpModalPlan, setCancelRsvpModalPlan] = useState<{ id: string; title: string } | null>(null);
   const [cancellingPlan, setCancellingPlan] = useState(false);
@@ -929,6 +947,24 @@ export default function OrgCalendarPage() {
       setTimeout(() => setCopiedPlanId(null), 2000);
     }
   }, []);
+
+  async function loadAttendees(eventGroupId: string) {
+    const phone = localStorage.getItem("leaf_phone");
+    if (!phone) return;
+    setLoadingAttendees(true);
+    try {
+      const result = await Parse.Cloud.run("getPlanAttendeesForHost", {
+        eventGroupId,
+        phoneNumber: phone,
+      });
+      setAttendees(result || []);
+    } catch (err) {
+      console.error("Failed to load attendees:", err);
+      setAttendees([]);
+    } finally {
+      setLoadingAttendees(false);
+    }
+  }
 
   async function handleCancelRsvp(planId: string) {
     const cached = getVerifiedUserCookie();
@@ -1255,6 +1291,10 @@ export default function OrgCalendarPage() {
         setRsvpedPlanIds(confirmedIds);
         setPendingRsvpIds(pendingIds);
       }
+
+      if (result.userHostedPlanIds && Array.isArray(result.userHostedPlanIds)) {
+        setHostedPlanIds(new Set(result.userHostedPlanIds));
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       // Stale Parse session token — clear it and retry once
@@ -1296,6 +1336,16 @@ export default function OrgCalendarPage() {
       autoOpenedPlanRef.current = planQueryId;
     }
   }, [org, planQueryId]);
+
+  // Auto-load attendees when a host opens their own plan
+  useEffect(() => {
+    if (selectedEvent && hostedPlanIds.has(selectedEvent.id)) {
+      loadAttendees(selectedEvent.id);
+    } else {
+      setAttendees([]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEvent?.id]);
 
   // Fetch nearby venues when either host modal or custom plan modal opens
   useEffect(() => {
@@ -2134,6 +2184,49 @@ export default function OrgCalendarPage() {
                       {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
                       <span className="text-xs font-bold uppercase tracking-widest">Share</span>
                     </button>
+                  </div>
+                )}
+                {/* Attendee list — visible only to the plan host */}
+                {hostedPlanIds.has(selectedEvent.id) && (
+                  <div className="border-t border-zinc-100 pt-4 mt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5" /> Attendees
+                        {attendees.length > 0 && <span className="text-zinc-400">({attendees.length})</span>}
+                      </h4>
+                      {attendees.filter(a => a.phone).length > 1 && (
+                        <a
+                          href={`sms:${attendees.filter(a => a.phone).map(a => a.phone).join(",")}`}
+                          className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 transition-colors"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" /> Message All
+                        </a>
+                      )}
+                    </div>
+                    {loadingAttendees ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+                      </div>
+                    ) : attendees.length === 0 ? (
+                      <p className="text-xs text-zinc-400 py-2">No attendees yet</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {attendees.map((a, i) => (
+                          <div key={i} className="flex items-center justify-between py-1.5 border-b border-zinc-50 last:border-0">
+                            <span className="text-sm text-zinc-800">{a.name}</span>
+                            {a.phone ? (
+                              <a href={`sms:${a.phone}`} className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 transition-colors">
+                                <Phone className="w-3 h-3" /> {a.phone}
+                              </a>
+                            ) : (
+                              <span className="text-xs text-zinc-300 flex items-center gap-1">
+                                <EyeOff className="w-3 h-3" /> Hidden
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
                 {/* Cancel Plan — visible to the plan host or calendar owner/co-host */}
