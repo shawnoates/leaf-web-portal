@@ -1617,6 +1617,7 @@ export default function OrgDashboardPage() {
             <div className="space-y-3">
               {dashboard.calendars.map((cal) => {
                 const activePlans = ((cal as Record<string, unknown>).activePlans as { objectId: string; title: string; description: string; image: string | null; date: string; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string } | null }[]) || [];
+                const suggestedPlans = ((cal as Record<string, unknown>).suggestedPlans as { id: string; type: string; title: string; subtitle: string; recommendedDate: string; isSuggestion: true }[]) || [];
                 const inactive = cal.isActive === false;
                 return (
                   <div
@@ -1702,7 +1703,7 @@ export default function OrgDashboardPage() {
                         )}
                       </div>
                     </div>
-                    {!inactive && activePlans.length > 0 && (
+                    {!inactive && (activePlans.length > 0 || suggestedPlans.length > 0) && (
                       <div className="border-t border-zinc-100 pt-3">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-3">Active Plans</p>
                         <div className="flex gap-3 overflow-x-auto no-scrollbar">
@@ -1725,6 +1726,37 @@ export default function OrgDashboardPage() {
                               </div>
                             </div>
                           ))}
+                          {suggestedPlans.map((suggestion) => {
+                            const isLocked = dashboard.tier !== "pro";
+                            return (
+                              <div
+                                key={suggestion.id}
+                                onClick={() => {
+                                  if (isLocked) setShowSubscription(true);
+                                }}
+                                className={`relative border rounded-lg overflow-hidden shrink-0 w-52 cursor-pointer transition-colors ${
+                                  isLocked ? "border-zinc-200 bg-zinc-50" : "border-dashed border-emerald-300 hover:border-emerald-400"
+                                }`}
+                              >
+                                <div className="w-full h-28 bg-gradient-to-br from-emerald-50 to-zinc-100 flex items-center justify-center relative">
+                                  <Sparkles className="w-6 h-6 text-emerald-400" />
+                                  {isLocked && (
+                                    <div className="absolute inset-0 bg-zinc-900/50 backdrop-blur-sm flex flex-col items-center justify-center">
+                                      <Lock className="w-4 h-4 text-white mb-1" />
+                                      <span className="text-[9px] font-bold uppercase tracking-widest text-white">Upgrade to unlock</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="p-3">
+                                  <h4 className="font-medium text-sm mb-1 truncate">{suggestion.title}</h4>
+                                  <p className="text-xs text-zinc-400 mb-1">
+                                    {new Date(suggestion.recommendedDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                                  </p>
+                                  <p className="text-[10px] text-emerald-600 truncate">{suggestion.subtitle}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
