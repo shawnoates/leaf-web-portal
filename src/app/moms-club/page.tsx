@@ -28,7 +28,7 @@ const config: LandingConfig = {
       description:
         "Easy 2-mile loop with coffee stops. Great way to meet other moms in the neighborhood. All ages welcome — strollers, carriers, or no kids at all.",
       image:
-        "https://images.unsplash.com/photo-1607081692251-3eef061ba2bb?w=800&q=80",
+        "https://images.unsplash.com/photo-1581952976147-5a2d15560349?w=800&q=80",
       hostName: "Rachel",
       attendeeCount: 14,
       location: "Prospect Park, Grand Army Plaza",
@@ -41,7 +41,7 @@ const config: LandingConfig = {
       description:
         "Gentle yoga class designed for postpartum bodies, with babies welcome. Bring a blanket for baby. Trained instructor, judgment-free zone.",
       image:
-        "https://images.unsplash.com/photo-1518309568569-43dd824f6b4d?w=800&q=80",
+        "https://images.unsplash.com/photo-1545389336-cf090694435e?w=800&q=80",
       hostName: "Priya",
       attendeeCount: 9,
       location: "Park Slope Yoga Studio",
@@ -67,7 +67,7 @@ const config: LandingConfig = {
       description:
         "After-nap playground hang. Toddlers play, moms chat. Snacks shared. Bring sunscreen and patience.",
       image:
-        "https://images.unsplash.com/photo-1597163399355-a39d31fbed4d?w=800&q=80",
+        "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800&q=80",
       hostName: "Maya",
       attendeeCount: 22,
       location: "Carroll Park Playground",

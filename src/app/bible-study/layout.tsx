@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 
-const TITLE = "Brooklyn Moms Club · Leaf";
+const TITLE = "Gateway Community Church · Leaf";
 const DESCRIPTION =
-  "A neighborhood community for moms. Stroller walks, playground meetups, mom's night out, and the village every parent deserves.";
+  "A warm community of faith. Sunday services, midweek bible study, small groups, and serving our neighbors together.";
 const OG_IMAGE =
-  "https://images.unsplash.com/photo-1581952976147-5a2d15560349?w=1200&q=80";
+  "https://images.unsplash.com/photo-1485808191679-5f86510681a2?w=1200&q=80";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     title: TITLE,
     description: DESCRIPTION,
     type: "website",
-    url: "https://os.joinleaf.com/moms-club",
+    url: "https://os.joinleaf.com/bible-study",
     images: [{ url: OG_IMAGE }],
     siteName: "Leaf",
   },
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default function MomsLayout({
+export default function BibleStudyLayout({
   children,
 }: {
   children: React.ReactNode;

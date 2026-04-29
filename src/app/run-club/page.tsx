@@ -134,7 +134,7 @@ const config: LandingConfig = {
         "12-week half marathon plan. Group meets weekly. Coach-led, beginner friendly.",
       category: "Training",
       image:
-        "https://images.unsplash.com/photo-1530137073521-28cda9e9b39b?w=800&q=80",
+        "https://images.unsplash.com/photo-1530143584546-02191bc84eb5?w=800&q=80",
     },
   ],
 };
