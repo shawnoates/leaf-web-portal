@@ -11,9 +11,6 @@ const config: LandingConfig = {
   followerCount: 312,
   navLabel: "Run Club",
   plansHeader: "Upcoming Runs",
-  ideasHeader: "Get Active",
-  ideasTitle: "Lead a Workout",
-  ideasButtonLabel: "Lead This",
   ctaTitle: "Build Your Run Club",
   ctaSubtitle:
     "Create a free calendar for your run club. Schedule routes, track RSVPs, and grow your crew.",

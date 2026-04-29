@@ -11,9 +11,6 @@ const config: LandingConfig = {
   followerCount: 156,
   navLabel: "Moms Club",
   plansHeader: "Upcoming Meetups",
-  ideasHeader: "Get Together",
-  ideasTitle: "Host a Meetup",
-  ideasButtonLabel: "Host This",
   ctaTitle: "Build Your Mom Village",
   ctaSubtitle:
     "Create a free calendar for your moms group. Coordinate playdates, support circles, and nights out — without the group chat chaos.",

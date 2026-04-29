@@ -11,9 +11,6 @@ const config: LandingConfig = {
   followerCount: 184,
   navLabel: "Studio",
   plansHeader: "Upcoming Classes",
-  ideasHeader: "Open Practice",
-  ideasTitle: "Teach a Class",
-  ideasButtonLabel: "Teach This",
   ctaTitle: "Build Your Studio Community",
   ctaSubtitle:
     "Create a free calendar for your studio. Schedule classes, manage RSVPs, and keep your community in flow.",
