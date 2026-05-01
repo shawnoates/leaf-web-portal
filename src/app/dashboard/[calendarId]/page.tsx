@@ -1617,7 +1617,7 @@ export default function OrgDashboardPage() {
             <div className="space-y-3">
               {dashboard.calendars.map((cal) => {
                 const activePlans = ((cal as Record<string, unknown>).activePlans as { objectId: string; title: string; description: string; image: string | null; date: string; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string } | null }[]) || [];
-                const suggestedPlans = ((cal as Record<string, unknown>).suggestedPlans as { id: string; type: string; title: string; subtitle: string; recommendedDate: string; isSuggestion: true }[]) || [];
+                const suggestedPlans = ((cal as Record<string, unknown>).suggestedPlans as { id: string; type: string; title: string; description?: string; subtitle: string; recommendedDate: string; recommendedTime?: string | null; venue?: { name: string; address: string } | null; image?: string | null; isSuggestion: true }[]) || [];
                 const inactive = cal.isActive === false;
                 return (
                   <div
@@ -1732,14 +1732,39 @@ export default function OrgDashboardPage() {
                               <div
                                 key={suggestion.id}
                                 onClick={() => {
-                                  if (isLocked) setShowSubscription(true);
+                                  if (isLocked) {
+                                    setShowSubscription(true);
+                                    return;
+                                  }
+                                  // Pre-fill the create plan modal with the suggestion's data
+                                  // (title/description/venue/time pulled from the source past plan)
+                                  const recDate = new Date(suggestion.recommendedDate);
+                                  setCreatePlanPrefill({
+                                    title: suggestion.title,
+                                    description: suggestion.description || "",
+                                    venue: suggestion.venue || null,
+                                    date: recDate.toISOString().slice(0, 10),
+                                    time: suggestion.recommendedTime || "",
+                                    capacity: "",
+                                    imageUrl: suggestion.image || null,
+                                  });
+                                  setShowCreatePlanModal(true);
                                 }}
                                 className={`relative border rounded-lg overflow-hidden shrink-0 w-52 cursor-pointer transition-colors ${
                                   isLocked ? "border-zinc-200 bg-zinc-50" : "border-dashed border-emerald-300 hover:border-emerald-400"
                                 }`}
                               >
-                                <div className="w-full h-28 bg-gradient-to-br from-emerald-50 to-zinc-100 flex items-center justify-center relative">
-                                  <Sparkles className="w-6 h-6 text-emerald-400" />
+                                <div className="w-full h-28 relative bg-gradient-to-br from-emerald-50 to-zinc-100">
+                                  {suggestion.image ? (
+                                    <img src={suggestion.image} alt={suggestion.title} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <Sparkles className="w-6 h-6 text-emerald-400" />
+                                    </div>
+                                  )}
+                                  <div className="absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded">
+                                    Suggested
+                                  </div>
                                   {isLocked && (
                                     <div className="absolute inset-0 bg-zinc-900/50 backdrop-blur-sm flex flex-col items-center justify-center">
                                       <Lock className="w-4 h-4 text-white mb-1" />
