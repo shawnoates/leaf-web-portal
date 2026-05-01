@@ -305,6 +305,27 @@ export default function OrgDashboardPage() {
   const [analyticsRange, setAnalyticsRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
   const [analyticsCalFilter, setAnalyticsCalFilter] = useState<string>("all");
 
+  // Dismissed insights — persisted per-calendar in localStorage. Key per
+  // insight is `${type}|${message}` so when the underlying insight changes
+  // (different top category, different best day, etc.) the new one shows
+  // even if the prior was dismissed.
+  const dismissedStorageKey = `analytics_dismissed_${calendarId}`;
+  const [dismissedInsights, setDismissedInsights] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(dismissedStorageKey);
+      if (raw) setDismissedInsights(new Set(JSON.parse(raw)));
+    } catch { /* ignore */ }
+  }, [dismissedStorageKey]);
+  const dismissInsight = useCallback((key: string) => {
+    setDismissedInsights((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      try { localStorage.setItem(dismissedStorageKey, JSON.stringify([...next])); } catch { /* quota */ }
+      return next;
+    });
+  }, [dismissedStorageKey]);
+
   // Modals
   const [showAddCalendar, setShowAddCalendar] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
@@ -1242,23 +1263,41 @@ export default function OrgDashboardPage() {
               <>
                 {/* Insights / recommendations (no_growth lives on the Followers tab) */}
                 {(() => {
-                  const filtered = analytics.insights.filter((ins) => ins.type !== "no_growth");
+                  // Build a stable dismiss key from insight content. If the
+                  // underlying insight changes (e.g., top category flips from
+                  // "dining" to "music"), the key changes and the new one
+                  // appears even if the prior was dismissed.
+                  const insightKey = (ins: { type: string; message: string }) =>
+                    `${ins.type}|${ins.message}`.slice(0, 200);
+
+                  const filtered = analytics.insights
+                    .filter((ins) => ins.type !== "no_growth")
+                    .filter((ins) => !dismissedInsights.has(insightKey(ins)));
                   if (filtered.length === 0) return null;
                   return (
-                    <section className="space-y-3">
-                      {filtered.map((ins, idx) => (
-                        <div
-                          key={idx}
-                          className="border border-emerald-200 bg-emerald-50/40 rounded-xl p-4 flex items-start gap-3"
-                        >
-                          <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center flex-shrink-0">
-                            <Sparkles className="w-4 h-4" />
+                    <section className="space-y-2">
+                      {filtered.map((ins) => {
+                        const key = insightKey(ins);
+                        return (
+                          <div
+                            key={key}
+                            className="border border-emerald-200 bg-emerald-50/40 rounded-lg px-3 py-2 flex items-center gap-3"
+                          >
+                            <div className="w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center flex-shrink-0">
+                              <Sparkles className="w-3 h-3" />
+                            </div>
+                            <p className="text-xs text-zinc-700 leading-snug flex-1">
+                              {ins.message}
+                            </p>
+                            <button
+                              onClick={() => dismissInsight(key)}
+                              className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 hover:text-zinc-700 transition-colors flex-shrink-0"
+                            >
+                              Dismiss
+                            </button>
                           </div>
-                          <p className="text-sm text-zinc-700 leading-relaxed pt-1">
-                            {ins.message}
-                          </p>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </section>
                   );
                 })()}
