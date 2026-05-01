@@ -147,6 +147,35 @@ function getFallbackRecommended(events: MarketplaceEvent[]): MarketplaceEvent[] 
   return result;
 }
 
+// Local recommendation engine — replaces the Gemini call.
+// Applies the org's blacklist + keyword filters, then round-robins across
+// sources for diversity. No model tokens consumed.
+function computeLocalRecommendations(
+  events: MarketplaceEvent[],
+  orgSettings: OrgSettings,
+): string[] {
+  const blacklistSet = new Set(
+    (orgSettings.blacklistCategories || []).map((c) => c.toLowerCase().trim()).filter(Boolean),
+  );
+  const excludeKeywords = (orgSettings.excludeKeywords || [])
+    .map((k) => k.toLowerCase().trim())
+    .filter(Boolean);
+
+  const filtered = events.filter((e) => {
+    const cat = (e.category || "").toLowerCase();
+    if (blacklistSet.has(cat)) return false;
+    if (excludeKeywords.length > 0) {
+      const haystack = `${e.title || ""} ${e.description || ""} ${cat}`.toLowerCase();
+      for (const kw of excludeKeywords) {
+        if (haystack.includes(kw)) return false;
+      }
+    }
+    return true;
+  });
+
+  return getFallbackRecommended(filtered).map((e) => e.id);
+}
+
 // ── Venue photo (lazy Google Places lookup) ─────────────────────────────
 
 const venuePhotoCache = new Map<string, string | null>();
@@ -197,7 +226,6 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
   const [section, setSection] = useState<"discover" | "collabs">("discover");
   const [events, setEvents] = useState<MarketplaceEvent[]>(prefetchedEvents || []);
   const [recommendedIds, setRecommendedIds] = useState<string[] | null>(null);
-  const [loadingRecs, setLoadingRecs] = useState(false);
   const [loading, setLoading] = useState(!prefetchedEvents);
   const [error, setError] = useState<string | null>(null);
   const initialLoadDone = useRef(!!prefetchedEvents);
@@ -280,33 +308,12 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
     }
   }, [calendarId, city]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fetchRecommendations = useCallback(async (eventsToRank: MarketplaceEvent[]) => {
+  const fetchRecommendations = useCallback((eventsToRank: MarketplaceEvent[]) => {
     if (!orgSettings || eventsToRank.length === 0) return;
-    setLoadingRecs(true);
-    try {
-      const res = await fetch("/api/recommend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          events: eventsToRank.map((e) => ({
-            id: e.id,
-            title: e.title,
-            description: e.description,
-            source: e.source,
-          })),
-          orgSettings,
-        }),
-      });
-      const data = await res.json();
-      const ids: string[] = data.recommendedIds || [];
-      if (ids.length > 0) {
-        setRecommendedIds(ids);
-        setCachedEvents(calendarId, eventsToRank, ids);
-      }
-    } catch {
-      // Silently fall back to round-robin
-    } finally {
-      setLoadingRecs(false);
+    const ids = computeLocalRecommendations(eventsToRank, orgSettings);
+    if (ids.length > 0) {
+      setRecommendedIds(ids);
+      setCachedEvents(calendarId, eventsToRank, ids);
     }
   }, [calendarId, orgSettings]);
 
@@ -463,7 +470,7 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
           </div>
 
           {/* Loading skeleton */}
-          {(loading || (loadingRecs && isRecommended && !recommendedIds)) && (
+          {loading && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[1, 2, 3, 4].map((i) => (
                 <div key={i} className="border border-zinc-100 rounded-lg overflow-hidden animate-pulse">
