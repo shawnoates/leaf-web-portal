@@ -27,6 +27,8 @@ export interface CreatePlanPrefill {
   time?: string;
   capacity?: string;
   imageUrl?: string | null;
+  /** Why this plan is being suggested (shown as a banner at top of the modal). */
+  justification?: string;
 }
 
 interface CreatePlanModalProps {
@@ -229,6 +231,13 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           {success && (
             <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg text-sm">
               <Check className="w-4 h-4" /> {editMode ? "Plan updated!" : "Plan created successfully!"}
+            </div>
+          )}
+
+          {prefill?.justification && !editMode && (
+            <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-lg text-xs leading-snug">
+              <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>{prefill.justification}</span>
             </div>
           )}
 

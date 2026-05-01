@@ -1746,6 +1746,7 @@ export default function OrgDashboardPage() {
                                     time: suggestion.recommendedTime || "",
                                     capacity: "",
                                     imageUrl: suggestion.image || null,
+                                    justification: suggestion.subtitle,
                                   });
                                   setShowCreatePlanModal(true);
                                 }}
@@ -1783,7 +1784,7 @@ export default function OrgDashboardPage() {
                                   <p className="text-xs text-zinc-400 mb-1">
                                     {new Date(suggestion.recommendedDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                                   </p>
-                                  <p className="text-[10px] text-emerald-600 truncate">{suggestion.subtitle}</p>
+                                  <p className="text-[10px] text-emerald-600 leading-snug line-clamp-2" title={suggestion.subtitle}>{suggestion.subtitle}</p>
                                 </div>
                               </div>
                             );
