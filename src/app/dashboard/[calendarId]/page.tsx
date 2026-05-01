@@ -1737,7 +1737,6 @@ export default function OrgDashboardPage() {
                                     return;
                                   }
                                   // Pre-fill the create plan modal with the suggestion's data
-                                  // (title/description/venue/time pulled from the source past plan)
                                   const recDate = new Date(suggestion.recommendedDate);
                                   setCreatePlanPrefill({
                                     title: suggestion.title,
@@ -1750,11 +1749,11 @@ export default function OrgDashboardPage() {
                                   });
                                   setShowCreatePlanModal(true);
                                 }}
-                                className={`relative border rounded-lg overflow-hidden shrink-0 w-52 cursor-pointer transition-colors ${
+                                className={`group relative border rounded-lg overflow-hidden shrink-0 w-52 cursor-pointer transition-colors ${
                                   isLocked ? "border-zinc-200 bg-zinc-50" : "border-dashed border-emerald-300 hover:border-emerald-400"
                                 }`}
                               >
-                                <div className="w-full h-28 relative bg-gradient-to-br from-emerald-50 to-zinc-100">
+                                <div className="w-full h-28 relative bg-gradient-to-br from-emerald-50 to-zinc-100 overflow-hidden">
                                   {suggestion.image ? (
                                     <img src={suggestion.image} alt={suggestion.title} className="w-full h-full object-cover" />
                                   ) : (
@@ -1765,6 +1764,13 @@ export default function OrgDashboardPage() {
                                   <div className="absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded">
                                     Suggested
                                   </div>
+                                  {!isLocked && (
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center">
+                                      <span className="bg-white text-zinc-900 px-4 py-2 text-[10px] tracking-[0.2em] uppercase font-bold shadow-xl">
+                                        Add to Calendar
+                                      </span>
+                                    </div>
+                                  )}
                                   {isLocked && (
                                     <div className="absolute inset-0 bg-zinc-900/50 backdrop-blur-sm flex flex-col items-center justify-center">
                                       <Lock className="w-4 h-4 text-white mb-1" />
