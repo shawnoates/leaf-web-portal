@@ -9,9 +9,22 @@ import {
   Check,
   ImagePlus,
   MapPin,
+  Plus,
   Sparkles,
+  Vote,
   X,
 } from "lucide-react";
+
+type PlanMode = "plan" | "idea" | "poll";
+
+type PollOptionDraft = { date: string; time: string };
+
+const MIN_POLL_OPTIONS = 2;
+const MAX_POLL_OPTIONS = 6;
+
+function emptyPollOption(): PollOptionDraft {
+  return { date: "", time: "" };
+}
 
 interface Venue {
   name: string;
@@ -73,7 +86,15 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(prefill?.imageUrl || null);
   const [hostNote, setHostNote] = useState("");
-  const [isHosted, setIsHosted] = useState(true);
+  const [mode, setMode] = useState<PlanMode>("plan");
+  const isHosted = mode === "plan";
+  const isPoll = mode === "poll";
+  const pollAllowed = tier !== "starter";
+  const [pollOptions, setPollOptions] = useState<PollOptionDraft[]>([
+    emptyPollOption(),
+    emptyPollOption(),
+  ]);
+  const [pollClosesAt, setPollClosesAt] = useState("");
   const [requireApproval, setRequireApproval] = useState(false);
   const [creating, setCreating] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -146,8 +167,64 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     }
   }
 
+  function validPollOptions(): PollOptionDraft[] {
+    const cleaned = pollOptions
+      .map((o) => ({ date: o.date.trim(), time: o.time }))
+      .filter((o) => /^\d{4}-\d{2}-\d{2}$/.test(o.date));
+    const seen = new Set<string>();
+    const unique: PollOptionDraft[] = [];
+    for (const opt of cleaned) {
+      const key = `${opt.date}|${opt.time}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(opt);
+    }
+    return unique;
+  }
+
   async function handleCreate() {
-    if (!title || !date) return;
+    if (!title) return;
+
+    if (isPoll) {
+      const optsClean = validPollOptions();
+      if (optsClean.length < MIN_POLL_OPTIONS) {
+        alert(`Add at least ${MIN_POLL_OPTIONS} valid date options for the poll.`);
+        return;
+      }
+      if (!imageBase64 && !prefill?.imageUrl && !selectedImageUrl) {
+        alert("Please upload a cover image for your poll.");
+        return;
+      }
+      setCreating(true);
+      try {
+        await Parse.Cloud.run("createCalendarDatePoll", {
+          calendarId: selectedCalendarId,
+          title,
+          description,
+          options: optsClean.map((o) => ({ date: o.date, time: o.time || null })),
+          closesAt: pollClosesAt ? new Date(`${pollClosesAt}T23:59:59`).toISOString() : undefined,
+          venue: selectedVenue
+            ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId }
+            : null,
+          imageBase64: imageBase64 || undefined,
+          imageUrl: !imageBase64 ? (selectedImageUrl || prefill?.imageUrl || undefined) : undefined,
+        });
+        setSuccess(true);
+        onCreated();
+        setTimeout(() => {
+          setSuccess(false);
+          onClose();
+        }, 1500);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to create poll";
+        alert(message);
+      } finally {
+        setCreating(false);
+      }
+      return;
+    }
+
+    if (!date) return;
     if (!editMode && isHosted && !imageBase64 && !prefill?.imageUrl && !selectedImageUrl) {
       alert("Please upload a cover image for your plan.");
       return;
@@ -218,7 +295,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       <div className="absolute inset-0 bg-black/40" onClick={() => { if (!creating) onClose(); }} />
       <div className="relative bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl">
         <div className="sticky top-0 bg-white border-b border-zinc-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{editMode ? "Edit Plan" : "New Plan"}</h2>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{editMode ? "Edit Plan" : isPoll ? "New Date Poll" : "New Plan"}</h2>
           <button
             onClick={() => { if (!creating) onClose(); }}
             className="p-1.5 hover:bg-zinc-100 rounded-full transition-colors"
@@ -230,7 +307,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
         <div className="px-6 py-5 space-y-5">
           {success && (
             <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg text-sm">
-              <Check className="w-4 h-4" /> {editMode ? "Plan updated!" : "Plan created successfully!"}
+              <Check className="w-4 h-4" /> {editMode ? "Plan updated!" : isPoll ? "Poll created — followers notified" : "Plan created successfully!"}
             </div>
           )}
 
@@ -260,30 +337,46 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           {/* Plan type toggle (hidden in edit mode) */}
           {!editMode && <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-3">Plan Type</label>
-            <div className="flex gap-3">
+            <div className="grid grid-cols-3 gap-2">
               <button
-                onClick={() => setIsHosted(true)}
-                className={`flex-1 border rounded-lg p-3 text-left transition-all ${
-                  isHosted ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
+                onClick={() => setMode("plan")}
+                className={`border rounded-lg p-2.5 text-left transition-all ${
+                  mode === "plan" ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
                 }`}
               >
-                <div className="flex items-center gap-2 mb-0.5">
+                <div className="flex items-center gap-1.5 mb-0.5">
                   <Calendar className="w-3.5 h-3.5" />
-                  <span className="text-sm font-medium">Upcoming Plan</span>
+                  <span className="text-xs font-medium">Plan</span>
                 </div>
-                <p className="text-xs text-zinc-500">You host it, members RSVP</p>
+                <p className="text-[10px] text-zinc-500 leading-tight">You host, members RSVP</p>
               </button>
               <button
-                onClick={() => setIsHosted(false)}
-                className={`flex-1 border rounded-lg p-3 text-left transition-all ${
-                  !isHosted ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
+                onClick={() => setMode("idea")}
+                className={`border rounded-lg p-2.5 text-left transition-all ${
+                  mode === "idea" ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
                 }`}
               >
-                <div className="flex items-center gap-2 mb-0.5">
+                <div className="flex items-center gap-1.5 mb-0.5">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span className="text-sm font-medium">Plan Idea</span>
+                  <span className="text-xs font-medium">Idea</span>
                 </div>
-                <p className="text-xs text-zinc-500">Members can host this idea</p>
+                <p className="text-[10px] text-zinc-500 leading-tight">Members can host</p>
+              </button>
+              <button
+                onClick={() => { if (pollAllowed) setMode("poll"); }}
+                disabled={!pollAllowed}
+                title={pollAllowed ? "" : "Date polls require Growth or Pro"}
+                className={`border rounded-lg p-2.5 text-left transition-all ${
+                  mode === "poll" ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
+                } ${pollAllowed ? "" : "opacity-40 cursor-not-allowed hover:border-zinc-200"}`}
+              >
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Vote className="w-3.5 h-3.5" />
+                  <span className="text-xs font-medium">Date Poll</span>
+                </div>
+                <p className="text-[10px] text-zinc-500 leading-tight">
+                  {pollAllowed ? "Followers vote on a date" : "Growth or Pro only"}
+                </p>
               </button>
             </div>
           </div>}
@@ -311,7 +404,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
 
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">
-              Cover Image {isHosted && <span className="text-red-400">*</span>}
+              Cover Image {(isHosted || isPoll) && <span className="text-red-400">*</span>}
             </label>
             {imagePreview || selectedImageUrl ? (
               <div className="relative w-full h-36 rounded-lg overflow-hidden">
@@ -403,43 +496,116 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Date</label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                min={today}
-                max={maxDate}
-                className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
-              />
-              {tier === "starter" && (
-                <p className="text-[10px] text-amber-600 mt-1">Starter: 2 weeks ahead max</p>
-              )}
+          {!isPoll && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Date</label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  min={today}
+                  max={maxDate}
+                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                />
+                {tier === "starter" && (
+                  <p className="text-[10px] text-amber-600 mt-1">Starter: 2 weeks ahead max</p>
+                )}
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Time</label>
+                <input
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                />
+              </div>
             </div>
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Time</label>
-              <input
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
-              />
-            </div>
-          </div>
+          )}
 
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Capacity (optional)</label>
-            <input
-              type="number"
-              value={capacity}
-              onChange={(e) => setCapacity(e.target.value)}
-              className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 max-w-[120px]"
-              placeholder="—"
-              min="1"
-            />
-          </div>
+          {isPoll && (
+            <>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                    Date Options ({MIN_POLL_OPTIONS}–{MAX_POLL_OPTIONS})
+                  </label>
+                  {pollOptions.length < MAX_POLL_OPTIONS && (
+                    <button
+                      type="button"
+                      onClick={() => setPollOptions((prev) => [...prev, emptyPollOption()])}
+                      className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-zinc-700 hover:text-zinc-900"
+                    >
+                      <Plus className="w-3 h-3" /> Add
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {pollOptions.map((opt, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={opt.date}
+                        min={today}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setPollOptions((prev) => prev.map((p, i) => i === idx ? { ...p, date: value } : p));
+                        }}
+                        className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                      />
+                      <input
+                        type="time"
+                        value={opt.time}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setPollOptions((prev) => prev.map((p, i) => i === idx ? { ...p, time: value } : p));
+                        }}
+                        className="w-28 border border-zinc-200 rounded-lg px-3 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                      />
+                      {pollOptions.length > MIN_POLL_OPTIONS && (
+                        <button
+                          type="button"
+                          onClick={() => setPollOptions((prev) => prev.filter((_, i) => i !== idx))}
+                          className="p-1.5 text-zinc-400 hover:text-zinc-700"
+                          aria-label="Remove option"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-zinc-400 mt-2">Time is optional. Followers verify their phone via OTP, one vote per phone.</p>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Voting closes (optional)</label>
+                <input
+                  type="date"
+                  value={pollClosesAt}
+                  min={today}
+                  onChange={(e) => setPollClosesAt(e.target.value)}
+                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                />
+                <p className="text-[10px] text-zinc-400 mt-1">Defaults to 7 days from now.</p>
+              </div>
+            </>
+          )}
+
+          {!isPoll && (
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Capacity (optional)</label>
+              <input
+                type="number"
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+                className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 max-w-[120px]"
+                placeholder="—"
+                min="1"
+              />
+            </div>
+          )}
 
           {isHosted && (
             <div>
@@ -455,20 +621,22 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             </div>
           )}
 
-          {/* Venue privacy toggle */}
-          <div className="flex items-center justify-between py-1">
-            <div>
-              <p className="text-xs font-medium text-zinc-700">Hide venue until RSVP</p>
-              <p className="text-[10px] text-zinc-400">Only show neighborhood on public page</p>
+          {/* Venue privacy toggle (not relevant for polls — venue isn't being voted on) */}
+          {!isPoll && (
+            <div className="flex items-center justify-between py-1">
+              <div>
+                <p className="text-xs font-medium text-zinc-700">Hide venue until RSVP</p>
+                <p className="text-[10px] text-zinc-400">Only show neighborhood on public page</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHideVenue(!hideVenue)}
+                className={`relative w-10 h-5 rounded-full transition-colors ${hideVenue ? "bg-zinc-900" : "bg-zinc-200"}`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${hideVenue ? "left-5" : "left-0.5"}`} />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setHideVenue(!hideVenue)}
-              className={`relative w-10 h-5 rounded-full transition-colors ${hideVenue ? "bg-zinc-900" : "bg-zinc-200"}`}
-            >
-              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${hideVenue ? "left-5" : "left-0.5"}`} />
-            </button>
-          </div>
+          )}
 
           {/* Require approval toggle */}
           {isHosted && (
@@ -489,10 +657,24 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
 
           <button
             onClick={handleCreate}
-            disabled={!title || !date || creating || (!editMode && isHosted && !imageBase64 && !prefill?.imageUrl && !selectedImageUrl)}
+            disabled={
+              !title ||
+              creating ||
+              (isPoll
+                ? validPollOptions().length < MIN_POLL_OPTIONS || (!imageBase64 && !prefill?.imageUrl && !selectedImageUrl)
+                : !date || (!editMode && isHosted && !imageBase64 && !prefill?.imageUrl && !selectedImageUrl))
+            }
             className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
           >
-            {creating ? (editMode ? "Saving..." : "Creating...") : editMode ? "Save Changes" : isHosted ? "Create Upcoming Plan" : "Create Plan Idea"}
+            {creating
+              ? (editMode ? "Saving..." : "Creating...")
+              : editMode
+                ? "Save Changes"
+                : isPoll
+                  ? "Create Date Poll"
+                  : isHosted
+                    ? "Create Upcoming Plan"
+                    : "Create Plan Idea"}
           </button>
         </div>
       </div>
