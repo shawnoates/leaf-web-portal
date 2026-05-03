@@ -512,6 +512,26 @@ export default function OrgDashboardPage() {
     }
   }, [dashboard, searchParams]);
 
+  // Auto-open the plan detail modal when ?openPoll=<eventGroupId> is in the URL.
+  // Used by the "Pick a date" button in the poll-expired notification email.
+  const autoOpenedPollRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!dashboard) return;
+    const pollId = searchParams.get("openPoll");
+    if (!pollId || autoOpenedPollRef.current === pollId) return;
+    type ActivePlan = NonNullable<typeof selectedActivePlan>;
+    for (const cal of dashboard.calendars) {
+      const plans = (cal as Record<string, unknown>).activePlans as ActivePlan[] | undefined;
+      const match = plans?.find((p) => p.objectId === pollId);
+      if (match) {
+        setSelectedActivePlan(match);
+        setActiveTab("calendars");
+        autoOpenedPollRef.current = pollId;
+        break;
+      }
+    }
+  }, [dashboard, searchParams]);
+
   // Prefetch marketplace data as soon as dashboard is available
   const [prefetchedMarketplace, setPrefetchedMarketplace] = useState<MarketplaceEvent[] | null>(null);
   const marketplacePrefetched = useRef(false);
@@ -1784,15 +1804,21 @@ export default function OrgDashboardPage() {
                         <div className="flex gap-3 overflow-x-auto no-scrollbar">
                           {activePlans.map((plan) => {
                             if (plan.isPoll) {
-                              const closesIn = plan.pollClosesAt
-                                ? Math.max(0, Math.ceil((new Date(plan.pollClosesAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+                              const closesAtMs = plan.pollClosesAt ? new Date(plan.pollClosesAt).getTime() : null;
+                              const isExpired = closesAtMs !== null && closesAtMs <= Date.now();
+                              const closesIn = closesAtMs !== null && !isExpired
+                                ? Math.max(0, Math.ceil((closesAtMs - Date.now()) / (24 * 60 * 60 * 1000)))
                                 : null;
                               return (
                                 <button
                                   key={plan.objectId}
                                   type="button"
                                   onClick={() => setSelectedActivePlan(plan)}
-                                  className="text-left border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer"
+                                  className={`text-left rounded-lg overflow-hidden transition-colors shrink-0 w-52 cursor-pointer border ${
+                                    isExpired
+                                      ? "border-amber-300 hover:border-amber-400 bg-amber-50/30"
+                                      : "border-zinc-100 hover:border-zinc-200"
+                                  }`}
                                 >
                                   <div className="relative">
                                     {plan.image ? (
@@ -1802,15 +1828,17 @@ export default function OrgDashboardPage() {
                                         <Calendar className="w-6 h-6 text-zinc-300" />
                                       </div>
                                     )}
-                                    <div className="absolute top-1.5 left-1.5 inline-flex items-center gap-1 bg-zinc-900 text-white text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded">
-                                      <Vote className="w-2.5 h-2.5" /> Poll
+                                    <div className={`absolute top-1.5 left-1.5 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded ${
+                                      isExpired ? "bg-amber-600 text-white" : "bg-zinc-900 text-white"
+                                    }`}>
+                                      <Vote className="w-2.5 h-2.5" /> {isExpired ? "Pick winner" : "Poll"}
                                     </div>
                                   </div>
                                   <div className="p-3">
                                     <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
-                                    <p className="text-xs text-zinc-400 mb-1">
+                                    <p className={`text-xs mb-1 ${isExpired ? "text-amber-700 font-medium" : "text-zinc-400"}`}>
                                       {plan.pollOptionCount} options
-                                      {closesIn !== null && (closesIn > 0 ? ` · ${closesIn}d left` : " · closed")}
+                                      {isExpired ? " · voting closed" : closesIn !== null ? ` · ${closesIn}d left` : ""}
                                     </p>
                                     <div className="flex items-center justify-between text-xs text-zinc-400">
                                       <span className="truncate">{plan.hostName}</span>
