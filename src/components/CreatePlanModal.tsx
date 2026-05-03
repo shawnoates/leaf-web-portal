@@ -8,6 +8,7 @@ import {
   Calendar,
   Check,
   ImagePlus,
+  Lock,
   MapPin,
   Plus,
   Sparkles,
@@ -60,6 +61,8 @@ interface CreatePlanModalProps {
   eventGroupId?: string;
   onClose: () => void;
   onCreated: () => void;
+  /** Optional — called when a starter-tier user clicks the locked Date Poll button. */
+  onUpgrade?: () => void;
 }
 
 // Convert display time ("6:30 PM") to 24h format ("18:30") for <input type="time">
@@ -77,7 +80,7 @@ function toTimeInputValue(t?: string | null): string {
   return `${String(h).padStart(2, "0")}:${m}`;
 }
 
-export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, editMode, eventGroupId, onClose, onCreated }: CreatePlanModalProps) {
+export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, editMode, eventGroupId, onClose, onCreated, onUpgrade }: CreatePlanModalProps) {
   const [selectedCalendarId, setSelectedCalendarId] = useState(calendarId);
   const [hideVenue, setHideVenue] = useState(hideVenueDefault ?? true);
   const [title, setTitle] = useState(prefill?.title || "");
@@ -386,19 +389,34 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                 <p className="text-[10px] text-zinc-500 leading-tight">Members can host</p>
               </button>
               <button
-                onClick={() => { if (pollAllowed) setMode("poll"); }}
-                disabled={!pollAllowed}
-                title={pollAllowed ? "" : "Date polls require Growth or Pro"}
-                className={`border rounded-lg p-2.5 text-left transition-all ${
+                onClick={() => {
+                  if (pollAllowed) { setMode("poll"); return; }
+                  if (onUpgrade) onUpgrade();
+                }}
+                title={pollAllowed ? "" : "Date polls require The Social or The Organizer plan"}
+                className={`group border rounded-lg p-2.5 text-left transition-all ${
                   mode === "poll" ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
-                } ${pollAllowed ? "" : "opacity-40 cursor-not-allowed hover:border-zinc-200"}`}
+                } ${pollAllowed ? "" : "opacity-50 hover:opacity-100 hover:border-zinc-400"}`}
               >
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <Vote className="w-3.5 h-3.5" />
+                  {pollAllowed ? (
+                    <Vote className="w-3.5 h-3.5" />
+                  ) : (
+                    <Lock className="w-3.5 h-3.5" />
+                  )}
                   <span className="text-xs font-medium">Date Poll</span>
                 </div>
                 <p className="text-[10px] text-zinc-500 leading-tight">
-                  {pollAllowed ? "Followers vote on a date" : "Growth or Pro only"}
+                  {pollAllowed ? (
+                    "Followers vote on a date"
+                  ) : (
+                    <>
+                      <span className="group-hover:hidden">The Social or The Organizer</span>
+                      <span className="hidden group-hover:inline-flex items-center gap-1 font-bold uppercase tracking-widest text-zinc-700">
+                        <Lock className="w-2.5 h-2.5" /> Upgrade
+                      </span>
+                    </>
+                  )}
                 </p>
               </button>
             </div>

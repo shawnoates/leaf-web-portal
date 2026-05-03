@@ -3384,6 +3384,7 @@ export default function OrgDashboardPage() {
           eventGroupId={editingPlanId || undefined}
           onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); setEditingPlanId(null); }}
           onCreated={() => fetchDashboard()}
+          onUpgrade={() => { setShowCreatePlanModal(false); setShowSubscription(true); }}
         />
       )}
 
