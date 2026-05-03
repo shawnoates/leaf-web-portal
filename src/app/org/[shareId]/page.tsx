@@ -47,6 +47,8 @@ interface Plan {
   title: string;
   date: string;
   time: string;
+  /** Raw ISO timestamp from the server (used to build .ics calendar invites). */
+  dateISO?: string | null;
   description: string;
   image: string;
   hostId: string | null;
@@ -190,6 +192,64 @@ function normalizeTimeString(time: string): string {
   const period = h >= 12 ? "PM" : "AM";
   const hour12 = h % 12 || 12;
   return `${hour12}:${String(m || 0).padStart(2, "0")} ${period}`;
+}
+
+// Build an iCalendar (.ics) data URL for a plan. Imports cleanly into Apple
+// Calendar (iOS/macOS), Outlook, Google Calendar (via download), and the
+// default calendar app on Android/Windows.
+//
+// Input dateISO is the plan's expiryDate in UTC; we default to a 2-hour
+// duration when no end time is known.
+function buildIcsDataUrl(opts: {
+  uid: string;
+  title: string;
+  dateISO: string;
+  durationHours?: number;
+  description?: string;
+  locationName?: string | null;
+  locationAddress?: string | null;
+  url?: string;
+}): string | null {
+  const start = new Date(opts.dateISO);
+  if (Number.isNaN(start.getTime())) return null;
+  const end = new Date(start.getTime() + (opts.durationHours ?? 2) * 60 * 60 * 1000);
+
+  // RFC 5545: DTSTAMP/DTSTART in basic UTC format YYYYMMDDTHHMMSSZ.
+  const fmt = (d: Date) =>
+    d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+
+  // RFC 5545 escaping for TEXT fields.
+  const esc = (s: string) =>
+    s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+
+  const locationParts = [opts.locationName, opts.locationAddress].filter(Boolean) as string[];
+  const location = locationParts.join(", ");
+
+  // Long description lines should be folded at 75 octets per RFC 5545; keeping
+  // it simple and trusting consumers — Apple/Google/Outlook all tolerate
+  // unfolded lines under typical lengths.
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Leaf//Calendar Plan//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${opts.uid}@joinleaf.com`,
+    `DTSTAMP:${fmt(new Date())}`,
+    `DTSTART:${fmt(start)}`,
+    `DTEND:${fmt(end)}`,
+    `SUMMARY:${esc(opts.title)}`,
+    opts.description ? `DESCRIPTION:${esc(opts.description)}` : "",
+    location ? `LOCATION:${esc(location)}` : "",
+    opts.url ? `URL:${esc(opts.url)}` : "",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].filter(Boolean);
+
+  // CRLF line endings per spec.
+  const ics = lines.join("\r\n");
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
 }
 
 // --- Components ---
@@ -428,6 +488,30 @@ function RsvpModal({
                 Open in Leaf App
               </a>
             )}
+
+            {!isPendingResult && plan.dateISO && (() => {
+              const icsUrl = buildIcsDataUrl({
+                uid: plan.id,
+                title: plan.title,
+                dateISO: plan.dateISO,
+                description: plan.description,
+                locationName: plan.location?.isPrivate ? null : plan.location?.name,
+                locationAddress: plan.location?.isPrivate ? null : plan.location?.address,
+                url: typeof window !== "undefined" ? `${window.location.origin}/p/${plan.id}` : undefined,
+              });
+              if (!icsUrl) return null;
+              const safeFilename = plan.title.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "plan";
+              return (
+                <a
+                  href={icsUrl}
+                  download={`${safeFilename}.ics`}
+                  className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-xs uppercase tracking-[0.2em] font-bold hover:bg-zinc-50 transition-colors rounded-lg"
+                >
+                  <Calendar className="w-4 h-4" />
+                  Add to Calendar
+                </a>
+              );
+            })()}
 
             <button
               onClick={onClose}
@@ -1201,6 +1285,7 @@ export default function OrgCalendarPage() {
         title: p.title as string || "Untitled Plan",
         date: p.expiryDate ? formatDate(p.expiryDate as string) : "",
         time: p.time ? normalizeTimeString(p.time as string) : (p.expiryDate ? formatTime(p.expiryDate as string) : ""),
+        dateISO: (p.expiryDate as string) || null,
         description: p.description as string || "",
         image: p.image as string || "",
         hostId: (p.host as Record<string, string>)?.objectId || null,
@@ -2268,6 +2353,35 @@ export default function OrgCalendarPage() {
                     </button>
                   </div>
                 )}
+                {/* Add to Calendar — only on real plans (not polls), and only when we have a date.
+                    Venue address is omitted when the location is gated behind RSVP/approval and
+                    the user hasn't unlocked it yet, so private addresses don't leak into calendar
+                    entries; the neighborhood (if any) is used as a coarse location hint. */}
+                {!selectedEvent.isPoll && selectedEvent.dateISO && (() => {
+                  const venueGated = !!(selectedEvent.location?.isPrivate
+                    || (selectedEvent.requireApproval && !rsvpedPlanIds.has(selectedEvent.id)));
+                  const icsUrl = buildIcsDataUrl({
+                    uid: selectedEvent.id,
+                    title: selectedEvent.title,
+                    dateISO: selectedEvent.dateISO,
+                    description: selectedEvent.description,
+                    locationName: venueGated ? selectedEvent.location?.neighborhood ?? null : selectedEvent.location?.name,
+                    locationAddress: venueGated ? null : selectedEvent.location?.address,
+                    url: typeof window !== "undefined" ? `${window.location.origin}/p/${selectedEvent.id}` : undefined,
+                  });
+                  if (!icsUrl) return null;
+                  const safeFilename = selectedEvent.title.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "plan";
+                  return (
+                    <a
+                      href={icsUrl}
+                      download={`${safeFilename}.ics`}
+                      className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-xs uppercase tracking-[0.2em] font-bold hover:bg-zinc-50 transition-colors rounded-lg mt-3"
+                    >
+                      <Calendar className="w-4 h-4" />
+                      Add to Calendar
+                    </a>
+                  );
+                })()}
                 {/* Attendee list — visible only to the plan host (and not on polls, which have voters not attendees) */}
                 {hostedPlanIds.has(selectedEvent.id) && !selectedEvent.isPoll && (
                   <div className="border-t border-zinc-100 pt-4 mt-4">
