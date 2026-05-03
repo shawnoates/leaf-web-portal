@@ -41,16 +41,6 @@ import {
   Vote,
 } from "lucide-react";
 
-type PollPlanRef = {
-  objectId: string;
-  title: string;
-  image: string | null;
-  hostName: string;
-  pollVoteCount: number;
-  pollOptionCount: number;
-  pollClosesAt: string | null;
-};
-
 type PollOptionDetail = { date: string; time: string | null; count: number };
 import {
   LineChart,
@@ -390,8 +380,21 @@ export default function OrgDashboardPage() {
   }
 
   // Plan detail modal
-  const [selectedActivePlan, setSelectedActivePlan] = useState<{ objectId: string; title: string; description: string; image: string | null; date: string; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string } | null } | null>(null);
-  const [selectedPoll, setSelectedPoll] = useState<PollPlanRef | null>(null);
+  const [selectedActivePlan, setSelectedActivePlan] = useState<{
+    objectId: string;
+    title: string;
+    description: string;
+    image: string | null;
+    date: string;
+    time: string | null;
+    hostName: string;
+    rsvpCount: number;
+    location: { name: string; address: string } | null;
+    isPoll?: boolean;
+    pollVoteCount?: number;
+    pollOptionCount?: number;
+    pollClosesAt?: string | null;
+  } | null>(null);
   const [pollDetail, setPollDetail] = useState<{ options: PollOptionDetail[]; totalVotes: number; isExpired: boolean } | null>(null);
   const [pollDetailLoading, setPollDetailLoading] = useState(false);
   const [closingPoll, setClosingPoll] = useState(false);
@@ -408,11 +411,11 @@ export default function OrgDashboardPage() {
       .finally(() => setPlanRsvpsLoading(false));
   }, [selectedActivePlan]);
 
-  // Fetch poll options + tally when the poll modal opens
+  // Fetch poll options + tally when the plan-detail modal opens for a poll plan.
   useEffect(() => {
-    if (!selectedPoll) { setPollDetail(null); return; }
+    if (!selectedActivePlan?.isPoll) { setPollDetail(null); return; }
     setPollDetailLoading(true);
-    Parse.Cloud.run("getCalendarDatePollForGuest", { eventGroupId: selectedPoll.objectId })
+    Parse.Cloud.run("getCalendarDatePollForGuest", { eventGroupId: selectedActivePlan.objectId })
       .then((result: { poll: { options: PollOptionDetail[]; totalVotes: number; isExpired: boolean } }) => {
         setPollDetail({
           options: result.poll.options || [],
@@ -422,7 +425,7 @@ export default function OrgDashboardPage() {
       })
       .catch(() => setPollDetail(null))
       .finally(() => setPollDetailLoading(false));
-  }, [selectedPoll]);
+  }, [selectedActivePlan]);
 
   // Create plan modal (used by marketplace + duplicate)
   const [createPlanPrefill, setCreatePlanPrefill] = useState<CreatePlanPrefill | null>(null);
@@ -1788,15 +1791,7 @@ export default function OrgDashboardPage() {
                                 <button
                                   key={plan.objectId}
                                   type="button"
-                                  onClick={() => setSelectedPoll({
-                                    objectId: plan.objectId,
-                                    title: plan.title,
-                                    image: plan.image,
-                                    hostName: plan.hostName,
-                                    pollVoteCount: plan.pollVoteCount || 0,
-                                    pollOptionCount: plan.pollOptionCount || 0,
-                                    pollClosesAt: plan.pollClosesAt || null,
-                                  })}
+                                  onClick={() => setSelectedActivePlan(plan)}
                                   className="text-left border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer"
                                 >
                                   <div className="relative">
@@ -3042,14 +3037,34 @@ export default function OrgDashboardPage() {
                   Hosted by {selectedActivePlan.hostName}
                 </p>
                 <div className="flex gap-6 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">
-                  <span className="flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
-                    {new Date(selectedActivePlan.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-                    {selectedActivePlan.time && ` at ${selectedActivePlan.time}`}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <Users className="w-4 h-4" /> {planRsvpsLoading ? selectedActivePlan.rsvpCount : planRsvps.length} RSVP{planRsvps.length === 1 ? "" : "s"}
-                  </span>
+                  {selectedActivePlan.isPoll ? (
+                    <>
+                      <span className="flex items-center gap-2">
+                        <Vote className="w-4 h-4" />
+                        {selectedActivePlan.pollOptionCount || 0} {selectedActivePlan.pollOptionCount === 1 ? "option" : "options"}
+                        {selectedActivePlan.pollClosesAt && (() => {
+                          const ms = new Date(selectedActivePlan.pollClosesAt).getTime() - Date.now();
+                          if (ms <= 0) return <> &middot; closed</>;
+                          const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
+                          return <> &middot; {days}d left</>;
+                        })()}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <Users className="w-4 h-4" /> {pollDetail?.totalVotes ?? selectedActivePlan.pollVoteCount ?? 0} {(pollDetail?.totalVotes ?? selectedActivePlan.pollVoteCount ?? 0) === 1 ? "vote" : "votes"}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        {new Date(selectedActivePlan.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                        {selectedActivePlan.time && ` at ${selectedActivePlan.time}`}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <Users className="w-4 h-4" /> {planRsvpsLoading ? selectedActivePlan.rsvpCount : planRsvps.length} RSVP{planRsvps.length === 1 ? "" : "s"}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -3072,7 +3087,98 @@ export default function OrgDashboardPage() {
                 </div>
               )}
 
-              {/* RSVPs */}
+              {/* Poll results — voting options + "Pick winning date" (organizer view) */}
+              {selectedActivePlan.isPoll ? (
+                <div className="space-y-3">
+                  <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                    Vote Results
+                  </h4>
+                  {pollDetailLoading && <p className="text-sm text-zinc-400">Loading results…</p>}
+                  {!pollDetailLoading && pollDetail && (
+                    <>
+                      {pollDetail.isExpired && (
+                        <div className="px-3 py-2 bg-amber-50 text-amber-700 text-xs rounded-md">
+                          This poll is closed. Convert anyway by picking a date below.
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        {[...pollDetail.options]
+                          .sort((a, b) => b.count - a.count || a.date.localeCompare(b.date))
+                          .map((opt, idx) => {
+                            const total = pollDetail.totalVotes;
+                            const pct = total > 0 ? Math.round((opt.count / total) * 100) : 0;
+                            const dateLabel = (() => {
+                              const [y, m, d] = opt.date.split("-").map(Number);
+                              if (!y || !m || !d) return opt.date;
+                              return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+                                weekday: "short",
+                                month: "short",
+                                day: "numeric",
+                              });
+                            })();
+                            const timeLabel = opt.time ? (() => {
+                              const [hh, mm] = opt.time!.split(":");
+                              let h = parseInt(hh, 10);
+                              const ampm = h >= 12 ? "PM" : "AM";
+                              if (h === 0) h = 12; else if (h > 12) h -= 12;
+                              return `${h}:${mm} ${ampm}`;
+                            })() : null;
+                            return (
+                              <div key={`${opt.date}|${opt.time || ""}`} className="relative border border-zinc-200 rounded-lg overflow-hidden">
+                                <div className="absolute inset-y-0 left-0 bg-zinc-100" style={{ width: `${pct}%` }} />
+                                <div className="relative flex items-center justify-between gap-3 p-3">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-zinc-900">
+                                      {dateLabel}
+                                      {timeLabel && <span className="text-zinc-500"> · {timeLabel}</span>}
+                                      {idx === 0 && opt.count > 0 && (
+                                        <span className="ml-2 text-[9px] font-bold uppercase tracking-widest bg-emerald-600 text-white px-1.5 py-0.5 rounded">
+                                          Leader
+                                        </span>
+                                      )}
+                                    </p>
+                                    <p className="text-[11px] text-zinc-400">
+                                      {opt.count} {opt.count === 1 ? "vote" : "votes"}{total > 0 ? ` · ${pct}%` : ""}
+                                    </p>
+                                  </div>
+                                  <button
+                                    disabled={closingPoll}
+                                    onClick={async () => {
+                                      if (!confirm(`Pick ${dateLabel}${timeLabel ? ` at ${timeLabel}` : ""}? Voters will be SMS'd to RSVP.`)) return;
+                                      setClosingPoll(true);
+                                      try {
+                                        await Parse.Cloud.run("closeAndConvertPoll", {
+                                          eventGroupId: selectedActivePlan.objectId,
+                                          winningDate: opt.date,
+                                          winningTime: opt.time || undefined,
+                                        });
+                                        setSelectedActivePlan(null);
+                                        fetchDashboard();
+                                      } catch (err) {
+                                        alert(err instanceof Error ? err.message : "Failed to close poll.");
+                                      } finally {
+                                        setClosingPoll(false);
+                                      }
+                                    }}
+                                    className="shrink-0 text-[10px] font-bold uppercase tracking-widest bg-zinc-900 text-white px-3 py-2 rounded hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                                  >
+                                    Pick this date
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                      <p className="text-[11px] text-zinc-400 leading-relaxed pt-1">
+                        Picking a date locks voting and promotes this to a real plan. Every voter gets a text with the chosen date and an RSVP link.
+                      </p>
+                    </>
+                  )}
+                  {!pollDetailLoading && !pollDetail && (
+                    <p className="text-sm text-zinc-400">Couldn&apos;t load poll details.</p>
+                  )}
+                </div>
+              ) : (
               <div className="space-y-3">
                 <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
                   Attendees {!planRsvpsLoading && `(${planRsvps.filter(r => r.status === "Accepted").length})`}
@@ -3171,6 +3277,7 @@ export default function OrgDashboardPage() {
                   <p className="text-sm text-zinc-400">No RSVPs yet.</p>
                 )}
               </div>
+              )}
 
               <div className="pt-8 border-t border-zinc-100 flex items-center justify-between">
                 <button
@@ -3195,6 +3302,10 @@ export default function OrgDashboardPage() {
                 </button>
                 <button
                   onClick={() => {
+                    if (selectedActivePlan.isPoll) {
+                      alert("Editing a poll's options isn't supported. Cancel and recreate, or duplicate to start a fresh poll.");
+                      return;
+                    }
                     const planDate = selectedActivePlan.date ? (() => { const d = new Date(selectedActivePlan.date); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })() : "";
                     setEditingPlanId(selectedActivePlan.objectId);
                     setCreatePlanPrefill({
@@ -3215,159 +3326,26 @@ export default function OrgDashboardPage() {
                 </button>
                 <button
                   onClick={async () => {
-                    if (!confirm("Cancel this plan? Attendees will be notified. This cannot be undone.")) return;
+                    const isPoll = selectedActivePlan.isPoll;
+                    const confirmMsg = isPoll
+                      ? "Cancel this poll? Voters won't be notified. This cannot be undone."
+                      : "Cancel this plan? Attendees will be notified. This cannot be undone.";
+                    if (!confirm(confirmMsg)) return;
                     try {
                       await Parse.Cloud.run("removePlanFromCalendar", { eventGroupId: selectedActivePlan.objectId });
                       setSelectedActivePlan(null);
                       fetchDashboard();
                     } catch (err) {
-                      console.error("Failed to cancel plan:", err);
-                      alert("Failed to cancel plan.");
+                      console.error("Failed to cancel:", err);
+                      alert(isPoll ? "Failed to cancel poll." : "Failed to cancel plan.");
                     }
                   }}
                   className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Cancel Plan
+                  {selectedActivePlan.isPoll ? "Cancel Poll" : "Cancel Plan"}
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Poll Detail / Close & Convert Modal */}
-      {selectedPoll && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col rounded-t-3xl md:rounded-2xl shadow-2xl relative">
-            <button
-              onClick={() => { if (!closingPoll) { setSelectedPoll(null); } }}
-              disabled={closingPoll}
-              className="absolute top-4 right-4 z-50 p-1.5 rounded-full hover:bg-zinc-100 disabled:opacity-50"
-            >
-              <Plus className="w-5 h-5 rotate-45" />
-            </button>
-
-            <div className="px-6 py-5 border-b border-zinc-100">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1 inline-flex items-center gap-1">
-                <Vote className="w-3 h-3" /> Date Poll
-              </p>
-              <h2 className="text-xl font-light tracking-tight text-zinc-900">{selectedPoll.title}</h2>
-              <p className="text-xs text-zinc-400 mt-1">
-                {selectedPoll.pollVoteCount} {selectedPoll.pollVoteCount === 1 ? "vote" : "votes"} · {selectedPoll.pollOptionCount} options
-                {selectedPoll.pollClosesAt && (
-                  <> · closes {new Date(selectedPoll.pollClosesAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</>
-                )}
-              </p>
-            </div>
-
-            <div className="px-6 py-5 overflow-y-auto space-y-4">
-              {pollDetailLoading && (
-                <p className="text-sm text-zinc-400">Loading results…</p>
-              )}
-              {!pollDetailLoading && pollDetail && (
-                <>
-                  {pollDetail.isExpired && (
-                    <div className="px-3 py-2 bg-amber-50 text-amber-700 text-xs rounded-md">
-                      This poll is closed. Convert anyway by picking a date below.
-                    </div>
-                  )}
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-                    Pick the winning date
-                  </p>
-                  <div className="space-y-2">
-                    {[...pollDetail.options]
-                      .sort((a, b) => b.count - a.count || a.date.localeCompare(b.date))
-                      .map((opt, idx) => {
-                        const total = pollDetail.totalVotes;
-                        const pct = total > 0 ? Math.round((opt.count / total) * 100) : 0;
-                        const dateLabel = (() => {
-                          const [y, m, d] = opt.date.split("-").map(Number);
-                          if (!y || !m || !d) return opt.date;
-                          return new Date(y, m - 1, d).toLocaleDateString("en-US", {
-                            weekday: "short",
-                            month: "short",
-                            day: "numeric",
-                          });
-                        })();
-                        const timeLabel = opt.time ? (() => {
-                          const [hh, mm] = opt.time!.split(":");
-                          let h = parseInt(hh, 10);
-                          const ampm = h >= 12 ? "PM" : "AM";
-                          if (h === 0) h = 12; else if (h > 12) h -= 12;
-                          return `${h}:${mm} ${ampm}`;
-                        })() : null;
-                        return (
-                          <div key={`${opt.date}|${opt.time || ""}`} className="relative border border-zinc-200 rounded-lg overflow-hidden">
-                            <div
-                              className="absolute inset-y-0 left-0 bg-zinc-100"
-                              style={{ width: `${pct}%` }}
-                            />
-                            <div className="relative flex items-center justify-between gap-3 p-3">
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-zinc-900">
-                                  {dateLabel}
-                                  {timeLabel && <span className="text-zinc-500"> · {timeLabel}</span>}
-                                  {idx === 0 && opt.count > 0 && (
-                                    <span className="ml-2 text-[9px] font-bold uppercase tracking-widest bg-emerald-600 text-white px-1.5 py-0.5 rounded">
-                                      Leader
-                                    </span>
-                                  )}
-                                </p>
-                                <p className="text-[11px] text-zinc-400">
-                                  {opt.count} {opt.count === 1 ? "vote" : "votes"}{total > 0 ? ` · ${pct}%` : ""}
-                                </p>
-                              </div>
-                              <button
-                                disabled={closingPoll}
-                                onClick={async () => {
-                                  if (!confirm(`Pick ${dateLabel}${timeLabel ? ` at ${timeLabel}` : ""}? Voters will be SMS'd to RSVP.`)) return;
-                                  setClosingPoll(true);
-                                  try {
-                                    await Parse.Cloud.run("closeAndConvertPoll", {
-                                      eventGroupId: selectedPoll.objectId,
-                                      winningDate: opt.date,
-                                      winningTime: opt.time || undefined,
-                                    });
-                                    setSelectedPoll(null);
-                                    fetchDashboard();
-                                  } catch (err) {
-                                    alert(err instanceof Error ? err.message : "Failed to close poll.");
-                                  } finally {
-                                    setClosingPoll(false);
-                                  }
-                                }}
-                                className="shrink-0 text-[10px] font-bold uppercase tracking-widest bg-zinc-900 text-white px-3 py-2 rounded hover:bg-zinc-800 transition-colors disabled:opacity-50"
-                              >
-                                Pick this date
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                  <p className="text-[10px] text-zinc-400 leading-relaxed pt-2">
-                    Picking a date locks voting and promotes this to a real plan. Every voter gets a text with the chosen date and an RSVP link.
-                  </p>
-                </>
-              )}
-              {!pollDetailLoading && !pollDetail && (
-                <p className="text-sm text-zinc-400">Couldn&apos;t load poll details.</p>
-              )}
-            </div>
-
-            <div className="px-6 py-4 border-t border-zinc-100 flex items-center justify-between">
-              <a
-                href={`/poll/${selectedPoll.objectId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 inline-flex items-center gap-1"
-              >
-                Public page <ExternalLink className="w-3 h-3" />
-              </a>
-              {closingPoll && (
-                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Converting…</span>
-              )}
             </div>
           </div>
         </div>

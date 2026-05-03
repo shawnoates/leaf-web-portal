@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import Link from "next/link";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
+import PollVoteWidget from "@/components/PollVoteWidget";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Plus,
@@ -1818,10 +1819,7 @@ export default function OrgCalendarPage() {
               >
                 <div
                   className="w-full md:w-3/5 aspect-[16/10] overflow-hidden cursor-pointer bg-zinc-100 shadow-sm"
-                  onClick={() => {
-                    if (plan.isPoll) { window.location.href = `/poll/${plan.id}`; return; }
-                    setSelectedEvent(plan);
-                  }}
+                  onClick={() => setSelectedEvent(plan)}
                 >
                   {plan.image ? (
                     <img
@@ -1875,13 +1873,13 @@ export default function OrgCalendarPage() {
                           {plan.pollVoteCount || 0} {plan.pollVoteCount === 1 ? "Vote" : "Votes"} so far
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4">
-                          <a
-                            href={`/poll/${plan.id}`}
+                          <button
+                            onClick={() => setSelectedEvent(plan)}
                             className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
                             style={{ backgroundColor: org.brandColor || "#18181b" }}
                           >
                             Vote on a Date <ArrowUpRight className="w-4 h-4" />
-                          </a>
+                          </button>
                           <button
                             onClick={() => handleSharePlan(plan.id, plan.title)}
                             className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
@@ -2119,12 +2117,32 @@ export default function OrgCalendarPage() {
                   Hosted by {selectedEvent.hostName}
                 </p>
                 <div className="flex gap-6 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">
-                  <span className="flex items-center gap-2">
-                    <Clock className="w-4 h-4" /> {selectedEvent.date}{selectedEvent.time ? ` at ${selectedEvent.time}` : ""}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <Users className="w-4 h-4" /> {selectedEvent.attendeeCount} attending
-                  </span>
+                  {selectedEvent.isPoll ? (
+                    <>
+                      <span className="flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        {selectedEvent.pollOptionCount || 0} {selectedEvent.pollOptionCount === 1 ? "option" : "options"}
+                        {selectedEvent.pollClosesAt && (() => {
+                          const ms = new Date(selectedEvent.pollClosesAt).getTime() - Date.now();
+                          if (ms <= 0) return <> &middot; closed</>;
+                          const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
+                          return <> &middot; {days}d left</>;
+                        })()}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <Users className="w-4 h-4" /> {selectedEvent.pollVoteCount || 0} {selectedEvent.pollVoteCount === 1 ? "vote" : "votes"}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex items-center gap-2">
+                        <Clock className="w-4 h-4" /> {selectedEvent.date}{selectedEvent.time ? ` at ${selectedEvent.time}` : ""}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <Users className="w-4 h-4" /> {selectedEvent.attendeeCount} attending
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -2147,7 +2165,20 @@ export default function OrgCalendarPage() {
                     <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
                       Location
                     </h4>
-                    {selectedEvent.location.isPrivate || (!selectedEvent.location.name && !selectedEvent.location.address) || (selectedEvent.requireApproval && !rsvpedPlanIds.has(selectedEvent.id)) ? (
+                    {selectedEvent.isPoll ? (
+                      // Polls don't gate location behind RSVP — date isn't picked yet
+                      // and the venue (if set) is shown as informational context.
+                      selectedEvent.location.name ? (
+                        <>
+                          <p className="text-sm text-zinc-700">{selectedEvent.location.name}</p>
+                          {selectedEvent.location.address && (
+                            <p className="text-sm text-zinc-500">{selectedEvent.location.address}</p>
+                          )}
+                        </>
+                      ) : selectedEvent.location.neighborhood && (
+                        <p className="text-sm text-zinc-700">{selectedEvent.location.neighborhood}</p>
+                      )
+                    ) : selectedEvent.location.isPrivate || (!selectedEvent.location.name && !selectedEvent.location.address) || (selectedEvent.requireApproval && !rsvpedPlanIds.has(selectedEvent.id)) ? (
                       <>
                         {selectedEvent.location.neighborhood && (
                           <p className="text-sm text-zinc-700">{selectedEvent.location.neighborhood}</p>
@@ -2167,7 +2198,21 @@ export default function OrgCalendarPage() {
               </div>
 
               <div className="pt-8 border-t border-zinc-100 flex flex-col gap-4">
-                {org.rsvpLimitReached ? (
+                {selectedEvent.isPoll ? (
+                  <div className="space-y-4">
+                    <PollVoteWidget
+                      eventGroupId={selectedEvent.id}
+                      brandColor={org.brandColor || "#18181b"}
+                    />
+                    <button
+                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
+                      className="w-full border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                      {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                      <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                    </button>
+                  </div>
+                ) : org.rsvpLimitReached ? (
                   <div className="space-y-3">
                     <button
                       disabled
@@ -2237,8 +2282,8 @@ export default function OrgCalendarPage() {
                     </button>
                   </div>
                 )}
-                {/* Attendee list — visible only to the plan host */}
-                {hostedPlanIds.has(selectedEvent.id) && (
+                {/* Attendee list — visible only to the plan host (and not on polls, which have voters not attendees) */}
+                {hostedPlanIds.has(selectedEvent.id) && !selectedEvent.isPoll && (
                   <div className="border-t border-zinc-100 pt-4 mt-4">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-1.5">
