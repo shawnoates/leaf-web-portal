@@ -1746,13 +1746,22 @@ export default function OrgCalendarPage() {
                 Manage
               </Link>
             )}
-            {!org.isOwner && !org.isHost && !parseUser && (
-              <button
-                onClick={() => setShowHostLogin(true)}
-                className="text-[9px] tracking-[0.2em] uppercase text-zinc-300 hover:text-zinc-500 transition-colors"
-              >
-                Host login
-              </button>
+            {!org.isOwner && !org.isHost && (
+              parseUser ? (
+                <Link
+                  href="/dashboard"
+                  className="text-[9px] tracking-[0.2em] uppercase text-zinc-300 hover:text-zinc-500 transition-colors"
+                >
+                  My Dashboard
+                </Link>
+              ) : (
+                <button
+                  onClick={() => setShowHostLogin(true)}
+                  className="text-[9px] tracking-[0.2em] uppercase text-zinc-300 hover:text-zinc-500 transition-colors"
+                >
+                  Host login
+                </button>
+              )
             )}
           </div>
         </div>
