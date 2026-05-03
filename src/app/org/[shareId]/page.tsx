@@ -949,14 +949,16 @@ export default function OrgCalendarPage() {
   }, []);
 
   async function loadAttendees(eventGroupId: string) {
+    // Auth uses Parse session when signed in (Google-auth admins) and falls
+    // back to phone lookup for web-verified users without a session.
     const phone = localStorage.getItem("leaf_phone");
-    if (!phone) return;
+    const hasParseSession = !!Parse.User.current();
+    if (!phone && !hasParseSession) return;
     setLoadingAttendees(true);
     try {
-      const result = await Parse.Cloud.run("getPlanAttendeesForHost", {
-        eventGroupId,
-        phoneNumber: phone,
-      });
+      const params: { eventGroupId: string; phoneNumber?: string } = { eventGroupId };
+      if (phone) params.phoneNumber = phone;
+      const result = await Parse.Cloud.run("getPlanAttendeesForHost", params);
       setAttendees(result || []);
     } catch (err) {
       console.error("Failed to load attendees:", err);
