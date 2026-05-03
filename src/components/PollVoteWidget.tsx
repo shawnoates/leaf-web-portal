@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { Check, Clock, ShieldCheck, Smartphone } from "lucide-react";
+import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 
 type PollOption = { date: string; time: string | null; count: number };
 
@@ -88,10 +89,21 @@ export default function PollVoteWidget({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [guestId, setGuestId] = useState("");
+  // If the browser already has a verified phone from a prior RSVP/poll on this
+  // domain, we skip OTP and submit directly — same trust model as rsvpToPlanViaWeb.
+  const [preVerified, setPreVerified] = useState(false);
 
   useEffect(() => {
     const id = getOrCreateGuestId();
     setGuestId(id);
+
+    // Pull a verified-user cookie if one's been set by an earlier RSVP/poll.
+    const cached = getVerifiedUserCookie();
+    if (cached) {
+      setName(cached.name);
+      setPhone(cached.phone);
+      setPreVerified(true);
+    }
 
     let cancelled = false;
     (async () => {
@@ -166,13 +178,26 @@ export default function PollVoteWidget({
     }
   }
 
-  async function handleSubmitVote() {
+  async function handleContinue() {
     setError("");
-    if (code.length < 4) {
+    if (selected.size === 0) {
+      setError("Pick at least one option.");
+      return;
+    }
+    // Pre-verified users (cookie from a prior RSVP or poll on this domain) skip OTP.
+    if (preVerified) {
+      await submitVote({ withCode: false });
+      return;
+    }
+    setStep("phone");
+  }
+
+  async function submitVote({ withCode }: { withCode: boolean }) {
+    if (!detail) return;
+    if (withCode && code.length < 4) {
       setError("Enter the full code.");
       return;
     }
-    if (!detail) return;
 
     const digits = phone.replace(/\D/g, "");
     const selectedOptions = detail.options
@@ -190,11 +215,13 @@ export default function PollVoteWidget({
       await Parse.Cloud.run("submitCalendarPollVote", {
         eventGroupId,
         phone: `+1${digits}`,
-        code,
+        ...(withCode ? { code } : {}),
         name: name.trim(),
         selectedOptions,
         guestId,
       });
+      // First-time OTP verification — cache so future polls/RSVPs skip OTP.
+      if (withCode) setVerifiedUserCookie(name.trim(), phone);
       // Re-fetch to refresh tally counts.
       const fresh = (await Parse.Cloud.run("getCalendarDatePollForGuest", {
         eventGroupId,
@@ -214,6 +241,11 @@ export default function PollVoteWidget({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleSubmitVote() {
+    setError("");
+    await submitVote({ withCode: true });
   }
 
   if (loading) {
@@ -300,15 +332,31 @@ export default function PollVoteWidget({
       </div>
 
       {step === "select" && !detail.isExpired && (
-        <button
-          type="button"
-          onClick={() => setStep("phone")}
-          disabled={selected.size === 0}
-          className="w-full py-3 text-xs font-bold uppercase tracking-widest rounded-lg text-white transition-opacity disabled:opacity-40"
-          style={{ backgroundColor: brandColor }}
-        >
-          Continue
-        </button>
+        <>
+          {preVerified && (
+            <p className="text-[10px] tracking-widest uppercase text-zinc-400 text-center">
+              Voting as <span className="text-zinc-700 font-bold">{name}</span>
+              {" · "}
+              <button
+                type="button"
+                onClick={() => { setPreVerified(false); setName(""); setPhone(""); setStep("phone"); }}
+                className="underline hover:text-zinc-700"
+              >
+                use a different number
+              </button>
+            </p>
+          )}
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          <button
+            type="button"
+            onClick={handleContinue}
+            disabled={selected.size === 0 || submitting}
+            className="w-full py-3 text-xs font-bold uppercase tracking-widest rounded-lg text-white transition-opacity disabled:opacity-40"
+            style={{ backgroundColor: brandColor }}
+          >
+            {submitting ? "Recording vote…" : preVerified ? "Submit vote" : "Continue"}
+          </button>
+        </>
       )}
 
       {step === "phone" && (

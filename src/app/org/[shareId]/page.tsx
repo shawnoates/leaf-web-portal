@@ -6,6 +6,7 @@ import Parse from "@/lib/parse-client";
 import Link from "next/link";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import PollVoteWidget from "@/components/PollVoteWidget";
+import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Plus,
