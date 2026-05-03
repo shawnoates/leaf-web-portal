@@ -443,30 +443,6 @@ function RsvpModal({
 
 // --- Cookie Helpers ---
 
-// --- Verified User Cookie (shared across Follow, RSVP, Host) ---
-
-interface VerifiedUser {
-  name: string;
-  phone: string; // formatted like 555-555-5555
-}
-
-function setVerifiedUserCookie(name: string, phone: string) {
-  const data = JSON.stringify({ name, phone });
-  const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
-  document.cookie = `leaf_verified_user=${encodeURIComponent(data)}; expires=${expires}; path=/; SameSite=Lax`;
-}
-
-function getVerifiedUserCookie(): VerifiedUser | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(/leaf_verified_user=([^;]+)/);
-  if (!match) return null;
-  try {
-    return JSON.parse(decodeURIComponent(match[1]));
-  } catch {
-    return null;
-  }
-}
-
 // Keep legacy follower cookie for backward compat
 function setFollowerCookie(calendarId: string, name: string, phone: string) {
   const data = JSON.stringify({ calendarId, name, phone });
