@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Parse from "@/lib/parse-client";
-import { Users, Calendar, ArrowUpRight, Loader2 } from "lucide-react";
+import { Users, Calendar, ArrowUpRight, Loader2, Vote } from "lucide-react";
 
 // --- Types ---
 
@@ -17,6 +17,10 @@ interface Plan {
   hostName: string;
   attendeeCount: number;
   location: { name: string; address: string } | null;
+  isPoll?: boolean;
+  pollOptionCount?: number;
+  pollVoteCount?: number;
+  pollClosesAt?: string | null;
 }
 
 interface EmbedData {
@@ -82,6 +86,10 @@ export default function EmbedCalendarPage() {
         location: p.location
           ? { name: p.location.name || "", address: p.location.address || "" }
           : null,
+        isPoll: !!p.isPoll,
+        pollOptionCount: p.pollOptionCount || 0,
+        pollVoteCount: p.pollVoteCount || 0,
+        pollClosesAt: p.pollClosesAt || null,
       }));
 
       setData({
@@ -154,82 +162,105 @@ export default function EmbedCalendarPage() {
 
       {/* Plans Stream */}
       <div className="py-12 space-y-24">
-        {data.plans.map((plan, index) => (
-          <article
-            key={plan.id}
-            className={`group flex flex-col md:flex-row gap-8 md:gap-12 md:items-center ${
-              index % 2 !== 0 ? "md:flex-row-reverse" : ""
-            }`}
-          >
-            {/* Image */}
-            <a
-              href={orgUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full md:w-3/5 aspect-[16/10] overflow-hidden bg-zinc-100 shadow-sm block"
+        {data.plans.map((plan, index) => {
+          const cardHref = plan.isPoll
+            ? `${typeof window !== "undefined" ? window.location.origin : ""}/poll/${plan.id}`
+            : orgUrl;
+          return (
+            <article
+              key={plan.id}
+              className={`group flex flex-col md:flex-row gap-8 md:gap-12 md:items-center ${
+                index % 2 !== 0 ? "md:flex-row-reverse" : ""
+              }`}
             >
-              {plan.image ? (
-                <img
-                  src={plan.image}
-                  alt={plan.title}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Calendar className="w-16 h-16 text-zinc-300" />
-                </div>
-              )}
-            </a>
-
-            {/* Details */}
-            <div className="w-full md:w-2/5 space-y-6">
-              <div className="space-y-2">
-                <p className="text-[11px] tracking-[0.3em] uppercase font-bold text-zinc-400">
-                  {plan.date} &bull; {plan.time}
-                </p>
-                <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
-                  {plan.title}
-                </h3>
-                <div className="pt-2">
-                  <p className="text-[10px] tracking-[0.2em] uppercase text-zinc-900 font-bold flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: data.brandColor }}
-                    />
-                    Hosted by {plan.hostName}
-                  </p>
-                </div>
-              </div>
-
-              <p className="text-zinc-500 leading-relaxed font-light text-lg line-clamp-3">
-                {plan.description}
-              </p>
-
-              <div className="pt-2 flex flex-col gap-6">
-                {/* Attendee count */}
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 ring-2 ring-white">
-                    <Users className="w-3.5 h-3.5 text-zinc-500" />
+              {/* Image */}
+              <a
+                href={cardHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full md:w-3/5 aspect-[16/10] overflow-hidden bg-zinc-100 shadow-sm block"
+              >
+                {plan.image ? (
+                  <img
+                    src={plan.image}
+                    alt={plan.title}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Calendar className="w-16 h-16 text-zinc-300" />
                   </div>
-                  <span className="text-[10px] tracking-widest uppercase font-bold text-zinc-400">
-                    {plan.attendeeCount} Attending
-                  </span>
+                )}
+              </a>
+
+              {/* Details */}
+              <div className="w-full md:w-2/5 space-y-6">
+                <div className="space-y-2">
+                  <p className="text-[11px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                    {plan.isPoll ? (
+                      <>
+                        Date Poll &bull; {plan.pollOptionCount || 0} {plan.pollOptionCount === 1 ? "option" : "options"}
+                        {plan.pollClosesAt && (() => {
+                          const ms = new Date(plan.pollClosesAt).getTime() - Date.now();
+                          if (ms <= 0) return <> &bull; closed</>;
+                          const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
+                          return <> &bull; {days}d left</>;
+                        })()}
+                      </>
+                    ) : (
+                      <>{plan.date} &bull; {plan.time}</>
+                    )}
+                  </p>
+                  <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
+                    {plan.title}
+                  </h3>
+                  <div className="pt-2">
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-zinc-900 font-bold flex items-center gap-2">
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: data.brandColor }}
+                      />
+                      Hosted by {plan.hostName}
+                    </p>
+                  </div>
                 </div>
 
-                {/* CTA */}
-                <a
-                  href={orgUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2 w-fit"
-                  style={{ backgroundColor: data.brandColor }}
-                >
-                  View Details <ArrowUpRight className="w-4 h-4" />
-                </a>
+                <p className="text-zinc-500 leading-relaxed font-light text-lg line-clamp-3">
+                  {plan.description}
+                </p>
+
+                <div className="pt-2 flex flex-col gap-6">
+                  {/* Vote / Attendee count */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 ring-2 ring-white">
+                      {plan.isPoll ? (
+                        <Vote className="w-3.5 h-3.5 text-zinc-500" />
+                      ) : (
+                        <Users className="w-3.5 h-3.5 text-zinc-500" />
+                      )}
+                    </div>
+                    <span className="text-[10px] tracking-widest uppercase font-bold text-zinc-400">
+                      {plan.isPoll
+                        ? <>{plan.pollVoteCount || 0} {plan.pollVoteCount === 1 ? "Vote" : "Votes"}</>
+                        : <>{plan.attendeeCount} Attending</>}
+                    </span>
+                  </div>
+
+                  {/* CTA */}
+                  <a
+                    href={cardHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2 w-fit"
+                    style={{ backgroundColor: data.brandColor }}
+                  >
+                    {plan.isPoll ? <>Vote on a Date</> : <>View Details</>} <ArrowUpRight className="w-4 h-4" />
+                  </a>
+                </div>
               </div>
-            </div>
-          </article>
-        ))}
+            </article>
+          );
+        })}
       </div>
 
       <PoweredByLeaf />

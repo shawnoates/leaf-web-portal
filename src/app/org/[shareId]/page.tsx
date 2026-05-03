@@ -59,6 +59,10 @@ interface Plan {
   } | null;
   hostNote: string | null;
   requireApproval?: boolean;
+  isPoll?: boolean;
+  pollOptionCount?: number;
+  pollVoteCount?: number;
+  pollClosesAt?: string | null;
 }
 
 interface PlanIdea {
@@ -1234,6 +1238,10 @@ export default function OrgCalendarPage() {
         } : null,
         hostNote: p.hostNote as string || null,
         requireApproval: p.requireApproval as boolean || false,
+        isPoll: p.isPoll as boolean || false,
+        pollOptionCount: (p.pollOptionCount as number) || 0,
+        pollVoteCount: (p.pollVoteCount as number) || 0,
+        pollClosesAt: (p.pollClosesAt as string) || null,
       }));
 
       const planIdeas: PlanIdea[] = (result.planIdeas || []).map((idea: Record<string, unknown>) => ({
@@ -1810,7 +1818,10 @@ export default function OrgCalendarPage() {
               >
                 <div
                   className="w-full md:w-3/5 aspect-[16/10] overflow-hidden cursor-pointer bg-zinc-100 shadow-sm"
-                  onClick={() => setSelectedEvent(plan)}
+                  onClick={() => {
+                    if (plan.isPoll) { window.location.href = `/poll/${plan.id}`; return; }
+                    setSelectedEvent(plan);
+                  }}
                 >
                   {plan.image ? (
                     <img
@@ -1828,7 +1839,19 @@ export default function OrgCalendarPage() {
                 <div className="w-full md:w-2/5 space-y-6">
                   <div className="space-y-2">
                     <p className="text-[11px] tracking-[0.3em] uppercase font-bold text-zinc-400">
-                      {plan.date}{plan.time ? <> &bull; {plan.time}</> : ""}
+                      {plan.isPoll ? (
+                        <>
+                          Date Poll &bull; {plan.pollOptionCount || 0} {plan.pollOptionCount === 1 ? "option" : "options"}
+                          {plan.pollClosesAt && (() => {
+                            const ms = new Date(plan.pollClosesAt).getTime() - Date.now();
+                            if (ms <= 0) return <> &bull; closed</>;
+                            const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
+                            return <> &bull; {days}d left</>;
+                          })()}
+                        </>
+                      ) : (
+                        <>{plan.date}{plan.time ? <> &bull; {plan.time}</> : ""}</>
+                      )}
                     </p>
                     <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
                       {plan.title}
@@ -1846,44 +1869,70 @@ export default function OrgCalendarPage() {
                   </p>
 
                   <div className="pt-2 flex flex-col gap-6">
-                    <div className="flex items-center gap-3">
-                      <AvatarStack count={plan.attendeeCount} />
-                      {pendingRsvpIds.has(plan.id) ? (
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500 flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> Pending
-                        </span>
-                      ) : rsvpedPlanIds.has(plan.id) ? (
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
-                          <Check className="w-3 h-3" /> Attending
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      {rsvpedPlanIds.has(plan.id) ? (
-                        <button
-                          onClick={() => handleCancelRsvp(plan.id)}
-                          disabled={cancellingRsvp === plan.id}
-                          className="border border-red-200 text-red-600 px-6 py-3 text-xs uppercase tracking-widest font-medium hover:bg-red-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                        >
-                          {cancellingRsvp === plan.id ? "Cancelling..." : "Cancel RSVP"}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setSelectedEvent(plan)}
-                          className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
-                          style={{ backgroundColor: org.brandColor || "#18181b" }}
-                        >
-                          View Details <ArrowUpRight className="w-4 h-4" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleSharePlan(plan.id, plan.title)}
-                        className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
-                      >
-                        {copiedPlanId === plan.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
-                        <span className="text-xs font-bold uppercase tracking-widest">Share</span>
-                      </button>
-                    </div>
+                    {plan.isPoll ? (
+                      <>
+                        <p className="text-[10px] tracking-widest uppercase font-bold text-zinc-500">
+                          {plan.pollVoteCount || 0} {plan.pollVoteCount === 1 ? "Vote" : "Votes"} so far
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          <a
+                            href={`/poll/${plan.id}`}
+                            className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+                            style={{ backgroundColor: org.brandColor || "#18181b" }}
+                          >
+                            Vote on a Date <ArrowUpRight className="w-4 h-4" />
+                          </a>
+                          <button
+                            onClick={() => handleSharePlan(plan.id, plan.title)}
+                            className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
+                          >
+                            {copiedPlanId === plan.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                            <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-3">
+                          <AvatarStack count={plan.attendeeCount} />
+                          {pendingRsvpIds.has(plan.id) ? (
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500 flex items-center gap-1">
+                              <Clock className="w-3 h-3" /> Pending
+                            </span>
+                          ) : rsvpedPlanIds.has(plan.id) ? (
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Attending
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          {rsvpedPlanIds.has(plan.id) ? (
+                            <button
+                              onClick={() => handleCancelRsvp(plan.id)}
+                              disabled={cancellingRsvp === plan.id}
+                              className="border border-red-200 text-red-600 px-6 py-3 text-xs uppercase tracking-widest font-medium hover:bg-red-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                              {cancellingRsvp === plan.id ? "Cancelling..." : "Cancel RSVP"}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setSelectedEvent(plan)}
+                              className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+                              style={{ backgroundColor: org.brandColor || "#18181b" }}
+                            >
+                              View Details <ArrowUpRight className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleSharePlan(plan.id, plan.title)}
+                            className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
+                          >
+                            {copiedPlanId === plan.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                            <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </article>
