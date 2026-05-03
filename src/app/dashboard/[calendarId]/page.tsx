@@ -3291,6 +3291,12 @@ export default function OrgDashboardPage() {
                       description: selectedActivePlan.description,
                       venue: selectedActivePlan.location,
                       imageUrl: selectedActivePlan.image,
+                      ...(selectedActivePlan.isPoll
+                        ? {
+                            mode: "poll",
+                            pollOptions: pollDetail?.options.map((o) => ({ date: o.date, time: o.time || "" })),
+                          }
+                        : {}),
                     });
                     setSelectedActivePlan(null);
                     setShowCreatePlanModal(true);
@@ -3303,7 +3309,22 @@ export default function OrgDashboardPage() {
                 <button
                   onClick={() => {
                     if (selectedActivePlan.isPoll) {
-                      alert("Editing a poll's options isn't supported. Cancel and recreate, or duplicate to start a fresh poll.");
+                      // Poll edit — prefill mode, options (from pollDetail), and close date.
+                      const closesAtYmd = selectedActivePlan.pollClosesAt
+                        ? new Date(selectedActivePlan.pollClosesAt).toISOString().slice(0, 10)
+                        : "";
+                      setEditingPlanId(selectedActivePlan.objectId);
+                      setCreatePlanPrefill({
+                        title: selectedActivePlan.title,
+                        description: selectedActivePlan.description,
+                        venue: selectedActivePlan.location,
+                        imageUrl: selectedActivePlan.image,
+                        mode: "poll",
+                        pollOptions: pollDetail?.options.map((o) => ({ date: o.date, time: o.time || "" })) || undefined,
+                        pollClosesAt: closesAtYmd || undefined,
+                      });
+                      setSelectedActivePlan(null);
+                      setShowCreatePlanModal(true);
                       return;
                     }
                     const planDate = selectedActivePlan.date ? (() => { const d = new Date(selectedActivePlan.date); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })() : "";

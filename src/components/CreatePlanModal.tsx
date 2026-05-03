@@ -42,6 +42,12 @@ export interface CreatePlanPrefill {
   imageUrl?: string | null;
   /** Why this plan is being suggested (shown as a banner at top of the modal). */
   justification?: string;
+  /** Open the modal directly in a specific mode (used when editing/duplicating polls). */
+  mode?: PlanMode;
+  /** Prefilled poll options (used when editing/duplicating a poll). */
+  pollOptions?: PollOptionDraft[];
+  /** Prefilled poll close date as YYYY-MM-DD (used when editing a poll). */
+  pollClosesAt?: string;
 }
 
 interface CreatePlanModalProps {
@@ -86,15 +92,16 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(prefill?.imageUrl || null);
   const [hostNote, setHostNote] = useState("");
-  const [mode, setMode] = useState<PlanMode>("plan");
+  const [mode, setMode] = useState<PlanMode>(prefill?.mode || "plan");
   const isHosted = mode === "plan";
   const isPoll = mode === "poll";
   const pollAllowed = tier !== "starter";
-  const [pollOptions, setPollOptions] = useState<PollOptionDraft[]>([
-    emptyPollOption(),
-    emptyPollOption(),
-  ]);
-  const [pollClosesAt, setPollClosesAt] = useState("");
+  const [pollOptions, setPollOptions] = useState<PollOptionDraft[]>(
+    prefill?.pollOptions && prefill.pollOptions.length >= MIN_POLL_OPTIONS
+      ? prefill.pollOptions.map((o) => ({ date: o.date, time: o.time }))
+      : [emptyPollOption(), emptyPollOption()]
+  );
+  const [pollClosesAt, setPollClosesAt] = useState(prefill?.pollClosesAt || "");
   const [requireApproval, setRequireApproval] = useState(false);
   const [creating, setCreating] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -186,8 +193,11 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     if (!title) return;
 
     if (isPoll) {
-      const optsClean = validPollOptions();
-      if (optsClean.length < MIN_POLL_OPTIONS) {
+      // Edit-mode polls only update safe fields (title/description/image/venue) —
+      // dates and close-date stay locked to avoid orphaning votes.
+      const isPollEdit = !!(editMode && eventGroupId);
+      const optsClean = isPollEdit ? [] : validPollOptions();
+      if (!isPollEdit && optsClean.length < MIN_POLL_OPTIONS) {
         alert(`Add at least ${MIN_POLL_OPTIONS} valid date options for the poll.`);
         return;
       }
@@ -197,18 +207,31 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       }
       setCreating(true);
       try {
-        await Parse.Cloud.run("createCalendarDatePoll", {
-          calendarId: selectedCalendarId,
-          title,
-          description,
-          options: optsClean.map((o) => ({ date: o.date, time: o.time || null })),
-          closesAt: pollClosesAt ? new Date(`${pollClosesAt}T23:59:59`).toISOString() : undefined,
-          venue: selectedVenue
-            ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId }
-            : null,
-          imageBase64: imageBase64 || undefined,
-          imageUrl: !imageBase64 ? (selectedImageUrl || prefill?.imageUrl || undefined) : undefined,
-        });
+        if (isPollEdit) {
+          await Parse.Cloud.run("updateCalendarDatePoll", {
+            eventGroupId,
+            title,
+            description,
+            venue: selectedVenue
+              ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId }
+              : null,
+            imageBase64: imageBase64 || undefined,
+            imageUrl: !imageBase64 ? (selectedImageUrl || prefill?.imageUrl || undefined) : undefined,
+          });
+        } else {
+          await Parse.Cloud.run("createCalendarDatePoll", {
+            calendarId: selectedCalendarId,
+            title,
+            description,
+            options: optsClean.map((o) => ({ date: o.date, time: o.time || null })),
+            closesAt: pollClosesAt ? new Date(`${pollClosesAt}T23:59:59`).toISOString() : undefined,
+            venue: selectedVenue
+              ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId }
+              : null,
+            imageBase64: imageBase64 || undefined,
+            imageUrl: !imageBase64 ? (selectedImageUrl || prefill?.imageUrl || undefined) : undefined,
+          });
+        }
         setSuccess(true);
         onCreated();
         setTimeout(() => {
@@ -216,7 +239,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           onClose();
         }, 1500);
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "Failed to create poll";
+        const message = err instanceof Error ? err.message : (editMode ? "Failed to update poll" : "Failed to create poll");
         alert(message);
       } finally {
         setCreating(false);
@@ -295,7 +318,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       <div className="absolute inset-0 bg-black/40" onClick={() => { if (!creating) onClose(); }} />
       <div className="relative bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl">
         <div className="sticky top-0 bg-white border-b border-zinc-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{editMode ? "Edit Plan" : isPoll ? "New Date Poll" : "New Plan"}</h2>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{editMode ? (isPoll ? "Edit Date Poll" : "Edit Plan") : isPoll ? "New Date Poll" : "New Plan"}</h2>
           <button
             onClick={() => { if (!creating) onClose(); }}
             className="p-1.5 hover:bg-zinc-100 rounded-full transition-colors"
@@ -307,7 +330,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
         <div className="px-6 py-5 space-y-5">
           {success && (
             <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg text-sm">
-              <Check className="w-4 h-4" /> {editMode ? "Plan updated!" : isPoll ? "Poll created — followers notified" : "Plan created successfully!"}
+              <Check className="w-4 h-4" /> {editMode ? (isPoll ? "Poll updated!" : "Plan updated!") : isPoll ? "Poll created — followers notified" : "Plan created successfully!"}
             </div>
           )}
 
@@ -524,7 +547,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             </div>
           )}
 
-          {isPoll && (
+          {isPoll && !editMode && (
             <>
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -661,7 +684,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
               !title ||
               creating ||
               (isPoll
-                ? validPollOptions().length < MIN_POLL_OPTIONS || (!imageBase64 && !prefill?.imageUrl && !selectedImageUrl)
+                ? (!editMode && validPollOptions().length < MIN_POLL_OPTIONS) || (!imageBase64 && !prefill?.imageUrl && !selectedImageUrl)
                 : !date || (!editMode && isHosted && !imageBase64 && !prefill?.imageUrl && !selectedImageUrl))
             }
             className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
