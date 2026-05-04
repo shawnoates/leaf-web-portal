@@ -1018,7 +1018,7 @@ export default function OrgCalendarPage() {
   async function loadAttendees(eventGroupId: string) {
     // Auth uses Parse session when signed in (Google-auth admins) and falls
     // back to phone lookup for web-verified users without a session.
-    const phone = localStorage.getItem("leaf_phone");
+    const phone = localStorage.getItem("leaf_follower_phone");
     const hasParseSession = !!Parse.User.current();
     if (!phone && !hasParseSession) return;
     setLoadingAttendees(true);
