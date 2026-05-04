@@ -2341,7 +2341,7 @@ export default function OrgCalendarPage() {
                         className="text-white py-3 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 rounded-lg"
                         style={{ backgroundColor: org.brandColor || "#18181b" }}
                       >
-                        <MessageCircle className="w-4 h-4" /> Hype Your Plan
+                        <MessageCircle className="w-4 h-4" /> Message Attendees
                       </a>
                     )}
                     <button
