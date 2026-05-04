@@ -2443,24 +2443,9 @@ export default function OrgCalendarPage() {
                         <Users className="w-3.5 h-3.5" /> Attendees
                         {attendees.length > 0 && <span className="text-zinc-400">({attendees.length})</span>}
                       </h4>
-                      {(() => {
-                        const sharedCount = attendees.filter(a => a.phone).length;
-                        if (sharedCount < 2 || !hostNotificationId) return null;
-                        // Send the host to the dedicated /h page so they can pick
-                        // between opening the plan chat in the app or texting all
-                        // attendees from their phone — iOS Safari's `sms:` handler
-                        // is unreliable with multi-recipient links inside modals.
-                        return (
-                          <a
-                            href={`/h/${hostNotificationId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 transition-colors"
-                          >
-                            <MessageCircle className="w-3.5 h-3.5" /> Message All
-                          </a>
-                        );
-                      })()}
+                      {/* The prominent "Message Attendees" button above
+                          (under "You're Hosting") covers this — keeping a
+                          duplicate link here was redundant. */}
                     </div>
                     {loadingAttendees ? (
                       <div className="flex items-center justify-center py-4">
