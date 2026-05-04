@@ -24,7 +24,7 @@ export default async function ChatSharePage({ params }: PageProps) {
   //   leaf://planChat?planId={eventNotificationId}
   // PathView navigates the current user to that plan's chat tab.
   const deepLink = `leaf://planChat?planId=${notificationId}`;
-  const appStoreUrl = "https://apps.apple.com/app/leaf";
+  const appStoreUrl = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
 
   return (
     <div

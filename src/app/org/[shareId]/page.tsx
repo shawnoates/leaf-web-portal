@@ -33,7 +33,7 @@ import {
   EyeOff,
 } from "lucide-react";
 
-const APP_STORE_URL = "https://apps.apple.com/app/leaf";
+const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
 
 function isIOSDevice() {
   if (typeof navigator === "undefined") return false;
