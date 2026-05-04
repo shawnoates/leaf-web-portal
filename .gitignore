@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Catch all env file variants (.env, .env.local, .1.env, env.bak, etc.)
+*.env
+*.env.*
+.env*
+env.*
+*.pem
+*.p8
+*.p12
+*-firebase-adminsdk-*.json
+serviceAccount*.json
