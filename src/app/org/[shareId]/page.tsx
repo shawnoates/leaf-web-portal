@@ -2333,6 +2333,17 @@ export default function OrgCalendarPage() {
                       <Check className="w-4 h-4 text-emerald-600" />
                       <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">You&apos;re Hosting</span>
                     </div>
+                    {hostNotificationId && (
+                      <a
+                        href={`/h/${hostNotificationId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-white py-3 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 rounded-lg"
+                        style={{ backgroundColor: org.brandColor || "#18181b" }}
+                      >
+                        <MessageCircle className="w-4 h-4" /> Hype Your Plan
+                      </a>
+                    )}
                     <button
                       onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
                       className="border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2"
