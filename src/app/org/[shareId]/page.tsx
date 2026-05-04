@@ -2353,11 +2353,16 @@ export default function OrgCalendarPage() {
                     </button>
                   </div>
                 )}
-                {/* Add to Calendar — only on real plans (not polls), and only when we have a date.
-                    Venue address is omitted when the location is gated behind RSVP/approval and
-                    the user hasn't unlocked it yet, so private addresses don't leak into calendar
-                    entries; the neighborhood (if any) is used as a coarse location hint. */}
-                {!selectedEvent.isPoll && selectedEvent.dateISO && (() => {
+                {/* Add to Calendar — only on real plans (not polls), only when we have a date,
+                    and only when the viewer is actually attending or hosting (otherwise it's
+                    misleading — they haven't agreed to go yet). Pending RSVPs are excluded
+                    since approval might be denied. Venue address is omitted when the location
+                    is gated behind RSVP/approval and the user hasn't unlocked it yet, so
+                    private addresses don't leak into calendar entries. */}
+                {!selectedEvent.isPoll
+                  && selectedEvent.dateISO
+                  && (rsvpedPlanIds.has(selectedEvent.id) || hostedPlanIds.has(selectedEvent.id))
+                  && (() => {
                   const venueGated = !!(selectedEvent.location?.isPrivate
                     || (selectedEvent.requireApproval && !rsvpedPlanIds.has(selectedEvent.id)));
                   const icsUrl = buildIcsDataUrl({
