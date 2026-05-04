@@ -996,6 +996,7 @@ export default function OrgCalendarPage() {
   const [pendingRsvpIds, setPendingRsvpIds] = useState<Set<string>>(new Set());
   const [hostedPlanIds, setHostedPlanIds] = useState<Set<string>>(new Set());
   const [attendees, setAttendees] = useState<Array<{ name: string; phone: string | null; sharePhoneWithHost: boolean; status: string }>>([]);
+  const [hostNotificationId, setHostNotificationId] = useState<string | null>(null);
   const [loadingAttendees, setLoadingAttendees] = useState(false);
   const [cancellingRsvp, setCancellingRsvp] = useState<string | null>(null);
   const [cancelRsvpModalPlan, setCancelRsvpModalPlan] = useState<{ id: string; title: string } | null>(null);
@@ -1024,11 +1025,23 @@ export default function OrgCalendarPage() {
     try {
       const params: { eventGroupId: string; phoneNumber?: string } = { eventGroupId };
       if (phone) params.phoneNumber = phone;
-      const result = await Parse.Cloud.run("getPlanAttendeesForHost", params);
-      setAttendees(result || []);
+      const result = (await Parse.Cloud.run("getPlanAttendeesForHost", params)) as
+        | { attendees?: Array<{ name: string; phone: string | null; sharePhoneWithHost: boolean; status: string }>; hostNotificationId?: string | null }
+        | Array<{ name: string; phone: string | null; sharePhoneWithHost: boolean; status: string }>
+        | null
+        | undefined;
+      // Tolerate the old array-shaped response in case clients are mid-deploy.
+      if (Array.isArray(result)) {
+        setAttendees(result);
+        setHostNotificationId(null);
+      } else {
+        setAttendees(result?.attendees || []);
+        setHostNotificationId(result?.hostNotificationId || null);
+      }
     } catch (err) {
       console.error("Failed to load attendees:", err);
       setAttendees([]);
+      setHostNotificationId(null);
     } finally {
       setLoadingAttendees(false);
     }
@@ -1416,6 +1429,7 @@ export default function OrgCalendarPage() {
       loadAttendees(selectedEvent.id);
     } else {
       setAttendees([]);
+      setHostNotificationId(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEvent?.id]);
@@ -1964,7 +1978,11 @@ export default function OrgCalendarPage() {
                       <>
                         <div className="flex items-center gap-3">
                           <AvatarStack count={plan.attendeeCount} />
-                          {pendingRsvpIds.has(plan.id) ? (
+                          {hostedPlanIds.has(plan.id) ? (
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Hosting
+                            </span>
+                          ) : pendingRsvpIds.has(plan.id) ? (
                             <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500 flex items-center gap-1">
                               <Clock className="w-3 h-3" /> Pending
                             </span>
@@ -2309,6 +2327,20 @@ export default function OrgCalendarPage() {
                       <span className="text-xs font-bold uppercase tracking-widest">Share</span>
                     </button>
                   </div>
+                ) : hostedPlanIds.has(selectedEvent.id) ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-center gap-2 py-2">
+                      <Check className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">You&apos;re Hosting</span>
+                    </div>
+                    <button
+                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
+                      className="border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                      {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                      <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                    </button>
+                  </div>
                 ) : rsvpedPlanIds.has(selectedEvent.id) ? (
                   <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-center gap-2 py-2">
@@ -2396,19 +2428,17 @@ export default function OrgCalendarPage() {
                         {attendees.length > 0 && <span className="text-zinc-400">({attendees.length})</span>}
                       </h4>
                       {(() => {
-                        const myDigits = (getVerifiedUserCookie()?.phone || "").replace(/\D/g, "");
-                        const recipients = attendees
-                          .map(a => a.phone)
-                          .filter((p): p is string => !!p)
-                          // Skip the host's own number — they can't text themselves
-                          .filter(p => !myDigits || p.replace(/\D/g, "") !== myDigits);
-                        if (recipients.length === 0) return null;
-                        // iOS Safari treats `+` in `sms:` URLs as a space, which causes
-                        // only the first recipient to parse correctly. Encode `+` as %2B.
-                        const smsHref = `sms:${recipients.map(p => encodeURIComponent(p)).join(",")}`;
+                        const sharedCount = attendees.filter(a => a.phone).length;
+                        if (sharedCount < 2 || !hostNotificationId) return null;
+                        // Send the host to the dedicated /h page so they can pick
+                        // between opening the plan chat in the app or texting all
+                        // attendees from their phone — iOS Safari's `sms:` handler
+                        // is unreliable with multi-recipient links inside modals.
                         return (
                           <a
-                            href={smsHref}
+                            href={`/h/${hostNotificationId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 transition-colors"
                           >
                             <MessageCircle className="w-3.5 h-3.5" /> Message All

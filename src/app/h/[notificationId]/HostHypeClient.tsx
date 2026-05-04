@@ -73,11 +73,12 @@ export default function HostHypeClient({ notificationId }: { notificationId: str
   }
 
   const deepLink = `leaf://planChat?planId=${notificationId}`;
-  // iOS Safari treats `+` in `sms:` URLs as a space — encode each phone so the
-  // Messages app receives all recipients (not just the first).
+  // iOS Safari treats `+` in `sms:` URLs as a space and is inconsistent with
+  // comma-separated multi-recipient `sms:phone1,phone2`. The `&addresses=`
+  // query form is the documented way to populate multiple recipients on iOS.
   const smsHref =
     data.attendees.length > 0
-      ? `sms:${data.attendees.map((a) => encodeURIComponent(a.phone)).join(",")}`
+      ? `sms:&addresses=${data.attendees.map((a) => encodeURIComponent(a.phone)).join(",")}`
       : null;
 
   const handleOpenChat = (e: React.MouseEvent<HTMLAnchorElement>) => {
