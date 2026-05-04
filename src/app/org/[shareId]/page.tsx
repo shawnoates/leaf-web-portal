@@ -2395,14 +2395,26 @@ export default function OrgCalendarPage() {
                         <Users className="w-3.5 h-3.5" /> Attendees
                         {attendees.length > 0 && <span className="text-zinc-400">({attendees.length})</span>}
                       </h4>
-                      {attendees.filter(a => a.phone).length > 1 && (
-                        <a
-                          href={`sms:${attendees.filter(a => a.phone).map(a => a.phone).join(",")}`}
-                          className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 transition-colors"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5" /> Message All
-                        </a>
-                      )}
+                      {(() => {
+                        const myDigits = (getVerifiedUserCookie()?.phone || "").replace(/\D/g, "");
+                        const recipients = attendees
+                          .map(a => a.phone)
+                          .filter((p): p is string => !!p)
+                          // Skip the host's own number — they can't text themselves
+                          .filter(p => !myDigits || p.replace(/\D/g, "") !== myDigits);
+                        if (recipients.length === 0) return null;
+                        // iOS Safari treats `+` in `sms:` URLs as a space, which causes
+                        // only the first recipient to parse correctly. Encode `+` as %2B.
+                        const smsHref = `sms:${recipients.map(p => encodeURIComponent(p)).join(",")}`;
+                        return (
+                          <a
+                            href={smsHref}
+                            className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 transition-colors"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" /> Message All
+                          </a>
+                        );
+                      })()}
                     </div>
                     {loadingAttendees ? (
                       <div className="flex items-center justify-center py-4">
@@ -2416,7 +2428,7 @@ export default function OrgCalendarPage() {
                           <div key={i} className="flex items-center justify-between py-1.5 border-b border-zinc-50 last:border-0">
                             <span className="text-sm text-zinc-800">{a.name}</span>
                             {a.phone ? (
-                              <a href={`sms:${a.phone}`} className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 transition-colors">
+                              <a href={`sms:${encodeURIComponent(a.phone)}`} className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 transition-colors">
                                 <Phone className="w-3 h-3" /> {a.phone}
                               </a>
                             ) : (
