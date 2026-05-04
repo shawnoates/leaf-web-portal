@@ -1017,8 +1017,13 @@ export default function OrgCalendarPage() {
 
   async function loadAttendees(eventGroupId: string) {
     // Auth uses Parse session when signed in (Google-auth admins) and falls
-    // back to phone lookup for web-verified users without a session.
-    const phone = localStorage.getItem("leaf_follower_phone");
+    // back to phone lookup for web-verified users without a session. Mirror
+    // the same fallback chain that fetchOrg uses (localStorage → verified-user
+    // cookie) so this works after a fresh page load on desktop where only the
+    // cookie is set.
+    const storedPhone = localStorage.getItem("leaf_follower_phone");
+    const cachedUser = getVerifiedUserCookie();
+    const phone = storedPhone || cachedUser?.phone?.replace(/\D/g, "") || null;
     const hasParseSession = !!Parse.User.current();
     if (!phone && !hasParseSession) return;
     setLoadingAttendees(true);
