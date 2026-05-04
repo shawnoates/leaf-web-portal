@@ -30,7 +30,6 @@ import {
   Heart,
   AlertTriangle,
   MessageCircle,
-  EyeOff,
 } from "lucide-react";
 
 const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
@@ -995,9 +994,7 @@ export default function OrgCalendarPage() {
   const [rsvpedPlanIds, setRsvpedPlanIds] = useState<Set<string>>(new Set());
   const [pendingRsvpIds, setPendingRsvpIds] = useState<Set<string>>(new Set());
   const [hostedPlanIds, setHostedPlanIds] = useState<Set<string>>(new Set());
-  const [attendees, setAttendees] = useState<Array<{ name: string; phone: string | null; sharePhoneWithHost: boolean; status: string }>>([]);
   const [hostNotificationId, setHostNotificationId] = useState<string | null>(null);
-  const [loadingAttendees, setLoadingAttendees] = useState(false);
   const [cancellingRsvp, setCancellingRsvp] = useState<string | null>(null);
   const [cancelRsvpModalPlan, setCancelRsvpModalPlan] = useState<{ id: string; title: string } | null>(null);
   const [cancellingPlan, setCancellingPlan] = useState(false);
@@ -1015,40 +1012,33 @@ export default function OrgCalendarPage() {
     }
   }, []);
 
-  async function loadAttendees(eventGroupId: string) {
-    // Auth uses Parse session when signed in (Google-auth admins) and falls
-    // back to phone lookup for web-verified users without a session. Mirror
-    // the same fallback chain that fetchOrg uses (localStorage → verified-user
-    // cookie) so this works after a fresh page load on desktop where only the
-    // cookie is set.
+  async function loadHostNotificationId(eventGroupId: string) {
+    // The attendee list itself is rendered on the dedicated /h/{id} page —
+    // here we only need the host's notification id so the "Message Attendees"
+    // button can deep-link to that page. Auth mirrors fetchOrg's chain
+    // (Parse session → localStorage → verified-user cookie).
     const storedPhone = localStorage.getItem("leaf_follower_phone");
     const cachedUser = getVerifiedUserCookie();
     const phone = storedPhone || cachedUser?.phone?.replace(/\D/g, "") || null;
     const hasParseSession = !!Parse.User.current();
     if (!phone && !hasParseSession) return;
-    setLoadingAttendees(true);
     try {
       const params: { eventGroupId: string; phoneNumber?: string } = { eventGroupId };
       if (phone) params.phoneNumber = phone;
       const result = (await Parse.Cloud.run("getPlanAttendeesForHost", params)) as
-        | { attendees?: Array<{ name: string; phone: string | null; sharePhoneWithHost: boolean; status: string }>; hostNotificationId?: string | null }
-        | Array<{ name: string; phone: string | null; sharePhoneWithHost: boolean; status: string }>
+        | { hostNotificationId?: string | null }
+        | unknown[]
         | null
         | undefined;
-      // Tolerate the old array-shaped response in case clients are mid-deploy.
-      if (Array.isArray(result)) {
-        setAttendees(result);
-        setHostNotificationId(null);
+      // Old array-shaped response from pre-deploy servers won't have the id.
+      if (result && !Array.isArray(result) && typeof result === "object") {
+        setHostNotificationId((result as { hostNotificationId?: string | null }).hostNotificationId || null);
       } else {
-        setAttendees(result?.attendees || []);
-        setHostNotificationId(result?.hostNotificationId || null);
+        setHostNotificationId(null);
       }
     } catch (err) {
-      console.error("Failed to load attendees:", err);
-      setAttendees([]);
+      console.error("Failed to load host notification id:", err);
       setHostNotificationId(null);
-    } finally {
-      setLoadingAttendees(false);
     }
   }
 
@@ -1428,12 +1418,12 @@ export default function OrgCalendarPage() {
     }
   }, [org, planQueryId]);
 
-  // Auto-load attendees when a host opens their own plan
+  // Auto-load the host notification id when a host opens their own plan
+  // (powers the "Message Attendees" button → /h/{id}).
   useEffect(() => {
     if (selectedEvent && hostedPlanIds.has(selectedEvent.id)) {
-      loadAttendees(selectedEvent.id);
+      loadHostNotificationId(selectedEvent.id);
     } else {
-      setAttendees([]);
       setHostNotificationId(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2435,44 +2425,11 @@ export default function OrgCalendarPage() {
                     </a>
                   );
                 })()}
-                {/* Attendee list — visible only to the plan host (and not on polls, which have voters not attendees) */}
-                {hostedPlanIds.has(selectedEvent.id) && !selectedEvent.isPoll && (
-                  <div className="border-t border-zinc-100 pt-4 mt-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5" /> Attendees
-                        {attendees.length > 0 && <span className="text-zinc-400">({attendees.length})</span>}
-                      </h4>
-                      {/* The prominent "Message Attendees" button above
-                          (under "You're Hosting") covers this — keeping a
-                          duplicate link here was redundant. */}
-                    </div>
-                    {loadingAttendees ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
-                      </div>
-                    ) : attendees.length === 0 ? (
-                      <p className="text-xs text-zinc-400 py-2">No attendees yet</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {attendees.map((a, i) => (
-                          <div key={i} className="flex items-center justify-between py-1.5 border-b border-zinc-50 last:border-0">
-                            <span className="text-sm text-zinc-800">{a.name}</span>
-                            {a.phone ? (
-                              <a href={`sms:${encodeURIComponent(a.phone)}`} className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 transition-colors">
-                                <Phone className="w-3 h-3" /> {a.phone}
-                              </a>
-                            ) : (
-                              <span className="text-xs text-zinc-300 flex items-center gap-1">
-                                <EyeOff className="w-3 h-3" /> Hidden
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Attendee list lives on the dedicated /h/{notificationId}
+                    page now (reached via the "Message Attendees" button
+                    above) so it's not duplicated here. Single place to see
+                    who's attending, who shared their number, and to message
+                    everyone. */}
                 {/* Cancel Plan — visible to the plan host or calendar owner/co-host */}
                 {parseUser && (selectedEvent.hostId === parseUser.id || org.isOwner || org.isHost) && (
                   <button
