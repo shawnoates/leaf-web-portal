@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { QRCodeSVG } from "qrcode.react";
-import { Calendar, MessageCircle, Loader2, Users } from "lucide-react";
+import { Calendar, MessageCircle, Loader2, Users, EyeOff } from "lucide-react";
 
 const APP_STORE_URL =
   "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
 
-type Attendee = { name: string; phone: string };
+type Attendee = { name: string; phone: string | null; sharePhoneWithHost: boolean };
 type HypeData = {
   title: string;
   expiryDate: string | null;
@@ -87,13 +87,17 @@ export default function HostHypeClient({ notificationId }: { notificationId: str
   }
 
   const deepLink = `leaf://planChat?planId=${notificationId}`;
+  // Only attendees who opted in to sharing get included in the SMS bundle.
   // iOS Safari treats `+` in `sms:` URLs as a space and is inconsistent with
   // comma-separated multi-recipient `sms:phone1,phone2`. The `&addresses=`
   // query form is the documented way to populate multiple recipients on iOS.
   // Android handles either format fine.
+  const sharingPhones = data.attendees
+    .filter((a) => a.sharePhoneWithHost && a.phone)
+    .map((a) => a.phone as string);
   const smsHref =
-    data.attendees.length > 0
-      ? `sms:&addresses=${data.attendees.map((a) => encodeURIComponent(a.phone)).join(",")}`
+    sharingPhones.length > 0
+      ? `sms:&addresses=${sharingPhones.map((p) => encodeURIComponent(p)).join(",")}`
       : null;
 
   const handleOpenChat = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -162,7 +166,7 @@ export default function HostHypeClient({ notificationId }: { notificationId: str
               className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3.5 text-xs uppercase tracking-[0.2em] font-bold rounded-lg hover:bg-zinc-50 transition-colors text-zinc-900"
             >
               <MessageCircle className="w-4 h-4" />
-              Message All ({data.attendees.length})
+              Message All ({sharingPhones.length})
             </a>
           ) : (
             <p className="text-xs text-zinc-400 text-center py-2">
@@ -183,12 +187,18 @@ export default function HostHypeClient({ notificationId }: { notificationId: str
                   className="flex items-center justify-between py-1.5 border-b border-zinc-50 last:border-0"
                 >
                   <span className="text-sm text-zinc-800">{a.name}</span>
-                  <a
-                    href={`sms:${encodeURIComponent(a.phone)}`}
-                    className="text-xs text-zinc-500 hover:text-zinc-900 transition-colors"
-                  >
-                    {a.phone}
-                  </a>
+                  {a.sharePhoneWithHost && a.phone ? (
+                    <a
+                      href={`sms:${encodeURIComponent(a.phone)}`}
+                      className="text-xs text-zinc-500 hover:text-zinc-900 transition-colors"
+                    >
+                      {a.phone}
+                    </a>
+                  ) : (
+                    <span className="text-xs text-zinc-300 flex items-center gap-1">
+                      <EyeOff className="w-3 h-3" /> Hidden
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
