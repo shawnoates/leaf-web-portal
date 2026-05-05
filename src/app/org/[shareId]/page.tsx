@@ -197,36 +197,88 @@ function normalizeTimeString(time: string): string {
 // Calendar (iOS/macOS), Outlook, Google Calendar (via download), and the
 // default calendar app on Android/Windows.
 //
-// Input dateISO is the plan's expiryDate in UTC; we default to a 2-hour
-// duration when no end time is known.
+// We emit DTSTART/DTEND as **floating time** (no `Z`, no `TZID`) so the
+// calendar app interprets the value as the importer's local time. This
+// sidesteps two issues:
+//   1. Some plans have `expiryDate` stored as "local time as UTC" (a legacy
+//      bug — old plans saved before the timezone fix on the server). UTC
+//      math against those records produces a 3-5 hour offset.
+//   2. We don't know the host's IANA timezone here, only the user-typed
+//      time string ("7:00 AM"), which is exactly what the page displays.
+//
+// When `time` is provided we use it together with the local date components
+// of `dateISO`, matching exactly what the host sees on the org page.
 function buildIcsDataUrl(opts: {
   uid: string;
   title: string;
   dateISO: string;
+  time?: string | null;
   durationHours?: number;
   description?: string;
   locationName?: string | null;
   locationAddress?: string | null;
   url?: string;
 }): string | null {
-  const start = new Date(opts.dateISO);
-  if (Number.isNaN(start.getTime())) return null;
-  const end = new Date(start.getTime() + (opts.durationHours ?? 2) * 60 * 60 * 1000);
+  const seed = new Date(opts.dateISO);
+  if (Number.isNaN(seed.getTime())) return null;
 
-  // RFC 5545: DTSTAMP/DTSTART in basic UTC format YYYYMMDDTHHMMSSZ.
-  const fmt = (d: Date) =>
+  const pad = (n: number) => String(n).padStart(2, "0");
+  // Floating: YYYYMMDDTHHMMSS, no zone suffix.
+  const floatFmt = (y: number, mo: number, d: number, h: number, mi: number) =>
+    `${y}${pad(mo)}${pad(d)}T${pad(h)}${pad(mi)}00`;
+  // UTC: YYYYMMDDTHHMMSSZ (only used for DTSTAMP, which spec-wise must be UTC).
+  const utcFmt = (d: Date) =>
     d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 
-  // RFC 5545 escaping for TEXT fields.
+  // Parse "7:00 AM", "7 PM", "07:00", "19:00" → { hour, minute } in 24h, or null.
+  const parseTime = (s: string): { h: number; m: number } | null => {
+    const t = s.trim();
+    const ampm = t.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
+    if (ampm) {
+      let h = parseInt(ampm[1], 10);
+      const m = ampm[2] ? parseInt(ampm[2], 10) : 0;
+      const isPM = ampm[3].toUpperCase() === "PM";
+      if (isPM && h < 12) h += 12;
+      if (!isPM && h === 12) h = 0;
+      return { h, m };
+    }
+    const h24 = t.match(/^(\d{1,2}):(\d{2})$/);
+    if (h24) return { h: parseInt(h24[1], 10), m: parseInt(h24[2], 10) };
+    return null;
+  };
+
+  // Pull the local date components from the seed (so a plan stored as
+  // "naive UTC" still yields the right calendar date in the viewer's TZ).
+  const year = seed.getFullYear();
+  const month = seed.getMonth() + 1;
+  const day = seed.getDate();
+
+  // If a typed time string is available, prefer it — that's what the page
+  // shows. Otherwise fall back to the seed's local hours/minutes.
+  const parsed = opts.time ? parseTime(opts.time) : null;
+  const startHour = parsed ? parsed.h : seed.getHours();
+  const startMin = parsed ? parsed.m : seed.getMinutes();
+
+  // Compute end by adding durationHours to the floating start. We use a Date
+  // object briefly for the +N-hour math, then read its local fields.
+  const startLocal = new Date(year, month - 1, day, startHour, startMin, 0, 0);
+  const endLocal = new Date(startLocal.getTime() + (opts.durationHours ?? 2) * 60 * 60 * 1000);
+
+  const dtStart = floatFmt(year, month, day, startHour, startMin);
+  const dtEnd = floatFmt(
+    endLocal.getFullYear(),
+    endLocal.getMonth() + 1,
+    endLocal.getDate(),
+    endLocal.getHours(),
+    endLocal.getMinutes(),
+  );
+
   const esc = (s: string) =>
     s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
 
   const locationParts = [opts.locationName, opts.locationAddress].filter(Boolean) as string[];
   const location = locationParts.join(", ");
 
-  // Long description lines should be folded at 75 octets per RFC 5545; keeping
-  // it simple and trusting consumers — Apple/Google/Outlook all tolerate
-  // unfolded lines under typical lengths.
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -235,9 +287,9 @@ function buildIcsDataUrl(opts: {
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
     `UID:${opts.uid}@joinleaf.com`,
-    `DTSTAMP:${fmt(new Date())}`,
-    `DTSTART:${fmt(start)}`,
-    `DTEND:${fmt(end)}`,
+    `DTSTAMP:${utcFmt(new Date())}`,
+    `DTSTART:${dtStart}`,
+    `DTEND:${dtEnd}`,
     `SUMMARY:${esc(opts.title)}`,
     opts.description ? `DESCRIPTION:${esc(opts.description)}` : "",
     location ? `LOCATION:${esc(location)}` : "",
@@ -246,7 +298,6 @@ function buildIcsDataUrl(opts: {
     "END:VCALENDAR",
   ].filter(Boolean);
 
-  // CRLF line endings per spec.
   const ics = lines.join("\r\n");
   return `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
 }
@@ -493,17 +544,19 @@ function RsvpModal({
                 uid: plan.id,
                 title: plan.title,
                 dateISO: plan.dateISO,
+                time: plan.time,
                 description: plan.description,
                 locationName: plan.location?.isPrivate ? null : plan.location?.name,
                 locationAddress: plan.location?.isPrivate ? null : plan.location?.address,
                 url: typeof window !== "undefined" ? `${window.location.origin}/p/${plan.id}` : undefined,
               });
               if (!icsUrl) return null;
-              const safeFilename = plan.title.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "plan";
+              // No `download` attribute — on iOS Safari this lets the
+              // text/calendar mime trigger Apple Calendar's "add event" sheet
+              // directly. On desktop browsers it'll still download.
               return (
                 <a
                   href={icsUrl}
-                  download={`${safeFilename}.ics`}
                   className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-xs uppercase tracking-[0.2em] font-bold hover:bg-zinc-50 transition-colors rounded-lg"
                 >
                   <Calendar className="w-4 h-4" />
@@ -2407,17 +2460,18 @@ export default function OrgCalendarPage() {
                     uid: selectedEvent.id,
                     title: selectedEvent.title,
                     dateISO: selectedEvent.dateISO,
+                    time: selectedEvent.time,
                     description: selectedEvent.description,
                     locationName: venueGated ? selectedEvent.location?.neighborhood ?? null : selectedEvent.location?.name,
                     locationAddress: venueGated ? null : selectedEvent.location?.address,
                     url: typeof window !== "undefined" ? `${window.location.origin}/p/${selectedEvent.id}` : undefined,
                   });
                   if (!icsUrl) return null;
-                  const safeFilename = selectedEvent.title.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "plan";
+                  // No `download` attribute — on iOS Safari the text/calendar
+                  // mime triggers Apple Calendar directly.
                   return (
                     <a
                       href={icsUrl}
-                      download={`${safeFilename}.ics`}
                       className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-xs uppercase tracking-[0.2em] font-bold hover:bg-zinc-50 transition-colors rounded-lg mt-3"
                     >
                       <Calendar className="w-4 h-4" />
