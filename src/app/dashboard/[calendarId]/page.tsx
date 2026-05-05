@@ -9,6 +9,7 @@ import CityAutocomplete from "@/components/CityAutocomplete";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import MarketplaceTab, { type MarketplaceEvent, type OrgSettings } from "@/components/MarketplaceTab";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
+import PlanDetailModal from "@/components/PlanDetailModal";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import {
@@ -41,7 +42,6 @@ import {
   Vote,
 } from "lucide-react";
 
-type PollOptionDetail = { date: string; time: string | null; count: number };
 import {
   LineChart,
   Line,
@@ -395,50 +395,6 @@ export default function OrgDashboardPage() {
     pollOptionCount?: number;
     pollClosesAt?: string | null;
   } | null>(null);
-  const [pollDetail, setPollDetail] = useState<{
-    options: PollOptionDetail[];
-    totalVotes: number;
-    isExpired: boolean;
-    voters: { name: string; phone: string | null; selectedDateTimes: { date: string; time: string | null }[] }[];
-    canSeeVoters: boolean;
-  } | null>(null);
-  const [pollDetailLoading, setPollDetailLoading] = useState(false);
-  const [closingPoll, setClosingPoll] = useState(false);
-  const [planRsvps, setPlanRsvps] = useState<{ notificationId: string; name: string; phone: string | null; source: string; status: string; rsvpNote: string | null }[]>([]);
-  const [planRsvpsLoading, setPlanRsvpsLoading] = useState(false);
-
-  // Fetch RSVPs when plan detail modal opens
-  useEffect(() => {
-    if (!selectedActivePlan) { setPlanRsvps([]); return; }
-    setPlanRsvpsLoading(true);
-    Parse.Cloud.run("getPlanRsvps", { eventGroupId: selectedActivePlan.objectId })
-      .then((result: { notificationId: string; name: string; phone: string | null; source: string; status: string; rsvpNote: string | null }[]) => setPlanRsvps(result || []))
-      .catch(() => setPlanRsvps([]))
-      .finally(() => setPlanRsvpsLoading(false));
-  }, [selectedActivePlan]);
-
-  // Fetch poll options + tally when the plan-detail modal opens for a poll plan.
-  useEffect(() => {
-    if (!selectedActivePlan?.isPoll) { setPollDetail(null); return; }
-    setPollDetailLoading(true);
-    Parse.Cloud.run("getCalendarDatePollForGuest", { eventGroupId: selectedActivePlan.objectId })
-      .then((result: {
-        poll: { options: PollOptionDetail[]; totalVotes: number; isExpired: boolean };
-        voters?: { name: string; phone: string | null; selectedDateTimes: { date: string; time: string | null }[] }[];
-        canSeeVoters?: boolean;
-      }) => {
-        setPollDetail({
-          options: result.poll.options || [],
-          totalVotes: result.poll.totalVotes || 0,
-          isExpired: result.poll.isExpired || false,
-          voters: result.voters || [],
-          canSeeVoters: !!result.canSeeVoters,
-        });
-      })
-      .catch(() => setPollDetail(null))
-      .finally(() => setPollDetailLoading(false));
-  }, [selectedActivePlan]);
-
   // Create plan modal (used by marketplace + duplicate)
   const [createPlanPrefill, setCreatePlanPrefill] = useState<CreatePlanPrefill | null>(null);
   const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
@@ -3047,418 +3003,80 @@ export default function OrgDashboardPage() {
         </div>
       )}
 
-      {/* Active Plan Detail Modal */}
+
+      {/* Active Plan Detail Modal — shared component, also used by /plans page */}
       {selectedActivePlan && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-5xl md:h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl rounded-t-3xl md:rounded-none relative">
-            <button
-              onClick={() => setSelectedActivePlan(null)}
-              className="absolute top-6 right-6 z-50 p-2 rounded-full bg-white/20 text-white md:text-zinc-900 md:bg-transparent"
-            >
-              <Plus className="w-8 h-8 rotate-45" />
-            </button>
-
-            <div className="hidden md:block w-1/2 h-full bg-zinc-100">
-              {selectedActivePlan.image ? (
-                <img src={selectedActivePlan.image} className="w-full h-full object-cover" alt="" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Calendar className="w-20 h-20 text-zinc-300" />
-                </div>
-              )}
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-8 md:p-16 space-y-12">
-              <div className="space-y-4">
-                <h2 className="text-4xl md:text-5xl font-light tracking-tighter">
-                  {selectedActivePlan.title}
-                </h2>
-                <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
-                  Hosted by {selectedActivePlan.hostName}
-                </p>
-                <div className="flex gap-6 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">
-                  {selectedActivePlan.isPoll ? (
-                    <>
-                      <span className="flex items-center gap-2">
-                        <Vote className="w-4 h-4" />
-                        {selectedActivePlan.pollOptionCount || 0} {selectedActivePlan.pollOptionCount === 1 ? "option" : "options"}
-                        {selectedActivePlan.pollClosesAt && (() => {
-                          const ms = new Date(selectedActivePlan.pollClosesAt).getTime() - Date.now();
-                          if (ms <= 0) return <> &middot; closed</>;
-                          const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
-                          return <> &middot; {days}d left</>;
-                        })()}
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <Users className="w-4 h-4" /> {pollDetail?.totalVotes ?? selectedActivePlan.pollVoteCount ?? 0} {(pollDetail?.totalVotes ?? selectedActivePlan.pollVoteCount ?? 0) === 1 ? "vote" : "votes"}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        {new Date(selectedActivePlan.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-                        {selectedActivePlan.time && ` at ${selectedActivePlan.time}`}
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <Users className="w-4 h-4" /> {planRsvpsLoading ? selectedActivePlan.rsvpCount : planRsvps.length} RSVP{planRsvps.length === 1 ? "" : "s"}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {(selectedActivePlan.description || selectedActivePlan.location) && (
-                <div className="space-y-6">
-                  {selectedActivePlan.description && (
-                    <p className="text-xl font-light leading-relaxed text-zinc-600">
-                      {selectedActivePlan.description}
-                    </p>
-                  )}
-                  {selectedActivePlan.location && (
-                    <div className="space-y-2">
-                      <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
-                        Location
-                      </h4>
-                      <p className="text-sm text-zinc-700">{selectedActivePlan.location.name}</p>
-                      <p className="text-sm text-zinc-500">{selectedActivePlan.location.address}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Poll results — voting options + "Pick winning date" (organizer view) */}
-              {selectedActivePlan.isPoll ? (
-                <div className="space-y-3">
-                  <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
-                    Vote Results
-                  </h4>
-                  {pollDetailLoading && <p className="text-sm text-zinc-400">Loading results…</p>}
-                  {!pollDetailLoading && pollDetail && (
-                    <>
-                      {pollDetail.isExpired && (
-                        <div className="px-3 py-2 bg-amber-50 text-amber-700 text-xs rounded-md">
-                          This poll is closed. Convert anyway by picking a date below.
-                        </div>
-                      )}
-                      <div className="space-y-2">
-                        {[...pollDetail.options]
-                          .sort((a, b) => b.count - a.count || a.date.localeCompare(b.date))
-                          .map((opt, idx) => {
-                            const total = pollDetail.totalVotes;
-                            const pct = total > 0 ? Math.round((opt.count / total) * 100) : 0;
-                            const dateLabel = (() => {
-                              const [y, m, d] = opt.date.split("-").map(Number);
-                              if (!y || !m || !d) return opt.date;
-                              return new Date(y, m - 1, d).toLocaleDateString("en-US", {
-                                weekday: "short",
-                                month: "short",
-                                day: "numeric",
-                              });
-                            })();
-                            const timeLabel = opt.time ? (() => {
-                              const [hh, mm] = opt.time!.split(":");
-                              let h = parseInt(hh, 10);
-                              const ampm = h >= 12 ? "PM" : "AM";
-                              if (h === 0) h = 12; else if (h > 12) h -= 12;
-                              return `${h}:${mm} ${ampm}`;
-                            })() : null;
-                            return (
-                              <div key={`${opt.date}|${opt.time || ""}`} className="relative border border-zinc-200 rounded-lg overflow-hidden">
-                                <div className="absolute inset-y-0 left-0 bg-zinc-100" style={{ width: `${pct}%` }} />
-                                <div className="relative flex items-center justify-between gap-3 p-3">
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-medium text-zinc-900">
-                                      {dateLabel}
-                                      {timeLabel && <span className="text-zinc-500"> · {timeLabel}</span>}
-                                      {idx === 0 && opt.count > 0 && (
-                                        <span className="ml-2 text-[9px] font-bold uppercase tracking-widest bg-emerald-600 text-white px-1.5 py-0.5 rounded">
-                                          Leader
-                                        </span>
-                                      )}
-                                    </p>
-                                    <p className="text-[11px] text-zinc-400">
-                                      {opt.count} {opt.count === 1 ? "vote" : "votes"}{total > 0 ? ` · ${pct}%` : ""}
-                                    </p>
-                                  </div>
-                                  <button
-                                    disabled={closingPoll}
-                                    onClick={async () => {
-                                      if (!confirm(`Pick ${dateLabel}${timeLabel ? ` at ${timeLabel}` : ""}? Voters will be SMS'd to RSVP.`)) return;
-                                      setClosingPoll(true);
-                                      try {
-                                        await Parse.Cloud.run("closeAndConvertPoll", {
-                                          eventGroupId: selectedActivePlan.objectId,
-                                          winningDate: opt.date,
-                                          winningTime: opt.time || undefined,
-                                        });
-                                        setSelectedActivePlan(null);
-                                        fetchDashboard();
-                                      } catch (err) {
-                                        alert(err instanceof Error ? err.message : "Failed to close poll.");
-                                      } finally {
-                                        setClosingPoll(false);
-                                      }
-                                    }}
-                                    className="shrink-0 text-[10px] font-bold uppercase tracking-widest bg-zinc-900 text-white px-3 py-2 rounded hover:bg-zinc-800 transition-colors disabled:opacity-50"
-                                  >
-                                    Pick this date
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                      </div>
-                      <p className="text-[11px] text-zinc-400 leading-relaxed pt-1">
-                        Picking a date locks voting and promotes this to a real plan. Every voter gets a text with the chosen date and an RSVP link.
-                      </p>
-
-                      {/* Voter roster — host/owner/co-host only */}
-                      {pollDetail.canSeeVoters && pollDetail.voters.length > 0 && (
-                        <div className="pt-6">
-                          <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400 mb-3">
-                            Voters ({pollDetail.voters.length})
-                          </h4>
-                          <div className="border border-zinc-200 rounded-xl overflow-hidden">
-                            <table className="w-full text-sm">
-                              <thead className="bg-zinc-50 text-left">
-                                <tr>
-                                  <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Name</th>
-                                  <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Phone</th>
-                                  <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Picked</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-zinc-100">
-                                {pollDetail.voters.map((v, i) => (
-                                  <tr key={i}>
-                                    <td className="px-4 py-2.5 text-zinc-700">{v.name}</td>
-                                    <td className="px-4 py-2.5 text-zinc-400">{v.phone || "—"}</td>
-                                    <td className="px-4 py-2.5 text-zinc-500 text-[12px]">
-                                      {v.selectedDateTimes.map((dt, j) => {
-                                        const [y, m, d] = dt.date.split("-").map(Number);
-                                        const dateLabel = (y && m && d)
-                                          ? new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-                                          : dt.date;
-                                        const timeLabel = dt.time ? (() => {
-                                          const [hh, mm] = dt.time.split(":");
-                                          let h = parseInt(hh, 10);
-                                          const ampm = h >= 12 ? "PM" : "AM";
-                                          if (h === 0) h = 12; else if (h > 12) h -= 12;
-                                          return `${h}:${mm} ${ampm}`;
-                                        })() : null;
-                                        return (
-                                          <span key={j}>
-                                            {j > 0 && ", "}
-                                            {dateLabel}{timeLabel && ` ${timeLabel}`}
-                                          </span>
-                                        );
-                                      })}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                  {!pollDetailLoading && !pollDetail && (
-                    <p className="text-sm text-zinc-400">Couldn&apos;t load poll details.</p>
-                  )}
-                </div>
-              ) : (
-              <div className="space-y-3">
-                <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
-                  Attendees {!planRsvpsLoading && `(${planRsvps.filter(r => r.status === "Accepted").length})`}
-                  {!planRsvpsLoading && planRsvps.some(r => r.status === "pendingRsvp") && (
-                    <span className="text-amber-500 ml-2">
-                      {planRsvps.filter(r => r.status === "pendingRsvp").length} pending
-                    </span>
-                  )}
-                </h4>
-                {planRsvpsLoading ? (
-                  <p className="text-sm text-zinc-400">Loading...</p>
-                ) : planRsvps.length > 0 ? (
-                  <div className="border border-zinc-200 rounded-xl overflow-x-auto">
-                    <table className="w-full text-sm min-w-0">
-                      <thead className="bg-zinc-50 text-left">
-                        <tr>
-                          <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Name</th>
-                          <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Phone</th>
-                          <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Status</th>
-                          <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-100">
-                        {planRsvps.map((r, i) => (
-                          <tr key={i}>
-                            <td className="px-4 py-2.5">
-                              <div>{r.name}</div>
-                              {r.rsvpNote && (
-                                <p className="text-[11px] text-zinc-400 italic truncate max-w-[200px]">&ldquo;{r.rsvpNote}&rdquo;</p>
-                              )}
-                            </td>
-                            <td className="px-4 py-2.5 text-zinc-400">{r.phone || "—"}</td>
-                            <td className="px-4 py-2.5">
-                              {r.status === "pendingRsvp" ? (
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Pending</span>
-                              ) : (
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Confirmed</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2.5">
-                              {r.status === "pendingRsvp" ? (
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={async () => {
-                                      try {
-                                        await Parse.Cloud.run("approveRsvpRequest", { notificationId: r.notificationId });
-                                        setPlanRsvps((prev) => prev.map((rsvp) => rsvp.notificationId === r.notificationId ? { ...rsvp, status: "Accepted" } : rsvp));
-                                        setDashboard((d) => d ? { ...d, pendingRsvpRequests: d.pendingRsvpRequests.filter((pr) => pr.notificationId !== r.notificationId) } : d);
-                                      } catch (err) {
-                                        console.error("Failed to approve:", err);
-                                      }
-                                    }}
-                                    className="px-2 py-1 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest rounded hover:bg-emerald-700 transition-colors"
-                                  >
-                                    Approve
-                                  </button>
-                                  <button
-                                    onClick={async () => {
-                                      try {
-                                        await Parse.Cloud.run("declineRsvpRequest", { notificationId: r.notificationId });
-                                        setPlanRsvps((prev) => prev.filter((rsvp) => rsvp.notificationId !== r.notificationId));
-                                        setDashboard((d) => d ? { ...d, pendingRsvpRequests: d.pendingRsvpRequests.filter((pr) => pr.notificationId !== r.notificationId) } : d);
-                                      } catch (err) {
-                                        console.error("Failed to decline:", err);
-                                      }
-                                    }}
-                                    className="px-2 py-1 bg-white text-zinc-600 text-[10px] font-bold uppercase tracking-widest rounded border border-zinc-300 hover:bg-zinc-50 transition-colors"
-                                  >
-                                    Decline
-                                  </button>
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={async () => {
-                                    if (!confirm(`Remove ${r.name} from this plan?`)) return;
-                                    try {
-                                      await Parse.Cloud.run("removeAttendeeFromPlan", { notificationId: r.notificationId });
-                                      setPlanRsvps((prev) => prev.filter((rsvp) => rsvp.notificationId !== r.notificationId));
-                                    } catch (err) {
-                                      console.error("Failed to remove attendee:", err);
-                                      alert("Failed to remove attendee.");
-                                    }
-                                  }}
-                                  className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
-                                >
-                                  Remove
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-sm text-zinc-400">No RSVPs yet.</p>
-                )}
-              </div>
-              )}
-
-              <div className="pt-8 border-t border-zinc-100 flex items-center justify-between">
-                <button
-                  onClick={() => {
-                    if (!leafAppConnected) {
-                      setShowPhoneModal(true);
-                      return;
-                    }
-                    setCreatePlanPrefill({
-                      title: selectedActivePlan.title,
-                      description: selectedActivePlan.description,
-                      venue: selectedActivePlan.location,
-                      imageUrl: selectedActivePlan.image,
-                      ...(selectedActivePlan.isPoll
-                        ? {
-                            mode: "poll",
-                            pollOptions: pollDetail?.options.map((o) => ({ date: o.date, time: o.time || "" })),
-                          }
-                        : {}),
-                    });
-                    setSelectedActivePlan(null);
-                    setShowCreatePlanModal(true);
-                  }}
-                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
-                >
-                  <Copy className="w-4 h-4" />
-                  Duplicate
-                </button>
-                <button
-                  onClick={() => {
-                    if (selectedActivePlan.isPoll) {
-                      // Poll edit — prefill mode, options (from pollDetail), and close date.
-                      const closesAtYmd = selectedActivePlan.pollClosesAt
-                        ? new Date(selectedActivePlan.pollClosesAt).toISOString().slice(0, 10)
-                        : "";
-                      setEditingPlanId(selectedActivePlan.objectId);
-                      setCreatePlanPrefill({
-                        title: selectedActivePlan.title,
-                        description: selectedActivePlan.description,
-                        venue: selectedActivePlan.location,
-                        imageUrl: selectedActivePlan.image,
-                        mode: "poll",
-                        pollOptions: pollDetail?.options.map((o) => ({ date: o.date, time: o.time || "" })) || undefined,
-                        pollClosesAt: closesAtYmd || undefined,
-                      });
-                      setSelectedActivePlan(null);
-                      setShowCreatePlanModal(true);
-                      return;
-                    }
-                    const planDate = selectedActivePlan.date ? (() => { const d = new Date(selectedActivePlan.date); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })() : "";
-                    setEditingPlanId(selectedActivePlan.objectId);
-                    setCreatePlanPrefill({
-                      title: selectedActivePlan.title,
-                      description: selectedActivePlan.description,
-                      venue: selectedActivePlan.location,
-                      date: planDate,
-                      time: selectedActivePlan.time || "",
-                      imageUrl: selectedActivePlan.image,
-                    });
-                    setSelectedActivePlan(null);
-                    setShowCreatePlanModal(true);
-                  }}
-                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
-                >
-                  <Pencil className="w-4 h-4" />
-                  Edit
-                </button>
-                <button
-                  onClick={async () => {
-                    const isPoll = selectedActivePlan.isPoll;
-                    const confirmMsg = isPoll
-                      ? "Cancel this poll? Voters won't be notified. This cannot be undone."
-                      : "Cancel this plan? Attendees will be notified. This cannot be undone.";
-                    if (!confirm(confirmMsg)) return;
-                    try {
-                      await Parse.Cloud.run("removePlanFromCalendar", { eventGroupId: selectedActivePlan.objectId });
-                      setSelectedActivePlan(null);
-                      fetchDashboard();
-                    } catch (err) {
-                      console.error("Failed to cancel:", err);
-                      alert(isPoll ? "Failed to cancel poll." : "Failed to cancel plan.");
-                    }
-                  }}
-                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  {selectedActivePlan.isPoll ? "Cancel Poll" : "Cancel Plan"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PlanDetailModal
+          plan={{
+            objectId: selectedActivePlan.objectId,
+            title: selectedActivePlan.title,
+            description: selectedActivePlan.description,
+            image: selectedActivePlan.image,
+            date: selectedActivePlan.date,
+            time: selectedActivePlan.time,
+            hostName: selectedActivePlan.hostName,
+            rsvpCount: selectedActivePlan.rsvpCount,
+            location: selectedActivePlan.location,
+            isPoll: selectedActivePlan.isPoll,
+            pollOptionCount: selectedActivePlan.pollOptionCount,
+            pollVoteCount: selectedActivePlan.pollVoteCount,
+            pollClosesAt: selectedActivePlan.pollClosesAt,
+          }}
+          onClose={() => setSelectedActivePlan(null)}
+          onChanged={fetchDashboard}
+          leafAppConnected={leafAppConnected}
+          onConnectApp={() => setShowPhoneModal(true)}
+          onDuplicate={(plan, pollOptions) => {
+            setCreatePlanPrefill({
+              title: plan.title,
+              description: plan.description,
+              venue: plan.location,
+              imageUrl: plan.image,
+              ...(plan.isPoll
+                ? { mode: "poll" as const, pollOptions }
+                : {}),
+            });
+            setSelectedActivePlan(null);
+            setShowCreatePlanModal(true);
+          }}
+          onEdit={(plan, pollOptions, pollClosesAt) => {
+            if (plan.isPoll) {
+              setEditingPlanId(plan.objectId);
+              setCreatePlanPrefill({
+                title: plan.title,
+                description: plan.description,
+                venue: plan.location,
+                imageUrl: plan.image,
+                mode: "poll",
+                pollOptions,
+                pollClosesAt,
+              });
+              setSelectedActivePlan(null);
+              setShowCreatePlanModal(true);
+              return;
+            }
+            const planDate = plan.date
+              ? (() => { const d = new Date(plan.date); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })()
+              : "";
+            setEditingPlanId(plan.objectId);
+            setCreatePlanPrefill({
+              title: plan.title,
+              description: plan.description,
+              venue: plan.location,
+              date: planDate,
+              time: plan.time || "",
+              imageUrl: plan.image,
+            });
+            setSelectedActivePlan(null);
+            setShowCreatePlanModal(true);
+          }}
+          onPendingRsvpResolved={(notificationId) => {
+            setDashboard((d) => d ? {
+              ...d,
+              pendingRsvpRequests: d.pendingRsvpRequests.filter((pr) => pr.notificationId !== notificationId),
+            } : d);
+          }}
+        />
       )}
 
       {/* Create Plan Modal (marketplace + duplicate) */}

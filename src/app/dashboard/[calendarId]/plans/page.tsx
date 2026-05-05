@@ -7,7 +7,8 @@ import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
-import { ArrowLeft, Calendar, Clock, Copy, Lock, MapPin, Pencil, Plus, RefreshCw, Settings, Trash2, Users } from "lucide-react";
+import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailModal";
+import { ArrowLeft, Calendar, Lock, MapPin, Plus, RefreshCw, Settings, Trash2 } from "lucide-react";
 
 interface PlanIdea {
   objectId: string;
@@ -28,6 +29,10 @@ interface UpcomingPlan {
   rsvpCount: number;
   host: { name: string } | null;
   location: { name: string; address: string } | null;
+  isPoll?: boolean;
+  pollOptionCount?: number;
+  pollVoteCount?: number;
+  pollClosesAt?: string | null;
 }
 
 export default function PlansPage() {
@@ -141,7 +146,21 @@ export default function PlansPage() {
       }
       const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId });
       setUpcomingPlans(
-        (page.plans || []).map((p: { objectId: string; title: string; description: string; image: string | null; expiryDate: string; time: string | null; rsvpCount: number; host: { name: string } | null; location: { name: string; address: string } | null }) => ({
+        (page.plans || []).map((p: {
+          objectId: string;
+          title: string;
+          description: string;
+          image: string | null;
+          expiryDate: string;
+          time: string | null;
+          rsvpCount: number;
+          host: { name: string } | null;
+          location: { name: string; address: string } | null;
+          isPoll?: boolean;
+          pollOptionCount?: number;
+          pollVoteCount?: number;
+          pollClosesAt?: string | null;
+        }) => ({
           objectId: p.objectId,
           title: p.title,
           description: p.description || "",
@@ -151,6 +170,10 @@ export default function PlansPage() {
           rsvpCount: p.rsvpCount,
           host: p.host,
           location: p.location,
+          isPoll: p.isPoll,
+          pollOptionCount: p.pollOptionCount,
+          pollVoteCount: p.pollVoteCount,
+          pollClosesAt: p.pollClosesAt,
         }))
       );
       const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null }) => ({
@@ -272,43 +295,47 @@ export default function PlansPage() {
     }
   }
 
-  async function handleDeletePlan(planId: string) {
-    if (!confirm("Cancel this plan? Attendees will be notified. This cannot be undone.")) return;
-    try {
-      await Parse.Cloud.run("removePlanFromCalendar", { eventGroupId: planId });
-      setSelectedPlan(null);
-      setUpcomingPlans((prev) => prev.filter((p) => p.objectId !== planId));
-    } catch (err) {
-      console.error("Failed to cancel plan:", err);
-      alert("Failed to cancel plan.");
-    }
-  }
-
-  function handleDuplicatePlan() {
-    if (!selectedPlan) return;
+  function handleDuplicatePlan(plan: PlanDetailData, pollOptions?: { date: string; time: string }[]) {
     setCreatePlanPrefill({
-      title: selectedPlan.title,
-      description: selectedPlan.description,
-      venue: selectedPlan.location,
-      imageUrl: selectedPlan.image,
+      title: plan.title,
+      description: plan.description,
+      venue: plan.location,
+      imageUrl: plan.image,
+      ...(plan.isPoll
+        ? { mode: "poll" as const, pollOptions }
+        : {}),
     });
     setEditingPlanId(null);
     setSelectedPlan(null);
     setShowCreateModal(true);
   }
 
-  function handleEditPlan() {
-    if (!selectedPlan) return;
-    const planDate = selectedPlan.expiryDate ? (() => { const d = new Date(selectedPlan.expiryDate); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })() : "";
+  function handleEditPlan(plan: PlanDetailData, pollOptions?: { date: string; time: string }[], pollClosesAt?: string) {
+    if (plan.isPoll) {
+      setCreatePlanPrefill({
+        title: plan.title,
+        description: plan.description,
+        venue: plan.location,
+        imageUrl: plan.image,
+        mode: "poll",
+        pollOptions,
+        pollClosesAt,
+      });
+      setEditingPlanId(plan.objectId);
+      setSelectedPlan(null);
+      setShowCreateModal(true);
+      return;
+    }
+    const planDate = plan.date ? (() => { const d = new Date(plan.date); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })() : "";
     setCreatePlanPrefill({
-      title: selectedPlan.title,
-      description: selectedPlan.description,
-      venue: selectedPlan.location,
+      title: plan.title,
+      description: plan.description,
+      venue: plan.location,
       date: planDate,
-      time: selectedPlan.time || "",
-      imageUrl: selectedPlan.image,
+      time: plan.time || "",
+      imageUrl: plan.image,
     });
-    setEditingPlanId(selectedPlan.objectId);
+    setEditingPlanId(plan.objectId);
     setSelectedPlan(null);
     setShowCreateModal(true);
   }
@@ -481,97 +508,32 @@ export default function PlansPage() {
         </section>
       </main>
 
-      {/* Plan Detail Modal */}
+      {/* Plan Detail Modal — shared component, same view as the dashboard active-plans modal */}
       {selectedPlan && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-5xl md:h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl rounded-t-3xl md:rounded-none relative">
-            <button
-              onClick={() => setSelectedPlan(null)}
-              className="absolute top-6 right-6 z-50 p-2 rounded-full bg-white/20 text-white md:text-zinc-900 md:bg-transparent"
-            >
-              <Plus className="w-8 h-8 rotate-45" />
-            </button>
-
-            <div className="hidden md:block w-1/2 h-full bg-zinc-100">
-              {selectedPlan.image ? (
-                <img src={selectedPlan.image} className="w-full h-full object-cover" alt="" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Calendar className="w-20 h-20 text-zinc-300" />
-                </div>
-              )}
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-8 md:p-16 space-y-12">
-              <div className="space-y-4">
-                <h2 className="text-4xl md:text-5xl font-light tracking-tighter">
-                  {selectedPlan.title}
-                </h2>
-                <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
-                  Hosted by {selectedPlan.host?.name || "You"}
-                </p>
-                <div className="flex gap-6 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">
-                  <span className="flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
-                    {new Date(selectedPlan.expiryDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-                    {(() => {
-                      if (selectedPlan.time) return ` at ${selectedPlan.time}`;
-                      const d = new Date(selectedPlan.expiryDate);
-                      if (d.getHours() || d.getMinutes()) return ` at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
-                      return null;
-                    })()}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <Users className="w-4 h-4" /> {selectedPlan.rsvpCount} attending
-                  </span>
-                </div>
-              </div>
-
-              {(selectedPlan.description || selectedPlan.location) && (
-                <div className="space-y-6">
-                  {selectedPlan.description && (
-                    <p className="text-xl font-light leading-relaxed text-zinc-600">
-                      {selectedPlan.description}
-                    </p>
-                  )}
-                  {selectedPlan.location && (
-                    <div className="space-y-2">
-                      <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
-                        Location
-                      </h4>
-                      <p className="text-sm text-zinc-700">{selectedPlan.location.name}</p>
-                      <p className="text-sm text-zinc-500">{selectedPlan.location.address}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="pt-8 border-t border-zinc-100 flex items-center justify-between">
-                <button
-                  onClick={handleDuplicatePlan}
-                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
-                >
-                  <Copy className="w-4 h-4" />
-                  Duplicate
-                </button>
-                <button
-                  onClick={handleEditPlan}
-                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
-                >
-                  <Pencil className="w-4 h-4" />
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDeletePlan(selectedPlan.objectId)}
-                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Cancel Plan
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PlanDetailModal
+          plan={{
+            objectId: selectedPlan.objectId,
+            title: selectedPlan.title,
+            description: selectedPlan.description,
+            image: selectedPlan.image,
+            date: selectedPlan.expiryDate,
+            time: selectedPlan.time,
+            hostName: selectedPlan.host?.name || "You",
+            rsvpCount: selectedPlan.rsvpCount,
+            location: selectedPlan.location,
+            isPoll: selectedPlan.isPoll,
+            pollOptionCount: selectedPlan.pollOptionCount,
+            pollVoteCount: selectedPlan.pollVoteCount,
+            pollClosesAt: selectedPlan.pollClosesAt,
+          }}
+          onClose={() => setSelectedPlan(null)}
+          onChanged={() => {
+            // Removing/updating a plan invalidates the upcoming list — refetch.
+            fetchPlanIdeas();
+          }}
+          onDuplicate={handleDuplicatePlan}
+          onEdit={handleEditPlan}
+        />
       )}
 
       {/* Create/Edit Plan Modal */}
