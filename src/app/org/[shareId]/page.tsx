@@ -2509,8 +2509,11 @@ export default function OrgCalendarPage() {
                     {cancellingRsvp === selectedEvent.id ? "Cancelling..." : "Cancel RSVP"}
                   </button>
                 )}
-                {/* Cancel Plan — visible to the plan host or calendar owner/co-host */}
-                {parseUser && (selectedEvent.hostId === parseUser.id || org.isOwner || org.isHost) && (
+                {/* Cancel Plan — visible only to the actual host of this plan.
+                    Owners/co-hosts can still cancel via the dashboard, but the
+                    public org page is the attendee/host POV — owners showing up
+                    here as RSVP'd shouldn't see admin-style cancel actions. */}
+                {parseUser && selectedEvent.hostId === parseUser.id && (
                   <button
                     onClick={() => handleCancelPlan(selectedEvent.id)}
                     disabled={cancellingPlan}
