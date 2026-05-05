@@ -1046,6 +1046,9 @@ export default function OrgCalendarPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [rsvpedPlanIds, setRsvpedPlanIds] = useState<Set<string>>(new Set());
   const [pendingRsvpIds, setPendingRsvpIds] = useState<Set<string>>(new Set());
+  // planId → EventNotification.objectId for the viewer's own RSVP. Powers
+  // the "Join Plan Chat" button (linked to /c/{notificationId}).
+  const [rsvpNotificationIds, setRsvpNotificationIds] = useState<Map<string, string>>(new Map());
   const [hostedPlanIds, setHostedPlanIds] = useState<Set<string>>(new Set());
   const [hostNotificationId, setHostNotificationId] = useState<string | null>(null);
   const [cancellingRsvp, setCancellingRsvp] = useState<string | null>(null);
@@ -1407,8 +1410,13 @@ export default function OrgCalendarPage() {
 
       // Sync RSVP cookies with backend data (handles admin-removed RSVPs)
       if (result.userRsvpPlanIds && Array.isArray(result.userRsvpPlanIds)) {
-        const confirmedIds = new Set<string>(result.userRsvpPlanIds.filter((r: { status: string }) => r.status === "Accepted").map((r: { planId: string }) => r.planId));
-        const pendingIds = new Set<string>(result.userRsvpPlanIds.filter((r: { status: string }) => r.status === "pendingRsvp").map((r: { planId: string }) => r.planId));
+        const rsvpEntries = result.userRsvpPlanIds as Array<{ planId: string; status: string; notificationId?: string }>;
+        const confirmedIds = new Set<string>(rsvpEntries.filter((r) => r.status === "Accepted").map((r) => r.planId));
+        const pendingIds = new Set<string>(rsvpEntries.filter((r) => r.status === "pendingRsvp").map((r) => r.planId));
+        const notifIdMap = new Map<string, string>();
+        for (const r of rsvpEntries) {
+          if (r.notificationId) notifIdMap.set(r.planId, r.notificationId);
+        }
 
         // Remove stale cookies for RSVPs that no longer exist
         for (const id of getRsvpCookieIds()) {
@@ -1424,6 +1432,7 @@ export default function OrgCalendarPage() {
 
         setRsvpedPlanIds(confirmedIds);
         setPendingRsvpIds(pendingIds);
+        setRsvpNotificationIds(notifIdMap);
       }
 
       if (result.userHostedPlanIds && Array.isArray(result.userHostedPlanIds)) {
@@ -2406,22 +2415,34 @@ export default function OrgCalendarPage() {
                       <Check className="w-4 h-4 text-emerald-600" />
                       <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">You&apos;re Attending</span>
                     </div>
-                    <div className="flex gap-4">
-                      <button
-                        onClick={() => handleCancelRsvp(selectedEvent.id)}
-                        disabled={cancellingRsvp === selectedEvent.id}
-                        className="flex-1 border border-red-200 text-red-600 py-3 text-xs uppercase tracking-[0.2em] font-bold hover:bg-red-50 transition-colors disabled:opacity-50"
-                      >
-                        {cancellingRsvp === selectedEvent.id ? "Cancelling..." : "Cancel RSVP"}
-                      </button>
+                    {rsvpNotificationIds.get(selectedEvent.id) ? (
+                      <div className="flex gap-4">
+                        <a
+                          href={`/c/${rsvpNotificationIds.get(selectedEvent.id)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 text-white py-3 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 rounded-lg"
+                          style={{ backgroundColor: org.brandColor || "#18181b" }}
+                        >
+                          <MessageCircle className="w-4 h-4" /> Join Plan Chat
+                        </a>
+                        <button
+                          onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
+                          className="border border-zinc-200 px-5 hover:bg-zinc-50 transition-colors flex items-center gap-2 rounded-lg"
+                        >
+                          {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                          <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                        </button>
+                      </div>
+                    ) : (
                       <button
                         onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
-                        className="border border-zinc-200 px-5 hover:bg-zinc-50 transition-colors flex items-center gap-2"
+                        className="border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2 rounded-lg"
                       >
                         {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
                         <span className="text-xs font-bold uppercase tracking-widest">Share</span>
                       </button>
-                    </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex gap-4">
@@ -2484,6 +2505,17 @@ export default function OrgCalendarPage() {
                     above) so it's not duplicated here. Single place to see
                     who's attending, who shared their number, and to message
                     everyone. */}
+                {/* Cancel RSVP — red text link at the bottom for confirmed
+                    attendees (mirrors the host's "Cancel this plan" treatment). */}
+                {rsvpedPlanIds.has(selectedEvent.id) && (
+                  <button
+                    onClick={() => handleCancelRsvp(selectedEvent.id)}
+                    disabled={cancellingRsvp === selectedEvent.id}
+                    className="text-xs text-red-400 hover:text-red-600 transition-colors pt-2 disabled:opacity-50"
+                  >
+                    {cancellingRsvp === selectedEvent.id ? "Cancelling..." : "Cancel RSVP"}
+                  </button>
+                )}
                 {/* Cancel Plan — visible to the plan host or calendar owner/co-host */}
                 {parseUser && (selectedEvent.hostId === parseUser.id || org.isOwner || org.isHost) && (
                   <button

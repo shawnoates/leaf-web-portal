@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { QRCodeSVG } from "qrcode.react";
+import { getVerifiedUserCookie } from "@/lib/verified-user";
 import { Calendar, MessageCircle, Loader2, Users, EyeOff } from "lucide-react";
 
 const APP_STORE_URL =
@@ -14,6 +15,11 @@ type HypeData = {
   expiryDate: string | null;
   timeString: string | null;
   attendees: Attendee[];
+  // Server confirms the caller is the host of this plan.
+  isHost?: boolean;
+  // Server confirms the caller can see the attendee roster + Message All —
+  // true for hosts and confirmed attendees, false for random URL recipients.
+  canSeeRoster?: boolean;
   hasAppOpenedChat: boolean;
 };
 
@@ -55,8 +61,15 @@ export default function HostHypeClient({ notificationId }: { notificationId: str
     let cancelled = false;
     (async () => {
       try {
+        // Send the visitor's verified phone (cookie set after RSVP/follow OTP)
+        // so the server can decide whether to include the attendee roster.
+        // Hosts and confirmed attendees of the plan get the roster; random
+        // URL recipients don't.
+        const cached = typeof window !== "undefined" ? getVerifiedUserCookie() : null;
+        const phoneNumber = cached?.phone?.replace(/\D/g, "") || undefined;
         const result = (await Parse.Cloud.run("getHostHypePageData", {
           notificationId,
+          phoneNumber,
         })) as HypeData;
         if (!cancelled) setData(result);
       } catch (err: unknown) {
@@ -125,8 +138,9 @@ export default function HostHypeClient({ notificationId }: { notificationId: str
         )}
 
         <p className="text-sm text-zinc-600 mb-6 leading-relaxed">
-          Join the plan chat in the app or text every attendee at once from
-          your phone.
+          {data.canSeeRoster
+            ? "Join the plan chat in the app or text every attendee at once from your phone."
+            : "Join the plan chat in the app to coordinate with the group."}
         </p>
 
         <div className="space-y-3">
@@ -160,7 +174,7 @@ export default function HostHypeClient({ notificationId }: { notificationId: str
               </a>
             </div>
           )}
-          {smsHref ? (
+          {data.canSeeRoster && smsHref && (
             <a
               href={smsHref}
               className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3.5 text-xs uppercase tracking-[0.2em] font-bold rounded-lg hover:bg-zinc-50 transition-colors text-zinc-900"
@@ -168,14 +182,15 @@ export default function HostHypeClient({ notificationId }: { notificationId: str
               <MessageCircle className="w-4 h-4" />
               Message All ({sharingPhones.length})
             </a>
-          ) : (
+          )}
+          {data.canSeeRoster && !smsHref && (
             <p className="text-xs text-zinc-400 text-center py-2">
               No attendees have shared their number yet.
             </p>
           )}
         </div>
 
-        {data.attendees.length > 0 && (
+        {data.canSeeRoster && data.attendees.length > 0 && (
           <div className="mt-8 pt-6 border-t border-zinc-100">
             <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-1.5 mb-3">
               <Users className="w-3.5 h-3.5" /> Attendees ({data.attendees.length})
