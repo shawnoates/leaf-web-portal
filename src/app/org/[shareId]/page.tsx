@@ -2050,23 +2050,16 @@ export default function OrgCalendarPage() {
                           ) : null}
                         </div>
                         <div className="flex flex-col sm:flex-row gap-4">
-                          {rsvpedPlanIds.has(plan.id) ? (
-                            <button
-                              onClick={() => handleCancelRsvp(plan.id)}
-                              disabled={cancellingRsvp === plan.id}
-                              className="border border-red-200 text-red-600 px-6 py-3 text-xs uppercase tracking-widest font-medium hover:bg-red-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                            >
-                              {cancellingRsvp === plan.id ? "Cancelling..." : "Cancel RSVP"}
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setSelectedEvent(plan)}
-                              className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
-                              style={{ backgroundColor: org.brandColor || "#18181b" }}
-                            >
-                              View Details <ArrowUpRight className="w-4 h-4" />
-                            </button>
-                          )}
+                          {/* "View Details" for everyone — RSVP'd, hosting, pending, or new.
+                              The modal handles state-specific actions (Join Plan Chat for
+                              attendees, Message Attendees for hosts, Cancel RSVP, etc.). */}
+                          <button
+                            onClick={() => setSelectedEvent(plan)}
+                            className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+                            style={{ backgroundColor: org.brandColor || "#18181b" }}
+                          >
+                            View Details <ArrowUpRight className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => handleSharePlan(plan.id, plan.title)}
                             className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
