@@ -395,7 +395,13 @@ export default function OrgDashboardPage() {
     pollOptionCount?: number;
     pollClosesAt?: string | null;
   } | null>(null);
-  const [pollDetail, setPollDetail] = useState<{ options: PollOptionDetail[]; totalVotes: number; isExpired: boolean } | null>(null);
+  const [pollDetail, setPollDetail] = useState<{
+    options: PollOptionDetail[];
+    totalVotes: number;
+    isExpired: boolean;
+    voters: { name: string; phone: string | null; selectedDateTimes: { date: string; time: string | null }[] }[];
+    canSeeVoters: boolean;
+  } | null>(null);
   const [pollDetailLoading, setPollDetailLoading] = useState(false);
   const [closingPoll, setClosingPoll] = useState(false);
   const [planRsvps, setPlanRsvps] = useState<{ notificationId: string; name: string; phone: string | null; source: string; status: string; rsvpNote: string | null }[]>([]);
@@ -416,11 +422,17 @@ export default function OrgDashboardPage() {
     if (!selectedActivePlan?.isPoll) { setPollDetail(null); return; }
     setPollDetailLoading(true);
     Parse.Cloud.run("getCalendarDatePollForGuest", { eventGroupId: selectedActivePlan.objectId })
-      .then((result: { poll: { options: PollOptionDetail[]; totalVotes: number; isExpired: boolean } }) => {
+      .then((result: {
+        poll: { options: PollOptionDetail[]; totalVotes: number; isExpired: boolean };
+        voters?: { name: string; phone: string | null; selectedDateTimes: { date: string; time: string | null }[] }[];
+        canSeeVoters?: boolean;
+      }) => {
         setPollDetail({
           options: result.poll.options || [],
           totalVotes: result.poll.totalVotes || 0,
           isExpired: result.poll.isExpired || false,
+          voters: result.voters || [],
+          canSeeVoters: !!result.canSeeVoters,
         });
       })
       .catch(() => setPollDetail(null))
@@ -3200,6 +3212,55 @@ export default function OrgDashboardPage() {
                       <p className="text-[11px] text-zinc-400 leading-relaxed pt-1">
                         Picking a date locks voting and promotes this to a real plan. Every voter gets a text with the chosen date and an RSVP link.
                       </p>
+
+                      {/* Voter roster — host/owner/co-host only */}
+                      {pollDetail.canSeeVoters && pollDetail.voters.length > 0 && (
+                        <div className="pt-6">
+                          <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400 mb-3">
+                            Voters ({pollDetail.voters.length})
+                          </h4>
+                          <div className="border border-zinc-200 rounded-xl overflow-hidden">
+                            <table className="w-full text-sm">
+                              <thead className="bg-zinc-50 text-left">
+                                <tr>
+                                  <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Name</th>
+                                  <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Phone</th>
+                                  <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Picked</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-zinc-100">
+                                {pollDetail.voters.map((v, i) => (
+                                  <tr key={i}>
+                                    <td className="px-4 py-2.5 text-zinc-700">{v.name}</td>
+                                    <td className="px-4 py-2.5 text-zinc-400">{v.phone || "—"}</td>
+                                    <td className="px-4 py-2.5 text-zinc-500 text-[12px]">
+                                      {v.selectedDateTimes.map((dt, j) => {
+                                        const [y, m, d] = dt.date.split("-").map(Number);
+                                        const dateLabel = (y && m && d)
+                                          ? new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                                          : dt.date;
+                                        const timeLabel = dt.time ? (() => {
+                                          const [hh, mm] = dt.time.split(":");
+                                          let h = parseInt(hh, 10);
+                                          const ampm = h >= 12 ? "PM" : "AM";
+                                          if (h === 0) h = 12; else if (h > 12) h -= 12;
+                                          return `${h}:${mm} ${ampm}`;
+                                        })() : null;
+                                        return (
+                                          <span key={j}>
+                                            {j > 0 && ", "}
+                                            {dateLabel}{timeLabel && ` ${timeLabel}`}
+                                          </span>
+                                        );
+                                      })}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
                   {!pollDetailLoading && !pollDetail && (
