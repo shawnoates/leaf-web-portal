@@ -2704,7 +2704,6 @@ export default function OrgDashboardPage() {
                         {dashboard.calendars.length > 1 && followerCalFilter === "all" && (
                           <th className="text-left px-4 py-3 font-bold">Calendar</th>
                         )}
-                        <th className="text-left px-4 py-3 font-bold">Phone</th>
                         <th className="text-left px-4 py-3 font-bold">Joined</th>
                         <th className="text-right px-4 py-3 font-bold">Actions</th>
                       </tr>
@@ -2716,7 +2715,6 @@ export default function OrgDashboardPage() {
                           {dashboard.calendars.length > 1 && followerCalFilter === "all" && (
                             <td className="px-4 py-3 text-zinc-400">{f.calendarName || "—"}</td>
                           )}
-                          <td className="px-4 py-3 text-zinc-400">{f.phone || "—"}</td>
                           <td className="px-4 py-3 text-zinc-400">
                             {new Date(f.joinedAt).toLocaleDateString()}
                           </td>
