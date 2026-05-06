@@ -8,7 +8,7 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
 import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailModal";
-import { ArrowLeft, Calendar, Lock, MapPin, Plus, RefreshCw, Settings, Trash2 } from "lucide-react";
+import { ArrowLeft, Calendar, Camera, Lock, MapPin, Plus, RefreshCw, Settings, Trash2, X } from "lucide-react";
 
 interface PlanIdea {
   objectId: string;
@@ -17,6 +17,26 @@ interface PlanIdea {
   date: string;
   image: string | null;
   location: { name: string; address: string } | null;
+}
+
+interface PastPlan {
+  objectId: string;
+  title: string;
+  description: string;
+  image: string | null;
+  expiryDate: string;
+  rsvpCount: number;
+  photoCount: number;
+  host: { name: string } | null;
+  location: { name: string; address: string } | null;
+}
+
+interface EventPhoto {
+  objectId: string;
+  url: string | null;
+  caption: string | null;
+  uploadedAt: string;
+  uploaderName: string;
 }
 
 interface UpcomingPlan {
@@ -57,6 +77,15 @@ export default function PlansPage() {
 
   // Upcoming plans (hosted)
   const [upcomingPlans, setUpcomingPlans] = useState<UpcomingPlan[]>([]);
+
+  // Past plans (with photo counts) — lazy-loaded when the user opens the Past tab
+  const [planTense, setPlanTense] = useState<"upcoming" | "past">("upcoming");
+  const [pastPlans, setPastPlans] = useState<PastPlan[] | null>(null);
+  const [loadingPast, setLoadingPast] = useState(false);
+
+  // Photos modal
+  const [photosModalPlan, setPhotosModalPlan] = useState<PastPlan | null>(null);
+  const [modalPhotos, setModalPhotos] = useState<EventPhoto[] | null>(null);
 
   // Plan ideas
   const [planIdeas, setPlanIdeas] = useState<PlanIdea[]>([]);
@@ -201,6 +230,32 @@ export default function PlansPage() {
   function resetForm() {
     setCreatePlanPrefill(null);
     setEditingPlanId(null);
+  }
+
+  async function fetchPastPlans() {
+    if (pastPlans !== null) return;
+    setLoadingPast(true);
+    try {
+      const result = await Parse.Cloud.run("getCalendarPastPlans", { calendarId });
+      setPastPlans(result.plans || []);
+    } catch {
+      setPastPlans([]);
+    } finally {
+      setLoadingPast(false);
+    }
+  }
+
+  async function openPhotosModal(plan: PastPlan) {
+    setPhotosModalPlan(plan);
+    setModalPhotos(null);
+    try {
+      const result = await Parse.Cloud.run("getEventPhotos", {
+        eventGroupId: plan.objectId,
+      });
+      setModalPhotos(result.photos || []);
+    } catch {
+      setModalPhotos([]);
+    }
   }
 
   async function handleRegenerate() {
@@ -385,37 +440,101 @@ export default function PlansPage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-8 space-y-10">
-        {/* Upcoming Plans (Hosted) */}
-        {upcomingPlans.length > 0 && (
-          <section>
-            <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">
-              Upcoming Plans ({upcomingPlans.length})
+        {/* Plans (Upcoming / Past) */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
+              {planTense === "upcoming"
+                ? `Upcoming Plans (${upcomingPlans.length})`
+                : `Past Plans${pastPlans ? ` (${pastPlans.length})` : ""}`}
             </h2>
-            <div className="flex gap-3 overflow-x-auto no-scrollbar">
-              {upcomingPlans.map((plan) => (
-                <div key={plan.objectId} onClick={() => setSelectedPlan(plan)} className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer">
+            <div className="flex gap-1 border border-zinc-200 rounded-lg p-0.5">
+              <button
+                onClick={() => setPlanTense("upcoming")}
+                className={`px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold rounded-md transition-colors ${
+                  planTense === "upcoming" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"
+                }`}
+              >
+                Upcoming
+              </button>
+              <button
+                onClick={() => {
+                  setPlanTense("past");
+                  fetchPastPlans();
+                }}
+                className={`px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold rounded-md transition-colors ${
+                  planTense === "past" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"
+                }`}
+              >
+                Past
+              </button>
+            </div>
+          </div>
+
+          {planTense === "upcoming" ? (
+            upcomingPlans.length > 0 ? (
+              <div className="flex gap-3 overflow-x-auto no-scrollbar">
+                {upcomingPlans.map((plan) => (
+                  <div key={plan.objectId} onClick={() => setSelectedPlan(plan)} className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer">
+                    {plan.image ? (
+                      <img src={plan.image} alt={plan.title} className="w-full h-28 object-cover" />
+                    ) : (
+                      <div className="w-full h-28 bg-zinc-100 flex items-center justify-center">
+                        <Calendar className="w-6 h-6 text-zinc-300" />
+                      </div>
+                    )}
+                    <div className="p-3">
+                      <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
+                      <p className="text-xs text-zinc-400 mb-1">
+                        {new Date(plan.expiryDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                      </p>
+                      <div className="flex items-center justify-between text-xs text-zinc-400">
+                        <span className="truncate">{plan.host?.name || "You"}</span>
+                        <span className="shrink-0 ml-2">{plan.rsvpCount} RSVPs</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-400">No upcoming plans yet.</p>
+            )
+          ) : loadingPast ? (
+            <div className="flex items-center justify-center py-10">
+              <RefreshCw className="w-4 h-4 animate-spin text-zinc-400" />
+            </div>
+          ) : pastPlans && pastPlans.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {pastPlans.map((plan) => (
+                <button
+                  key={plan.objectId}
+                  onClick={() => openPhotosModal(plan)}
+                  className="text-left border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors flex"
+                >
                   {plan.image ? (
-                    <img src={plan.image} alt={plan.title} className="w-full h-28 object-cover" />
+                    <img src={plan.image} alt={plan.title} className="w-24 h-24 object-cover flex-shrink-0" />
                   ) : (
-                    <div className="w-full h-28 bg-zinc-100 flex items-center justify-center">
+                    <div className="w-24 h-24 bg-zinc-100 flex items-center justify-center flex-shrink-0">
                       <Calendar className="w-6 h-6 text-zinc-300" />
                     </div>
                   )}
-                  <div className="p-3">
+                  <div className="p-3 flex-1 min-w-0">
                     <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
-                    <p className="text-xs text-zinc-400 mb-1">
-                      {new Date(plan.expiryDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                    <p className="text-xs text-zinc-400 mb-2">
+                      {new Date(plan.expiryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     </p>
-                    <div className="flex items-center justify-between text-xs text-zinc-400">
-                      <span className="truncate">{plan.host?.name || "You"}</span>
-                      <span className="shrink-0 ml-2">{plan.rsvpCount} RSVPs</span>
+                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+                      <Camera className="w-3 h-3" />
+                      {plan.photoCount} {plan.photoCount === 1 ? "photo" : "photos"}
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
-          </section>
-        )}
+          ) : (
+            <p className="text-sm text-zinc-400">No past plans yet.</p>
+          )}
+        </section>
 
         {/* Existing Plan Ideas */}
         <section>
@@ -557,6 +676,81 @@ export default function PlansPage() {
           onClose={() => setShowUpgradeModal(false)}
           loading={subscriptionLoading}
         />
+      )}
+
+      {/* Past Plan Photos Modal */}
+      {photosModalPlan && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+          onClick={() => {
+            setPhotosModalPlan(null);
+            setModalPhotos(null);
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between p-5 border-b border-zinc-100">
+              <div className="min-w-0">
+                <h3 className="text-lg font-medium text-zinc-900 truncate">
+                  {photosModalPlan.title}
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  {new Date(photosModalPlan.expiryDate).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                  {" · "}
+                  {photosModalPlan.photoCount}{" "}
+                  {photosModalPlan.photoCount === 1 ? "photo" : "photos"}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setPhotosModalPlan(null);
+                  setModalPhotos(null);
+                }}
+                className="text-zinc-400 hover:text-zinc-900 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-5">
+              {modalPhotos === null ? (
+                <div className="flex items-center justify-center py-10">
+                  <RefreshCw className="w-4 h-4 animate-spin text-zinc-400" />
+                </div>
+              ) : modalPhotos.length === 0 ? (
+                <p className="text-sm text-zinc-400 text-center py-10">
+                  No photos uploaded yet.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {modalPhotos.map((photo) =>
+                    photo.url ? (
+                      <a
+                        key={photo.objectId}
+                        href={photo.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block aspect-square rounded-lg overflow-hidden bg-zinc-100"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={photo.url}
+                          alt={`Photo by ${photo.uploaderName}`}
+                          className="w-full h-full object-cover hover:opacity-90 transition-opacity"
+                        />
+                      </a>
+                    ) : null
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

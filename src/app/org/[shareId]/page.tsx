@@ -197,18 +197,12 @@ function normalizeTimeString(time: string): string {
 // Calendar (iOS/macOS), Outlook, Google Calendar (via download), and the
 // default calendar app on Android/Windows.
 //
-// We emit DTSTART/DTEND as **floating time** (no `Z`, no `TZID`) so the
-// calendar app interprets the value as the importer's local time. This
-// sidesteps two issues:
-//   1. Some plans have `expiryDate` stored as "local time as UTC" (a legacy
-//      bug — old plans saved before the timezone fix on the server). UTC
-//      math against those records produces a 3-5 hour offset.
-//   2. We don't know the host's IANA timezone here, only the user-typed
-//      time string ("7:00 AM"), which is exactly what the page displays.
-//
-// When `time` is provided we use it together with the local date components
-// of `dateISO`, matching exactly what the host sees on the org page.
-function buildIcsDataUrl(opts: {
+// Link to the server-rendered .ics endpoint rather than a `data:` URL — iOS
+// Safari only opens the Calendar "add event" sheet when the response comes
+// over HTTP with `Content-Type: text/calendar`. Data URLs trigger a download
+// instead. Server route lives at src/app/api/ics/route.ts and owns all the
+// timezone/format handling (floating time, etc.).
+function buildIcsHref(opts: {
   uid: string;
   title: string;
   dateISO: string;
@@ -219,87 +213,18 @@ function buildIcsDataUrl(opts: {
   locationAddress?: string | null;
   url?: string;
 }): string | null {
-  const seed = new Date(opts.dateISO);
-  if (Number.isNaN(seed.getTime())) return null;
-
-  const pad = (n: number) => String(n).padStart(2, "0");
-  // Floating: YYYYMMDDTHHMMSS, no zone suffix.
-  const floatFmt = (y: number, mo: number, d: number, h: number, mi: number) =>
-    `${y}${pad(mo)}${pad(d)}T${pad(h)}${pad(mi)}00`;
-  // UTC: YYYYMMDDTHHMMSSZ (only used for DTSTAMP, which spec-wise must be UTC).
-  const utcFmt = (d: Date) =>
-    d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-
-  // Parse "7:00 AM", "7 PM", "07:00", "19:00" → { hour, minute } in 24h, or null.
-  const parseTime = (s: string): { h: number; m: number } | null => {
-    const t = s.trim();
-    const ampm = t.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
-    if (ampm) {
-      let h = parseInt(ampm[1], 10);
-      const m = ampm[2] ? parseInt(ampm[2], 10) : 0;
-      const isPM = ampm[3].toUpperCase() === "PM";
-      if (isPM && h < 12) h += 12;
-      if (!isPM && h === 12) h = 0;
-      return { h, m };
-    }
-    const h24 = t.match(/^(\d{1,2}):(\d{2})$/);
-    if (h24) return { h: parseInt(h24[1], 10), m: parseInt(h24[2], 10) };
-    return null;
-  };
-
-  // Pull the local date components from the seed (so a plan stored as
-  // "naive UTC" still yields the right calendar date in the viewer's TZ).
-  const year = seed.getFullYear();
-  const month = seed.getMonth() + 1;
-  const day = seed.getDate();
-
-  // If a typed time string is available, prefer it — that's what the page
-  // shows. Otherwise fall back to the seed's local hours/minutes.
-  const parsed = opts.time ? parseTime(opts.time) : null;
-  const startHour = parsed ? parsed.h : seed.getHours();
-  const startMin = parsed ? parsed.m : seed.getMinutes();
-
-  // Compute end by adding durationHours to the floating start. We use a Date
-  // object briefly for the +N-hour math, then read its local fields.
-  const startLocal = new Date(year, month - 1, day, startHour, startMin, 0, 0);
-  const endLocal = new Date(startLocal.getTime() + (opts.durationHours ?? 2) * 60 * 60 * 1000);
-
-  const dtStart = floatFmt(year, month, day, startHour, startMin);
-  const dtEnd = floatFmt(
-    endLocal.getFullYear(),
-    endLocal.getMonth() + 1,
-    endLocal.getDate(),
-    endLocal.getHours(),
-    endLocal.getMinutes(),
-  );
-
-  const esc = (s: string) =>
-    s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
-
-  const locationParts = [opts.locationName, opts.locationAddress].filter(Boolean) as string[];
-  const location = locationParts.join(", ");
-
-  const lines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Leaf//Calendar Plan//EN",
-    "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
-    "BEGIN:VEVENT",
-    `UID:${opts.uid}@joinleaf.com`,
-    `DTSTAMP:${utcFmt(new Date())}`,
-    `DTSTART:${dtStart}`,
-    `DTEND:${dtEnd}`,
-    `SUMMARY:${esc(opts.title)}`,
-    opts.description ? `DESCRIPTION:${esc(opts.description)}` : "",
-    location ? `LOCATION:${esc(location)}` : "",
-    opts.url ? `URL:${esc(opts.url)}` : "",
-    "END:VEVENT",
-    "END:VCALENDAR",
-  ].filter(Boolean);
-
-  const ics = lines.join("\r\n");
-  return `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
+  if (Number.isNaN(new Date(opts.dateISO).getTime())) return null;
+  const sp = new URLSearchParams();
+  sp.set("uid", opts.uid);
+  sp.set("title", opts.title);
+  sp.set("dateISO", opts.dateISO);
+  if (opts.time) sp.set("time", opts.time);
+  if (opts.durationHours != null) sp.set("durationHours", String(opts.durationHours));
+  if (opts.description) sp.set("description", opts.description);
+  if (opts.locationName) sp.set("locationName", opts.locationName);
+  if (opts.locationAddress) sp.set("locationAddress", opts.locationAddress);
+  if (opts.url) sp.set("url", opts.url);
+  return `/api/ics?${sp.toString()}`;
 }
 
 // --- Components ---
@@ -540,7 +465,7 @@ function RsvpModal({
             )}
 
             {!isPendingResult && plan.dateISO && (() => {
-              const icsUrl = buildIcsDataUrl({
+              const icsUrl = buildIcsHref({
                 uid: plan.id,
                 title: plan.title,
                 dateISO: plan.dateISO,
@@ -551,9 +476,6 @@ function RsvpModal({
                 url: typeof window !== "undefined" ? `${window.location.origin}/p/${plan.id}` : undefined,
               });
               if (!icsUrl) return null;
-              // No `download` attribute — on iOS Safari this lets the
-              // text/calendar mime trigger Apple Calendar's "add event" sheet
-              // directly. On desktop browsers it'll still download.
               return (
                 <a
                   href={icsUrl}
@@ -2470,7 +2392,7 @@ export default function OrgCalendarPage() {
                   && (() => {
                   const venueGated = !!(selectedEvent.location?.isPrivate
                     || (selectedEvent.requireApproval && !rsvpedPlanIds.has(selectedEvent.id)));
-                  const icsUrl = buildIcsDataUrl({
+                  const icsUrl = buildIcsHref({
                     uid: selectedEvent.id,
                     title: selectedEvent.title,
                     dateISO: selectedEvent.dateISO,
@@ -2481,8 +2403,6 @@ export default function OrgCalendarPage() {
                     url: typeof window !== "undefined" ? `${window.location.origin}/p/${selectedEvent.id}` : undefined,
                   });
                   if (!icsUrl) return null;
-                  // No `download` attribute — on iOS Safari the text/calendar
-                  // mime triggers Apple Calendar directly.
                   return (
                     <a
                       href={icsUrl}

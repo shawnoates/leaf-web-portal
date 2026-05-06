@@ -164,6 +164,14 @@ interface OrgDashboard {
     rsvpNote: string | null;
     requestedAt: string;
   }[];
+  recentPhotos: {
+    objectId: string;
+    url: string | null;
+    uploadedAt: string;
+    uploaderName: string;
+    eventGroupId: string | null;
+    eventTitle: string;
+  }[];
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -1175,6 +1183,44 @@ export default function OrgDashboardPage() {
                 </div>
               ))}
             </div>
+
+            {/* Recent Photos — attendee uploads from past plans */}
+            {dashboard.recentPhotos && dashboard.recentPhotos.length > 0 && (
+              <section>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                    Recent Photos
+                  </h3>
+                  <Link
+                    href={`/dashboard/${calendarId}/plans`}
+                    className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 hover:text-zinc-900 transition-colors"
+                  >
+                    See all
+                  </Link>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                  {dashboard.recentPhotos.map((photo) =>
+                    photo.url ? (
+                      <a
+                        key={photo.objectId}
+                        href={photo.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`${photo.eventTitle} · ${photo.uploaderName}`}
+                        className="block aspect-square rounded-lg overflow-hidden bg-zinc-100 group relative"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={photo.url}
+                          alt={`Photo from ${photo.eventTitle}`}
+                          className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+                        />
+                      </a>
+                    ) : null
+                  )}
+                </div>
+              </section>
+            )}
 
             {/* Concierge Ad */}
             <div className="border border-emerald-200 rounded-xl p-6 bg-gradient-to-br from-emerald-50/60 to-white">
