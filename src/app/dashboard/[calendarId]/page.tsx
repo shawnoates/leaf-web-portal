@@ -2575,51 +2575,115 @@ export default function OrgDashboardPage() {
                         <th className="text-left px-4 py-3 font-bold">Name</th>
                         <th className="text-left px-4 py-3 font-bold">Email</th>
                         <th className="text-left px-4 py-3 font-bold">Role</th>
+                        <th className="text-left px-4 py-3 font-bold">Scope</th>
                         <th className="text-left px-4 py-3 font-bold">Joined</th>
                         <th className="px-4 py-3"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
-                      {dashboard.members.map((m, i) => (
-                        <tr key={m.membershipId || i}>
-                          <td className="px-4 py-3">{m.name}</td>
-                          <td className="px-4 py-3 text-zinc-400">{m.email || "—"}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs bg-zinc-100 px-2 py-0.5 rounded-full">
-                                {m.status}
-                              </span>
-                              {m.leafAppConnected && (
-                                <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
-                                  Synced to app
+                      {dashboard.members.map((m, i) => {
+                        const isHost = m.status === "Host";
+                        const isOwnerRow = m.status === "Owned" || m.status === "Owner";
+                        return (
+                          <tr key={m.membershipId || `${m.objectId || m.email}-${i}`}>
+                            <td className="px-4 py-3">{m.name}</td>
+                            <td className="px-4 py-3 text-zinc-400">{m.email || "—"}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-xs bg-zinc-100 px-2 py-0.5 rounded-full">
+                                  {isOwnerRow ? "Owner" : m.status}
                                 </span>
+                                {m.pending && (
+                                  <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
+                                    Pending invite
+                                  </span>
+                                )}
+                                {m.leafAppConnected && (
+                                  <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
+                                    Synced to app
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-zinc-500">
+                              {isOwnerRow ? (
+                                <span className="text-xs text-zinc-400">All Calendars</span>
+                              ) : isHost && m.scope ? (
+                                m.scope.allCalendars ? (
+                                  <span className="text-xs">All Calendars</span>
+                                ) : m.scope.calendars.length === 0 ? (
+                                  <span className="text-xs text-zinc-400">—</span>
+                                ) : (
+                                  <span
+                                    className="text-xs"
+                                    title={m.scope.calendars.map((c) => c.name).join(", ")}
+                                  >
+                                    {m.scope.calendars.length === 1
+                                      ? m.scope.calendars[0].name
+                                      : `${m.scope.calendars.length} calendars`}
+                                  </span>
+                                )
+                              ) : (
+                                <span className="text-xs text-zinc-400">—</span>
                               )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-zinc-400">
-                            {new Date(m.joinedAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {m.status !== "Owned" && m.status !== "Owner" && (
-                              <button
-                                onClick={async () => {
-                                  if (!confirm(`Remove ${m.name} from this calendar?`)) return;
-                                  try {
-                                    await Parse.Cloud.run("removeMember", { membershipId: m.membershipId, calendarId });
-                                    setDashboard((d) => d ? { ...d, members: d.members.filter((x) => x.membershipId !== m.membershipId) } : d);
-                                  } catch (err) {
-                                    console.error("Failed to remove member:", err);
-                                  }
-                                }}
-                                className="text-zinc-400 hover:text-red-500 transition-colors"
-                                title="Remove user"
-                              >
-                                <UserMinus className="w-4 h-4" />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="px-4 py-3 text-zinc-400">
+                              {new Date(m.joinedAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                {isHost && (
+                                  <button
+                                    onClick={() => {
+                                      const all = m.scope?.allCalendars ?? true;
+                                      const ids = m.scope?.calendars.map((c) => c.id) ?? [];
+                                      setEditScopeFor({
+                                        name: m.name,
+                                        userId: m.objectId,
+                                        email: m.email,
+                                      });
+                                      setEditScopeAll(all);
+                                      setEditScopeIds(all ? [] : ids);
+                                    }}
+                                    className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+                                    title="Edit scope"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
+                                {!isOwnerRow && (
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm(`Remove ${m.name} from this calendar?`)) return;
+                                      try {
+                                        if (isHost) {
+                                          await Parse.Cloud.run("removeCoHost", {
+                                            orgId: calendarId,
+                                            ...(m.objectId ? { userId: m.objectId } : { email: m.email }),
+                                          });
+                                        } else if (m.membershipId) {
+                                          await Parse.Cloud.run("removeMember", {
+                                            membershipId: m.membershipId,
+                                            calendarId,
+                                          });
+                                        }
+                                        fetchDashboard();
+                                      } catch (err) {
+                                        console.error("Failed to remove member:", err);
+                                        alert(err instanceof Error ? err.message : "Failed to remove user.");
+                                      }
+                                    }}
+                                    className="text-zinc-400 hover:text-red-500 transition-colors"
+                                    title="Remove user"
+                                  >
+                                    <UserMinus className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -3155,6 +3219,76 @@ export default function OrgDashboardPage() {
         </div>
       )}
 
+
+      {/* Edit Co-Host Scope Modal */}
+      {editScopeFor && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-xl p-8 relative">
+            <button
+              onClick={() => setEditScopeFor(null)}
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-zinc-100"
+            >
+              <Plus className="w-5 h-5 rotate-45" />
+            </button>
+            <h2 className="text-xl font-light tracking-tight mb-1">Edit co-host scope</h2>
+            <p className="text-xs text-zinc-500 mb-6">
+              {editScopeFor.name}
+            </p>
+            <div className="mb-6">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">Calendars</label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setEditScopeAll(true); setEditScopeIds([]); }}
+                  className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                    editScopeAll
+                      ? "bg-zinc-900 text-white border-zinc-900"
+                      : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400"
+                  }`}
+                >
+                  All Calendars
+                </button>
+                {dashboard.calendars.map((cal) => {
+                  const selected = !editScopeAll && editScopeIds.includes(cal.objectId);
+                  return (
+                    <button
+                      key={cal.objectId}
+                      type="button"
+                      onClick={() => {
+                        setEditScopeAll(false);
+                        setEditScopeIds((prev) =>
+                          prev.includes(cal.objectId)
+                            ? prev.filter((id) => id !== cal.objectId)
+                            : [...prev, cal.objectId]
+                        );
+                      }}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                        selected
+                          ? "bg-zinc-900 text-white border-zinc-900"
+                          : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400"
+                      }`}
+                    >
+                      {cal.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-zinc-400 mt-2">
+                {editScopeAll
+                  ? "Co-host will have access to every current and future calendar in this organization."
+                  : `Co-host will have access only to ${editScopeIds.length === 0 ? "the calendars you select" : `${editScopeIds.length} selected calendar${editScopeIds.length === 1 ? "" : "s"}`}.`}
+              </p>
+            </div>
+            <button
+              onClick={handleSaveScope}
+              disabled={savingScope || (!editScopeAll && editScopeIds.length === 0)}
+              className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
+            >
+              {savingScope ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Active Plan Detail Modal — shared component, also used by /plans page */}
       {selectedActivePlan && (

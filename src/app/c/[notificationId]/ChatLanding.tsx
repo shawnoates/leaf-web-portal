@@ -16,55 +16,50 @@ function isIOSDevice(): boolean {
 export default function ChatLanding({ notificationId }: { notificationId: string }) {
   const deepLink = `leaf://planChat?planId=${notificationId}`;
   const [isIOS, setIsIOS] = useState<boolean | null>(null);
-  const [redirectError, setRedirectError] = useState<string | null>(null);
+  const [eventGroupId, setEventGroupId] = useState<string | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(null);
 
   useEffect(() => {
     setIsIOS(isIOSDevice());
   }, []);
 
-  // iOS: try the in-app deep link, fall back to App Store after a short delay.
+  // Translate notificationId -> eventGroupId so both branches can offer the
+  // web chat as an option (iOS) or auto-redirect to it (non-iOS).
   useEffect(() => {
-    if (isIOS !== true) return;
-
-    let cancelled = false;
-    const onVisibilityChange = () => {
-      if (document.hidden) cancelled = true;
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    window.location.href = deepLink;
-    const timer = window.setTimeout(() => {
-      if (!cancelled) window.location.href = APP_STORE_URL;
-    }, 1500);
-    return () => {
-      window.clearTimeout(timer);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [isIOS, deepLink]);
-
-  // Non-iOS: forward to the web chat at /chat/{eventGroupId}. Need to translate
-  // notificationId -> eventGroupId via cloud function (cheap lookup).
-  useEffect(() => {
-    if (isIOS !== false) return;
+    if (isIOS === null) return;
     let cancelled = false;
     Parse.Cloud.run("getEventGroupIdForNotification", { notificationId })
       .then((result: { eventGroupId: string }) => {
         if (cancelled) return;
         if (result?.eventGroupId) {
-          window.location.replace(`/chat/${result.eventGroupId}`);
+          setEventGroupId(result.eventGroupId);
         } else {
-          setRedirectError("Could not find this chat.");
+          setLookupError("Could not find this chat.");
         }
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setRedirectError(
-          err instanceof Error ? err.message : "Could not open this chat."
-        );
+        setLookupError(err instanceof Error ? err.message : "Could not open this chat.");
       });
     return () => {
       cancelled = true;
     };
   }, [isIOS, notificationId]);
+
+  // iOS: try the deep link automatically. If the app's installed it'll open
+  // and the user never sees the rest of the page. If not, they stay on this
+  // page with a clear "Continue in browser" option (no App Store auto-redirect).
+  useEffect(() => {
+    if (isIOS !== true) return;
+    window.location.href = deepLink;
+  }, [isIOS, deepLink]);
+
+  // Non-iOS: forward to /chat/{eventGroupId} as soon as we have the id.
+  useEffect(() => {
+    if (isIOS !== false) return;
+    if (!eventGroupId) return;
+    window.location.replace(`/chat/${eventGroupId}`);
+  }, [isIOS, eventGroupId]);
 
   return (
     <div
@@ -92,10 +87,11 @@ export default function ChatLanding({ notificationId }: { notificationId: string
               margin: "0 0 12px 0",
             }}
           >
-            Opening Leaf…
+            Join the Plan Chat
           </h1>
-          <p style={{ fontSize: 14, margin: "0 0 24px 0" }}>
-            Taking you to the plan chat.
+          <p style={{ fontSize: 14, margin: "0 0 32px 0", maxWidth: 360 }}>
+            Open in the Leaf app for push notifications and split-the-bill, or
+            continue in your browser.
           </p>
           <a
             href={deepLink}
@@ -103,18 +99,33 @@ export default function ChatLanding({ notificationId }: { notificationId: string
               display: "inline-block",
               backgroundColor: "#18181b",
               color: "#ffffff",
-              padding: "12px 32px",
+              padding: "14px 32px",
               fontSize: 12,
               fontWeight: 700,
               letterSpacing: "0.15em",
               textTransform: "uppercase",
               textDecoration: "none",
               borderRadius: 8,
+              minWidth: 240,
             }}
           >
-            Open in Leaf
+            Open in Leaf app
           </a>
-          <p style={{ fontSize: 12, marginTop: 24 }}>
+          {eventGroupId && (
+            <a
+              href={`/chat/${eventGroupId}`}
+              style={{
+                display: "inline-block",
+                marginTop: 12,
+                color: "#18181b",
+                fontSize: 13,
+                textDecoration: "underline",
+              }}
+            >
+              Continue in browser
+            </a>
+          )}
+          <p style={{ fontSize: 12, marginTop: 32 }}>
             Don&rsquo;t have the app?{" "}
             <a href={APP_STORE_URL} style={{ color: "#18181b" }}>
               Download Leaf
@@ -123,7 +134,7 @@ export default function ChatLanding({ notificationId }: { notificationId: string
         </>
       )}
 
-      {isIOS === false && !redirectError && (
+      {isIOS === false && !lookupError && (
         <>
           <h1
             style={{
@@ -142,7 +153,7 @@ export default function ChatLanding({ notificationId }: { notificationId: string
         </>
       )}
 
-      {isIOS === false && redirectError && (
+      {isIOS === false && lookupError && (
         <>
           <h1
             style={{
@@ -156,7 +167,7 @@ export default function ChatLanding({ notificationId }: { notificationId: string
             Couldn&rsquo;t open the chat
           </h1>
           <p style={{ fontSize: 14, margin: "0 0 24px 0", maxWidth: 360 }}>
-            {redirectError}
+            {lookupError}
           </p>
           <a
             href={APP_STORE_URL}
