@@ -856,23 +856,16 @@ export default function OrgDashboardPage() {
     }
     setSavingScope(true);
     try {
-      const params = {
+      await Parse.Cloud.run("setCoHostScope", {
         orgId: calendarId,
         ...(editScopeFor.userId ? { userId: editScopeFor.userId } : { email: editScopeFor.email }),
         allCalendars: editScopeAll,
         calendarIds: editScopeAll ? [] : editScopeIds,
-      };
-      // eslint-disable-next-line no-console
-      console.log("[setCoHostScope] calling with", params);
-      const result = await Parse.Cloud.run("setCoHostScope", params);
-      // eslint-disable-next-line no-console
-      console.log("[setCoHostScope] result", result);
+      });
       setEditScopeFor(null);
       await fetchDashboard();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to update scope";
-      // eslint-disable-next-line no-console
-      console.error("[setCoHostScope] error", err);
       alert(message);
     } finally {
       setSavingScope(false);
@@ -2537,7 +2530,7 @@ export default function OrgDashboardPage() {
                           </span>
                           All Calendars
                         </button>
-                        {dashboard.calendars.map((cal) => {
+                        {dashboard.calendars.filter((c) => !c.isPrimary).map((cal) => {
                           const selected = !inviteScopeAll && inviteScopeIds.includes(cal.objectId);
                           return (
                             <button
@@ -2665,7 +2658,12 @@ export default function OrgDashboardPage() {
                                   <button
                                     onClick={() => {
                                       const all = m.scope?.allCalendars ?? true;
-                                      const ids = m.scope?.calendars.map((c) => c.id) ?? [];
+                                      const primaryIds = new Set(
+                                        dashboard.calendars.filter((c) => c.isPrimary).map((c) => c.objectId)
+                                      );
+                                      const ids = (m.scope?.calendars ?? [])
+                                        .map((c) => c.id)
+                                        .filter((id) => !primaryIds.has(id));
                                       setEditScopeFor({
                                         name: m.name,
                                         userId: m.objectId,
@@ -3277,7 +3275,7 @@ export default function OrgDashboardPage() {
                 >
                   All Calendars
                 </button>
-                {dashboard.calendars.map((cal) => {
+                {dashboard.calendars.filter((c) => !c.isPrimary).map((cal) => {
                   const selected = !editScopeAll && editScopeIds.includes(cal.objectId);
                   return (
                     <button
