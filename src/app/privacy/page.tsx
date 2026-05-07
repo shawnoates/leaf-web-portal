@@ -263,13 +263,14 @@ export default function PrivacyPolicyPage() {
             </p>
             <p>
               You can opt out of optional emails at any time using the
-              unsubscribe link at the bottom of those messages or by visiting{" "}
-              <Link
-                href="/unsubscribe"
+              unsubscribe link at the bottom of those messages, or by emailing
+              us at{" "}
+              <a
+                href="mailto:team@getleaflets.co"
                 className="text-zinc-900 underline underline-offset-4 hover:text-zinc-600"
               >
-                /unsubscribe
-              </Link>
+                team@getleaflets.co
+              </a>
               . You can disable push notifications in your device settings,
               and you can reply <code>STOP</code> to opt out of non-essential
               SMS. We may continue to send transactional messages necessary
