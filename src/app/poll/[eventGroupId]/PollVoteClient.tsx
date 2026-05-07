@@ -320,7 +320,7 @@ export default function PollVoteClient({
 
           {/* Options */}
           <div className="space-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+            <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">
               {hasVoted ? "Results" : "Pick what works for you"}
             </p>
             {poll.poll.options.map((opt) => {
@@ -376,7 +376,7 @@ export default function PollVoteClient({
                         {opt.count} {opt.count === 1 ? "vote" : "votes"}
                       </p>
                       {hasVoted && totalVotes > 0 && (
-                        <p className="text-[10px] text-zinc-400">{pct}%</p>
+                        <p className="text-xs text-zinc-400">{pct}%</p>
                       )}
                     </div>
                   </div>
@@ -409,7 +409,7 @@ export default function PollVoteClient({
                 We&apos;ll text you a one-time code so each vote counts only once.
               </p>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">
+                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">
                   Your name
                 </label>
                 <input
@@ -420,7 +420,7 @@ export default function PollVoteClient({
                 />
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">
+                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">
                   Phone
                 </label>
                 <div className="flex items-center gap-2">
@@ -469,7 +469,7 @@ export default function PollVoteClient({
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                 placeholder="000000"
                 autoFocus
-                className="w-full border border-zinc-200 rounded-lg py-3 text-center text-base tracking-[0.4em] focus:outline-none focus:border-zinc-900"
+                className="w-full border border-zinc-200 rounded-lg py-3 text-center text-base tracking-widest focus:outline-none focus:border-zinc-900"
               />
               {error && <p className="text-xs text-red-500">{error}</p>}
               <button
@@ -519,7 +519,7 @@ export default function PollVoteClient({
           )}
 
           <div className="flex items-center justify-center pt-4">
-            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-zinc-300">
+            <span className="inline-flex items-center gap-1 text-xs uppercase tracking-widest text-zinc-300">
               <Calendar className="w-3 h-3" />
               Powered by Leaf
             </span>

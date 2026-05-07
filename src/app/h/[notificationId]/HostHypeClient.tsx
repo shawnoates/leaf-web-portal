@@ -105,7 +105,7 @@ export default function HostHypeClient({ notificationId }: { notificationId: str
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-md mx-auto px-6 py-10">
-        <p className="text-xs uppercase tracking-[0.2em] font-bold text-zinc-400 mb-2">
+        <p className="text-xs uppercase tracking-wider font-bold text-zinc-400 mb-2">
           Your plan starts soon
         </p>
         <h1 className="text-2xl font-light tracking-tight text-zinc-900 mb-1">
@@ -125,7 +125,7 @@ export default function HostHypeClient({ notificationId }: { notificationId: str
         <div className="space-y-3">
           <Link
             href={chatHref}
-            className="block w-full bg-zinc-900 text-white py-3.5 text-xs uppercase tracking-[0.2em] font-bold text-center rounded-lg hover:opacity-90 transition-opacity"
+            className="block w-full bg-zinc-900 text-white py-3.5 text-xs uppercase tracking-wider font-bold text-center rounded-lg hover:opacity-90 transition-opacity"
           >
             Join Plan Chat
           </Link>

@@ -70,20 +70,20 @@ export default function AboutPage() {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/leaf-logo-black.png" alt="Leaf" className="h-7" />
-            <span className="text-lg font-light tracking-[0.2em] uppercase">
+            <span className="text-lg font-light tracking-wider uppercase">
               OS
             </span>
           </Link>
           <nav className="flex items-center gap-8">
             <Link
               href="/organizations"
-              className="text-xs tracking-[0.2em] uppercase text-zinc-500 hover:text-zinc-900 transition-colors"
+              className="text-xs tracking-wider uppercase text-zinc-500 hover:text-zinc-900 transition-colors"
             >
               Organizations
             </Link>
             <Link
               href="/organizations/setup"
-              className="text-xs tracking-[0.2em] uppercase font-bold bg-zinc-900 text-white px-5 py-2.5 hover:bg-zinc-800 transition-colors"
+              className="text-xs tracking-wider uppercase font-bold bg-zinc-900 text-white px-5 py-2.5 hover:bg-zinc-800 transition-colors"
             >
               Get Started
             </Link>
@@ -103,7 +103,7 @@ export default function AboutPage() {
           <div className="absolute inset-0 bg-black/35" />
           <div className="relative z-10 h-full flex items-end">
             <div className="max-w-6xl mx-auto px-6 pb-16 md:pb-24 w-full">
-              <p className="text-[10px] tracking-[0.3em] uppercase text-white/80 mb-4">
+              <p className="text-xs tracking-wider uppercase text-white/80 mb-4">
                 About Leaf
               </p>
               <h1 className="text-5xl md:text-7xl font-light tracking-tight text-white max-w-3xl leading-[1.05]">
@@ -117,7 +117,7 @@ export default function AboutPage() {
       {/* Story */}
       <section className="py-24 md:py-32 px-6">
         <div className="max-w-3xl mx-auto space-y-8">
-          <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400">
+          <p className="text-xs tracking-wider uppercase text-zinc-400">
             Our Story
           </p>
           <h2 className="text-3xl md:text-4xl font-light tracking-tight leading-tight">
@@ -153,7 +153,7 @@ export default function AboutPage() {
       <section className="py-24 px-6 bg-zinc-50/60 border-y border-zinc-100">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16 space-y-4">
-            <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400">
+            <p className="text-xs tracking-wider uppercase text-zinc-400">
               What We Believe
             </p>
             <h2 className="text-3xl md:text-4xl font-light tracking-tight">
@@ -163,7 +163,7 @@ export default function AboutPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
             {VALUES.map((v) => (
               <div key={v.label} className="space-y-4">
-                <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-900">
+                <p className="text-xs tracking-wider uppercase font-bold text-zinc-900">
                   {v.label}
                 </p>
                 <h3 className="text-2xl font-light tracking-tight leading-snug">
@@ -182,7 +182,7 @@ export default function AboutPage() {
       <section className="py-24 md:py-32 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16 space-y-4">
-            <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400">
+            <p className="text-xs tracking-wider uppercase text-zinc-400">
               Community
             </p>
             <h2 className="text-3xl md:text-4xl font-light tracking-tight max-w-2xl mx-auto leading-tight">
@@ -212,7 +212,7 @@ export default function AboutPage() {
       {/* Closing CTA */}
       <section className="py-24 md:py-32 px-6 bg-zinc-900 text-white">
         <div className="max-w-3xl mx-auto text-center space-y-8">
-          <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400">
+          <p className="text-xs tracking-wider uppercase text-zinc-400">
             Start Your Community
           </p>
           <h2 className="text-4xl md:text-5xl font-light tracking-tight leading-tight">
@@ -225,7 +225,7 @@ export default function AboutPage() {
           <div className="pt-4">
             <Link
               href="/organizations/setup"
-              className="inline-flex items-center gap-2 bg-white text-zinc-900 px-8 py-4 text-xs uppercase tracking-[0.2em] font-bold hover:bg-zinc-100 transition-colors"
+              className="inline-flex items-center gap-2 bg-white text-zinc-900 px-8 py-4 text-xs uppercase tracking-wider font-bold hover:bg-zinc-100 transition-colors"
             >
               Create Your Calendar <ArrowRight className="w-4 h-4" />
             </Link>
@@ -240,7 +240,7 @@ export default function AboutPage() {
             <div className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/leaf-logo-black.png" alt="Leaf" className="h-7" />
-              <span className="text-lg font-light tracking-[0.2em] uppercase">
+              <span className="text-lg font-light tracking-wider uppercase">
                 OS
               </span>
             </div>
@@ -251,7 +251,7 @@ export default function AboutPage() {
           </div>
           <div className="grid grid-cols-2 gap-16">
             <div className="space-y-4">
-              <h5 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-900">
+              <h5 className="text-xs tracking-wider uppercase font-bold text-zinc-900">
                 Platform
               </h5>
               <div className="flex flex-col gap-2 text-sm text-zinc-500 mt-4">
@@ -264,7 +264,7 @@ export default function AboutPage() {
               </div>
             </div>
             <div className="space-y-4">
-              <h5 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-900">
+              <h5 className="text-xs tracking-wider uppercase font-bold text-zinc-900">
                 Legal
               </h5>
               <div className="flex flex-col gap-2 text-sm text-zinc-500 mt-4">

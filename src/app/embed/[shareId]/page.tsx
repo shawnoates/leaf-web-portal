@@ -155,7 +155,7 @@ export default function EmbedCalendarPage() {
     <div className="max-w-6xl mx-auto px-6">
       {/* Stream Header */}
       <div className="pt-8 pb-4 border-b border-zinc-100">
-        <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold">
+        <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
           Upcoming Plans
         </p>
       </div>
@@ -196,7 +196,7 @@ export default function EmbedCalendarPage() {
               {/* Details */}
               <div className="w-full md:w-2/5 space-y-6">
                 <div className="space-y-2">
-                  <p className="text-[11px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                  <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
                     {plan.isPoll ? (
                       <>
                         Date Poll &bull; {plan.pollOptionCount || 0} {plan.pollOptionCount === 1 ? "option" : "options"}
@@ -215,7 +215,7 @@ export default function EmbedCalendarPage() {
                     {plan.title}
                   </h3>
                   <div className="pt-2">
-                    <p className="text-[10px] tracking-[0.2em] uppercase text-zinc-900 font-bold flex items-center gap-2">
+                    <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
                       <span
                         className="w-2 h-2 rounded-full"
                         style={{ backgroundColor: data.brandColor }}
@@ -239,7 +239,7 @@ export default function EmbedCalendarPage() {
                         <Users className="w-3.5 h-3.5 text-zinc-500" />
                       )}
                     </div>
-                    <span className="text-[10px] tracking-widest uppercase font-bold text-zinc-400">
+                    <span className="text-xs tracking-widest uppercase font-bold text-zinc-400">
                       {plan.isPoll
                         ? <>{plan.pollVoteCount || 0} {plan.pollVoteCount === 1 ? "Vote" : "Votes"}</>
                         : <>{plan.attendeeCount} Attending</>}
@@ -275,7 +275,7 @@ function PoweredByLeaf() {
         href="https://os.joinleaf.com"
         target="_blank"
         rel="noopener noreferrer"
-        className="text-[10px] tracking-[0.3em] uppercase text-zinc-300 hover:text-zinc-400 transition-colors"
+        className="text-xs tracking-wider uppercase text-zinc-300 hover:text-zinc-400 transition-colors"
       >
         Powered by Leaf
       </a>

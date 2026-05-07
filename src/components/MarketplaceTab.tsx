@@ -591,7 +591,7 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
                               href={event.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                              className="inline-flex items-center gap-1 mt-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
                             >
                               <ExternalLink className="w-3 h-3" />
                               View details
@@ -601,7 +601,7 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
 
                         {/* Metadata */}
                         {event.venue && (
-                          <div className="text-[10px] text-zinc-400 uppercase tracking-widest space-y-0.5">
+                          <div className="text-xs text-zinc-400 uppercase tracking-widest space-y-0.5">
                             <span className="flex items-center gap-1">
                               <MapPin className="w-3 h-3" />
                               {event.venue.name}

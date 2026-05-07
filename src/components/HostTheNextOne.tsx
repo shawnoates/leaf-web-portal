@@ -109,7 +109,7 @@ export default function HostTheNextOne({ viewerRole, calendar, recap, event }: P
   return (
     <div className="border-t border-zinc-100 mt-10 pt-8">
       <div className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-emerald-50/60 to-white p-6">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 mb-2">
+        <p className="text-xs font-bold uppercase tracking-widest text-emerald-700 mb-2">
           {headline}
         </p>
         <h2 className="text-xl font-light text-zinc-900 mb-1">

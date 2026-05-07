@@ -259,7 +259,7 @@ function SetupPageInner() {
             </p>
           </div>
           <div className="bg-zinc-50 p-6 space-y-2">
-            <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+            <p className="text-xs tracking-wider uppercase font-bold text-zinc-400">
               Your Calendar URL
             </p>
             <p className="text-lg font-mono">
@@ -269,7 +269,7 @@ function SetupPageInner() {
           <div className="flex flex-col gap-4">
             <Link
               href={`/org/${shareId}?welcome=1`}
-              className="bg-zinc-900 text-white px-8 py-4 text-xs uppercase tracking-[0.3em] font-medium hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
+              className="bg-zinc-900 text-white px-8 py-4 text-xs uppercase tracking-wider font-medium hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
             >
               View Your Calendar <ArrowRight className="w-4 h-4" />
             </Link>
@@ -279,7 +279,7 @@ function SetupPageInner() {
                   `os.joinleaf.com/org/${shareId}`
                 )
               }
-              className="border border-zinc-200 px-8 py-4 text-xs uppercase tracking-[0.3em] font-medium hover:bg-zinc-50 transition-colors"
+              className="border border-zinc-200 px-8 py-4 text-xs uppercase tracking-wider font-medium hover:bg-zinc-50 transition-colors"
             >
               Copy Link
             </button>
@@ -311,9 +311,9 @@ function SetupPageInner() {
           <div className="max-w-3xl mx-auto flex justify-between items-center">
             <Link href="/organizations" className="flex items-center gap-3">
               <img src="/leaf-logo-black.png" alt="Leaf" className="h-7" />
-              <span className="text-lg font-light tracking-[0.2em] uppercase">OS</span>
+              <span className="text-lg font-light tracking-wider uppercase">OS</span>
               <div className="h-4 w-px bg-zinc-200" />
-              <span className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold">
+              <span className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
                 Setup
               </span>
             </Link>
@@ -356,7 +356,7 @@ function SetupPageInner() {
             <div className="text-center pt-4 space-y-4">
               <Link
                 href={`/org/${shareId}?welcome=1`}
-                className="px-12 py-4 text-xs uppercase tracking-[0.3em] font-bold inline-flex items-center gap-2 transition-colors bg-zinc-900 text-white hover:bg-zinc-800"
+                className="px-12 py-4 text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 transition-colors bg-zinc-900 text-white hover:bg-zinc-800"
               >
                 View Your Calendar <ArrowRight className="w-4 h-4" />
               </Link>
@@ -364,7 +364,7 @@ function SetupPageInner() {
                 <div>
                   <Link
                     href={`/dashboard/${calendarId}`}
-                    className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400 hover:text-zinc-900"
+                    className="text-xs tracking-wider uppercase font-bold text-zinc-400 hover:text-zinc-900"
                   >
                     Go to dashboard
                   </Link>
@@ -385,9 +385,9 @@ function SetupPageInner() {
         <div className="max-w-3xl mx-auto flex justify-between items-center">
           <Link href="/organizations" className="flex items-center gap-3">
             <img src="/leaf-logo-black.png" alt="Leaf" className="h-7" />
-            <span className="text-lg font-light tracking-[0.2em] uppercase">OS</span>
+            <span className="text-lg font-light tracking-wider uppercase">OS</span>
             <div className="h-4 w-px bg-zinc-200" />
-            <span className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold">
+            <span className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
               Setup
             </span>
           </Link>
@@ -414,7 +414,7 @@ function SetupPageInner() {
           <div className="space-y-6">
             {/* Organization Name */}
             <div className="space-y-2">
-              <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+              <label className="text-xs tracking-wider uppercase font-bold">
                 Organization Name
               </label>
               <input
@@ -428,7 +428,7 @@ function SetupPageInner() {
 
             {/* Organization Type */}
             <div className="space-y-3">
-              <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+              <label className="text-xs tracking-wider uppercase font-bold">
                 Organization Type
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -452,7 +452,7 @@ function SetupPageInner() {
 
             {/* City */}
             <div className="space-y-2">
-              <label className="text-[10px] tracking-[0.3em] uppercase font-bold flex items-center gap-1.5">
+              <label className="text-xs tracking-wider uppercase font-bold flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5" />
                 City
               </label>
@@ -474,7 +474,7 @@ function SetupPageInner() {
 
             {/* Website (Optional — used to auto-generate description) */}
             <div className="space-y-2">
-              <label className="text-[10px] tracking-[0.3em] uppercase font-bold flex items-center gap-1.5">
+              <label className="text-xs tracking-wider uppercase font-bold flex items-center gap-1.5">
                 <Globe className="w-3.5 h-3.5" />
                 Website <span className="text-zinc-400 normal-case font-normal">(optional)</span>
               </label>
@@ -496,14 +496,14 @@ function SetupPageInner() {
             {/* Description */}
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
-                <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                <label className="text-xs tracking-wider uppercase font-bold">
                   Description
                 </label>
                 <button
                   type="button"
                   onClick={handleGenerateDescription}
                   disabled={descGenerating || !form.website.trim()}
-                  className={`flex items-center gap-1.5 text-[10px] tracking-[0.2em] uppercase font-bold transition-colors ${
+                  className={`flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold transition-colors ${
                     descGenerating || !form.website.trim()
                       ? "text-zinc-300 cursor-not-allowed"
                       : "text-zinc-500 hover:text-zinc-900"
@@ -540,7 +540,7 @@ function SetupPageInner() {
           <button
             onClick={handleGenerateClick}
             disabled={!canGenerate}
-            className={`px-8 py-3.5 text-xs uppercase tracking-[0.2em] font-bold flex items-center gap-2 transition-colors ${
+            className={`px-8 py-3.5 text-xs uppercase tracking-wider font-bold flex items-center gap-2 transition-colors ${
               canGenerate
                 ? "bg-zinc-900 text-white hover:bg-zinc-800"
                 : "bg-zinc-200 text-zinc-400 cursor-not-allowed"
@@ -563,7 +563,7 @@ function SetupPageInner() {
             <div className="hidden sm:flex w-[340px] shrink-0 bg-zinc-950 text-white flex-col justify-between p-10">
               <div className="flex items-center gap-3">
                 <img src="/leaf-logo-white.svg" alt="Leaf" className="h-7" />
-                <span className="text-lg font-light tracking-[0.2em] uppercase">OS</span>
+                <span className="text-lg font-light tracking-wider uppercase">OS</span>
               </div>
               <div className="space-y-6">
                 <h3 className="text-3xl font-light leading-snug">
@@ -603,7 +603,7 @@ function SetupPageInner() {
 
               <div className="space-y-8">
                 <div className="space-y-3">
-                  <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                  <p className="text-xs tracking-wider uppercase font-bold text-zinc-400">
                     Almost there
                   </p>
                   <h3 className="text-2xl font-light tracking-tight">

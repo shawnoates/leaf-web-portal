@@ -138,7 +138,7 @@ export default function PhoneVerificationModal({ onVerified, onClose }: PhoneVer
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                 placeholder="Enter code"
-                className="w-full px-3 py-2 text-sm text-center tracking-[0.3em] border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-300"
+                className="w-full px-3 py-2 text-sm text-center tracking-wider border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-300"
                 autoFocus
               />
             </div>

@@ -15,13 +15,13 @@ export default function PrivacyPolicyPage() {
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <Link
             href="/"
-            className="text-sm tracking-[0.3em] uppercase font-light hover:text-zinc-600 transition-colors"
+            className="text-sm tracking-wider uppercase font-light hover:text-zinc-600 transition-colors"
           >
             Leaf
           </Link>
           <Link
             href="/safety"
-            className="text-xs tracking-[0.2em] uppercase text-zinc-500 hover:text-zinc-900 transition-colors"
+            className="text-xs tracking-wider uppercase text-zinc-500 hover:text-zinc-900 transition-colors"
           >
             Safety
           </Link>
@@ -31,13 +31,13 @@ export default function PrivacyPolicyPage() {
       {/* Content */}
       <main className="max-w-3xl mx-auto px-6 py-20">
         <div className="space-y-3 mb-16">
-          <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400">
+          <p className="text-xs tracking-wider uppercase text-zinc-400">
             Legal
           </p>
           <h1 className="text-4xl md:text-5xl font-light tracking-tight">
             Privacy Policy
           </h1>
-          <p className="text-sm text-zinc-500">Last updated: April 10, 2026</p>
+          <p className="text-sm text-zinc-500">Last updated: May 7, 2026</p>
         </div>
 
         <article className="space-y-12 text-zinc-700 leading-relaxed font-light">
@@ -71,9 +71,18 @@ export default function PrivacyPolicyPage() {
             <ul className="list-disc pl-6 space-y-2">
               <li>Email address</li>
               <li>First and last name</li>
-              <li>Phone number</li>
+              <li>Phone number (used for verification and account recovery)</li>
               <li>Profile photo</li>
               <li>Organization or community affiliation</li>
+              <li>
+                Content you create or submit through the Service, such as plans
+                you host, RSVPs, polls, photos and event memories, and messages
+                you send in chats
+              </li>
+              <li>
+                Payment information you provide to our payment processor (we do
+                not store full card numbers ourselves)
+              </li>
               <li>Usage data</li>
             </ul>
 
@@ -150,8 +159,16 @@ export default function PrivacyPolicyPage() {
                   With service providers:
                 </strong>{" "}
                 We share information with vendors who perform services on our
-                behalf, such as hosting, analytics, customer support, and email
-                delivery.
+                behalf. Today these include: Parse Platform and our cloud
+                hosting providers (application hosting and database), Google
+                Firebase (authentication and the real-time database that
+                powers in-app chat), Stripe (payment processing), Google
+                (Sign-In, Maps, and Gemini for AI-assisted features), Apple
+                (Sign in with Apple), Meta (Facebook Login), and Unsplash
+                (event cover imagery). We also use providers to deliver
+                transactional and marketing email, SMS, and push notifications.
+                These providers process information only on our instructions
+                and under written agreements.
               </li>
               <li>
                 <strong className="font-medium text-zinc-900">
@@ -192,7 +209,116 @@ export default function PrivacyPolicyPage() {
 
           <section className="space-y-4">
             <h2 className="text-xl font-normal text-zinc-900">
-              4. Data Retention
+              4. Cookies and Similar Technologies
+            </h2>
+            <p>
+              The Leaf OS web portal uses a small number of cookies and similar
+              browser storage technologies. We do not use cookies for
+              advertising, cross-site tracking, or behavioral profiling, and
+              the portal does not load third-party analytics, marketing pixels,
+              session-replay, or tag-management scripts.
+            </p>
+            <p>The cookies we do set fall into two categories:</p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>
+                <strong className="font-medium text-zinc-900">
+                  Strictly necessary:
+                </strong>{" "}
+                session cookies set by Parse, Firebase Authentication, and
+                third-party sign-in providers so you can log in and stay
+                signed in securely.
+              </li>
+              <li>
+                <strong className="font-medium text-zinc-900">
+                  Functional:
+                </strong>{" "}
+                small cookies that remember your verified name and phone
+                number, the calendars you follow, and your RSVP state so you
+                don&rsquo;t have to re-enter information across pages. These
+                are set with <code>SameSite=Lax</code> and are limited to the
+                Leaf domain.
+              </li>
+            </ul>
+            <p>
+              Because we do not use non-essential cookies, the portal does not
+              display a cookie consent banner. You can clear or block cookies
+              at any time through your browser settings; doing so may sign
+              you out and require you to re-enter information such as your
+              name or phone number when RSVPing.
+            </p>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-xl font-normal text-zinc-900">
+              5. Communications
+            </h2>
+            <p>
+              We send two kinds of communications: <em>transactional</em>{" "}
+              messages that are part of the Service (for example, phone
+              verification codes, RSVP confirmations, host alerts, plan
+              reminders, and security notices) and <em>optional</em>{" "}
+              messages such as digests, recommendations, and announcements.
+              Depending on the contact information you provide, these may
+              arrive by email, SMS, or push notification.
+            </p>
+            <p>
+              You can opt out of optional emails at any time using the
+              unsubscribe link at the bottom of those messages or by visiting{" "}
+              <Link
+                href="/unsubscribe"
+                className="text-zinc-900 underline underline-offset-4 hover:text-zinc-600"
+              >
+                /unsubscribe
+              </Link>
+              . You can disable push notifications in your device settings,
+              and you can reply <code>STOP</code> to opt out of non-essential
+              SMS. We may continue to send transactional messages necessary
+              to operate your account.
+            </p>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-xl font-normal text-zinc-900">
+              6. Messaging and Chat
+            </h2>
+            <p>
+              Leaf includes in-app and web-based group chat for plans and
+              communities. Messages, the names and profile photos of
+              participants, timestamps, and any images or links you share are
+              transmitted and stored through Google Firebase&rsquo;s real-time
+              database so we can deliver them to other participants. Anyone
+              who has access to the relevant plan or group can read messages
+              posted there, and organization administrators may have access
+              to messages within their organization.
+            </p>
+            <p>
+              Please use good judgment about what you share in chat. Do not
+              post sensitive personal, financial, or health information. We
+              retain messages for as long as the related plan or group exists
+              and may remove content that violates our terms or applicable
+              law.
+            </p>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-xl font-normal text-zinc-900">
+              7. AI-Assisted Features
+            </h2>
+            <p>
+              Some features use AI models from Google (Gemini) to help with
+              tasks such as suggesting plan details, summarizing activity, or
+              generating descriptions. When you use these features, the
+              relevant inputs (for example, the text of a plan or prompt you
+              provide) are sent to the model provider for processing. We do
+              not authorize Google to use your inputs to train its general
+              foundation models. We do not use AI to make decisions that
+              produce legal or similarly significant effects about you.
+            </p>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-xl font-normal text-zinc-900">
+              8. Data Retention
             </h2>
             <p>
               We retain your personal data only for as long as is necessary for
@@ -204,7 +330,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-xl font-normal text-zinc-900">5. Security</h2>
+            <h2 className="text-xl font-normal text-zinc-900">9. Security</h2>
             <p>
               The security of your personal data is important to us. We use
               commercially acceptable means to protect your information, but no
@@ -215,7 +341,7 @@ export default function PrivacyPolicyPage() {
 
           <section className="space-y-4">
             <h2 className="text-xl font-normal text-zinc-900">
-              6. Your Rights
+              10. Your Rights
             </h2>
             <p>
               Depending on where you live, you may have certain rights
@@ -243,7 +369,7 @@ export default function PrivacyPolicyPage() {
 
           <section className="space-y-4">
             <h2 className="text-xl font-normal text-zinc-900">
-              7. Children&rsquo;s Privacy
+              11. Children&rsquo;s Privacy
             </h2>
             <p>
               The Service is not directed to anyone under the age of 13. We do
@@ -256,7 +382,7 @@ export default function PrivacyPolicyPage() {
 
           <section className="space-y-4">
             <h2 className="text-xl font-normal text-zinc-900">
-              8. Third-Party Services
+              12. Third-Party Services
             </h2>
             <p>
               The Service may contain links to or integrations with
@@ -269,7 +395,7 @@ export default function PrivacyPolicyPage() {
 
           <section className="space-y-4">
             <h2 className="text-xl font-normal text-zinc-900">
-              9. Changes to This Privacy Policy
+              13. Changes to This Privacy Policy
             </h2>
             <p>
               We may update our Privacy Policy from time to time. We will
@@ -280,7 +406,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-xl font-normal text-zinc-900">10. Contact Us</h2>
+            <h2 className="text-xl font-normal text-zinc-900">14. Contact Us</h2>
             <p>
               If you have any questions about this Privacy Policy, please
               contact us at{" "}

@@ -1072,7 +1072,7 @@ export default function OrgDashboardPage() {
                               console.error("Failed to approve:", err);
                             }
                           }}
-                          className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-emerald-700 transition-colors"
+                          className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-emerald-700 transition-colors"
                         >
                           Approve
                         </button>
@@ -1085,7 +1085,7 @@ export default function OrgDashboardPage() {
                               console.error("Failed to decline:", err);
                             }
                           }}
-                          className="px-3 py-1.5 bg-white text-zinc-600 text-[10px] font-bold uppercase tracking-widest rounded-lg border border-zinc-300 hover:bg-zinc-50 transition-colors"
+                          className="px-3 py-1.5 bg-white text-zinc-600 text-xs font-bold uppercase tracking-widest rounded-lg border border-zinc-300 hover:bg-zinc-50 transition-colors"
                         >
                           Decline
                         </button>
@@ -1134,7 +1134,7 @@ export default function OrgDashboardPage() {
                               console.error("Failed to approve:", err);
                             }
                           }}
-                          className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-emerald-700 transition-colors"
+                          className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-emerald-700 transition-colors"
                         >
                           Approve
                         </button>
@@ -1147,7 +1147,7 @@ export default function OrgDashboardPage() {
                               console.error("Failed to decline:", err);
                             }
                           }}
-                          className="px-3 py-1.5 bg-white text-zinc-600 text-[10px] font-bold uppercase tracking-widest rounded-lg border border-zinc-300 hover:bg-zinc-50 transition-colors"
+                          className="px-3 py-1.5 bg-white text-zinc-600 text-xs font-bold uppercase tracking-widest rounded-lg border border-zinc-300 hover:bg-zinc-50 transition-colors"
                         >
                           Decline
                         </button>
@@ -1192,7 +1192,7 @@ export default function OrgDashboardPage() {
               {editName ? (
                 <div className="space-y-4">
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name</label>
+                    <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name</label>
                     <input
                       value={nameValue}
                       onChange={(e) => setNameValue(e.target.value)}
@@ -1200,7 +1200,7 @@ export default function OrgDashboardPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
+                    <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
                     <textarea
                       value={descValue}
                       onChange={(e) => setDescValue(e.target.value)}
@@ -1235,7 +1235,7 @@ export default function OrgDashboardPage() {
                 { label: "Active Plans", value: dashboard.upcomingPlanCount },
               ].map((stat) => (
                 <div key={stat.label} className="border border-zinc-200 rounded-xl p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">{stat.label}</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1">{stat.label}</p>
                   <p className="text-2xl font-light">{stat.value}</p>
                 </div>
               ))}
@@ -1245,12 +1245,12 @@ export default function OrgDashboardPage() {
             {dashboard.recentPhotos && dashboard.recentPhotos.length > 0 && (
               <section>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
                     Recent Photos
                   </h3>
                   <Link
                     href={`/dashboard/${calendarId}/plans`}
-                    className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 hover:text-zinc-900 transition-colors"
+                    className="text-xs uppercase tracking-widest font-bold text-zinc-400 hover:text-zinc-900 transition-colors"
                   >
                     See all
                   </Link>
@@ -1328,7 +1328,7 @@ export default function OrgDashboardPage() {
                   <button
                     key={r}
                     onClick={() => setAnalyticsRange(r)}
-                    className={`px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold rounded-md transition-colors ${
+                    className={`px-3 py-1.5 text-xs uppercase tracking-widest font-bold rounded-md transition-colors ${
                       analyticsRange === r
                         ? "bg-zinc-900 text-white"
                         : "text-zinc-500 hover:text-zinc-900"
@@ -1385,7 +1385,7 @@ export default function OrgDashboardPage() {
                             </p>
                             <button
                               onClick={() => dismissInsight(key)}
-                              className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 hover:text-zinc-700 transition-colors flex-shrink-0"
+                              className="text-xs uppercase tracking-widest font-bold text-zinc-400 hover:text-zinc-700 transition-colors flex-shrink-0"
                             >
                               Dismiss
                             </button>
@@ -1398,7 +1398,7 @@ export default function OrgDashboardPage() {
 
                 {/* Growth headline stats */}
                 <section>
-                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-3">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-3">
                     Growth
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -1438,7 +1438,7 @@ export default function OrgDashboardPage() {
                         key={stat.label}
                         className="border border-zinc-200 rounded-xl p-4"
                       >
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">
+                        <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1">
                           {stat.label}
                         </p>
                         <p className="text-2xl font-light">{stat.value}</p>
@@ -1464,7 +1464,7 @@ export default function OrgDashboardPage() {
 
                 {/* Followers over time */}
                 <section className="border border-zinc-200 rounded-xl p-6">
-                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
                     Followers over time
                   </h3>
                   <div className="h-56 w-full">
@@ -1519,7 +1519,7 @@ export default function OrgDashboardPage() {
 
                 {/* Page views over time */}
                 <section className="border border-zinc-200 rounded-xl p-6">
-                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
                     Page views over time
                   </h3>
                   <div className="h-56 w-full">
@@ -1569,7 +1569,7 @@ export default function OrgDashboardPage() {
                 {/* RSVPs by day of week + time of day */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <section className="border border-zinc-200 rounded-xl p-6">
-                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
                       RSVPs by day of week
                     </h3>
                     <div className="h-48 w-full">
@@ -1603,7 +1603,7 @@ export default function OrgDashboardPage() {
                   </section>
 
                   <section className="border border-zinc-200 rounded-xl p-6">
-                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
                       RSVPs by time of day
                     </h3>
                     <div className="h-48 w-full">
@@ -1650,18 +1650,18 @@ export default function OrgDashboardPage() {
 
                 {/* Engagement summary */}
                 <section className="border border-zinc-200 rounded-xl p-6">
-                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
                     Engagement
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                     <div>
-                      <p className="text-[10px] uppercase tracking-widest text-zinc-400 mb-1">
+                      <p className="text-xs uppercase tracking-widest text-zinc-400 mb-1">
                         Avg RSVPs / plan
                       </p>
                       <p className="text-2xl font-light">{analytics.engagement.rsvpRate}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase tracking-widest text-zinc-400 mb-1">
+                      <p className="text-xs uppercase tracking-widest text-zinc-400 mb-1">
                         Repeat attendees
                       </p>
                       <p className="text-2xl font-light">
@@ -1672,7 +1672,7 @@ export default function OrgDashboardPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase tracking-widest text-zinc-400 mb-1">
+                      <p className="text-xs uppercase tracking-widest text-zinc-400 mb-1">
                         Repeat rate
                       </p>
                       <p className="text-2xl font-light">
@@ -1685,7 +1685,7 @@ export default function OrgDashboardPage() {
                 {/* Top plans */}
                 {analytics.engagement.topPlans.length > 0 && (
                   <section className="border border-zinc-200 rounded-xl p-6">
-                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
                       Top plans
                     </h3>
                     <div className="space-y-2">
@@ -1711,7 +1711,7 @@ export default function OrgDashboardPage() {
                 {/* Top categories */}
                 {analytics.whatsWorking.topCategories.length > 0 && (
                   <section className="border border-zinc-200 rounded-xl p-6">
-                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
                       Top categories
                     </h3>
                     <div className="h-48 w-full">
@@ -1830,17 +1830,17 @@ export default function OrgDashboardPage() {
                             </>
                           )}
                           {cal.isPrimary && (
-                            <span className="text-[10px] font-bold uppercase tracking-widest bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">
+                            <span className="text-xs font-bold uppercase tracking-widest bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">
                               Primary
                             </span>
                           )}
                           {cal.role === "Host" && (
-                            <span className="text-[10px] font-bold uppercase tracking-widest bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
+                            <span className="text-xs font-bold uppercase tracking-widest bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
                               Co-host
                             </span>
                           )}
                           {inactive && (
-                            <span className="text-[10px] font-bold uppercase tracking-widest bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full">
+                            <span className="text-xs font-bold uppercase tracking-widest bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full">
                               Inactive
                             </span>
                           )}
@@ -1876,7 +1876,7 @@ export default function OrgDashboardPage() {
                     </div>
                     {!inactive && (activePlans.length > 0 || suggestedPlans.length > 0) && (
                       <div className="border-t border-zinc-100 pt-3">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-3">Active Plans</p>
+                        <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-3">Active Plans</p>
                         <div className="flex gap-3 overflow-x-auto no-scrollbar">
                           {activePlans.map((plan) => {
                             if (plan.isPoll) {
@@ -1985,7 +1985,7 @@ export default function OrgDashboardPage() {
                                   </div>
                                   {!isLocked && (
                                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center">
-                                      <span className="bg-white text-zinc-900 px-4 py-2 text-[10px] tracking-[0.2em] uppercase font-bold shadow-xl">
+                                      <span className="bg-white text-zinc-900 px-4 py-2 text-xs tracking-wider uppercase font-bold shadow-xl">
                                         Add to Calendar
                                       </span>
                                     </div>
@@ -2002,7 +2002,7 @@ export default function OrgDashboardPage() {
                                   <p className="text-xs text-zinc-400 mb-1">
                                     {new Date(suggestion.recommendedDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                                   </p>
-                                  <p className="text-[10px] text-emerald-600 leading-snug line-clamp-2" title={suggestion.subtitle}>{suggestion.subtitle}</p>
+                                  <p className="text-xs text-emerald-600 leading-snug line-clamp-2" title={suggestion.subtitle}>{suggestion.subtitle}</p>
                                 </div>
                               </div>
                             );
@@ -2012,7 +2012,7 @@ export default function OrgDashboardPage() {
                     )}
                     {embedCalId === cal.objectId && (
                       <div className="border-t border-zinc-100 pt-3 mt-3">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-2">Embed on Your Website</p>
+                        <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-2">Embed on Your Website</p>
                         <p className="text-xs text-zinc-500 mb-3">Copy this code and paste it into your website&apos;s HTML to show upcoming events.</p>
                         <div className="relative">
                           <pre className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 pr-20 text-xs text-zinc-600 overflow-x-auto whitespace-pre-wrap break-all">{`<iframe src="${typeof window !== "undefined" ? window.location.origin : ""}/embed/${cal.shareId}" width="100%" height="400" frameborder="0" style="border:none;border-radius:12px;"></iframe>`}</pre>
@@ -2023,7 +2023,7 @@ export default function OrgDashboardPage() {
                               setToast("Embed code copied!");
                               setTimeout(() => setToast(null), 2000);
                             }}
-                            className="absolute top-2 right-2 text-[10px] bg-zinc-900 text-white px-3 py-1.5 rounded-lg hover:bg-zinc-800 transition-colors font-bold uppercase tracking-widest"
+                            className="absolute top-2 right-2 text-xs bg-zinc-900 text-white px-3 py-1.5 rounded-lg hover:bg-zinc-800 transition-colors font-bold uppercase tracking-widest"
                           >
                             Copy
                           </button>
@@ -2154,7 +2154,7 @@ export default function OrgDashboardPage() {
             <div className="relative">
               {!isGrowthPlus && (
                 <div className="absolute top-4 right-4 z-10" onClick={() => setShowSubscription(true)}>
-                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest cursor-pointer hover:bg-zinc-800 transition-colors">
+                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest cursor-pointer hover:bg-zinc-800 transition-colors">
                     <Lock className="w-3 h-3" /> Upgrade
                   </div>
                 </div>
@@ -2194,7 +2194,7 @@ export default function OrgDashboardPage() {
             <div className="relative">
               {!isGrowthPlus && (
                 <div className="absolute top-4 right-4 z-10" onClick={() => setShowSubscription(true)}>
-                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest cursor-pointer hover:bg-zinc-800 transition-colors">
+                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest cursor-pointer hover:bg-zinc-800 transition-colors">
                     <Lock className="w-3 h-3" /> Upgrade
                   </div>
                 </div>
@@ -2233,7 +2233,7 @@ export default function OrgDashboardPage() {
             <div className="relative">
               {!isGrowthPlus && (
                 <div className="absolute top-4 right-4 z-10" onClick={() => setShowSubscription(true)}>
-                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest cursor-pointer hover:bg-zinc-800 transition-colors">
+                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest cursor-pointer hover:bg-zinc-800 transition-colors">
                     <Lock className="w-3 h-3" /> Upgrade
                   </div>
                 </div>
@@ -2487,7 +2487,7 @@ export default function OrgDashboardPage() {
               )}
               <div className="flex gap-3 items-end">
                 <div className="flex-1 min-w-0">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Email</label>
+                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Email</label>
                   <input
                     type="email"
                     value={inviteEmail}
@@ -2497,7 +2497,7 @@ export default function OrgDashboardPage() {
                   />
                 </div>
                 <div className="w-56 relative">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Calendars</label>
+                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Calendars</label>
                   <button
                     type="button"
                     onClick={() => setInviteScopeOpen((o) => !o)}
@@ -2559,7 +2559,7 @@ export default function OrgDashboardPage() {
                   )}
                 </div>
                 <div className="w-40">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name (optional)</label>
+                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name (optional)</label>
                   <input
                     type="text"
                     value={inviteName}
@@ -2576,7 +2576,7 @@ export default function OrgDashboardPage() {
                   {inviting ? "Sending..." : "Send Invite"}
                 </button>
               </div>
-              <p className="text-[10px] text-zinc-400 mt-2">
+              <p className="text-xs text-zinc-400 mt-2">
                 {inviteScopeAll
                   ? "Co-host will have access to every current and future calendar in this organization."
                   : `Co-host will have access only to ${inviteScopeIds.length === 0 ? "the calendars you select" : `${inviteScopeIds.length} selected calendar${inviteScopeIds.length === 1 ? "" : "s"}`}.`}
@@ -2668,7 +2668,7 @@ export default function OrgDashboardPage() {
                                       setEditScopeAll(all);
                                       setEditScopeIds(all ? [] : ids);
                                     }}
-                                    className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+                                    className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
                                     title="Edit scope"
                                   >
                                     Edit
@@ -2790,7 +2790,7 @@ export default function OrgDashboardPage() {
                                   alert(err instanceof Error ? err.message : "Failed to approve.");
                                 }
                               }}
-                              className="bg-zinc-900 text-white px-3 py-1.5 text-[10px] uppercase tracking-[0.15em] font-bold rounded-lg hover:bg-zinc-800 transition-colors"
+                              className="bg-zinc-900 text-white px-3 py-1.5 text-xs uppercase tracking-wider font-bold rounded-lg hover:bg-zinc-800 transition-colors"
                             >
                               Approve
                             </button>
@@ -2813,7 +2813,7 @@ export default function OrgDashboardPage() {
                                   console.error("Failed to reject follower:", err);
                                 }
                               }}
-                              className="text-zinc-300 hover:text-red-500 transition-colors text-[10px] uppercase tracking-[0.15em] font-bold px-3 py-1.5 border border-zinc-200 rounded-lg hover:border-red-200"
+                              className="text-zinc-300 hover:text-red-500 transition-colors text-xs uppercase tracking-wider font-bold px-3 py-1.5 border border-zinc-200 rounded-lg hover:border-red-200"
                             >
                               Reject
                             </button>
@@ -2870,7 +2870,7 @@ export default function OrgDashboardPage() {
                           <a
                             href={`/org/${cal.shareId}`}
                             target="_blank"
-                            className="bg-zinc-900 text-white px-4 py-2 text-[10px] uppercase tracking-[0.2em] font-bold rounded-lg hover:bg-zinc-800 transition-colors flex items-center gap-1.5"
+                            className="bg-zinc-900 text-white px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-lg hover:bg-zinc-800 transition-colors flex items-center gap-1.5"
                           >
                             View <ExternalLink className="w-3 h-3" />
                           </a>
@@ -2880,7 +2880,7 @@ export default function OrgDashboardPage() {
                               setToast("Link copied!");
                               setTimeout(() => setToast(null), 2000);
                             }}
-                            className="border border-zinc-200 px-4 py-2 text-[10px] uppercase tracking-[0.2em] font-bold rounded-lg hover:bg-white transition-colors flex items-center gap-1.5"
+                            className="border border-zinc-200 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-lg hover:bg-white transition-colors flex items-center gap-1.5"
                           >
                             <Link2 className="w-3 h-3" /> Copy
                           </button>
@@ -2962,7 +2962,7 @@ export default function OrgDashboardPage() {
             <h2 className="text-xl font-light tracking-tight mb-6">Add Calendar</h2>
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name</label>
                 <input
                   value={newCalName}
                   onChange={(e) => setNewCalName(e.target.value)}
@@ -2971,7 +2971,7 @@ export default function OrgDashboardPage() {
                 />
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
                 <textarea
                   value={newCalDesc}
                   onChange={(e) => setNewCalDesc(e.target.value)}
@@ -2981,7 +2981,7 @@ export default function OrgDashboardPage() {
                 />
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">City</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">City</label>
                 <CityAutocomplete
                   value={newCalCity}
                   onChange={(v) => { setNewCalCity(v); setNewCalCitySelected(false); }}
@@ -3083,11 +3083,11 @@ export default function OrgDashboardPage() {
                 </div>
                 <div className="flex-1">
                   <p className="text-xs text-zinc-500">Calendar image</p>
-                  <p className="text-[10px] text-zinc-400">Overrides org logo on public page</p>
+                  <p className="text-xs text-zinc-400">Overrides org logo on public page</p>
                   {editCalImagePreview && (
                     <button
                       onClick={() => { setEditCalImagePreview(null); setEditCalImageBase64(null); setEditCalRemoveImage(true); }}
-                      className="text-[10px] text-red-500 hover:text-red-700 mt-1"
+                      className="text-xs text-red-500 hover:text-red-700 mt-1"
                     >
                       Remove image
                     </button>
@@ -3096,7 +3096,7 @@ export default function OrgDashboardPage() {
               </div>
 
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name</label>
                 <input
                   value={editCalName}
                   onChange={(e) => setEditCalName(e.target.value)}
@@ -3104,7 +3104,7 @@ export default function OrgDashboardPage() {
                 />
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
                 <textarea
                   value={editCalDesc}
                   onChange={(e) => setEditCalDesc(e.target.value)}
@@ -3114,7 +3114,7 @@ export default function OrgDashboardPage() {
                 />
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">URL Slug</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">URL Slug</label>
                 <div className="flex items-center gap-0">
                   <span className="text-sm text-zinc-400 font-light whitespace-nowrap">os.joinleaf.com/org/</span>
                   <input
@@ -3132,7 +3132,7 @@ export default function OrgDashboardPage() {
               </div>
               {dashboard?.tier === "pro" && (
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">City</label>
+                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">City</label>
                   <CityAutocomplete
                     value={editCalCity}
                     onChange={(v) => { setEditCalCity(v); setEditCalCitySelected(false); }}
@@ -3146,7 +3146,7 @@ export default function OrgDashboardPage() {
               <div className="flex items-center justify-between py-2">
                 <div>
                   <p className="text-xs font-medium text-zinc-700">Hide venue until RSVP</p>
-                  <p className="text-[10px] text-zinc-400">Show only neighborhood on public page</p>
+                  <p className="text-xs text-zinc-400">Show only neighborhood on public page</p>
                 </div>
                 <button
                   type="button"
@@ -3160,7 +3160,7 @@ export default function OrgDashboardPage() {
               <div className="flex items-center justify-between py-2">
                 <div>
                   <p className="text-xs font-medium text-zinc-700">Private calendar</p>
-                  <p className="text-[10px] text-zinc-400">Visitors must request to follow before seeing plans</p>
+                  <p className="text-xs text-zinc-400">Visitors must request to follow before seeing plans</p>
                 </div>
                 <button
                   type="button"
@@ -3174,7 +3174,7 @@ export default function OrgDashboardPage() {
               <div className="flex items-center justify-between py-2">
                 <div>
                   <p className="text-xs font-medium text-zinc-700">Show plan ideas</p>
-                  <p className="text-[10px] text-zinc-400">Let members browse and host AI-generated plan ideas</p>
+                  <p className="text-xs text-zinc-400">Let members browse and host AI-generated plan ideas</p>
                 </div>
                 <button
                   type="button"
@@ -3188,7 +3188,7 @@ export default function OrgDashboardPage() {
                 <button
                   type="button"
                   onClick={() => { setEditingCalId(null); setActiveTab("settings"); }}
-                  className="text-[10px] text-zinc-400 hover:text-zinc-600 transition-colors underline -mt-2.5"
+                  className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors underline -mt-2.5"
                 >
                   Automated plan idea settings
                 </button>
@@ -3197,7 +3197,7 @@ export default function OrgDashboardPage() {
               <div className="flex items-center justify-between py-2">
                 <div>
                   <p className="text-xs font-medium text-zinc-700">Hide custom plan proposals</p>
-                  <p className="text-[10px] text-zinc-400">Prevent members from proposing their own plan ideas</p>
+                  <p className="text-xs text-zinc-400">Prevent members from proposing their own plan ideas</p>
                 </div>
                 <button
                   type="button"
@@ -3258,7 +3258,7 @@ export default function OrgDashboardPage() {
               {editScopeFor.name}
             </p>
             <div className="mb-6">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">Calendars</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-2">Calendars</label>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -3296,7 +3296,7 @@ export default function OrgDashboardPage() {
                   );
                 })}
               </div>
-              <p className="text-[10px] text-zinc-400 mt-2">
+              <p className="text-xs text-zinc-400 mt-2">
                 {editScopeAll
                   ? "Co-host will have access to every current and future calendar in this organization."
                   : `Co-host will have access only to ${editScopeIds.length === 0 ? "the calendars you select" : `${editScopeIds.length} selected calendar${editScopeIds.length === 1 ? "" : "s"}`}.`}

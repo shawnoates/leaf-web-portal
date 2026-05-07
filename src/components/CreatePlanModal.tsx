@@ -352,7 +352,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           {/* Calendar selector (only when multiple calendars, hidden in edit mode) */}
           {!editMode && calendars && calendars.length > 1 && (
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Calendar</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Calendar</label>
               <select
                 value={selectedCalendarId}
                 onChange={(e) => setSelectedCalendarId(e.target.value)}
@@ -367,7 +367,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
 
           {/* Plan type toggle (hidden in edit mode) */}
           {!editMode && <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-3">Plan Type</label>
+            <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-3">Plan Type</label>
             <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => setMode("plan")}
@@ -379,7 +379,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   <Calendar className="w-3.5 h-3.5" />
                   <span className="text-xs font-medium">Plan</span>
                 </div>
-                <p className="text-[10px] text-zinc-500 leading-tight">You host, members RSVP</p>
+                <p className="text-xs text-zinc-500 leading-tight">You host, members RSVP</p>
               </button>
               <button
                 onClick={() => setMode("idea")}
@@ -391,7 +391,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   <Sparkles className="w-3.5 h-3.5" />
                   <span className="text-xs font-medium">Idea</span>
                 </div>
-                <p className="text-[10px] text-zinc-500 leading-tight">Members can host</p>
+                <p className="text-xs text-zinc-500 leading-tight">Members can host</p>
               </button>
               <button
                 onClick={() => {
@@ -411,7 +411,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   )}
                   <span className="text-xs font-medium">Date Poll</span>
                 </div>
-                <p className="text-[10px] text-zinc-500 leading-tight">
+                <p className="text-xs text-zinc-500 leading-tight">
                   {pollAllowed ? (
                     "Followers vote on a date"
                   ) : (
@@ -428,7 +428,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           </div>}
 
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Title</label>
+            <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Title</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -438,7 +438,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           </div>
 
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
+            <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -449,7 +449,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           </div>
 
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-2">
               Cover Image {(isHosted || isPoll) && <span className="text-red-400">*</span>}
             </label>
             {imagePreview || selectedImageUrl ? (
@@ -481,7 +481,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             {/* Photo suggestions from Unsplash */}
             {(unsplashLoading || unsplashPhotos.length > 0) && (
               <div className="mt-3 space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Photo suggestions</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">Photo suggestions</p>
                 <div className="flex gap-2 overflow-x-auto pb-1">
                   {unsplashLoading && [0, 1, 2, 3].map((i) => (
                     <div key={`skel-${i}`} className="min-w-[120px] h-[80px] bg-zinc-100 rounded-lg animate-pulse shrink-0" />
@@ -514,7 +514,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   const selected = unsplashPhotos.find(p => p.url === selectedImageUrl);
                   if (!selected) return null;
                   return (
-                    <p className="text-[10px] text-zinc-400">
+                    <p className="text-xs text-zinc-400">
                       Photo by{" "}
                       <a href={`${selected.photographerUrl}?utm_source=leaf&utm_medium=referral`} target="_blank" rel="noopener noreferrer" className="underline hover:text-zinc-600">
                         {selected.photographerName}
@@ -531,7 +531,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           </div>
 
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Venue</label>
+            <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Venue</label>
             <VenueSearch
               value={venueQuery}
               onChange={setVenueQuery}
@@ -548,7 +548,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           {!isPoll && (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Date</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Date</label>
                 <input
                   type="date"
                   value={date}
@@ -558,11 +558,11 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
                 />
                 {tier === "starter" && (
-                  <p className="text-[10px] text-amber-600 mt-1">Starter: 2 weeks ahead max</p>
+                  <p className="text-xs text-amber-600 mt-1">Starter: 2 weeks ahead max</p>
                 )}
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Time</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Time</label>
                 <input
                   type="time"
                   value={time}
@@ -577,14 +577,14 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             <>
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-400">
                     Date Options ({MIN_POLL_OPTIONS}–{MAX_POLL_OPTIONS})
                   </label>
                   {pollOptions.length < MAX_POLL_OPTIONS && (
                     <button
                       type="button"
                       onClick={() => setPollOptions((prev) => [...prev, emptyPollOption()])}
-                      className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-zinc-700 hover:text-zinc-900"
+                      className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-zinc-700 hover:text-zinc-900"
                     >
                       <Plus className="w-3 h-3" /> Add
                     </button>
@@ -625,11 +625,11 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                     </div>
                   ))}
                 </div>
-                <p className="text-[10px] text-zinc-400 mt-2">Time is optional. Followers verify their phone via OTP, one vote per phone.</p>
+                <p className="text-xs text-zinc-400 mt-2">Time is optional. Followers verify their phone via OTP, one vote per phone.</p>
               </div>
 
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Voting closes (optional)</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Voting closes (optional)</label>
                 <input
                   type="date"
                   value={pollClosesAt}
@@ -637,14 +637,14 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   onChange={(e) => setPollClosesAt(e.target.value)}
                   className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
                 />
-                <p className="text-[10px] text-zinc-400 mt-1">Defaults to 7 days from now.</p>
+                <p className="text-xs text-zinc-400 mt-1">Defaults to 7 days from now.</p>
               </div>
             </>
           )}
 
           {!isPoll && (
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Capacity (optional)</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Capacity (optional)</label>
               <input
                 type="number"
                 value={capacity}
@@ -658,7 +658,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
 
           {isHosted && (
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Host Note (optional)</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Host Note (optional)</label>
               <textarea
                 value={hostNote}
                 onChange={(e) => setHostNote(e.target.value)}
@@ -675,7 +675,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             <div className="flex items-center justify-between py-1">
               <div>
                 <p className="text-xs font-medium text-zinc-700">Hide venue until RSVP</p>
-                <p className="text-[10px] text-zinc-400">Only show neighborhood on public page</p>
+                <p className="text-xs text-zinc-400">Only show neighborhood on public page</p>
               </div>
               <button
                 type="button"
@@ -692,7 +692,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             <div className="flex items-center justify-between py-1">
               <div>
                 <p className="text-xs font-medium text-zinc-700">Require approval to attend</p>
-                <p className="text-[10px] text-zinc-400">Visitors must be approved before confirming</p>
+                <p className="text-xs text-zinc-400">Visitors must be approved before confirming</p>
               </div>
               <button
                 type="button"

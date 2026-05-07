@@ -256,7 +256,7 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
           </p>
           <a
             href={APP_STORE_URL}
-            className="inline-block bg-zinc-900 text-white px-6 py-3 text-xs uppercase tracking-[0.2em] font-bold rounded-lg"
+            className="inline-block bg-zinc-900 text-white px-6 py-3 text-xs uppercase tracking-wider font-bold rounded-lg"
           >
             Open in Leaf App
           </a>
@@ -273,7 +273,7 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
           <p className="text-sm text-zinc-500">{errorMsg || "Please try again."}</p>
           <button
             onClick={() => window.location.reload()}
-            className="inline-block bg-zinc-900 text-white px-6 py-3 text-xs uppercase tracking-[0.2em] font-bold rounded-lg"
+            className="inline-block bg-zinc-900 text-white px-6 py-3 text-xs uppercase tracking-wider font-bold rounded-lg"
           >
             Reload
           </button>
@@ -366,7 +366,7 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
           </button>
 
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] font-bold text-zinc-400 mb-2">
+            <p className="text-xs uppercase tracking-wider font-bold text-zinc-400 mb-2">
               Plan
             </p>
             <h1 className="text-2xl font-light tracking-tight text-zinc-900 leading-tight">
@@ -403,7 +403,7 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
 
           {planDescription && (
             <div className="pt-4 border-t border-zinc-100">
-              <p className="text-xs uppercase tracking-[0.2em] font-bold text-zinc-400 mb-2">
+              <p className="text-xs uppercase tracking-wider font-bold text-zinc-400 mb-2">
                 About
               </p>
               <p className="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap">
@@ -419,14 +419,14 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
               {device === "desktop" ? (
                 <button
                   onClick={() => setShowQrModal(true)}
-                  className="block w-full border border-zinc-200 py-2.5 text-xs uppercase tracking-[0.2em] font-bold text-center rounded-lg hover:bg-zinc-50 transition-colors text-zinc-900"
+                  className="block w-full border border-zinc-200 py-2.5 text-xs uppercase tracking-wider font-bold text-center rounded-lg hover:bg-zinc-50 transition-colors text-zinc-900"
                 >
                   Open in Leaf app
                 </button>
               ) : (
                 <button
                   onClick={handleOpenInApp}
-                  className="block w-full border border-zinc-200 py-2.5 text-xs uppercase tracking-[0.2em] font-bold text-center rounded-lg hover:bg-zinc-50 transition-colors text-zinc-900"
+                  className="block w-full border border-zinc-200 py-2.5 text-xs uppercase tracking-wider font-bold text-center rounded-lg hover:bg-zinc-50 transition-colors text-zinc-900"
                 >
                   Open in Leaf app
                 </button>

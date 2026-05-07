@@ -189,7 +189,7 @@ export default function OrganizationsPage() {
           <div className="max-w-6xl mx-auto flex justify-between items-center">
             <Link href="/" className="flex items-center gap-3">
               <img src="/leaf-logo-white.svg" alt="Leaf" className="h-8" />
-              <span className="text-xl font-light tracking-[0.2em] uppercase text-white">OS</span>
+              <span className="text-xl font-light tracking-wider uppercase text-white">OS</span>
             </Link>
             <div className="flex gap-6 items-center">
               <a
@@ -503,7 +503,7 @@ export default function OrganizationsPage() {
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <img src="/leaf-logo-black.png" alt="Leaf" className="h-7" />
-              <span className="text-lg font-light tracking-[0.2em] uppercase">OS</span>
+              <span className="text-lg font-light tracking-wider uppercase">OS</span>
             </div>
             <p className="text-zinc-400 text-sm font-light max-w-xs leading-relaxed">
               AI-powered community calendars that help organizations plan
@@ -512,7 +512,7 @@ export default function OrganizationsPage() {
           </div>
           <div className="grid grid-cols-2 gap-16">
             <div className="space-y-4">
-              <h5 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-900">
+              <h5 className="text-xs tracking-wider uppercase font-bold text-zinc-900">
                 Platform
               </h5>
               <div className="flex flex-col gap-2 text-sm text-zinc-500 mt-4">
@@ -528,7 +528,7 @@ export default function OrganizationsPage() {
               </div>
             </div>
             <div className="space-y-4">
-              <h5 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-900">
+              <h5 className="text-xs tracking-wider uppercase font-bold text-zinc-900">
                 Legal
               </h5>
               <div className="flex flex-col gap-2 text-sm text-zinc-500 mt-4">

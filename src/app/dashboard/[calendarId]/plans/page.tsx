@@ -451,7 +451,7 @@ export default function PlansPage() {
             <div className="flex gap-1 border border-zinc-200 rounded-lg p-0.5">
               <button
                 onClick={() => setPlanTense("upcoming")}
-                className={`px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold rounded-md transition-colors ${
+                className={`px-3 py-1.5 text-xs uppercase tracking-widest font-bold rounded-md transition-colors ${
                   planTense === "upcoming" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"
                 }`}
               >
@@ -462,7 +462,7 @@ export default function PlansPage() {
                   setPlanTense("past");
                   fetchPastPlans();
                 }}
-                className={`px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold rounded-md transition-colors ${
+                className={`px-3 py-1.5 text-xs uppercase tracking-widest font-bold rounded-md transition-colors ${
                   planTense === "past" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"
                 }`}
               >

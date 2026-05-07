@@ -45,6 +45,7 @@ export interface LandingConfig {
   profilePhoto: string;
   brandColor: string;
   followerCount: number;
+  pastPlanCount?: number;
   navLabel?: string;
   plansHeader?: string;
   ideasHeader?: string;
@@ -87,7 +88,7 @@ function AvatarStack({ count }: { count: number }) {
           <Users className="w-3.5 h-3.5 text-zinc-500" />
         </div>
       </div>
-      <span className="text-[10px] tracking-widest uppercase font-bold text-zinc-400">
+      <span className="text-xs tracking-widest uppercase font-bold text-zinc-400">
         {count} Attending
       </span>
     </div>
@@ -130,14 +131,14 @@ function CTAModal({
           <div className="space-y-3 pt-2">
             <a
               href={SETUP_URL}
-              className="block w-full text-white py-3.5 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 rounded-lg text-center"
+              className="block w-full text-white py-3.5 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 rounded-lg text-center"
               style={{ backgroundColor: config.brandColor }}
             >
               {config.ctaButtonLabel}
             </a>
             <a
               href="https://www.os.joinleaf.com"
-              className="block w-full border border-zinc-200 py-3 text-xs uppercase tracking-[0.2em] font-bold text-center hover:bg-zinc-50 transition-colors rounded-lg"
+              className="block w-full border border-zinc-200 py-3 text-xs uppercase tracking-wider font-bold text-center hover:bg-zinc-50 transition-colors rounded-lg"
             >
               Learn More
             </a>
@@ -204,21 +205,27 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
               alt={config.profileName}
               className="w-9 h-9 rounded-lg object-cover shrink-0"
             />
-            <h1 className="text-sm md:text-2xl font-light tracking-[0.1em] md:tracking-[0.2em] uppercase line-clamp-2 md:truncate">
+            <h1 className="text-sm md:text-2xl font-light tracking-[0.1em] md:tracking-wider uppercase line-clamp-2 md:truncate">
               {config.profileName}
             </h1>
             <div className="h-4 w-px bg-zinc-200 hidden md:block" />
-            <span className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold hidden md:block">
+            <span className="text-xs tracking-wider uppercase text-zinc-400 font-bold hidden md:block">
               {navLabel}
             </span>
           </div>
           <div className="flex items-center gap-4 shrink-0">
-            <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400 hidden sm:inline">
+            <span className="text-xs tracking-wider uppercase font-bold text-zinc-400 hidden sm:inline">
               {config.followerCount} followers
+              {config.pastPlanCount !== undefined && config.pastPlanCount > 0 && (
+                <>
+                  <span className="mx-1.5 text-zinc-300">·</span>
+                  {config.pastPlanCount} past plan{config.pastPlanCount === 1 ? "" : "s"}
+                </>
+              )}
             </span>
             <button
               onClick={() => setShowCTA(true)}
-              className="flex items-center gap-1.5 text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
+              className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
             >
               <Heart className="w-3.5 h-3.5" />
               Follow
@@ -229,7 +236,7 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
 
       {/* Stream Header */}
       <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100">
-        <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold">
+        <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
           {plansHeader}
         </p>
       </div>
@@ -259,14 +266,14 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
 
                 <div className="w-full md:w-2/5 space-y-6">
                   <div className="space-y-2">
-                    <p className="text-[11px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                    <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
                       {formatDate(date)} &bull; {plan.time}
                     </p>
                     <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
                       {plan.title}
                     </h3>
                     <div className="pt-2">
-                      <p className="text-[10px] tracking-[0.2em] uppercase text-zinc-900 font-bold flex items-center gap-2">
+                      <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
                         <span
                           className="w-2 h-2 rounded-full"
                           style={{ backgroundColor: config.brandColor }}
@@ -315,7 +322,7 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
         <section className="mt-48 mb-24 space-y-12">
           <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
             <div className="space-y-2">
-              <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold flex items-center gap-2">
+              <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold flex items-center gap-2">
                 <Sparkles className="w-3.5 h-3.5" /> {ideasHeader}
               </p>
               <h2 className="text-4xl font-light tracking-tight italic">
@@ -355,7 +362,7 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
                     alt={idea.title}
                   />
                   <div className="absolute inset-0 transition-all duration-300 flex items-center justify-center bg-black/0 group-hover:bg-black/20 opacity-0 group-hover:opacity-100">
-                    <span className="bg-white px-6 py-3 text-[10px] tracking-[0.3em] uppercase font-bold shadow-xl">
+                    <span className="bg-white px-6 py-3 text-xs tracking-wider uppercase font-bold shadow-xl">
                       {ideasButtonLabel}
                     </span>
                   </div>
@@ -382,7 +389,7 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
                     <Plus className="w-7 h-7" />
                   </div>
                   <div className="space-y-2">
-                    <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-emerald-700">
+                    <p className="text-xs tracking-wider uppercase font-bold text-emerald-700">
                       Your Idea
                     </p>
                     <h4 className="text-lg font-medium tracking-tight text-zinc-900">

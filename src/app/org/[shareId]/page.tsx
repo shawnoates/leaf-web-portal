@@ -94,6 +94,7 @@ interface OrgData {
   orgType: string | null;
   orgCity: string | null;
   memberCount: number;
+  pastPlanCount: number;
   rsvpLimitReached: boolean;
   isOwner: boolean;
   isHost: boolean;
@@ -231,7 +232,7 @@ function AvatarStack({ count }: { count: number }) {
           <Users className="w-3.5 h-3.5 text-zinc-500" />
         </div>
       </div>
-      <span className="text-[10px] tracking-widest uppercase font-bold text-zinc-400">
+      <span className="text-xs tracking-widest uppercase font-bold text-zinc-400">
         {count} Attending
       </span>
     </div>
@@ -388,13 +389,13 @@ function RsvpModal({
                     className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-none"
                     placeholder="Tell the host a bit about yourself..."
                   />
-                  <p className="text-[10px] text-zinc-400 text-right mt-0.5">{rsvpNote.length}/200</p>
+                  <p className="text-xs text-zinc-400 text-right mt-0.5">{rsvpNote.length}/200</p>
                 </div>
               )}
               <button
                 type="submit"
                 disabled={formStep === "submitting" || !verify.isVerified || !verify.name}
-                className="w-full text-white py-3.5 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full text-white py-3.5 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-50"
                 style={{ backgroundColor: brandColor || "#18181b" }}
               >
                 {formStep === "submitting" ? (
@@ -445,7 +446,7 @@ function RsvpModal({
             {!isPendingResult && !notificationId && (
               <Link
                 href={`/chat/${plan.id}`}
-                className="flex items-center justify-center gap-2 w-full text-white py-3 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 rounded-lg"
+                className="flex items-center justify-center gap-2 w-full text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 rounded-lg"
                 style={{ backgroundColor: brandColor || "#18181b" }}
               >
                 <MessageCircle className="w-4 h-4" /> Join Plan Chat
@@ -467,7 +468,7 @@ function RsvpModal({
               return (
                 <a
                   href={icsUrl}
-                  className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-xs uppercase tracking-[0.2em] font-bold hover:bg-zinc-50 transition-colors rounded-lg"
+                  className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-xs uppercase tracking-wider font-bold hover:bg-zinc-50 transition-colors rounded-lg"
                 >
                   <Calendar className="w-4 h-4" />
                   Add to Calendar
@@ -622,7 +623,7 @@ function PhoneVerifyFields({ verify, onSendOTP }: { verify: ReturnType<typeof us
   return (
     <>
       <div className="space-y-2">
-        <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+        <label className="text-xs tracking-wider uppercase font-bold">
           Your Name
         </label>
         <input
@@ -636,7 +637,7 @@ function PhoneVerifyFields({ verify, onSendOTP }: { verify: ReturnType<typeof us
         />
       </div>
       <div className="space-y-2">
-        <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+        <label className="text-xs tracking-wider uppercase font-bold">
           Phone Number
         </label>
         {verify.step === "phone" && (
@@ -656,7 +657,7 @@ function PhoneVerifyFields({ verify, onSendOTP }: { verify: ReturnType<typeof us
               type="button"
               onClick={onSendOTP || verify.sendOTP}
               disabled={verify.sending || verify.phone.replace(/\D/g, "").length < 10 || !verify.name}
-              className="px-4 py-2.5 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 whitespace-nowrap"
+              className="px-4 py-2.5 bg-zinc-900 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 whitespace-nowrap"
             >
               {verify.sending ? "Sending..." : "Verify"}
             </button>
@@ -679,7 +680,7 @@ function PhoneVerifyFields({ verify, onSendOTP }: { verify: ReturnType<typeof us
                 type="button"
                 onClick={verify.verifyOTP}
                 disabled={verify.sending || verify.code.length < 6}
-                className="px-4 py-2.5 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 whitespace-nowrap"
+                className="px-4 py-2.5 bg-zinc-900 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 whitespace-nowrap"
               >
                 {verify.sending ? "Checking..." : "Confirm"}
               </button>
@@ -762,7 +763,7 @@ function CancelRsvpModal({
           <button
             onClick={handleCancel}
             disabled={!verify.isVerified || cancelling}
-            className="w-full border border-red-200 text-red-600 py-3.5 text-xs uppercase tracking-[0.2em] font-bold hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full border border-red-200 text-red-600 py-3.5 text-xs uppercase tracking-wider font-bold hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm Cancellation"}
           </button>
@@ -1304,6 +1305,7 @@ export default function OrgCalendarPage() {
         orgType: result.orgType || null,
         orgCity: result.orgCity || null,
         memberCount: result.memberCount || 0,
+        pastPlanCount: result.pastPlanCount || 0,
         rsvpLimitReached: result.rsvpLimitReached || false,
         isOwner: result.isOwner || false,
         isHost: result.isHost || false,
@@ -1725,10 +1727,10 @@ export default function OrgCalendarPage() {
       <div className="min-h-screen">
         <nav className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-zinc-100 px-6 py-8">
           <div className="max-w-6xl mx-auto flex justify-between items-center">
-            <h1 className="text-2xl font-light tracking-[0.2em] uppercase">
+            <h1 className="text-2xl font-light tracking-wider uppercase">
               {isInactive.name}
             </h1>
-            <span className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold">
+            <span className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
               Calendar
             </span>
           </div>
@@ -1770,15 +1772,21 @@ export default function OrgCalendarPage() {
               />
             )}
             <div className="min-w-0">
-              <h1 className="text-sm md:text-2xl font-light tracking-[0.1em] md:tracking-[0.2em] uppercase line-clamp-2 md:truncate">
+              <h1 className="text-sm md:text-2xl font-light tracking-[0.1em] md:tracking-wider uppercase line-clamp-2 md:truncate">
                 {org.name}
               </h1>
-              <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+              <span className="text-xs tracking-wider uppercase font-bold text-zinc-400">
                 {followerCount} followers
+                {org.pastPlanCount > 0 && (
+                  <>
+                    <span className="mx-1.5 text-zinc-300">·</span>
+                    {org.pastPlanCount} past plan{org.pastPlanCount === 1 ? "" : "s"}
+                  </>
+                )}
               </span>
             </div>
             <div className="h-4 w-px bg-zinc-200 hidden md:block" />
-            <span className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold hidden md:block">
+            <span className="text-xs tracking-wider uppercase text-zinc-400 font-bold hidden md:block">
               Calendar
             </span>
           </div>
@@ -1787,7 +1795,7 @@ export default function OrgCalendarPage() {
               isFollowing ? (
                 <button
                   onClick={handleUnfollow}
-                  className="flex items-center gap-1.5 text-[10px] tracking-[0.3em] uppercase font-bold text-emerald-600 border border-emerald-200 bg-emerald-50 hover:bg-red-50 hover:border-red-200 hover:text-red-600 px-3 py-1.5 rounded-full transition-colors group"
+                  className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-emerald-600 border border-emerald-200 bg-emerald-50 hover:bg-red-50 hover:border-red-200 hover:text-red-600 px-3 py-1.5 rounded-full transition-colors group"
                 >
                   <Check className="w-3.5 h-3.5 group-hover:hidden" />
                   <X className="w-3.5 h-3.5 hidden group-hover:block" />
@@ -1795,14 +1803,14 @@ export default function OrgCalendarPage() {
                   <span className="hidden group-hover:inline">Unfollow</span>
                 </button>
               ) : followRequestPending ? (
-                <span className="flex items-center gap-1.5 text-[10px] tracking-[0.3em] uppercase font-bold text-amber-600 border border-amber-200 bg-amber-50 px-3 py-1.5 rounded-full">
+                <span className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-amber-600 border border-amber-200 bg-amber-50 px-3 py-1.5 rounded-full">
                   <Clock className="w-3.5 h-3.5" />
                   Pending
                 </span>
               ) : (
                 <button
                   onClick={() => setShowFollowModal(true)}
-                  className="flex items-center gap-1.5 text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
+                  className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
                 >
                   <Heart className="w-3.5 h-3.5" />
                   {org.isPrivate ? "Request to Follow" : "Follow"}
@@ -1812,7 +1820,7 @@ export default function OrgCalendarPage() {
             {(org.isOwner || org.isHost) && (
               <Link
                 href={`/dashboard/${org.parentOrgId || org.objectId}`}
-                className="flex items-center gap-1.5 text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
+                className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
               >
                 <Settings className="w-3.5 h-3.5" />
                 Manage
@@ -1822,14 +1830,14 @@ export default function OrgCalendarPage() {
               parseUser ? (
                 <Link
                   href="/dashboard"
-                  className="text-[9px] tracking-[0.2em] uppercase text-zinc-300 hover:text-zinc-500 transition-colors"
+                  className="text-[9px] tracking-wider uppercase text-zinc-300 hover:text-zinc-500 transition-colors"
                 >
                   My Dashboard
                 </Link>
               ) : (
                 <button
                   onClick={() => setShowHostLogin(true)}
-                  className="text-[9px] tracking-[0.2em] uppercase text-zinc-300 hover:text-zinc-500 transition-colors"
+                  className="text-[9px] tracking-wider uppercase text-zinc-300 hover:text-zinc-500 transition-colors"
                 >
                   Host login
                 </button>
@@ -1872,7 +1880,7 @@ export default function OrgCalendarPage() {
       <>
       {/* Stream Header */}
       <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100">
-        <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold">
+        <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
           Upcoming Plans
         </p>
       </div>
@@ -1917,7 +1925,7 @@ export default function OrgCalendarPage() {
 
                 <div className="w-full md:w-2/5 space-y-6">
                   <div className="space-y-2">
-                    <p className="text-[11px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                    <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
                       {plan.isPoll ? (
                         <>
                           Date Poll &bull; {plan.pollOptionCount || 0} {plan.pollOptionCount === 1 ? "option" : "options"}
@@ -1936,7 +1944,7 @@ export default function OrgCalendarPage() {
                       {plan.title}
                     </h3>
                     <div className="pt-2">
-                      <p className="text-[10px] tracking-[0.2em] uppercase text-zinc-900 font-bold flex items-center gap-2">
+                      <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: org.brandColor || "#18181b" }} />
                         Hosted by {plan.hostName}
                       </p>
@@ -1950,7 +1958,7 @@ export default function OrgCalendarPage() {
                   <div className="pt-2 flex flex-col gap-6">
                     {plan.isPoll ? (
                       <>
-                        <p className="text-[10px] tracking-widest uppercase font-bold text-zinc-500">
+                        <p className="text-xs tracking-widest uppercase font-bold text-zinc-500">
                           {plan.pollVoteCount || 0} {plan.pollVoteCount === 1 ? "Vote" : "Votes"} so far
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4">
@@ -1975,15 +1983,15 @@ export default function OrgCalendarPage() {
                         <div className="flex items-center gap-3">
                           <AvatarStack count={plan.attendeeCount} />
                           {hostedPlanIds.has(plan.id) ? (
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
+                            <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
                               <Check className="w-3 h-3" /> Hosting
                             </span>
                           ) : pendingRsvpIds.has(plan.id) ? (
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500 flex items-center gap-1">
+                            <span className="text-xs font-bold uppercase tracking-widest text-amber-500 flex items-center gap-1">
                               <Clock className="w-3 h-3" /> Pending
                             </span>
                           ) : rsvpedPlanIds.has(plan.id) ? (
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
+                            <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
                               <Check className="w-3 h-3" /> Attending
                             </span>
                           ) : null}
@@ -2022,7 +2030,7 @@ export default function OrgCalendarPage() {
           <section className={`${org.plans.length > 0 ? "mt-48" : "mt-8"} mb-24 space-y-12`}>
             <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
               <div className="space-y-2">
-                <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold flex items-center gap-2">
+                <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold flex items-center gap-2">
                   <Sparkles className="w-3.5 h-3.5" /> Get Involved
                 </p>
                 <h2 className="text-4xl font-light tracking-tight italic">
@@ -2082,7 +2090,7 @@ export default function OrgCalendarPage() {
                         <Plus className="w-7 h-7" />
                       </div>
                       <div className="space-y-2">
-                        <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-emerald-700">
+                        <p className="text-xs tracking-wider uppercase font-bold text-emerald-700">
                           Your Idea
                         </p>
                         <h4 className="text-lg font-medium tracking-tight text-zinc-900">
@@ -2136,11 +2144,11 @@ export default function OrgCalendarPage() {
                         : "bg-black/0 group-hover:bg-black/20 opacity-0 group-hover:opacity-100"
                     }`}>
                       {org.rsvpLimitReached ? (
-                        <span className="bg-white/90 px-6 py-3 text-[10px] tracking-[0.3em] uppercase font-bold shadow-xl flex items-center gap-2 text-zinc-400">
+                        <span className="bg-white/90 px-6 py-3 text-xs tracking-wider uppercase font-bold shadow-xl flex items-center gap-2 text-zinc-400">
                           <Lock className="w-3.5 h-3.5" /> Host This
                         </span>
                       ) : (
-                        <span className="bg-white px-6 py-3 text-[10px] tracking-[0.3em] uppercase font-bold shadow-xl">
+                        <span className="bg-white px-6 py-3 text-xs tracking-wider uppercase font-bold shadow-xl">
                           Host This
                         </span>
                       )}
@@ -2230,7 +2238,7 @@ export default function OrgCalendarPage() {
                 </p>
                 {selectedEvent.hostNote && (
                   <div className="space-y-2">
-                    <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                    <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
                       Note from Host
                     </h4>
                     <p className="text-sm text-zinc-400 italic border-l-2 border-zinc-200 pl-3">
@@ -2240,7 +2248,7 @@ export default function OrgCalendarPage() {
                 )}
                 {selectedEvent.location && (
                   <div className="space-y-2">
-                    <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                    <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
                       Location
                     </h4>
                     {selectedEvent.isPoll ? (
@@ -2294,7 +2302,7 @@ export default function OrgCalendarPage() {
                   <div className="space-y-3">
                     <button
                       disabled
-                      className="w-full bg-zinc-300 text-zinc-500 py-3 text-xs uppercase tracking-[0.2em] font-bold cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full bg-zinc-300 text-zinc-500 py-3 text-xs uppercase tracking-wider font-bold cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       <Lock className="w-3.5 h-3.5" /> RSVPs Paused
                     </button>
@@ -2327,7 +2335,7 @@ export default function OrgCalendarPage() {
                         href={`/h/${hostNotificationId}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-white py-3 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 rounded-lg"
+                        className="text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 rounded-lg"
                         style={{ backgroundColor: org.brandColor || "#18181b" }}
                       >
                         <MessageCircle className="w-4 h-4" /> Message Attendees
@@ -2353,7 +2361,7 @@ export default function OrgCalendarPage() {
                           href={`/c/${rsvpNotificationIds.get(selectedEvent.id)}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex-1 text-white py-3 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 rounded-lg"
+                          className="flex-1 text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 rounded-lg"
                           style={{ backgroundColor: org.brandColor || "#18181b" }}
                         >
                           <MessageCircle className="w-4 h-4" /> Join Plan Chat
@@ -2383,7 +2391,7 @@ export default function OrgCalendarPage() {
                         setRsvpPlan(selectedEvent);
                         setSelectedEvent(null);
                       }}
-                      className="flex-1 text-white py-3 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90"
+                      className="flex-1 text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90"
                       style={{ backgroundColor: org.brandColor || "#18181b" }}
                     >
                       {selectedEvent.requireApproval ? "Request to Attend" : "I\u0027m Attending"}
@@ -2423,7 +2431,7 @@ export default function OrgCalendarPage() {
                   return (
                     <a
                       href={icsUrl}
-                      className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-xs uppercase tracking-[0.2em] font-bold hover:bg-zinc-50 transition-colors rounded-lg mt-3"
+                      className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-xs uppercase tracking-wider font-bold hover:bg-zinc-50 transition-colors rounded-lg mt-3"
                     >
                       <Calendar className="w-4 h-4" />
                       Add to Calendar
@@ -2546,7 +2554,7 @@ export default function OrgCalendarPage() {
                   {hostSuccess === "pending" && (
                     <p className="text-sm text-zinc-500">The organizer will review your request and get back to you.</p>
                   )}
-                  <p className="text-zinc-400 uppercase tracking-widest text-[10px]">
+                  <p className="text-zinc-400 uppercase tracking-widest text-xs">
                     Closing...
                   </p>
                 </div>
@@ -2563,7 +2571,7 @@ export default function OrgCalendarPage() {
 
                   {/* Venue Carousel */}
                   <div className="space-y-3">
-                    <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                    <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
                       Choose a Venue
                     </h4>
                     {venuesLoading ? (
@@ -2605,10 +2613,10 @@ export default function OrgCalendarPage() {
                               <p className="text-xs font-bold truncate">{venue.name}</p>
                               <div className="flex items-center gap-1 mt-0.5">
                                 {venue.rating && (
-                                  <span className="text-[10px] text-zinc-500">{venue.rating.toFixed(1)} &#9733;</span>
+                                  <span className="text-xs text-zinc-500">{venue.rating.toFixed(1)} &#9733;</span>
                                 )}
                               </div>
-                              <p className="text-[10px] text-zinc-400 truncate mt-0.5">{venue.address}</p>
+                              <p className="text-xs text-zinc-400 truncate mt-0.5">{venue.address}</p>
                             </div>
                           </button>
                         ))}
@@ -2637,7 +2645,7 @@ export default function OrgCalendarPage() {
                     )}
 
                     <div className="space-y-2">
-                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                      <label className="text-xs tracking-wider uppercase font-bold">
                         Preferred Date
                       </label>
                       <input
@@ -2650,7 +2658,7 @@ export default function OrgCalendarPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                      <label className="text-xs tracking-wider uppercase font-bold">
                         Start Time
                       </label>
                       <input
@@ -2661,7 +2669,7 @@ export default function OrgCalendarPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                      <label className="text-xs tracking-wider uppercase font-bold">
                         Host&apos;s Note
                       </label>
                       <textarea
@@ -2672,10 +2680,10 @@ export default function OrgCalendarPage() {
                         className="w-full border border-zinc-200 rounded-lg p-4 text-sm font-light focus:outline-none focus:border-zinc-900 transition-colors resize-none"
                         placeholder="Add a personal note for attendees (optional)"
                       />
-                      <p className="text-[10px] text-zinc-400 text-right">{hostNote.length}/500</p>
+                      <p className="text-xs text-zinc-400 text-right">{hostNote.length}/500</p>
                     </div>
                     <div className="space-y-4">
-                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                      <label className="text-xs tracking-wider uppercase font-bold">
                         Visibility
                       </label>
                       <div className="p-6 border border-zinc-900 bg-zinc-50">
@@ -2698,7 +2706,7 @@ export default function OrgCalendarPage() {
                       <button
                         type="submit"
                         disabled={hostSubmitting || (!(org.isOwner || org.isHost) && !hostVerify.isVerified)}
-                        className="flex-1 text-white py-3.5 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center"
+                        className="flex-1 text-white py-3.5 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center"
                         style={{ backgroundColor: org.brandColor || "#18181b" }}
                       >
                         {hostSubmitting ? (
@@ -2746,14 +2754,14 @@ export default function OrgCalendarPage() {
                       ? "Your plan is live. Followers will see it on the calendar."
                       : "The organizer will review your custom plan and get back to you."}
                   </p>
-                  <p className="text-zinc-400 uppercase tracking-widest text-[10px]">
+                  <p className="text-zinc-400 uppercase tracking-widest text-xs">
                     Closing...
                   </p>
                 </div>
               ) : (
                 <>
                   <div className="space-y-2">
-                    <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-emerald-700 flex items-center gap-2">
+                    <p className="text-xs tracking-wider uppercase font-bold text-emerald-700 flex items-center gap-2">
                       <Sparkles className="w-3.5 h-3.5" /> Be the Host
                     </p>
                     <h3 className="text-3xl font-light italic">Propose a custom plan</h3>
@@ -2766,7 +2774,7 @@ export default function OrgCalendarPage() {
 
                   <form onSubmit={handleCustomPlanSubmit} className="space-y-8">
                     <div className="space-y-2">
-                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                      <label className="text-xs tracking-wider uppercase font-bold">
                         Plan Title
                       </label>
                       <input
@@ -2781,7 +2789,7 @@ export default function OrgCalendarPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                      <label className="text-xs tracking-wider uppercase font-bold">
                         Description
                       </label>
                       <textarea
@@ -2797,7 +2805,7 @@ export default function OrgCalendarPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                        <label className="text-xs tracking-wider uppercase font-bold">
                           Date
                         </label>
                         <input
@@ -2809,7 +2817,7 @@ export default function OrgCalendarPage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                        <label className="text-xs tracking-wider uppercase font-bold">
                           Start Time
                         </label>
                         <input
@@ -2823,7 +2831,7 @@ export default function OrgCalendarPage() {
 
                     {/* Venue search */}
                     <div className="space-y-3">
-                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                      <label className="text-xs tracking-wider uppercase font-bold">
                         Venue Type / Search
                       </label>
                       <input
@@ -2839,7 +2847,7 @@ export default function OrgCalendarPage() {
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                      <label className="text-xs tracking-wider uppercase font-bold">
                         Choose a Venue <span className="text-red-500">*</span>
                       </label>
                       {venuesLoading ? (
@@ -2880,9 +2888,9 @@ export default function OrgCalendarPage() {
                               <div className="p-2.5">
                                 <p className="text-xs font-bold truncate">{venue.name}</p>
                                 {venue.rating && (
-                                  <span className="text-[10px] text-zinc-500">{venue.rating.toFixed(1)} &#9733;</span>
+                                  <span className="text-xs text-zinc-500">{venue.rating.toFixed(1)} &#9733;</span>
                                 )}
-                                <p className="text-[10px] text-zinc-400 truncate mt-0.5">{venue.address}</p>
+                                <p className="text-xs text-zinc-400 truncate mt-0.5">{venue.address}</p>
                               </div>
                             </button>
                           ))}
@@ -2909,7 +2917,7 @@ export default function OrgCalendarPage() {
                     {/* Cover Image Picker */}
                     {selectedVenue && customTitle.trim() && (
                       <div className="space-y-3">
-                        <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                        <label className="text-xs tracking-wider uppercase font-bold">
                           Cover Image
                         </label>
                         <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
@@ -2972,7 +2980,7 @@ export default function OrgCalendarPage() {
                           const selected = unsplashPhotos.find(p => p.url === selectedImageUrl);
                           if (!selected) return null;
                           return (
-                            <p className="text-[10px] text-zinc-400">
+                            <p className="text-xs text-zinc-400">
                               Photo by{" "}
                               <a
                                 href={`${selected.photographerUrl}?utm_source=leaf&utm_medium=referral`}
@@ -2999,7 +3007,7 @@ export default function OrgCalendarPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                        <label className="text-xs tracking-wider uppercase font-bold">
                           Capacity <span className="text-zinc-400 normal-case">(optional)</span>
                         </label>
                         <input
@@ -3015,7 +3023,7 @@ export default function OrgCalendarPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] tracking-[0.3em] uppercase font-bold">
+                      <label className="text-xs tracking-wider uppercase font-bold">
                         Host&apos;s Note <span className="text-zinc-400 normal-case">(optional)</span>
                       </label>
                       <textarea
@@ -3026,7 +3034,7 @@ export default function OrgCalendarPage() {
                         className="w-full border border-zinc-200 rounded-lg p-4 text-sm font-light focus:outline-none focus:border-zinc-900 transition-colors resize-none"
                         placeholder="Add a personal note for attendees"
                       />
-                      <p className="text-[10px] text-zinc-400 text-right">{hostNote.length}/500</p>
+                      <p className="text-xs text-zinc-400 text-right">{hostNote.length}/500</p>
                     </div>
 
                     {!(org.isOwner || org.isHost) && (
@@ -3050,7 +3058,7 @@ export default function OrgCalendarPage() {
                           !customTitle.trim() ||
                           !customDescription.trim()
                         }
-                        className="flex-1 text-white py-3.5 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center"
+                        className="flex-1 text-white py-3.5 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center"
                         style={{ backgroundColor: org.brandColor || "#18181b" }}
                       >
                         {customSubmitting ? (
@@ -3072,7 +3080,7 @@ export default function OrgCalendarPage() {
       <section ref={ctaSectionRef} className="py-10 px-6 border-t border-zinc-100 bg-zinc-50/60">
         <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-center sm:text-left">
-            <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 mb-1">
+            <p className="text-xs tracking-wider uppercase text-zinc-400 mb-1">
               Powered by Leaf
             </p>
             <p className="text-sm text-zinc-600 font-light">
@@ -3081,7 +3089,7 @@ export default function OrgCalendarPage() {
           </div>
           <a
             href="https://www.os.joinleaf.com/organizations/setup"
-            className="inline-flex items-center gap-2 bg-zinc-900 text-white px-6 py-3 text-[10px] uppercase tracking-[0.2em] font-bold hover:bg-zinc-800 transition-colors shrink-0"
+            className="inline-flex items-center gap-2 bg-zinc-900 text-white px-6 py-3 text-xs uppercase tracking-wider font-bold hover:bg-zinc-800 transition-colors shrink-0"
           >
             Get Started — It&apos;s Free <ArrowRight className="w-3.5 h-3.5" />
           </a>
@@ -3095,7 +3103,7 @@ export default function OrgCalendarPage() {
       <footer className="py-24 px-6 border-t border-zinc-100">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start gap-12">
           <div className="space-y-4">
-            <span className="text-xl font-light tracking-[0.3em] uppercase">
+            <span className="text-xl font-light tracking-wider uppercase">
               {org.name}
             </span>
             <p className="text-zinc-400 text-sm font-light max-w-xs leading-relaxed">
@@ -3104,7 +3112,7 @@ export default function OrgCalendarPage() {
           </div>
           <div className="grid grid-cols-2 gap-16">
             <div className="space-y-4">
-              <h5 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-900">
+              <h5 className="text-xs tracking-wider uppercase font-bold text-zinc-900">
                 Platform
               </h5>
               <div className="flex flex-col gap-2 text-sm text-zinc-500 mt-4">
@@ -3120,7 +3128,7 @@ export default function OrgCalendarPage() {
               </div>
             </div>
             <div className="space-y-4">
-              <h5 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-900">
+              <h5 className="text-xs tracking-wider uppercase font-bold text-zinc-900">
                 Connect
               </h5>
               <div className="flex flex-col gap-2 text-sm text-zinc-500 mt-4">
@@ -3223,13 +3231,13 @@ export default function OrgCalendarPage() {
               <div className="flex flex-col gap-3 pt-2">
                 <Link
                   href={`/dashboard/${org.parentOrgId || org.objectId}?tab=calendars`}
-                  className="bg-zinc-900 text-white px-6 py-3.5 text-xs uppercase tracking-[0.2em] font-bold text-center hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
+                  className="bg-zinc-900 text-white px-6 py-3.5 text-xs uppercase tracking-wider font-bold text-center hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
                 >
                   Manage Calendar Settings <ArrowRight className="w-4 h-4" />
                 </Link>
                 <button
                   onClick={() => setShowWelcomeInvite(false)}
-                  className="px-6 py-3 text-xs uppercase tracking-[0.2em] font-medium text-zinc-500 hover:text-zinc-900 text-center transition-colors"
+                  className="px-6 py-3 text-xs uppercase tracking-wider font-medium text-zinc-500 hover:text-zinc-900 text-center transition-colors"
                 >
                   Skip and view my calendar
                 </button>
@@ -3304,7 +3312,7 @@ export default function OrgCalendarPage() {
               </div>
             )}
             <div className="p-4">
-              <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400 font-bold mb-1.5">
+              <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold mb-1.5">
                 {popupIdea.category}
               </p>
               <h4 className="text-sm font-medium tracking-tight text-zinc-900 mb-3 pr-6">

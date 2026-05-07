@@ -254,7 +254,7 @@ function ReadyToSplitRow() {
         </div>
         <a
           href={APP_STORE_URL}
-          className="flex items-center justify-center gap-2 w-full bg-zinc-900 text-white py-2.5 text-xs uppercase tracking-[0.2em] font-bold rounded-lg hover:opacity-90"
+          className="flex items-center justify-center gap-2 w-full bg-zinc-900 text-white py-2.5 text-xs uppercase tracking-wider font-bold rounded-lg hover:opacity-90"
         >
           <Smartphone className="w-4 h-4" />
           Split the bill in the app
@@ -283,7 +283,7 @@ function OpenInAppRow({ message }: { message: FirMessage }) {
         </div>
         <a
           href={APP_STORE_URL}
-          className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-2 text-xs uppercase tracking-[0.2em] font-bold rounded-lg hover:bg-zinc-50"
+          className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-2 text-xs uppercase tracking-wider font-bold rounded-lg hover:bg-zinc-50"
         >
           <Smartphone className="w-3.5 h-3.5" />
           {copy.cta}

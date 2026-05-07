@@ -258,7 +258,7 @@ export default function PlanDetailModal({
               )}
               {plan.location && (
                 <div className="space-y-2">
-                  <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+                  <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
                     Location
                   </h4>
                   <p className="text-sm text-zinc-700">{plan.location.name}</p>
@@ -271,7 +271,7 @@ export default function PlanDetailModal({
           {/* Poll branch — vote results, voter list, "Pick this date" */}
           {plan.isPoll ? (
             <div className="space-y-3">
-              <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+              <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
                 Vote Results
               </h4>
               {pollDetailLoading && <p className="text-sm text-zinc-400">Loading results…</p>}
@@ -325,7 +325,7 @@ export default function PlanDetailModal({
                               <button
                                 disabled={closingPoll}
                                 onClick={() => handlePickPollWinner(opt, dateLabel, timeLabel)}
-                                className="shrink-0 text-[10px] font-bold uppercase tracking-widest bg-zinc-900 text-white px-3 py-2 rounded hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                                className="shrink-0 text-xs font-bold uppercase tracking-widest bg-zinc-900 text-white px-3 py-2 rounded hover:bg-zinc-800 transition-colors disabled:opacity-50"
                               >
                                 Pick this date
                               </button>
@@ -341,16 +341,16 @@ export default function PlanDetailModal({
                   {/* Voter roster — host/owner/co-host only */}
                   {pollDetail.canSeeVoters && pollDetail.voters.length > 0 && (
                     <div className="pt-6">
-                      <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400 mb-3">
+                      <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400 mb-3">
                         Voters ({pollDetail.voters.length})
                       </h4>
                       <div className="border border-zinc-200 rounded-xl overflow-hidden">
                         <table className="w-full text-sm">
                           <thead className="bg-zinc-50 text-left">
                             <tr>
-                              <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Name</th>
-                              <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Phone</th>
-                              <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Picked</th>
+                              <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400">Name</th>
+                              <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400">Phone</th>
+                              <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400">Picked</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-zinc-100">
@@ -395,7 +395,7 @@ export default function PlanDetailModal({
           ) : (
             // Non-poll branch — attendees table
             <div className="space-y-3">
-              <h4 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400">
+              <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
                 Attendees{!planRsvpsLoading && ` (${planRsvps.filter((r) => r.status === "Accepted").length})`}
                 {!planRsvpsLoading && planRsvps.some((r) => r.status === "pendingRsvp") && (
                   <span className="text-amber-500 ml-2">
@@ -410,10 +410,10 @@ export default function PlanDetailModal({
                   <table className="w-full text-sm min-w-0">
                     <thead className="bg-zinc-50 text-left">
                       <tr>
-                        <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Name</th>
-                        <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Phone</th>
-                        <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Status</th>
-                        <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400"></th>
+                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400">Name</th>
+                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400">Phone</th>
+                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400">Status</th>
+                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
@@ -428,9 +428,9 @@ export default function PlanDetailModal({
                           <td className="px-4 py-2.5 text-zinc-400">{r.phone || "—"}</td>
                           <td className="px-4 py-2.5">
                             {r.status === "pendingRsvp" ? (
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Pending</span>
+                              <span className="text-xs font-bold uppercase tracking-widest text-amber-500">Pending</span>
                             ) : (
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Confirmed</span>
+                              <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">Confirmed</span>
                             )}
                           </td>
                           <td className="px-4 py-2.5">
@@ -446,7 +446,7 @@ export default function PlanDetailModal({
                                       console.error("Failed to approve:", err);
                                     }
                                   }}
-                                  className="px-2 py-1 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest rounded hover:bg-emerald-700 transition-colors"
+                                  className="px-2 py-1 bg-emerald-600 text-white text-xs font-bold uppercase tracking-widest rounded hover:bg-emerald-700 transition-colors"
                                 >
                                   Approve
                                 </button>
@@ -460,7 +460,7 @@ export default function PlanDetailModal({
                                       console.error("Failed to decline:", err);
                                     }
                                   }}
-                                  className="px-2 py-1 bg-white text-zinc-600 text-[10px] font-bold uppercase tracking-widest rounded border border-zinc-300 hover:bg-zinc-50 transition-colors"
+                                  className="px-2 py-1 bg-white text-zinc-600 text-xs font-bold uppercase tracking-widest rounded border border-zinc-300 hover:bg-zinc-50 transition-colors"
                                 >
                                   Decline
                                 </button>
@@ -477,7 +477,7 @@ export default function PlanDetailModal({
                                     alert("Failed to remove attendee.");
                                   }
                                 }}
-                                className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
+                                className="text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
                               >
                                 Remove
                               </button>

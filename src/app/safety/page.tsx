@@ -15,13 +15,13 @@ export default function SafetyPage() {
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <Link
             href="/"
-            className="text-sm tracking-[0.3em] uppercase font-light hover:text-zinc-600 transition-colors"
+            className="text-sm tracking-wider uppercase font-light hover:text-zinc-600 transition-colors"
           >
             Leaf
           </Link>
           <Link
             href="/privacy"
-            className="text-xs tracking-[0.2em] uppercase text-zinc-500 hover:text-zinc-900 transition-colors"
+            className="text-xs tracking-wider uppercase text-zinc-500 hover:text-zinc-900 transition-colors"
           >
             Privacy
           </Link>
@@ -31,7 +31,7 @@ export default function SafetyPage() {
       {/* Content */}
       <main className="max-w-3xl mx-auto px-6 py-20">
         <div className="space-y-3 mb-16">
-          <p className="text-[10px] tracking-[0.3em] uppercase text-zinc-400">
+          <p className="text-xs tracking-wider uppercase text-zinc-400">
             Community
           </p>
           <h1 className="text-4xl md:text-5xl font-light tracking-tight">

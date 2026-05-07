@@ -129,7 +129,7 @@ export default function MemoryClient({
             className="w-full h-48 sm:h-56 object-cover rounded-xl mb-5"
           />
         )}
-        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-2">
+        <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-2">
           You attended
         </p>
         <h1 className="text-2xl sm:text-3xl font-light text-zinc-900 mb-3">
@@ -187,7 +187,7 @@ export default function MemoryClient({
       {info.photos.length > 0 ? (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
               Gallery ({info.photoCount})
             </h2>
           </div>

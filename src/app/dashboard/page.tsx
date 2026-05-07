@@ -89,7 +89,7 @@ export default function DashboardPage() {
           <div className="relative z-10 flex flex-col justify-between p-12 lg:p-16 text-white w-full">
             <Link href="/" className="flex items-center gap-3">
               <img src="/leaf-logo-white.svg" alt="Leaf" className="h-7" />
-              <span className="text-lg font-light tracking-[0.2em] uppercase">OS</span>
+              <span className="text-lg font-light tracking-wider uppercase">OS</span>
             </Link>
             <div className="space-y-6 max-w-md min-h-[180px]">
               {quote && (
@@ -97,13 +97,13 @@ export default function DashboardPage() {
                   <p className="text-3xl lg:text-4xl font-light tracking-tight leading-tight">
                     &ldquo;{quote.quote}&rdquo;
                   </p>
-                  <p className="text-xs uppercase tracking-[0.2em] text-white/60">
+                  <p className="text-xs uppercase tracking-wider text-white/60">
                     — {quote.author}
                   </p>
                 </>
               )}
             </div>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-white/50">
+            <p className="text-xs uppercase tracking-wider text-white/50">
               Leaf OS · For Organizations
             </p>
           </div>

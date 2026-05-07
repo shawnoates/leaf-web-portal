@@ -261,11 +261,11 @@ export default function PollVoteWidget({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+        <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">
           {hasVoted ? "Results" : "Pick what works for you"}
         </p>
         {expiresIn && (
-          <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-zinc-400">
+          <span className="inline-flex items-center gap-1 text-xs uppercase tracking-widest text-zinc-400">
             <Clock className="w-3 h-3" /> {expiresIn}
           </span>
         )}
@@ -322,7 +322,7 @@ export default function PollVoteWidget({
                     {opt.count} {opt.count === 1 ? "vote" : "votes"}
                   </p>
                   {hasVoted && totalVotes > 0 && (
-                    <p className="text-[10px] text-zinc-400">{pct}%</p>
+                    <p className="text-xs text-zinc-400">{pct}%</p>
                   )}
                 </div>
               </div>
@@ -334,7 +334,7 @@ export default function PollVoteWidget({
       {step === "select" && !detail.isExpired && (
         <>
           {preVerified && (
-            <p className="text-[10px] tracking-widest uppercase text-zinc-400 text-center">
+            <p className="text-xs tracking-widest uppercase text-zinc-400 text-center">
               Voting as <span className="text-zinc-700 font-bold">{name}</span>
               {" · "}
               <button
@@ -371,7 +371,7 @@ export default function PollVoteWidget({
             We&apos;ll text you a one-time code so each vote counts only once.
           </p>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">
+            <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">
               Your name
             </label>
             <input
@@ -382,7 +382,7 @@ export default function PollVoteWidget({
             />
           </div>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">
+            <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">
               Phone
             </label>
             <div className="flex items-center gap-2">
@@ -431,7 +431,7 @@ export default function PollVoteWidget({
             onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
             placeholder="000000"
             autoFocus
-            className="w-full border border-zinc-200 rounded-lg py-3 text-center text-base tracking-[0.4em] focus:outline-none focus:border-zinc-900"
+            className="w-full border border-zinc-200 rounded-lg py-3 text-center text-base tracking-widest focus:outline-none focus:border-zinc-900"
           />
           {error && <p className="text-xs text-red-500">{error}</p>}
           <button

@@ -138,7 +138,7 @@ export default function JoinChatPicker({
             </p>
           </div>
           <span
-            className="text-[10px] uppercase tracking-[0.2em] font-bold mt-1"
+            className="text-xs uppercase tracking-wider font-bold mt-1"
             style={{ color: accent }}
           >
             Recommended
