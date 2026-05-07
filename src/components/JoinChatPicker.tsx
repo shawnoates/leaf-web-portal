@@ -109,52 +109,66 @@ export default function JoinChatPicker({
   }, [scriptReady, buttonRendered, handleCredentialResponse]);
 
   const appUrl = `https://os.joinleaf.com/c/${eventNotificationId}`;
+  const accent = brandColor || "#18181b";
 
   return (
-    <div className="space-y-4">
-      <div className="text-center space-y-1">
-        <h4 className="text-base font-medium">Join the chat</h4>
-        <p className="text-xs text-zinc-500">Coordinate with the other attendees</p>
+    <div className="space-y-6">
+      <div className="text-center space-y-1.5">
+        <h4 className="text-xl md:text-2xl font-light tracking-tight">Join the chat</h4>
+        <p className="text-sm text-zinc-500">Coordinate with the other attendees</p>
       </div>
 
-      <a
-        href={appUrl}
-        className="flex items-center gap-3 w-full border border-zinc-900 rounded-lg p-4 hover:bg-zinc-50 transition-colors"
-        style={{ borderColor: brandColor || "#18181b" }}
-      >
-        <Smartphone className="w-5 h-5 shrink-0" style={{ color: brandColor || "#18181b" }} />
-        <div className="flex-1 text-left">
-          <p className="text-sm font-medium">Get the Leaf app</p>
-          <p className="text-xs text-zinc-500">Push notifications, split bill, save photos</p>
-        </div>
-      </a>
-
-      <div className="flex items-center gap-3 text-xs text-zinc-400">
-        <div className="flex-1 h-px bg-zinc-200" />
-        <span>or</span>
-        <div className="flex-1 h-px bg-zinc-200" />
-      </div>
-
-      <div className="border border-zinc-200 rounded-lg p-4 space-y-3">
-        <div className="flex items-center gap-3">
-          <MessageCircle className="w-5 h-5 shrink-0 text-zinc-700" />
-          <div className="flex-1">
-            <p className="text-sm font-medium">Join in your browser</p>
-            <p className="text-xs text-zinc-500">No app install. Get email reminders.</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
+        {/* Left card: Get the app */}
+        <a
+          href={appUrl}
+          className="group relative border-2 rounded-2xl p-6 md:p-7 flex flex-col items-center text-center gap-3 hover:bg-zinc-50 transition-colors"
+          style={{ borderColor: accent }}
+        >
+          <div
+            className="w-12 h-12 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: accent }}
+          >
+            <Smartphone className="w-6 h-6 text-white" />
           </div>
-        </div>
-        <div className="flex justify-center min-h-[40px]">
-          {signingIn ? (
-            <div className="flex items-center gap-2 text-zinc-400 text-sm py-2">
-              <Loader2 className="w-4 h-4 animate-spin" /> Signing in...
-            </div>
-          ) : !scriptReady ? (
-            <div className="flex items-center gap-2 text-zinc-400 text-sm py-2">
-              <Loader2 className="w-4 h-4 animate-spin" /> Loading...
-            </div>
-          ) : (
-            <div ref={buttonRef} />
-          )}
+          <div className="space-y-1">
+            <p className="text-base font-semibold">Get the Leaf app</p>
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Push notifications, split the bill, save photos
+            </p>
+          </div>
+          <span
+            className="text-[10px] uppercase tracking-[0.2em] font-bold mt-1"
+            style={{ color: accent }}
+          >
+            Recommended
+          </span>
+        </a>
+
+        {/* Right card: Continue in browser via Google */}
+        <div className="border border-zinc-200 rounded-2xl p-6 md:p-7 flex flex-col items-center text-center gap-3 bg-white">
+          <div className="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center">
+            <MessageCircle className="w-6 h-6 text-zinc-700" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-base font-semibold">Join in your browser</p>
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              No app install. Get email reminders.
+            </p>
+          </div>
+          <div className="flex justify-center items-center min-h-[44px] mt-1">
+            {signingIn ? (
+              <div className="flex items-center gap-2 text-zinc-400 text-sm">
+                <Loader2 className="w-4 h-4 animate-spin" /> Signing in...
+              </div>
+            ) : !scriptReady ? (
+              <div className="flex items-center gap-2 text-zinc-400 text-sm">
+                <Loader2 className="w-4 h-4 animate-spin" /> Loading...
+              </div>
+            ) : (
+              <div ref={buttonRef} />
+            )}
+          </div>
         </div>
       </div>
 

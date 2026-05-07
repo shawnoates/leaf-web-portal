@@ -320,9 +320,17 @@ function RsvpModal({
     }
   };
 
+  // Widen the modal once we're past the form so the JoinChatPicker can lay
+  // its two options out side-by-side on desktop. Form step stays narrow so
+  // the input fields aren't awkwardly stretched.
+  const isJoinPickerStep = formStep === "success" && !isPendingResult && Boolean(notificationId);
+  const maxWidthClass = isJoinPickerStep ? "max-w-3xl" : "max-w-md";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-none p-8 relative">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm overflow-y-auto">
+      <div
+        className={`bg-white w-full ${maxWidthClass} rounded-t-2xl md:rounded-2xl p-8 md:p-12 relative my-0 md:my-8`}
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-900"

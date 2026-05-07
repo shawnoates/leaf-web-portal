@@ -15,6 +15,7 @@ import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import {
   Calendar,
   Check,
+  ChevronDown,
   ChevronRight,
   Clock,
   Copy,
@@ -429,9 +430,10 @@ export default function OrgDashboardPage() {
   const [inviteName, setInviteName] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState("");
-  // Scope picker: null = "All calendars" (org-wide); array = specific calendar ids.
+  // Scope picker: All Calendars (org-wide) or specific calendar ids.
   const [inviteScopeAll, setInviteScopeAll] = useState(true);
   const [inviteScopeIds, setInviteScopeIds] = useState<string[]>([]);
+  const [inviteScopeOpen, setInviteScopeOpen] = useState(false);
 
   // Edit-scope popover
   const [editScopeFor, setEditScopeFor] = useState<{
@@ -2482,8 +2484,8 @@ export default function OrgDashboardPage() {
                   <Check className="w-4 h-4" /> {inviteSuccess}
                 </div>
               )}
-              <div className="flex gap-3 items-end mb-4">
-                <div className="flex-1">
+              <div className="flex gap-3 items-end">
+                <div className="flex-1 min-w-0">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Email</label>
                   <input
                     type="email"
@@ -2492,6 +2494,68 @@ export default function OrgDashboardPage() {
                     className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
                     placeholder="cohost@example.com"
                   />
+                </div>
+                <div className="w-56 relative">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Calendars</label>
+                  <button
+                    type="button"
+                    onClick={() => setInviteScopeOpen((o) => !o)}
+                    className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 text-left flex items-center justify-between gap-2"
+                  >
+                    <span className="truncate">
+                      {inviteScopeAll
+                        ? "All Calendars"
+                        : inviteScopeIds.length === 0
+                        ? "Select calendars…"
+                        : inviteScopeIds.length === 1
+                        ? dashboard.calendars.find((c) => c.objectId === inviteScopeIds[0])?.name || "1 calendar"
+                        : `${inviteScopeIds.length} calendars`}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${inviteScopeOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {inviteScopeOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setInviteScopeOpen(false)}
+                      />
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-lg shadow-lg z-20 max-h-64 overflow-y-auto">
+                        <button
+                          type="button"
+                          onClick={() => { setInviteScopeAll(true); setInviteScopeIds([]); }}
+                          className={`w-full px-3 py-2 text-sm text-left hover:bg-zinc-50 flex items-center gap-2 border-b border-zinc-100 ${inviteScopeAll ? "text-zinc-900 font-medium" : "text-zinc-600"}`}
+                        >
+                          <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${inviteScopeAll ? "bg-zinc-900 border-zinc-900" : "border-zinc-300"}`}>
+                            {inviteScopeAll && <Check className="w-3 h-3 text-white" />}
+                          </span>
+                          All Calendars
+                        </button>
+                        {dashboard.calendars.map((cal) => {
+                          const selected = !inviteScopeAll && inviteScopeIds.includes(cal.objectId);
+                          return (
+                            <button
+                              key={cal.objectId}
+                              type="button"
+                              onClick={() => {
+                                setInviteScopeAll(false);
+                                setInviteScopeIds((prev) =>
+                                  prev.includes(cal.objectId)
+                                    ? prev.filter((id) => id !== cal.objectId)
+                                    : [...prev, cal.objectId]
+                                );
+                              }}
+                              className={`w-full px-3 py-2 text-sm text-left hover:bg-zinc-50 flex items-center gap-2 ${selected ? "text-zinc-900 font-medium" : "text-zinc-600"}`}
+                            >
+                              <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selected ? "bg-zinc-900 border-zinc-900" : "border-zinc-300"}`}>
+                                {selected && <Check className="w-3 h-3 text-white" />}
+                              </span>
+                              <span className="truncate">{cal.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className="w-40">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name (optional)</label>
@@ -2505,59 +2569,17 @@ export default function OrgDashboardPage() {
                 </div>
                 <button
                   onClick={handleInviteCoHost}
-                  disabled={!inviteEmail || inviting}
+                  disabled={!inviteEmail || inviting || (!inviteScopeAll && inviteScopeIds.length === 0)}
                   className="bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50 shrink-0"
                 >
                   {inviting ? "Sending..." : "Send Invite"}
                 </button>
               </div>
-
-              {/* Calendar scope picker — required choice */}
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">Calendars</label>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { setInviteScopeAll(true); setInviteScopeIds([]); }}
-                    className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                      inviteScopeAll
-                        ? "bg-zinc-900 text-white border-zinc-900"
-                        : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400"
-                    }`}
-                  >
-                    All Calendars
-                  </button>
-                  {dashboard.calendars.map((cal) => {
-                    const selected = !inviteScopeAll && inviteScopeIds.includes(cal.objectId);
-                    return (
-                      <button
-                        key={cal.objectId}
-                        type="button"
-                        onClick={() => {
-                          setInviteScopeAll(false);
-                          setInviteScopeIds((prev) =>
-                            prev.includes(cal.objectId)
-                              ? prev.filter((id) => id !== cal.objectId)
-                              : [...prev, cal.objectId]
-                          );
-                        }}
-                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                          selected
-                            ? "bg-zinc-900 text-white border-zinc-900"
-                            : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400"
-                        }`}
-                      >
-                        {cal.name}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-[10px] text-zinc-400 mt-2">
-                  {inviteScopeAll
-                    ? "Co-host will have access to every current and future calendar in this organization."
-                    : `Co-host will have access only to ${inviteScopeIds.length === 0 ? "the calendars you select" : `${inviteScopeIds.length} selected calendar${inviteScopeIds.length === 1 ? "" : "s"}`}.`}
-                </p>
-              </div>
+              <p className="text-[10px] text-zinc-400 mt-2">
+                {inviteScopeAll
+                  ? "Co-host will have access to every current and future calendar in this organization."
+                  : `Co-host will have access only to ${inviteScopeIds.length === 0 ? "the calendars you select" : `${inviteScopeIds.length} selected calendar${inviteScopeIds.length === 1 ? "" : "s"}`}.`}
+              </p>
             </section>
 
             {/* Users */}
