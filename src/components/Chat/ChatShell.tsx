@@ -300,6 +300,18 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
       })
     : null;
 
+  // Server-stored time strings can come in 24h ("07:00") — normalize to
+  // 12h with no leading zero ("7:00 AM") for display.
+  const formattedTime = (() => {
+    if (!planTimeString) return null;
+    if (/[APap][Mm]/.test(planTimeString)) return planTimeString;
+    const [h, m] = planTimeString.split(":").map(Number);
+    if (isNaN(h)) return planTimeString;
+    const period = h >= 12 ? "PM" : "AM";
+    const hour12 = h % 12 || 12;
+    return `${hour12}:${String(m || 0).padStart(2, "0")} ${period}`;
+  })();
+
   // Universal Link to /c/{notificationId} — same handler as the iOS deep
   // link entry route. Encodes the user's specific RSVP so the iOS app opens
   // the right plan chat. QR code on desktop renders this so a phone scan
@@ -363,13 +375,13 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
           </div>
 
           <div className="space-y-3 text-sm">
-            {(formattedDate || planTimeString) && (
+            {(formattedDate || formattedTime) && (
               <div className="flex items-start gap-2.5">
                 <Calendar className="w-4 h-4 mt-0.5 text-zinc-400 shrink-0" />
                 <div className="text-zinc-700">
                   {formattedDate}
-                  {formattedDate && planTimeString && <span className="text-zinc-400"> · </span>}
-                  {planTimeString}
+                  {formattedDate && formattedTime && <span className="text-zinc-400"> · </span>}
+                  {formattedTime}
                 </div>
               </div>
             )}
