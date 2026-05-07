@@ -46,13 +46,10 @@ export default function ChatLanding({ notificationId }: { notificationId: string
     };
   }, [isIOS, notificationId]);
 
-  // iOS: try the deep link automatically. If the app's installed it'll open
-  // and the user never sees the rest of the page. If not, they stay on this
-  // page with a clear "Continue in browser" option (no App Store auto-redirect).
-  useEffect(() => {
-    if (isIOS !== true) return;
-    window.location.href = deepLink;
-  }, [isIOS, deepLink]);
+  // iOS: don't auto-fire the deep link — both Chrome and Safari show a "This
+  // site is trying to open another application" prompt that's confusing for
+  // users who don't have the app. Let them tap "Open in Leaf app" explicitly,
+  // which still uses the same deep link.
 
   // Non-iOS: forward to /chat/{eventGroupId} as soon as we have the id.
   useEffect(() => {

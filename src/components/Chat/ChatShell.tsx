@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import { getChatDatabase, signInToChat } from "@/lib/firebase-client";
 import {
@@ -21,8 +21,10 @@ type AuthState = "checking" | "ready" | "denied" | "error";
 const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
 
 export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
+  const router = useRouter();
   const [authState, setAuthState] = useState<AuthState>("checking");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [planTitle, setPlanTitle] = useState<string | null>(null);
   const [messages, setMessages] = useState<FirMessage[]>([]);
   const [users, setUsers] = useState<Map<string, UserLite>>(new Map());
   const [composeText, setComposeText] = useState("");
@@ -52,10 +54,11 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
       try {
         const tokenResult = (await Parse.Cloud.run("getChatToken", {
           eventGroupId,
-        })) as { firebaseToken: string };
+        })) as { firebaseToken: string; planTitle?: string | null };
 
         await signInToChat(tokenResult.firebaseToken);
         if (!mounted) return;
+        if (tokenResult.planTitle) setPlanTitle(tokenResult.planTitle);
 
         const db = getChatDatabase();
         const messagesRef = ref(db, `groups/${eventGroupId}/messages`);
@@ -231,14 +234,24 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50">
       <header className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
-        <Link
-          href="/"
+        <button
+          onClick={() => {
+            // Prefer browser-history back so users return to wherever they
+            // came from (org page, /c/ landing, etc.). Fall back to home for
+            // direct landings (e.g. tapped link from email).
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+            } else {
+              router.push("/");
+            }
+          }}
+          aria-label="Back"
           className="p-1.5 -ml-1.5 text-zinc-500 hover:text-zinc-900 rounded-lg"
         >
           <ArrowLeft className="w-5 h-5" />
-        </Link>
+        </button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-sm font-medium truncate">Plan chat</h1>
+          <h1 className="text-sm font-medium truncate">{planTitle || "Plan chat"}</h1>
           <p className="text-xs text-zinc-500">
             {messages.length} message{messages.length === 1 ? "" : "s"}
           </p>

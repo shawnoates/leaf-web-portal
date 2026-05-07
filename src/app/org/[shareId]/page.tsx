@@ -308,6 +308,21 @@ function RsvpModal({
       setVerifiedUserCookie(verify.name, verify.phone);
       if (result?.eventNotificationId) {
         setNotificationId(result.eventNotificationId);
+        // Mint a Parse session for the phone-user so /chat/[eventGroupId]
+        // can authenticate. Failure here is non-fatal — the user still sees
+        // the success state; they just won't be able to load the web chat
+        // until they complete Google SSO from the JoinChatPicker.
+        try {
+          const session = (await Parse.Cloud.run("getRsvpSession", {
+            eventNotificationId: result.eventNotificationId,
+            phoneNumber: verify.phone.replace(/\D/g, ""),
+          })) as { sessionToken?: string };
+          if (session?.sessionToken) {
+            await Parse.User.become(session.sessionToken);
+          }
+        } catch (sessionErr) {
+          console.warn("[RSVP] Could not mint chat session:", sessionErr);
+        }
       }
       if (result?.pendingApproval) {
         setIsPendingResult(true);
