@@ -25,6 +25,7 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
   const [authState, setAuthState] = useState<AuthState>("checking");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [planTitle, setPlanTitle] = useState<string | null>(null);
+  const [calendarShareId, setCalendarShareId] = useState<string | null>(null);
   const [messages, setMessages] = useState<FirMessage[]>([]);
   const [users, setUsers] = useState<Map<string, UserLite>>(new Map());
   const [composeText, setComposeText] = useState("");
@@ -54,11 +55,16 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
       try {
         const tokenResult = (await Parse.Cloud.run("getChatToken", {
           eventGroupId,
-        })) as { firebaseToken: string; planTitle?: string | null };
+        })) as {
+          firebaseToken: string;
+          planTitle?: string | null;
+          calendarShareId?: string | null;
+        };
 
         await signInToChat(tokenResult.firebaseToken);
         if (!mounted) return;
         if (tokenResult.planTitle) setPlanTitle(tokenResult.planTitle);
+        if (tokenResult.calendarShareId) setCalendarShareId(tokenResult.calendarShareId);
 
         const db = getChatDatabase();
         const messagesRef = ref(db, `groups/${eventGroupId}/messages`);
@@ -232,14 +238,16 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-zinc-50">
-      <header className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
+    <div className="h-dvh flex flex-col bg-zinc-50 overflow-hidden">
+      <header className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center gap-3 z-10 shrink-0">
         <button
           onClick={() => {
-            // Prefer browser-history back so users return to wherever they
-            // came from (org page, /c/ landing, etc.). Fall back to home for
-            // direct landings (e.g. tapped link from email).
-            if (typeof window !== "undefined" && window.history.length > 1) {
+            // Always route back to the calendar's public page — that's the
+            // canonical "parent" of any plan chat. Falls back to home for
+            // chats whose calendar shareId we couldn't resolve.
+            if (calendarShareId) {
+              router.push(`/org/${calendarShareId}`);
+            } else if (typeof window !== "undefined" && window.history.length > 1) {
               router.back();
             } else {
               router.push("/");
@@ -294,7 +302,7 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
         )}
       </div>
 
-      <div className="bg-white border-t border-zinc-200 px-4 py-3">
+      <div className="bg-white border-t border-zinc-200 px-4 py-3 shrink-0">
         <form
           onSubmit={(e) => {
             e.preventDefault();

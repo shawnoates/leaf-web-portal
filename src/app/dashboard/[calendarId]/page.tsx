@@ -856,16 +856,23 @@ export default function OrgDashboardPage() {
     }
     setSavingScope(true);
     try {
-      await Parse.Cloud.run("setCoHostScope", {
+      const params = {
         orgId: calendarId,
         ...(editScopeFor.userId ? { userId: editScopeFor.userId } : { email: editScopeFor.email }),
         allCalendars: editScopeAll,
         calendarIds: editScopeAll ? [] : editScopeIds,
-      });
+      };
+      // eslint-disable-next-line no-console
+      console.log("[setCoHostScope] calling with", params);
+      const result = await Parse.Cloud.run("setCoHostScope", params);
+      // eslint-disable-next-line no-console
+      console.log("[setCoHostScope] result", result);
       setEditScopeFor(null);
-      fetchDashboard();
+      await fetchDashboard();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to update scope";
+      // eslint-disable-next-line no-console
+      console.error("[setCoHostScope] error", err);
       alert(message);
     } finally {
       setSavingScope(false);
@@ -2597,7 +2604,7 @@ export default function OrgDashboardPage() {
                         <th className="text-left px-4 py-3 font-bold">Name</th>
                         <th className="text-left px-4 py-3 font-bold">Email</th>
                         <th className="text-left px-4 py-3 font-bold">Role</th>
-                        <th className="text-left px-4 py-3 font-bold">Scope</th>
+                        <th className="text-left px-4 py-3 font-bold">Calendar</th>
                         <th className="text-left px-4 py-3 font-bold">Joined</th>
                         <th className="px-4 py-3"></th>
                       </tr>
