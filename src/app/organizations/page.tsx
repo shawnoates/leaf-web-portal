@@ -31,6 +31,7 @@ const PRICING_TIERS = [
       "1 calendar",
       "5 AI plan ideas per week",
       "Up to 50 RSVPs",
+      "Web chat for attendees",
       "Automated follower notifications",
       "Access to local events database",
     ],
@@ -54,6 +55,7 @@ const PRICING_TIERS = [
       "1 calendar",
       "10 AI plan ideas per week",
       "Unlimited RSVPs",
+      "Web chat for attendees",
       "Automated follower notifications",
       "Access to local events database",
       "Unlimited scheduling",
@@ -79,6 +81,7 @@ const PRICING_TIERS = [
       "5 calendars",
       "15 AI plan ideas per week",
       "Unlimited RSVPs",
+      "Web chat for attendees",
       "Automated follower notifications",
       "Access to local events database",
       "Unlimited scheduling",
@@ -191,21 +194,21 @@ export default function OrganizationsPage() {
             <div className="flex gap-6 items-center">
               <a
                 href="#pricing"
-                className="text-[10px] tracking-[0.3em] uppercase font-bold text-white/60 hover:text-white transition-colors hidden sm:block"
+                className="text-sm font-medium text-white/70 hover:text-white transition-colors hidden sm:block"
               >
                 Pricing
               </a>
               {!isLoggedIn && (
                 <Link
                   href="/dashboard"
-                  className="text-[10px] tracking-[0.3em] uppercase font-bold text-white/60 hover:text-white transition-colors"
+                  className="text-sm font-medium text-white/70 hover:text-white transition-colors"
                 >
-                  Sign In
+                  Sign in
                 </Link>
               )}
               <Link
                 href={isLoggedIn ? "/dashboard" : "/organizations/setup"}
-                className="bg-white text-zinc-900 px-5 py-2.5 text-[10px] uppercase tracking-[0.2em] font-bold hover:bg-white/90 transition-colors"
+                className="bg-white text-zinc-900 px-5 py-2.5 text-sm font-semibold rounded-full hover:bg-white/90 transition-colors"
               >
                 {isLoggedIn ? "Dashboard" : "Get Started"}
               </Link>
@@ -229,15 +232,15 @@ export default function OrganizationsPage() {
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Link
                   href={isLoggedIn ? "/dashboard" : "/organizations/setup"}
-                  className="bg-white text-zinc-900 px-8 py-4 text-xs uppercase tracking-[0.3em] font-medium hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
+                  className="bg-white text-zinc-900 px-8 py-4 text-base font-semibold rounded-full hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
                 >
-                  {isLoggedIn ? "Dashboard" : "Get Started Free"} <ArrowRight className="w-4 h-4" />
+                  {isLoggedIn ? "Dashboard" : "Get started free"} <ArrowRight className="w-4 h-4" />
                 </Link>
                 <a
                   href="#how-it-works"
-                  className="border border-white/30 text-white px-8 py-4 text-xs uppercase tracking-[0.3em] font-medium hover:bg-white/10 transition-colors text-center"
+                  className="border border-white/30 text-white px-8 py-4 text-base font-medium rounded-full hover:bg-white/10 transition-colors text-center"
                 >
-                  See How It Works
+                  See how it works
                 </a>
               </div>
             </div>
@@ -249,7 +252,7 @@ export default function OrganizationsPage() {
       <section id="how-it-works" className="bg-zinc-50 py-32">
         <div className="max-w-6xl mx-auto px-6">
           <div className="mb-20">
-            <p className="text-[10px] tracking-[0.4em] uppercase text-zinc-400 font-bold mb-4">
+            <p className="text-xs tracking-wider uppercase text-zinc-500 font-semibold mb-3">
               How It Works
             </p>
             <h2 className="text-4xl font-light tracking-tight italic">
@@ -260,7 +263,7 @@ export default function OrganizationsPage() {
             {STEPS.map((step) => (
               <div key={step.number} className="space-y-6">
                 <div className="flex items-center gap-4">
-                  <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-300">
+                  <span className="text-xs tracking-wider uppercase font-semibold text-zinc-400">
                     {step.number}
                   </span>
                   <div className="h-px flex-1 bg-zinc-200" />
@@ -284,7 +287,7 @@ export default function OrganizationsPage() {
       <section className="py-32">
         <div className="max-w-6xl mx-auto px-6">
           <div className="mb-20">
-            <p className="text-[10px] tracking-[0.4em] uppercase text-zinc-400 font-bold mb-4">
+            <p className="text-xs tracking-wider uppercase text-zinc-500 font-semibold mb-3">
               Everything You Need
             </p>
             <h2 className="text-4xl font-light tracking-tight italic">
@@ -313,7 +316,7 @@ export default function OrganizationsPage() {
       <section id="pricing" className="bg-zinc-50 py-32">
         <div className="max-w-6xl mx-auto px-6">
           <div className="mb-12 text-center">
-            <p className="text-[10px] tracking-[0.4em] uppercase text-zinc-400 font-bold mb-4">
+            <p className="text-xs tracking-wider uppercase text-zinc-500 font-semibold mb-3">
               Pricing
             </p>
             <h2 className="text-4xl font-light tracking-tight italic mb-8">
@@ -323,7 +326,7 @@ export default function OrganizationsPage() {
             <div className="inline-flex items-center gap-1 bg-zinc-100 rounded-full p-1">
               <button
                 onClick={() => setBillingPeriod("monthly")}
-                className={`px-5 py-2 text-xs font-bold uppercase tracking-[0.15em] rounded-full transition-colors ${
+                className={`px-5 py-2 text-sm font-medium rounded-full transition-colors ${
                   billingPeriod === "monthly"
                     ? "bg-zinc-900 text-white"
                     : "text-zinc-500 hover:text-zinc-700"
@@ -333,7 +336,7 @@ export default function OrganizationsPage() {
               </button>
               <button
                 onClick={() => setBillingPeriod("yearly")}
-                className={`px-5 py-2 text-xs font-bold uppercase tracking-[0.15em] rounded-full transition-colors ${
+                className={`px-5 py-2 text-sm font-medium rounded-full transition-colors ${
                   billingPeriod === "yearly"
                     ? "bg-zinc-900 text-white"
                     : "text-zinc-500 hover:text-zinc-700"
@@ -357,12 +360,12 @@ export default function OrganizationsPage() {
                 }`}
               >
                 {tier.highlight && (
-                  <div className="absolute -top-3 left-8 bg-zinc-900 text-white px-4 py-1 text-[10px] tracking-[0.2em] uppercase font-bold">
-                    Most Popular
+                  <div className="absolute -top-3 left-8 bg-zinc-900 text-white px-3.5 py-1 text-xs tracking-wider uppercase font-semibold rounded-full">
+                    Most popular
                   </div>
                 )}
                 <div className="mb-8">
-                  <h3 className="text-[10px] tracking-[0.3em] uppercase font-bold text-zinc-400 mb-4">
+                  <h3 className="text-xs tracking-wider uppercase font-semibold text-zinc-500 mb-4">
                     {tier.name}
                   </h3>
                   <div className="flex items-baseline gap-1">
@@ -408,13 +411,13 @@ export default function OrganizationsPage() {
                 </div>
                 <Link
                   href={isLoggedIn ? "/dashboard" : `/organizations/setup?tier=${tier.id}&billingPeriod=${billingPeriod}`}
-                  className={`w-full py-3.5 text-xs uppercase tracking-[0.2em] font-bold text-center flex items-center justify-center gap-2 transition-colors ${
+                  className={`w-full py-3.5 text-sm font-semibold text-center flex items-center justify-center gap-2 rounded-full transition-colors ${
                     tier.highlight
                       ? "bg-zinc-900 text-white hover:bg-zinc-800"
                       : "border border-zinc-200 text-zinc-900 hover:bg-zinc-50"
                   }`}
                 >
-                  {isLoggedIn ? "Go to Dashboard" : tier.cta} <ChevronRight className="w-3.5 h-3.5" />
+                  {isLoggedIn ? "Go to dashboard" : tier.cta} <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
               );
@@ -426,7 +429,7 @@ export default function OrganizationsPage() {
       {/* FAQ */}
       <section className="py-24">
         <div className="max-w-3xl mx-auto px-6">
-          <p className="text-[10px] tracking-[0.4em] uppercase text-zinc-400 font-bold mb-4 text-center">
+          <p className="text-xs tracking-wider uppercase text-zinc-500 font-semibold mb-3 text-center">
             FAQ
           </p>
           <h2 className="text-3xl font-light tracking-tight italic mb-12 text-center">
@@ -487,9 +490,9 @@ export default function OrganizationsPage() {
           </p>
           <Link
             href={isLoggedIn ? "/dashboard" : "/organizations/setup"}
-            className="inline-flex bg-zinc-900 text-white px-10 py-4 text-xs uppercase tracking-[0.3em] font-medium hover:bg-zinc-800 transition-colors items-center gap-2"
+            className="inline-flex bg-zinc-900 text-white px-10 py-4 text-base font-semibold rounded-full hover:bg-zinc-800 transition-colors items-center gap-2"
           >
-            {isLoggedIn ? "Dashboard" : "Get Started Free"} <ArrowRight className="w-4 h-4" />
+            {isLoggedIn ? "Dashboard" : "Get started free"} <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>

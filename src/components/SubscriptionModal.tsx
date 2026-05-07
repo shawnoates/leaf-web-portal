@@ -16,6 +16,7 @@ const TIERS = [
       "1 calendar",
       "5 AI plan ideas per week",
       "Up to 50 RSVPs",
+      "Web chat for attendees",
       "Automated follower notifications",
       "Access to local events database",
     ],
@@ -34,6 +35,7 @@ const TIERS = [
       "1 calendar",
       "10 AI plan ideas per week",
       "Unlimited RSVPs",
+      "Web chat for attendees",
       "Automated follower notifications",
       "Access to local events database",
       "Unlimited scheduling",
@@ -54,6 +56,7 @@ const TIERS = [
       "5 calendars",
       "15 AI plan ideas per week",
       "Unlimited RSVPs",
+      "Web chat for attendees",
       "Automated follower notifications",
       "Access to local events database",
       "Unlimited scheduling",
@@ -100,7 +103,7 @@ export default function SubscriptionModal({
         <div className="flex items-center justify-center gap-2 mb-8">
           <button
             onClick={() => setBillingPeriod("monthly")}
-            className={`px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-full transition-colors ${
+            className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
               billingPeriod === "monthly"
                 ? "bg-zinc-900 text-white"
                 : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
@@ -110,7 +113,7 @@ export default function SubscriptionModal({
           </button>
           <button
             onClick={() => setBillingPeriod("yearly")}
-            className={`px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-full transition-colors ${
+            className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
               billingPeriod === "yearly"
                 ? "bg-zinc-900 text-white"
                 : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
@@ -135,11 +138,11 @@ export default function SubscriptionModal({
                 } ${isCurrent ? "bg-zinc-50" : ""}`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-sm font-bold uppercase tracking-widest">
+                  <h3 className="text-sm font-semibold tracking-tight text-zinc-900">
                     {tier.name}
                   </h3>
                   {tier.highlight && (
-                    <span className="text-[10px] font-bold uppercase tracking-widest bg-zinc-900 text-white px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-semibold bg-zinc-900 text-white px-2.5 py-0.5 rounded-full">
                       Popular
                     </span>
                   )}
@@ -167,13 +170,13 @@ export default function SubscriptionModal({
                 <button
                   onClick={() => !isCurrent && onSelect(tier.id, billingPeriod)}
                   disabled={isCurrent || loading}
-                  className={`w-full py-2.5 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors ${
+                  className={`w-full py-2.5 px-3 text-sm font-semibold rounded-full transition-colors ${
                     isCurrent
                       ? "bg-zinc-100 text-zinc-400 cursor-default"
                       : "bg-zinc-900 text-white hover:bg-zinc-800"
                   } disabled:opacity-50`}
                 >
-                  {isCurrent ? "Current Plan" : loading ? "Updating..." : `Switch to ${tier.name}`}
+                  {isCurrent ? "Current plan" : loading ? "Updating..." : `Switch to ${tier.name}`}
                 </button>
               </div>
             );
