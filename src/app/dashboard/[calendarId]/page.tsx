@@ -2092,6 +2092,7 @@ export default function OrgDashboardPage() {
                 time,
                 capacity: event.capacityMax?.toString() || "",
                 imageUrl: event.image,
+                coverSeed: event.id,
               });
               setShowCreatePlanModal(true);
             }}
