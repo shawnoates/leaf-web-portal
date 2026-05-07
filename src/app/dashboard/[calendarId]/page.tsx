@@ -92,13 +92,19 @@ interface OrgDashboard {
   upcomingPlanCount: number;
   followerCount: number;
   members: {
-    membershipId: string;
+    membershipId: string | null;
     objectId: string | null;
     name: string;
     email: string | null;
     status: string;
     leafAppConnected?: boolean;
     joinedAt: string;
+    pending?: boolean;
+    scope?: {
+      allCalendars: boolean;
+      calendars: { id: string; name: string }[];
+      membershipIds: string[];
+    };
   }[];
   followers: {
     membershipId: string;
@@ -365,32 +371,6 @@ export default function OrgDashboardPage() {
   const slugTimerRef = useRef<NodeJS.Timeout | null>(null);
   const originalSlugRef = useRef<string>("");
 
-  // Per-calendar cohosts (visible to calendar owner only)
-  const [calCohosts, setCalCohosts] = useState<{
-    membershipId: string;
-    name: string;
-    email: string;
-    leafAppConnected: boolean;
-    joinedAt: string;
-  }[]>([]);
-  const [calCohostsLoading, setCalCohostsLoading] = useState(false);
-  const [inviteCohostEmail, setInviteCohostEmail] = useState("");
-  const [inviteCohostName, setInviteCohostName] = useState("");
-  const [invitingCohost, setInvitingCohost] = useState(false);
-
-  async function loadCalCohosts(calId: string) {
-    setCalCohostsLoading(true);
-    try {
-      const result = await Parse.Cloud.run("listCalendarCoHosts", { calendarId: calId });
-      setCalCohosts(result.cohosts || []);
-    } catch (err) {
-      console.error("Failed to load calendar cohosts:", err);
-      setCalCohosts([]);
-    } finally {
-      setCalCohostsLoading(false);
-    }
-  }
-
   function handleSlugChange(raw: string) {
     const cleaned = raw.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").slice(0, 40);
     setEditCalSlug(cleaned);
@@ -416,24 +396,6 @@ export default function OrgDashboardPage() {
       }
     }, 400);
   }
-
-  // Load this calendar's per-calendar cohosts whenever the Edit Calendar
-  // modal opens, but only if the viewer is the owner of that calendar
-  // (the management UI is owner-only).
-  useEffect(() => {
-    if (!editingCalId) {
-      setCalCohosts([]);
-      setInviteCohostEmail("");
-      setInviteCohostName("");
-      return;
-    }
-    const cal = dashboard?.calendars.find((c) => c.objectId === editingCalId);
-    if (cal?.role === "Owner") {
-      loadCalCohosts(editingCalId);
-    } else {
-      setCalCohosts([]);
-    }
-  }, [editingCalId, dashboard]);
 
   // Plan detail modal
   const [selectedActivePlan, setSelectedActivePlan] = useState<{
@@ -467,6 +429,19 @@ export default function OrgDashboardPage() {
   const [inviteName, setInviteName] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState("");
+  // Scope picker: null = "All calendars" (org-wide); array = specific calendar ids.
+  const [inviteScopeAll, setInviteScopeAll] = useState(true);
+  const [inviteScopeIds, setInviteScopeIds] = useState<string[]>([]);
+
+  // Edit-scope popover
+  const [editScopeFor, setEditScopeFor] = useState<{
+    name: string;
+    userId: string | null;
+    email: string | null;
+  } | null>(null);
+  const [editScopeAll, setEditScopeAll] = useState(true);
+  const [editScopeIds, setEditScopeIds] = useState<string[]>([]);
+  const [savingScope, setSavingScope] = useState(false);
 
   useEffect(() => {
     try {
@@ -843,6 +818,11 @@ export default function OrgDashboardPage() {
 
   async function handleInviteCoHost() {
     if (!inviteEmail) return;
+    // Force a real choice: "all" or at least one calendar selected.
+    if (!inviteScopeAll && inviteScopeIds.length === 0) {
+      alert("Pick at least one calendar, or choose All Calendars.");
+      return;
+    }
     setInviting(true);
     setInviteSuccess("");
     try {
@@ -850,16 +830,43 @@ export default function OrgDashboardPage() {
         calendarId,
         email: inviteEmail,
         name: inviteName,
+        ...(inviteScopeAll ? {} : { calendarIds: inviteScopeIds }),
       });
       setInviteSuccess(`Invitation sent to ${inviteEmail}`);
       setInviteEmail("");
       setInviteName("");
+      setInviteScopeAll(true);
+      setInviteScopeIds([]);
       fetchDashboard();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to send invite";
       alert(message);
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function handleSaveScope() {
+    if (!editScopeFor) return;
+    if (!editScopeAll && editScopeIds.length === 0) {
+      alert("Pick at least one calendar, or choose All Calendars.");
+      return;
+    }
+    setSavingScope(true);
+    try {
+      await Parse.Cloud.run("setCoHostScope", {
+        orgId: calendarId,
+        ...(editScopeFor.userId ? { userId: editScopeFor.userId } : { email: editScopeFor.email }),
+        allCalendars: editScopeAll,
+        calendarIds: editScopeAll ? [] : editScopeIds,
+      });
+      setEditScopeFor(null);
+      fetchDashboard();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to update scope";
+      alert(message);
+    } finally {
+      setSavingScope(false);
     }
   }
 
@@ -2475,7 +2482,7 @@ export default function OrgDashboardPage() {
                   <Check className="w-4 h-4" /> {inviteSuccess}
                 </div>
               )}
-              <div className="flex gap-3 items-end">
+              <div className="flex gap-3 items-end mb-4">
                 <div className="flex-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Email</label>
                   <input
@@ -2503,6 +2510,53 @@ export default function OrgDashboardPage() {
                 >
                   {inviting ? "Sending..." : "Send Invite"}
                 </button>
+              </div>
+
+              {/* Calendar scope picker — required choice */}
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">Calendars</label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setInviteScopeAll(true); setInviteScopeIds([]); }}
+                    className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                      inviteScopeAll
+                        ? "bg-zinc-900 text-white border-zinc-900"
+                        : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400"
+                    }`}
+                  >
+                    All Calendars
+                  </button>
+                  {dashboard.calendars.map((cal) => {
+                    const selected = !inviteScopeAll && inviteScopeIds.includes(cal.objectId);
+                    return (
+                      <button
+                        key={cal.objectId}
+                        type="button"
+                        onClick={() => {
+                          setInviteScopeAll(false);
+                          setInviteScopeIds((prev) =>
+                            prev.includes(cal.objectId)
+                              ? prev.filter((id) => id !== cal.objectId)
+                              : [...prev, cal.objectId]
+                          );
+                        }}
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                          selected
+                            ? "bg-zinc-900 text-white border-zinc-900"
+                            : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400"
+                        }`}
+                      >
+                        {cal.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-zinc-400 mt-2">
+                  {inviteScopeAll
+                    ? "Co-host will have access to every current and future calendar in this organization."
+                    : `Co-host will have access only to ${inviteScopeIds.length === 0 ? "the calendars you select" : `${inviteScopeIds.length} selected calendar${inviteScopeIds.length === 1 ? "" : "s"}`}.`}
+                </p>
               </div>
             </section>
 
@@ -3066,101 +3120,6 @@ export default function OrgDashboardPage() {
                   <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalHideCustomPlans ? "left-5" : "left-0.5"}`} />
                 </button>
               </div>
-
-              {/* Per-calendar co-hosts (owner-only). Co-hosts can manage this
-                  calendar's plans, followers, and settings — but only this
-                  calendar, not siblings. */}
-              {dashboard.calendars.find((c) => c.objectId === editingCalId)?.role === "Owner" && (
-                <div className="border-t border-zinc-100 pt-4 mt-4">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-3">Co-hosts for this calendar</p>
-
-                  {calCohostsLoading ? (
-                    <p className="text-xs text-zinc-400">Loading…</p>
-                  ) : (
-                    <div className="space-y-2 mb-3">
-                      {calCohosts.length === 0 && (
-                        <p className="text-xs text-zinc-400">No co-hosts yet. Invite someone below.</p>
-                      )}
-                      {calCohosts.map((ch) => (
-                        <div key={ch.membershipId} className="flex items-center justify-between border border-zinc-100 rounded-lg px-3 py-2">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-zinc-800 truncate">{ch.name}</p>
-                            <p className="text-[11px] text-zinc-500 truncate">{ch.email || "—"}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (!confirm(`Remove ${ch.name} as a co-host?`)) return;
-                              try {
-                                await Parse.Cloud.run("removeCalendarCoHost", {
-                                  calendarId: editingCalId,
-                                  membershipId: ch.membershipId,
-                                });
-                                setCalCohosts((prev) => prev.filter((c) => c.membershipId !== ch.membershipId));
-                              } catch (err) {
-                                console.error("Failed to remove cohost:", err);
-                                alert(err instanceof Error ? err.message : "Failed to remove co-host.");
-                              }
-                            }}
-                            className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-700"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {dashboard.tier === "starter" ? (
-                    <p className="text-[11px] text-zinc-400">Co-host invitations require a Growth or Pro subscription.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={inviteCohostName}
-                        onChange={(e) => setInviteCohostName(e.target.value)}
-                        placeholder="Name (optional)"
-                        className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm font-light focus:outline-none focus:border-zinc-400"
-                      />
-                      <div className="flex gap-2">
-                        <input
-                          type="email"
-                          value={inviteCohostEmail}
-                          onChange={(e) => setInviteCohostEmail(e.target.value)}
-                          placeholder="Email"
-                          className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm font-light focus:outline-none focus:border-zinc-400"
-                        />
-                        <button
-                          type="button"
-                          disabled={!inviteCohostEmail || invitingCohost}
-                          onClick={async () => {
-                            if (!editingCalId || !inviteCohostEmail) return;
-                            setInvitingCohost(true);
-                            try {
-                              await Parse.Cloud.run("inviteCalendarCoHost", {
-                                calendarId: editingCalId,
-                                email: inviteCohostEmail,
-                                name: inviteCohostName || undefined,
-                              });
-                              setInviteCohostEmail("");
-                              setInviteCohostName("");
-                              await loadCalCohosts(editingCalId);
-                            } catch (err) {
-                              console.error("Failed to invite cohost:", err);
-                              alert(err instanceof Error ? err.message : "Failed to invite co-host.");
-                            } finally {
-                              setInvitingCohost(false);
-                            }
-                          }}
-                          className="bg-zinc-900 text-white px-4 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
-                        >
-                          {invitingCohost ? "…" : "Invite"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
               <button
                 onClick={handleSaveCalendar}
