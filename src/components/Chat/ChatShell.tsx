@@ -183,6 +183,15 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
         to: eventGroupId,
         timestamp: Date.now() / 1000,
       });
+      // Fire-and-forget: notify other attendees via push (and one-time SMS
+      // nudge for web RSVPers without the app). Same cloud function the iOS
+      // app calls when it sends a chat message — keeps notification parity.
+      Parse.Cloud.run("sendPushNotificationsToAttendeesOfGroup", {
+        groupId: eventGroupId,
+        message: text,
+      }).catch((err: unknown) => {
+        console.warn("[chat] push notification failed:", err);
+      });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to send");
       setComposeText(text);
