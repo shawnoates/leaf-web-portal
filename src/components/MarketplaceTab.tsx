@@ -9,6 +9,7 @@ import {
   Star,
   Search,
 } from "lucide-react";
+import { getDefaultCoverForSeed } from "@/lib/default-covers";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -212,10 +213,14 @@ const VenuePhoto = memo(function VenuePhoto({ venue, alt }: { venue: { name: str
     return <div className="w-full h-full bg-zinc-100 animate-pulse" />;
   }
 
-  // No photo found
+  // No photo found — fall back to a default cover gradient seeded by venue name
+  const cover = getDefaultCoverForSeed(`${venue.name}|${venue.address}`);
   return (
-    <div className="w-full h-full bg-zinc-50 flex items-center justify-center">
-      <MapPin className="w-8 h-8 text-zinc-300" />
+    <div
+      className="w-full h-full flex items-center justify-center"
+      style={{ background: cover.gradient }}
+    >
+      <MapPin className="w-8 h-8 text-white/70" />
     </div>
   );
 });
@@ -560,8 +565,11 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
                         ) : event.venue ? (
                           <VenuePhoto venue={event.venue} alt={displayTitle || ""} />
                         ) : (
-                          <div className="w-full h-full bg-zinc-50 flex items-center justify-center">
-                            <Sparkles className="w-8 h-8 text-zinc-300" />
+                          <div
+                            className="w-full h-full flex items-center justify-center"
+                            style={{ background: getDefaultCoverForSeed(event.id).gradient }}
+                          >
+                            <Sparkles className="w-8 h-8 text-white/70" />
                           </div>
                         )}
                         <span className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[9px] font-semibold text-zinc-600 px-2 py-0.5 rounded-full">
