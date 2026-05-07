@@ -32,7 +32,6 @@ import {
   MessageCircle,
 } from "lucide-react";
 
-const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
 
 // --- Types ---
 
@@ -244,16 +243,18 @@ function RsvpModal({
   onClose,
   brandColor,
   onRsvpSuccess,
+  existingNotificationId,
 }: {
   plan: Plan;
   brandColor?: string;
   onClose: () => void;
   onRsvpSuccess?: (planId: string, alreadyRsvpd: boolean, pendingApproval?: boolean) => void;
+  existingNotificationId?: string | null;
 }) {
   const verify = usePhoneVerify();
   const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
   const [errorMsg, setErrorMsg] = useState("");
-  const [notificationId, setNotificationId] = useState<string | null>(null);
+  const [notificationId, setNotificationId] = useState<string | null>(existingNotificationId || null);
   const [rsvpNote, setRsvpNote] = useState("");
   const [isPendingResult, setIsPendingResult] = useState(false);
   const [sharePhone, setSharePhone] = useState(true);
@@ -442,12 +443,13 @@ function RsvpModal({
             )}
 
             {!isPendingResult && !notificationId && (
-              <a
-                href={APP_STORE_URL}
-                className="block w-full border border-zinc-200 py-3 text-xs uppercase tracking-[0.2em] font-bold text-center hover:bg-zinc-50 transition-colors rounded-lg"
+              <Link
+                href={`/chat/${plan.id}`}
+                className="flex items-center justify-center gap-2 w-full text-white py-3 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 rounded-lg"
+                style={{ backgroundColor: brandColor || "#18181b" }}
               >
-                Open in Leaf App
-              </a>
+                <MessageCircle className="w-4 h-4" /> Join Plan Chat
+              </Link>
             )}
 
             {!isPendingResult && plan.dateISO && (() => {
@@ -2469,6 +2471,7 @@ export default function OrgCalendarPage() {
           plan={rsvpPlan}
           onClose={() => setRsvpPlan(null)}
           brandColor={org.brandColor || undefined}
+          existingNotificationId={rsvpNotificationIds.get(rsvpPlan.id) || null}
           onRsvpSuccess={(planId, alreadyRsvpd, pendingApproval) => {
             if (pendingApproval) {
               addPendingRsvpCookie(planId);
