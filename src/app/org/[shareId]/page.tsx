@@ -5,9 +5,9 @@ import { useParams } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import Link from "next/link";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
+import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
-import { QRCodeSVG } from "qrcode.react";
 import {
   Plus,
   Users,
@@ -33,11 +33,6 @@ import {
 } from "lucide-react";
 
 const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
-
-function isIOSDevice() {
-  if (typeof navigator === "undefined") return false;
-  return /iPad|iPhone|iPod/.test(navigator.userAgent);
-}
 
 // --- Types ---
 
@@ -325,19 +320,6 @@ function RsvpModal({
     }
   };
 
-  const deepLink = notificationId ? `leaf://planChat?planId=${notificationId}` : null;
-  const isIOS = isIOSDevice();
-
-  const handleIOSDeepLink = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!deepLink) return;
-    e.preventDefault();
-    window.location.href = deepLink;
-    // Fallback to App Store if the app isn't installed
-    setTimeout(() => {
-      window.location.href = APP_STORE_URL;
-    }, 1500);
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
       <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-none p-8 relative">
@@ -425,37 +407,18 @@ function RsvpModal({
               </p>
             </div>
 
-            {!isPendingResult && deepLink && isIOS && (
-              <div className="pt-2 space-y-3">
-                <a
-                  href={deepLink}
-                  onClick={handleIOSDeepLink}
-                  className="block w-full text-white py-3.5 text-xs uppercase tracking-[0.2em] font-bold transition-opacity hover:opacity-90 rounded-lg"
-                  style={{ backgroundColor: brandColor || "#18181b" }}
-                >
-                  Join the Plan Chat
-                </a>
-                <p className="text-[11px] text-zinc-400">
-                  Don&apos;t have the app?{" "}
-                  <a href={APP_STORE_URL} className="underline hover:text-zinc-900">
-                    Download Leaf
-                  </a>
-                </p>
+            {!isPendingResult && notificationId && (
+              <div className="pt-2">
+                <JoinChatPicker
+                  eventGroupId={plan.id}
+                  eventNotificationId={notificationId}
+                  brandColor={brandColor}
+                  onError={(msg) => setErrorMsg(msg)}
+                />
               </div>
             )}
 
-            {!isPendingResult && deepLink && !isIOS && (
-              <div className="pt-2 space-y-3">
-                <div className="inline-block bg-white p-3 rounded-lg border border-zinc-200">
-                  <QRCodeSVG value={deepLink} size={180} level="M" />
-                </div>
-                <p className="text-[11px] text-zinc-400">
-                  Scan with your phone to open the chat in the Leaf app
-                </p>
-              </div>
-            )}
-
-            {!isPendingResult && !deepLink && (
+            {!isPendingResult && !notificationId && (
               <a
                 href={APP_STORE_URL}
                 className="block w-full border border-zinc-200 py-3 text-xs uppercase tracking-[0.2em] font-bold text-center hover:bg-zinc-50 transition-colors rounded-lg"
@@ -1390,6 +1353,35 @@ export default function OrgCalendarPage() {
     const id = search.get("plan");
     if (id) setPlanQueryId(id);
     if (search.get("welcome") === "1") setShowWelcomeInvite(true);
+
+    // Auto-open the custom-plan ("Suggest the next one") form when arriving
+    // from the memory page with ?suggest=1 and prefill params. The venue name
+    // populates the category search so the user's previous spot likely shows
+    // up at the top of nearby results — placeId still has to be picked from
+    // Google Places, since the cloud function requires a real placeId.
+    if (search.get("suggest") === "1") {
+      const t = search.get("prefillTitle") || "";
+      const d = search.get("prefillDescription") || "";
+      let venueName = "";
+      const venueStr = search.get("prefillVenue");
+      if (venueStr) {
+        try {
+          const v = JSON.parse(venueStr);
+          venueName = v.name || "";
+        } catch {
+          // ignore malformed venue JSON
+        }
+      }
+      setCustomTitle(t);
+      setCustomDescription(d);
+      setCustomCategory(venueName);
+      setCustomCapacity("");
+      setHostNote("");
+      setSelectedVenue(null);
+      setCustomSubmitting(false);
+      setCustomSuccess(false);
+      setCreatingCustomPlan(true);
+    }
   }, []);
   const autoOpenedPlanRef = useRef<string | null>(null);
   useEffect(() => {

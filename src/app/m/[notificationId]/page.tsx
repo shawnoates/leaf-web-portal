@@ -23,6 +23,20 @@ type AttendeeMemoryInfo = {
     host: { name: string } | null;
     calendarName: string | null;
   };
+  calendar?: {
+    objectId: string;
+    shareId: string | null;
+    name: string | null;
+  } | null;
+  viewerRole?: "owner" | "host" | "attendee";
+  recap?: {
+    rsvpCount: number;
+    photoCount: number;
+    dayOfWeek: string | null;
+    timeOfDay: string | null;
+    venueName: string | null;
+    weeksSinceLastPlan: number | null;
+  };
   attendee: { name: string };
   photos: Photo[];
   photoCount: number;

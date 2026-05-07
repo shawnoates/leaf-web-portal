@@ -5,6 +5,7 @@ import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { Camera, Loader2, MapPin, Calendar, History } from "lucide-react";
+import HostTheNextOne from "@/components/HostTheNextOne";
 
 type Photo = {
   objectId: string;
@@ -26,6 +27,20 @@ type AttendeeMemoryInfo = {
     location: { name: string; address: string } | null;
     host: { name: string } | null;
     calendarName: string | null;
+  };
+  calendar?: {
+    objectId: string;
+    shareId: string | null;
+    name: string | null;
+  } | null;
+  viewerRole?: "owner" | "host" | "attendee";
+  recap?: {
+    rsvpCount: number;
+    photoCount: number;
+    dayOfWeek: string | null;
+    timeOfDay: string | null;
+    venueName: string | null;
+    weeksSinceLastPlan: number | null;
   };
   attendee: { name: string };
   photos: Photo[];
@@ -201,6 +216,21 @@ export default function MemoryClient({
         <p className="text-center text-sm text-zinc-400 py-8">
           No photos yet. Be the first to share one.
         </p>
+      )}
+
+      {/* Host the next one — role-aware CTA backed by recap stats */}
+      {info.recap && info.calendar && (
+        <HostTheNextOne
+          viewerRole={info.viewerRole || "attendee"}
+          calendar={info.calendar}
+          recap={info.recap}
+          event={{
+            title: info.event.title,
+            description: info.event.description,
+            image: info.event.image,
+            location: info.event.location,
+          }}
+        />
       )}
 
       {/* Past events link */}
