@@ -13,12 +13,24 @@ import {
   orderByChild,
   limitToLast,
 } from "firebase/database";
-import { Loader2, Send, ArrowLeft, Calendar, MapPin, Users } from "lucide-react";
+import { Loader2, Send, ArrowLeft, Calendar, MapPin, Users, X, Smartphone } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import MessageRow from "./MessageRow";
 import type { FirMessage, UserLite } from "./types";
 
 type AuthState = "checking" | "ready" | "denied" | "error";
+type DeviceType = "ios" | "android" | "desktop";
 const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
+
+function detectDevice(): DeviceType {
+  if (typeof navigator === "undefined") return "desktop";
+  const ua = navigator.userAgent || "";
+  if (/iPad|iPhone|iPod/.test(ua) || (ua.includes("Mac") && navigator.maxTouchPoints > 1)) {
+    return "ios";
+  }
+  if (/Android/i.test(ua)) return "android";
+  return "desktop";
+}
 
 export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
   const router = useRouter();
@@ -31,10 +43,17 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
   const [planDescription, setPlanDescription] = useState<string | null>(null);
   const [planLocationName, setPlanLocationName] = useState<string | null>(null);
   const [attendeeCount, setAttendeeCount] = useState<number | null>(null);
+  const [notificationId, setNotificationId] = useState<string | null>(null);
+  const [device, setDevice] = useState<DeviceType>("desktop");
+  const [showQrModal, setShowQrModal] = useState(false);
   const [messages, setMessages] = useState<FirMessage[]>([]);
   const [users, setUsers] = useState<Map<string, UserLite>>(new Map());
   const [composeText, setComposeText] = useState("");
   const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    setDevice(detectDevice());
+  }, []);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const currentUserIdRef = useRef<string | null>(null);
 
@@ -69,6 +88,7 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
           planDescription?: string | null;
           planLocationName?: string | null;
           attendeeCount?: number | null;
+          notificationId?: string | null;
         };
 
         await signInToChat(tokenResult.firebaseToken);
@@ -80,6 +100,7 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
         if (tokenResult.planDescription) setPlanDescription(tokenResult.planDescription);
         if (tokenResult.planLocationName) setPlanLocationName(tokenResult.planLocationName);
         if (typeof tokenResult.attendeeCount === "number") setAttendeeCount(tokenResult.attendeeCount);
+        if (tokenResult.notificationId) setNotificationId(tokenResult.notificationId);
 
         const db = getChatDatabase();
         const messagesRef = ref(db, `groups/${eventGroupId}/messages`);
@@ -279,6 +300,22 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
       })
     : null;
 
+  // Universal Link to /c/{notificationId} — same handler as the iOS deep
+  // link entry route. Encodes the user's specific RSVP so the iOS app opens
+  // the right plan chat. QR code on desktop renders this so a phone scan
+  // routes through the app's own /c/ handling.
+  const appLinkUrl = notificationId ? `https://os.joinleaf.com/c/${notificationId}` : null;
+  const iosDeepLink = notificationId ? `leaf://planChat?planId=${notificationId}` : null;
+
+  const handleOpenInApp = () => {
+    if (!iosDeepLink) return;
+    window.location.href = iosDeepLink;
+    // Fall back to App Store if the app isn't installed.
+    setTimeout(() => {
+      window.location.href = APP_STORE_URL;
+    }, 1500);
+  };
+
   return (
     <div className="h-dvh flex flex-col md:flex-row bg-zinc-50 overflow-hidden">
       {/* Mobile-only top header (no sidebar shown). On desktop the sidebar carries the same nav. */}
@@ -296,12 +333,14 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
             {attendeeCount != null ? `${attendeeCount} attendee${attendeeCount === 1 ? "" : "s"}` : `${messages.length} message${messages.length === 1 ? "" : "s"}`}
           </p>
         </div>
-        <a
-          href={APP_STORE_URL}
-          className="text-xs text-zinc-500 hover:text-zinc-900 underline"
-        >
-          Open in app
-        </a>
+        {device === "ios" && iosDeepLink && (
+          <button
+            onClick={handleOpenInApp}
+            className="text-xs text-zinc-500 hover:text-zinc-900 underline"
+          >
+            Open in app
+          </button>
+        )}
       </header>
 
       {/* Desktop sidebar with plan details */}
@@ -361,19 +400,68 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
             </div>
           )}
 
-          <div className="pt-4 border-t border-zinc-100">
-            <a
-              href={APP_STORE_URL}
-              className="block w-full border border-zinc-200 py-2.5 text-xs uppercase tracking-[0.2em] font-bold text-center rounded-lg hover:bg-zinc-50 transition-colors text-zinc-900"
+          {/* Open-in-app CTA: desktop opens QR modal; iOS fires deep link with
+              App Store fallback; Android is hidden (Leaf is iOS-only). */}
+          {device !== "android" && iosDeepLink && (
+            <div className="pt-4 border-t border-zinc-100">
+              {device === "desktop" ? (
+                <button
+                  onClick={() => setShowQrModal(true)}
+                  className="block w-full border border-zinc-200 py-2.5 text-xs uppercase tracking-[0.2em] font-bold text-center rounded-lg hover:bg-zinc-50 transition-colors text-zinc-900"
+                >
+                  Open in Leaf app
+                </button>
+              ) : (
+                <button
+                  onClick={handleOpenInApp}
+                  className="block w-full border border-zinc-200 py-2.5 text-xs uppercase tracking-[0.2em] font-bold text-center rounded-lg hover:bg-zinc-50 transition-colors text-zinc-900"
+                >
+                  Open in Leaf app
+                </button>
+              )}
+              <p className="text-[11px] text-zinc-400 text-center mt-2">
+                Push notifications, split bill, save photos
+              </p>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* QR modal — desktop only. Encodes the Universal Link to /c/{notificationId}
+          so a scan from iPhone opens the plan chat in the app (or App Store). */}
+      {showQrModal && appLinkUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm p-4"
+          onClick={() => setShowQrModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-8 max-w-sm w-full relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowQrModal(false)}
+              aria-label="Close"
+              className="absolute top-4 right-4 p-1.5 text-zinc-400 hover:text-zinc-900 rounded-lg"
             >
-              Open in Leaf app
-            </a>
-            <p className="text-[11px] text-zinc-400 text-center mt-2">
-              Push notifications, split bill, save photos
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2 mb-2 text-zinc-900">
+              <Smartphone className="w-5 h-5" />
+              <h3 className="text-lg font-medium">Open in Leaf app</h3>
+            </div>
+            <p className="text-sm text-zinc-500 mb-6">
+              Scan with your iPhone to open this chat in the Leaf app — or
+              install it from the App Store if you don&rsquo;t have it yet.
+            </p>
+            <div className="flex justify-center bg-white border border-zinc-200 rounded-xl p-4">
+              <QRCodeSVG value={appLinkUrl} size={220} level="M" />
+            </div>
+            <p className="text-[11px] text-zinc-400 text-center mt-4 break-all">
+              {appLinkUrl}
             </p>
           </div>
         </div>
-      </aside>
+      )}
 
       {/* Chat column */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
