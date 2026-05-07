@@ -262,19 +262,22 @@ export default function PrivacyPolicyPage() {
               arrive by email, SMS, or push notification.
             </p>
             <p>
-              You can opt out of optional emails at any time using the
-              unsubscribe link at the bottom of those messages, or by emailing
-              us at{" "}
+              Most optional emails (digests, recommendations, plan updates)
+              are tied to the calendars and organizations you follow. To stop
+              receiving them, unfollow the calendar or organization in the
+              Leaf app or web portal, or use the unsubscribe link at the
+              bottom of the email. You can disable push notifications in
+              your device settings, and you can reply <code>STOP</code> to
+              opt out of non-essential SMS. We may continue to send
+              transactional messages necessary to operate your account. If
+              you have trouble managing your preferences, email us at{" "}
               <a
                 href="mailto:team@getleaflets.co"
                 className="text-zinc-900 underline underline-offset-4 hover:text-zinc-600"
               >
                 team@getleaflets.co
               </a>
-              . You can disable push notifications in your device settings,
-              and you can reply <code>STOP</code> to opt out of non-essential
-              SMS. We may continue to send transactional messages necessary
-              to operate your account.
+              .
             </p>
           </section>
 
