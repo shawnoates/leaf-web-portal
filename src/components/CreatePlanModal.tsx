@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Parse from "@/lib/parse-client";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
-import { DEFAULT_COVERS, rasterizeSvgToPng, type DefaultCover } from "@/lib/default-covers";
+import { getDefaultCoverForSeed } from "@/lib/default-covers";
 import VenueSearch from "@/components/VenueSearch";
 import {
   Calendar,
@@ -113,19 +113,8 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [unsplashPhotos, setUnsplashPhotos] = useState<{ id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]>([]);
   const [unsplashLoading, setUnsplashLoading] = useState(false);
-  const [selectedDefaultCoverId, setSelectedDefaultCoverId] = useState<string | null>(null);
 
-  async function handleDefaultCoverSelect(cover: DefaultCover) {
-    try {
-      const { preview, base64 } = await rasterizeSvgToPng(cover.svg);
-      setImagePreview(preview);
-      setImageBase64(base64);
-      setSelectedImageUrl(null);
-      setSelectedDefaultCoverId(cover.id);
-    } catch {
-      alert("Could not apply this cover. Try another.");
-    }
-  }
+  const placeholderCover = getDefaultCoverForSeed(title.trim() || "default");
 
   // If prefill has an image URL, fetch and convert to base64 (once on mount)
   const prefillImageLoaded = useRef(false);
@@ -186,7 +175,6 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       setImagePreview(preview);
       setImageBase64(base64);
       setSelectedImageUrl(null);
-      setSelectedDefaultCoverId(null);
     } catch {
       alert("Could not process this image. Please try a different file.");
     }
@@ -471,52 +459,22 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   </div>
                 )}
                 <button
-                  onClick={() => { setImagePreview(null); setImageBase64(null); setSelectedImageUrl(null); setSelectedDefaultCoverId(null); }}
+                  onClick={() => { setImagePreview(null); setImageBase64(null); setSelectedImageUrl(null); }}
                   className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             ) : (
-              <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-zinc-200 rounded-lg cursor-pointer hover:border-zinc-400 transition-colors">
-                <ImagePlus className="w-6 h-6 text-zinc-300 mb-2" />
-                <span className="text-xs text-zinc-400">Click to upload an image</span>
+              <label
+                className="flex flex-col items-center justify-center w-full h-28 rounded-lg cursor-pointer transition-opacity hover:opacity-90"
+                style={{ background: placeholderCover.gradient }}
+              >
+                <ImagePlus className="w-6 h-6 text-white/90 mb-2" />
+                <span className="text-xs text-white/90">Click to upload an image</span>
                 <input type="file" accept={IMAGE_ACCEPT} onChange={handleImageSelect} className="hidden" />
               </label>
             )}
-
-            {/* Default cover gallery — always available, no API quota */}
-            <div className="mt-3 space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Default covers</p>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {DEFAULT_COVERS.map((cover) => {
-                  const isSelected = selectedDefaultCoverId === cover.id;
-                  return (
-                    <button
-                      key={cover.id}
-                      type="button"
-                      onClick={() => handleDefaultCoverSelect(cover)}
-                      title={cover.name}
-                      className={`min-w-[120px] max-w-[120px] h-[80px] shrink-0 rounded-lg overflow-hidden border-2 transition-all relative ${
-                        isSelected
-                          ? "border-zinc-900 shadow-lg"
-                          : "border-zinc-200 hover:border-zinc-300"
-                      }`}
-                      style={{ background: cover.gradient }}
-                    >
-                      {isSelected && (
-                        <div className="absolute top-1 right-1 bg-zinc-900 text-white rounded-full p-0.5 z-10">
-                          <Check className="w-2.5 h-2.5" />
-                        </div>
-                      )}
-                      <span className="absolute bottom-1 left-1.5 text-[9px] font-medium text-white/90 uppercase tracking-widest drop-shadow">
-                        {cover.name}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
             {/* Photo suggestions from Unsplash */}
             {(unsplashLoading || unsplashPhotos.length > 0) && (
@@ -534,7 +492,6 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                         setSelectedImageUrl(selectedImageUrl === photo.url ? null : photo.url);
                         setImagePreview(null);
                         setImageBase64(null);
-                        setSelectedDefaultCoverId(null);
                       }}
                       className={`min-w-[120px] max-w-[120px] h-[80px] shrink-0 rounded-lg overflow-hidden border-2 transition-all relative ${
                         selectedImageUrl === photo.url
