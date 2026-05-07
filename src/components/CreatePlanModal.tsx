@@ -50,6 +50,8 @@ export interface CreatePlanPrefill {
   pollOptions?: PollOptionDraft[];
   /** Prefilled poll close date as YYYY-MM-DD (used when editing a poll). */
   pollClosesAt?: string;
+  /** Seed for the placeholder cover gradient — match the source card's color. */
+  coverSeed?: string;
 }
 
 interface CreatePlanModalProps {
@@ -114,7 +116,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [unsplashPhotos, setUnsplashPhotos] = useState<{ id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]>([]);
   const [unsplashLoading, setUnsplashLoading] = useState(false);
 
-  const placeholderCover = getDefaultCoverForSeed(title.trim() || "default");
+  const placeholderCover = getDefaultCoverForSeed(prefill?.coverSeed || title.trim() || "default");
 
   // If prefill has an image URL, fetch and convert to base64 (once on mount)
   const prefillImageLoaded = useRef(false);
