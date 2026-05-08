@@ -47,6 +47,12 @@ interface JoinChatPickerProps {
   eventNotificationId: string;
   brandColor?: string;
   onError?: (message: string) => void;
+  // Override the "Get the app" tile href. Defaults to the universal /c/{id}
+  // link, which is correct from /org/[shareId] (Safari follows it to the
+  // chat landing). On the chat landing itself it would be a self-link, so
+  // callers there should pass `leaf://planChat?planId=...` (iOS) or the App
+  // Store URL.
+  appLinkHref?: string;
 }
 
 export default function JoinChatPicker({
@@ -54,6 +60,7 @@ export default function JoinChatPicker({
   eventNotificationId,
   brandColor,
   onError,
+  appLinkHref,
 }: JoinChatPickerProps) {
   const router = useRouter();
   const buttonRef = useRef<HTMLDivElement>(null);
@@ -108,7 +115,7 @@ export default function JoinChatPicker({
     setButtonRendered(true);
   }, [scriptReady, buttonRendered, handleCredentialResponse]);
 
-  const appUrl = `https://os.joinleaf.com/c/${eventNotificationId}`;
+  const appUrl = appLinkHref || `https://os.joinleaf.com/c/${eventNotificationId}`;
   const accent = brandColor || "#18181b";
 
   return (

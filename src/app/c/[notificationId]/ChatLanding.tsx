@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
+import JoinChatPicker from "@/components/JoinChatPicker";
 
 const APP_STORE_URL =
   "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
@@ -18,9 +19,12 @@ export default function ChatLanding({ notificationId }: { notificationId: string
   const [isIOS, setIsIOS] = useState<boolean | null>(null);
   const [eventGroupId, setEventGroupId] = useState<string | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
+  const [hasUser, setHasUser] = useState<boolean | null>(null);
 
   useEffect(() => {
     setIsIOS(isIOSDevice());
+    // Parse stores the session in localStorage; safe to read on client mount.
+    setHasUser(!!Parse.User.current());
   }, []);
 
   // Translate notificationId -> eventGroupId so both branches can offer the
@@ -51,12 +55,16 @@ export default function ChatLanding({ notificationId }: { notificationId: string
   // users who don't have the app. Let them tap "Open in Leaf app" explicitly,
   // which still uses the same deep link.
 
-  // Non-iOS: forward to /chat/{eventGroupId} as soon as we have the id.
+  // Non-iOS: forward to /chat/{eventGroupId} as soon as we have the id —
+  // but only if the user is already signed in. Unauthenticated visitors get
+  // the Google sign-in flow rendered below (otherwise ChatShell would just
+  // show the "You need to RSVP first" denied state).
   useEffect(() => {
     if (isIOS !== false) return;
+    if (hasUser !== true) return;
     if (!eventGroupId) return;
     window.location.replace(`/chat/${eventGroupId}`);
-  }, [isIOS, eventGroupId]);
+  }, [isIOS, hasUser, eventGroupId]);
 
   return (
     <div
@@ -73,7 +81,17 @@ export default function ChatLanding({ notificationId }: { notificationId: string
           "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       }}
     >
-      {isIOS === true && (
+      {hasUser === false && eventGroupId && !lookupError && (
+        <div style={{ width: "100%", maxWidth: 640 }}>
+          <JoinChatPicker
+            eventGroupId={eventGroupId}
+            eventNotificationId={notificationId}
+            appLinkHref={isIOS ? deepLink : APP_STORE_URL}
+          />
+        </div>
+      )}
+
+      {hasUser === true && isIOS === true && !lookupError && (
         <>
           <h1
             style={{
@@ -131,7 +149,7 @@ export default function ChatLanding({ notificationId }: { notificationId: string
         </>
       )}
 
-      {isIOS === false && !lookupError && (
+      {hasUser === true && isIOS === false && !lookupError && (
         <>
           <h1
             style={{
@@ -150,7 +168,7 @@ export default function ChatLanding({ notificationId }: { notificationId: string
         </>
       )}
 
-      {isIOS === false && lookupError && (
+      {lookupError && (
         <>
           <h1
             style={{

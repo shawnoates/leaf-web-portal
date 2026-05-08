@@ -37,7 +37,6 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
   const [authState, setAuthState] = useState<AuthState>("checking");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [planTitle, setPlanTitle] = useState<string | null>(null);
-  const [calendarShareId, setCalendarShareId] = useState<string | null>(null);
   const [planDate, setPlanDate] = useState<string | null>(null);
   const [planTimeString, setPlanTimeString] = useState<string | null>(null);
   const [planDescription, setPlanDescription] = useState<string | null>(null);
@@ -82,7 +81,6 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
         })) as {
           firebaseToken: string;
           planTitle?: string | null;
-          calendarShareId?: string | null;
           planDate?: string | null;
           planTimeString?: string | null;
           planDescription?: string | null;
@@ -94,7 +92,6 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
         await signInToChat(tokenResult.firebaseToken);
         if (!mounted) return;
         if (tokenResult.planTitle) setPlanTitle(tokenResult.planTitle);
-        if (tokenResult.calendarShareId) setCalendarShareId(tokenResult.calendarShareId);
         if (tokenResult.planDate) setPlanDate(tokenResult.planDate);
         if (tokenResult.planTimeString) setPlanTimeString(tokenResult.planTimeString);
         if (tokenResult.planDescription) setPlanDescription(tokenResult.planDescription);
@@ -283,13 +280,7 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
   }
 
   const handleBack = () => {
-    if (calendarShareId) {
-      router.push(`/org/${calendarShareId}`);
-    } else if (typeof window !== "undefined" && window.history.length > 1) {
-      router.back();
-    } else {
-      router.push("/");
-    }
+    router.push(`/p/${eventGroupId}`);
   };
 
   const formattedDate = planDate
