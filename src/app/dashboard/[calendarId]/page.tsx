@@ -2976,7 +2976,7 @@ export default function OrgDashboardPage() {
                   value={newCalDesc}
                   onChange={(e) => setNewCalDesc(e.target.value)}
                   rows={2}
-                  className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-none"
+                  className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-y"
                   placeholder="What is this calendar about?"
                 />
               </div>
@@ -3109,7 +3109,7 @@ export default function OrgDashboardPage() {
                   value={editCalDesc}
                   onChange={(e) => setEditCalDesc(e.target.value)}
                   rows={3}
-                  className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-none"
+                  className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-y"
                   placeholder="What is this calendar about?"
                 />
               </div>

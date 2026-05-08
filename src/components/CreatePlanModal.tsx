@@ -443,7 +443,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-none"
+              className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-y"
               placeholder="What's this plan about?"
             />
           </div>
