@@ -62,9 +62,17 @@ export async function generateMetadata({
   const description = info.description || descParts.join(" · ");
   const ogImages = info.image ? [{ url: info.image }] : undefined;
 
+  const icons = info.calendar?.profilePhoto
+    ? {
+        icon: info.calendar.profilePhoto,
+        apple: info.calendar.profilePhoto,
+      }
+    : undefined;
+
   return {
     title,
     description,
+    icons,
     openGraph: {
       title,
       description,

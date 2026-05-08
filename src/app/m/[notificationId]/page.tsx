@@ -27,6 +27,7 @@ type AttendeeMemoryInfo = {
     objectId: string;
     shareId: string | null;
     name: string | null;
+    profilePhoto?: string | null;
   } | null;
   viewerRole?: "owner" | "host" | "attendee";
   recap?: {
@@ -74,9 +75,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
   const title = `Photos from ${info.event.title}`;
   const description = `Add your photos from ${info.event.title} on Leaf.`;
+  const icons = info.calendar?.profilePhoto
+    ? {
+        icon: info.calendar.profilePhoto,
+        apple: info.calendar.profilePhoto,
+      }
+    : undefined;
   return {
     title: `${title} · Leaf`,
     description,
+    icons,
     openGraph: {
       title,
       description,
