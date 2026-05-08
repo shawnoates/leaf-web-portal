@@ -3216,6 +3216,32 @@ export default function OrgDashboardPage() {
                 {savingCal ? "Saving..." : "Save Changes"}
               </button>
 
+              {/* Make primary — owner-only, non-primary sub-calendars only */}
+              {!dashboard.calendars.find((c) => c.objectId === editingCalId)?.isPrimary
+                && dashboard.calendars.find((c) => c.objectId === editingCalId)?.role === "Owner" && (
+                <button
+                  onClick={async () => {
+                    const calName = dashboard.calendars.find((c) => c.objectId === editingCalId)?.name || "this calendar";
+                    if (!confirm(`Make "${calName}" your primary calendar? Billing, ownership, and org-level settings will move to this calendar. The dashboard URL will change — existing bookmarks may need updating.`)) return;
+                    try {
+                      const result = await Parse.Cloud.run("makePrimaryCalendar", { calendarId: editingCalId, orgId: calendarId });
+                      setEditingCalId(null);
+                      if (result?.newOrgId && result.newOrgId !== calendarId) {
+                        router.push(`/dashboard/${result.newOrgId}`);
+                      } else {
+                        fetchDashboard();
+                      }
+                    } catch (err) {
+                      console.error("Failed to make calendar primary:", err);
+                      alert(err instanceof Error ? err.message : "Failed to make calendar primary.");
+                    }
+                  }}
+                  className="w-full text-center py-2 mt-3 text-xs font-bold uppercase tracking-widest text-zinc-700 hover:text-zinc-900 transition-colors"
+                >
+                  Make Primary
+                </button>
+              )}
+
               {/* Delete calendar — owner-only, non-primary sub-calendars only */}
               {!dashboard.calendars.find((c) => c.objectId === editingCalId)?.isPrimary
                 && dashboard.calendars.find((c) => c.objectId === editingCalId)?.role === "Owner" && (
