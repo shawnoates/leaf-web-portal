@@ -10,7 +10,6 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Sparkles,
   Heart,
   Check,
   ArrowRight,
@@ -322,8 +321,8 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
         <section className="mt-48 mb-24 space-y-12">
           <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
             <div className="space-y-2">
-              <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold flex items-center gap-2">
-                <Sparkles className="w-3.5 h-3.5" /> {ideasHeader}
+              <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
+                {ideasHeader}
               </p>
               <h2 className="text-4xl font-light tracking-tight italic">
                 {ideasTitle}
