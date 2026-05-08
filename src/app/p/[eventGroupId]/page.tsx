@@ -12,6 +12,7 @@ type PlanShareInfo = {
   host: { name: string } | null;
   shareId: string | null;
   calendarName: string | null;
+  calendarProfilePhoto: string | null;
 };
 
 async function fetchPlanShareInfo(
@@ -57,9 +58,17 @@ export async function generateMetadata({
 
   const ogImages = info.image ? [{ url: info.image }] : undefined;
 
+  const icons = info.calendarProfilePhoto
+    ? {
+        icon: info.calendarProfilePhoto,
+        apple: info.calendarProfilePhoto,
+      }
+    : undefined;
+
   return {
     title: `${title} · Leaf`,
     description,
+    icons,
     openGraph: {
       title,
       description,
