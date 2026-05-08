@@ -59,9 +59,17 @@ export async function generateMetadata({
   const imageUrl = info.bannerUrl || info.profilePhoto || firstPlanImage || firstIdeaImage || null;
   const ogImages = imageUrl ? [{ url: imageUrl }] : undefined;
 
+  const icons = info.profilePhoto
+    ? {
+        icon: info.profilePhoto,
+        apple: info.profilePhoto,
+      }
+    : undefined;
+
   return {
     title: `${title} · Leaf`,
     description,
+    icons,
     openGraph: {
       title,
       description,
