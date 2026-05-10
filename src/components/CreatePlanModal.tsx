@@ -322,10 +322,10 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       : undefined;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={() => { if (!creating) onClose(); }} />
-      <div className="relative bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl">
-        <div className="sticky top-0 bg-white border-b border-zinc-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+    <div className="fixed inset-0 z-50 sm:flex sm:items-center sm:justify-center sm:p-4">
+      <div className="absolute inset-0 bg-black/40 hidden sm:block" onClick={() => { if (!creating) onClose(); }} />
+      <div className="relative bg-white w-full h-[100dvh] overflow-y-auto sm:rounded-2xl sm:max-w-lg sm:h-auto sm:max-h-[90vh] sm:shadow-xl">
+        <div className="sticky top-0 bg-white border-b border-zinc-100 px-6 py-4 flex items-center justify-between sm:rounded-t-2xl">
           <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{editMode ? (isPoll ? "Edit Date Poll" : "Edit Plan") : isPoll ? "New Date Poll" : "New Plan"}</h2>
           <button
             onClick={() => { if (!creating) onClose(); }}
