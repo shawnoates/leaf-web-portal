@@ -121,6 +121,14 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   // If prefill has an image URL, fetch and convert to base64 (once on mount)
   const prefillImageLoaded = useRef(false);
   useEffect(() => {
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, []);
+
+  useEffect(() => {
     if (prefill?.imageUrl && !prefillImageLoaded.current) {
       prefillImageLoaded.current = true;
       setLoadingImage(true);
@@ -322,10 +330,16 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       : undefined;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="fixed inset-0 bg-black/40" onClick={() => { if (!creating) onClose(); }} />
-      <div className="relative min-h-full flex items-center justify-center p-4">
-      <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-xl my-4">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/40"
+      onClick={() => { if (!creating) onClose(); }}
+      style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
+    >
+      <div className="min-h-full flex items-start sm:items-center justify-center p-4">
+      <div
+        className="relative bg-white rounded-2xl w-full max-w-lg shadow-xl my-4"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="sticky top-0 bg-white border-b border-zinc-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
           <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{editMode ? (isPoll ? "Edit Date Poll" : "Edit Plan") : isPoll ? "New Date Poll" : "New Plan"}</h2>
           <button
