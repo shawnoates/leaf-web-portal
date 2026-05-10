@@ -2030,8 +2030,8 @@ export default function OrgCalendarPage() {
           <section className={`${org.plans.length > 0 ? "mt-48" : "mt-8"} mb-24 space-y-12`}>
             <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
               <div className="space-y-2">
-                <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold flex items-center gap-2">
-                  <Sparkles className="w-3.5 h-3.5" /> Get Involved
+                <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
+                  Get Involved
                 </p>
                 <h2 className="text-4xl font-light tracking-tight italic">
                   Host Something for the Community
