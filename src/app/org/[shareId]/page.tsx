@@ -2727,7 +2727,7 @@ export default function OrgCalendarPage() {
       {/* Custom Plan Request Overlay */}
       {creatingCustomPlan && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-3xl md:h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-t-3xl md:rounded-none relative">
+          <div className="bg-white w-full max-w-3xl max-h-[90vh] md:h-[90vh] md:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-t-3xl md:rounded-none relative">
             <button
               onClick={() => {
                 setCreatingCustomPlan(false);
