@@ -52,6 +52,8 @@ export interface CreatePlanPrefill {
   pollClosesAt?: string;
   /** Seed for the placeholder cover gradient — match the source card's color. */
   coverSeed?: string;
+  /** Plan's current hideVenueUntilRsvp value (used when editing an existing plan). */
+  hideVenueUntilRsvp?: boolean;
 }
 
 interface CreatePlanModalProps {
@@ -85,7 +87,7 @@ function toTimeInputValue(t?: string | null): string {
 
 export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, editMode, eventGroupId, onClose, onCreated, onUpgrade }: CreatePlanModalProps) {
   const [selectedCalendarId, setSelectedCalendarId] = useState(calendarId);
-  const [hideVenue, setHideVenue] = useState(hideVenueDefault ?? true);
+  const [hideVenue, setHideVenue] = useState(prefill?.hideVenueUntilRsvp ?? hideVenueDefault ?? true);
   const [title, setTitle] = useState(prefill?.title || "");
   const [description, setDescription] = useState(prefill?.description || "");
   const [venueQuery, setVenueQuery] = useState(prefill?.venue?.name || "");
@@ -282,6 +284,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
           capacity: capacity ? parseInt(capacity) : null,
           hostNote: hostNote.trim() || undefined,
+          hideVenueUntilRsvp: hideVenue,
           requireApproval,
         });
       } else {

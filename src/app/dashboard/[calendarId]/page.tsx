@@ -413,6 +413,7 @@ export default function OrgDashboardPage() {
     pollVoteCount?: number;
     pollOptionCount?: number;
     pollClosesAt?: string | null;
+    hideVenueUntilRsvp?: boolean;
   } | null>(null);
   // Create plan modal (used by marketplace + duplicate)
   const [createPlanPrefill, setCreatePlanPrefill] = useState<CreatePlanPrefill | null>(null);
@@ -1782,7 +1783,7 @@ export default function OrgDashboardPage() {
             </div>
             <div className="space-y-3">
               {dashboard.calendars.map((cal) => {
-                const activePlans = ((cal as Record<string, unknown>).activePlans as { objectId: string; title: string; description: string; image: string | null; date: string; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null }[]) || [];
+                const activePlans = ((cal as Record<string, unknown>).activePlans as { objectId: string; title: string; description: string; image: string | null; date: string; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean }[]) || [];
                 const suggestedPlans = ((cal as Record<string, unknown>).suggestedPlans as { id: string; type: string; title: string; description?: string; subtitle: string; recommendedDate: string; recommendedTime?: string | null; venue?: { name: string; address: string } | null; image?: string | null; isSuggestion: true }[]) || [];
                 const inactive = cal.isActive === false;
                 return (
@@ -3356,6 +3357,7 @@ export default function OrgDashboardPage() {
             pollOptionCount: selectedActivePlan.pollOptionCount,
             pollVoteCount: selectedActivePlan.pollVoteCount,
             pollClosesAt: selectedActivePlan.pollClosesAt,
+            hideVenueUntilRsvp: selectedActivePlan.hideVenueUntilRsvp,
           }}
           onClose={() => setSelectedActivePlan(null)}
           onChanged={fetchDashboard}
@@ -3385,6 +3387,7 @@ export default function OrgDashboardPage() {
                 mode: "poll",
                 pollOptions,
                 pollClosesAt,
+                hideVenueUntilRsvp: plan.hideVenueUntilRsvp,
               });
               setSelectedActivePlan(null);
               setShowCreatePlanModal(true);
@@ -3401,6 +3404,7 @@ export default function OrgDashboardPage() {
               date: planDate,
               time: plan.time || "",
               imageUrl: plan.image,
+              hideVenueUntilRsvp: plan.hideVenueUntilRsvp,
             });
             setSelectedActivePlan(null);
             setShowCreatePlanModal(true);

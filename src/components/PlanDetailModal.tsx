@@ -27,6 +27,7 @@ export type PlanDetailData = {
   pollOptionCount?: number;
   pollClosesAt?: string | null;
   pollVoteCount?: number;
+  hideVenueUntilRsvp?: boolean;
 };
 
 type PollOptionDetail = { date: string; time: string | null; count: number };

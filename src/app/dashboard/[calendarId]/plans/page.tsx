@@ -53,6 +53,7 @@ interface UpcomingPlan {
   pollOptionCount?: number;
   pollVoteCount?: number;
   pollClosesAt?: string | null;
+  hideVenueUntilRsvp?: boolean;
 }
 
 export default function PlansPage() {
@@ -189,6 +190,7 @@ export default function PlansPage() {
           pollOptionCount?: number;
           pollVoteCount?: number;
           pollClosesAt?: string | null;
+          hideVenueUntilRsvp?: boolean;
         }) => ({
           objectId: p.objectId,
           title: p.title,
@@ -203,6 +205,7 @@ export default function PlansPage() {
           pollOptionCount: p.pollOptionCount,
           pollVoteCount: p.pollVoteCount,
           pollClosesAt: p.pollClosesAt,
+          hideVenueUntilRsvp: p.hideVenueUntilRsvp,
         }))
       );
       const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null }) => ({
@@ -375,6 +378,7 @@ export default function PlansPage() {
         mode: "poll",
         pollOptions,
         pollClosesAt,
+        hideVenueUntilRsvp: plan.hideVenueUntilRsvp,
       });
       setEditingPlanId(plan.objectId);
       setSelectedPlan(null);
@@ -389,6 +393,7 @@ export default function PlansPage() {
       date: planDate,
       time: plan.time || "",
       imageUrl: plan.image,
+      hideVenueUntilRsvp: plan.hideVenueUntilRsvp,
     });
     setEditingPlanId(plan.objectId);
     setSelectedPlan(null);
@@ -644,6 +649,7 @@ export default function PlansPage() {
             pollOptionCount: selectedPlan.pollOptionCount,
             pollVoteCount: selectedPlan.pollVoteCount,
             pollClosesAt: selectedPlan.pollClosesAt,
+            hideVenueUntilRsvp: selectedPlan.hideVenueUntilRsvp,
           }}
           onClose={() => setSelectedPlan(null)}
           onChanged={() => {
