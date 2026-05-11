@@ -54,6 +54,8 @@ export interface CreatePlanPrefill {
   coverSeed?: string;
   /** Plan's current hideVenueUntilRsvp value (used when editing an existing plan). */
   hideVenueUntilRsvp?: boolean;
+  /** Plan's current requireApproval value (used when editing an existing plan). */
+  requireApproval?: boolean;
 }
 
 interface CreatePlanModalProps {
@@ -110,7 +112,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       : [emptyPollOption(), emptyPollOption()]
   );
   const [pollClosesAt, setPollClosesAt] = useState(prefill?.pollClosesAt || "");
-  const [requireApproval, setRequireApproval] = useState(false);
+  const [requireApproval, setRequireApproval] = useState(prefill?.requireApproval ?? false);
   const [creating, setCreating] = useState(false);
   const [success, setSuccess] = useState(false);
   const [loadingImage, setLoadingImage] = useState(false);
