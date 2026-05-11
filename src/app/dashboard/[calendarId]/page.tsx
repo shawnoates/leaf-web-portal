@@ -146,6 +146,7 @@ interface OrgDashboard {
     role: "Owner" | "Host";
     calendarImage: string | null;
     hideVenueUntilRsvp: boolean;
+    requireApprovalDefault: boolean;
     isPrivate: boolean;
     hidePlanIdeas: boolean;
     hideCustomPlans: boolean;
@@ -366,6 +367,7 @@ export default function OrgDashboardPage() {
   const [editCalImageBase64, setEditCalImageBase64] = useState<string | null>(null);
   const [editCalRemoveImage, setEditCalRemoveImage] = useState(false);
   const [editCalHideVenue, setEditCalHideVenue] = useState(true);
+  const [editCalRequireApprovalDefault, setEditCalRequireApprovalDefault] = useState(false);
   const [editCalIsPrivate, setEditCalIsPrivate] = useState(false);
   const [editCalHidePlanIdeas, setEditCalHidePlanIdeas] = useState(false);
   const [editCalHideCustomPlans, setEditCalHideCustomPlans] = useState(false);
@@ -508,6 +510,7 @@ export default function OrgDashboardPage() {
       setEditCalImageBase64(null);
       setEditCalRemoveImage(false);
       setEditCalHideVenue(cal.hideVenueUntilRsvp !== false);
+      setEditCalRequireApprovalDefault(cal.requireApprovalDefault === true);
       setEditCalIsPrivate(cal.isPrivate || false);
       setEditCalHidePlanIdeas(cal.hidePlanIdeas || false);
       setEditCalHideCustomPlans(cal.hideCustomPlans || false);
@@ -618,6 +621,7 @@ export default function OrgDashboardPage() {
         params.removeImage = true;
       }
       params.hideVenueUntilRsvp = editCalHideVenue;
+      params.requireApprovalDefault = editCalRequireApprovalDefault;
       params.isPrivate = editCalIsPrivate;
       params.hidePlanIdeas = editCalHidePlanIdeas;
       params.hideCustomPlans = editCalHideCustomPlans;
@@ -627,7 +631,7 @@ export default function OrgDashboardPage() {
       setDashboard((d) => d ? {
         ...d,
         calendars: d.calendars.map((c) =>
-          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId, city: editCalCity || c.city, calendarImage: editCalImageBase64 ? newCalImage : (editCalRemoveImage ? null : c.calendarImage), hideVenueUntilRsvp: editCalHideVenue, isPrivate: editCalIsPrivate, hidePlanIdeas: editCalHidePlanIdeas, hideCustomPlans: editCalHideCustomPlans } : c
+          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId, city: editCalCity || c.city, calendarImage: editCalImageBase64 ? newCalImage : (editCalRemoveImage ? null : c.calendarImage), hideVenueUntilRsvp: editCalHideVenue, requireApprovalDefault: editCalRequireApprovalDefault, isPrivate: editCalIsPrivate, hidePlanIdeas: editCalHidePlanIdeas, hideCustomPlans: editCalHideCustomPlans } : c
         ),
       } : d);
       setEditingCalId(null);
@@ -1861,7 +1865,7 @@ export default function OrgDashboardPage() {
                         ) : (
                           <>
                             <button
-                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); setEditCalCity(cal.city || ""); setEditCalCitySelected(false); setEditCalImagePreview(cal.calendarImage || null); setEditCalImageBase64(null); setEditCalRemoveImage(false); setEditCalHideVenue(cal.hideVenueUntilRsvp !== false); setEditCalIsPrivate(cal.isPrivate || false); setEditCalHidePlanIdeas(cal.hidePlanIdeas || false); setEditCalHideCustomPlans(cal.hideCustomPlans || false); }}
+                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); setEditCalCity(cal.city || ""); setEditCalCitySelected(false); setEditCalImagePreview(cal.calendarImage || null); setEditCalImageBase64(null); setEditCalRemoveImage(false); setEditCalHideVenue(cal.hideVenueUntilRsvp !== false); setEditCalRequireApprovalDefault(cal.requireApprovalDefault === true); setEditCalIsPrivate(cal.isPrivate || false); setEditCalHidePlanIdeas(cal.hidePlanIdeas || false); setEditCalHideCustomPlans(cal.hideCustomPlans || false); }}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
                             >
                               <Pencil className="w-3 h-3" /> Edit
@@ -3158,6 +3162,20 @@ export default function OrgDashboardPage() {
                   <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalHideVenue ? "left-5" : "left-0.5"}`} />
                 </button>
               </div>
+              {/* Require approval default toggle */}
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <p className="text-xs font-medium text-zinc-700">Require approval to attend by default</p>
+                  <p className="text-xs text-zinc-400">New plans require host approval before RSVPs are confirmed</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditCalRequireApprovalDefault(!editCalRequireApprovalDefault)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${editCalRequireApprovalDefault ? "bg-zinc-900" : "bg-zinc-200"}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalRequireApprovalDefault ? "left-5" : "left-0.5"}`} />
+                </button>
+              </div>
               {/* Private calendar toggle */}
               <div className="flex items-center justify-between py-2">
                 <div>
@@ -3430,6 +3448,7 @@ export default function OrgDashboardPage() {
           tier={dashboard.tier}
           prefill={createPlanPrefill}
           hideVenueDefault={dashboard.calendars.find((c) => c.objectId === calendarId)?.hideVenueUntilRsvp}
+          requireApprovalDefault={dashboard.calendars.find((c) => c.objectId === calendarId)?.requireApprovalDefault}
           editMode={!!editingPlanId}
           eventGroupId={editingPlanId || undefined}
           onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); setEditingPlanId(null); }}

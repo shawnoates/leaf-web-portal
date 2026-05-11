@@ -64,6 +64,7 @@ interface CreatePlanModalProps {
   tier: string;
   prefill?: CreatePlanPrefill | null;
   hideVenueDefault?: boolean;
+  requireApprovalDefault?: boolean;
   editMode?: boolean;
   eventGroupId?: string;
   onClose: () => void;
@@ -87,7 +88,7 @@ function toTimeInputValue(t?: string | null): string {
   return `${String(h).padStart(2, "0")}:${m}`;
 }
 
-export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, editMode, eventGroupId, onClose, onCreated, onUpgrade }: CreatePlanModalProps) {
+export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, requireApprovalDefault, editMode, eventGroupId, onClose, onCreated, onUpgrade }: CreatePlanModalProps) {
   const [selectedCalendarId, setSelectedCalendarId] = useState(calendarId);
   const [hideVenue, setHideVenue] = useState(prefill?.hideVenueUntilRsvp ?? hideVenueDefault ?? true);
   const [title, setTitle] = useState(prefill?.title || "");
@@ -112,7 +113,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       : [emptyPollOption(), emptyPollOption()]
   );
   const [pollClosesAt, setPollClosesAt] = useState(prefill?.pollClosesAt || "");
-  const [requireApproval, setRequireApproval] = useState(prefill?.requireApproval ?? false);
+  const [requireApproval, setRequireApproval] = useState(prefill?.requireApproval ?? requireApprovalDefault ?? false);
   const [creating, setCreating] = useState(false);
   const [success, setSuccess] = useState(false);
   const [loadingImage, setLoadingImage] = useState(false);
