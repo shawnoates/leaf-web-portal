@@ -202,7 +202,12 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
                   : undefined;
             next.set(u.id, {
               objectId: u.id,
+              // Match iOS User.getFullName() preference order: `name` first
+              // (set by iOS sign-up), then `full_name` (dashboard/non-app
+              // users), then `first_name`. Skipping `name` was leaving
+              // iOS-registered senders without a resolved display name.
               name:
+                (u.get("name") as string) ||
                 (u.get("full_name") as string) ||
                 (u.get("first_name") as string) ||
                 "",
