@@ -4,7 +4,7 @@ const TITLE = "Atlanta Rec League · Leaf";
 const DESCRIPTION =
   "Everything around the games — post-game happy hours, pre-season runs, watch parties, captains brunches. The social glue that keeps the league together.";
 const OG_IMAGE =
-  "https://images.unsplash.com/photo-1559526324-c1f275fbfa32?w=1200&q=80";
+  "https://images.unsplash.com/photo-1514820720301-4c4790309f46?w=1200&q=80";
 
 export const metadata: Metadata = {
   title: TITLE,
