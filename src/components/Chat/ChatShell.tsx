@@ -88,6 +88,7 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
           planLocationName?: string | null;
           attendeeCount?: number | null;
           notificationId?: string | null;
+          users?: Record<string, { name: string; profilePictureUrl?: string | null }>;
         };
 
         await signInToChat(tokenResult.firebaseToken);
@@ -107,6 +108,25 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
         if (senderName) {
           const userRef = ref(db, `groups/${eventGroupId}/users/${user.id}`);
           fbUpdate(userRef, { name: senderName }).catch(() => undefined);
+        }
+        // Server resolves names for every participant (User.name → User.full_name
+        // → User.first_name → EventNotification.rsvpName), bypassing the
+        // unreliable client-side _User read ACL. This pre-fills sender names
+        // for any historical messages from users whose _User fields the web
+        // SDK can't read.
+        if (tokenResult.users) {
+          setUsers((prev) => {
+            const next = new Map(prev);
+            for (const [userId, info] of Object.entries(tokenResult.users || {})) {
+              if (!info?.name) continue;
+              next.set(userId, {
+                objectId: userId,
+                name: info.name,
+                profilePictureUrl: info.profilePictureUrl || undefined,
+              });
+            }
+            return next;
+          });
         }
         if (tokenResult.planTitle) setPlanTitle(tokenResult.planTitle);
         if (tokenResult.planDate) setPlanDate(tokenResult.planDate);
