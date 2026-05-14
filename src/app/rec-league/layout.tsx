@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 
 const TITLE = "Atlanta Rec League · Leaf";
 const DESCRIPTION =
-  "Kickball, softball, volleyball, and flag football across Atlanta. Game nights, tournaments, and bar socials — all skill levels welcome.";
+  "Everything around the games — post-game happy hours, pre-season runs, watch parties, captains brunches. The social glue that keeps the league together.";
 const OG_IMAGE =
-  "https://images.unsplash.com/photo-1530549387789-4c1017266635?w=1200&q=80";
+  "https://images.unsplash.com/photo-1559526324-c1f275fbfa32?w=1200&q=80";
 
 export const metadata: Metadata = {
   title: TITLE,
