@@ -923,6 +923,7 @@ export default function OrgCalendarPage() {
   const [hostSuccess, setHostSuccess] = useState<boolean | "pending">(false);
   const [hostSubmitting, setHostSubmitting] = useState(false);
   const [hostNote, setHostNote] = useState("");
+  const [hostEmail, setHostEmail] = useState("");
   const hostVerify = usePhoneVerify();
   const [nearbyVenues, setNearbyVenues] = useState<NearbyVenue[]>([]);
   const [venuesLoading, setVenuesLoading] = useState(false);
@@ -938,6 +939,7 @@ export default function OrgCalendarPage() {
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [unsplashPhotos, setUnsplashPhotos] = useState<{ id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]>([]);
   const [unsplashLoading, setUnsplashLoading] = useState(false);
+  const [customEmail, setCustomEmail] = useState("");
   const customVerify = usePhoneVerify();
   const scrollRef = useRef<HTMLDivElement>(null);
   const ctaSectionRef = useRef<HTMLDivElement>(null);
@@ -1610,6 +1612,7 @@ export default function OrgCalendarPage() {
         hostNote: hostNote.trim() || undefined,
         hostName: !isOwnerOrHost ? hostVerify.name.trim() : undefined,
         hostPhone: !isOwnerOrHost ? `+1${hostVerify.phone.replace(/\D/g, "")}` : undefined,
+        hostEmail: !isOwnerOrHost && hostEmail.trim() ? hostEmail.trim() : undefined,
         venue: selectedVenue ? {
           placeId: selectedVenue.placeId,
           name: selectedVenue.name,
@@ -1620,6 +1623,7 @@ export default function OrgCalendarPage() {
       });
       setHostSuccess(result?.pendingApproval ? "pending" : true);
       setHostNote("");
+      setHostEmail("");
       setSelectedVenue(null);
       // Auto-follow visual update for non-owners/hosts
       if (!isOwnerOrHost && !isFollowing && org) {
@@ -1666,6 +1670,7 @@ export default function OrgCalendarPage() {
         shareId,
         name: isOwnerOrHost ? undefined : customVerify.name.trim(),
         phoneNumber: isOwnerOrHost ? undefined : `+1${customVerify.phone.replace(/\D/g, "")}`,
+        email: !isOwnerOrHost && customEmail.trim() ? customEmail.trim() : undefined,
         title: customTitle.trim(),
         description: customDescription.trim(),
         date: dateTime,
@@ -1685,6 +1690,7 @@ export default function OrgCalendarPage() {
       }
       setCustomSuccess(result?.pendingApproval === false ? "published" : true);
       setHostNote("");
+      setCustomEmail("");
       setSelectedVenue(null);
       setSelectedImageUrl(null);
       setUnsplashPhotos([]);
@@ -2641,7 +2647,22 @@ export default function OrgCalendarPage() {
                   <form onSubmit={handleHostSubmit} className="space-y-8">
                     {/* Name & Phone for non-owners */}
                     {!(org.isOwner || org.isHost) && (
-                      <PhoneVerifyFields verify={hostVerify} />
+                      <>
+                        <PhoneVerifyFields verify={hostVerify} />
+                        <div className="space-y-2">
+                          <label className="text-xs tracking-wider uppercase font-bold">
+                            Email (optional)
+                          </label>
+                          <input
+                            type="email"
+                            value={hostEmail}
+                            onChange={(e) => setHostEmail(e.target.value)}
+                            placeholder="you@example.com"
+                            className="w-full border-b border-zinc-300 py-3 text-lg font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                          />
+                          <p className="text-xs text-zinc-400">We&apos;ll send updates about your plan here.</p>
+                        </div>
+                      </>
                     )}
 
                     <div className="space-y-2">
@@ -3038,7 +3059,22 @@ export default function OrgCalendarPage() {
                     </div>
 
                     {!(org.isOwner || org.isHost) && (
-                      <PhoneVerifyFields verify={customVerify} />
+                      <>
+                        <PhoneVerifyFields verify={customVerify} />
+                        <div className="space-y-2">
+                          <label className="text-xs tracking-wider uppercase font-bold">
+                            Email (optional)
+                          </label>
+                          <input
+                            type="email"
+                            value={customEmail}
+                            onChange={(e) => setCustomEmail(e.target.value)}
+                            placeholder="you@example.com"
+                            className="w-full border-b border-zinc-300 py-3 text-lg font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                          />
+                          <p className="text-xs text-zinc-400">We&apos;ll send updates about your plan here.</p>
+                        </div>
+                      </>
                     )}
 
                     <div className="pt-4 flex gap-4">
