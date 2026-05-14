@@ -28,7 +28,7 @@ const config: LandingConfig = {
       description:
         "Games wrap at 8:30 — we take over Ladybird's back patio after. Pitchers on the league, jerseys stay on, season standings on the chalkboard. Recap the bad calls and even worse plays.",
       image:
-        "https://images.unsplash.com/photo-1742946745348-3c7c03f1e2fa?w=800&q=80",
+        "https://images.unsplash.com/photo-1541532713592-79a0317b6b77?w=800&q=80",
       hostName: "Marcus",
       attendeeCount: 78,
       location: "Ladybird Grove & Mess Hall",
