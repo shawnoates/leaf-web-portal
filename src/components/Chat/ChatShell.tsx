@@ -9,6 +9,7 @@ import {
   onChildAdded,
   push as fbPush,
   set as fbSet,
+  update as fbUpdate,
   query,
   orderByChild,
   limitToLast,
@@ -91,6 +92,22 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
 
         await signInToChat(tokenResult.firebaseToken);
         if (!mounted) return;
+
+        const db = getChatDatabase();
+
+        // Mirror iOS makeChatGroup: ensure the sender exists in
+        // groups/{id}/users/{userId} so the mobile app's fallback name
+        // lookup (PlanChatViewModel.getUser) resolves us instead of
+        // rendering "Unknown User".
+        const senderName =
+          (user.get("name") as string) ||
+          (user.get("full_name") as string) ||
+          (user.get("first_name") as string) ||
+          "";
+        if (senderName) {
+          const userRef = ref(db, `groups/${eventGroupId}/users/${user.id}`);
+          fbUpdate(userRef, { name: senderName }).catch(() => undefined);
+        }
         if (tokenResult.planTitle) setPlanTitle(tokenResult.planTitle);
         if (tokenResult.planDate) setPlanDate(tokenResult.planDate);
         if (tokenResult.planTimeString) setPlanTimeString(tokenResult.planTimeString);
@@ -99,7 +116,6 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
         if (typeof tokenResult.attendeeCount === "number") setAttendeeCount(tokenResult.attendeeCount);
         if (tokenResult.notificationId) setNotificationId(tokenResult.notificationId);
 
-        const db = getChatDatabase();
         const messagesRef = ref(db, `groups/${eventGroupId}/messages`);
         const recentMessages = query(
           messagesRef,
