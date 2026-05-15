@@ -21,6 +21,13 @@ interface VenueSearchProps {
   onSelect: (venue: Venue) => void;
   placeholder?: string;
   className?: string;
+  /**
+   * When true, on first mount with a non-empty `value`, run a Places
+   * autocomplete query for that string and auto-select the top match.
+   * Used to upgrade a free-text venue name (e.g. from a marketplace prefill)
+   * into a real Place with placeId without forcing the user to click.
+   */
+  autoResolveInitial?: boolean;
 }
 
 let googleMapsLoading = false;
@@ -74,6 +81,7 @@ export default function VenueSearch({
   onSelect,
   placeholder = "Search for a venue...",
   className = "",
+  autoResolveInitial = false,
 }: VenueSearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.AutocompleteService | null>(null);
@@ -83,16 +91,47 @@ export default function VenueSearch({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
+  // Hold latest onSelect + initial value in refs so the mount-only effect below
+  // doesn't capture stale closures and doesn't need to re-run on every render.
+  const onSelectRef = useRef(onSelect);
+  useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
+  const initialValueRef = useRef(value);
+  const autoResolvedRef = useRef(false);
+
   useEffect(() => {
     loadGoogleMaps().then(() => {
-      if (window.google) {
-        autocompleteRef.current = new window.google.maps.places.AutocompleteService();
-        // PlacesService needs a div (or map) element
-        const div = document.createElement("div");
-        placesRef.current = new window.google.maps.places.PlacesService(div);
+      if (!window.google) return;
+      autocompleteRef.current = new window.google.maps.places.AutocompleteService();
+      // PlacesService needs a div (or map) element
+      const div = document.createElement("div");
+      placesRef.current = new window.google.maps.places.PlacesService(div);
+
+      // Auto-resolve the prefilled value to a real Place so we capture placeId
+      // (and a normalized address) without the user having to click a suggestion.
+      const initial = initialValueRef.current.trim();
+      if (autoResolveInitial && !autoResolvedRef.current && initial.length >= 2) {
+        autoResolvedRef.current = true;
+        autocompleteRef.current.getPlacePredictions(
+          { input: initial, types: ["establishment"] },
+          (predictions, status) => {
+            if (
+              status !== google.maps.places.PlacesServiceStatus.OK ||
+              !predictions ||
+              predictions.length === 0
+            ) {
+              return;
+            }
+            const best = predictions[0];
+            onSelectRef.current({
+              name: best.structured_formatting.main_text,
+              address: best.structured_formatting.secondary_text || "",
+              placeId: best.place_id,
+            });
+          },
+        );
       }
     });
-  }, []);
+  }, [autoResolveInitial]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -165,7 +204,10 @@ export default function VenueSearch({
             fetchSuggestions(e.target.value);
           }}
           onKeyDown={handleKeyDown}
-          onFocus={() => { if (suggestions.length > 0) setShowDropdown(true); }}
+          onFocus={() => {
+            if (suggestions.length > 0) setShowDropdown(true);
+            else if (value.trim().length >= 2) fetchSuggestions(value);
+          }}
           placeholder={placeholder}
           className={`pl-9 ${className}`}
         />

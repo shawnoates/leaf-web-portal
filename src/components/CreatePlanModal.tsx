@@ -37,7 +37,7 @@ interface Venue {
 export interface CreatePlanPrefill {
   title?: string;
   description?: string;
-  venue?: { name: string; address: string } | null;
+  venue?: { name: string; address: string; placeId?: string | null } | null;
   date?: string;
   time?: string;
   capacity?: string;
@@ -95,7 +95,9 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [description, setDescription] = useState(prefill?.description || "");
   const [venueQuery, setVenueQuery] = useState(prefill?.venue?.name || "");
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(
-    prefill?.venue ? { name: prefill.venue.name, address: prefill.venue.address, placeId: "" } : null
+    prefill?.venue?.placeId
+      ? { name: prefill.venue.name, address: prefill.venue.address, placeId: prefill.venue.placeId }
+      : null
   );
   const [date, setDate] = useState(prefill?.date || "");
   const [time, setTime] = useState(toTimeInputValue(prefill?.time));
@@ -120,6 +122,16 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [unsplashPhotos, setUnsplashPhotos] = useState<{ id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]>([]);
   const [unsplashLoading, setUnsplashLoading] = useState(false);
+  // We trigger VenueSearch's auto-resolve when prefill gives us a venue name
+  // but no placeId. The lookup is fast (~500ms); show a neutral "confirming"
+  // hint during that window so the amber warning doesn't flash unnecessarily.
+  const autoResolvingVenue = !!prefill?.venue?.name && !prefill?.venue?.placeId;
+  const [venueResolveSettled, setVenueResolveSettled] = useState(!autoResolvingVenue);
+  useEffect(() => {
+    if (!autoResolvingVenue) return;
+    const t = setTimeout(() => setVenueResolveSettled(true), 2000);
+    return () => clearTimeout(t);
+  }, [autoResolvingVenue]);
 
   const placeholderCover = getDefaultCoverForSeed(prefill?.coverSeed || title.trim() || "default");
 
@@ -204,6 +216,13 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
 
   async function handleCreate() {
     if (!title) return;
+
+    // A venue name without a Google Places match means we'd save a Location with
+    // no placeId/coords, breaking maps and dedupe downstream. Require selection.
+    if (venueQuery.trim() && !selectedVenue) {
+      alert("Please select the venue from the suggestions list so we can save its location details.");
+      return;
+    }
 
     if (isPoll) {
       // Edit-mode polls only update safe fields (title/description/image/venue) —
@@ -540,15 +559,29 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Venue</label>
             <VenueSearch
               value={venueQuery}
-              onChange={setVenueQuery}
+              onChange={(v) => {
+                setVenueQuery(v);
+                if (selectedVenue && v !== selectedVenue.name) setSelectedVenue(null);
+              }}
               onSelect={(v) => { setSelectedVenue(v); setVenueQuery(v.name); }}
+              autoResolveInitial={!!prefill?.venue?.name && !prefill?.venue?.placeId}
               className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
             />
-            {selectedVenue && (
+            {selectedVenue ? (
               <p className="text-xs text-zinc-400 mt-1 flex items-center gap-1">
                 <MapPin className="w-3 h-3" /> {selectedVenue.address}
               </p>
-            )}
+            ) : venueQuery.trim() ? (
+              !venueResolveSettled ? (
+                <p className="text-xs text-zinc-400 mt-1 flex items-center gap-1">
+                  <MapPin className="w-3 h-3" /> Confirming location with Google Places…
+                </p>
+              ) : (
+                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                  <MapPin className="w-3 h-3" /> Select this venue from the suggestions to confirm its location
+                </p>
+              )
+            ) : null}
           </div>
 
           {!isPoll && (
