@@ -107,6 +107,7 @@ interface OrgData {
   isPrivate?: boolean;
   isFollower?: boolean;
   followRequestPending?: boolean;
+  requireApprovalDefault?: boolean;
 }
 
 // Maps human-readable blacklist labels (set in the org dashboard) to Google
@@ -924,6 +925,7 @@ export default function OrgCalendarPage() {
   const [hostSubmitting, setHostSubmitting] = useState(false);
   const [hostNote, setHostNote] = useState("");
   const [hostEmail, setHostEmail] = useState("");
+  const [hostRequireApproval, setHostRequireApproval] = useState(false);
   const hostVerify = usePhoneVerify();
   const [nearbyVenues, setNearbyVenues] = useState<NearbyVenue[]>([]);
   const [venuesLoading, setVenuesLoading] = useState(false);
@@ -940,6 +942,7 @@ export default function OrgCalendarPage() {
   const [unsplashPhotos, setUnsplashPhotos] = useState<{ id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]>([]);
   const [unsplashLoading, setUnsplashLoading] = useState(false);
   const [customEmail, setCustomEmail] = useState("");
+  const [customRequireApproval, setCustomRequireApproval] = useState(false);
   const customVerify = usePhoneVerify();
   const scrollRef = useRef<HTMLDivElement>(null);
   const ctaSectionRef = useRef<HTMLDivElement>(null);
@@ -1320,6 +1323,7 @@ export default function OrgCalendarPage() {
         isPrivate: result.isPrivate || false,
         isFollower: result.isFollower || false,
         followRequestPending: result.followRequestPending || false,
+        requireApprovalDefault: result.requireApprovalDefault === true,
       });
 
       // Sync RSVP cookies with backend data (handles admin-removed RSVPs)
@@ -1549,6 +1553,17 @@ export default function OrgCalendarPage() {
     return () => clearTimeout(timer);
   }, [hostingIdea, creatingCustomPlan, customCategory, org]);
 
+  // Sync the proposer-side "require approval" toggles to the calendar default
+  // whenever a proposal form opens. Owners/hosts editing on the dashboard get
+  // their own toggle in CreatePlanModal; this only applies to follower
+  // proposals from this page.
+  useEffect(() => {
+    if (hostingIdea) setHostRequireApproval(org?.requireApprovalDefault === true);
+  }, [hostingIdea, org?.requireApprovalDefault]);
+  useEffect(() => {
+    if (creatingCustomPlan) setCustomRequireApproval(org?.requireApprovalDefault === true);
+  }, [creatingCustomPlan, org?.requireApprovalDefault]);
+
   // Fetch Unsplash images when venue is selected and title is typed
   useEffect(() => {
     if (!selectedVenue || !customTitle.trim() || !creatingCustomPlan) {
@@ -1613,6 +1628,7 @@ export default function OrgCalendarPage() {
         hostName: !isOwnerOrHost ? hostVerify.name.trim() : undefined,
         hostPhone: !isOwnerOrHost ? `+1${hostVerify.phone.replace(/\D/g, "")}` : undefined,
         hostEmail: !isOwnerOrHost && hostEmail.trim() ? hostEmail.trim() : undefined,
+        requireApproval: hostRequireApproval,
         venue: selectedVenue ? {
           placeId: selectedVenue.placeId,
           name: selectedVenue.name,
@@ -1671,6 +1687,7 @@ export default function OrgCalendarPage() {
         name: isOwnerOrHost ? undefined : customVerify.name.trim(),
         phoneNumber: isOwnerOrHost ? undefined : `+1${customVerify.phone.replace(/\D/g, "")}`,
         email: !isOwnerOrHost && customEmail.trim() ? customEmail.trim() : undefined,
+        requireApproval: customRequireApproval,
         title: customTitle.trim(),
         description: customDescription.trim(),
         date: dateTime,
@@ -2703,6 +2720,19 @@ export default function OrgCalendarPage() {
                       />
                       <p className="text-xs text-zinc-400 text-right">{hostNote.length}/500</p>
                     </div>
+                    <div className="flex items-center justify-between py-1">
+                      <div>
+                        <p className="text-xs tracking-wider uppercase font-bold">Require approval to attend</p>
+                        <p className="text-xs text-zinc-400 font-light">Visitors must be approved before confirming</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setHostRequireApproval(!hostRequireApproval)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${hostRequireApproval ? "bg-zinc-900" : "bg-zinc-200"}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${hostRequireApproval ? "left-5" : "left-0.5"}`} />
+                      </button>
+                    </div>
                     <div className="space-y-4">
                       <label className="text-xs tracking-wider uppercase font-bold">
                         Visibility
@@ -3076,6 +3106,20 @@ export default function OrgCalendarPage() {
                         </div>
                       </>
                     )}
+
+                    <div className="flex items-center justify-between py-1">
+                      <div>
+                        <p className="text-xs tracking-wider uppercase font-bold">Require approval to attend</p>
+                        <p className="text-xs text-zinc-400 font-light">Visitors must be approved before confirming</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCustomRequireApproval(!customRequireApproval)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${customRequireApproval ? "bg-zinc-900" : "bg-zinc-200"}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${customRequireApproval ? "left-5" : "left-0.5"}`} />
+                      </button>
+                    </div>
 
                     <div className="pt-4 flex gap-4">
                       <button
