@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import {
   Calendar,
   Clock,
   Copy,
+  EyeOff,
+  MessageCircle,
   Pencil,
   Plus,
   Trash2,
@@ -42,6 +45,7 @@ type Rsvp = {
   notificationId: string;
   name: string;
   phone: string | null;
+  sharePhoneWithHost: boolean;
   source: string;
   status: string;
   rsvpNote: string | null;
@@ -397,14 +401,36 @@ export default function PlanDetailModal({
           ) : (
             // Non-poll branch — attendees table
             <div className="space-y-3">
-              <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
-                Attendees{!planRsvpsLoading && ` (${planRsvps.filter((r) => r.status === "Accepted").length})`}
-                {!planRsvpsLoading && planRsvps.some((r) => r.status === "pendingRsvp") && (
-                  <span className="text-amber-500 ml-2">
-                    {planRsvps.filter((r) => r.status === "pendingRsvp").length} pending
-                  </span>
-                )}
-              </h4>
+              <div className="flex items-center justify-between gap-3">
+                <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
+                  Attendees{!planRsvpsLoading && ` (${planRsvps.filter((r) => r.status === "Accepted").length})`}
+                  {!planRsvpsLoading && planRsvps.some((r) => r.status === "pendingRsvp") && (
+                    <span className="text-amber-500 ml-2">
+                      {planRsvps.filter((r) => r.status === "pendingRsvp").length} pending
+                    </span>
+                  )}
+                </h4>
+                {(() => {
+                  // iOS Safari treats `+` in `sms:` URLs as a space and is inconsistent
+                  // with comma-separated multi-recipient links. The `&addresses=` query
+                  // form is the documented way to populate multiple recipients on iOS;
+                  // Android handles either format fine.
+                  const sharingPhones = planRsvps
+                    .filter((r) => r.status === "Accepted" && r.sharePhoneWithHost && r.phone)
+                    .map((r) => r.phone as string);
+                  if (sharingPhones.length === 0) return null;
+                  const smsHref = `sms:&addresses=${sharingPhones.map((p) => encodeURIComponent(p)).join(",")}`;
+                  return (
+                    <a
+                      href={smsHref}
+                      className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      Message All ({sharingPhones.length})
+                    </a>
+                  );
+                })()}
+              </div>
               {planRsvpsLoading ? (
                 <p className="text-sm text-zinc-400">Loading...</p>
               ) : planRsvps.length > 0 ? (
@@ -427,7 +453,13 @@ export default function PlanDetailModal({
                               <p className="text-[11px] text-zinc-400 italic truncate max-w-[200px]">&ldquo;{r.rsvpNote}&rdquo;</p>
                             )}
                           </td>
-                          <td className="px-4 py-2.5 text-zinc-400">{r.phone || "—"}</td>
+                          <td className="px-4 py-2.5 text-zinc-400">
+                            {r.phone
+                              ? r.phone
+                              : r.sharePhoneWithHost
+                                ? "—"
+                                : <span className="inline-flex items-center gap-1 text-zinc-300"><EyeOff className="w-3 h-3" /> Hidden</span>}
+                          </td>
                           <td className="px-4 py-2.5">
                             {r.status === "pendingRsvp" ? (
                               <span className="text-xs font-bold uppercase tracking-widest text-amber-500">Pending</span>
@@ -496,8 +528,17 @@ export default function PlanDetailModal({
             </div>
           )}
 
-          {/* Action bar — Duplicate / Edit / Cancel */}
+          {/* Action bar — Plan Chat / Duplicate / Edit / Cancel */}
           <div className="pt-8 border-t border-zinc-100 flex items-center justify-between">
+            {!plan.isPoll && (
+              <Link
+                href={`/chat/${plan.objectId}`}
+                className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Plan Chat
+              </Link>
+            )}
             <button
               onClick={handleDuplicate}
               className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
