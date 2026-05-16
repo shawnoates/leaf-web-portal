@@ -528,38 +528,42 @@ export default function PlanDetailModal({
             </div>
           )}
 
-          {/* Action bar — Plan Chat / Duplicate / Edit / Cancel */}
-          <div className="pt-8 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-            {!plan.isPoll && (
-              <Link
-                href={`/chat/${plan.objectId}`}
+          {/* Action bar — Plan Chat / Duplicate / Edit on top, Cancel below */}
+          <div className="pt-8 border-t border-zinc-100 space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+              {!plan.isPoll && (
+                <Link
+                  href={`/chat/${plan.objectId}`}
+                  className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Plan Chat
+                </Link>
+              )}
+              <button
+                onClick={handleDuplicate}
                 className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
               >
-                <MessageCircle className="w-4 h-4" />
-                Plan Chat
-              </Link>
-            )}
-            <button
-              onClick={handleDuplicate}
-              className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
-            >
-              <Copy className="w-4 h-4" />
-              Duplicate
-            </button>
-            <button
-              onClick={handleEdit}
-              className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
-            >
-              <Pencil className="w-4 h-4" />
-              Edit
-            </button>
-            <button
-              onClick={handleCancel}
-              className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              {plan.isPoll ? "Cancel Poll" : "Cancel Plan"}
-            </button>
+                <Copy className="w-4 h-4" />
+                Duplicate
+              </button>
+              <button
+                onClick={handleEdit}
+                className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+              >
+                <Pencil className="w-4 h-4" />
+                Edit
+              </button>
+            </div>
+            <div className="flex justify-center">
+              <button
+                onClick={handleCancel}
+                className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                {plan.isPoll ? "Cancel Poll" : "Cancel Plan"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
