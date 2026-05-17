@@ -261,42 +261,6 @@ function RsvpModal({
   const [isPendingResult, setIsPendingResult] = useState(false);
   const [sharePhone, setSharePhone] = useState(true);
 
-  // Override sendOTP to check existing RSVP first (skip OTP if already RSVP'd)
-  const originalSendOTP = verify.sendOTP;
-  const sendOTPWithRsvpCheck = async () => {
-    const digits = verify.phone.replace(/\D/g, "");
-    if (digits.length < 10) { originalSendOTP(); return; }
-    verify.setSending(true);
-    try {
-      const check = await Parse.Cloud.run("checkRsvpByPhone", {
-        phoneNumber: digits,
-        eventGroupId: plan.id,
-      }) as { hasRsvp: boolean; status: string | null; name: string | null } | null;
-      if (check?.hasRsvp) {
-        // Already RSVP'd — restore state without OTP
-        // "Requested" is the unified pending status (iOS canonical); "pendingRsvp" is
-        // legacy data still appearing until the one-shot migration runs.
-        const isPending = check.status === "pendingRsvp" || check.status === "Requested";
-        if (isPending) {
-          setIsPendingResult(true);
-          addPendingRsvpCookie(plan.id);
-        } else {
-          addRsvpCookie(plan.id);
-        }
-        localStorage.setItem("leaf_follower_phone", digits);
-        // Do NOT set leaf_verified_user cookie — cancel will require OTP
-        onRsvpSuccess?.(plan.id, true, isPending);
-        setFormStep("success");
-        verify.setSending(false);
-        return;
-      }
-    } catch {
-      // Check failed — fall through to normal OTP flow
-    }
-    verify.setSending(false);
-    await originalSendOTP();
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!verify.isVerified) return;
@@ -369,7 +333,7 @@ function RsvpModal({
               </p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-5">
-              <PhoneVerifyFields verify={verify} onSendOTP={sendOTPWithRsvpCheck} />
+              <PhoneVerifyFields verify={verify} onSendOTP={verify.sendOTP} />
               {verify.isVerified && (
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
