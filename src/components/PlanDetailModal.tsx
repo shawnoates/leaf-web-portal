@@ -171,7 +171,7 @@ export default function PlanDetailModal({
   };
 
   const handlePickPollWinner = async (opt: PollOptionDetail, dateLabel: string, timeLabel: string | null) => {
-    if (!confirm(`Pick ${dateLabel}${timeLabel ? ` at ${timeLabel}` : ""}? Voters will be SMS'd to RSVP.`)) return;
+    if (!confirm(`Pick ${dateLabel}${timeLabel ? ` at ${timeLabel}` : ""}? All followers will be SMS'd to RSVP.`)) return;
     setClosingPoll(true);
     try {
       await Parse.Cloud.run("closeAndConvertPoll", {
