@@ -167,42 +167,42 @@ export default function PlansPage() {
   async function fetchPlanIdeas() {
     setLoadingIdeas(true);
     try {
-      // Use getOrgCalendarPage to get plan ideas for this calendar
-      // First get the shareId (for child calendars, find it in the calendars list)
+      // Upcoming plans come from getOrgDashboard's activePlans — getOrgCalendarPage
+      // is a public-visitor endpoint that returns plans:[] for private calendars
+      // when no phoneNumber is supplied. Plan ideas are still pulled from
+      // getOrgCalendarPage since they aren't exposed on the dashboard response.
       const dash = await Parse.Cloud.run("getOrgDashboard", { calendarId: orgId });
       let shareId = dash.shareId;
-      if (orgId !== calendarId && dash.calendars) {
-        const child = dash.calendars.find((c: { objectId: string; shareId: string }) => c.objectId === calendarId);
-        if (child) shareId = child.shareId;
-      }
-      const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId });
+      const cal = dash.calendars?.find((c: { objectId: string }) => c.objectId === calendarId);
+      if (cal?.shareId) shareId = cal.shareId;
+      const activePlans = (cal?.activePlans || []) as {
+        objectId: string;
+        title: string;
+        description: string;
+        image: string | null;
+        date: string;
+        time: string | null;
+        hostName: string;
+        rsvpCount: number;
+        location: { name: string; address: string; placeId?: string | null } | null;
+        isPoll?: boolean;
+        pollOptionCount?: number;
+        pollVoteCount?: number;
+        pollClosesAt?: string | null;
+        hideVenueUntilRsvp?: boolean;
+        requireApproval?: boolean;
+      }[];
       setUpcomingPlans(
-        (page.plans || []).map((p: {
-          objectId: string;
-          title: string;
-          description: string;
-          image: string | null;
-          expiryDate: string;
-          time: string | null;
-          rsvpCount: number;
-          host: { name: string } | null;
-          location: { name: string; address: string } | null;
-          isPoll?: boolean;
-          pollOptionCount?: number;
-          pollVoteCount?: number;
-          pollClosesAt?: string | null;
-          hideVenueUntilRsvp?: boolean;
-          requireApproval?: boolean;
-        }) => ({
+        activePlans.map((p) => ({
           objectId: p.objectId,
           title: p.title,
           description: p.description || "",
           image: p.image,
-          expiryDate: p.expiryDate,
+          expiryDate: p.date,
           time: p.time,
           rsvpCount: p.rsvpCount,
-          host: p.host,
-          location: p.location,
+          host: p.hostName ? { name: p.hostName } : null,
+          location: p.location ? { name: p.location.name, address: p.location.address } : null,
           isPoll: p.isPoll,
           pollOptionCount: p.pollOptionCount,
           pollVoteCount: p.pollVoteCount,
@@ -211,6 +211,7 @@ export default function PlansPage() {
           requireApproval: p.requireApproval,
         }))
       );
+      const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId });
       const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null }) => ({
         objectId: idea.objectId,
         title: idea.title,
