@@ -156,6 +156,7 @@ interface OrgDashboard {
   hostRequests: {
     planId: string;
     title: string;
+    description: string;
     image: string | null;
     calendarName: string | null;
     calendarId: string | null;
@@ -163,7 +164,9 @@ interface OrgDashboard {
     requesterPhone: string | null;
     requestedDate: string | null;
     requestedNote: string | null;
-    requestedVenue: { name: string; address: string } | null;
+    requestedVenue: { name: string; address: string; placeId?: string | null } | null;
+    requestedCapacity: number | null;
+    requestedRequireApproval: boolean;
     requestedAt: string | null;
   }[];
   pendingRsvpRequests: {
@@ -422,6 +425,8 @@ export default function OrgDashboardPage() {
   const [createPlanPrefill, setCreatePlanPrefill] = useState<CreatePlanPrefill | null>(null);
   const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [editingHostRequestId, setEditingHostRequestId] = useState<string | null>(null);
+  const [editingHostRequestCalendarId, setEditingHostRequestCalendarId] = useState<string | null>(null);
 
   // Leaf app connection (explicit OTP verification, not auto-populated from phone field)
   const [leafAppConnected, setLeafAppConnected] = useState(false);
@@ -1081,6 +1086,28 @@ export default function OrgDashboardPage() {
                           className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-emerald-700 transition-colors"
                         >
                           Approve
+                        </button>
+                        <button
+                          onClick={() => {
+                            const d = req.requestedDate ? new Date(req.requestedDate) : null;
+                            const pad = (n: number) => String(n).padStart(2, "0");
+                            setCreatePlanPrefill({
+                              title: req.title,
+                              description: req.description || "",
+                              venue: req.requestedVenue ? { name: req.requestedVenue.name, address: req.requestedVenue.address, placeId: req.requestedVenue.placeId ?? null } : null,
+                              date: d ? `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` : "",
+                              time: d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : "",
+                              capacity: req.requestedCapacity != null ? String(req.requestedCapacity) : "",
+                              imageUrl: req.image || null,
+                              requireApproval: req.requestedRequireApproval,
+                            });
+                            setEditingHostRequestId(req.planId);
+                            setEditingHostRequestCalendarId(req.calendarId);
+                            setShowCreatePlanModal(true);
+                          }}
+                          className="px-3 py-1.5 bg-white text-zinc-700 text-xs font-bold uppercase tracking-widest rounded-lg border border-zinc-300 hover:bg-zinc-50 transition-colors"
+                        >
+                          Edit
                         </button>
                         <button
                           onClick={async () => {
@@ -3443,7 +3470,7 @@ export default function OrgDashboardPage() {
       {/* Create Plan Modal (marketplace + duplicate) */}
       {showCreatePlanModal && (
         <CreatePlanModal
-          calendarId={calendarId}
+          calendarId={editingHostRequestCalendarId || calendarId}
           calendars={dashboard.calendars.map((c) => ({ objectId: c.objectId, name: c.name }))}
           tier={dashboard.tier}
           prefill={createPlanPrefill}
@@ -3451,7 +3478,9 @@ export default function OrgDashboardPage() {
           requireApprovalDefault={dashboard.calendars.find((c) => c.objectId === calendarId)?.requireApprovalDefault}
           editMode={!!editingPlanId}
           eventGroupId={editingPlanId || undefined}
-          onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); setEditingPlanId(null); }}
+          hostRequestMode={!!editingHostRequestId}
+          hostRequestId={editingHostRequestId || undefined}
+          onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); setEditingPlanId(null); setEditingHostRequestId(null); setEditingHostRequestCalendarId(null); }}
           onCreated={() => fetchDashboard()}
           onUpgrade={() => { setShowCreatePlanModal(false); setShowSubscription(true); }}
         />

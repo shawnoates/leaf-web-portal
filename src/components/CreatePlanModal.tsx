@@ -67,6 +67,10 @@ interface CreatePlanModalProps {
   requireApprovalDefault?: boolean;
   editMode?: boolean;
   eventGroupId?: string;
+  /** Edit-and-approve mode for a pending follower-proposed plan. Submits via
+   *  approveHostRequest with overrides instead of creating/updating a plan. */
+  hostRequestMode?: boolean;
+  hostRequestId?: string;
   onClose: () => void;
   onCreated: () => void;
   /** Optional — called when a starter-tier user clicks the locked Date Poll button. */
@@ -88,7 +92,7 @@ function toTimeInputValue(t?: string | null): string {
   return `${String(h).padStart(2, "0")}:${m}`;
 }
 
-export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, requireApprovalDefault, editMode, eventGroupId, onClose, onCreated, onUpgrade }: CreatePlanModalProps) {
+export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, requireApprovalDefault, editMode, eventGroupId, hostRequestMode, hostRequestId, onClose, onCreated, onUpgrade }: CreatePlanModalProps) {
   const [selectedCalendarId, setSelectedCalendarId] = useState(calendarId);
   const [hideVenue, setHideVenue] = useState(prefill?.hideVenueUntilRsvp ?? hideVenueDefault ?? true);
   const [title, setTitle] = useState(prefill?.title || "");
@@ -294,7 +298,21 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       const absM = String(Math.abs(offset) % 60).padStart(2, "0");
       const tzSuffix = `${sign}${absH}:${absM}`;
 
-      if (editMode && eventGroupId) {
+      if (hostRequestMode && hostRequestId) {
+        await Parse.Cloud.run("approveHostRequest", {
+          calendarPlanId: hostRequestId,
+          overrides: {
+            title,
+            description,
+            date: `${date}T${time || "12:00"}:00${tzSuffix}`,
+            time: time || null,
+            venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
+            capacity: capacity ? parseInt(capacity) : null,
+            requireApproval,
+            imageBase64: imageBase64 || undefined,
+          },
+        });
+      } else if (editMode && eventGroupId) {
         await Parse.Cloud.run("updatePlanDetails", {
           eventGroupId,
           title,
@@ -351,7 +369,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       <div className="absolute inset-0 bg-black/40 hidden sm:block" onClick={() => { if (!creating) onClose(); }} />
       <div className="relative bg-white w-full h-[100dvh] overflow-y-auto sm:rounded-2xl sm:max-w-lg sm:h-auto sm:max-h-[90vh] sm:shadow-xl">
         <div className="sticky top-0 bg-white border-b border-zinc-100 px-6 py-4 flex items-center justify-between sm:rounded-t-2xl">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{editMode ? (isPoll ? "Edit Date Poll" : "Edit Plan") : isPoll ? "New Date Poll" : "New Plan"}</h2>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{hostRequestMode ? "Review Plan Request" : editMode ? (isPoll ? "Edit Date Poll" : "Edit Plan") : isPoll ? "New Date Poll" : "New Plan"}</h2>
           <button
             onClick={() => { if (!creating) onClose(); }}
             className="p-1.5 hover:bg-zinc-100 rounded-full transition-colors"
@@ -363,7 +381,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
         <div className="px-6 py-5 space-y-5">
           {success && (
             <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg text-sm">
-              <Check className="w-4 h-4" /> {editMode ? (isPoll ? "Poll updated!" : "Plan updated!") : isPoll ? "Poll created — followers notified" : "Plan created successfully!"}
+              <Check className="w-4 h-4" /> {hostRequestMode ? "Approved — requester notified" : editMode ? (isPoll ? "Poll updated!" : "Plan updated!") : isPoll ? "Poll created — followers notified" : "Plan created successfully!"}
             </div>
           )}
 
@@ -374,8 +392,8 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             </div>
           )}
 
-          {/* Calendar selector (only when multiple calendars, hidden in edit mode) */}
-          {!editMode && calendars && calendars.length > 1 && (
+          {/* Calendar selector (only when multiple calendars, hidden in edit/host-request modes) */}
+          {!editMode && !hostRequestMode && calendars && calendars.length > 1 && (
             <div>
               <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Calendar</label>
               <select
@@ -390,8 +408,8 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             </div>
           )}
 
-          {/* Plan type toggle (hidden in edit mode) */}
-          {!editMode && <div>
+          {/* Plan type toggle (hidden in edit and host-request modes) */}
+          {!editMode && !hostRequestMode && <div>
             <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-3">Plan Type</label>
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -755,14 +773,16 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
           >
             {creating
-              ? (editMode ? "Saving..." : "Creating...")
-              : editMode
-                ? "Save Changes"
-                : isPoll
-                  ? "Create Date Poll"
-                  : isHosted
-                    ? "Create Upcoming Plan"
-                    : "Create Plan Idea"}
+              ? (hostRequestMode ? "Approving..." : editMode ? "Saving..." : "Creating...")
+              : hostRequestMode
+                ? "Approve & Notify Requester"
+                : editMode
+                  ? "Save Changes"
+                  : isPoll
+                    ? "Create Date Poll"
+                    : isHosted
+                      ? "Create Upcoming Plan"
+                      : "Create Plan Idea"}
           </button>
         </div>
       </div>
