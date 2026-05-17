@@ -274,7 +274,9 @@ function RsvpModal({
       }) as { hasRsvp: boolean; status: string | null; name: string | null } | null;
       if (check?.hasRsvp) {
         // Already RSVP'd — restore state without OTP
-        const isPending = check.status === "pendingRsvp";
+        // "Requested" is the unified pending status (iOS canonical); "pendingRsvp" is
+        // legacy data still appearing until the one-shot migration runs.
+        const isPending = check.status === "pendingRsvp" || check.status === "Requested";
         if (isPending) {
           setIsPendingResult(true);
           addPendingRsvpCookie(plan.id);
@@ -1330,7 +1332,7 @@ export default function OrgCalendarPage() {
       if (result.userRsvpPlanIds && Array.isArray(result.userRsvpPlanIds)) {
         const rsvpEntries = result.userRsvpPlanIds as Array<{ planId: string; status: string; notificationId?: string }>;
         const confirmedIds = new Set<string>(rsvpEntries.filter((r) => r.status === "Accepted").map((r) => r.planId));
-        const pendingIds = new Set<string>(rsvpEntries.filter((r) => r.status === "pendingRsvp").map((r) => r.planId));
+        const pendingIds = new Set<string>(rsvpEntries.filter((r) => r.status === "pendingRsvp" || r.status === "Requested").map((r) => r.planId));
         const notifIdMap = new Map<string, string>();
         for (const r of rsvpEntries) {
           if (r.notificationId) notifIdMap.set(r.planId, r.notificationId);

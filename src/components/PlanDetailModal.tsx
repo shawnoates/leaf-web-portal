@@ -404,9 +404,9 @@ export default function PlanDetailModal({
               <div className="flex items-center justify-between gap-3">
                 <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
                   Attendees{!planRsvpsLoading && ` (${planRsvps.filter((r) => r.status === "Accepted").length})`}
-                  {!planRsvpsLoading && planRsvps.some((r) => r.status === "pendingRsvp") && (
+                  {!planRsvpsLoading && planRsvps.some((r) => (r.status === "pendingRsvp" || r.status === "Requested")) && (
                     <span className="text-amber-500 ml-2">
-                      {planRsvps.filter((r) => r.status === "pendingRsvp").length} pending
+                      {planRsvps.filter((r) => (r.status === "pendingRsvp" || r.status === "Requested")).length} pending
                     </span>
                   )}
                 </h4>
@@ -450,7 +450,12 @@ export default function PlanDetailModal({
                           <td className="px-4 py-2.5">
                             <div>{r.name}</div>
                             {r.rsvpNote && (
-                              <p className="text-[11px] text-zinc-400 italic truncate max-w-[200px]">&ldquo;{r.rsvpNote}&rdquo;</p>
+                              <p
+                                className="text-[11px] text-zinc-400 italic max-w-[280px] line-clamp-3 whitespace-pre-wrap break-words"
+                                title={r.rsvpNote}
+                              >
+                                &ldquo;{r.rsvpNote}&rdquo;
+                              </p>
                             )}
                           </td>
                           <td className="px-4 py-2.5 text-zinc-400">
@@ -461,14 +466,14 @@ export default function PlanDetailModal({
                                 : <span className="inline-flex items-center gap-1 text-zinc-300"><EyeOff className="w-3 h-3" /> Hidden</span>}
                           </td>
                           <td className="px-4 py-2.5">
-                            {r.status === "pendingRsvp" ? (
+                            {(r.status === "pendingRsvp" || r.status === "Requested") ? (
                               <span className="text-xs font-bold uppercase tracking-widest text-amber-500">Pending</span>
                             ) : (
                               <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">Confirmed</span>
                             )}
                           </td>
                           <td className="px-4 py-2.5">
-                            {r.status === "pendingRsvp" ? (
+                            {(r.status === "pendingRsvp" || r.status === "Requested") ? (
                               <div className="flex gap-2">
                                 <button
                                   onClick={async () => {
