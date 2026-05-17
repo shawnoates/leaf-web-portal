@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useRef } from "react";
-import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
-import { Camera, Loader2, MapPin, Calendar, History } from "lucide-react";
+import { Camera, Loader2, MapPin, Calendar } from "lucide-react";
 import HostTheNextOne from "@/components/HostTheNextOne";
 
 type Photo = {
@@ -233,16 +232,6 @@ export default function MemoryClient({
         />
       )}
 
-      {/* Past events link */}
-      <div className="border-t border-zinc-100 mt-10 pt-6 text-center">
-        <Link
-          href={`/m/${notificationId}/all`}
-          className="inline-flex items-center gap-2 text-xs uppercase tracking-widest font-bold text-zinc-500 hover:text-zinc-900 transition-colors"
-        >
-          <History className="w-3.5 h-3.5" />
-          See all your past events
-        </Link>
-      </div>
     </div>
   );
 }
