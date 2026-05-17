@@ -438,10 +438,10 @@ export default function PlanDetailModal({
                   <table className="w-full text-sm min-w-0">
                     <thead className="bg-zinc-50 text-left">
                       <tr>
-                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400">Name</th>
-                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400">Phone</th>
-                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400">Status</th>
-                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400"></th>
+                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400 min-w-[220px] w-[45%]">Name</th>
+                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400 whitespace-nowrap">Phone</th>
+                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400 whitespace-nowrap">Status</th>
+                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400 w-1"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
@@ -451,7 +451,7 @@ export default function PlanDetailModal({
                             <div>{r.name}</div>
                             {r.rsvpNote && (
                               <p
-                                className="text-[11px] text-zinc-400 italic max-w-[280px] line-clamp-3 whitespace-pre-wrap break-words"
+                                className="text-[11px] text-zinc-400 italic line-clamp-3 whitespace-pre-wrap break-words"
                                 title={r.rsvpNote}
                               >
                                 &ldquo;{r.rsvpNote}&rdquo;
