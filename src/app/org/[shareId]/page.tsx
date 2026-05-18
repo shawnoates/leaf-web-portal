@@ -2807,9 +2807,9 @@ export default function OrgCalendarPage() {
                               setHostNote("");
                               setSelectedVenue(null);
                             }}
-                            className="text-left min-w-[180px] max-w-[180px] snap-start group"
+                            className="text-left min-w-[140px] max-w-[140px] snap-start group"
                           >
-                            <div className="aspect-[4/5] overflow-hidden bg-zinc-100 mb-2 relative rounded-md">
+                            <div className="aspect-square overflow-hidden bg-zinc-100 mb-2 relative rounded-md">
                               {idea.image ? (
                                 <img
                                   src={idea.image}
@@ -2818,16 +2818,13 @@ export default function OrgCalendarPage() {
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
-                                  <Sparkles className="w-8 h-8 text-zinc-300" />
+                                  <Sparkles className="w-7 h-7 text-zinc-300" />
                                 </div>
                               )}
                             </div>
-                            <h5 className="text-sm font-medium tracking-tight line-clamp-1 group-hover:italic">
+                            <h5 className="text-xs font-medium tracking-tight line-clamp-2 group-hover:italic leading-snug">
                               {idea.title}
                             </h5>
-                            <p className="text-xs text-zinc-500 font-light line-clamp-2 leading-snug">
-                              {idea.description}
-                            </p>
                           </button>
                         ))}
                       </div>

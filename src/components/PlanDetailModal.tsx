@@ -1,8 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
+
+function renderLinkedText(text: string) {
+  const parts = text.split(/(https?:\/\/[^\s<>"']+)/g);
+  return parts.map((part, i) => {
+    if (!/^https?:\/\//.test(part)) return <Fragment key={i}>{part}</Fragment>;
+    const trailing = part.match(/[.,;:!?)\]}]+$/)?.[0] ?? "";
+    const url = trailing ? part.slice(0, -trailing.length) : part;
+    return (
+      <Fragment key={i}>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-emerald-700 underline hover:text-emerald-800 break-words"
+        >
+          {url}
+        </a>
+        {trailing}
+      </Fragment>
+    );
+  });
+}
 import {
   Calendar,
   Clock,
@@ -258,8 +280,8 @@ export default function PlanDetailModal({
           {(plan.description || plan.location) && (
             <div className="space-y-6">
               {plan.description && (
-                <p className="text-xl font-light leading-relaxed text-zinc-600">
-                  {plan.description}
+                <p className="text-xl font-light leading-relaxed text-zinc-600 whitespace-pre-wrap">
+                  {renderLinkedText(plan.description)}
                 </p>
               )}
               {plan.location && (
