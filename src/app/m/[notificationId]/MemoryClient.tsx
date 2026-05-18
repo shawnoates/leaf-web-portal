@@ -44,6 +44,7 @@ type AttendeeMemoryInfo = {
   attendee: { name: string };
   photos: Photo[];
   photoCount: number;
+  uploadsClosed?: boolean;
   limits: { maxBytes: number; maxPerAttendee: number; maxPerEvent: number };
 };
 
@@ -180,7 +181,17 @@ export default function MemoryClient({
         </div>
       </div>
 
-      {/* Upload area */}
+      {/* Upload area — hidden once the 7-day upload window closes */}
+      {info.uploadsClosed ? (
+        <div className="border-2 border-dashed border-zinc-200 rounded-xl p-6 mb-6 bg-zinc-50/50 text-center">
+          <p className="text-sm text-zinc-500">
+            Photo uploads for this event have closed.
+          </p>
+          <p className="text-[11px] text-zinc-400 mt-1">
+            The gallery is still open for viewing.
+          </p>
+        </div>
+      ) : (
       <div className="border-2 border-dashed border-zinc-200 rounded-xl p-6 mb-6 bg-zinc-50/50">
         <input
           ref={fileInputRef}
@@ -253,6 +264,7 @@ export default function MemoryClient({
           <p className="text-xs text-red-600 mt-3 text-center">{error}</p>
         )}
       </div>
+      )}
 
       {/* Gallery */}
       {info.photos.length > 0 ? (
