@@ -299,9 +299,12 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       const tzSuffix = `${sign}${absH}:${absM}`;
 
       if (hostRequestMode && hostRequestId) {
-        await Parse.Cloud.run("approveHostRequest", {
+        // Two-step: commit edits to the source EventDetail/EventGroup first,
+        // then approve. Keeps approveHostRequest focused on the link-and-notify
+        // flow and removes the override-application branch from approval.
+        await Parse.Cloud.run("updateHostRequestPlan", {
           calendarPlanId: hostRequestId,
-          overrides: {
+          edits: {
             title,
             description,
             date: `${date}T${time || "12:00"}:00${tzSuffix}`,
@@ -312,6 +315,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             imageBase64: imageBase64 || undefined,
           },
         });
+        await Parse.Cloud.run("approveHostRequest", { calendarPlanId: hostRequestId });
       } else if (editMode && eventGroupId) {
         await Parse.Cloud.run("updatePlanDetails", {
           eventGroupId,
