@@ -8,6 +8,7 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
+import { renderLinkedText } from "@/lib/linkify";
 import {
   Plus,
   Users,
@@ -2222,8 +2223,8 @@ export default function OrgCalendarPage() {
               </div>
 
               <div className="space-y-6">
-                <p className="text-xl font-light leading-relaxed text-zinc-600">
-                  {selectedEvent.description}
+                <p className="text-xl font-light leading-relaxed text-zinc-600 whitespace-pre-wrap">
+                  {renderLinkedText(selectedEvent.description)}
                 </p>
                 {selectedEvent.hostNote && (
                   <div className="space-y-2">
