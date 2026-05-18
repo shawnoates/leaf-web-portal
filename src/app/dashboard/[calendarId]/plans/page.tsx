@@ -39,6 +39,12 @@ interface EventPhoto {
   uploaderName: string;
 }
 
+interface PastPlanRsvp {
+  notificationId: string;
+  name: string;
+  status: string;
+}
+
 interface UpcomingPlan {
   objectId: string;
   title: string;
@@ -88,6 +94,7 @@ export default function PlansPage() {
   // Photos modal
   const [photosModalPlan, setPhotosModalPlan] = useState<PastPlan | null>(null);
   const [modalPhotos, setModalPhotos] = useState<EventPhoto[] | null>(null);
+  const [modalRsvps, setModalRsvps] = useState<PastPlanRsvp[] | null>(null);
 
   // Plan ideas
   const [planIdeas, setPlanIdeas] = useState<PlanIdea[]>([]);
@@ -255,14 +262,15 @@ export default function PlansPage() {
   async function openPhotosModal(plan: PastPlan) {
     setPhotosModalPlan(plan);
     setModalPhotos(null);
-    try {
-      const result = await Parse.Cloud.run("getEventPhotos", {
-        eventGroupId: plan.objectId,
-      });
-      setModalPhotos(result.photos || []);
-    } catch {
-      setModalPhotos([]);
-    }
+    setModalRsvps(null);
+    Parse.Cloud.run("getEventPhotos", { eventGroupId: plan.objectId })
+      .then((result: { photos: EventPhoto[] }) => setModalPhotos(result.photos || []))
+      .catch(() => setModalPhotos([]));
+    Parse.Cloud.run("getPlanRsvps", { eventGroupId: plan.objectId })
+      .then((result: PastPlanRsvp[]) =>
+        setModalRsvps((result || []).filter((r) => r.status === "Accepted"))
+      )
+      .catch(() => setModalRsvps([]));
   }
 
   async function handleRegenerate() {
@@ -698,6 +706,7 @@ export default function PlansPage() {
           onClick={() => {
             setPhotosModalPlan(null);
             setModalPhotos(null);
+            setModalRsvps(null);
           }}
         >
           <div
@@ -724,43 +733,73 @@ export default function PlansPage() {
                 onClick={() => {
                   setPhotosModalPlan(null);
                   setModalPhotos(null);
+                  setModalRsvps(null);
                 }}
                 className="text-zinc-400 hover:text-zinc-900 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="overflow-y-auto p-5">
-              {modalPhotos === null ? (
-                <div className="flex items-center justify-center py-10">
-                  <RefreshCw className="w-4 h-4 animate-spin text-zinc-400" />
-                </div>
-              ) : modalPhotos.length === 0 ? (
-                <p className="text-sm text-zinc-400 text-center py-10">
-                  No photos uploaded yet.
-                </p>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {modalPhotos.map((photo) =>
-                    photo.url ? (
-                      <a
-                        key={photo.objectId}
-                        href={photo.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block aspect-square rounded-lg overflow-hidden bg-zinc-100"
+            <div className="overflow-y-auto p-5 space-y-6">
+              <section>
+                <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-3">
+                  Attendees
+                  {modalRsvps !== null ? ` (${modalRsvps.length})` : ""}
+                </h4>
+                {modalRsvps === null ? (
+                  <div className="flex items-center py-4">
+                    <RefreshCw className="w-4 h-4 animate-spin text-zinc-400" />
+                  </div>
+                ) : modalRsvps.length === 0 ? (
+                  <p className="text-sm text-zinc-400">No RSVPs.</p>
+                ) : (
+                  <ul className="flex flex-wrap gap-2">
+                    {modalRsvps.map((r) => (
+                      <li
+                        key={r.notificationId}
+                        className="text-sm text-zinc-700 bg-zinc-100 rounded-full px-3 py-1"
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={photo.url}
-                          alt={`Photo by ${photo.uploaderName}`}
-                          className="w-full h-full object-cover hover:opacity-90 transition-opacity"
-                        />
-                      </a>
-                    ) : null
-                  )}
-                </div>
-              )}
+                        {r.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              <section>
+                <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-3">
+                  Photos
+                  {modalPhotos !== null ? ` (${modalPhotos.length})` : ""}
+                </h4>
+                {modalPhotos === null ? (
+                  <div className="flex items-center py-4">
+                    <RefreshCw className="w-4 h-4 animate-spin text-zinc-400" />
+                  </div>
+                ) : modalPhotos.length === 0 ? (
+                  <p className="text-sm text-zinc-400">No photos uploaded yet.</p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {modalPhotos.map((photo) =>
+                      photo.url ? (
+                        <a
+                          key={photo.objectId}
+                          href={photo.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block aspect-square rounded-lg overflow-hidden bg-zinc-100"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={photo.url}
+                            alt={`Photo by ${photo.uploaderName}`}
+                            className="w-full h-full object-cover hover:opacity-90 transition-opacity"
+                          />
+                        </a>
+                      ) : null
+                    )}
+                  </div>
+                )}
+              </section>
             </div>
           </div>
         </div>
