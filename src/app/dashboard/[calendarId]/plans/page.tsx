@@ -8,7 +8,7 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
 import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailModal";
-import { ArrowLeft, Calendar, Camera, Lock, MapPin, Plus, RefreshCw, Settings, Trash2, X } from "lucide-react";
+import { ArrowLeft, Calendar, Camera, Lock, MapPin, Plus, RefreshCw, Settings, Trash2, Users, X } from "lucide-react";
 
 interface PlanIdea {
   objectId: string;
@@ -542,9 +542,15 @@ export default function PlansPage() {
                     <p className="text-xs text-zinc-400 mb-2">
                       {new Date(plan.expiryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     </p>
-                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-                      <Camera className="w-3 h-3" />
-                      {plan.photoCount} {plan.photoCount === 1 ? "photo" : "photos"}
+                    <div className="flex items-center gap-3 text-[11px] text-zinc-500">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Users className="w-3 h-3" />
+                        {plan.rsvpCount} {plan.rsvpCount === 1 ? "attendee" : "attendees"}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Camera className="w-3 h-3" />
+                        {plan.photoCount} {plan.photoCount === 1 ? "photo" : "photos"}
+                      </span>
                     </div>
                   </div>
                 </button>
