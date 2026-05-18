@@ -2789,6 +2789,51 @@ export default function OrgCalendarPage() {
                     </p>
                   </div>
 
+                  {!org.hidePlanIdeas && org.planIdeas.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-xs tracking-wider uppercase font-bold text-zinc-500">
+                        Or host one of these ideas
+                      </p>
+                      <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory -mx-8 md:-mx-16 px-8 md:px-16 pb-2">
+                        {org.planIdeas.map((idea) => (
+                          <button
+                            type="button"
+                            key={idea.id}
+                            onClick={() => {
+                              setCreatingCustomPlan(false);
+                              setHostingIdea(idea);
+                              setHostSubmitting(false);
+                              setHostSuccess(false);
+                              setHostNote("");
+                              setSelectedVenue(null);
+                            }}
+                            className="text-left min-w-[180px] max-w-[180px] snap-start group"
+                          >
+                            <div className="aspect-[4/5] overflow-hidden bg-zinc-100 mb-2 relative rounded-md">
+                              {idea.image ? (
+                                <img
+                                  src={idea.image}
+                                  alt={idea.title}
+                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Sparkles className="w-8 h-8 text-zinc-300" />
+                                </div>
+                              )}
+                            </div>
+                            <h5 className="text-sm font-medium tracking-tight line-clamp-1 group-hover:italic">
+                              {idea.title}
+                            </h5>
+                            <p className="text-xs text-zinc-500 font-light line-clamp-2 leading-snug">
+                              {idea.description}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <form onSubmit={handleCustomPlanSubmit} className="space-y-8">
                     <div className="space-y-2">
                       <label className="text-xs tracking-wider uppercase font-bold">
