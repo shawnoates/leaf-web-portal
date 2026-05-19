@@ -27,7 +27,7 @@ const config: LandingConfig = {
       description:
         "Two lanes reserved for residents. Beer, shoes, and bragging rights — bring your A-game (or just your friends).",
       image:
-        "https://images.unsplash.com/photo-1538511005973-d54f1a2d4019?w=800&q=80",
+        "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?w=800&q=80",
       hostName: "Devon",
       attendeeCount: 14,
       location: "Frames Bowling Lounge",
@@ -40,7 +40,7 @@ const config: LandingConfig = {
       description:
         "Weekly resident pickleball at the public courts down the block. Paddles available to borrow — all skill levels welcome.",
       image:
-        "https://images.unsplash.com/photo-1687204209242-7d8d7c5bfa19?w=800&q=80",
+        "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=800&q=80",
       hostName: "Priya",
       attendeeCount: 9,
       location: "Lincoln Park Courts",
