@@ -33,21 +33,21 @@ const config: LandingConfig = {
       image:
         "https://static.spotapps.co/spots/92/4bfaa8f4c240e29650546f1185a603/full",
       hostName: "Mateo",
-      attendeeCount: 16,
+      attendeeCount: 6,
       location: "Bar & Mezcal Lounge",
     },
     {
       id: "2",
-      title: "Ceviche Masterclass with Chef Rosa",
+      title: "Ceviche Tasting Crawl",
       daysFromNow: 8,
       time: "2:00 PM",
       description:
-        "Hands-on class at the kitchen counter. Three styles of Peruvian ceviche, leche de tigre techniques, and a pisco sour to start. Apron included.",
+        "Order every ceviche on the menu and rank them as a table. Bring a friend who's never tried one. Leche de tigre shots optional but encouraged.",
       image:
         "https://static.spotapps.co/spots/d7/1a69519bee4b0993b2b84f66cc8a7e/full",
-      hostName: "Chef Rosa",
-      attendeeCount: 12,
-      location: "Open Kitchen Counter",
+      hostName: "Camila",
+      attendeeCount: 6,
+      location: "Main Dining Room",
     },
     {
       id: "3",
@@ -59,46 +59,46 @@ const config: LandingConfig = {
       image:
         "https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=800&q=80",
       hostName: "Sara",
-      attendeeCount: 34,
+      attendeeCount: 8,
       location: "Back Patio",
     },
     {
       id: "4",
-      title: "Live Latin Jazz Friday",
+      title: "Friday Latin Night Out",
       daysFromNow: 18,
       time: "8:00 PM",
       description:
-        "Trio takes the patio: upright bass, nylon guitar, and percussion. No cover, full dinner menu, reservations strongly recommended.",
+        "Long table on the patio. Pisco cocktails, picadas to share, and the buzz of a busy Friday night. No agenda — just a good crew.",
       image:
         "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/31/89/5a/a3/brooklyn-s-next-big-latin.jpg?w=900&h=500&s=1",
       hostName: "Daniela",
-      attendeeCount: 42,
+      attendeeCount: 7,
       location: "Back Patio",
     },
     {
       id: "5",
-      title: "Pisco Sour Cocktail Workshop",
+      title: "Pisco Sour Showdown",
       daysFromNow: 25,
       time: "6:30 PM",
       description:
-        "Take over the bar for an evening. Build three Peruvian classics — Pisco Sour, Chilcano, and Capitán — with our head bartender.",
+        "Order every pisco cocktail on the menu — Sour, Chilcano, Capitán — and rank them blind around the table. Loser buys the next round.",
       image:
         "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=800&q=80",
       hostName: "Diego",
-      attendeeCount: 14,
+      attendeeCount: 5,
       location: "Bar & Mezcal Lounge",
     },
     {
       id: "6",
-      title: "Chef's Table Tasting Menu",
+      title: "Eight-Course Birthday Dinner",
       daysFromNow: 32,
       time: "7:00 PM",
       description:
-        "Eight courses of Peruvian-Mexican fusion served at the fireplace. Optional mezcal and natural wine pairings. Twelve seats only.",
+        "Eight of us, the eight-course tasting menu, and optional pisco-mezcal pairings. Long dinner by the fireplace for Sofia's birthday. RSVP a week out so the kitchen can plan.",
       image:
         "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80",
-      hostName: "Chef Rosa",
-      attendeeCount: 12,
+      hostName: "Sofia",
+      attendeeCount: 8,
       location: "Fireplace Lounge",
     },
   ],
