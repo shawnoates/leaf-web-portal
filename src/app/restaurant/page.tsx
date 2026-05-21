@@ -7,7 +7,7 @@ import CalendarLandingPage, {
 const config: LandingConfig = {
   profileName: "Landmark Cevicheria",
   profilePhoto:
-    "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400&q=80",
+    "https://static.spotapps.co/spots/cb/428476d97046fabf5dfff4fb5e2a5f/full",
   brandColor: "#b45309",
   followerCount: 246,
   navLabel: "Restaurant",
@@ -31,7 +31,7 @@ const config: LandingConfig = {
       description:
         "Guided flight of five mezcals from one of Brooklyn's deepest selections. Smoked almonds, tasting notes, and stories from the agave fields.",
       image:
-        "https://images.unsplash.com/photo-1551024601-bec78aea704b?w=800&q=80",
+        "https://static.spotapps.co/spots/92/4bfaa8f4c240e29650546f1185a603/full",
       hostName: "Mateo",
       attendeeCount: 16,
       location: "Bar & Mezcal Lounge",
@@ -44,7 +44,7 @@ const config: LandingConfig = {
       description:
         "Hands-on class at the kitchen counter. Three styles of Peruvian ceviche, leche de tigre techniques, and a pisco sour to start. Apron included.",
       image:
-        "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&q=80",
+        "https://static.spotapps.co/spots/d7/1a69519bee4b0993b2b84f66cc8a7e/full",
       hostName: "Chef Rosa",
       attendeeCount: 12,
       location: "Open Kitchen Counter",
@@ -70,7 +70,7 @@ const config: LandingConfig = {
       description:
         "Trio takes the patio: upright bass, nylon guitar, and percussion. No cover, full dinner menu, reservations strongly recommended.",
       image:
-        "https://images.unsplash.com/photo-1493676304819-0d7a8d026dcf?w=800&q=80",
+        "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/31/89/5a/a3/brooklyn-s-next-big-latin.jpg?w=900&h=500&s=1",
       hostName: "Daniela",
       attendeeCount: 42,
       location: "Back Patio",
