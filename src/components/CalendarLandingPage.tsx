@@ -318,6 +318,7 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
         </div>
 
         {/* Plan Ideas Carousel */}
+        {config.planIdeas.length > 0 && (
         <section className="mt-48 mb-24 space-y-12">
           <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
             <div className="space-y-2">
@@ -412,6 +413,7 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
             </div>
           </div>
         </section>
+        )}
 
         {/* Bottom CTA */}
         <div className="text-center py-16 border-t border-zinc-100">

@@ -10,7 +10,7 @@ const config: LandingConfig = {
     "https://static.spotapps.co/spots/cb/428476d97046fabf5dfff4fb5e2a5f/full",
   brandColor: "#b45309",
   followerCount: 246,
-  navLabel: "Restaurant",
+  navLabel: "Calendar",
   plansHeader: "What's On at Landmark",
   ideasHeader: "Book the Space",
   ideasTitle: "Host your night here",
@@ -102,44 +102,7 @@ const config: LandingConfig = {
       location: "Fireplace Lounge",
     },
   ],
-  planIdeas: [
-    {
-      id: "i1",
-      title: "Birthday Buyout — Fireplace Lounge",
-      description:
-        "Reserve the lounge for the night. Custom menu, dedicated bartender, and your own playlist on the speakers.",
-      category: "Private Events",
-      image:
-        "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&q=80",
-    },
-    {
-      id: "i2",
-      title: "Día de los Muertos Pop-Up",
-      description:
-        "Themed prix-fixe night with marigolds, sugar skulls, and a mezcal flight built around the holiday.",
-      category: "Seasonal",
-      image:
-        "https://images.unsplash.com/photo-1572731535619-3a1d6f905049?w=800&q=80",
-    },
-    {
-      id: "i3",
-      title: "Corporate Happy Hour",
-      description:
-        "Buyout the patio for your team. Passed bites, two-cocktail tickets per guest, easy invoicing for the office.",
-      category: "Corporate",
-      image:
-        "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=800&q=80",
-    },
-    {
-      id: "i4",
-      title: "Rehearsal Dinner",
-      description:
-        "Family-style Peruvian sharing menu in the main dining room. Up to 40, with toasts welcome.",
-      category: "Weddings",
-      image:
-        "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=800&q=80",
-    },
-  ],
+  planIdeas: [],
 };
 
 export default function RestaurantPage() {
