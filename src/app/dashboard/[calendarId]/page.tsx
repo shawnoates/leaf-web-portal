@@ -248,6 +248,8 @@ interface OrgAnalytics {
     rsvpCount: number;
     planCount: number;
     rsvpRate: number;
+    attendanceCount: number;
+    attendanceRate: number;
     repeatAttendeeCount: number;
     uniqueRsvpUsersInRange: number;
     repeatRate: number;
@@ -1686,12 +1688,23 @@ export default function OrgDashboardPage() {
                   <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
                     Engagement
                   </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                     <div>
                       <p className="text-xs uppercase tracking-widest text-zinc-400 mb-1">
                         Avg RSVPs / plan
                       </p>
                       <p className="text-2xl font-light">{analytics.engagement.rsvpRate}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-zinc-400 mb-1">
+                        Attendance
+                      </p>
+                      <p className="text-2xl font-light">
+                        {analytics.engagement.attendanceRate}%
+                        <span className="text-sm text-zinc-400 ml-1">
+                          ({analytics.engagement.attendanceCount}/{analytics.engagement.rsvpCount})
+                        </span>
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-widest text-zinc-400 mb-1">

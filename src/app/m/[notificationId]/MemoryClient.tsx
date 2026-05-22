@@ -3,7 +3,17 @@
 import { useState, useRef } from "react";
 import Parse from "@/lib/parse-client";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
-import { Camera, Loader2, MapPin, Calendar, X, Upload } from "lucide-react";
+import {
+  Camera,
+  Loader2,
+  MapPin,
+  Calendar,
+  X,
+  Upload,
+  Check,
+  ShieldCheck,
+  UserCheck,
+} from "lucide-react";
 import HostTheNextOne from "@/components/HostTheNextOne";
 
 type Photo = {
@@ -14,6 +24,15 @@ type Photo = {
   uploaderName: string;
   uploaderId: string | null;
   eventGroupId: string | null;
+};
+
+type Attendee = {
+  notificationId: string;
+  name: string;
+  checkedInViaMobile: boolean;
+  checkedInAt: string | null;
+  attendedAt: string | null;
+  attendedSource: string | null;
 };
 
 type AttendeeMemoryInfo = {
@@ -33,6 +52,7 @@ type AttendeeMemoryInfo = {
     name: string | null;
   } | null;
   viewerRole?: "owner" | "host" | "attendee";
+  canMarkAttendance?: boolean;
   recap?: {
     rsvpCount: number;
     photoCount: number;
@@ -42,6 +62,7 @@ type AttendeeMemoryInfo = {
     weeksSinceLastPlan: number | null;
   };
   attendee: { name: string };
+  attendees?: Attendee[];
   photos: Photo[];
   photoCount: number;
   uploadsClosed?: boolean;
@@ -72,7 +93,54 @@ export default function MemoryClient({
   >([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showHostOtp, setShowHostOtp] = useState(false);
+  const [markingId, setMarkingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function refreshInfo() {
+    try {
+      const fresh = (await Parse.Cloud.run("getAttendeeMemoryInfo", {
+        notificationId,
+      })) as AttendeeMemoryInfo;
+      setInfo(fresh);
+    } catch (err) {
+      console.error("[MemoryClient] refresh failed:", err);
+    }
+  }
+
+  async function toggleAttendance(attendee: Attendee) {
+    if (attendee.checkedInViaMobile) return; // mobile check-ins are read-only
+    setMarkingId(attendee.notificationId);
+    setError(null);
+    const nextAttended = !attendee.attendedAt;
+    try {
+      await Parse.Cloud.run("markAttendance", {
+        notificationId,
+        attendeeNotificationId: attendee.notificationId,
+        attended: nextAttended,
+      });
+      setInfo((prev) =>
+        prev && prev.attendees
+          ? {
+              ...prev,
+              attendees: prev.attendees.map((a) =>
+                a.notificationId === attendee.notificationId
+                  ? {
+                      ...a,
+                      attendedAt: nextAttended ? new Date().toISOString() : null,
+                      attendedSource: nextAttended ? "host" : null,
+                    }
+                  : a
+              ),
+            }
+          : prev
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Couldn't update attendance.");
+    } finally {
+      setMarkingId(null);
+    }
+  }
 
   if (!info) {
     return (
@@ -266,6 +334,107 @@ export default function MemoryClient({
       </div>
       )}
 
+      {/* Mark Attendance — host-only. Visible when the link belongs to the host
+          (viewerRole === host|owner); writes require host-phone OTP verification. */}
+      {(info.viewerRole === "host" || info.viewerRole === "owner") &&
+        info.attendees && info.attendees.length > 0 && (
+        <div className="border border-zinc-200 rounded-xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-500">
+              Mark Attendance
+            </h2>
+            {(() => {
+              const attended = info.attendees.filter(
+                (a) => a.attendedAt || a.checkedInViaMobile
+              ).length;
+              return (
+                <span className="text-[11px] text-zinc-400">
+                  {attended}/{info.attendees.length}
+                </span>
+              );
+            })()}
+          </div>
+          <p className="text-xs text-zinc-500 mb-4">
+            Check off who actually showed up. People who checked in on the Leaf
+            app are already counted.
+          </p>
+
+          {!info.canMarkAttendance ? (
+            <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-4 text-center">
+              <ShieldCheck className="w-5 h-5 text-zinc-400 mx-auto mb-2" />
+              <p className="text-xs text-zinc-600 mb-3">
+                Verify your phone to mark attendance.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowHostOtp(true)}
+                className="inline-flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
+              >
+                Verify as host
+              </button>
+            </div>
+          ) : (
+            <ul className="divide-y divide-zinc-100">
+              {info.attendees.map((a) => {
+                const isMarked = !!a.attendedAt || a.checkedInViaMobile;
+                const isBusy = markingId === a.notificationId;
+                return (
+                  <li
+                    key={a.notificationId}
+                    className="flex items-center justify-between py-2.5"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <UserCheck
+                        className={`w-3.5 h-3.5 flex-shrink-0 ${
+                          isMarked ? "text-emerald-600" : "text-zinc-300"
+                        }`}
+                      />
+                      <span className="text-sm text-zinc-800 truncate">
+                        {a.name}
+                      </span>
+                      {a.checkedInViaMobile && (
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                          Checked in
+                        </span>
+                      )}
+                    </div>
+                    {a.checkedInViaMobile ? (
+                      <Check className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => toggleAttendance(a)}
+                        disabled={isBusy}
+                        aria-pressed={!!a.attendedAt}
+                        className={`relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 ${
+                          a.attendedAt ? "bg-emerald-600" : "bg-zinc-200"
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                            a.attendedAt ? "translate-x-5" : "translate-x-0.5"
+                          }`}
+                        />
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {showHostOtp && (
+        <HostOtpModal
+          onClose={() => setShowHostOtp(false)}
+          onVerified={async () => {
+            setShowHostOtp(false);
+            await refreshInfo();
+          }}
+        />
+      )}
+
       {/* Gallery */}
       {info.photos.length > 0 ? (
         <div>
@@ -316,6 +485,154 @@ export default function MemoryClient({
         />
       )}
 
+    </div>
+  );
+}
+
+function HostOtpModal({
+  onClose,
+  onVerified,
+}: {
+  onClose: () => void;
+  onVerified: () => void | Promise<void>;
+}) {
+  const [step, setStep] = useState<"phone" | "code">("phone");
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  function formatPhone(value: string) {
+    const digits = value.replace(/\D/g, "").slice(0, 10);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  async function sendCode() {
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 10) {
+      setErr("Enter a valid 10-digit phone number.");
+      return;
+    }
+    setBusy(true);
+    setErr("");
+    try {
+      await Parse.Cloud.run("requestOTP", { phone: `+1${digits}` });
+      setStep("code");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Couldn't send code.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitCode() {
+    const digits = phone.replace(/\D/g, "");
+    if (code.length < 4) {
+      setErr("Enter the full code.");
+      return;
+    }
+    setBusy(true);
+    setErr("");
+    try {
+      const token = (await Parse.Cloud.run("verifyOTP", {
+        phone: `+1${digits}`,
+        code,
+      })) as string;
+      if (!token || typeof token !== "string" || !token.startsWith("r:")) {
+        throw new Error("Verification failed. Try again.");
+      }
+      await Parse.User.become(token);
+      await onVerified();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Verification failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-600"
+          aria-label="Close"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-zinc-100 rounded-full flex items-center justify-center">
+            <ShieldCheck className="w-5 h-5 text-zinc-600" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-900">Verify as host</h3>
+            <p className="text-xs text-zinc-500">
+              {step === "phone"
+                ? "Confirm the phone on your Leaf account."
+                : `Sent to +1 ${phone}`}
+            </p>
+          </div>
+        </div>
+
+        {step === "phone" ? (
+          <>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm text-zinc-400">+1</span>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
+                placeholder="(555) 123-4567"
+                className="flex-1 px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-300"
+                autoFocus
+              />
+            </div>
+            {err && <p className="text-xs text-red-500 mb-2">{err}</p>}
+            <button
+              onClick={sendCode}
+              disabled={busy}
+              className="w-full py-2.5 text-sm font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+            >
+              {busy ? "Sending…" : "Send code"}
+            </button>
+          </>
+        ) : (
+          <>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={code}
+              onChange={(e) =>
+                setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+              }
+              placeholder="Enter code"
+              className="w-full px-3 py-2 text-sm text-center tracking-widest border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-300 mb-3"
+              autoFocus
+            />
+            {err && <p className="text-xs text-red-500 mb-2">{err}</p>}
+            <button
+              onClick={submitCode}
+              disabled={busy}
+              className="w-full py-2.5 text-sm font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 disabled:opacity-50 transition-colors mb-2"
+            >
+              {busy ? "Verifying…" : "Verify"}
+            </button>
+            <button
+              onClick={() => {
+                setStep("phone");
+                setCode("");
+                setErr("");
+              }}
+              className="w-full text-xs text-zinc-400 hover:text-zinc-600"
+            >
+              Use a different number
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

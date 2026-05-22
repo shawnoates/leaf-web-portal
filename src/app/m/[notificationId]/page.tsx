@@ -30,6 +30,7 @@ type AttendeeMemoryInfo = {
     profilePhoto?: string | null;
   } | null;
   viewerRole?: "owner" | "host" | "attendee";
+  canMarkAttendance?: boolean;
   recap?: {
     rsvpCount: number;
     photoCount: number;
@@ -39,6 +40,14 @@ type AttendeeMemoryInfo = {
     weeksSinceLastPlan: number | null;
   };
   attendee: { name: string };
+  attendees?: {
+    notificationId: string;
+    name: string;
+    checkedInViaMobile: boolean;
+    checkedInAt: string | null;
+    attendedAt: string | null;
+    attendedSource: string | null;
+  }[];
   photos: Photo[];
   photoCount: number;
   limits: {
