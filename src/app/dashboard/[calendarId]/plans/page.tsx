@@ -8,7 +8,7 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
 import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailModal";
-import { ArrowLeft, Calendar, Camera, Lock, MapPin, Plus, RefreshCw, Settings, Trash2, Users, X } from "lucide-react";
+import { ArrowLeft, Calendar, Camera, Check, Lock, MapPin, Plus, RefreshCw, Settings, Trash2, UserCheck, Users, X } from "lucide-react";
 
 interface PlanIdea {
   objectId: string;
@@ -550,8 +550,14 @@ export default function PlansPage() {
                     <div className="flex items-center gap-3 text-[11px] text-zinc-500">
                       <span className="inline-flex items-center gap-1.5">
                         <Users className="w-3 h-3" />
-                        {plan.rsvpCount} {plan.rsvpCount === 1 ? "attendee" : "attendees"}
+                        {plan.rsvpCount} RSVP{plan.rsvpCount === 1 ? "" : "s"}
                       </span>
+                      {plan.rsvpCount > 0 && (
+                        <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                          <UserCheck className="w-3 h-3" />
+                          {plan.attendanceCount}/{plan.rsvpCount} attended
+                        </span>
+                      )}
                       <span className="inline-flex items-center gap-1.5">
                         <Camera className="w-3 h-3" />
                         {plan.photoCount} {plan.photoCount === 1 ? "photo" : "photos"}
@@ -753,10 +759,23 @@ export default function PlansPage() {
             </div>
             <div className="overflow-y-auto p-5 space-y-6">
               <section>
-                <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-3">
-                  Attendees
-                  {modalRsvps !== null ? ` (${modalRsvps.length})` : ""}
-                </h4>
+                <div className="flex items-baseline justify-between mb-3">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                    Attendance
+                    {modalRsvps !== null ? ` (${modalRsvps.length})` : ""}
+                  </h4>
+                  {modalRsvps !== null && modalRsvps.length > 0 && (() => {
+                    const attended = modalRsvps.filter(
+                      (r) => r.attendedAt || r.checkedInViaMobile
+                    ).length;
+                    const pct = Math.round((attended / modalRsvps.length) * 100);
+                    return (
+                      <span className="text-[11px] text-zinc-500">
+                        {attended}/{modalRsvps.length} attended ({pct}%)
+                      </span>
+                    );
+                  })()}
+                </div>
                 {modalRsvps === null ? (
                   <div className="flex items-center py-4">
                     <RefreshCw className="w-4 h-4 animate-spin text-zinc-400" />
@@ -764,15 +783,37 @@ export default function PlansPage() {
                 ) : modalRsvps.length === 0 ? (
                   <p className="text-sm text-zinc-400">No RSVPs.</p>
                 ) : (
-                  <ul className="flex flex-wrap gap-2">
-                    {modalRsvps.map((r) => (
-                      <li
-                        key={r.notificationId}
-                        className="text-sm text-zinc-700 bg-zinc-100 rounded-full px-3 py-1"
-                      >
-                        {r.name}
-                      </li>
-                    ))}
+                  <ul className="divide-y divide-zinc-100 border border-zinc-100 rounded-lg">
+                    {modalRsvps.map((r) => {
+                      const attended = !!r.attendedAt || r.checkedInViaMobile;
+                      const badge = r.checkedInViaMobile
+                        ? { label: "Checked in", cls: "text-emerald-700 bg-emerald-50" }
+                        : r.attendedAt
+                        ? { label: "Attended", cls: "text-emerald-700 bg-emerald-50" }
+                        : { label: "No-show", cls: "text-zinc-500 bg-zinc-100" };
+                      return (
+                        <li
+                          key={r.notificationId}
+                          className="flex items-center justify-between px-3 py-2"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {attended ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                            ) : (
+                              <X className="w-3.5 h-3.5 text-zinc-300 flex-shrink-0" />
+                            )}
+                            <span className="text-sm text-zinc-800 truncate">
+                              {r.name}
+                            </span>
+                          </div>
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${badge.cls}`}
+                          >
+                            {badge.label}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </section>
