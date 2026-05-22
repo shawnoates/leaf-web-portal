@@ -6,7 +6,7 @@ import Parse from "@/lib/parse-client";
 import { Loader2, Smartphone, MessageCircle } from "lucide-react";
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
-const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-plans-with-friends/id1521960862";
+const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
 
 let gisLoading = false;
 let gisLoaded = false;

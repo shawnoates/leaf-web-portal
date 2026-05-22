@@ -16,6 +16,12 @@ export const metadata: Metadata = {
     icon: "/favicon.png",
     apple: "/favicon.png",
   },
+  // Apple-managed smart app banner shown across Safari on iOS — prompts
+  // visitors to install the Leaf app. Universal links handle deep-linking
+  // for already-installed users, so app-argument is unnecessary.
+  other: {
+    "apple-itunes-app": "app-id=1040588046",
+  },
 };
 
 export default function RootLayout({
