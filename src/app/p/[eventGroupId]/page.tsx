@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Parse from "@/lib/parse";
 import PlanShareRedirect from "./PlanShareRedirect";
 
+type ShareMode = "invite" | "copy";
+
 type PlanShareInfo = {
+  mode: ShareMode;
   objectId: string;
   title: string;
   description: string;
@@ -16,11 +19,13 @@ type PlanShareInfo = {
 };
 
 async function fetchPlanShareInfo(
-  eventGroupId: string
+  eventGroupId: string,
+  mode: ShareMode
 ): Promise<PlanShareInfo | null> {
   try {
     const result = (await Parse.Cloud.run("getPlanShareInfo", {
       eventGroupId,
+      mode,
     })) as PlanShareInfo;
     return result || null;
   } catch (err) {
@@ -31,18 +36,28 @@ async function fetchPlanShareInfo(
 
 type PageProps = {
   params: Promise<{ eventGroupId: string }>;
+  searchParams: Promise<{ copy?: string }>;
 };
+
+function resolveMode(copyParam: string | undefined): ShareMode {
+  return copyParam === "1" ? "copy" : "invite";
+}
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: PageProps): Promise<Metadata> {
   const { eventGroupId } = await params;
-  const info = await fetchPlanShareInfo(eventGroupId);
+  const { copy } = await searchParams;
+  const mode = resolveMode(copy);
+  const info = await fetchPlanShareInfo(eventGroupId, mode);
 
   if (!info) {
     return {
-      title: "Leaf — Join the plan",
-      description: "Open this plan on Leaf.",
+      title: mode === "copy" ? "Leaf — Save this plan" : "Leaf — Join the plan",
+      description: mode === "copy"
+        ? "Save this plan to your calendar on Leaf."
+        : "Open this plan on Leaf.",
     };
   }
 
@@ -54,7 +69,9 @@ export async function generateMetadata({
   const description =
     info.description ||
     descParts.join(" · ") ||
-    "Open this plan on Leaf.";
+    (mode === "copy"
+      ? "Save this plan to your calendar on Leaf."
+      : "Open this plan on Leaf.");
 
   const ogImages = info.image ? [{ url: info.image }] : undefined;
 
@@ -65,6 +82,11 @@ export async function generateMetadata({
       }
     : undefined;
 
+  const canonicalUrl =
+    mode === "copy"
+      ? `https://os.joinleaf.com/p/${eventGroupId}?copy=1`
+      : `https://os.joinleaf.com/p/${eventGroupId}`;
+
   return {
     title: `${title} · Leaf`,
     description,
@@ -73,7 +95,7 @@ export async function generateMetadata({
       title,
       description,
       type: "article",
-      url: `https://os.joinleaf.com/p/${eventGroupId}`,
+      url: canonicalUrl,
       images: ogImages,
       siteName: "Leaf",
     },
@@ -86,19 +108,28 @@ export async function generateMetadata({
   };
 }
 
-export default async function PlanSharePage({ params }: PageProps) {
+export default async function PlanSharePage({ params, searchParams }: PageProps) {
   const { eventGroupId } = await params;
-  const info = await fetchPlanShareInfo(eventGroupId);
+  const { copy } = await searchParams;
+  const mode = resolveMode(copy);
+  const info = await fetchPlanShareInfo(eventGroupId, mode);
 
-  // Destination: org page with the plan modal pre-opened.
-  // If we couldn't resolve a shareId, fall back to home.
-  const destination = info?.shareId
-    ? `/org/${info.shareId}?plan=${eventGroupId}`
-    : "/";
+  // Invite mode: redirect into the calendar context where the plan modal opens.
+  // Copy mode: no calendar context — the recipient is forking a recipe, not
+  // joining the host's instance. Stay on this page and surface an "Open in app"
+  // affordance via the standalone copy view (still to be built; for now we
+  // render the OG-tag landing only).
+  const destination =
+    mode === "invite" && info?.shareId
+      ? `/org/${info.shareId}?plan=${eventGroupId}`
+      : mode === "invite"
+        ? "/"
+        : null;
 
   // We render a 200 response (NOT a server redirect) so OG unfurlers like
   // iMessage / RCS read the plan-specific OG tags from generateMetadata.
-  // The client component below redirects real browsers after hydration.
+  // The client component below redirects real browsers after hydration —
+  // only in invite mode, since copy mode has no destination yet.
   return (
     <div
       style={{
@@ -114,24 +145,34 @@ export default async function PlanSharePage({ params }: PageProps) {
           "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       }}
     >
-      <PlanShareRedirect destination={destination} />
-      <p style={{ fontSize: 14 }}>
-        Opening{" "}
-        <a
-          href={destination}
-          style={{ color: "#18181b", textDecoration: "underline" }}
-        >
-          {info?.title || "the plan"}
-        </a>
-        …
-      </p>
-      <noscript>
-        <p style={{ fontSize: 12, marginTop: 16 }}>
-          <a href={destination} style={{ color: "#18181b" }}>
-            Tap here if you are not redirected automatically.
+      {destination ? <PlanShareRedirect destination={destination} /> : null}
+      {destination ? (
+        <p style={{ fontSize: 14 }}>
+          Opening{" "}
+          <a
+            href={destination}
+            style={{ color: "#18181b", textDecoration: "underline" }}
+          >
+            {info?.title || "the plan"}
           </a>
+          …
         </p>
-      </noscript>
+      ) : (
+        <p style={{ fontSize: 14 }}>
+          {info?.title ? <strong>{info.title}</strong> : "A plan on Leaf"}
+          <br />
+          Open Leaf to save this plan to your calendar.
+        </p>
+      )}
+      {destination ? (
+        <noscript>
+          <p style={{ fontSize: 12, marginTop: 16 }}>
+            <a href={destination} style={{ color: "#18181b" }}>
+              Tap here if you are not redirected automatically.
+            </a>
+          </p>
+        </noscript>
+      ) : null}
     </div>
   );
 }

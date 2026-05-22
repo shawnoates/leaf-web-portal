@@ -247,12 +247,24 @@ function RsvpModal({
   brandColor,
   onRsvpSuccess,
   existingNotificationId,
+  calendarId,
+  calendarName,
+  isFollowingCalendar,
+  followRequestPending: followRequestPendingProp,
+  isPrivateCalendar,
+  onFollowedCalendar,
 }: {
   plan: Plan;
   brandColor?: string;
   onClose: () => void;
   onRsvpSuccess?: (planId: string, alreadyRsvpd: boolean, pendingApproval?: boolean) => void;
   existingNotificationId?: string | null;
+  calendarId?: string;
+  calendarName?: string;
+  isFollowingCalendar?: boolean;
+  followRequestPending?: boolean;
+  isPrivateCalendar?: boolean;
+  onFollowedCalendar?: (pending: boolean) => void;
 }) {
   const verify = usePhoneVerify();
   const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
@@ -261,6 +273,30 @@ function RsvpModal({
   const [rsvpNote, setRsvpNote] = useState("");
   const [isPendingResult, setIsPendingResult] = useState(false);
   const [sharePhone, setSharePhone] = useState(true);
+  const [followState, setFollowState] = useState<"idle" | "following" | "done" | "pending">(
+    isFollowingCalendar ? "done" : followRequestPendingProp ? "pending" : "idle"
+  );
+  const [followError, setFollowError] = useState("");
+
+  const handleFollowCalendar = async () => {
+    if (!calendarId || !verify.isVerified) return;
+    setFollowError("");
+    setFollowState("following");
+    try {
+      const result = await Parse.Cloud.run("followCalendarViaWeb", {
+        calendarId,
+        name: verify.name,
+        phoneNumber: verify.phone.replace(/\D/g, ""),
+      }) as { alreadyFollowing?: boolean; pending?: boolean } | null | undefined;
+      setFollowerCookie(calendarId, verify.name, verify.phone);
+      const pending = result?.pending === true;
+      setFollowState(pending ? "pending" : "done");
+      onFollowedCalendar?.(pending);
+    } catch (err: unknown) {
+      setFollowError(err instanceof Error ? err.message : "Could not follow. Please try again.");
+      setFollowState("idle");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -443,6 +479,51 @@ function RsvpModal({
                 </a>
               );
             })()}
+
+            {calendarId && calendarName && followState === "idle" && (
+              <div className="pt-1">
+                <button
+                  onClick={handleFollowCalendar}
+                  className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-xs uppercase tracking-wider font-bold hover:bg-zinc-50 transition-colors rounded-lg"
+                >
+                  <Heart className="w-4 h-4" />
+                  {isPrivateCalendar ? `Request to Follow ${calendarName}` : `Follow ${calendarName}`}
+                </button>
+                <p className="text-[11px] text-zinc-400 mt-1.5">
+                  Get notified when new plans are added.
+                </p>
+                {followError && (
+                  <p className="text-[11px] text-red-500 mt-1.5">{followError}</p>
+                )}
+              </div>
+            )}
+
+            {calendarId && calendarName && followState === "following" && (
+              <div className="pt-1">
+                <div className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-xs uppercase tracking-wider font-bold rounded-lg opacity-60">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Following…
+                </div>
+              </div>
+            )}
+
+            {calendarName && followState === "done" && (
+              <div className="pt-1">
+                <div className="flex items-center justify-center gap-2 w-full border border-emerald-200 bg-emerald-50 text-emerald-700 py-3 text-xs uppercase tracking-wider font-bold rounded-lg">
+                  <Check className="w-4 h-4" />
+                  Following {calendarName}
+                </div>
+              </div>
+            )}
+
+            {calendarName && followState === "pending" && (
+              <div className="pt-1">
+                <div className="flex items-center justify-center gap-2 w-full border border-amber-200 bg-amber-50 text-amber-700 py-3 text-xs uppercase tracking-wider font-bold rounded-lg">
+                  <Clock className="w-4 h-4" />
+                  Follow Request Pending
+                </div>
+              </div>
+            )}
 
             <button
               onClick={onClose}
@@ -2470,6 +2551,19 @@ export default function OrgCalendarPage() {
           onClose={() => setRsvpPlan(null)}
           brandColor={org.brandColor || undefined}
           existingNotificationId={rsvpNotificationIds.get(rsvpPlan.id) || null}
+          calendarId={org.objectId}
+          calendarName={org.name}
+          isFollowingCalendar={isFollowing}
+          followRequestPending={followRequestPending || org.followRequestPending}
+          isPrivateCalendar={org.isPrivate}
+          onFollowedCalendar={(pending) => {
+            if (pending) {
+              setFollowRequestPending(true);
+            } else {
+              setIsFollowing(true);
+              setFollowerCount((c) => c + 1);
+            }
+          }}
           onRsvpSuccess={(planId, alreadyRsvpd, pendingApproval) => {
             if (pendingApproval) {
               addPendingRsvpCookie(planId);
