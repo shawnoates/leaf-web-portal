@@ -26,6 +26,7 @@ interface PastPlan {
   image: string | null;
   expiryDate: string;
   rsvpCount: number;
+  attendanceCount: number;
   photoCount: number;
   host: { name: string } | null;
   location: { name: string; address: string } | null;
@@ -43,6 +44,10 @@ interface PastPlanRsvp {
   notificationId: string;
   name: string;
   status: string;
+  attendedAt: string | null;
+  attendedSource: string | null;
+  checkedInViaMobile: boolean;
+  checkedInAt: string | null;
 }
 
 interface UpcomingPlan {
