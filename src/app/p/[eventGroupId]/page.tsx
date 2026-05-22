@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Parse from "@/lib/parse";
 import PlanShareRedirect from "./PlanShareRedirect";
+import StandalonePlanCard from "./StandalonePlanCard";
 
 type ShareMode = "invite" | "copy";
 
@@ -15,6 +16,7 @@ type PlanShareInfo = {
   host: { name: string } | null;
   shareId: string | null;
   calendarName: string | null;
+  calendarIsPrivate: boolean;
   calendarProfilePhoto: string | null;
 };
 
@@ -114,57 +116,50 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
   const mode = resolveMode(copy);
   const info = await fetchPlanShareInfo(eventGroupId, mode);
 
-  // Invite mode: redirect into the calendar context where the plan modal opens.
-  // Copy mode: no calendar context — the recipient is forking a recipe, not
-  // joining the host's instance. Stay on this page and surface an "Open in app"
-  // affordance via the standalone copy view (still to be built; for now we
-  // render the OG-tag landing only).
-  const destination =
-    mode === "invite" && info?.shareId
-      ? `/org/${info.shareId}?plan=${eventGroupId}`
-      : mode === "invite"
-        ? "/"
-        : null;
+  // Resolution: how should this page present?
+  //  - invite + public calendar  → redirect into /org/<shareId>?plan=<id>
+  //    (auto-opens plan modal inside the calendar context)
+  //  - invite + private calendar → request-to-follow scrim with blurred details
+  //    (recipient doesn't have access to plan details yet)
+  //  - invite + no calendar      → standalone plan card with "Open in Leaf"
+  //  - copy mode                 → recipe card with "Save this plan in Leaf"
+  //  - missing info               → minimal fallback to home
+  if (!info) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center px-6 py-16 text-center text-zinc-500 text-sm">
+        This plan is no longer available.
+      </div>
+    );
+  }
 
-  // We render a 200 response (NOT a server redirect) so OG unfurlers like
-  // iMessage / RCS read the plan-specific OG tags from generateMetadata.
-  // The client component below redirects real browsers after hydration —
-  // only in invite mode, since copy mode has no destination yet.
-  return (
-    <div
-      style={{
-        minHeight: "60vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "60px 20px",
-        textAlign: "center",
-        color: "#52525b",
-        fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      }}
-    >
-      {destination ? <PlanShareRedirect destination={destination} /> : null}
-      {destination ? (
+  if (mode === "invite" && info.shareId && !info.calendarIsPrivate) {
+    const destination = `/org/${info.shareId}?plan=${eventGroupId}`;
+    return (
+      <div
+        style={{
+          minHeight: "60vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "60px 20px",
+          textAlign: "center",
+          color: "#52525b",
+          fontFamily:
+            "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        }}
+      >
+        <PlanShareRedirect destination={destination} />
         <p style={{ fontSize: 14 }}>
           Opening{" "}
           <a
             href={destination}
             style={{ color: "#18181b", textDecoration: "underline" }}
           >
-            {info?.title || "the plan"}
+            {info.title || "the plan"}
           </a>
           …
         </p>
-      ) : (
-        <p style={{ fontSize: 14 }}>
-          {info?.title ? <strong>{info.title}</strong> : "A plan on Leaf"}
-          <br />
-          Open Leaf to save this plan to your calendar.
-        </p>
-      )}
-      {destination ? (
         <noscript>
           <p style={{ fontSize: 12, marginTop: 16 }}>
             <a href={destination} style={{ color: "#18181b" }}>
@@ -172,7 +167,29 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
             </a>
           </p>
         </noscript>
-      ) : null}
-    </div>
+      </div>
+    );
+  }
+
+  const variant: "standalone" | "copy" | "privateCalendar" =
+    mode === "copy"
+      ? "copy"
+      : info.calendarIsPrivate && info.shareId
+        ? "privateCalendar"
+        : "standalone";
+
+  return (
+    <StandalonePlanCard
+      variant={variant}
+      title={info.title}
+      description={info.description}
+      image={info.image}
+      expiryDate={info.expiryDate}
+      location={info.location}
+      hostName={info.host?.name ?? null}
+      calendarName={info.calendarName}
+      calendarProfilePhoto={info.calendarProfilePhoto}
+      shareId={info.shareId}
+    />
   );
 }
