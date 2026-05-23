@@ -83,9 +83,11 @@ function formatEventDate(iso: string | null): string {
 export default function MemoryClient({
   notificationId,
   initialInfo,
+  initialError,
 }: {
   notificationId: string;
   initialInfo: AttendeeMemoryInfo | null;
+  initialError?: string | null;
 }) {
   const [info, setInfo] = useState<AttendeeMemoryInfo | null>(initialInfo);
   const [staged, setStaged] = useState<
@@ -145,9 +147,19 @@ export default function MemoryClient({
   if (!info) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-8 text-center">
-        <p className="text-sm text-zinc-500">
-          We couldn&apos;t find this invitation. The link may have expired.
-        </p>
+        <div className="max-w-sm">
+          <p className="text-sm text-zinc-700 mb-2">
+            We couldn&apos;t open this invitation.
+          </p>
+          {initialError && (
+            <p className="text-xs text-zinc-500 font-mono break-words">
+              {initialError}
+            </p>
+          )}
+          <p className="text-[11px] text-zinc-400 mt-3">
+            Link id: <span className="font-mono">{notificationId}</span>
+          </p>
+        </div>
       </div>
     );
   }

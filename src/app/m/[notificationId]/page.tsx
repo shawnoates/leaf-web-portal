@@ -57,15 +57,18 @@ type AttendeeMemoryInfo = {
   };
 };
 
-async function fetchInfo(notificationId: string): Promise<AttendeeMemoryInfo | null> {
+async function fetchInfo(
+  notificationId: string
+): Promise<{ info: AttendeeMemoryInfo | null; error: string | null }> {
   try {
     const result = (await Parse.Cloud.run("getAttendeeMemoryInfo", {
       notificationId,
     })) as AttendeeMemoryInfo;
-    return result || null;
+    return { info: result || null, error: result ? null : "No data returned." };
   } catch (err) {
     console.error("[/m] getAttendeeMemoryInfo failed:", err);
-    return null;
+    const message = err instanceof Error ? err.message : String(err);
+    return { info: null, error: message };
   }
 }
 
@@ -75,7 +78,7 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { notificationId } = await params;
-  const info = await fetchInfo(notificationId);
+  const { info } = await fetchInfo(notificationId);
   if (!info) {
     return {
       title: "Add your photos · Leaf",
@@ -107,6 +110,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function MemoryPage({ params }: PageProps) {
   const { notificationId } = await params;
-  const info = await fetchInfo(notificationId);
-  return <MemoryClient notificationId={notificationId} initialInfo={info} />;
+  const { info, error } = await fetchInfo(notificationId);
+  return (
+    <MemoryClient
+      notificationId={notificationId}
+      initialInfo={info}
+      initialError={error}
+    />
+  );
 }
