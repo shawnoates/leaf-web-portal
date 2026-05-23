@@ -395,13 +395,13 @@ function RsvpModal({
             </div>
 
             {!isPendingResult && notificationId ? (
-              <div className="pt-2">
-                <JoinChatPicker
-                  eventGroupId={eventGroupId}
-                  eventNotificationId={notificationId}
-                  onError={(msg) => setErrorMsg(msg)}
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => openPlanChatInApp(notificationId)}
+                className="flex items-center justify-center gap-2 w-full bg-zinc-900 text-white py-3 text-xs uppercase tracking-wider font-bold hover:bg-zinc-800 transition-colors rounded-lg"
+              >
+                <MessageCircle className="w-4 h-4" /> Open Plan Chat in Leaf
+              </button>
             ) : null}
 
             {!isPendingResult && expiryDate ? (() => {
