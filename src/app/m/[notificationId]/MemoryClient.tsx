@@ -55,6 +55,7 @@ type AttendeeMemoryInfo = {
   } | null;
   viewerRole?: "owner" | "host" | "attendee";
   canMarkAttendance?: boolean;
+  attendanceClosed?: boolean;
   nextPlanIdea?: {
     objectId: string;
     title: string;
@@ -377,11 +378,50 @@ export default function MemoryClient({
             })()}
           </div>
           <p className="text-xs text-zinc-500 mb-4">
-            Check off who actually showed up. People who checked in on the Leaf
-            app are already counted.
+            {info.attendanceClosed
+              ? "Attendance editing closed 7 days after the event. Existing marks are still counted."
+              : "Check off who actually showed up. People who checked in on the Leaf app are already counted."}
           </p>
 
-          {!info.canMarkAttendance ? (
+          {info.attendanceClosed ? (
+            <ul className="divide-y divide-zinc-100">
+              {info.attendees.map((a) => {
+                const isMarked = !!a.attendedAt || a.checkedInViaMobile;
+                return (
+                  <li
+                    key={a.notificationId}
+                    className="flex items-center justify-between py-2.5"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <UserCheck
+                        className={`w-3.5 h-3.5 flex-shrink-0 ${
+                          isMarked ? "text-emerald-600" : "text-zinc-300"
+                        }`}
+                      />
+                      <span className="text-sm text-zinc-800 truncate">
+                        {a.name}
+                      </span>
+                    </div>
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                        a.checkedInViaMobile
+                          ? "text-emerald-700 bg-emerald-50"
+                          : a.attendedAt
+                          ? "text-emerald-700 bg-emerald-50"
+                          : "text-zinc-500 bg-zinc-100"
+                      }`}
+                    >
+                      {a.checkedInViaMobile
+                        ? "Checked in"
+                        : a.attendedAt
+                        ? "Attended"
+                        : "No-show"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : !info.canMarkAttendance ? (
             <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-4 text-center">
               <ShieldCheck className="w-5 h-5 text-zinc-400 mx-auto mb-2" />
               <p className="text-xs text-zinc-600 mb-3">

@@ -33,6 +33,7 @@ type AttendeeMemoryInfo = {
   } | null;
   viewerRole?: "owner" | "host" | "attendee";
   canMarkAttendance?: boolean;
+  attendanceClosed?: boolean;
   nextPlanIdea?: {
     objectId: string;
     title: string;
