@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Parse from "@/lib/parse-client";
-import JoinChatPicker from "@/components/JoinChatPicker";
 import {
   setVerifiedUserCookie,
   getVerifiedUserCookie,
@@ -14,9 +13,36 @@ import {
   CheckCircle2,
   Clock,
   Loader2,
+  MessageCircle,
   Phone,
   X,
 } from "lucide-react";
+
+const APP_STORE_URL =
+  "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
+
+// Open the Plan Chat in the iOS app via custom-scheme deep link, falling
+// back to the App Store if the app isn't installed. The visibility-change
+// listener cancels the fallback when the app actually opens (iOS hides the
+// page when switching apps). Tuned to 1.2s — shorter feels twitchy on
+// installed phones; longer leaves uninstalled users staring at a blank tap.
+function openPlanChatInApp(eventNotificationId: string) {
+  if (typeof window === "undefined") return;
+  const deepLink = `leaf://planChat?planId=${encodeURIComponent(eventNotificationId)}`;
+  let didLeave = false;
+  const onVisibilityChange = () => {
+    if (document.hidden) {
+      didLeave = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    }
+  };
+  document.addEventListener("visibilitychange", onVisibilityChange);
+  window.setTimeout(() => {
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    if (!didLeave) window.location.href = APP_STORE_URL;
+  }, 1200);
+  window.location.href = deepLink;
+}
 
 type Props = {
   eventGroupId: string;
