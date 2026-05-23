@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
@@ -87,6 +87,10 @@ export default function PlansPage() {
   const [selectedPlan, setSelectedPlan] = useState<UpcomingPlan | null>(null);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   const [createPlanPrefill, setCreatePlanPrefill] = useState<CreatePlanPrefill | null>(null);
+  // Tracks whether the current create-plan modal session resulted in a save.
+  // Used together with the ?returnTo query param to decide where to send the
+  // user on close: created => stay on dashboard, cancelled => returnTo (/m page).
+  const planCreatedRef = useRef(false);
 
   // Upcoming plans (hosted)
   const [upcomingPlans, setUpcomingPlans] = useState<UpcomingPlan[]>([]);
@@ -701,8 +705,22 @@ export default function PlansPage() {
           prefill={createPlanPrefill}
           editMode={!!editingPlanId}
           eventGroupId={editingPlanId || undefined}
-          onClose={() => { setShowCreateModal(false); resetForm(); }}
-          onCreated={() => fetchPlanIdeas()}
+          onClose={() => {
+            setShowCreateModal(false);
+            const returnTo = searchParams.get("returnTo");
+            // Cancelled (no create occurred) + returnTo set => bounce back to
+            // wherever the user came from (e.g. /m/{notificationId}). On create,
+            // stay on dashboard so the host can see their new plan land.
+            if (!planCreatedRef.current && returnTo && returnTo.startsWith("/")) {
+              router.replace(returnTo);
+            }
+            planCreatedRef.current = false;
+            resetForm();
+          }}
+          onCreated={() => {
+            planCreatedRef.current = true;
+            fetchPlanIdeas();
+          }}
         />
       )}
 

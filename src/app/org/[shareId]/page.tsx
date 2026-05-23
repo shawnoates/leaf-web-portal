@@ -1463,7 +1463,13 @@ export default function OrgCalendarPage() {
       setCustomSuccess(false);
       setCreatingCustomPlan(true);
     }
+    // returnTo from the memory page — used when a follower cancels out of the
+    // custom-plan form. On submit they stay here; on cancel they bounce back
+    // to wherever they came from (e.g. /m/{notificationId}).
+    const rt = search.get("returnTo");
+    if (rt && rt.startsWith("/")) setReturnTo(rt);
   }, []);
+  const [returnTo, setReturnTo] = useState<string | null>(null);
   const autoOpenedPlanRef = useRef<string | null>(null);
   useEffect(() => {
     if (!org || !planQueryId) return;
@@ -2846,6 +2852,12 @@ export default function OrgCalendarPage() {
                 setCustomSuccess(false);
                 setSelectedImageUrl(null);
                 setUnsplashPhotos([]);
+                // If the user landed here from /m/{notificationId} (returnTo
+                // was set on the URL) and is cancelling without submitting,
+                // bounce back to the memory page.
+                if (!customSuccess && returnTo) {
+                  window.location.replace(returnTo);
+                }
               }}
               className="absolute top-6 right-6 z-50 p-2 rounded-full text-zinc-900"
             >
@@ -3227,7 +3239,10 @@ export default function OrgCalendarPage() {
                     <div className="pt-4 flex gap-4">
                       <button
                         type="button"
-                        onClick={() => setCreatingCustomPlan(false)}
+                        onClick={() => {
+                          setCreatingCustomPlan(false);
+                          if (returnTo) window.location.replace(returnTo);
+                        }}
                         className="flex-1 text-xs uppercase tracking-widest font-medium text-zinc-500 hover:text-zinc-900 py-3"
                       >
                         Cancel
