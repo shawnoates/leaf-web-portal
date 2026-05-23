@@ -44,6 +44,8 @@ interface Props {
   recap: Recap;
   event: Event;
   nextPlanIdea?: PlanIdea | null;
+  /** When set, the create-plan flow returns here on cancel (not on create). */
+  returnTo?: string;
 }
 
 function buildPrefillUrl(
@@ -74,6 +76,7 @@ export default function HostTheNextOne({
   calendar,
   event,
   nextPlanIdea,
+  returnTo,
 }: Props) {
   if (!calendar) return null;
 
@@ -105,6 +108,7 @@ export default function HostTheNextOne({
         prefillTitle: cardTitle,
         prefillDescription: cardDescription,
         prefillVenue: venueJson || undefined,
+        returnTo: returnTo || undefined,
       })
     : calendar.shareId
     ? buildPrefillUrl(`/org/${calendar.shareId}`, {
@@ -112,6 +116,7 @@ export default function HostTheNextOne({
         prefillTitle: cardTitle,
         prefillDescription: cardDescription,
         prefillVenue: venueJson || undefined,
+        returnTo: returnTo || undefined,
       })
     : null;
 

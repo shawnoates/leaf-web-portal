@@ -546,6 +546,7 @@ export default function MemoryClient({
             location: info.event.location,
           }}
           nextPlanIdea={info.nextPlanIdea || null}
+          returnTo={`/m/${notificationId}`}
         />
       )}
 
