@@ -50,9 +50,19 @@ type AttendeeMemoryInfo = {
     objectId: string;
     shareId: string | null;
     name: string | null;
+    hidePlanIdeas?: boolean;
+    hideCustomPlans?: boolean;
   } | null;
   viewerRole?: "owner" | "host" | "attendee";
   canMarkAttendance?: boolean;
+  nextPlanIdea?: {
+    objectId: string;
+    title: string;
+    description: string;
+    image: string | null;
+    date: string | null;
+    location: { name: string; address: string } | null;
+  } | null;
   recap?: {
     rsvpCount: number;
     photoCount: number;
@@ -482,7 +492,8 @@ export default function MemoryClient({
         </p>
       )}
 
-      {/* Host the next one — role-aware CTA backed by recap stats */}
+      {/* Host the next one — prefers a real plan idea, falls back to a
+          repeat of this plan when custom plans are enabled. */}
       {info.recap && info.calendar && (
         <HostTheNextOne
           viewerRole={info.viewerRole || "attendee"}
@@ -494,6 +505,7 @@ export default function MemoryClient({
             image: info.event.image,
             location: info.event.location,
           }}
+          nextPlanIdea={info.nextPlanIdea || null}
         />
       )}
 

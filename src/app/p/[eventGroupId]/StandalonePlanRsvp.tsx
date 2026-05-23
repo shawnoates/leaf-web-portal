@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import Parse from "@/lib/parse-client";
+import JoinChatPicker from "@/components/JoinChatPicker";
 import {
   setVerifiedUserCookie,
   getVerifiedUserCookie,
 } from "@/lib/verified-user";
 import {
   ArrowRight,
+  Calendar as CalendarIcon,
   Check,
   CheckCircle2,
   Clock,
@@ -19,8 +21,34 @@ import {
 type Props = {
   eventGroupId: string;
   planTitle: string;
+  planDescription: string;
+  expiryDate: string | null;
+  location: { name: string; address: string } | null;
   requireApproval: boolean;
 };
+
+// Mirror of buildIcsHref in org/[shareId]/page.tsx — keeps the standalone
+// landing decoupled from that page. Both call /api/ics with the same params.
+function buildIcsHref(opts: {
+  uid: string;
+  title: string;
+  dateISO: string;
+  description?: string;
+  locationName?: string | null;
+  locationAddress?: string | null;
+  url?: string;
+}): string | null {
+  if (Number.isNaN(new Date(opts.dateISO).getTime())) return null;
+  const sp = new URLSearchParams();
+  sp.set("uid", opts.uid);
+  sp.set("title", opts.title);
+  sp.set("dateISO", opts.dateISO);
+  if (opts.description) sp.set("description", opts.description);
+  if (opts.locationName) sp.set("locationName", opts.locationName);
+  if (opts.locationAddress) sp.set("locationAddress", opts.locationAddress);
+  if (opts.url) sp.set("url", opts.url);
+  return `/api/ics?${sp.toString()}`;
+}
 
 function formatPhoneNumber(input: string): string {
   const digits = input.replace(/\D/g, "").slice(0, 10);
@@ -32,6 +60,9 @@ function formatPhoneNumber(input: string): string {
 export default function StandalonePlanRsvp({
   eventGroupId,
   planTitle,
+  planDescription,
+  expiryDate,
+  location,
   requireApproval,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -48,6 +79,9 @@ export default function StandalonePlanRsvp({
         <RsvpModal
           eventGroupId={eventGroupId}
           planTitle={planTitle}
+          planDescription={planDescription}
+          expiryDate={expiryDate}
+          location={location}
           requireApproval={requireApproval}
           onClose={() => setOpen(false)}
         />
@@ -59,11 +93,17 @@ export default function StandalonePlanRsvp({
 function RsvpModal({
   eventGroupId,
   planTitle,
+  planDescription,
+  expiryDate,
+  location,
   requireApproval,
   onClose,
 }: {
   eventGroupId: string;
   planTitle: string;
+  planDescription: string;
+  expiryDate: string | null;
+  location: { name: string; address: string } | null;
   requireApproval: boolean;
   onClose: () => void;
 }) {

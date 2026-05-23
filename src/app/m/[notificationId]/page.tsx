@@ -27,10 +27,20 @@ type AttendeeMemoryInfo = {
     objectId: string;
     shareId: string | null;
     name: string | null;
+    hidePlanIdeas?: boolean;
+    hideCustomPlans?: boolean;
     profilePhoto?: string | null;
   } | null;
   viewerRole?: "owner" | "host" | "attendee";
   canMarkAttendance?: boolean;
+  nextPlanIdea?: {
+    objectId: string;
+    title: string;
+    description: string;
+    image: string | null;
+    date: string | null;
+    location: { name: string; address: string } | null;
+  } | null;
   recap?: {
     rsvpCount: number;
     photoCount: number;
