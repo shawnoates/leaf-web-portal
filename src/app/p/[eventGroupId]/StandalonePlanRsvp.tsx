@@ -207,22 +207,12 @@ function RsvpModal({
         | null
         | undefined;
       setVerifiedUserCookie(name, phone);
+      // Capture the EventNotification id so the success view's "Open Plan
+      // Chat in Leaf" button can deep-link straight into the chat. Web chat
+      // session minting is intentionally skipped — standalone plans push
+      // everyone into the iOS app rather than offering a web chat fallback.
       if (result?.eventNotificationId) {
         setNotificationId(result.eventNotificationId);
-        // Mint a Parse session for the phone-user so /chat/[eventGroupId] can
-        // authenticate. Non-fatal if it fails — visitor still sees success and
-        // can fall back to Google SSO from JoinChatPicker.
-        try {
-          const session = (await Parse.Cloud.run("getRsvpSession", {
-            eventNotificationId: result.eventNotificationId,
-            phoneNumber: phone.replace(/\D/g, ""),
-          })) as { sessionToken?: string } | null | undefined;
-          if (session?.sessionToken) {
-            await Parse.User.become(session.sessionToken);
-          }
-        } catch (sessionErr) {
-          console.warn("[/p RSVP] Could not mint chat session:", sessionErr);
-        }
       }
       if (result?.pendingApproval) setIsPendingResult(true);
       setFormStep("success");
