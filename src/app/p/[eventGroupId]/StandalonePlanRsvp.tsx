@@ -176,8 +176,28 @@ function RsvpModal({
         eventGroupId,
         rsvpNote: requireApproval && rsvpNote.trim() ? rsvpNote.trim() : undefined,
         sharePhoneWithHost: sharePhone,
-      })) as { pendingApproval?: boolean } | null | undefined;
+      })) as
+        | { eventNotificationId?: string; pendingApproval?: boolean }
+        | null
+        | undefined;
       setVerifiedUserCookie(name, phone);
+      if (result?.eventNotificationId) {
+        setNotificationId(result.eventNotificationId);
+        // Mint a Parse session for the phone-user so /chat/[eventGroupId] can
+        // authenticate. Non-fatal if it fails — visitor still sees success and
+        // can fall back to Google SSO from JoinChatPicker.
+        try {
+          const session = (await Parse.Cloud.run("getRsvpSession", {
+            eventNotificationId: result.eventNotificationId,
+            phoneNumber: phone.replace(/\D/g, ""),
+          })) as { sessionToken?: string } | null | undefined;
+          if (session?.sessionToken) {
+            await Parse.User.become(session.sessionToken);
+          }
+        } catch (sessionErr) {
+          console.warn("[/p RSVP] Could not mint chat session:", sessionErr);
+        }
+      }
       if (result?.pendingApproval) setIsPendingResult(true);
       setFormStep("success");
     } catch (err: unknown) {
@@ -186,9 +206,14 @@ function RsvpModal({
     }
   };
 
+  // Mirror org/[shareId] RsvpModal: widen once we're past the form so the
+  // JoinChatPicker can lay its two options out side-by-side on desktop.
+  const isJoinPickerStep = formStep === "success" && !isPendingResult && Boolean(notificationId);
+  const maxWidthClass = isJoinPickerStep ? "max-w-3xl" : "max-w-md";
+
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-2xl p-8 md:p-12 relative my-0 md:my-8">
+      <div className={`bg-white w-full ${maxWidthClass} rounded-t-2xl md:rounded-2xl p-8 md:p-12 relative my-0 md:my-8`}>
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-900"
@@ -354,9 +379,42 @@ function RsvpModal({
               <p className="text-sm text-zinc-500 max-w-xs mx-auto">
                 {isPendingResult
                   ? "You’ll receive a text when your request is approved."
-                  : "We’ve sent a confirmation text. Open Leaf to chat with the host."}
+                  : "Coordinate with the group. Join the Plan Chat."}
               </p>
             </div>
+
+            {!isPendingResult && notificationId ? (
+              <div className="pt-2">
+                <JoinChatPicker
+                  eventGroupId={eventGroupId}
+                  eventNotificationId={notificationId}
+                  onError={(msg) => setErrorMsg(msg)}
+                />
+              </div>
+            ) : null}
+
+            {!isPendingResult && expiryDate ? (() => {
+              const icsUrl = buildIcsHref({
+                uid: eventGroupId,
+                title: planTitle,
+                dateISO: expiryDate,
+                description: planDescription,
+                locationName: location?.name ?? null,
+                locationAddress: location?.address ?? null,
+                url: typeof window !== "undefined" ? `${window.location.origin}/p/${eventGroupId}` : undefined,
+              });
+              if (!icsUrl) return null;
+              return (
+                <a
+                  href={icsUrl}
+                  className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-xs uppercase tracking-wider font-bold hover:bg-zinc-50 transition-colors rounded-lg"
+                >
+                  <CalendarIcon className="w-4 h-4" />
+                  Add to Calendar
+                </a>
+              );
+            })() : null}
+
             <button onClick={onClose} className="text-sm text-zinc-400 hover:text-zinc-900">
               Close
             </button>

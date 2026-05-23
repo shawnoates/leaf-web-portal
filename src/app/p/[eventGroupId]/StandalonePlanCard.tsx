@@ -132,6 +132,9 @@ export default function StandalonePlanCard({
               <StandalonePlanRsvp
                 eventGroupId={eventGroupId}
                 planTitle={title}
+                planDescription={description}
+                expiryDate={expiryDate}
+                location={location}
                 requireApproval={requireApproval}
               />
               <a
