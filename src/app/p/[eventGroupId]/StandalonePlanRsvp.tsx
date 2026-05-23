@@ -121,6 +121,7 @@ function RsvpModal({
   const [rsvpNote, setRsvpNote] = useState("");
   const [sharePhone, setSharePhone] = useState(true);
   const [isPendingResult, setIsPendingResult] = useState(false);
+  const [notificationId, setNotificationId] = useState<string | null>(null);
 
   const isVerified = step === "verified";
 
