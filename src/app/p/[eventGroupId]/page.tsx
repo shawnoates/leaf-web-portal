@@ -20,6 +20,7 @@ type PlanShareInfo = {
   calendarIsPrivate: boolean;
   viewerIsFollower: boolean;
   calendarProfilePhoto: string | null;
+  requireApproval: boolean;
 };
 
 async function fetchPlanShareInfo(
@@ -218,6 +219,7 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
   return (
     <StandalonePlanCard
       variant={variant}
+      eventGroupId={eventGroupId}
       title={info.title}
       description={info.description}
       image={info.image}
@@ -227,6 +229,7 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
       calendarName={info.calendarName}
       calendarProfilePhoto={info.calendarProfilePhoto}
       shareId={info.shareId}
+      requireApproval={info.requireApproval}
     />
   );
 }

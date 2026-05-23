@@ -1,4 +1,5 @@
 import Link from "next/link";
+import StandalonePlanRsvp from "./StandalonePlanRsvp";
 
 const APP_STORE_URL =
   "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
@@ -7,6 +8,7 @@ type Variant = "standalone" | "copy" | "privateCalendar";
 
 type Props = {
   variant: Variant;
+  eventGroupId: string;
   title: string;
   description: string;
   image: string | null;
@@ -17,6 +19,8 @@ type Props = {
   calendarProfilePhoto: string | null;
   // Only present when variant === "privateCalendar"
   shareId: string | null;
+  // Affects "I'm Attending" vs "Request to Attend" button copy
+  requireApproval: boolean;
 };
 
 function formatWhen(expiryDate: string | null): { date: string; time: string } | null {
@@ -37,6 +41,7 @@ function formatWhen(expiryDate: string | null): { date: string; time: string } |
 
 export default function StandalonePlanCard({
   variant,
+  eventGroupId,
   title,
   description,
   image,
@@ -46,6 +51,7 @@ export default function StandalonePlanCard({
   calendarName,
   calendarProfilePhoto,
   shareId,
+  requireApproval,
 }: Props) {
   const when = variant === "copy" ? null : formatWhen(expiryDate);
   const blurDetails = variant === "privateCalendar";
@@ -123,14 +129,19 @@ export default function StandalonePlanCard({
 
           {variant === "standalone" ? (
             <>
+              <StandalonePlanRsvp
+                eventGroupId={eventGroupId}
+                planTitle={title}
+                requireApproval={requireApproval}
+              />
               <a
                 href={APP_STORE_URL}
-                className="block w-full text-center bg-zinc-900 text-white rounded-full py-3 text-sm font-medium hover:bg-zinc-800 transition"
+                className="block w-full text-center border border-zinc-200 text-zinc-900 rounded-full py-3 text-sm font-medium hover:bg-zinc-50 transition"
               >
                 Open in Leaf
               </a>
               <p className="text-xs text-center text-zinc-500">
-                Get the app to RSVP and chat with the host.
+                RSVP in the browser, or open Leaf to chat with the host.
               </p>
             </>
           ) : null}
