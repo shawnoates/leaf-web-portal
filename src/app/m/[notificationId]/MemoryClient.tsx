@@ -548,14 +548,20 @@ function HostOtpModal({
     setBusy(true);
     setErr("");
     try {
-      const token = (await Parse.Cloud.run("verifyOTP", {
+      const result = (await Parse.Cloud.run("verifyOTP", {
         phone: `+1${digits}`,
         code,
-      })) as string;
-      if (!token || typeof token !== "string" || !token.startsWith("r:")) {
-        throw new Error("Verification failed. Try again.");
+      })) as { sessionToken?: string } | string;
+      const sessionToken =
+        typeof result === "string" ? result : result?.sessionToken;
+      if (!sessionToken || !sessionToken.startsWith("r:")) {
+        throw new Error(
+          typeof result === "string" && result
+            ? result
+            : "Verification failed. Try again."
+        );
       }
-      await Parse.User.become(token);
+      await Parse.User.become(sessionToken);
       await onVerified();
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Verification failed.");
