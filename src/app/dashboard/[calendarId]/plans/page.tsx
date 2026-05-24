@@ -131,6 +131,24 @@ export default function PlansPage() {
             )
           : prev
       );
+      // Keep the past-plans card rollup ("X/Y attended") in sync with the
+      // toggle. Without this the card still shows the count from when the
+      // tab was first loaded until a full refresh.
+      setPastPlans((prev) =>
+        prev
+          ? prev.map((p) =>
+              p.objectId === eventGroupId
+                ? {
+                    ...p,
+                    attendanceCount: Math.max(
+                      0,
+                      p.attendanceCount + (nextAttended ? 1 : -1)
+                    ),
+                  }
+                : p
+            )
+          : prev
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[dashboard] markAttendance failed:", err);
