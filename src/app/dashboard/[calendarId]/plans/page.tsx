@@ -104,6 +104,37 @@ export default function PlansPage() {
   const [photosModalPlan, setPhotosModalPlan] = useState<PastPlan | null>(null);
   const [modalPhotos, setModalPhotos] = useState<EventPhoto[] | null>(null);
   const [modalRsvps, setModalRsvps] = useState<PastPlanRsvp[] | null>(null);
+  const [markingAttendeeId, setMarkingAttendeeId] = useState<string | null>(null);
+
+  async function toggleAttendance(eventGroupId: string, attendee: PastPlanRsvp) {
+    if (attendee.checkedInViaMobile) return; // mobile check-ins are read-only
+    const nextAttended = !attendee.attendedAt;
+    setMarkingAttendeeId(attendee.notificationId);
+    try {
+      await Parse.Cloud.run("markAttendance", {
+        eventGroupId,
+        attendeeNotificationId: attendee.notificationId,
+        attended: nextAttended,
+      });
+      setModalRsvps((prev) =>
+        prev
+          ? prev.map((r) =>
+              r.notificationId === attendee.notificationId
+                ? {
+                    ...r,
+                    attendedAt: nextAttended ? new Date().toISOString() : null,
+                    attendedSource: nextAttended ? "host" : null,
+                  }
+                : r
+            )
+          : prev
+      );
+    } catch (err) {
+      console.error("[dashboard] markAttendance failed:", err);
+    } finally {
+      setMarkingAttendeeId(null);
+    }
+  }
 
   // Plan ideas
   const [planIdeas, setPlanIdeas] = useState<PlanIdea[]>([]);
@@ -552,17 +583,18 @@ export default function PlansPage() {
                       {new Date(plan.expiryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     </p>
                     <div className="flex items-center gap-3 text-[11px] text-zinc-500">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Users className="w-3 h-3" />
-                        {plan.rsvpCount} RSVP{plan.rsvpCount === 1 ? "" : "s"}
-                      </span>
-                      {plan.rsvpCount > 0 && (
-                        <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                      {plan.rsvpCount > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 text-emerald-700 whitespace-nowrap">
                           <UserCheck className="w-3 h-3" />
                           {plan.attendanceCount}/{plan.rsvpCount} attended
                         </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                          <Users className="w-3 h-3" />
+                          0 RSVPs
+                        </span>
                       )}
-                      <span className="inline-flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                         <Camera className="w-3 h-3" />
                         {plan.photoCount} {plan.photoCount === 1 ? "photo" : "photos"}
                       </span>
@@ -809,6 +841,8 @@ export default function PlansPage() {
                         : r.attendedAt
                         ? { label: "Attended", cls: "text-emerald-700 bg-emerald-50" }
                         : { label: "No-show", cls: "text-zinc-500 bg-zinc-100" };
+                      const editable = !r.checkedInViaMobile && !!photosModalPlan;
+                      const isBusy = markingAttendeeId === r.notificationId;
                       return (
                         <li
                           key={r.notificationId}
@@ -824,11 +858,26 @@ export default function PlansPage() {
                               {r.name}
                             </span>
                           </div>
-                          <span
-                            className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${badge.cls}`}
-                          >
-                            {badge.label}
-                          </span>
+                          {editable ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                toggleAttendance(photosModalPlan!.objectId, r)
+                              }
+                              disabled={isBusy}
+                              title={r.attendedAt ? "Click to mark as no-show" : "Click to mark as attended"}
+                              className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors disabled:opacity-50 hover:opacity-80 cursor-pointer ${badge.cls}`}
+                            >
+                              {isBusy ? "..." : badge.label}
+                            </button>
+                          ) : (
+                            <span
+                              className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${badge.cls}`}
+                              title="Checked in via the Leaf app — can't be edited"
+                            >
+                              {badge.label}
+                            </span>
+                          )}
                         </li>
                       );
                     })}
