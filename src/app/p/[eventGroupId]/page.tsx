@@ -71,7 +71,7 @@ async function readViewerPhone(): Promise<string | null> {
 
 type PageProps = {
   params: Promise<{ eventGroupId: string }>;
-  searchParams: Promise<{ copy?: string }>;
+  searchParams: Promise<{ copy?: string; rsvp?: string }>;
 };
 
 function resolveMode(copyParam: string | undefined): ShareMode {
@@ -147,8 +147,9 @@ export async function generateMetadata({
 
 export default async function PlanSharePage({ params, searchParams }: PageProps) {
   const { eventGroupId } = await params;
-  const { copy } = await searchParams;
+  const { copy, rsvp } = await searchParams;
   const mode = resolveMode(copy);
+  const autoOpenRsvp = rsvp === "1";
   const phoneNumber = await readViewerPhone();
   const info = await fetchPlanShareInfo(eventGroupId, mode, phoneNumber);
 
@@ -230,6 +231,7 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
       calendarProfilePhoto={info.calendarProfilePhoto}
       shareId={info.shareId}
       requireApproval={info.requireApproval}
+      autoOpenRsvp={autoOpenRsvp}
     />
   );
 }

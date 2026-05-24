@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import {
   setVerifiedUserCookie,
@@ -51,6 +51,11 @@ type Props = {
   expiryDate: string | null;
   location: { name: string; address: string } | null;
   requireApproval: boolean;
+  // True when the visitor was bounced back from /open/p/<id>?rsvp=1
+  // because iOS didn't intercept the Universal Link (no app installed).
+  // Opens the RSVP modal on mount so the tap that started the journey
+  // doesn't get dropped on the floor.
+  autoOpenRsvp: boolean;
 };
 
 // Mirror of buildIcsHref in org/[shareId]/page.tsx — keeps the standalone
@@ -90,17 +95,37 @@ export default function StandalonePlanRsvp({
   expiryDate,
   location,
   requireApproval,
+  autoOpenRsvp,
 }: Props) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoOpenRsvp);
+
+  // Strip the rsvp=1 query the bouncer added so a refresh / share doesn't
+  // re-pop the modal. The cookie/state hydration inside RsvpModal still
+  // works because we're only touching the URL, not the component tree.
+  useEffect(() => {
+    if (!autoOpenRsvp) return;
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("rsvp")) {
+      url.searchParams.delete("rsvp");
+      window.history.replaceState(null, "", url.toString());
+    }
+  }, [autoOpenRsvp]);
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
+      {/* /open/p/<id>?rsvp=1 is the Universal Link bouncer: iOS opens the
+          Leaf app directly when installed; otherwise the bouncer page
+          redirects to /p/<id>?rsvp=1, which re-renders this component
+          with autoOpenRsvp=true so the verify-via-web modal opens
+          automatically. Plain <a> (not next Link) so the browser does a
+          full navigation that Safari can hand off to iOS's UL machinery. */}
+      <a
+        href={`/open/p/${eventGroupId}?rsvp=1`}
         className="block w-full text-center bg-zinc-900 text-white rounded-full py-3 text-sm font-medium hover:bg-zinc-800 transition"
       >
         {requireApproval ? "Request to Attend" : "I’m Attending"}
-      </button>
+      </a>
       {open ? (
         <RsvpModal
           eventGroupId={eventGroupId}

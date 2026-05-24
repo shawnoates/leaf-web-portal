@@ -1,9 +1,6 @@
 import Link from "next/link";
 import StandalonePlanRsvp from "./StandalonePlanRsvp";
 
-const APP_STORE_URL =
-  "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
-
 type Variant = "standalone" | "copy" | "privateCalendar";
 
 type Props = {
@@ -21,6 +18,10 @@ type Props = {
   shareId: string | null;
   // Affects "I'm Attending" vs "Request to Attend" button copy
   requireApproval: boolean;
+  // Set when /p/<id>?rsvp=1 — the visitor was bounced back from
+  // /open/p/<id>?rsvp=1 after iOS failed to intercept (no app installed),
+  // so the StandalonePlanRsvp child opens its RSVP modal on mount.
+  autoOpenRsvp: boolean;
 };
 
 function formatWhen(expiryDate: string | null): { date: string; time: string } | null {
@@ -52,6 +53,7 @@ export default function StandalonePlanCard({
   calendarProfilePhoto,
   shareId,
   requireApproval,
+  autoOpenRsvp,
 }: Props) {
   const when = variant === "copy" ? null : formatWhen(expiryDate);
   const blurDetails = variant === "privateCalendar";
@@ -136,9 +138,15 @@ export default function StandalonePlanCard({
                 expiryDate={expiryDate}
                 location={location}
                 requireApproval={requireApproval}
+                autoOpenRsvp={autoOpenRsvp}
               />
+              {/* /open/p/<id> is the Universal Link bouncer — iOS intercepts
+                  and opens the Leaf app when installed; otherwise the bouncer
+                  page server-redirects to the App Store. Plain <a> (not next
+                  Link) so the browser does a full navigation that Safari can
+                  hand off to iOS's UL machinery. */}
               <a
-                href={APP_STORE_URL}
+                href={`/open/p/${eventGroupId}`}
                 className="block w-full text-center border border-zinc-200 text-zinc-900 rounded-full py-3 text-sm font-medium hover:bg-zinc-50 transition"
               >
                 Open in Leaf
@@ -152,7 +160,7 @@ export default function StandalonePlanCard({
           {variant === "copy" ? (
             <>
               <a
-                href={APP_STORE_URL}
+                href={`/open/p/${eventGroupId}?copy=1`}
                 className="block w-full text-center bg-zinc-900 text-white rounded-full py-3 text-sm font-medium hover:bg-zinc-800 transition"
               >
                 Save this plan in Leaf
