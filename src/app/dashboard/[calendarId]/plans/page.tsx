@@ -105,11 +105,13 @@ export default function PlansPage() {
   const [modalPhotos, setModalPhotos] = useState<EventPhoto[] | null>(null);
   const [modalRsvps, setModalRsvps] = useState<PastPlanRsvp[] | null>(null);
   const [markingAttendeeId, setMarkingAttendeeId] = useState<string | null>(null);
+  const [attendanceError, setAttendanceError] = useState<string | null>(null);
 
   async function toggleAttendance(eventGroupId: string, attendee: PastPlanRsvp) {
     if (attendee.checkedInViaMobile) return; // mobile check-ins are read-only
     const nextAttended = !attendee.attendedAt;
     setMarkingAttendeeId(attendee.notificationId);
+    setAttendanceError(null);
     try {
       await Parse.Cloud.run("markAttendance", {
         eventGroupId,
@@ -130,7 +132,9 @@ export default function PlansPage() {
           : prev
       );
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       console.error("[dashboard] markAttendance failed:", err);
+      setAttendanceError(msg);
     } finally {
       setMarkingAttendeeId(null);
     }
@@ -833,6 +837,12 @@ export default function PlansPage() {
                 ) : modalRsvps.length === 0 ? (
                   <p className="text-sm text-zinc-400">No RSVPs.</p>
                 ) : (
+                  <>
+                  {attendanceError && (
+                    <p className="text-xs text-red-600 mb-2 break-words">
+                      {attendanceError}
+                    </p>
+                  )}
                   <ul className="divide-y divide-zinc-100 border border-zinc-100 rounded-lg">
                     {modalRsvps.map((r) => {
                       const attended = !!r.attendedAt || r.checkedInViaMobile;
@@ -882,6 +892,7 @@ export default function PlansPage() {
                       );
                     })}
                   </ul>
+                  </>
                 )}
               </section>
 
