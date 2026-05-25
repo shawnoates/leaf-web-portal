@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PlanWhen from "./PlanWhen";
 import StandalonePlanRsvp from "./StandalonePlanRsvp";
 
 type Variant = "standalone" | "copy" | "privateCalendar";
@@ -24,22 +25,6 @@ type Props = {
   autoOpenRsvp: boolean;
 };
 
-function formatWhen(expiryDate: string | null): { date: string; time: string } | null {
-  if (!expiryDate) return null;
-  const d = new Date(expiryDate);
-  if (Number.isNaN(d.getTime())) return null;
-  const date = d.toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-  const time = d.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  return { date, time };
-}
-
 export default function StandalonePlanCard({
   variant,
   eventGroupId,
@@ -55,11 +40,11 @@ export default function StandalonePlanCard({
   requireApproval,
   autoOpenRsvp,
 }: Props) {
-  const when = variant === "copy" ? null : formatWhen(expiryDate);
+  const showWhen = variant !== "copy" && expiryDate !== null;
   const blurDetails = variant === "privateCalendar";
 
   return (
-    <div className="min-h-screen bg-zinc-50 px-4 py-10 flex items-center justify-center">
+    <div className="min-h-dvh bg-zinc-50 px-4 py-6 md:py-10 flex justify-center items-start md:items-center">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm overflow-hidden">
         {image ? (
           <div
@@ -87,12 +72,7 @@ export default function StandalonePlanCard({
             ) : null}
           </div>
 
-          {when ? (
-            <div className="text-sm text-zinc-700">
-              <div>{when.date}</div>
-              <div className="text-zinc-500">{when.time}</div>
-            </div>
-          ) : null}
+          {showWhen && expiryDate ? <PlanWhen expiryDate={expiryDate} /> : null}
 
           {location ? (
             <div className="text-sm text-zinc-700">

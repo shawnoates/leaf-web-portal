@@ -110,7 +110,12 @@ export async function generateMetadata({
       ? "Save this plan to your calendar on Leaf."
       : "Open this plan on Leaf.");
 
-  const ogImages = info.image ? [{ url: info.image }] : undefined;
+  // Always emit an og:image at the 1200x630 size iMessage / Slack expect.
+  // When the plan has no cover photo, fall back to /api/og/plan-fallback,
+  // which renders a Leaf-branded card. Without an explicit og:image,
+  // iMessage falls through to apple-touch-icon at the wrong dimensions and
+  // renders a giant empty grey preview bubble.
+  const ogImageUrl = info.image ?? "https://os.joinleaf.com/api/og/plan-fallback";
 
   const icons = info.calendarProfilePhoto
     ? {
@@ -133,14 +138,14 @@ export async function generateMetadata({
       description,
       type: "article",
       url: canonicalUrl,
-      images: ogImages,
+      images: [{ url: ogImageUrl, width: 1200, height: 630 }],
       siteName: "Leaf",
     },
     twitter: {
-      card: info.image ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title,
       description,
-      images: info.image ? [info.image] : undefined,
+      images: [ogImageUrl],
     },
   };
 }
