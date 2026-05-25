@@ -49,7 +49,7 @@ type Props = {
   planTitle: string;
   planDescription: string;
   expiryDate: string | null;
-  location: { name: string; address: string } | null;
+  location: { name: string; address: string; timezone: string | null } | null;
   requireApproval: boolean;
   // True when the visitor was bounced back from /open/p/<id>?rsvp=1
   // because iOS didn't intercept the Universal Link (no app installed).
@@ -154,7 +154,7 @@ function RsvpModal({
   planTitle: string;
   planDescription: string;
   expiryDate: string | null;
-  location: { name: string; address: string } | null;
+  location: { name: string; address: string; timezone: string | null } | null;
   requireApproval: boolean;
   onClose: () => void;
 }) {

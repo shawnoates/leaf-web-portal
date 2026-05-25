@@ -13,7 +13,7 @@ type PlanShareInfo = {
   description: string;
   image: string | null;
   expiryDate: string | null;
-  location: { name: string; address: string } | null;
+  location: { name: string; address: string; timezone: string | null } | null;
   host: { name: string } | null;
   shareId: string | null;
   calendarName: string | null;

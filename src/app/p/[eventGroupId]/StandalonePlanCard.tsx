@@ -11,7 +11,7 @@ type Props = {
   description: string;
   image: string | null;
   expiryDate: string | null;
-  location: { name: string; address: string } | null;
+  location: { name: string; address: string; timezone: string | null } | null;
   hostName: string | null;
   calendarName: string | null;
   calendarProfilePhoto: string | null;
@@ -72,7 +72,9 @@ export default function StandalonePlanCard({
             ) : null}
           </div>
 
-          {showWhen && expiryDate ? <PlanWhen expiryDate={expiryDate} /> : null}
+          {showWhen && expiryDate ? (
+            <PlanWhen expiryDate={expiryDate} timezone={location?.timezone ?? null} />
+          ) : null}
 
           {location ? (
             <div className="text-sm text-zinc-700">
