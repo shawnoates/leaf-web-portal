@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { MapPin } from "lucide-react";
 
 declare global {
   interface Window {
@@ -194,7 +193,6 @@ export default function VenueSearch({
   return (
     <div ref={wrapperRef} className="relative">
       <div className="relative">
-        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
         <input
           ref={inputRef}
           type="text"
@@ -209,7 +207,7 @@ export default function VenueSearch({
             else if (value.trim().length >= 2) fetchSuggestions(value);
           }}
           placeholder={placeholder}
-          className={`pl-9 ${className}`}
+          className={className}
         />
       </div>
       {showDropdown && suggestions.length > 0 && (
