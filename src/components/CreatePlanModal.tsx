@@ -839,7 +839,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   <Repeat className="w-3.5 h-3.5 text-zinc-700 mt-0.5" />
                   <div>
                     <p className="text-xs font-medium text-zinc-700">Repeats</p>
-                    <p className="text-xs text-zinc-400">{mode === "idea" ? "Automatically offer the same idea each cycle" : "Automatically create the next plan each cycle"}</p>
+                    <p className="text-xs text-zinc-400">{mode === "idea" ? "Automatically offer the same idea each cycle" : "Automatically create the same plan each cycle"}</p>
                   </div>
                 </div>
                 <button
