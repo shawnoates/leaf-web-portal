@@ -12,6 +12,7 @@ import {
   Lock,
   MapPin,
   Plus,
+  Repeat,
   Sparkles,
   Vote,
   X,
@@ -21,8 +22,13 @@ type PlanMode = "plan" | "idea" | "poll";
 
 type PollOptionDraft = { date: string; time: string };
 
+type SeriesFreq = "weekly" | "biweekly" | "monthly";
+type SeriesEndType = "occurrences" | "until";
+
 const MIN_POLL_OPTIONS = 2;
 const MAX_POLL_OPTIONS = 6;
+const SERIES_MAX_OCCURRENCES = 26;
+const SERIES_DEFAULT_OCCURRENCES = 12;
 
 function emptyPollOption(): PollOptionDraft {
   return { date: "", time: "" };
@@ -71,6 +77,14 @@ interface CreatePlanModalProps {
    *  approveHostRequest with overrides instead of creating/updating a plan. */
   hostRequestMode?: boolean;
   hostRequestId?: string;
+  /** Poll-to-plan conversion mode. Modal is pre-filled with the poll's data
+   *  + the winning date; submit calls convertPollToPlan, which mutates the
+   *  existing EventGroup in place (preserving /p/<id> links) and optionally
+   *  attaches a PlanSeries when Repeats is toggled on. */
+  pollConvertMode?: boolean;
+  pollEventGroupId?: string;
+  pollWinningDate?: string; // YYYY-MM-DD
+  pollWinningTime?: string | null; // HH:MM
   onClose: () => void;
   onCreated: () => void;
   /** Optional — called when a starter-tier user clicks the locked Date Poll button. */
@@ -92,7 +106,7 @@ function toTimeInputValue(t?: string | null): string {
   return `${String(h).padStart(2, "0")}:${m}`;
 }
 
-export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, requireApprovalDefault, editMode, eventGroupId, hostRequestMode, hostRequestId, onClose, onCreated, onUpgrade }: CreatePlanModalProps) {
+export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, requireApprovalDefault, editMode, eventGroupId, hostRequestMode, hostRequestId, pollConvertMode, pollEventGroupId, pollWinningDate, pollWinningTime, onClose, onCreated, onUpgrade }: CreatePlanModalProps) {
   const [selectedCalendarId, setSelectedCalendarId] = useState(calendarId);
   const [hideVenue, setHideVenue] = useState(prefill?.hideVenueUntilRsvp ?? hideVenueDefault ?? true);
   const [title, setTitle] = useState(prefill?.title || "");
@@ -120,6 +134,14 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   );
   const [pollClosesAt, setPollClosesAt] = useState(prefill?.pollClosesAt || "");
   const [requireApproval, setRequireApproval] = useState(prefill?.requireApproval ?? requireApprovalDefault ?? false);
+  // Recurring plan series — only valid in create-mode for hosted plans.
+  // Editing an existing plan or approving a host request doesn't currently
+  // support converting to a series; that's a future flow.
+  const [recurring, setRecurring] = useState(false);
+  const [seriesFreq, setSeriesFreq] = useState<SeriesFreq>("weekly");
+  const [seriesEndType, setSeriesEndType] = useState<SeriesEndType>("occurrences");
+  const [seriesOccurrences, setSeriesOccurrences] = useState<string>(String(SERIES_DEFAULT_OCCURRENCES));
+  const [seriesEndsAt, setSeriesEndsAt] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [success, setSuccess] = useState(false);
   const [loadingImage, setLoadingImage] = useState(false);
@@ -298,7 +320,36 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       const absM = String(Math.abs(offset) % 60).padStart(2, "0");
       const tzSuffix = `${sign}${absH}:${absM}`;
 
-      if (hostRequestMode && hostRequestId) {
+      if (pollConvertMode && pollEventGroupId && pollWinningDate) {
+        // The winning date is locked at the moment the owner picked the option;
+        // we don't let them edit the date in the modal (that would orphan votes).
+        // Recurrence is opt-in via the toggle.
+        const occInt = Math.min(
+          Math.max(parseInt(seriesOccurrences, 10) || SERIES_DEFAULT_OCCURRENCES, 1),
+          SERIES_MAX_OCCURRENCES,
+        );
+        await Parse.Cloud.run("convertPollToPlan", {
+          eventGroupId: pollEventGroupId,
+          winningDate: pollWinningDate,
+          winningTime: pollWinningTime || undefined,
+          title,
+          description,
+          venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
+          imageBase64: imageBase64 || undefined,
+          imageUrl: !imageBase64 ? (selectedImageUrl || prefill?.imageUrl || undefined) : undefined,
+          capacity: capacity ? parseInt(capacity) : undefined,
+          hostNote: hostNote.trim() || undefined,
+          hideVenueUntilRsvp: hideVenue,
+          requireApproval,
+          ...(recurring
+            ? {
+                freq: seriesFreq,
+                maxOccurrences: seriesEndType === "occurrences" ? occInt : undefined,
+                endsAt: seriesEndType === "until" && seriesEndsAt ? `${seriesEndsAt}T23:59:59${tzSuffix}` : undefined,
+              }
+            : {}),
+        });
+      } else if (hostRequestMode && hostRequestId) {
         // Two-step: commit edits to the source EventDetail/EventGroup first,
         // then approve. Keeps approveHostRequest focused on the link-and-notify
         // flow and removes the override-application branch from approval.
@@ -330,6 +381,28 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           hostNote: hostNote.trim() || undefined,
           hideVenueUntilRsvp: hideVenue,
           requireApproval,
+        });
+      } else if (recurring && isHosted) {
+        const occInt = Math.min(
+          Math.max(parseInt(seriesOccurrences, 10) || SERIES_DEFAULT_OCCURRENCES, 1),
+          SERIES_MAX_OCCURRENCES,
+        );
+        await Parse.Cloud.run("createPlanSeries", {
+          calendarId: selectedCalendarId,
+          title,
+          description,
+          venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
+          firstInstanceDate: `${date}T${time || "12:00"}:00${tzSuffix}`,
+          time: time || null,
+          capacity: capacity ? parseInt(capacity) : null,
+          imageBase64: imageBase64 || undefined,
+          imageUrl: !imageBase64 ? (selectedImageUrl || prefill?.imageUrl || undefined) : undefined,
+          hostNote: hostNote.trim() || undefined,
+          hideVenueUntilRsvp: hideVenue,
+          requireApproval,
+          freq: seriesFreq,
+          maxOccurrences: seriesEndType === "occurrences" ? occInt : undefined,
+          endsAt: seriesEndType === "until" && seriesEndsAt ? `${seriesEndsAt}T23:59:59${tzSuffix}` : undefined,
         });
       } else {
         await Parse.Cloud.run("createManualPlan", {
@@ -373,7 +446,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       <div className="absolute inset-0 bg-black/40 hidden sm:block" onClick={() => { if (!creating) onClose(); }} />
       <div className="relative bg-white w-full h-[100dvh] overflow-y-auto sm:rounded-2xl sm:max-w-lg sm:h-auto sm:max-h-[90vh] sm:shadow-xl">
         <div className="sticky top-0 bg-white border-b border-zinc-100 px-6 py-4 flex items-center justify-between sm:rounded-t-2xl">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{hostRequestMode ? "Review Plan Request" : editMode ? (isPoll ? "Edit Date Poll" : "Edit Plan") : isPoll ? "New Date Poll" : "New Plan"}</h2>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{pollConvertMode ? "Confirm & Convert Poll" : hostRequestMode ? "Review Plan Request" : editMode ? (isPoll ? "Edit Date Poll" : "Edit Plan") : isPoll ? "New Date Poll" : "New Plan"}</h2>
           <button
             onClick={() => { if (!creating) onClose(); }}
             className="p-1.5 hover:bg-zinc-100 rounded-full transition-colors"
@@ -385,7 +458,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
         <div className="px-6 py-5 space-y-5">
           {success && (
             <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg text-sm">
-              <Check className="w-4 h-4" /> {hostRequestMode ? "Approved — requester notified" : editMode ? (isPoll ? "Poll updated!" : "Plan updated!") : isPoll ? "Poll created — followers notified" : "Plan created successfully!"}
+              <Check className="w-4 h-4" /> {pollConvertMode ? "Poll converted — voters notified" : hostRequestMode ? "Approved — requester notified" : editMode ? (isPoll ? "Poll updated!" : "Plan updated!") : isPoll ? "Poll created — followers notified" : "Plan created successfully!"}
             </div>
           )}
 
@@ -412,8 +485,8 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             </div>
           )}
 
-          {/* Plan type toggle (hidden in edit and host-request modes) */}
-          {!editMode && !hostRequestMode && <div>
+          {/* Plan type toggle (hidden in edit, host-request, and poll-convert modes) */}
+          {!editMode && !hostRequestMode && !pollConvertMode && <div>
             <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-3">Plan Type</label>
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -616,11 +689,14 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   onChange={(e) => setDate(e.target.value)}
                   min={today}
                   max={maxDate}
-                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                  disabled={pollConvertMode}
+                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 disabled:text-zinc-500 disabled:bg-transparent"
                 />
-                {tier === "starter" && (
+                {pollConvertMode ? (
+                  <p className="text-xs text-zinc-400 mt-1">Locked to the winning vote</p>
+                ) : tier === "starter" ? (
                   <p className="text-xs text-amber-600 mt-1">Starter: 2 weeks ahead max</p>
-                )}
+                ) : null}
               </div>
               <div>
                 <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Time</label>
@@ -628,7 +704,8 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   type="time"
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
-                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                  disabled={pollConvertMode}
+                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 disabled:text-zinc-500 disabled:bg-transparent"
                 />
               </div>
             </div>
@@ -731,6 +808,83 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             </div>
           )}
 
+          {/* Recurring series — create-mode only, hosted plans only. Each
+              materialized instance is a regular plan with its own RSVPs. */}
+          {isHosted && !editMode && !hostRequestMode && (
+            <div>
+              <div className="flex items-center justify-between py-1">
+                <div className="flex items-start gap-2">
+                  <Repeat className="w-3.5 h-3.5 text-zinc-700 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-medium text-zinc-700">Repeats</p>
+                    <p className="text-xs text-zinc-400">Automatically create the next plan each cycle</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRecurring(!recurring)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${recurring ? "bg-zinc-900" : "bg-zinc-200"}`}
+                  aria-label="Toggle recurring plan"
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${recurring ? "left-5" : "left-0.5"}`} />
+                </button>
+              </div>
+
+              {recurring && (
+                <div className="mt-3 space-y-3 pl-6">
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Every</label>
+                    <select
+                      value={seriesFreq}
+                      onChange={(e) => setSeriesFreq(e.target.value as SeriesFreq)}
+                      className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 bg-transparent"
+                    >
+                      <option value="weekly">Week</option>
+                      <option value="biweekly">Other week</option>
+                      <option value="monthly">Month</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Ends</label>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={seriesEndType}
+                        onChange={(e) => setSeriesEndType(e.target.value as SeriesEndType)}
+                        className="border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 bg-transparent"
+                      >
+                        <option value="occurrences">After</option>
+                        <option value="until">On</option>
+                      </select>
+                      {seriesEndType === "occurrences" ? (
+                        <>
+                          <input
+                            type="number"
+                            value={seriesOccurrences}
+                            onChange={(e) => setSeriesOccurrences(e.target.value)}
+                            min={1}
+                            max={SERIES_MAX_OCCURRENCES}
+                            className="w-16 border-b border-zinc-300 py-2 text-sm font-light text-center focus:outline-none focus:border-zinc-900"
+                          />
+                          <span className="text-sm text-zinc-500">occurrences</span>
+                        </>
+                      ) : (
+                        <input
+                          type="date"
+                          value={seriesEndsAt}
+                          min={date || today}
+                          onChange={(e) => setSeriesEndsAt(e.target.value)}
+                          className="flex-1 border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                        />
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-1">Max {SERIES_MAX_OCCURRENCES} occurrences.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Venue privacy toggle (not relevant for polls — venue isn't being voted on) */}
           {!isPoll && (
             <div className="flex items-center justify-between py-1">
@@ -772,21 +926,24 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
               creating ||
               (isPoll
                 ? (!editMode && validPollOptions().length < MIN_POLL_OPTIONS) || (!imageBase64 && !prefill?.imageUrl && !selectedImageUrl)
-                : !date || (!editMode && isHosted && !imageBase64 && !prefill?.imageUrl && !selectedImageUrl))
+                : !date || (!editMode && !pollConvertMode && isHosted && !imageBase64 && !prefill?.imageUrl && !selectedImageUrl)) ||
+              (recurring && isHosted && seriesEndType === "until" && !seriesEndsAt)
             }
             className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
           >
             {creating
-              ? (hostRequestMode ? "Approving..." : editMode ? "Saving..." : "Creating...")
-              : hostRequestMode
-                ? "Approve & Notify Requester"
-                : editMode
-                  ? "Save Changes"
-                  : isPoll
-                    ? "Create Date Poll"
-                    : isHosted
-                      ? "Create Upcoming Plan"
-                      : "Create Plan Idea"}
+              ? (pollConvertMode ? "Converting..." : hostRequestMode ? "Approving..." : editMode ? "Saving..." : recurring && isHosted ? "Starting Series..." : "Creating...")
+              : pollConvertMode
+                ? (recurring ? "Convert & Start Series" : "Convert to Plan")
+                : hostRequestMode
+                  ? "Approve & Notify Requester"
+                  : editMode
+                    ? "Save Changes"
+                    : isPoll
+                      ? "Create Date Poll"
+                      : isHosted
+                        ? (recurring ? "Start Recurring Plan" : "Create Upcoming Plan")
+                        : "Create Plan Idea"}
           </button>
         </div>
       </div>

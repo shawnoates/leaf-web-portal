@@ -61,6 +61,10 @@ type Props = {
   onDuplicate: (plan: PlanDetailData, pollOptions?: { date: string; time: string }[]) => void;
   /** Open the create modal in edit mode. Receives current poll options + close date when this is a poll plan. */
   onEdit: (plan: PlanDetailData, pollOptions?: { date: string; time: string }[], pollClosesAt?: string) => void;
+  /** Open the create modal in poll-convert mode, pre-filled with the poll's
+   *  current data and the winning date. The owner reviews/edits and optionally
+   *  toggles Repeats; submission calls convertPollToPlan. */
+  onConvertPoll?: (plan: PlanDetailData, winningDate: string, winningTime: string | null) => void;
   /**
    * If false, Duplicate calls `onConnectApp` instead of `onDuplicate` (used by the dashboard
    * to gate duplication behind the iOS-app pairing flow). Defaults to true.
@@ -78,6 +82,7 @@ export default function PlanDetailModal({
   onChanged,
   onDuplicate,
   onEdit,
+  onConvertPoll,
   leafAppConnected = true,
   onConnectApp,
   onPendingRsvpResolved,
@@ -172,6 +177,14 @@ export default function PlanDetailModal({
   };
 
   const handlePickPollWinner = async (opt: PollOptionDetail, dateLabel: string, timeLabel: string | null) => {
+    // Newer flow: open the create modal pre-filled with the poll's data + the
+    // winning date so the owner can edit copy/venue/image and optionally toggle
+    // Repeats. Falls back to the legacy inline conversion if the parent didn't
+    // wire onConvertPoll (e.g. /plans page hasn't been updated yet).
+    if (onConvertPoll) {
+      onConvertPoll(plan, opt.date, opt.time);
+      return;
+    }
     if (!confirm(`Pick ${dateLabel}${timeLabel ? ` at ${timeLabel}` : ""}? All followers will be SMS'd to RSVP.`)) return;
     setClosingPoll(true);
     try {

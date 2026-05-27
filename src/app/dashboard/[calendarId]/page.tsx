@@ -429,6 +429,11 @@ export default function OrgDashboardPage() {
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   const [editingHostRequestId, setEditingHostRequestId] = useState<string | null>(null);
   const [editingHostRequestCalendarId, setEditingHostRequestCalendarId] = useState<string | null>(null);
+  // Poll → plan conversion. When set, CreatePlanModal opens in pollConvertMode
+  // pre-filled with the poll's data and the winning date.
+  const [pollConvertEventGroupId, setPollConvertEventGroupId] = useState<string | null>(null);
+  const [pollConvertWinningDate, setPollConvertWinningDate] = useState<string | null>(null);
+  const [pollConvertWinningTime, setPollConvertWinningTime] = useState<string | null>(null);
 
   // Leaf app connection (explicit OTP verification, not auto-populated from phone field)
   const [leafAppConnected, setLeafAppConnected] = useState(false);
@@ -3477,6 +3482,25 @@ export default function OrgDashboardPage() {
               pendingRsvpRequests: d.pendingRsvpRequests.filter((pr) => pr.notificationId !== notificationId),
             } : d);
           }}
+          onConvertPoll={(plan, winningDate, winningTime) => {
+            setPollConvertEventGroupId(plan.objectId);
+            setPollConvertWinningDate(winningDate);
+            setPollConvertWinningTime(winningTime);
+            // Pre-fill copy/venue/image from the poll; the date input renders
+            // the winning date (locked) so the owner sees what's being chosen.
+            setCreatePlanPrefill({
+              title: plan.title,
+              description: plan.description,
+              venue: plan.location,
+              imageUrl: plan.image,
+              date: winningDate,
+              time: winningTime || "",
+              hideVenueUntilRsvp: plan.hideVenueUntilRsvp,
+              requireApproval: plan.requireApproval,
+            });
+            setSelectedActivePlan(null);
+            setShowCreatePlanModal(true);
+          }}
         />
       )}
 
@@ -3493,7 +3517,11 @@ export default function OrgDashboardPage() {
           eventGroupId={editingPlanId || undefined}
           hostRequestMode={!!editingHostRequestId}
           hostRequestId={editingHostRequestId || undefined}
-          onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); setEditingPlanId(null); setEditingHostRequestId(null); setEditingHostRequestCalendarId(null); }}
+          pollConvertMode={!!pollConvertEventGroupId}
+          pollEventGroupId={pollConvertEventGroupId || undefined}
+          pollWinningDate={pollConvertWinningDate || undefined}
+          pollWinningTime={pollConvertWinningTime}
+          onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); setEditingPlanId(null); setEditingHostRequestId(null); setEditingHostRequestCalendarId(null); setPollConvertEventGroupId(null); setPollConvertWinningDate(null); setPollConvertWinningTime(null); }}
           onCreated={() => fetchDashboard()}
           onUpgrade={() => { setShowCreatePlanModal(false); setShowSubscription(true); }}
         />

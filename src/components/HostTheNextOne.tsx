@@ -38,12 +38,22 @@ type PlanIdea = {
   location: { name: string; address: string } | null;
 };
 
+type NextSeriesInstance = {
+  objectId: string;
+  title: string;
+  expiryDate: string | null;
+};
+
 interface Props {
   viewerRole: ViewerRole;
   calendar: CalendarInfo | null;
   recap: Recap;
   event: Event;
   nextPlanIdea?: PlanIdea | null;
+  /** When the just-finished plan is part of a recurring series and the next
+   *  instance has already been materialized, surface a direct RSVP CTA
+   *  ("Join the next one") instead of the generic "Host another" prompt. */
+  nextSeriesInstance?: NextSeriesInstance | null;
   /** When set, the create-plan flow returns here on cancel (not on create). */
   returnTo?: string;
 }
@@ -76,9 +86,49 @@ export default function HostTheNextOne({
   calendar,
   event,
   nextPlanIdea,
+  nextSeriesInstance,
   returnTo,
 }: Props) {
   if (!calendar) return null;
+
+  // Recurring series wins the slot — attendees get a direct RSVP link to the
+  // next instance instead of a "host another" prompt. Different audience too:
+  // shown to everyone (attendees AND host), since the host already isn't
+  // creating it again — the cron did.
+  if (nextSeriesInstance) {
+    const nextDateLabel = (() => {
+      if (!nextSeriesInstance.expiryDate) return null;
+      const d = new Date(nextSeriesInstance.expiryDate);
+      if (Number.isNaN(d.getTime())) return null;
+      return d.toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "short",
+        day: "numeric",
+      });
+    })();
+    return (
+      <div className="border-t border-zinc-100 mt-10 pt-8">
+        <div className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-emerald-50/60 to-white p-6">
+          <p className="text-xs font-bold uppercase tracking-widest text-emerald-700 mb-2">
+            Happening again
+          </p>
+          <h2 className="text-xl font-light text-zinc-900 mb-1">{nextSeriesInstance.title}</h2>
+          {nextDateLabel && (
+            <p className="text-sm text-zinc-500 mb-5 font-light flex items-center gap-2">
+              <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+              <span>{nextDateLabel}</span>
+            </p>
+          )}
+          <Link
+            href={`/p/${nextSeriesInstance.objectId}`}
+            className="inline-flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
+          >
+            Join the Next One
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const hasPlanIdea = !!nextPlanIdea && !calendar.hidePlanIdeas;
   const canRepeatPlan = !calendar.hideCustomPlans;

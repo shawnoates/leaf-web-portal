@@ -64,6 +64,11 @@ type AttendeeMemoryInfo = {
     date: string | null;
     location: { name: string; address: string } | null;
   } | null;
+  nextSeriesInstance?: {
+    objectId: string;
+    title: string;
+    expiryDate: string | null;
+  } | null;
   recap?: {
     rsvpCount: number;
     photoCount: number;
@@ -546,6 +551,7 @@ export default function MemoryClient({
             location: info.event.location,
           }}
           nextPlanIdea={info.nextPlanIdea || null}
+          nextSeriesInstance={info.nextSeriesInstance || null}
           returnTo={`/m/${notificationId}`}
         />
       )}
