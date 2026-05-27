@@ -8,7 +8,7 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
 import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailModal";
-import { ArrowLeft, Calendar, Camera, Check, Lock, MapPin, Plus, RefreshCw, Settings, Trash2, UserCheck, Users, X } from "lucide-react";
+import { ArrowLeft, Calendar, Camera, Check, Lock, MapPin, Plus, RefreshCw, Repeat, Settings, Trash2, UserCheck, Users, X } from "lucide-react";
 
 interface PlanIdea {
   objectId: string;
@@ -17,6 +17,7 @@ interface PlanIdea {
   date: string;
   image: string | null;
   location: { name: string; address: string } | null;
+  ideaSeriesId: string | null;
 }
 
 interface PastPlan {
@@ -284,13 +285,14 @@ export default function PlansPage() {
         }))
       );
       const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId });
-      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null }) => ({
+      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null }) => ({
         objectId: idea.objectId,
         title: idea.title,
         description: idea.description,
         date: idea.date,
         image: idea.image || null,
         location: idea.location,
+        ideaSeriesId: idea.ideaSeriesId || null,
       }));
       // Deduplicate by title (backend may return duplicate plan ideas)
       const seen = new Set<string>();
@@ -358,13 +360,14 @@ export default function PlansPage() {
         try {
           const dash = await Parse.Cloud.run("getOrgDashboard", { calendarId });
           const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId: dash.shareId });
-          const rawIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null }) => ({
+          const rawIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null }) => ({
             objectId: idea.objectId,
             title: idea.title,
             description: idea.description,
             date: idea.date,
             image: idea.image || null,
             location: idea.location,
+            ideaSeriesId: idea.ideaSeriesId || null,
           }));
           const seenTitles = new Set<string>();
           const ideas = rawIdeas.filter((idea: PlanIdea) => {
@@ -427,6 +430,19 @@ export default function PlansPage() {
       setPlanIdeas((prev) => prev.filter((p) => p.objectId !== ideaId));
     } catch (err) {
       console.error("Failed to remove idea:", err);
+    }
+  }
+
+  async function handleEndSeries(ideaSeriesId: string) {
+    if (!confirm("End this recurring idea? Future instances will stop being created. The current idea stays.")) return;
+    try {
+      await Parse.Cloud.run("endIdeaSeries", { ideaSeriesId });
+      // Drop the series link locally so the badge disappears immediately on the
+      // current instance. Already-materialized ideas remain claimable.
+      setPlanIdeas((prev) => prev.map((p) => p.ideaSeriesId === ideaSeriesId ? { ...p, ideaSeriesId: null } : p));
+    } catch (err) {
+      console.error("Failed to end series:", err);
+      alert(err instanceof Error ? err.message : "Failed to end series");
     }
   }
 
@@ -696,7 +712,14 @@ export default function PlansPage() {
                     <img src={idea.image} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-sm truncate">{idea.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium text-sm truncate">{idea.title}</h3>
+                      {idea.ideaSeriesId && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-600 bg-zinc-100 shrink-0">
+                          <Repeat className="w-3 h-3" /> Recurring
+                        </span>
+                      )}
+                    </div>
                     {idea.description && (
                       <p className="text-xs text-zinc-500 line-clamp-1 mt-0.5">{idea.description}</p>
                     )}
@@ -711,6 +734,15 @@ export default function PlansPage() {
                       )}
                     </div>
                   </div>
+                  {idea.ideaSeriesId && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleEndSeries(idea.ideaSeriesId!); }}
+                      className="p-3 text-zinc-300 hover:text-zinc-700 transition-colors shrink-0 self-start"
+                      title="End recurring series"
+                    >
+                      <Repeat className="w-4 h-4" />
+                    </button>
+                  )}
                   <button
                     onClick={(e) => { e.stopPropagation(); handleRemoveIdea(idea.objectId); }}
                     className="p-3 text-zinc-300 hover:text-red-500 transition-colors shrink-0 self-start"

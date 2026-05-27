@@ -404,6 +404,25 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           maxOccurrences: seriesEndType === "occurrences" ? occInt : undefined,
           endsAt: seriesEndType === "until" && seriesEndsAt ? `${seriesEndsAt}T23:59:59${tzSuffix}` : undefined,
         });
+      } else if (recurring && mode === "idea") {
+        const occInt = Math.min(
+          Math.max(parseInt(seriesOccurrences, 10) || SERIES_DEFAULT_OCCURRENCES, 1),
+          SERIES_MAX_OCCURRENCES,
+        );
+        await Parse.Cloud.run("createIdeaSeries", {
+          calendarId: selectedCalendarId,
+          title,
+          description,
+          suggestedVenue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
+          suggestedCapacity: capacity ? parseInt(capacity) : undefined,
+          firstInstanceDate: `${date}T${time || "12:00"}:00${tzSuffix}`,
+          time: time || null,
+          imageBase64: imageBase64 || undefined,
+          imageUrl: !imageBase64 ? (selectedImageUrl || prefill?.imageUrl || undefined) : undefined,
+          freq: seriesFreq,
+          maxOccurrences: seriesEndType === "occurrences" ? occInt : undefined,
+          endsAt: seriesEndType === "until" && seriesEndsAt ? `${seriesEndsAt}T23:59:59${tzSuffix}` : undefined,
+        });
       } else {
         await Parse.Cloud.run("createManualPlan", {
           calendarId: selectedCalendarId,
@@ -808,9 +827,12 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             </div>
           )}
 
-          {/* Recurring series — create-mode only, hosted plans only. Each
-              materialized instance is a regular plan with its own RSVPs. */}
-          {isHosted && !editMode && !hostRequestMode && (
+          {/* Recurring series — create-mode only. For hosted plans, each
+              materialized instance is a regular plan with its own RSVPs.
+              For ideas, each instance is a CalendarGeneratedPlan that members
+              can claim — counts against orgPlanIdeasPerWeek per instance, so
+              series self-throttle when the quota is full. */}
+          {(isHosted || mode === "idea") && !editMode && !hostRequestMode && (
             <div>
               <div className="flex items-center justify-between py-1">
                 <div className="flex items-start gap-2">
@@ -927,12 +949,12 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
               (isPoll
                 ? (!editMode && validPollOptions().length < MIN_POLL_OPTIONS) || (!imageBase64 && !prefill?.imageUrl && !selectedImageUrl)
                 : !date || (!editMode && !pollConvertMode && isHosted && !imageBase64 && !prefill?.imageUrl && !selectedImageUrl)) ||
-              (recurring && isHosted && seriesEndType === "until" && !seriesEndsAt)
+              (recurring && (isHosted || mode === "idea") && seriesEndType === "until" && !seriesEndsAt)
             }
             className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
           >
             {creating
-              ? (pollConvertMode ? "Converting..." : hostRequestMode ? "Approving..." : editMode ? "Saving..." : recurring && isHosted ? "Starting Series..." : "Creating...")
+              ? (pollConvertMode ? "Converting..." : hostRequestMode ? "Approving..." : editMode ? "Saving..." : recurring && (isHosted || mode === "idea") ? "Starting Series..." : "Creating...")
               : pollConvertMode
                 ? (recurring ? "Convert & Start Series" : "Convert to Plan")
                 : hostRequestMode
@@ -943,7 +965,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                       ? "Create Date Poll"
                       : isHosted
                         ? (recurring ? "Start Recurring Plan" : "Create Upcoming Plan")
-                        : "Create Plan Idea"}
+                        : (recurring ? "Start Recurring Idea" : "Create Plan Idea")}
           </button>
         </div>
       </div>
