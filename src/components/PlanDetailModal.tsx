@@ -12,6 +12,7 @@ import {
   MessageCircle,
   Pencil,
   Plus,
+  Repeat,
   Trash2,
   Users,
   Vote,
@@ -33,6 +34,10 @@ export type PlanDetailData = {
   pollVoteCount?: number;
   hideVenueUntilRsvp?: boolean;
   requireApproval?: boolean;
+  /** When set, this plan was materialized from a recurring PlanSeries. The
+   *  modal exposes a "Cancel future occurrences" action that stops further
+   *  materialization without touching already-created instances. */
+  planSeriesId?: string | null;
 };
 
 type PollOptionDetail = { date: string; time: string | null; count: number };
@@ -164,7 +169,9 @@ export default function PlanDetailModal({
     const isPoll = !!plan.isPoll;
     const confirmMsg = isPoll
       ? "Cancel this poll? Voters won't be notified. This cannot be undone."
-      : "Cancel this plan? Attendees will be notified. This cannot be undone.";
+      : plan.planSeriesId
+        ? "Cancel just this occurrence? Future occurrences will continue. This cannot be undone."
+        : "Cancel this plan? Attendees will be notified. This cannot be undone.";
     if (!confirm(confirmMsg)) return;
     try {
       await Parse.Cloud.run("removePlanFromCalendar", { eventGroupId: plan.objectId });
@@ -173,6 +180,19 @@ export default function PlanDetailModal({
     } catch (err) {
       console.error("Failed to cancel:", err);
       alert(isPoll ? "Failed to cancel poll." : "Failed to cancel plan.");
+    }
+  };
+
+  const handleCancelSeries = async () => {
+    if (!plan.planSeriesId) return;
+    if (!confirm("End this recurring series? Already-created occurrences stay; no new ones will be scheduled. This cannot be undone.")) return;
+    try {
+      await Parse.Cloud.run("cancelPlanSeries", { planSeriesId: plan.planSeriesId });
+      onClose();
+      onChanged();
+    } catch (err) {
+      console.error("Failed to cancel series:", err);
+      alert(err instanceof Error ? err.message : "Failed to end series.");
     }
   };
 
@@ -574,14 +594,27 @@ export default function PlanDetailModal({
                 Edit
               </button>
             </div>
-            <div className="flex justify-center">
+            <div className="flex justify-center gap-6 flex-wrap">
               <button
                 onClick={handleCancel}
                 className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
-                {plan.isPoll ? "Cancel Poll" : "Cancel Plan"}
+                {plan.isPoll
+                  ? "Cancel Poll"
+                  : plan.planSeriesId
+                    ? "Cancel This Occurrence"
+                    : "Cancel Plan"}
               </button>
+              {plan.planSeriesId && (
+                <button
+                  onClick={handleCancelSeries}
+                  className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
+                >
+                  <Repeat className="w-4 h-4" />
+                  End Recurring Series
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -422,6 +422,7 @@ export default function OrgDashboardPage() {
     pollClosesAt?: string | null;
     hideVenueUntilRsvp?: boolean;
     requireApproval?: boolean;
+    planSeriesId?: string | null;
   } | null>(null);
   // Create plan modal (used by marketplace + duplicate)
   const [createPlanPrefill, setCreatePlanPrefill] = useState<CreatePlanPrefill | null>(null);
@@ -1833,7 +1834,7 @@ export default function OrgDashboardPage() {
             </div>
             <div className="space-y-3">
               {dashboard.calendars.map((cal) => {
-                const activePlans = ((cal as Record<string, unknown>).activePlans as { objectId: string; title: string; description: string; image: string | null; date: string; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean }[]) || [];
+                const activePlans = ((cal as Record<string, unknown>).activePlans as { objectId: string; title: string; description: string; image: string | null; date: string; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null }[]) || [];
                 const suggestedPlans = ((cal as Record<string, unknown>).suggestedPlans as { id: string; type: string; title: string; description?: string; subtitle: string; recommendedDate: string; recommendedTime?: string | null; venue?: { name: string; address: string } | null; image?: string | null; isSuggestion: true }[]) || [];
                 const inactive = cal.isActive === false;
                 return (
@@ -3423,6 +3424,7 @@ export default function OrgDashboardPage() {
             pollClosesAt: selectedActivePlan.pollClosesAt,
             hideVenueUntilRsvp: selectedActivePlan.hideVenueUntilRsvp,
             requireApproval: selectedActivePlan.requireApproval,
+            planSeriesId: selectedActivePlan.planSeriesId,
           }}
           onClose={() => setSelectedActivePlan(null)}
           onChanged={fetchDashboard}

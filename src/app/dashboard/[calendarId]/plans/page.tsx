@@ -66,6 +66,7 @@ interface UpcomingPlan {
   pollClosesAt?: string | null;
   hideVenueUntilRsvp?: boolean;
   requireApproval?: boolean;
+  planSeriesId?: string | null;
 }
 
 export default function PlansPage() {
@@ -260,6 +261,7 @@ export default function PlansPage() {
         pollClosesAt?: string | null;
         hideVenueUntilRsvp?: boolean;
         requireApproval?: boolean;
+        planSeriesId?: string | null;
       }[];
       setUpcomingPlans(
         activePlans.map((p) => ({
@@ -278,6 +280,7 @@ export default function PlansPage() {
           pollClosesAt: p.pollClosesAt,
           hideVenueUntilRsvp: p.hideVenueUntilRsvp,
           requireApproval: p.requireApproval,
+          planSeriesId: p.planSeriesId,
         }))
       );
       const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId });
@@ -740,6 +743,7 @@ export default function PlansPage() {
             pollClosesAt: selectedPlan.pollClosesAt,
             hideVenueUntilRsvp: selectedPlan.hideVenueUntilRsvp,
             requireApproval: selectedPlan.requireApproval,
+            planSeriesId: selectedPlan.planSeriesId,
           }}
           onClose={() => setSelectedPlan(null)}
           onChanged={() => {
