@@ -1296,8 +1296,8 @@ export default function OrgDashboardPage() {
                     See all
                   </Link>
                 </div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                  {dashboard.recentPhotos.map((photo) =>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 [&>*:nth-child(n+4)]:hidden sm:[&>*:nth-child(-n+4)]:block sm:[&>*:nth-child(n+5)]:hidden md:[&>*:nth-child(-n+6)]:block md:[&>*:nth-child(n+7)]:hidden">
+                  {dashboard.recentPhotos.slice(0, 6).map((photo) =>
                     photo.url ? (
                       <a
                         key={photo.objectId}
