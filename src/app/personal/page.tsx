@@ -227,8 +227,8 @@ export default function PersonalPage() {
 
         <div className="relative z-20 h-full flex items-center">
           <div className="max-w-6xl mx-auto px-6 w-full">
-            <div className="max-w-4xl space-y-8">
-              <h1 className="text-6xl md:text-8xl font-light tracking-tight leading-[1.02] text-white">
+            <div className="max-w-3xl space-y-8">
+              <h1 className="text-5xl md:text-7xl font-light tracking-tight leading-[1.05] text-white">
                 The easiest way to bring your people{" "}
                 <span className="italic">together.</span>
               </h1>
@@ -237,27 +237,27 @@ export default function PersonalPage() {
                 the plans. Your friends RSVP with just a phone number. No app
                 required.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Link
-                  href={isLoggedIn ? "/dashboard" : "/organizations/setup"}
-                  className="bg-white text-zinc-900 px-8 py-4 text-base font-semibold rounded-full hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
-                >
-                  {isLoggedIn ? "Dashboard" : "Start your calendar"} <ArrowRight className="w-4 h-4" />
-                </Link>
+              <div className="flex flex-col sm:flex-row gap-4 pt-4 items-start">
+                <div className="flex flex-col items-center gap-3">
+                  <Link
+                    href={isLoggedIn ? "/dashboard" : "/organizations/setup"}
+                    className="bg-white text-zinc-900 px-8 py-4 text-base font-semibold rounded-full hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
+                  >
+                    {isLoggedIn ? "Dashboard" : "Start your calendar"} <ArrowRight className="w-4 h-4" />
+                  </Link>
+                  <Link
+                    href="/summer"
+                    className="text-sm font-medium text-white/70 hover:text-white underline underline-offset-4 decoration-white/30 hover:decoration-white transition-colors inline-flex items-center gap-1.5"
+                  >
+                    See it in action <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
                 <a
                   href="#how-it-works"
                   className="border border-white/30 text-white px-8 py-4 text-base font-medium rounded-full hover:bg-white/10 transition-colors text-center"
                 >
                   How it works
                 </a>
-              </div>
-              <div className="pt-2">
-                <Link
-                  href="/summer"
-                  className="text-sm font-medium text-white/70 hover:text-white underline underline-offset-4 decoration-white/30 hover:decoration-white transition-colors inline-flex items-center gap-1.5"
-                >
-                  See it in action <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
               </div>
             </div>
           </div>
