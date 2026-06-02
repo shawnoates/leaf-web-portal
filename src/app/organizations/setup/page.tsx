@@ -13,6 +13,7 @@ import {
   MapPin,
   Globe,
   Wand2,
+  Copy,
 } from "lucide-react";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
@@ -20,23 +21,31 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 // --- Constants ---
 
 const ORG_TYPES = [
-  { value: "church", label: "Church", emoji: "\u26ea" },
-  { value: "gym", label: "Gym / Fitness", emoji: "\ud83c\udfcb\ufe0f" },
-  { value: "company", label: "Company", emoji: "\ud83c\udfe2" },
-  { value: "brick_and_mortar", label: "Brick & Mortar", emoji: "\ud83c\udfea" },
-  { value: "community", label: "Community Group", emoji: "\ud83c\udf1f" },
-  { value: "school", label: "School / University", emoji: "\ud83c\udf93" },
-  { value: "consumer_brand", label: "Consumer Brand", emoji: "\ud83d\udce6" },
-  { value: "other", label: "Other", emoji: "\ud83d\udccc" },
+  { value: "community", label: "Friends / Community", emoji: "\u{1F31F}" },
+  { value: "gym", label: "Gym / Fitness", emoji: "\u{1F3CB}\u{FE0F}" },
+  { value: "church", label: "Church", emoji: "⛪" },
+  { value: "school", label: "School / University", emoji: "\u{1F393}" },
+  { value: "company", label: "Company", emoji: "\u{1F3E2}" },
+  { value: "brick_and_mortar", label: "Brick & Mortar", emoji: "\u{1F3EA}" },
+  { value: "consumer_brand", label: "Consumer Brand", emoji: "\u{1F4E6}" },
+  { value: "other", label: "Other", emoji: "\u{1F4CC}" },
 ];
 
 const GENERATION_MESSAGES = [
-  "Finding venues near your city...",
-  "Crafting plan ideas for your community...",
+  "Finding venues near you...",
+  "Crafting plan ideas...",
   "Matching activities to your vibe...",
   "Picking the best times and places...",
   "Almost ready...",
 ];
+
+const TIER_LABELS: Record<
+  string,
+  { name: string; monthly: string; yearly: string }
+> = {
+  growth: { name: "The Social", monthly: "$4.99/mo", yearly: "$49.99/yr" },
+  pro: { name: "The Organizer", monthly: "$9.99/mo", yearly: "$99.99/yr" },
+};
 
 // --- Types ---
 
@@ -92,6 +101,7 @@ function SetupPageInner() {
   const [redirectingToCheckout, setRedirectingToCheckout] = useState(false);
   const [descGenerating, setDescGenerating] = useState(false);
   const [descGenError, setDescGenError] = useState("");
+  const [copied, setCopied] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [parseUser, setParseUser] = useState<any>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -106,6 +116,13 @@ function SetupPageInner() {
     form.orgType !== "" &&
     form.primaryCitySelected &&
     form.description.trim() !== "";
+
+  const tierInfo = TIER_LABELS[form.tier];
+  const tierPrice = tierInfo
+    ? initialBillingPeriod === "yearly"
+      ? tierInfo.yearly
+      : tierInfo.monthly
+    : null;
 
   // Check for existing Parse session on mount
   useEffect(() => {
@@ -184,12 +201,12 @@ function SetupPageInner() {
       setSubmitError(
         err instanceof Error
           ? err.message
-          : "Failed to create organization. Please try again."
+          : "Failed to create your calendar. Please try again."
       );
     } finally {
       setSubmitting(false);
     }
-  }, [form]);
+  }, [form, initialBillingPeriod]);
 
   const handleGenerateClick = useCallback(() => {
     if (parseUser) {
@@ -242,311 +259,363 @@ function SetupPageInner() {
     [startGeneration]
   );
 
-  // Step 2: Success
-  if (step === 2) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-6">
-        <div className="max-w-lg w-full text-center space-y-8">
-          <div className="w-20 h-20 border-2 border-zinc-900 rounded-full flex items-center justify-center mx-auto">
-            <Sparkles className="w-10 h-10" />
-          </div>
-          <div className="space-y-3">
-            <h1 className="text-4xl font-light tracking-tight">
-              Your calendar is live!
-            </h1>
-            <p className="text-zinc-500 font-light text-lg">
-              AI is generating your first plan ideas. They&apos;ll appear on your calendar shortly.
-            </p>
-          </div>
-          <div className="bg-zinc-50 p-6 space-y-2">
-            <p className="text-xs tracking-wider uppercase font-bold text-zinc-400">
-              Your Calendar URL
-            </p>
-            <p className="text-lg font-mono">
-              os.joinleaf.com/org/{shareId}
-            </p>
-          </div>
-          <div className="flex flex-col gap-4">
-            <Link
-              href={`/org/${shareId}?welcome=1`}
-              className="bg-zinc-900 text-white px-8 py-4 text-xs uppercase tracking-wider font-medium hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
-            >
-              View Your Calendar <ArrowRight className="w-4 h-4" />
-            </Link>
-            <button
-              onClick={() =>
-                navigator.clipboard.writeText(
-                  `os.joinleaf.com/org/${shareId}`
-                )
-              }
-              className="border border-zinc-200 px-8 py-4 text-xs uppercase tracking-wider font-medium hover:bg-zinc-50 transition-colors"
-            >
-              Copy Link
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const copyShareUrl = useCallback(() => {
+    navigator.clipboard.writeText(`os.joinleaf.com/org/${shareId}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [shareId]);
 
-  // Step 1: Generating / Success
+  // --- Step 1: Generating / Success ---
   if (step === 1) {
     const headline = redirectingToCheckout
-      ? "Redirecting to secure checkout..."
+      ? "Heading to checkout..."
       : generationDone
-        ? "Your calendar is ready!"
+        ? "Your calendar is live."
         : "Generating your calendar...";
 
     const subtext = redirectingToCheckout
       ? "Hang tight — Stripe is loading your payment page."
       : generationDone
-        ? `Created calendar for ${form.name}`
+        ? `${form.name} is ready to go.`
         : GENERATION_MESSAGES[generationMessageIndex];
 
     const showLoader = !generationDone || redirectingToCheckout;
 
     return (
-      <div className="min-h-screen">
-        <nav className="w-full bg-white border-b border-zinc-100 px-6 py-6">
-          <div className="max-w-3xl mx-auto flex justify-between items-center">
-            <Link href="/organizations" className="flex items-center gap-3">
-              <img src="/leaf-logo-black.png" alt="Leaf" className="h-7" />
-              <span className="text-lg font-light tracking-wider uppercase">OS</span>
-              <div className="h-4 w-px bg-zinc-200" />
-              <span className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
-                Setup
-              </span>
-            </Link>
-          </div>
-        </nav>
-
-        <div className="max-w-2xl mx-auto px-6 py-20">
-          <div className="text-center mb-12">
-            <div className="w-16 h-16 mx-auto mb-6 flex items-center justify-center">
+      <Shell>
+        <div className="max-w-2xl mx-auto px-6 py-24">
+          <div className="text-center space-y-10">
+            {/* Visual */}
+            <div className="flex justify-center">
               {showLoader ? (
-                <Loader2 className="w-12 h-12 animate-spin text-zinc-400" />
+                <div className="relative w-24 h-24 flex items-center justify-center">
+                  <div className="absolute inset-0 rounded-full bg-zinc-100 animate-ping opacity-60" />
+                  <div className="relative w-20 h-20 rounded-full bg-zinc-50 border border-zinc-200 flex items-center justify-center">
+                    <Loader2 className="w-9 h-9 animate-spin text-zinc-500" />
+                  </div>
+                </div>
               ) : (
-                <div className="w-16 h-16 border-2 border-zinc-900 rounded-full flex items-center justify-center">
-                  <Check className="w-8 h-8" />
+                <div className="w-24 h-24 rounded-full bg-zinc-900 flex items-center justify-center">
+                  <Check className="w-12 h-12 text-white" strokeWidth={1.5} />
                 </div>
               )}
             </div>
-            <h2 className="text-3xl font-light tracking-tight mb-3">{headline}</h2>
-            <p className="text-zinc-500 font-light text-lg transition-opacity">{subtext}</p>
-          </div>
 
-          {/* Error */}
-          {submitError && (
-            <div className="mb-8 p-4 bg-red-50 border border-red-200 text-red-700 text-sm text-center">
-              {submitError}
-              <button
-                onClick={() => {
-                  setStep(0);
-                  setSubmitError("");
-                }}
-                className="block mx-auto mt-2 underline text-red-600"
-              >
-                Go back and try again
-              </button>
-            </div>
-          )}
-
-          {/* Continue Button — only visible after generation is done and we're not redirecting */}
-          {generationDone && !redirectingToCheckout && (
-            <div className="text-center pt-4 space-y-4">
-              <Link
-                href={`/org/${shareId}?welcome=1`}
-                className="px-12 py-4 text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 transition-colors bg-zinc-900 text-white hover:bg-zinc-800"
-              >
-                View Your Calendar <ArrowRight className="w-4 h-4" />
-              </Link>
-              {calendarId && (
-                <div>
-                  <Link
-                    href={`/dashboard/${calendarId}`}
-                    className="text-xs tracking-wider uppercase font-bold text-zinc-400 hover:text-zinc-900"
-                  >
-                    Go to dashboard
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Step 0: Tell us about your community
-  return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <nav className="w-full bg-white border-b border-zinc-100 px-6 py-6">
-        <div className="max-w-3xl mx-auto flex justify-between items-center">
-          <Link href="/organizations" className="flex items-center gap-3">
-            <img src="/leaf-logo-black.png" alt="Leaf" className="h-7" />
-            <span className="text-lg font-light tracking-wider uppercase">OS</span>
-            <div className="h-4 w-px bg-zinc-200" />
-            <span className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
-              Setup
-            </span>
-          </Link>
-          <Link
-            href="/organizations"
-            className="text-zinc-400 hover:text-zinc-900"
-          >
-            <X className="w-5 h-5" />
-          </Link>
-        </div>
-      </nav>
-
-      <div className="max-w-3xl mx-auto px-6 py-12">
-        <div className="space-y-10">
-          <div>
-            <h2 className="text-3xl font-light tracking-tight mb-2">
-              Tell us about your community
-            </h2>
-            <p className="text-zinc-500 font-light">
-              We&apos;ll use this to generate personalized plan ideas for your calendar.
-            </p>
-          </div>
-
-          <div className="space-y-6">
-            {/* Organization Name */}
-            <div className="space-y-2">
-              <label className="text-xs tracking-wider uppercase font-bold">
-                Organization Name
-              </label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => updateForm({ name: e.target.value })}
-                placeholder="e.g., Yoga for Austin"
-                className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
-              />
-            </div>
-
-            {/* Organization Type */}
+            {/* Copy */}
             <div className="space-y-3">
-              <label className="text-xs tracking-wider uppercase font-bold">
-                Organization Type
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {ORG_TYPES.map((type) => (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => updateForm({ orgType: type.value })}
-                    className={`p-4 border text-left transition-all ${
-                      form.orgType === type.value
-                        ? "border-zinc-900 bg-zinc-50"
-                        : "border-zinc-100 hover:border-zinc-300"
-                    }`}
-                  >
-                    <span className="text-xl mb-1 block">{type.emoji}</span>
-                    <span className="text-sm font-medium">{type.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* City */}
-            <div className="space-y-2">
-              <label className="text-xs tracking-wider uppercase font-bold flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5" />
-                City
-              </label>
-              <CityAutocomplete
-                value={form.primaryCity}
-                onChange={(val) =>
-                  updateForm({ primaryCity: val, primaryCitySelected: false })
-                }
-                onSelect={(place) =>
-                  updateForm({
-                    primaryCity: place.description,
-                    primaryCitySelected: true,
-                  })
-                }
-                placeholder="e.g., Austin, TX"
-                className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
-              />
-            </div>
-
-            {/* Website (Optional — used to auto-generate description) */}
-            <div className="space-y-2">
-              <label className="text-xs tracking-wider uppercase font-bold flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5" />
-                Website <span className="text-zinc-400 normal-case font-normal">(optional)</span>
-              </label>
-              <input
-                type="url"
-                value={form.website}
-                onChange={(e) => {
-                  updateForm({ website: e.target.value });
-                  if (descGenError) setDescGenError("");
-                }}
-                placeholder="e.g., https://yourorg.com"
-                className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
-              />
-              <p className="text-[11px] text-zinc-400">
-                Add your website and we&apos;ll draft a description for you.
+              <h1 className="text-4xl md:text-5xl font-light tracking-tight">
+                {generationDone && !redirectingToCheckout ? (
+                  <>
+                    Your calendar is{" "}
+                    <span className="italic">live.</span>
+                  </>
+                ) : (
+                  headline
+                )}
+              </h1>
+              <p className="text-zinc-500 font-light text-lg transition-opacity">
+                {subtext}
               </p>
             </div>
 
-            {/* Description */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <label className="text-xs tracking-wider uppercase font-bold">
-                  Description
-                </label>
+            {/* URL display */}
+            {generationDone && !redirectingToCheckout && shareId && (
+              <div className="bg-zinc-50 border border-zinc-100 rounded-2xl p-6 space-y-3 text-left">
+                <p className="text-[11px] tracking-wider uppercase font-semibold text-zinc-400">
+                  Your calendar URL
+                </p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-base sm:text-lg font-mono text-zinc-800 truncate">
+                    os.joinleaf.com/org/{shareId}
+                  </p>
+                  <button
+                    onClick={copyShareUrl}
+                    className="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600 hover:text-zinc-900 transition-colors"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" /> Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" /> Copy
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Error */}
+            {submitError && (
+              <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-sm text-left rounded-xl">
+                {submitError}
                 <button
-                  type="button"
-                  onClick={handleGenerateDescription}
-                  disabled={descGenerating || !form.website.trim()}
-                  className={`flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold transition-colors ${
-                    descGenerating || !form.website.trim()
-                      ? "text-zinc-300 cursor-not-allowed"
-                      : "text-zinc-500 hover:text-zinc-900"
-                  }`}
-                  title={form.website.trim() ? "Generate from website" : "Add a website URL above to enable"}
+                  onClick={() => {
+                    setStep(0);
+                    setSubmitError("");
+                  }}
+                  className="block mt-2 underline text-red-600"
                 >
-                  {descGenerating ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="w-3.5 h-3.5" /> Generate from website
-                    </>
-                  )}
+                  Go back and try again
                 </button>
               </div>
-              <textarea
-                value={form.description}
-                onChange={(e) => updateForm({ description: e.target.value })}
-                placeholder="Describe your community and the kind of gatherings you'd like..."
-                rows={3}
-                className="w-full border border-zinc-200 p-4 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors resize-none"
-              />
-              {descGenError && (
-                <p className="text-[11px] text-red-500">{descGenError}</p>
-              )}
+            )}
+
+            {/* CTAs */}
+            {generationDone && !redirectingToCheckout && (
+              <div className="flex flex-col items-center gap-4 pt-2">
+                <Link
+                  href={`/org/${shareId}?welcome=1`}
+                  className="inline-flex items-center gap-2 bg-zinc-900 text-white px-8 py-4 text-sm font-semibold rounded-full hover:bg-zinc-800 transition-colors"
+                >
+                  View your calendar <ArrowRight className="w-4 h-4" />
+                </Link>
+                {calendarId && (
+                  <Link
+                    href={`/dashboard/${calendarId}`}
+                    className="text-sm font-medium text-zinc-500 hover:text-zinc-900 underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-900 transition-colors"
+                  >
+                    Go to dashboard
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
+  // Step 2 success (unused fallback — preserved for backward compatibility)
+  if (step === 2) {
+    return (
+      <Shell>
+        <div className="min-h-[80vh] flex items-center justify-center px-6">
+          <div className="max-w-lg w-full text-center space-y-8">
+            <div className="w-20 h-20 bg-zinc-900 rounded-full flex items-center justify-center mx-auto">
+              <Sparkles className="w-10 h-10 text-white" />
             </div>
+            <div className="space-y-3">
+              <h1 className="text-4xl font-light tracking-tight">
+                Your calendar is <span className="italic">live.</span>
+              </h1>
+              <p className="text-zinc-500 font-light text-lg">
+                AI is generating your first plan ideas. They&apos;ll appear on your calendar shortly.
+              </p>
+            </div>
+            <div className="bg-zinc-50 border border-zinc-100 rounded-2xl p-6 space-y-2">
+              <p className="text-[11px] tracking-wider uppercase font-semibold text-zinc-400">
+                Your calendar URL
+              </p>
+              <p className="text-lg font-mono">
+                os.joinleaf.com/org/{shareId}
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 items-center">
+              <Link
+                href={`/org/${shareId}?welcome=1`}
+                className="bg-zinc-900 text-white px-8 py-4 text-sm font-semibold rounded-full hover:bg-zinc-800 transition-colors inline-flex items-center justify-center gap-2"
+              >
+                View your calendar <ArrowRight className="w-4 h-4" />
+              </Link>
+              <button
+                onClick={copyShareUrl}
+                className="text-sm font-medium text-zinc-500 hover:text-zinc-900 underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-900 transition-colors"
+              >
+                {copied ? "Copied!" : "Copy link"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
+  // --- Step 0: Form ---
+  return (
+    <Shell>
+      <div className="max-w-2xl mx-auto px-6 py-16">
+        {/* Hero */}
+        <div className="space-y-4 mb-12">
+          <p className="text-xs tracking-wider uppercase text-zinc-400 font-semibold">
+            Calendar setup
+          </p>
+          <h1 className="text-5xl md:text-6xl font-light tracking-tight leading-[1.05]">
+            Let&apos;s spin up{" "}
+            <span className="italic">your calendar.</span>
+          </h1>
+          <p className="text-lg text-zinc-500 font-light leading-relaxed max-w-xl">
+            Tell us a bit about it. We&apos;ll generate your first week of plan
+            ideas in seconds.
+          </p>
+        </div>
+
+        {/* Tier banner */}
+        {tierInfo && tierPrice && (
+          <div className="mb-10 flex items-start gap-3 p-4 rounded-2xl bg-zinc-50 border border-zinc-100">
+            <Sparkles className="w-4 h-4 mt-0.5 text-zinc-700 shrink-0" />
+            <div className="text-sm leading-relaxed">
+              <span className="font-semibold">
+                You&apos;re starting with {tierInfo.name} ({tierPrice}).
+              </span>{" "}
+              <span className="text-zinc-500">
+                We&apos;ll create your calendar first, then hand you off to
+                secure checkout.
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Form */}
+        <div className="space-y-10">
+          {/* Calendar Name */}
+          <Field
+            label="Calendar name"
+            hint="What you'd call it in a group chat."
+          >
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => updateForm({ name: e.target.value })}
+              placeholder="e.g., Sunday Suppers"
+              className="w-full border-b border-zinc-300 pb-3 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors placeholder:text-zinc-300"
+            />
+          </Field>
+
+          {/* Type */}
+          <Field
+            label="What kind of calendar is it?"
+            hint="We use this to shape the plan ideas."
+          >
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {ORG_TYPES.map((type) => (
+                <button
+                  key={type.value}
+                  type="button"
+                  onClick={() => updateForm({ orgType: type.value })}
+                  className={`p-4 rounded-xl border text-left transition-all ${
+                    form.orgType === type.value
+                      ? "border-zinc-900 bg-zinc-50"
+                      : "border-zinc-100 hover:border-zinc-300 hover:bg-zinc-50/50"
+                  }`}
+                >
+                  <span className="text-xl mb-1.5 block">{type.emoji}</span>
+                  <span className="text-sm font-medium leading-tight">
+                    {type.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          {/* City */}
+          <Field
+            label="Your city"
+            icon={<MapPin className="w-3.5 h-3.5" />}
+            hint="Plans are scoped here by default — you can travel later."
+          >
+            <CityAutocomplete
+              value={form.primaryCity}
+              onChange={(val) =>
+                updateForm({ primaryCity: val, primaryCitySelected: false })
+              }
+              onSelect={(place) =>
+                updateForm({
+                  primaryCity: place.description,
+                  primaryCitySelected: true,
+                })
+              }
+              placeholder="e.g., Austin, TX"
+              className="w-full border-b border-zinc-300 pb-3 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors placeholder:text-zinc-300"
+            />
+          </Field>
+
+          {/* Website */}
+          <Field
+            label={
+              <>
+                Website{" "}
+                <span className="text-zinc-400 normal-case font-normal">
+                  (optional)
+                </span>
+              </>
+            }
+            icon={<Globe className="w-3.5 h-3.5" />}
+            hint="Drop a URL and we'll draft a description for you."
+          >
+            <input
+              type="url"
+              value={form.website}
+              onChange={(e) => {
+                updateForm({ website: e.target.value });
+                if (descGenError) setDescGenError("");
+              }}
+              placeholder="https://yourthing.com"
+              className="w-full border-b border-zinc-300 pb-3 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors placeholder:text-zinc-300"
+            />
+          </Field>
+
+          {/* Description */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <label className="text-xs tracking-wider uppercase font-semibold">
+                Tell us about it
+              </label>
+              <button
+                type="button"
+                onClick={handleGenerateDescription}
+                disabled={descGenerating || !form.website.trim()}
+                className={`flex items-center gap-1.5 text-xs tracking-wider uppercase font-semibold transition-colors ${
+                  descGenerating || !form.website.trim()
+                    ? "text-zinc-300 cursor-not-allowed"
+                    : "text-zinc-500 hover:text-zinc-900"
+                }`}
+                title={
+                  form.website.trim()
+                    ? "Generate from website"
+                    : "Add a website URL to enable"
+                }
+              >
+                {descGenerating ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="w-3.5 h-3.5" /> Draft from website
+                  </>
+                )}
+              </button>
+            </div>
+            <textarea
+              value={form.description}
+              onChange={(e) => updateForm({ description: e.target.value })}
+              placeholder="Who's it for, what kind of plans you'd actually go to, anything that makes it yours..."
+              rows={4}
+              className="w-full border border-zinc-200 rounded-xl p-4 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors resize-none placeholder:text-zinc-300"
+            />
+            {descGenError && (
+              <p className="text-xs text-red-500">{descGenError}</p>
+            )}
           </div>
         </div>
 
         {/* CTA */}
-        <div className="flex justify-end pt-12 mt-12 border-t border-zinc-100">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 pt-10 mt-12 border-t border-zinc-100">
+          <p className="text-xs text-zinc-400">
+            Free to start. No credit card required.
+          </p>
           <button
             onClick={handleGenerateClick}
             disabled={!canGenerate}
-            className={`px-8 py-3.5 text-xs uppercase tracking-wider font-bold flex items-center gap-2 transition-colors ${
+            className={`px-8 py-4 text-sm font-semibold rounded-full inline-flex items-center justify-center gap-2 transition-colors ${
               canGenerate
                 ? "bg-zinc-900 text-white hover:bg-zinc-800"
-                : "bg-zinc-200 text-zinc-400 cursor-not-allowed"
+                : "bg-zinc-100 text-zinc-400 cursor-not-allowed"
             }`}
           >
-            Create My First Calendar <Sparkles className="w-4 h-4" />
+            Generate my plans <Sparkles className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -558,7 +627,7 @@ function SetupPageInner() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setShowAuthModal(false)}
           />
-          <div className="relative bg-white max-w-[820px] w-full mx-4 shadow-2xl overflow-hidden flex">
+          <div className="relative bg-white max-w-[820px] w-full mx-4 shadow-2xl rounded-2xl overflow-hidden flex">
             {/* Left panel — visual */}
             <div className="hidden sm:flex w-[340px] shrink-0 bg-zinc-950 text-white flex-col justify-between p-10">
               <div className="flex items-center gap-3">
@@ -567,13 +636,13 @@ function SetupPageInner() {
               </div>
               <div className="space-y-6">
                 <h3 className="text-3xl font-light leading-snug">
-                  Your AI-powered calendar awaits
+                  Your calendar, <span className="italic">a tap away.</span>
                 </h3>
                 <div className="space-y-3">
                   {[
                     "AI-generated plan ideas",
-                    "One-tap phone number RSVP",
-                    "Shareable calendar link",
+                    "Phone-number RSVPs",
+                    "A shareable calendar link",
                   ].map((item) => (
                     <div key={item} className="flex items-center gap-3">
                       <div className="w-5 h-5 rounded-full border border-zinc-600 flex items-center justify-center shrink-0">
@@ -586,14 +655,13 @@ function SetupPageInner() {
                   ))}
                 </div>
               </div>
-              <p className="text-[11px] text-zinc-600">
-                Trusted by 1,800+ members across various local organizations
+              <p className="text-[11px] text-zinc-600 leading-relaxed">
+                Trusted by 1,800+ members across local organizations.
               </p>
             </div>
 
             {/* Right panel — sign in */}
-            <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 py-12">
-              {/* Close button */}
+            <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 py-12 relative">
               <button
                 onClick={() => setShowAuthModal(false)}
                 className="absolute top-4 right-4 z-10 text-zinc-400 hover:text-zinc-900 transition-colors"
@@ -603,30 +671,24 @@ function SetupPageInner() {
 
               <div className="space-y-8">
                 <div className="space-y-3">
-                  <p className="text-xs tracking-wider uppercase font-bold text-zinc-400">
+                  <p className="text-xs tracking-wider uppercase font-semibold text-zinc-400">
                     Almost there
                   </p>
-                  <h3 className="text-2xl font-light tracking-tight">
-                    Sign in to create <br className="hidden sm:block" />
-                    your calendar
+                  <h3 className="text-3xl font-light tracking-tight">
+                    Sign in to <span className="italic">launch.</span>
                   </h3>
                   <p className="text-sm text-zinc-500 font-light leading-relaxed">
-                    We&apos;ll link your account so you can manage plans, track RSVPs, and customize your page.
+                    We&apos;ll save your work and link the calendar to your account so you can manage plans and RSVPs.
                   </p>
                 </div>
 
-                {/* Google Sign In */}
-                <div>
-                  <GoogleSignInButton
-                    onSignIn={handleSignIn}
-                    onError={(err) => setAuthError(err)}
-                  />
-                </div>
+                <GoogleSignInButton
+                  onSignIn={handleSignIn}
+                  onError={(err) => setAuthError(err)}
+                />
 
                 {authError && (
-                  <p className="text-sm text-red-600">
-                    {authError}
-                  </p>
+                  <p className="text-sm text-red-600">{authError}</p>
                 )}
 
                 <div className="pt-2 border-t border-zinc-100">
@@ -639,6 +701,60 @@ function SetupPageInner() {
           </div>
         </div>
       )}
+    </Shell>
+  );
+}
+
+// --- Shared shell ---
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-white">
+      <nav className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-zinc-100">
+        <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
+          <Link href="/personal" className="flex items-center gap-3">
+            <img src="/leaf-logo-black.png" alt="Leaf" className="h-7" />
+            <span className="text-lg font-light tracking-wider uppercase">OS</span>
+            <div className="h-4 w-px bg-zinc-200" />
+            <span className="text-xs tracking-wider uppercase text-zinc-400 font-semibold">
+              Setup
+            </span>
+          </Link>
+          <Link
+            href="/personal"
+            className="text-zinc-400 hover:text-zinc-900 transition-colors"
+            aria-label="Close setup"
+          >
+            <X className="w-5 h-5" />
+          </Link>
+        </div>
+      </nav>
+      {children}
+    </div>
+  );
+}
+
+// --- Small helper component for form fields ---
+
+function Field({
+  label,
+  hint,
+  icon,
+  children,
+}: {
+  label: React.ReactNode;
+  hint?: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-3">
+      <label className="text-xs tracking-wider uppercase font-semibold flex items-center gap-1.5">
+        {icon}
+        {label}
+      </label>
+      {children}
+      {hint && <p className="text-[11px] text-zinc-400">{hint}</p>}
     </div>
   );
 }
