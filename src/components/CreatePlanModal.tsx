@@ -438,6 +438,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           hostNote: isHosted && hostNote.trim() ? hostNote.trim() : undefined,
           hideVenueUntilRsvp: hideVenue,
           requireApproval: isHosted ? requireApproval : undefined,
+          clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         });
       }
       setSuccess(true);
