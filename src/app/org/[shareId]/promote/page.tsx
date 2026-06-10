@@ -24,7 +24,7 @@ interface CalendarInfo {
   city: string | null;
 }
 
-type Template = "door-hanger" | "lobby-flyer";
+type Template = "flyer" | "social";
 
 export default function PromotePage({
   params,
@@ -36,7 +36,7 @@ export default function PromotePage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
-  const [template, setTemplate] = useState<Template>("door-hanger");
+  const [template, setTemplate] = useState<Template>("flyer");
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
@@ -170,8 +170,7 @@ export default function PromotePage({
                   Promote {calendar.name}
                 </h1>
                 <p className="text-sm text-zinc-500 mt-1">
-                  Printable flyers and door hangers. Residents scan the QR to
-                  join your calendar.
+                  Print, save, or share. Residents scan the QR to join.
                 </p>
               </div>
               <button
@@ -186,8 +185,8 @@ export default function PromotePage({
             <div className="mt-4 flex gap-2">
               {(
                 [
-                  ["door-hanger", "Door hanger"],
-                  ["lobby-flyer", "Lobby flyer"],
+                  ["flyer", "Flyer"],
+                  ["social", "Social media"],
                 ] as [Template, string][]
               ).map(([k, label]) => (
                 <button
@@ -204,17 +203,18 @@ export default function PromotePage({
               ))}
             </div>
             <p className="text-xs text-zinc-500 mt-2">
-              Tip: use your browser&apos;s print dialog → <em>Save as PDF</em> to
-              download.
+              {template === "flyer"
+                ? "Letter size · prints on standard 8.5\" × 11\" paper."
+                : "1080 × 1080 — sized for Instagram, Facebook, Threads."}
             </p>
           </div>
 
           <div className="flex justify-center">
-            {template === "door-hanger" && (
-              <DoorHanger calendar={calendar} url={calendarUrl} />
+            {template === "flyer" && (
+              <Flyer calendar={calendar} url={calendarUrl} />
             )}
-            {template === "lobby-flyer" && (
-              <LobbyFlyer calendar={calendar} url={calendarUrl} />
+            {template === "social" && (
+              <SocialPost calendar={calendar} url={calendarUrl} />
             )}
           </div>
         </div>
@@ -247,7 +247,7 @@ function WelcomePopup({
           <div>
             <h2 className="text-lg font-semibold">Spread the word</h2>
             <p className="text-sm text-zinc-600 mt-1">
-              Print door hangers and flyers for {calendarName}. Residents scan
+              Print a flyer for {calendarName} or post to social. Residents scan
               the QR code and join your calendar in one tap — no app required.
             </p>
             <button
@@ -263,7 +263,11 @@ function WelcomePopup({
   );
 }
 
-function DoorHanger({
+// ────────────────────────────────────────────────────────────────────────────
+// FLYER — letter size, bold design
+// ────────────────────────────────────────────────────────────────────────────
+
+function Flyer({
   calendar,
   url,
 }: {
@@ -272,125 +276,380 @@ function DoorHanger({
 }) {
   return (
     <div
-      className="print-page bg-white shadow-md border border-zinc-200"
-      style={{
-        width: "4.25in",
-        height: "11in",
-        padding: "0.5in 0.4in",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      <div className="text-center">
-        <div className="text-[10px] uppercase tracking-widest text-emerald-700 font-semibold">
-          Leaf
-        </div>
-        <div className="mt-4 text-xl font-bold leading-tight">
-          Meet your neighbors.
-        </div>
-        <div className="mt-1 text-xs text-zinc-600">
-          Bowling. Pickleball. Happy hours. Dinners.
-        </div>
-      </div>
-
-      <div className="mt-6 flex justify-center">
-        <div className="border-2 border-zinc-900 p-2">
-          <QRCodeSVG value={url} size={170} level="M" />
-        </div>
-      </div>
-
-      <div className="mt-5 text-center">
-        <div className="text-xs text-zinc-500">Scan to join</div>
-        <div className="mt-1 text-base font-bold">{calendar.name}</div>
-      </div>
-
-      <div className="mt-auto pt-6 text-center text-[10px] text-zinc-400">
-        <div>Free for residents · 30 seconds to set up</div>
-        <div className="mt-1">No app required</div>
-      </div>
-    </div>
-  );
-}
-
-function LobbyFlyer({
-  calendar,
-  url,
-}: {
-  calendar: CalendarInfo;
-  url: string;
-}) {
-  return (
-    <div
-      className="print-page bg-white shadow-md border border-zinc-200"
+      className="print-page bg-white shadow-md border border-zinc-200 overflow-hidden"
       style={{
         width: "8.5in",
         height: "11in",
-        padding: "0.6in 0.7in",
         display: "flex",
         flexDirection: "column",
       }}
     >
-      <div>
-        <div className="text-[10px] uppercase tracking-widest text-emerald-700 font-semibold">
+      {/* Top color band */}
+      <div
+        style={{
+          background:
+            "linear-gradient(135deg, #064e3b 0%, #047857 50%, #10b981 100%)",
+          padding: "0.7in 0.7in 0.5in",
+          color: "white",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "11px",
+            letterSpacing: "0.25em",
+            textTransform: "uppercase",
+            fontWeight: 600,
+            opacity: 0.85,
+          }}
+        >
           Leaf · Resident calendar
         </div>
-        <h1 className="mt-2 text-4xl font-bold leading-tight">
-          {calendar.name} has a calendar.
+        <h1
+          style={{
+            fontSize: "54px",
+            fontWeight: 800,
+            lineHeight: 1.02,
+            marginTop: "16px",
+            letterSpacing: "-0.02em",
+          }}
+        >
+          Meet your neighbors.
         </h1>
-        <p className="mt-3 text-zinc-700 text-lg">
-          A free shared calendar for residents to organize and RSVP to building
-          events.
+        <p
+          style={{
+            marginTop: "12px",
+            fontSize: "18px",
+            fontWeight: 300,
+            opacity: 0.95,
+            maxWidth: "5.5in",
+            lineHeight: 1.35,
+          }}
+        >
+          {calendar.name} has a shared calendar for residents to organize and
+          RSVP to building events.
         </p>
       </div>
 
-      <div className="mt-8 grid grid-cols-3 gap-3 text-sm">
-        <SamplePlan
-          title="Bowling Night"
-          when="Fri 7:30 PM"
-          where="Frames Bowling"
-        />
-        <SamplePlan
-          title="Pickleball Pickup"
-          when="Sat 6:00 PM"
-          where="Lincoln Park Courts"
-        />
-        <SamplePlan
-          title="Rooftop Mixer"
-          when="Sun 6:30 PM"
-          where="Building Rooftop"
-        />
+      {/* Sample plans */}
+      <div style={{ padding: "0.45in 0.7in 0.3in", flex: 1 }}>
+        <div
+          style={{
+            fontSize: "10px",
+            letterSpacing: "0.25em",
+            textTransform: "uppercase",
+            fontWeight: 700,
+            color: "#71717a",
+            marginBottom: "14px",
+          }}
+        >
+          What residents organize
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "14px",
+          }}
+        >
+          <PlanCard
+            emoji="🎳"
+            title="Bowling Night"
+            when="Fri 7:30 PM"
+            where="Frames Lanes"
+          />
+          <PlanCard
+            emoji="🥒"
+            title="Pickleball"
+            when="Sat 6:00 PM"
+            where="Lincoln Park"
+          />
+          <PlanCard
+            emoji="🍷"
+            title="Rooftop Mixer"
+            when="Sun 6:30 PM"
+            where="Building Rooftop"
+          />
+        </div>
       </div>
 
-      <div className="mt-auto pt-8 flex items-end justify-between border-t border-zinc-200">
-        <div className="pt-6">
-          <div className="text-xs uppercase tracking-wide text-zinc-500">
-            Scan to join
-          </div>
-          <div className="mt-1 text-2xl font-bold">{calendar.name}</div>
-          <div className="mt-1 text-xs text-zinc-500 break-all">{url}</div>
+      {/* QR section */}
+      <div
+        style={{
+          padding: "0.4in 0.7in 0.6in",
+          borderTop: "1px solid #f4f4f5",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.4in",
+        }}
+      >
+        <div
+          style={{
+            background: "white",
+            border: "3px solid #064e3b",
+            padding: "10px",
+            borderRadius: "4px",
+          }}
+        >
+          <QRCodeSVG value={url} size={160} level="M" />
         </div>
-        <div className="border-2 border-zinc-900 p-2">
-          <QRCodeSVG value={url} size={150} level="M" />
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontSize: "11px",
+              letterSpacing: "0.25em",
+              textTransform: "uppercase",
+              fontWeight: 700,
+              color: "#047857",
+            }}
+          >
+            Scan to join — 30 seconds
+          </div>
+          <div
+            style={{
+              fontSize: "28px",
+              fontWeight: 800,
+              marginTop: "6px",
+              letterSpacing: "-0.01em",
+              lineHeight: 1.1,
+            }}
+          >
+            {calendar.name}
+          </div>
+          <div
+            style={{
+              fontSize: "12px",
+              color: "#71717a",
+              marginTop: "8px",
+              wordBreak: "break-all",
+            }}
+          >
+            {url}
+          </div>
+          <div
+            style={{
+              fontSize: "10px",
+              color: "#a1a1aa",
+              marginTop: "10px",
+            }}
+          >
+            Free for residents · No app required
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function SamplePlan({
+function PlanCard({
+  emoji,
   title,
   when,
   where,
 }: {
+  emoji: string;
   title: string;
   when: string;
   where: string;
 }) {
   return (
-    <div className="border border-zinc-200 rounded p-3">
-      <div className="font-semibold">{title}</div>
-      <div className="text-xs text-zinc-500 mt-0.5">{when}</div>
-      <div className="text-xs text-zinc-500">{where}</div>
+    <div
+      style={{
+        border: "1px solid #e4e4e7",
+        borderRadius: "12px",
+        padding: "14px",
+        background: "#fafafa",
+      }}
+    >
+      <div style={{ fontSize: "22px" }}>{emoji}</div>
+      <div
+        style={{
+          fontSize: "14px",
+          fontWeight: 700,
+          marginTop: "6px",
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {title}
+      </div>
+      <div
+        style={{
+          fontSize: "11px",
+          color: "#52525b",
+          marginTop: "4px",
+        }}
+      >
+        {when}
+      </div>
+      <div
+        style={{
+          fontSize: "11px",
+          color: "#a1a1aa",
+        }}
+      >
+        {where}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// SOCIAL POST — 1080×1080 (rendered at smaller size on screen, prints square)
+// ────────────────────────────────────────────────────────────────────────────
+
+function SocialPost({
+  calendar,
+  url,
+}: {
+  calendar: CalendarInfo;
+  url: string;
+}) {
+  return (
+    <div
+      className="print-page shadow-md overflow-hidden"
+      style={{
+        width: "1080px",
+        height: "1080px",
+        maxWidth: "100%",
+        aspectRatio: "1 / 1",
+        position: "relative",
+        background:
+          "linear-gradient(135deg, #022c22 0%, #064e3b 40%, #047857 100%)",
+        color: "white",
+        display: "flex",
+        flexDirection: "column",
+        // Scale down to fit screen while preserving 1080×1080 print size
+        transform: "scale(min(1, calc((100vw - 32px) / 1080)))",
+        transformOrigin: "top center",
+      }}
+    >
+      {/* Decorative texture circles */}
+      <div
+        style={{
+          position: "absolute",
+          width: "600px",
+          height: "600px",
+          borderRadius: "50%",
+          background: "rgba(255,255,255,0.04)",
+          top: "-200px",
+          right: "-150px",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          width: "400px",
+          height: "400px",
+          borderRadius: "50%",
+          background: "rgba(255,255,255,0.03)",
+          bottom: "-100px",
+          left: "-100px",
+        }}
+      />
+
+      {/* Content */}
+      <div
+        style={{
+          position: "relative",
+          padding: "80px",
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "20px",
+            letterSpacing: "0.25em",
+            textTransform: "uppercase",
+            fontWeight: 600,
+            opacity: 0.85,
+          }}
+        >
+          Leaf · Resident calendar
+        </div>
+
+        <div style={{ marginTop: "40px", flex: 1 }}>
+          <h1
+            style={{
+              fontSize: "104px",
+              fontWeight: 900,
+              lineHeight: 0.95,
+              letterSpacing: "-0.03em",
+            }}
+          >
+            Meet your
+            <br />
+            neighbors.
+          </h1>
+          <p
+            style={{
+              marginTop: "32px",
+              fontSize: "30px",
+              fontWeight: 300,
+              opacity: 0.9,
+              maxWidth: "780px",
+              lineHeight: 1.3,
+            }}
+          >
+            {calendar.name} has a calendar for resident events — bowling,
+            pickleball, happy hours, dinners.
+          </p>
+        </div>
+
+        {/* Footer: QR + CTA */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "40px",
+            paddingTop: "32px",
+            borderTop: "1px solid rgba(255,255,255,0.2)",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              padding: "14px",
+              borderRadius: "12px",
+            }}
+          >
+            <QRCodeSVG value={url} size={180} level="M" fgColor="#022c22" />
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: "16px",
+                letterSpacing: "0.25em",
+                textTransform: "uppercase",
+                fontWeight: 700,
+                opacity: 0.85,
+              }}
+            >
+              Scan to join
+            </div>
+            <div
+              style={{
+                fontSize: "44px",
+                fontWeight: 800,
+                marginTop: "8px",
+                lineHeight: 1.1,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {calendar.name}
+            </div>
+            <div
+              style={{
+                fontSize: "18px",
+                opacity: 0.75,
+                marginTop: "10px",
+              }}
+            >
+              Free · No app required
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -27,6 +27,7 @@ import {
   Loader2,
   Lock,
   MapPin,
+  Megaphone,
   Settings,
   Heart,
   AlertTriangle,
@@ -1902,13 +1903,22 @@ export default function OrgCalendarPage() {
               )
             )}
             {(org.isOwner || org.isHost) && (
-              <Link
-                href={`/dashboard/${org.parentOrgId || org.objectId}`}
-                className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                Manage
-              </Link>
+              <>
+                <Link
+                  href={`/org/${shareId}/promote`}
+                  className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-emerald-700 hover:text-emerald-900 transition-colors border border-emerald-200 bg-emerald-50 px-3 py-1.5 rounded-full"
+                >
+                  <Megaphone className="w-3.5 h-3.5" />
+                  Promote
+                </Link>
+                <Link
+                  href={`/dashboard/${org.parentOrgId || org.objectId}`}
+                  className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  Manage
+                </Link>
+              </>
             )}
             {!org.isOwner && !org.isHost && (
               parseUser ? (
