@@ -254,6 +254,7 @@ export default function PlansPage() {
         description: string;
         image: string | null;
         date: string;
+        timezone: string | null;
         time: string | null;
         hostName: string;
         rsvpCount: number;
@@ -273,6 +274,7 @@ export default function PlansPage() {
           description: p.description || "",
           image: p.image,
           expiryDate: p.date,
+          timezone: p.timezone ?? null,
           time: p.time,
           rsvpCount: p.rsvpCount,
           host: p.hostName ? { name: p.hostName } : null,
