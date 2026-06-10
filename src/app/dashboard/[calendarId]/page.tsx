@@ -38,6 +38,7 @@ import {
   TrendingUp,
   Sparkles,
   Code,
+  Megaphone,
   Ticket,
   Phone,
   Smartphone,
@@ -1881,6 +1882,14 @@ export default function OrgDashboardPage() {
                               >
                                 <Code className="w-4 h-4" />
                               </button>
+                              <Link
+                                href={`/org/${cal.shareId}/promote`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-zinc-300 hover:text-emerald-600 transition-colors"
+                                title="Promote — print flyers and door hangers"
+                              >
+                                <Megaphone className="w-4 h-4" />
+                              </Link>
                             </>
                           )}
                           {cal.isPrimary && (
