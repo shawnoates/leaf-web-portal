@@ -22,9 +22,130 @@ interface CalendarInfo {
   ownerId: string | null;
   ownerName: string;
   city: string | null;
+  orgType: string | null;
 }
 
 type Template = "flyer" | "social";
+
+// ────────────────────────────────────────────────────────────────────────────
+// Headline + sample-plan copy per orgType. The promote page picks the
+// right variant based on the calendar's category so the hero text feels
+// native to the audience.
+// ────────────────────────────────────────────────────────────────────────────
+
+interface CategoryConfig {
+  headline: string; // hero on flyer/social
+  subhead: (name: string) => string;
+  plansLabel: string;
+  plans: { emoji: string; title: string; when: string; where: string }[];
+}
+
+const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
+  apartment_complex: {
+    headline: "Meet your neighbors.",
+    subhead: (name) =>
+      `${name} has a shared calendar for residents to organize and RSVP to building events.`,
+    plansLabel: "What residents organize",
+    plans: [
+      { emoji: "🎳", title: "Bowling Night", when: "Fri 7:30 PM", where: "Frames Lanes" },
+      { emoji: "🥒", title: "Pickleball", when: "Sat 6:00 PM", where: "Lincoln Park" },
+      { emoji: "🍷", title: "Rooftop Mixer", when: "Sun 6:30 PM", where: "Building Rooftop" },
+    ],
+  },
+  community: {
+    headline: "Meet your community.",
+    subhead: (name) =>
+      `${name} is a shared calendar for members to organize and RSVP to community events.`,
+    plansLabel: "What members organize",
+    plans: [
+      { emoji: "☕", title: "Coffee Meetup", when: "Sat 10:00 AM", where: "Local Café" },
+      { emoji: "🥾", title: "Group Hike", when: "Sun 8:00 AM", where: "Trailhead" },
+      { emoji: "🎲", title: "Game Night", when: "Fri 7:00 PM", where: "Community Room" },
+    ],
+  },
+  gym: {
+    headline: "Meet your gym crew.",
+    subhead: (name) =>
+      `${name} is a shared calendar for members to organize workouts, classes, and gatherings.`,
+    plansLabel: "What members organize",
+    plans: [
+      { emoji: "💪", title: "Group Lift", when: "Tue 6:00 AM", where: "Main Floor" },
+      { emoji: "☀️", title: "Morning Yoga", when: "Sat 8:00 AM", where: "Studio" },
+      { emoji: "🏃", title: "Run Club", when: "Sun 7:00 AM", where: "Park Loop" },
+    ],
+  },
+  church: {
+    headline: "Meet the congregation.",
+    subhead: (name) =>
+      `${name} is a shared calendar for the congregation to organize gatherings, studies, and events.`,
+    plansLabel: "What members organize",
+    plans: [
+      { emoji: "📖", title: "Bible Study", when: "Wed 7:00 PM", where: "Fellowship Hall" },
+      { emoji: "🍲", title: "Potluck", when: "Sun 12:30 PM", where: "Church Hall" },
+      { emoji: "🎵", title: "Choir Practice", when: "Thu 6:30 PM", where: "Sanctuary" },
+    ],
+  },
+  school: {
+    headline: "Meet your classmates.",
+    subhead: (name) =>
+      `${name} is a shared calendar for students to organize meetups, study sessions, and events.`,
+    plansLabel: "What students organize",
+    plans: [
+      { emoji: "📚", title: "Study Group", when: "Tue 6:00 PM", where: "Library Rm 2" },
+      { emoji: "🏀", title: "Pickup Game", when: "Sat 2:00 PM", where: "Campus Gym" },
+      { emoji: "🎬", title: "Movie Night", when: "Fri 8:00 PM", where: "Student Lounge" },
+    ],
+  },
+  company: {
+    headline: "Meet your coworkers.",
+    subhead: (name) =>
+      `${name} is a shared calendar for the team to organize gatherings, lunches, and events.`,
+    plansLabel: "What teammates organize",
+    plans: [
+      { emoji: "🍱", title: "Team Lunch", when: "Thu 12:30 PM", where: "Conference Rm" },
+      { emoji: "🍻", title: "Happy Hour", when: "Fri 5:30 PM", where: "Local Bar" },
+      { emoji: "🎤", title: "Lunch & Learn", when: "Wed 12:00 PM", where: "Main Floor" },
+    ],
+  },
+  brick_and_mortar: {
+    headline: "Meet other regulars.",
+    subhead: (name) =>
+      `${name} is a shared calendar for regulars to organize meetups and events.`,
+    plansLabel: "What regulars organize",
+    plans: [
+      { emoji: "☕", title: "Coffee Meetup", when: "Sat 10:00 AM", where: "Shop" },
+      { emoji: "🎤", title: "Open Mic", when: "Fri 7:00 PM", where: "Stage" },
+      { emoji: "🎲", title: "Game Night", when: "Wed 6:30 PM", where: "Back Room" },
+    ],
+  },
+  consumer_brand: {
+    headline: "Meet other fans.",
+    subhead: (name) =>
+      `${name} is a shared calendar for fans to organize meetups and events.`,
+    plansLabel: "What fans organize",
+    plans: [
+      { emoji: "🎉", title: "Launch Party", when: "Sat 7:00 PM", where: "Venue TBD" },
+      { emoji: "🤝", title: "Community Mixer", when: "Fri 6:00 PM", where: "Local Spot" },
+      { emoji: "🛠️", title: "Workshop", when: "Sun 1:00 PM", where: "Studio" },
+    ],
+  },
+  other: {
+    headline: "Meet the group.",
+    subhead: (name) =>
+      `${name} is a shared calendar for members to organize and RSVP to events.`,
+    plansLabel: "What members organize",
+    plans: [
+      { emoji: "☕", title: "Coffee Meetup", when: "Sat 10:00 AM", where: "Local Café" },
+      { emoji: "🍽️", title: "Dinner", when: "Fri 7:00 PM", where: "Restaurant" },
+      { emoji: "🎲", title: "Game Night", when: "Wed 7:00 PM", where: "Hangout Spot" },
+    ],
+  },
+};
+
+function getCategoryConfig(orgType: string | null): CategoryConfig {
+  if (orgType && CATEGORY_CONFIG[orgType]) return CATEGORY_CONFIG[orgType];
+  return CATEGORY_CONFIG.other;
+}
 
 export default function PromotePage({
   params,
@@ -64,6 +185,7 @@ export default function PromotePage({
           ownerName:
             cal.owner?.full_name || cal.owner?.name || cal.ownerName || "",
           city: cal.city || null,
+          orgType: cal.orgType || cal.org_type || null,
         };
         const owns = !!ownerId && ownerId === current.id;
         setCalendar(info);
@@ -274,6 +396,7 @@ function Flyer({
   calendar: CalendarInfo;
   url: string;
 }) {
+  const config = getCategoryConfig(calendar.orgType);
   return (
     <div
       className="print-page bg-white shadow-md border border-zinc-200 overflow-hidden"
@@ -289,7 +412,7 @@ function Flyer({
         style={{
           background:
             "linear-gradient(135deg, #064e3b 0%, #047857 50%, #10b981 100%)",
-          padding: "0.7in 0.7in 0.5in",
+          padding: "0.75in 0.7in 0.6in",
           color: "white",
         }}
       >
@@ -302,191 +425,104 @@ function Flyer({
             opacity: 0.85,
           }}
         >
-          Leaf · Resident calendar
+          Leaf · Shared calendar
         </div>
         <h1
           style={{
-            fontSize: "54px",
+            fontSize: "68px",
             fontWeight: 800,
-            lineHeight: 1.02,
-            marginTop: "16px",
-            letterSpacing: "-0.02em",
+            lineHeight: 1.0,
+            marginTop: "18px",
+            letterSpacing: "-0.025em",
           }}
         >
-          Meet your neighbors.
+          {config.headline}
         </h1>
         <p
           style={{
-            marginTop: "12px",
-            fontSize: "18px",
+            marginTop: "16px",
+            fontSize: "20px",
             fontWeight: 300,
             opacity: 0.95,
-            maxWidth: "5.5in",
+            maxWidth: "6in",
             lineHeight: 1.35,
           }}
         >
-          {calendar.name} has a shared calendar for residents to organize and
-          RSVP to building events.
+          {config.subhead(calendar.name)}
         </p>
       </div>
 
-      {/* Sample plans */}
-      <div style={{ padding: "0.45in 0.7in 0.3in", flex: 1 }}>
-        <div
-          style={{
-            fontSize: "10px",
-            letterSpacing: "0.25em",
-            textTransform: "uppercase",
-            fontWeight: 700,
-            color: "#71717a",
-            marginBottom: "14px",
-          }}
-        >
-          What residents organize
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: "14px",
-          }}
-        >
-          <PlanCard
-            emoji="🎳"
-            title="Bowling Night"
-            when="Fri 7:30 PM"
-            where="Frames Lanes"
-          />
-          <PlanCard
-            emoji="🥒"
-            title="Pickleball"
-            when="Sat 6:00 PM"
-            where="Lincoln Park"
-          />
-          <PlanCard
-            emoji="🍷"
-            title="Rooftop Mixer"
-            when="Sun 6:30 PM"
-            where="Building Rooftop"
-          />
-        </div>
-      </div>
-
-      {/* QR section */}
+      {/* QR section — center stage, lots of breathing room */}
       <div
         style={{
-          padding: "0.4in 0.7in 0.6in",
-          borderTop: "1px solid #f4f4f5",
+          flex: 1,
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
-          gap: "0.4in",
+          justifyContent: "center",
+          padding: "0.6in 0.7in",
         }}
       >
+        <div
+          style={{
+            fontSize: "12px",
+            letterSpacing: "0.3em",
+            textTransform: "uppercase",
+            fontWeight: 700,
+            color: "#047857",
+            marginBottom: "20px",
+          }}
+        >
+          Scan to join · 30 seconds
+        </div>
         <div
           style={{
             background: "white",
             border: "3px solid #064e3b",
-            padding: "10px",
-            borderRadius: "4px",
+            padding: "16px",
+            borderRadius: "8px",
           }}
         >
-          <QRCodeSVG value={url} size={160} level="M" />
+          <QRCodeSVG value={url} size={260} level="M" />
         </div>
-        <div style={{ flex: 1 }}>
-          <div
-            style={{
-              fontSize: "11px",
-              letterSpacing: "0.25em",
-              textTransform: "uppercase",
-              fontWeight: 700,
-              color: "#047857",
-            }}
-          >
-            Scan to join — 30 seconds
-          </div>
-          <div
-            style={{
-              fontSize: "28px",
-              fontWeight: 800,
-              marginTop: "6px",
-              letterSpacing: "-0.01em",
-              lineHeight: 1.1,
-            }}
-          >
-            {calendar.name}
-          </div>
-          <div
-            style={{
-              fontSize: "12px",
-              color: "#71717a",
-              marginTop: "8px",
-              wordBreak: "break-all",
-            }}
-          >
-            {url}
-          </div>
-          <div
-            style={{
-              fontSize: "10px",
-              color: "#a1a1aa",
-              marginTop: "10px",
-            }}
-          >
-            Free for residents · No app required
-          </div>
+        <div
+          style={{
+            fontSize: "38px",
+            fontWeight: 800,
+            marginTop: "28px",
+            letterSpacing: "-0.02em",
+            lineHeight: 1.1,
+            textAlign: "center",
+            maxWidth: "6.5in",
+          }}
+        >
+          {calendar.name}
+        </div>
+        <div
+          style={{
+            fontSize: "13px",
+            color: "#71717a",
+            marginTop: "12px",
+            wordBreak: "break-all",
+            textAlign: "center",
+          }}
+        >
+          {url}
         </div>
       </div>
-    </div>
-  );
-}
 
-function PlanCard({
-  emoji,
-  title,
-  when,
-  where,
-}: {
-  emoji: string;
-  title: string;
-  when: string;
-  where: string;
-}) {
-  return (
-    <div
-      style={{
-        border: "1px solid #e4e4e7",
-        borderRadius: "12px",
-        padding: "14px",
-        background: "#fafafa",
-      }}
-    >
-      <div style={{ fontSize: "22px" }}>{emoji}</div>
+      {/* Footer */}
       <div
         style={{
-          fontSize: "14px",
-          fontWeight: 700,
-          marginTop: "6px",
-          letterSpacing: "-0.01em",
-        }}
-      >
-        {title}
-      </div>
-      <div
-        style={{
-          fontSize: "11px",
-          color: "#52525b",
-          marginTop: "4px",
-        }}
-      >
-        {when}
-      </div>
-      <div
-        style={{
+          padding: "0.3in 0.7in 0.45in",
+          borderTop: "1px solid #f4f4f5",
           fontSize: "11px",
           color: "#a1a1aa",
+          textAlign: "center",
+          letterSpacing: "0.05em",
         }}
       >
-        {where}
+        Free · No app required · Powered by Leaf
       </div>
     </div>
   );
@@ -503,6 +539,13 @@ function SocialPost({
   calendar: CalendarInfo;
   url: string;
 }) {
+  const config = getCategoryConfig(calendar.orgType);
+  // For visual impact on social, split the headline into two lines at the
+  // first space (e.g., "Meet your neighbors." → "Meet your\nneighbors.").
+  const headlineWords = config.headline.split(" ");
+  const splitIdx = Math.ceil(headlineWords.length / 2);
+  const headlineL1 = headlineWords.slice(0, splitIdx).join(" ");
+  const headlineL2 = headlineWords.slice(splitIdx).join(" ");
   return (
     <div
       className="print-page shadow-md overflow-hidden"
@@ -565,7 +608,7 @@ function SocialPost({
             opacity: 0.85,
           }}
         >
-          Leaf · Resident calendar
+          Leaf · Shared calendar
         </div>
 
         <div style={{ marginTop: "40px", flex: 1 }}>
@@ -577,9 +620,13 @@ function SocialPost({
               letterSpacing: "-0.03em",
             }}
           >
-            Meet your
-            <br />
-            neighbors.
+            {headlineL1}
+            {headlineL2 && (
+              <>
+                <br />
+                {headlineL2}
+              </>
+            )}
           </h1>
           <p
             style={{
@@ -591,8 +638,7 @@ function SocialPost({
               lineHeight: 1.3,
             }}
           >
-            {calendar.name} has a calendar for resident events — bowling,
-            pickleball, happy hours, dinners.
+            {config.subhead(calendar.name)}
           </p>
         </div>
 
