@@ -12,6 +12,7 @@ import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlan
 import PlanDetailModal from "@/components/PlanDetailModal";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
+import { formatDateInputInTimezone } from "@/lib/date-utils";
 import {
   Calendar,
   Check,
@@ -412,6 +413,7 @@ export default function OrgDashboardPage() {
     description: string;
     image: string | null;
     date: string;
+    timezone: string | null;
     time: string | null;
     hostName: string;
     rsvpCount: number;
@@ -1834,7 +1836,7 @@ export default function OrgDashboardPage() {
             </div>
             <div className="space-y-3">
               {dashboard.calendars.map((cal) => {
-                const activePlans = ((cal as Record<string, unknown>).activePlans as { objectId: string; title: string; description: string; image: string | null; date: string; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null }[]) || [];
+                const activePlans = ((cal as Record<string, unknown>).activePlans as { objectId: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null }[]) || [];
                 const suggestedPlans = ((cal as Record<string, unknown>).suggestedPlans as { id: string; type: string; title: string; description?: string; subtitle: string; recommendedDate: string; recommendedTime?: string | null; venue?: { name: string; address: string } | null; image?: string | null; isSuggestion: true }[]) || [];
                 const inactive = cal.isActive === false;
                 return (
@@ -3414,6 +3416,7 @@ export default function OrgDashboardPage() {
             description: selectedActivePlan.description,
             image: selectedActivePlan.image,
             date: selectedActivePlan.date,
+            timezone: selectedActivePlan.timezone ?? null,
             time: selectedActivePlan.time,
             hostName: selectedActivePlan.hostName,
             rsvpCount: selectedActivePlan.rsvpCount,
@@ -3461,9 +3464,7 @@ export default function OrgDashboardPage() {
               setShowCreatePlanModal(true);
               return;
             }
-            const planDate = plan.date
-              ? (() => { const d = new Date(plan.date); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })()
-              : "";
+            const planDate = plan.date ? formatDateInputInTimezone(plan.date, plan.timezone) : "";
             setEditingPlanId(plan.objectId);
             setCreatePlanPrefill({
               title: plan.title,

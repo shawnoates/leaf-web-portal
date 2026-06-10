@@ -8,6 +8,7 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
 import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailModal";
+import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { ArrowLeft, Calendar, Camera, Check, Lock, MapPin, Plus, RefreshCw, Repeat, Settings, Trash2, UserCheck, Users, X } from "lucide-react";
 
 interface PlanIdea {
@@ -483,7 +484,11 @@ export default function PlansPage() {
       setShowCreateModal(true);
       return;
     }
-    const planDate = plan.date ? (() => { const d = new Date(plan.date); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })() : "";
+    // Derive YYYY-MM-DD in the venue's zone, not the viewer's — otherwise a
+    // Bangkok editor opening a NYC plan stored as 23:30 UTC sees the form
+    // pre-filled with the next-day Bangkok date instead of the NYC date the
+    // host originally chose.
+    const planDate = plan.date ? formatDateInputInTimezone(plan.date, plan.timezone) : "";
     setCreatePlanPrefill({
       title: plan.title,
       description: plan.description,
@@ -769,6 +774,7 @@ export default function PlansPage() {
             description: selectedPlan.description,
             image: selectedPlan.image,
             date: selectedPlan.expiryDate,
+            timezone: selectedPlan.timezone,
             time: selectedPlan.time,
             hostName: selectedPlan.host?.name || "You",
             rsvpCount: selectedPlan.rsvpCount,

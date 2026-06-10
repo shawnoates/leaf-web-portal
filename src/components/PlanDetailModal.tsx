@@ -24,6 +24,10 @@ export type PlanDetailData = {
   description: string;
   image: string | null;
   date: string | null;
+  /** Venue's IANA timezone (e.g. "America/New_York"). Used by the edit
+   *  pre-fill so a cross-zone editor sees the plan's wall-clock, not their
+   *  own. Falls back to viewer-local when null. */
+  timezone: string | null;
   time: string | null;
   hostName: string;
   rsvpCount: number;
