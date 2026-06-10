@@ -26,6 +26,7 @@ interface PastPlan {
   description: string;
   image: string | null;
   expiryDate: string;
+  timezone: string | null;
   rsvpCount: number;
   attendanceCount: number;
   photoCount: number;
@@ -57,6 +58,7 @@ interface UpcomingPlan {
   description: string;
   image: string | null;
   expiryDate: string;
+  timezone: string | null;
   time: string | null;
   rsvpCount: number;
   host: { name: string } | null;
@@ -586,7 +588,7 @@ export default function PlansPage() {
                     <div className="p-3">
                       <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
                       <p className="text-xs text-zinc-400 mb-1">
-                        {new Date(plan.expiryDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                        {new Date(plan.expiryDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", ...(plan.timezone ? { timeZone: plan.timezone } : {}) })}
                       </p>
                       <div className="flex items-center justify-between text-xs text-zinc-400">
                         <span className="truncate">{plan.host?.name || "You"}</span>
@@ -621,7 +623,7 @@ export default function PlansPage() {
                   <div className="p-3 flex-1 min-w-0">
                     <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
                     <p className="text-xs text-zinc-400 mb-2">
-                      {new Date(plan.expiryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      {new Date(plan.expiryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", ...(plan.timezone ? { timeZone: plan.timezone } : {}) })}
                     </p>
                     <div className="flex items-center gap-3 text-[11px] text-zinc-500">
                       {plan.rsvpCount > 0 ? (
@@ -848,6 +850,7 @@ export default function PlansPage() {
                     month: "short",
                     day: "numeric",
                     year: "numeric",
+                    ...(photosModalPlan.timezone ? { timeZone: photosModalPlan.timezone } : {}),
                   })}
                   {" · "}
                   {photosModalPlan.photoCount}{" "}

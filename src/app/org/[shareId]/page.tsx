@@ -160,22 +160,29 @@ function isVenueBlacklisted(
 
 // --- Helpers ---
 
-function formatDate(isoDate: string): string {
+// Format in the venue's IANA zone when known — a Bangkok viewer reading a
+// NYC plan should see NYC's wall-clock, not their own. Falls through to
+// viewer-local when no tz is supplied (legacy plans, missing venue data).
+function formatDate(isoDate: string, timezone: string | null = null): string {
   const date = new Date(isoDate);
-  return date.toLocaleDateString("en-US", {
+  const opts: Intl.DateTimeFormatOptions = {
     weekday: "long",
     month: "short",
     day: "numeric",
-  });
+  };
+  if (timezone) opts.timeZone = timezone;
+  return date.toLocaleDateString("en-US", opts);
 }
 
-function formatTime(isoDate: string): string {
+function formatTime(isoDate: string, timezone: string | null = null): string {
   const date = new Date(isoDate);
-  return date.toLocaleTimeString("en-US", {
+  const opts: Intl.DateTimeFormatOptions = {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-  });
+  };
+  if (timezone) opts.timeZone = timezone;
+  return date.toLocaleTimeString("en-US", opts);
 }
 
 /** Normalize a time string to 12-hour format (e.g. "19:00" → "7:00 PM") */
@@ -1311,8 +1318,8 @@ export default function OrgCalendarPage() {
       const plans: Plan[] = (result.plans || []).map((p: Record<string, unknown>) => ({
         id: p.objectId as string,
         title: p.title as string || "Untitled Plan",
-        date: p.expiryDate ? formatDate(p.expiryDate as string) : "",
-        time: p.time ? normalizeTimeString(p.time as string) : (p.expiryDate ? formatTime(p.expiryDate as string) : ""),
+        date: p.expiryDate ? formatDate(p.expiryDate as string, (p.timezone as string | null) ?? null) : "",
+        time: p.time ? normalizeTimeString(p.time as string) : (p.expiryDate ? formatTime(p.expiryDate as string, (p.timezone as string | null) ?? null) : ""),
         dateISO: (p.expiryDate as string) || null,
         description: p.description as string || "",
         image: p.image as string || "",
