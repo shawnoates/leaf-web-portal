@@ -20,6 +20,7 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 const ORG_TYPES = [
   { value: "community", label: "Friends / Community", emoji: "\u{1F31F}" },
+  { value: "apartment_complex", label: "Apartment Complex", emoji: "\u{1F3E2}" },
   { value: "gym", label: "Gym / Fitness", emoji: "\u{1F3CB}\u{FE0F}" },
   { value: "church", label: "Church", emoji: "⛪" },
   { value: "school", label: "School / University", emoji: "\u{1F393}" },
@@ -79,6 +80,18 @@ function SetupPageInner() {
   const initialBillingPeriod: "monthly" | "yearly" =
     requestedBillingPeriod === "yearly" ? "yearly" : "monthly";
 
+  // Building-claim flow: rep onboarded an apartment, RM clicks email link →
+  // /claim/{token} → here. We prefill name + type and complete the claim
+  // after the EventGroup is created.
+  const claimToken = searchParams.get("claim");
+  const [claimInfo, setClaimInfo] = useState<{
+    leadId: string;
+    buildingName: string;
+    formattedAddress: string;
+    rmEmail: string;
+  } | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
+
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>({
     name: "",
@@ -88,6 +101,55 @@ function SetupPageInner() {
     primaryCitySelected: false,
     tier: initialTier,
   });
+
+  // Load claim info on mount + prefill form
+  useEffect(() => {
+    if (!claimToken) return;
+    Parse.Cloud.run("validateBuildingClaimToken", { token: claimToken })
+      .then(
+        (r: {
+          valid: boolean;
+          reason?: string;
+          alreadyClaimed?: boolean;
+          leadId?: string;
+          buildingName?: string;
+          formattedAddress?: string;
+          rmEmail?: string;
+          linkedOrgCalendarId?: string | null;
+        }) => {
+          if (!r.valid) {
+            setClaimError(
+              r.reason === "token_expired"
+                ? "This claim link has expired."
+                : "This claim link isn't valid."
+            );
+            return;
+          }
+          if (r.alreadyClaimed && r.linkedOrgCalendarId) {
+            // Already claimed — bounce to the calendar
+            window.location.assign(`/dashboard/${r.linkedOrgCalendarId}`);
+            return;
+          }
+          setClaimInfo({
+            leadId: r.leadId || "",
+            buildingName: r.buildingName || "",
+            formattedAddress: r.formattedAddress || "",
+            rmEmail: r.rmEmail || "",
+          });
+          setForm((prev) => ({
+            ...prev,
+            name: prev.name || `${r.buildingName} Resident Events`,
+            orgType: prev.orgType || "apartment_complex",
+            description:
+              prev.description ||
+              `A shared calendar for residents of ${r.buildingName} to organize and RSVP to building events.`,
+          }));
+        }
+      )
+      .catch((e) => {
+        setClaimError(e instanceof Error ? e.message : "Couldn't validate claim link.");
+      });
+  }, [claimToken]);
   const [shareId, setShareId] = useState("");
   const [calendarId, setCalendarId] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -169,6 +231,20 @@ function SetupPageInner() {
       setShareId(result.shareId);
       setCalendarId(result.calendarId);
       setGenerationDone(true);
+
+      // If this came from a building claim, link the lead to the new
+      // calendar and fire the rep's $25 RM-click bonus.
+      if (claimToken && claimInfo) {
+        try {
+          await Parse.Cloud.run("completeBuildingClaim", {
+            token: claimToken,
+            linkedOrgCalendarId: result.calendarId,
+          });
+        } catch (claimErr) {
+          console.error("Building claim completion failed:", claimErr);
+          // Don't block the user — calendar was created successfully
+        }
+      }
 
       // If a paid tier was requested, kick off Stripe Checkout
       if (form.tier === "growth" || form.tier === "pro") {
@@ -414,6 +490,27 @@ function SetupPageInner() {
             ideas in seconds.
           </p>
         </div>
+
+        {/* Claim banner — when arriving from a rep's building lead */}
+        {claimInfo && (
+          <div className="mb-10 flex items-start gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
+            <Sparkles className="w-4 h-4 mt-0.5 text-emerald-700 shrink-0" />
+            <div className="text-sm leading-relaxed">
+              <span className="font-semibold text-emerald-900">
+                Setting up a calendar for {claimInfo.buildingName}.
+              </span>{" "}
+              <span className="text-emerald-700">
+                We&apos;ve prefilled some details — edit anything before
+                generating.
+              </span>
+            </div>
+          </div>
+        )}
+        {claimError && (
+          <div className="mb-10 p-4 rounded-2xl bg-red-50 border border-red-200 text-sm text-red-700">
+            {claimError}
+          </div>
+        )}
 
         {/* Tier banner */}
         {tierInfo && tierPrice && (
