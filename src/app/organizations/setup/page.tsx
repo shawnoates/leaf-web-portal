@@ -146,7 +146,7 @@ function SetupPageInner() {
           }));
         }
       )
-      .catch((e) => {
+      .catch((e: unknown) => {
         setClaimError(e instanceof Error ? e.message : "Couldn't validate claim link.");
       });
   }, [claimToken]);
