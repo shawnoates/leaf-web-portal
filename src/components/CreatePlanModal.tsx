@@ -696,6 +696,10 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   <MapPin className="w-3 h-3" /> Select this venue from the suggestions to confirm its location
                 </p>
               )
+            ) : pollConvertMode ? (
+              <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                <MapPin className="w-3 h-3" /> Pick a venue so voters know where to go
+              </p>
             ) : null}
           </div>
 
@@ -950,6 +954,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
               (isPoll
                 ? (!editMode && validPollOptions().length < MIN_POLL_OPTIONS) || (!imageBase64 && !prefill?.imageUrl && !selectedImageUrl)
                 : !date || (!editMode && !pollConvertMode && isHosted && !imageBase64 && !prefill?.imageUrl && !selectedImageUrl)) ||
+              (pollConvertMode && !selectedVenue) ||
               (recurring && (isHosted || mode === "idea") && seriesEndType === "until" && !seriesEndsAt)
             }
             className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
