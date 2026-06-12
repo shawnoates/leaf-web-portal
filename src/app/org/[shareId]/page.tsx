@@ -7,6 +7,7 @@ import Link from "next/link";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
+import DealsStrip from "@/components/DealsStrip";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import {
@@ -1972,6 +1973,8 @@ export default function OrgCalendarPage() {
         </main>
       ) : (
       <>
+      <DealsStrip calendarId={org.objectId} brandColor={org.brandColor} />
+
       {/* Stream Header */}
       <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100">
         <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
