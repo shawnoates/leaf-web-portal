@@ -12,7 +12,6 @@ import {
   Loader2,
   Megaphone,
   X,
-  Sparkles,
 } from "lucide-react";
 
 interface CalendarInfo {
@@ -292,7 +291,7 @@ export default function PromotePage({
                   Promote {calendar.name}
                 </h1>
                 <p className="text-sm text-zinc-500 mt-1">
-                  Print, save, or share. Residents scan the QR to join.
+                  Print, save, or share. People scan the QR to join.
                 </p>
               </div>
               <button
@@ -364,12 +363,12 @@ function WelcomePopup({
         </button>
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-            <Sparkles className="w-5 h-5 text-emerald-700" />
+            <Megaphone className="w-5 h-5 text-emerald-700" />
           </div>
           <div>
             <h2 className="text-lg font-semibold">Spread the word</h2>
             <p className="text-sm text-zinc-600 mt-1">
-              Print a flyer for {calendarName} or post to social. Residents scan
+              Print a flyer for {calendarName} or post to social. People scan
               the QR code and join your calendar in one tap — no app required.
             </p>
             <button
