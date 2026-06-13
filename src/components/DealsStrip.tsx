@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { Check, Copy, Tag, MapPin, Clock, Lock } from "lucide-react";
+import ScheduleDealModal from "@/components/ScheduleDealModal";
 
 interface Deal {
   objectId: string;
@@ -204,23 +205,35 @@ function ExclusiveCta({
   deal: Deal;
   brandColor?: string | null;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div
-      className="mt-2 px-3 py-2 rounded-md border border-dashed text-center"
-      style={{
-        borderColor: brandColor ? `${brandColor}60` : "#d4d4d8",
-      }}
-    >
-      <p
-        className="text-xs font-bold uppercase tracking-wider"
-        style={{ color: brandColor || "#18181b" }}
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="mt-2 w-full px-3 py-2 rounded-md text-white text-xs font-bold uppercase tracking-wider transition-opacity hover:opacity-90"
+        style={{ backgroundColor: brandColor || "#18181b" }}
       >
         Schedule to redeem
-      </p>
-      <p className="text-[10px] text-zinc-500 mt-0.5 inline-flex items-center gap-1">
+      </button>
+      <p className="text-[10px] text-zinc-500 mt-1 inline-flex items-center gap-1">
         <Clock className="w-2.5 h-2.5" />
-        Coming soon · ±{deal.redeemWindowMinutes}min window
+        ±{deal.redeemWindowMinutes}min window at the business
       </p>
-    </div>
+      {open && (
+        <ScheduleDealModal
+          deal={{
+            objectId: deal.objectId,
+            title: deal.title,
+            redeemWindowMinutes: deal.redeemWindowMinutes,
+            business: deal.business,
+          }}
+          brandColor={brandColor}
+          onClose={() => setOpen(false)}
+          onScheduled={() => {
+            // Modal handles its own success state; nothing for the strip to do.
+          }}
+        />
+      )}
+    </>
   );
 }
