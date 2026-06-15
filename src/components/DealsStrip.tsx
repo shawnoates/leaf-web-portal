@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
-import { Check, Copy, Tag, MapPin, Clock, Lock } from "lucide-react";
+import { Check, Copy, Tag, MapPin, Clock, Lock, Flag } from "lucide-react";
 import ScheduleDealModal from "@/components/ScheduleDealModal";
+import ReportDealModal from "@/components/ReportDealModal";
 
 interface Deal {
   objectId: string;
@@ -79,9 +80,10 @@ function DealCard({
   brandColor?: string | null;
 }) {
   const isExclusive = deal.dealType === "exclusive";
+  const [reportOpen, setReportOpen] = useState(false);
 
   return (
-    <div className="min-w-[280px] max-w-[320px] snap-start bg-white border border-zinc-200 rounded-xl overflow-hidden flex flex-col">
+    <div className="min-w-[280px] max-w-[320px] snap-start bg-white border border-zinc-200 rounded-xl overflow-hidden flex flex-col relative">
       {deal.imageUrl ? (
         <div className="aspect-[4/3] bg-zinc-100 overflow-hidden">
           <img
@@ -151,7 +153,24 @@ function DealCard({
         ) : (
           <PublicCta deal={deal} />
         )}
+
+        <button
+          onClick={() => setReportOpen(true)}
+          className="mt-2 self-end text-[10px] text-zinc-400 hover:text-zinc-700 inline-flex items-center gap-1"
+        >
+          <Flag className="w-2.5 h-2.5" />
+          Report
+        </button>
       </div>
+
+      {reportOpen && (
+        <ReportDealModal
+          dealId={deal.objectId}
+          dealTitle={deal.title}
+          businessName={deal.business?.name ?? null}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
     </div>
   );
 }
