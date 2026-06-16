@@ -2469,7 +2469,23 @@ export default function OrgDashboardPage() {
               {settingsSaving ? "Saving..." : "Save Settings"}
             </button>
 
-            {/* Delete account — separate from calendar delete (Danger Zone above). */}
+            {/* Organization — surfaces the primary-calendar delete that was
+                previously buried inside Org Details edit mode. */}
+            <section className="border border-zinc-200 rounded-xl p-6">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Organization</h2>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="text-sm text-red-600 hover:text-red-700 underline font-medium"
+              >
+                Delete organization
+              </button>
+              <p className="text-xs text-zinc-500 mt-2">
+                Permanently removes this organization and its calendar.
+                Followers and past plans are erased.
+              </p>
+            </section>
+
+            {/* Delete account — separate from organization delete. */}
             <section className="border border-zinc-200 rounded-xl p-6">
               <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Account</h2>
               <a
@@ -2479,7 +2495,8 @@ export default function OrgDashboardPage() {
                 Delete account
               </a>
               <p className="text-xs text-zinc-500 mt-2">
-                Removes your sign-in. Delete or transfer any calendars first.
+                Removes your sign-in. Owned organizations are deleted along
+                with it; sub-calendars need to be removed first.
               </p>
             </section>
             </div>
