@@ -120,9 +120,9 @@ function SampleDealCard({
   };
 
   return (
-    <div className="min-w-[280px] max-w-[320px] snap-start bg-white border border-zinc-200 rounded-xl overflow-hidden flex flex-col">
+    <div className="min-w-[200px] max-w-[220px] snap-start bg-white border border-zinc-200 rounded-lg overflow-hidden flex flex-col">
       {deal.imageUrl ? (
-        <div className="aspect-[4/3] bg-zinc-100 overflow-hidden">
+        <div className="aspect-[16/10] bg-zinc-100 overflow-hidden">
           <img
             src={deal.imageUrl}
             alt={deal.title}
@@ -131,75 +131,45 @@ function SampleDealCard({
         </div>
       ) : (
         <div
-          className="aspect-[4/3] flex items-center justify-center"
+          className="aspect-[16/10] flex items-center justify-center"
           style={{ backgroundColor: `${brandColor}15` }}
         >
-          <Tag className="w-8 h-8" style={{ color: brandColor }} />
+          <Tag className="w-6 h-6" style={{ color: brandColor }} />
         </div>
       )}
-      <div className="p-4 flex-1 flex flex-col gap-2">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-[10px] tracking-wider uppercase font-bold text-zinc-500 line-clamp-1">
+      <div className="p-3 flex-1 flex flex-col gap-1.5">
+        <div className="flex items-start justify-between gap-1.5">
+          <p className="text-[9px] tracking-wider uppercase font-bold text-zinc-500 line-clamp-1">
             {deal.businessName}
           </p>
           {isExclusive ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-900 text-white">
-              <Lock className="w-2.5 h-2.5" />
-              Exclusive
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-zinc-900 text-white shrink-0">
+              <Lock className="w-2 h-2" />
+              Excl
             </span>
-          ) : (
-            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">
-              Public
-            </span>
-          )}
+          ) : null}
         </div>
-        <h3 className="text-base font-medium tracking-tight leading-snug line-clamp-2">
+        <h3 className="text-sm font-medium tracking-tight leading-snug line-clamp-2">
           {deal.title}
         </h3>
-        {deal.description && (
-          <p className="text-xs text-zinc-500 leading-relaxed line-clamp-2">
-            {deal.description}
-          </p>
-        )}
         {deal.address && (
-          <div className="flex items-center gap-1 text-[11px] text-zinc-400 mt-auto pt-1">
-            <MapPin className="w-3 h-3 shrink-0" />
+          <div className="flex items-center gap-1 text-[10px] text-zinc-400 mt-auto pt-1">
+            <MapPin className="w-2.5 h-2.5 shrink-0" />
             <span className="line-clamp-1">{deal.address}</span>
           </div>
         )}
         {isExclusive ? (
           <div
-            className="mt-2 w-full px-3 py-2 rounded-md text-white text-xs font-bold uppercase tracking-wider text-center"
+            className="mt-1.5 w-full px-2 py-1.5 rounded text-white text-[10px] font-bold uppercase tracking-wider text-center"
             style={{ backgroundColor: brandColor }}
           >
             Schedule to redeem
-            <div className="text-[10px] font-normal opacity-90 mt-0.5 inline-flex items-center gap-1 justify-center">
-              <Clock className="w-2.5 h-2.5" />
-              ±{deal.redeemWindowMinutes ?? 60}min window
-            </div>
           </div>
         ) : deal.promoCode ? (
-          <button
-            onClick={copy}
-            className="mt-2 inline-flex items-center justify-center gap-2 w-full px-3 py-2 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold uppercase tracking-wider rounded-md transition-colors"
-          >
-            {copied ? (
-              <>
-                <Check className="w-3.5 h-3.5" />
-                Copied
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5" />
-                Code: {deal.promoCode}
-              </>
-            )}
-          </button>
-        ) : (
-          <p className="mt-2 text-[11px] text-zinc-400 text-center py-2 border-t border-zinc-100">
-            Visit the business to redeem
+          <p className="mt-1.5 text-[10px] text-zinc-500 line-clamp-1">
+            Use code <span className="font-mono font-semibold text-zinc-900">{deal.promoCode}</span>
           </p>
-        )}
+        ) : null}
       </div>
     </div>
   );
