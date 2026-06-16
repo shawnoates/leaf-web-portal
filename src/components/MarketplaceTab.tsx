@@ -185,7 +185,15 @@ const VenueMap = memo(function VenueMap({
   venue: { name: string; address: string };
 }) {
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-  if (!key) {
+  const [failed, setFailed] = useState(false);
+
+  // Render placeholder when: no API key, network failure on iframe load, OR a
+  // load-timeout watchdog fires (covers DNS failures and very slow loads).
+  // Note: this does NOT catch Google's "API not activated" content page —
+  // that renders as a successful HTML response inside the iframe, which CORS
+  // blocks us from inspecting. Enabling the Maps Embed API in Cloud Console
+  // is the fix for that case.
+  if (!key || failed) {
     return (
       <div className="w-full h-full bg-zinc-50 flex items-center justify-center text-zinc-300">
         <MapPin className="w-6 h-6" />
@@ -195,15 +203,44 @@ const VenueMap = memo(function VenueMap({
   const query = encodeURIComponent(`${venue.name}, ${venue.address}`);
   const src = `https://www.google.com/maps/embed/v1/place?key=${key}&q=${query}&zoom=15`;
   return (
+    <VenueMapIframe
+      src={src}
+      title={`Map of ${venue.name}`}
+      onFail={() => setFailed(true)}
+    />
+  );
+});
+
+function VenueMapIframe({
+  src,
+  title,
+  onFail,
+}: {
+  src: string;
+  title: string;
+  onFail: () => void;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  // Watchdog: if onLoad hasn't fired within 8s, give up and show fallback.
+  useEffect(() => {
+    if (loaded) return;
+    const t = setTimeout(() => {
+      if (!loaded) onFail();
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [loaded, onFail]);
+  return (
     <iframe
       src={src}
       loading="lazy"
       referrerPolicy="no-referrer-when-downgrade"
       className="w-full h-full border-0"
-      title={`Map of ${venue.name}`}
+      title={title}
+      onLoad={() => setLoaded(true)}
+      onError={onFail}
     />
   );
-});
+}
 
 // ── Venue photo (lazy Google Places lookup) ─────────────────────────────
 
