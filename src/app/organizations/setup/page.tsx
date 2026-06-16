@@ -570,27 +570,54 @@ function SetupPageInner() {
             </div>
           </Field>
 
-          {/* City */}
-          <Field
-            label="Your city"
-            icon={<MapPin className="w-3.5 h-3.5" />}
-            hint="Plans are scoped here by default — you can travel later."
-          >
-            <CityAutocomplete
-              value={form.primaryCity}
-              onChange={(val) =>
-                updateForm({ primaryCity: val, primaryCitySelected: false })
-              }
-              onSelect={(place) =>
-                updateForm({
-                  primaryCity: place.description,
-                  primaryCitySelected: true,
-                })
-              }
-              placeholder="e.g., Austin, TX"
-              className="w-full border-b border-zinc-300 pb-3 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors placeholder:text-zinc-300"
-            />
-          </Field>
+          {/* City / building address — apartment complexes capture the full
+              building address so deals + leads can be tied to a specific
+              property. Other org types stay at city granularity for now. */}
+          {form.orgType === "apartment_complex" ? (
+            <Field
+              label="Building address"
+              icon={<MapPin className="w-3.5 h-3.5" />}
+              hint="Used to scope deals + resident matching to your building."
+            >
+              <CityAutocomplete
+                value={form.primaryCity}
+                onChange={(val) =>
+                  updateForm({ primaryCity: val, primaryCitySelected: false })
+                }
+                onSelect={(place) =>
+                  updateForm({
+                    primaryCity: place.description,
+                    primaryCitySelected: true,
+                  })
+                }
+                placeholder="e.g., 123 Main St, Brooklyn, NY"
+                types={["address"]}
+                errorText="Pick the building address from the suggestions"
+                className="w-full border-b border-zinc-300 pb-3 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors placeholder:text-zinc-300"
+              />
+            </Field>
+          ) : (
+            <Field
+              label="Your city"
+              icon={<MapPin className="w-3.5 h-3.5" />}
+              hint="Plans are scoped here by default — you can travel later."
+            >
+              <CityAutocomplete
+                value={form.primaryCity}
+                onChange={(val) =>
+                  updateForm({ primaryCity: val, primaryCitySelected: false })
+                }
+                onSelect={(place) =>
+                  updateForm({
+                    primaryCity: place.description,
+                    primaryCitySelected: true,
+                  })
+                }
+                placeholder="e.g., Austin, TX"
+                className="w-full border-b border-zinc-300 pb-3 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors placeholder:text-zinc-300"
+              />
+            </Field>
+          )}
 
           {/* Description */}
           <Field label="Tell us about it">

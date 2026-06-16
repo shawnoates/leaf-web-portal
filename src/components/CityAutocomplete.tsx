@@ -15,6 +15,13 @@ interface CityAutocompleteProps {
   placeholder?: string;
   className?: string;
   required?: boolean;
+  /**
+   * Google Places `types` filter. Defaults to cities. Pass `["address"]` to
+   * accept building addresses (e.g. for apartment-complex org setup).
+   */
+  types?: string[];
+  /** Override the inline error shown when text doesn't match a suggestion. */
+  errorText?: string;
 }
 
 let googleMapsLoading = false;
@@ -62,6 +69,8 @@ export default function CityAutocomplete({
   placeholder = "e.g., Austin, TX",
   className = "",
   required = false,
+  types = ["locality", "sublocality", "administrative_area_level_3"],
+  errorText = "Please select a city from the suggestions",
 }: CityAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.AutocompleteService | null>(null);
@@ -98,7 +107,7 @@ export default function CityAutocomplete({
     }
 
     autocompleteRef.current.getPlacePredictions(
-      { input, types: ["locality", "sublocality", "administrative_area_level_3"] },
+      { input, types },
       (predictions, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
           setSuggestions(predictions);
@@ -110,7 +119,7 @@ export default function CityAutocomplete({
         }
       }
     );
-  }, []);
+  }, [types]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -160,7 +169,7 @@ export default function CityAutocomplete({
         className={className}
       />
       {showError && (
-        <p className="text-xs text-amber-600 mt-1">Please select a city from the suggestions</p>
+        <p className="text-xs text-amber-600 mt-1">{errorText}</p>
       )}
       {showDropdown && suggestions.length > 0 && (
         <ul className="absolute z-50 left-0 right-0 bg-white border border-zinc-200 shadow-lg mt-1 max-h-60 overflow-y-auto">
