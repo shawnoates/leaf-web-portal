@@ -346,7 +346,6 @@ export default function OrgDashboardPage() {
   // Modals
   const [showAddCalendar, setShowAddCalendar] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [cancelAt, setCancelAt] = useState<number | null>(null);
 
@@ -803,16 +802,6 @@ export default function OrgDashboardPage() {
     }
   }
 
-  async function handleDelete() {
-    try {
-      await Parse.Cloud.run("deleteOrganization", { calendarId });
-      router.push("/dashboard");
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to delete";
-      alert(message);
-    }
-  }
-
   async function handleLogout() {
     try {
       await Parse.User.logOut();
@@ -1251,15 +1240,6 @@ export default function OrgDashboardPage() {
                       rows={3}
                       className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-none"
                     />
-                  </div>
-                  {/* Danger Zone — only visible in edit mode */}
-                  <div className="pt-4 border-t border-red-100 mt-4">
-                    <button
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Delete Organization
-                    </button>
                   </div>
                 </div>
               ) : (
@@ -2469,34 +2449,21 @@ export default function OrgDashboardPage() {
               {settingsSaving ? "Saving..." : "Save Settings"}
             </button>
 
-            {/* Organization — surfaces the primary-calendar delete that was
-                previously buried inside Org Details edit mode. */}
+            {/* Delete organization — single terminal action. Cascade-deletes
+                this organization AND the underlying account in one step. For
+                a non-org (personal) user the same destination page reads
+                "Delete account" — same flow, contextual label. */}
             <section className="border border-zinc-200 rounded-xl p-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Organization</h2>
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="text-sm text-red-600 hover:text-red-700 underline font-medium"
-              >
-                Delete organization
-              </button>
-              <p className="text-xs text-zinc-500 mt-2">
-                Permanently removes this organization and its calendar.
-                Followers and past plans are erased.
-              </p>
-            </section>
-
-            {/* Delete account — separate from organization delete. */}
-            <section className="border border-zinc-200 rounded-xl p-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Account</h2>
+              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Delete organization</h2>
               <a
                 href={`/account/delete?from=${calendarId}`}
                 className="text-sm text-red-600 hover:text-red-700 underline font-medium"
               >
-                Delete account
+                Delete organization
               </a>
               <p className="text-xs text-zinc-500 mt-2">
-                Removes your sign-in. Owned organizations are deleted along
-                with it; sub-calendars need to be removed first.
+                Permanently removes this organization, its calendar, and your
+                sign-in. Followers and past plans are erased.
               </p>
             </section>
             </div>
@@ -3087,32 +3054,6 @@ export default function OrgDashboardPage() {
         />
       )}
 
-      {/* Delete Confirmation */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-sm rounded-t-2xl md:rounded-xl p-8 text-center">
-            <Trash2 className="w-10 h-10 mx-auto mb-4 text-red-400" />
-            <h2 className="text-xl font-light tracking-tight mb-2">Delete Organization?</h2>
-            <p className="text-sm text-zinc-500 mb-6">
-              This will permanently delete <strong>{dashboard.name}</strong> and all its calendars, plans, and data. This cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 border border-zinc-200 py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                className="flex-1 bg-red-600 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-colors"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {/* Edit Calendar Modal */}
       {editingCalId && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
