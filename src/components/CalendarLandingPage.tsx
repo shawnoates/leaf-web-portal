@@ -101,9 +101,11 @@ function formatDate(date: Date): string {
 function SampleDealCard({
   deal,
   brandColor,
+  onClick,
 }: {
   deal: SampleDeal;
   brandColor: string;
+  onClick?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const isExclusive = deal.dealType === "exclusive";
@@ -120,58 +122,58 @@ function SampleDealCard({
   };
 
   return (
-    <div className="min-w-[200px] max-w-[220px] snap-start bg-white border border-zinc-200 rounded-lg overflow-hidden flex flex-col">
-      {deal.imageUrl ? (
-        <div className="aspect-[16/10] bg-zinc-100 overflow-hidden">
-          <img
-            src={deal.imageUrl}
-            alt={deal.title}
-            className="w-full h-full object-cover"
-          />
-        </div>
-      ) : (
-        <div
-          className="aspect-[16/10] flex items-center justify-center"
-          style={{ backgroundColor: `${brandColor}15` }}
-        >
-          <Tag className="w-6 h-6" style={{ color: brandColor }} />
-        </div>
-      )}
-      <div className="p-3 flex-1 flex flex-col gap-1.5">
-        <div className="flex items-start justify-between gap-1.5">
-          <p className="text-[9px] tracking-wider uppercase font-bold text-zinc-500 line-clamp-1">
-            {deal.businessName}
-          </p>
-          {isExclusive ? (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-zinc-900 text-white shrink-0">
-              <Lock className="w-2 h-2" />
-              Excl
-            </span>
-          ) : null}
-        </div>
-        <h3 className="text-sm font-medium tracking-tight leading-snug line-clamp-2">
+    <button
+      type="button"
+      onClick={onClick}
+      className="min-w-[160px] max-w-[180px] snap-start bg-white border border-zinc-200 rounded-lg overflow-hidden flex flex-col text-left hover:border-zinc-300 hover:shadow-sm transition-all cursor-pointer"
+    >
+      <div className="relative">
+        {deal.imageUrl ? (
+          <div className="aspect-[16/10] bg-zinc-100 overflow-hidden">
+            <img
+              src={deal.imageUrl}
+              alt={deal.title}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ) : (
+          <div
+            className="aspect-[16/10] flex items-center justify-center"
+            style={{ backgroundColor: `${brandColor}15` }}
+          >
+            <Tag className="w-5 h-5" style={{ color: brandColor }} />
+          </div>
+        )}
+        {isExclusive && (
+          <span className="absolute top-1.5 right-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-zinc-900/90 text-white backdrop-blur-sm">
+            <Lock className="w-2 h-2" />
+            Excl
+          </span>
+        )}
+      </div>
+      <div className="p-2.5 flex-1 flex flex-col gap-1">
+        <p className="text-[9px] tracking-wider uppercase font-bold text-zinc-500 line-clamp-1">
+          {deal.businessName}
+        </p>
+        <h3 className="text-xs font-medium tracking-tight leading-snug line-clamp-2">
           {deal.title}
         </h3>
         {deal.address && (
-          <div className="flex items-center gap-1 text-[10px] text-zinc-400 mt-auto pt-1">
+          <div className="flex items-center gap-1 text-[10px] text-zinc-400 mt-auto pt-0.5">
             <MapPin className="w-2.5 h-2.5 shrink-0" />
             <span className="line-clamp-1">{deal.address}</span>
           </div>
         )}
-        {isExclusive ? (
+        {isExclusive && (
           <div
-            className="mt-1.5 w-full px-2 py-1.5 rounded text-white text-[10px] font-bold uppercase tracking-wider text-center"
+            className="mt-1 w-full px-2 py-1 rounded text-white text-[10px] font-bold uppercase tracking-wider text-center"
             style={{ backgroundColor: brandColor }}
           >
             Schedule to redeem
           </div>
-        ) : deal.promoCode ? (
-          <p className="mt-1.5 text-[10px] text-zinc-500 line-clamp-1">
-            Use code <span className="font-mono font-semibold text-zinc-900">{deal.promoCode}</span>
-          </p>
-        ) : null}
+        )}
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -348,6 +350,7 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
                 key={deal.id}
                 deal={deal}
                 brandColor={config.brandColor}
+                onClick={() => setShowCTA(true)}
               />
             ))}
           </div>
