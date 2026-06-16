@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Parse from "@/lib/parse-client";
@@ -29,6 +29,22 @@ interface SessionUser {
 }
 
 export default function DeleteAccountPage() {
+  // Wrap in Suspense — useSearchParams() bails out of static generation
+  // unless it's inside a Suspense boundary.
+  return (
+    <Suspense
+      fallback={
+        <Centered>
+          <Loader2 className="w-6 h-6 animate-spin text-zinc-400" />
+        </Centered>
+      }
+    >
+      <DeleteAccountPageInner />
+    </Suspense>
+  );
+}
+
+function DeleteAccountPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromCalendarId = searchParams.get("from");
