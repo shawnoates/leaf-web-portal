@@ -14,6 +14,10 @@ const config: LandingConfig = {
   ctaSubtitle:
     "Create a free calendar for your apartment building. Host bowling nights, pickup games, happy hours, and dinners — neighbors RSVP in one tap.",
   ctaButtonLabel: "Create Your Building Calendar",
+  // Comped Pro membership only applies to rep-invited RM claims, NOT to
+  // self-serve signups from this marketing page. Don't promise "Free
+  // forever" to visitors we can't actually deliver it to.
+  ctaFootnote: "Free to get started · No credit card required",
   scrollPopupTitle: "A calendar for your building",
   scrollPopupSubtitle: "Free for residents — set up in 60 seconds",
   scrollPopupButton: "Get Started — Free",

@@ -71,6 +71,14 @@ export interface LandingConfig {
   deals?: SampleDeal[];
   ctaTitle: string;
   ctaSubtitle: string;
+  /**
+   * Small print under the CTA buttons. Defaults to
+   * "Free forever · No credit card required" for backwards-compat with
+   * non-apartment landing pages. Apartment / org pages that don't actually
+   * grant comped Pro to self-serve signups should override this with an
+   * honest promise (e.g. "Free to get started · No credit card required").
+   */
+  ctaFootnote?: string;
   ctaButtonLabel: string;
   scrollPopupTitle: string;
   scrollPopupSubtitle: string;
@@ -242,7 +250,7 @@ function CTAModal({
           </div>
 
           <p className="text-[11px] text-zinc-400">
-            Free forever &middot; No credit card required
+            {config.ctaFootnote ?? "Free forever · No credit card required"}
           </p>
         </div>
       </div>
