@@ -177,6 +177,34 @@ function computeLocalRecommendations(
   return getFallbackRecommended(filtered).map((e) => e.id);
 }
 
+// ── Venue map (Google Maps Embed iframe with location pin) ──────────────
+
+const VenueMap = memo(function VenueMap({
+  venue,
+}: {
+  venue: { name: string; address: string };
+}) {
+  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!key) {
+    return (
+      <div className="w-full h-full bg-zinc-50 flex items-center justify-center text-zinc-300">
+        <MapPin className="w-6 h-6" />
+      </div>
+    );
+  }
+  const query = encodeURIComponent(`${venue.name}, ${venue.address}`);
+  const src = `https://www.google.com/maps/embed/v1/place?key=${key}&q=${query}&zoom=15`;
+  return (
+    <iframe
+      src={src}
+      loading="lazy"
+      referrerPolicy="no-referrer-when-downgrade"
+      className="w-full h-full border-0"
+      title={`Map of ${venue.name}`}
+    />
+  );
+});
+
 // ── Venue photo (lazy Google Places lookup) ─────────────────────────────
 
 const venuePhotoCache = new Map<string, string | null>();
@@ -554,22 +582,30 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
                       key={event.id}
                       className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-300 transition-colors group"
                     >
-                      {/* Image */}
-                      <div className="h-40 overflow-hidden relative">
-                        {event.image ? (
-                          <img
-                            src={event.image}
-                            alt={displayTitle}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          />
-                        ) : event.venue ? (
-                          <VenuePhoto venue={event.venue} alt={displayTitle || ""} />
-                        ) : (
-                          <div
-                            className="w-full h-full flex items-center justify-center"
-                            style={{ background: getDefaultCoverForSeed(event.id).gradient }}
-                          >
-                            <Sparkles className="w-8 h-8 text-white/70" />
+                      {/* Image + map split. Map only renders when the result
+                          has a venue address; otherwise image takes full width. */}
+                      <div className="h-40 overflow-hidden relative flex">
+                        <div className={event.venue?.address ? "w-1/2 h-full overflow-hidden" : "w-full h-full overflow-hidden"}>
+                          {event.image ? (
+                            <img
+                              src={event.image}
+                              alt={displayTitle}
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+                          ) : event.venue ? (
+                            <VenuePhoto venue={event.venue} alt={displayTitle || ""} />
+                          ) : (
+                            <div
+                              className="w-full h-full flex items-center justify-center"
+                              style={{ background: getDefaultCoverForSeed(event.id).gradient }}
+                            >
+                              <Sparkles className="w-8 h-8 text-white/70" />
+                            </div>
+                          )}
+                        </div>
+                        {event.venue?.address && (
+                          <div className="w-1/2 h-full border-l border-zinc-100">
+                            <VenueMap venue={event.venue} />
                           </div>
                         )}
                         <span className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[9px] font-semibold text-zinc-600 px-2 py-0.5 rounded-full">
