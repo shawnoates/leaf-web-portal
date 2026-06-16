@@ -134,6 +134,13 @@ const BLACKLIST_TYPE_MAP: Record<string, { types: string[]; keywords: string[] }
   },
 };
 
+// Loose substring match — orgType values aren't enum-locked yet, so we catch
+// "apartment", "Apartment Complex", "apartment_building", etc. uniformly.
+function isApartmentOrgType(orgType: string | null | undefined): boolean {
+  if (!orgType) return false;
+  return /apartment|residential|condo|building/i.test(orgType);
+}
+
 function isVenueBlacklisted(
   name: string,
   types: string[],
@@ -1973,7 +1980,11 @@ export default function OrgCalendarPage() {
         </main>
       ) : (
       <>
-      <DealsStrip calendarId={org.objectId} brandColor={org.brandColor} />
+      <DealsStrip
+        calendarId={org.objectId}
+        brandColor={org.brandColor}
+        compact={isApartmentOrgType(org.orgType)}
+      />
 
       {/* Stream Header */}
       <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100">

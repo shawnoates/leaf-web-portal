@@ -34,9 +34,16 @@ interface ListResponse {
 export default function DealsStrip({
   calendarId,
   brandColor,
+  compact = false,
 }: {
   calendarId: string;
   brandColor?: string | null;
+  /**
+   * Compact layout — matches the apartment landing page design. Smaller
+   * cards, no public-deal copy code button, exclusive badge overlaid on the
+   * image, tighter section header. Used on apartment-type org calendars.
+   */
+  compact?: boolean;
 }) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -50,6 +57,31 @@ export default function DealsStrip({
   }, [calendarId]);
 
   if (!loaded || deals.length === 0) return null;
+
+  if (compact) {
+    return (
+      <section className="max-w-6xl mx-auto px-6 pt-5 pb-1">
+        <div className="flex items-center justify-between pb-3 mb-3">
+          <p className="text-[11px] tracking-wider uppercase text-zinc-400 font-bold">
+            Local Deals
+          </p>
+          <p className="text-[10px] text-zinc-400 hidden sm:block">
+            {deals.length} {deals.length === 1 ? "deal" : "deals"} from nearby
+            businesses
+          </p>
+        </div>
+        <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2 -mx-6 px-6">
+          {deals.map((deal) => (
+            <CompactDealCard
+              key={deal.objectId}
+              deal={deal}
+              brandColor={brandColor}
+            />
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="max-w-6xl mx-auto px-6 pt-12 pb-2">
@@ -69,6 +101,113 @@ export default function DealsStrip({
         ))}
       </div>
     </section>
+  );
+}
+
+// ─── Compact card (apartment-only) ───────────────────────────────────────
+// Mirrors the SampleDealCard on /apartment: smaller width, badge overlaid
+// on image, no copy-code button for public deals (address is the
+// redemption hint). Keeps ScheduleDealModal for exclusive deals + the
+// Report flow.
+function CompactDealCard({
+  deal,
+  brandColor,
+}: {
+  deal: Deal;
+  brandColor?: string | null;
+}) {
+  const isExclusive = deal.dealType === "exclusive";
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+
+  return (
+    <div className="min-w-[160px] max-w-[180px] snap-start bg-white border border-zinc-200 rounded-lg overflow-hidden flex flex-col">
+      <div className="relative">
+        {deal.imageUrl ? (
+          <div className="aspect-[16/10] bg-zinc-100 overflow-hidden">
+            <img
+              src={deal.imageUrl}
+              alt={deal.title}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ) : (
+          <div
+            className="aspect-[16/10] flex items-center justify-center"
+            style={{
+              backgroundColor: brandColor ? `${brandColor}15` : "#fafafa",
+            }}
+          >
+            <Tag
+              className="w-5 h-5"
+              style={{ color: brandColor || "#a1a1aa" }}
+            />
+          </div>
+        )}
+        {isExclusive && (
+          <span className="absolute top-1.5 right-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-zinc-900/90 text-white backdrop-blur-sm">
+            <Lock className="w-2 h-2" />
+            Excl
+          </span>
+        )}
+      </div>
+      <div className="p-2.5 flex-1 flex flex-col gap-1">
+        <p className="text-[9px] tracking-wider uppercase font-bold text-zinc-500 line-clamp-1">
+          {deal.business?.name ?? "Local Business"}
+        </p>
+        <h3 className="text-xs font-medium tracking-tight leading-snug line-clamp-2">
+          {deal.title}
+        </h3>
+        {deal.business?.formattedAddress && (
+          <div className="flex items-center gap-1 text-[10px] text-zinc-400 mt-auto pt-0.5">
+            <MapPin className="w-2.5 h-2.5 shrink-0" />
+            <span className="line-clamp-1">
+              {deal.business.formattedAddress}
+            </span>
+          </div>
+        )}
+        {isExclusive && (
+          <button
+            onClick={() => setScheduleOpen(true)}
+            className="mt-1 w-full px-2 py-1 rounded text-white text-[10px] font-bold uppercase tracking-wider text-center transition-opacity hover:opacity-90"
+            style={{ backgroundColor: brandColor || "#18181b" }}
+          >
+            Schedule to redeem
+          </button>
+        )}
+        <button
+          onClick={() => setReportOpen(true)}
+          className="mt-1 self-end text-[9px] text-zinc-300 hover:text-zinc-600 inline-flex items-center gap-0.5"
+        >
+          <Flag className="w-2 h-2" />
+          Report
+        </button>
+      </div>
+
+      {scheduleOpen && (
+        <ScheduleDealModal
+          deal={{
+            objectId: deal.objectId,
+            title: deal.title,
+            redeemWindowMinutes: deal.redeemWindowMinutes,
+            business: deal.business,
+          }}
+          brandColor={brandColor}
+          onClose={() => setScheduleOpen(false)}
+          onScheduled={() => {
+            /* modal owns success */
+          }}
+        />
+      )}
+      {reportOpen && (
+        <ReportDealModal
+          dealId={deal.objectId}
+          dealTitle={deal.title}
+          businessName={deal.business?.name ?? null}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
+    </div>
   );
 }
 
