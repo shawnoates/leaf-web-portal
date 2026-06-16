@@ -2470,17 +2470,18 @@ export default function OrgDashboardPage() {
             </button>
 
             {/* Delete account — separate from calendar delete (Danger Zone above). */}
-            <div className="pt-8 mt-8 border-t border-zinc-100 flex flex-col items-start gap-1">
+            <section className="border border-zinc-200 rounded-xl p-6">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Account</h2>
               <a
-                href="/account/delete"
-                className="text-xs text-zinc-400 hover:text-red-600 underline transition-colors"
+                href={`/account/delete?from=${calendarId}`}
+                className="text-sm text-red-600 hover:text-red-700 underline font-medium"
               >
                 Delete account
               </a>
-              <p className="text-[11px] text-zinc-400">
+              <p className="text-xs text-zinc-500 mt-2">
                 Removes your sign-in. Delete or transfer any calendars first.
               </p>
-            </div>
+            </section>
             </div>
             )}
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import {
   AlertTriangle,
@@ -30,6 +30,9 @@ interface SessionUser {
 
 export default function DeleteAccountPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromCalendarId = searchParams.get("from");
+  const cancelHref = fromCalendarId ? `/dashboard/${fromCalendarId}` : "/";
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -199,7 +202,7 @@ export default function DeleteAccountPage() {
 
             <div className="flex items-center justify-between gap-2 pt-2">
               <Link
-                href="/"
+                href={cancelHref}
                 className="text-sm text-zinc-500 hover:text-zinc-900 inline-flex items-center gap-1"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Cancel
