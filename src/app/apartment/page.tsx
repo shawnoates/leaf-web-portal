@@ -136,6 +136,75 @@ const config: LandingConfig = {
         "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80",
     },
   ],
+  dealsHeader: "Local Deals",
+  deals: [
+    {
+      id: "d1",
+      businessName: "Bocca Trattoria",
+      title: "20% off dinner, Mon–Thu",
+      description: "Show the code at the table. Dine-in only.",
+      address: "127 Lincoln Ave · 2 blocks away",
+      promoCode: "LEAFBOCCA",
+      dealType: "public",
+      imageUrl:
+        "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80",
+    },
+    {
+      id: "d2",
+      businessName: "The Quarter",
+      title: "$5 drafts after 9pm",
+      description: "Weeknights only. Cash or card. Happy hour vibes.",
+      address: "44 Park St · across the street",
+      promoCode: "LEAFQUARTER",
+      dealType: "public",
+      imageUrl:
+        "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=800&q=80",
+    },
+    {
+      id: "d3",
+      businessName: "Frames Bowling",
+      title: "Free shoes Wed & Sun",
+      description: "Show the code at the counter when checking lanes.",
+      address: "210 River Rd · 8 min walk",
+      promoCode: "LEAFFRAMES",
+      dealType: "public",
+      imageUrl:
+        "https://images.unsplash.com/photo-1545056453-f0359c3df6db?w=800&q=80",
+    },
+    {
+      id: "d4",
+      businessName: "Lincoln Park Café",
+      title: "Buy one coffee, get one free",
+      description: "Right now only — limited to ten redemptions in the next hour.",
+      address: "12 Lincoln Park N · 1 block",
+      dealType: "exclusive",
+      redeemWindowMinutes: 60,
+      imageUrl:
+        "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&q=80",
+    },
+    {
+      id: "d5",
+      businessName: "Riverbend Fitness",
+      title: "First class free",
+      description: "Yoga, HIIT, or spin — your pick. New members only.",
+      address: "300 River Rd · 6 min walk",
+      promoCode: "LEAFRIVER",
+      dealType: "public",
+      imageUrl:
+        "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80",
+    },
+    {
+      id: "d6",
+      businessName: "Park Slope Bookshop",
+      title: "10% off all books",
+      description: "Independent shop. Code works in-store and online.",
+      address: "88 5th Ave · 5 min walk",
+      promoCode: "LEAFREAD",
+      dealType: "public",
+      imageUrl:
+        "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=800&q=80",
+    },
+  ],
 };
 
 export default function ApartmentPage() {
