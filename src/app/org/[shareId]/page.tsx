@@ -134,11 +134,24 @@ const BLACKLIST_TYPE_MAP: Record<string, { types: string[]; keywords: string[] }
   },
 };
 
-// Loose substring match — orgType values aren't enum-locked yet, so we catch
-// "apartment", "Apartment Complex", "apartment_building", etc. uniformly.
-function isApartmentOrgType(orgType: string | null | undefined): boolean {
-  if (!orgType) return false;
-  return /apartment|residential|condo|building/i.test(orgType);
+// Loose substring match — `orgType` values aren't enum-locked, and many
+// legacy calendars were created before the picker existed (so `orgType` is
+// null). Also scan the calendar name + description for common apartment
+// signals so legacy buildings still render the compact deals strip without
+// requiring a backfill.
+function isApartmentOrgType(
+  orgType: string | null | undefined,
+  name?: string | null,
+  description?: string | null
+): boolean {
+  const blob = [orgType, name, description]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (!blob) return false;
+  return /apartment|residential|\bcondo\b|\bbuilding\b|\blofts?\b|\btowers?\b|\bresidences?\b|\bresidents?\b|\btenants?\b|\bhoa\b|\bhangouts?\b/i.test(
+    blob
+  );
 }
 
 function isVenueBlacklisted(
@@ -1983,7 +1996,7 @@ export default function OrgCalendarPage() {
       <DealsStrip
         calendarId={org.objectId}
         brandColor={org.brandColor}
-        compact={isApartmentOrgType(org.orgType)}
+        compact={isApartmentOrgType(org.orgType, org.name, org.description)}
       />
 
       {/* Stream Header */}
