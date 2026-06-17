@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
-import { Check, Copy, Tag, MapPin, Clock, Lock, Flag } from "lucide-react";
+import { Check, Copy, Tag, MapPin, Clock, Lock, Flag, Heart } from "lucide-react";
 import ScheduleDealModal from "@/components/ScheduleDealModal";
 import ReportDealModal from "@/components/ReportDealModal";
 
@@ -19,12 +19,60 @@ interface Deal {
   redeemRadiusMeters: number;
   redeemWindowMinutes: number;
   isLastMinute: boolean;
+  interestCount: number;
   business: {
     objectId: string;
     name: string;
     category: string | null;
     formattedAddress: string | null;
   } | null;
+}
+
+// ─── Interest tracking (anonymous, cookie-based) ─────────────────────────
+// One opaque cookie per visitor; we never associate it with anything
+// identifying. localStorage tracks which deals THIS visitor has already
+// interested in so the heart shows filled across reloads.
+
+const INTEREST_COOKIE_KEY = "leaf_interest_cookie";
+const INTERESTED_DEALS_KEY = "leaf_interested_deals";
+
+function getOrCreateInterestCookie(): string {
+  if (typeof document === "undefined") return "";
+  const match = document.cookie.match(
+    new RegExp(`${INTEREST_COOKIE_KEY}=([^;]+)`)
+  );
+  if (match) return match[1];
+  const random = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  document.cookie = `${INTEREST_COOKIE_KEY}=${random}; path=/; max-age=${365 * 24 * 3600}; samesite=lax`;
+  return random;
+}
+
+function isLocallyInterested(dealId: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(INTERESTED_DEALS_KEY);
+    if (!raw) return false;
+    const ids: string[] = JSON.parse(raw);
+    return Array.isArray(ids) && ids.includes(dealId);
+  } catch {
+    return false;
+  }
+}
+
+function rememberInterest(dealId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(INTERESTED_DEALS_KEY);
+    const ids: string[] = raw ? JSON.parse(raw) : [];
+    if (!ids.includes(dealId)) {
+      ids.push(dealId);
+      localStorage.setItem(INTERESTED_DEALS_KEY, JSON.stringify(ids));
+    }
+  } catch {
+    /* localStorage blocked / quota */
+  }
 }
 
 interface ListResponse {
@@ -119,6 +167,33 @@ function CompactDealCard({
   const isExclusive = deal.dealType === "exclusive";
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [interested, setInterested] = useState(false);
+  const [interestCount, setInterestCount] = useState(deal.interestCount || 0);
+
+  useEffect(() => {
+    setInterested(isLocallyInterested(deal.objectId));
+  }, [deal.objectId]);
+
+  const markInterested = async () => {
+    if (interested) return;
+    const cookie = getOrCreateInterestCookie();
+    // Optimistic — keep UX snappy even on slow networks.
+    setInterested(true);
+    setInterestCount((n) => n + 1);
+    rememberInterest(deal.objectId);
+    try {
+      const r: { interestCount?: number; deduped?: boolean } =
+        await Parse.Cloud.run("markDealInterest", {
+          dealId: deal.objectId,
+          cookie,
+        });
+      if (typeof r.interestCount === "number") setInterestCount(r.interestCount);
+    } catch {
+      // Roll back the optimistic bump on failure (but keep "interested"
+      // local state — they've expressed intent).
+      setInterestCount((n) => Math.max(0, n - 1));
+    }
+  };
 
   return (
     <div className="min-w-[160px] max-w-[180px] snap-start bg-white border border-zinc-200 rounded-lg overflow-hidden flex flex-col">
@@ -175,13 +250,35 @@ function CompactDealCard({
             Schedule to redeem
           </button>
         )}
-        <button
-          onClick={() => setReportOpen(true)}
-          className="mt-1 self-end text-[9px] text-zinc-300 hover:text-zinc-600 inline-flex items-center gap-0.5"
-        >
-          <Flag className="w-2 h-2" />
-          Report
-        </button>
+        <div className="mt-1 flex items-center justify-between">
+          <button
+            onClick={markInterested}
+            disabled={interested}
+            className={`inline-flex items-center gap-1 text-[10px] font-medium transition-colors ${
+              interested
+                ? "text-red-600 cursor-default"
+                : "text-zinc-500 hover:text-red-600"
+            }`}
+            aria-label={interested ? "You're interested" : "Mark as interested"}
+          >
+            <Heart
+              className="w-3 h-3"
+              fill={interested ? "currentColor" : "none"}
+            />
+            <span>
+              {interestCount > 0 ? interestCount : ""}
+              {interestCount === 0 && !interested && "Interested"}
+              {interested && interestCount === 1 && " You"}
+            </span>
+          </button>
+          <button
+            onClick={() => setReportOpen(true)}
+            className="text-[9px] text-zinc-300 hover:text-zinc-600 inline-flex items-center gap-0.5"
+          >
+            <Flag className="w-2 h-2" />
+            Report
+          </button>
+        </div>
       </div>
 
       {scheduleOpen && (
