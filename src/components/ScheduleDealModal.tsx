@@ -382,7 +382,14 @@ function Frame({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
+    // stopPropagation on the overlay — this modal is sometimes rendered as a
+    // child of a card-level onClick handler (e.g. DealsStrip CompactDealCard).
+    // Without this, clicking Cancel / X / backdrop bubbles up to the parent
+    // and immediately re-opens the modal.
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm"
+    >
       <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-2xl relative">
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
           <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
