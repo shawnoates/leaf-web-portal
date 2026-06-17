@@ -7,7 +7,7 @@ import Link from "next/link";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
-import DealsStrip from "@/components/DealsStrip";
+import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import {
@@ -2013,6 +2013,26 @@ export default function OrgCalendarPage() {
         calendarId={org.objectId}
         brandColor={org.brandColor}
         compact={isApartmentOrgType(org.orgType, org.name, org.description)}
+        onCreatePlanFromDeal={(deal: StripDeal) => {
+          // Pre-fill the org page's existing custom-plan modal with venue +
+          // title + description from this deal. Date/time stay blank — the
+          // resident picks when they want to go.
+          if (!deal.business) return;
+          setSelectedVenue({
+            placeId:
+              deal.business.googlePlaceId ||
+              `deal-business-${deal.business.objectId}`,
+            name: deal.business.name,
+            address: deal.business.formattedAddress || "",
+            rating: null,
+            photoUrl: deal.imageUrl,
+            flagged: false,
+          });
+          setCustomTitle(deal.title);
+          setCustomDescription(deal.description || "");
+          setCustomCategory("");
+          setCreatingCustomPlan(true);
+        }}
       />
 
       {/* Stream Header */}
