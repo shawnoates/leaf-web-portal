@@ -195,8 +195,24 @@ function CompactDealCard({
     }
   };
 
+  // Tapping the card body opens the schedule modal so residents can convert
+  // the deal into a plan on the building calendar. Footer buttons
+  // (Interested, Report, Schedule) stop propagation so they don't double-fire.
+  const openSchedule = () => setScheduleOpen(true);
+
   return (
-    <div className="min-w-[160px] max-w-[180px] snap-start bg-white border border-zinc-200 rounded-lg overflow-hidden flex flex-col">
+    <div
+      onClick={openSchedule}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openSchedule();
+        }
+      }}
+      className="min-w-[160px] max-w-[180px] snap-start bg-white border border-zinc-200 rounded-lg overflow-hidden flex flex-col text-left hover:border-zinc-300 hover:shadow-sm transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-zinc-900"
+    >
       <div className="relative">
         {deal.imageUrl ? (
           <div className="aspect-[16/10] bg-zinc-100 overflow-hidden">
@@ -234,16 +250,16 @@ function CompactDealCard({
           {deal.title}
         </h3>
         {deal.business?.formattedAddress && (
-          <div className="flex items-center gap-1 text-[10px] text-zinc-400 mt-auto pt-0.5">
-            <MapPin className="w-2.5 h-2.5 shrink-0" />
-            <span className="line-clamp-1">
-              {deal.business.formattedAddress}
-            </span>
-          </div>
+          <p className="text-[10px] text-zinc-400 mt-auto pt-0.5 line-clamp-1">
+            {deal.business.formattedAddress}
+          </p>
         )}
         {isExclusive && (
           <button
-            onClick={() => setScheduleOpen(true)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setScheduleOpen(true);
+            }}
             className="mt-1 w-full px-2 py-1 rounded text-white text-[10px] font-bold uppercase tracking-wider text-center transition-opacity hover:opacity-90"
             style={{ backgroundColor: brandColor || "#18181b" }}
           >
@@ -252,7 +268,10 @@ function CompactDealCard({
         )}
         <div className="mt-1 flex items-center justify-between">
           <button
-            onClick={markInterested}
+            onClick={(e) => {
+              e.stopPropagation();
+              markInterested();
+            }}
             disabled={interested}
             className={`inline-flex items-center gap-1 text-[10px] font-medium transition-colors ${
               interested
@@ -272,7 +291,10 @@ function CompactDealCard({
             </span>
           </button>
           <button
-            onClick={() => setReportOpen(true)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setReportOpen(true);
+            }}
             className="text-[9px] text-zinc-300 hover:text-zinc-600 inline-flex items-center gap-0.5"
           >
             <Flag className="w-2 h-2" />

@@ -1925,13 +1925,29 @@ export default function OrgCalendarPage() {
             )}
             {(org.isOwner || org.isHost) && (
               <>
-                <Link
-                  href={`/org/${shareId}/promote`}
-                  className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-emerald-700 hover:text-emerald-900 transition-colors border border-emerald-200 bg-emerald-50 px-3 py-1.5 rounded-full"
+                <button
+                  onClick={async () => {
+                    const url = window.location.href;
+                    const title = org.name;
+                    if (navigator.share) {
+                      try {
+                        await navigator.share({ title, url });
+                      } catch {
+                        /* user cancelled */
+                      }
+                    } else {
+                      try {
+                        await navigator.clipboard.writeText(url);
+                      } catch {
+                        /* clipboard blocked */
+                      }
+                    }
+                  }}
+                  className="flex items-center justify-center text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 w-9 h-9 rounded-full"
+                  aria-label="Share calendar"
                 >
-                  <Megaphone className="w-3.5 h-3.5" />
-                  Promote
-                </Link>
+                  <Share2 className="w-3.5 h-3.5" />
+                </button>
                 <Link
                   href={`/dashboard/${org.parentOrgId || org.objectId}`}
                   className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
