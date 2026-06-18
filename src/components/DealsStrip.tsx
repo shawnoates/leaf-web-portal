@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
-import { Tag, Lock, Flag, Heart } from "lucide-react";
+import { Tag, Lock, Flag, Heart, ChevronRight, X } from "lucide-react";
 import ReportDealModal from "@/components/ReportDealModal";
+
+const CAROUSEL_LIMIT = 6;
 
 export interface Deal {
   objectId: string;
@@ -103,6 +105,7 @@ export default function DealsStrip({
 }) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [viewAllOpen, setViewAllOpen] = useState(false);
 
   useEffect(() => {
     if (!calendarId) return;
@@ -114,6 +117,9 @@ export default function DealsStrip({
 
   if (!loaded || deals.length === 0) return null;
 
+  const visibleDeals = deals.slice(0, CAROUSEL_LIMIT);
+  const overflowCount = deals.length - CAROUSEL_LIMIT;
+
   if (compact) {
     return (
       <section className="max-w-6xl mx-auto px-6 pt-5 pb-1">
@@ -121,13 +127,23 @@ export default function DealsStrip({
           <p className="text-[11px] tracking-wider uppercase text-zinc-400 font-bold">
             Local Deals
           </p>
-          <p className="text-[10px] text-zinc-400 hidden sm:block">
-            {deals.length} {deals.length === 1 ? "deal" : "deals"} from nearby
-            businesses
-          </p>
+          {overflowCount > 0 ? (
+            <button
+              onClick={() => setViewAllOpen(true)}
+              className="inline-flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-900 font-medium transition-colors"
+            >
+              View all <span className="text-zinc-400">({deals.length})</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          ) : (
+            <p className="text-[10px] text-zinc-400 hidden sm:block">
+              {deals.length} {deals.length === 1 ? "deal" : "deals"} from nearby
+              businesses
+            </p>
+          )}
         </div>
         <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2 -mx-6 px-6">
-          {deals.map((deal) => (
+          {visibleDeals.map((deal) => (
             <CompactDealCard
               key={deal.objectId}
               deal={deal}
@@ -136,6 +152,14 @@ export default function DealsStrip({
             />
           ))}
         </div>
+        {viewAllOpen && (
+          <AllDealsModal
+            deals={deals}
+            brandColor={brandColor}
+            onCreatePlanFromDeal={onCreatePlanFromDeal}
+            onClose={() => setViewAllOpen(false)}
+          />
+        )}
       </section>
     );
   }
@@ -146,14 +170,24 @@ export default function DealsStrip({
         <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
           Local Deals
         </p>
-        <p className="text-[11px] text-zinc-400 hidden sm:block">
-          {deals.length} {deals.length === 1 ? "deal" : "deals"} from nearby
-          businesses
-        </p>
+        {overflowCount > 0 ? (
+          <button
+            onClick={() => setViewAllOpen(true)}
+            className="inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-900 font-medium transition-colors"
+          >
+            View all <span className="text-zinc-400">({deals.length})</span>
+            <ChevronRight className="w-3 h-3" />
+          </button>
+        ) : (
+          <p className="text-[11px] text-zinc-400 hidden sm:block">
+            {deals.length} {deals.length === 1 ? "deal" : "deals"} from nearby
+            businesses
+          </p>
+        )}
       </div>
 
       <div className="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-4 -mx-6 px-6">
-        {deals.map((deal) => (
+        {visibleDeals.map((deal) => (
           <DealCard
             key={deal.objectId}
             deal={deal}
@@ -162,7 +196,90 @@ export default function DealsStrip({
           />
         ))}
       </div>
+      {viewAllOpen && (
+        <AllDealsModal
+          deals={deals}
+          brandColor={brandColor}
+          onCreatePlanFromDeal={onCreatePlanFromDeal}
+          onClose={() => setViewAllOpen(false)}
+        />
+      )}
     </section>
+  );
+}
+
+// ─── Full-screen "View all deals" modal ──────────────────────────────────
+// Grid of CompactDealCard regardless of context — vertical density beats
+// per-card detail when you're scanning 10+ deals. Same hover, tap, and
+// Interested behaviors as the carousel version.
+function AllDealsModal({
+  deals,
+  brandColor,
+  onCreatePlanFromDeal,
+  onClose,
+}: {
+  deals: Deal[];
+  brandColor?: string | null;
+  onCreatePlanFromDeal?: (deal: Deal) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white w-full md:max-w-5xl md:h-[90vh] h-full md:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col overflow-hidden"
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 shrink-0">
+          <div>
+            <p className="text-[10px] tracking-wider uppercase font-bold text-zinc-500">
+              Local Deals
+            </p>
+            <h2 className="text-lg font-semibold tracking-tight">
+              {deals.length} {deals.length === 1 ? "deal" : "deals"} nearby
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 text-zinc-400 hover:text-zinc-900"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div
+            className="grid gap-3"
+            style={{
+              gridTemplateColumns:
+                "repeat(auto-fill, minmax(160px, 1fr))",
+            }}
+          >
+            {deals.map((deal) => (
+              <CompactDealCard
+                key={deal.objectId}
+                deal={deal}
+                brandColor={brandColor}
+                onCreatePlanFromDeal={(d) => {
+                  onCreatePlanFromDeal?.(d);
+                  onClose();
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
