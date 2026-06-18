@@ -105,6 +105,7 @@ interface OrgData {
   planIdeas: PlanIdea[];
   hidePlanIdeas: boolean;
   hideCustomPlans: boolean;
+  hideDeals: boolean;
   blacklistCategories: string[];
   excludeKeywords: string[];
   isPrivate?: boolean;
@@ -1399,6 +1400,7 @@ export default function OrgCalendarPage() {
         planIdeas,
         hidePlanIdeas: result.hidePlanIdeas || false,
         hideCustomPlans: result.hideCustomPlans || false,
+        hideDeals: result.hideDeals || false,
         blacklistCategories: result.orgBlacklistCategories || [],
         excludeKeywords: result.orgExcludeKeywords || [],
         isPrivate: result.isPrivate || false,
@@ -2013,7 +2015,7 @@ export default function OrgCalendarPage() {
         </main>
       ) : (
       <>
-      <DealsStrip
+      {!org.hideDeals && <DealsStrip
         calendarId={org.objectId}
         brandColor={org.brandColor}
         compact={isApartmentOrgType(org.orgType, org.name, org.description)}
@@ -2038,7 +2040,7 @@ export default function OrgCalendarPage() {
           setCustomFromDeal(true);
           setCreatingCustomPlan(true);
         }}
-      />
+      />}
 
       {/* Stream Header */}
       <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100">

@@ -88,6 +88,7 @@ interface OrgDashboard {
   imageStyle: string;
   hidePlanIdeas: boolean;
   hideCustomPlans: boolean;
+  hideDeals: boolean;
   memberCount: number;
   totalRsvpCount: number;
   rsvpLimit: number | null;
@@ -152,6 +153,7 @@ interface OrgDashboard {
     isPrivate: boolean;
     hidePlanIdeas: boolean;
     hideCustomPlans: boolean;
+    hideDeals: boolean;
     pendingFollowerCount: number;
   }[];
   calendarLimit: number | null;
@@ -357,6 +359,9 @@ export default function OrgDashboardPage() {
   // Captured for apartment_complex orgs so each sub-calendar has its own
   // geo (different building = different radius matching for deals).
   const [newCalLat, setNewCalLat] = useState<number | null>(null);
+  // Defaults to ON (show deals). Owner can flip off in the create form for
+  // calendars where deals aren't relevant (e.g., a remote book club).
+  const [newCalHideDeals, setNewCalHideDeals] = useState(false);
   const [newCalLng, setNewCalLng] = useState<number | null>(null);
   const [addingCalendar, setAddingCalendar] = useState(false);
 
@@ -382,6 +387,7 @@ export default function OrgDashboardPage() {
   const [editCalRequireApprovalDefault, setEditCalRequireApprovalDefault] = useState(false);
   const [editCalIsPrivate, setEditCalIsPrivate] = useState(false);
   const [editCalHidePlanIdeas, setEditCalHidePlanIdeas] = useState(false);
+  const [editCalHideDeals, setEditCalHideDeals] = useState(false);
   const [editCalHideCustomPlans, setEditCalHideCustomPlans] = useState(false);
   const slugTimerRef = useRef<NodeJS.Timeout | null>(null);
   const originalSlugRef = useRef<string>("");
@@ -650,6 +656,7 @@ export default function OrgDashboardPage() {
       params.isPrivate = editCalIsPrivate;
       params.hidePlanIdeas = editCalHidePlanIdeas;
       params.hideCustomPlans = editCalHideCustomPlans;
+      params.hideDeals = editCalHideDeals;
       const result = await Parse.Cloud.run("updateCalendar", params);
       const newShareId = result.shareId;
       const newCalImage = editCalRemoveImage ? null : (editCalImagePreview || null);
@@ -743,7 +750,7 @@ export default function OrgDashboardPage() {
     if (!newCalName || !newCalCity || !newCalCitySelected) return;
     setAddingCalendar(true);
     try {
-      const params: Record<string, string | number> = {
+      const params: Record<string, string | number | boolean> = {
         organizationId: calendarId,
         name: newCalName,
         description: newCalDesc,
@@ -753,6 +760,7 @@ export default function OrgDashboardPage() {
         params.lat = newCalLat;
         params.lng = newCalLng;
       }
+      if (newCalHideDeals) params.hideDeals = true;
       await Parse.Cloud.run("createCalendarUnderOrg", params);
       setShowAddCalendar(false);
       setNewCalName("");
@@ -761,6 +769,7 @@ export default function OrgDashboardPage() {
       setNewCalCitySelected(false);
       setNewCalLat(null);
       setNewCalLng(null);
+      setNewCalHideDeals(false);
       fetchDashboard();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to add calendar";
@@ -1919,7 +1928,7 @@ export default function OrgDashboardPage() {
                         ) : (
                           <>
                             <button
-                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); setEditCalCity(cal.city || ""); setEditCalCitySelected(false); setEditCalImagePreview(cal.calendarImage || null); setEditCalImageBase64(null); setEditCalRemoveImage(false); setEditCalHideVenue(cal.hideVenueUntilRsvp !== false); setEditCalRequireApprovalDefault(cal.requireApprovalDefault === true); setEditCalIsPrivate(cal.isPrivate || false); setEditCalHidePlanIdeas(cal.hidePlanIdeas || false); setEditCalHideCustomPlans(cal.hideCustomPlans || false); }}
+                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); setEditCalCity(cal.city || ""); setEditCalCitySelected(false); setEditCalImagePreview(cal.calendarImage || null); setEditCalImageBase64(null); setEditCalRemoveImage(false); setEditCalHideVenue(cal.hideVenueUntilRsvp !== false); setEditCalRequireApprovalDefault(cal.requireApprovalDefault === true); setEditCalIsPrivate(cal.isPrivate || false); setEditCalHidePlanIdeas(cal.hidePlanIdeas || false); setEditCalHideCustomPlans(cal.hideCustomPlans || false); setEditCalHideDeals(cal.hideDeals || false); }}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
                             >
                               <Pencil className="w-3 h-3" /> Edit
@@ -3062,6 +3071,19 @@ export default function OrgDashboardPage() {
                   More specific = more accurate nearby-deal matching.
                 </p>
               </div>
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <p className="text-xs font-medium text-zinc-700">Show local deals</p>
+                  <p className="text-xs text-zinc-400">Surface a strip of deals from nearby businesses</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNewCalHideDeals(!newCalHideDeals)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${!newCalHideDeals ? "bg-zinc-900" : "bg-zinc-200"}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${!newCalHideDeals ? "left-5" : "left-0.5"}`} />
+                </button>
+              </div>
               <button
                 onClick={handleAddCalendar}
                 disabled={!newCalName || !newCalCitySelected || addingCalendar}
@@ -3275,6 +3297,20 @@ export default function OrgDashboardPage() {
                   className={`relative w-10 h-5 rounded-full transition-colors ${editCalHideCustomPlans ? "bg-zinc-900" : "bg-zinc-200"}`}
                 >
                   <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalHideCustomPlans ? "left-5" : "left-0.5"}`} />
+                </button>
+              </div>
+              {/* Show Local Deals toggle */}
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <p className="text-xs font-medium text-zinc-700">Show local deals</p>
+                  <p className="text-xs text-zinc-400">Surface a strip of deals from nearby businesses</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditCalHideDeals(!editCalHideDeals)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${!editCalHideDeals ? "bg-zinc-900" : "bg-zinc-200"}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${!editCalHideDeals ? "left-5" : "left-0.5"}`} />
                 </button>
               </div>
 
