@@ -389,6 +389,8 @@ export default function OrgDashboardPage() {
   const [editCalHidePlanIdeas, setEditCalHidePlanIdeas] = useState(false);
   const [editCalHideDeals, setEditCalHideDeals] = useState(false);
   const [editCalHideCustomPlans, setEditCalHideCustomPlans] = useState(false);
+  const [editPrivacyOpen, setEditPrivacyOpen] = useState(false);
+  const [editFeaturesOpen, setEditFeaturesOpen] = useState(false);
   const slugTimerRef = useRef<NodeJS.Timeout | null>(null);
   const originalSlugRef = useRef<string>("");
 
@@ -3220,98 +3222,123 @@ export default function OrgDashboardPage() {
                   />
                 </div>
               )}
-              {/* Venue privacy toggle */}
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <p className="text-xs font-medium text-zinc-700">Hide venue until RSVP</p>
-                  <p className="text-xs text-zinc-400">Show only neighborhood on public page</p>
-                </div>
+              {/* Privacy & access */}
+              <div className="border-t border-zinc-100 pt-2">
                 <button
                   type="button"
-                  onClick={() => setEditCalHideVenue(!editCalHideVenue)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${editCalHideVenue ? "bg-zinc-900" : "bg-zinc-200"}`}
+                  onClick={() => setEditPrivacyOpen(!editPrivacyOpen)}
+                  className="w-full flex items-center justify-between py-2 group"
                 >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalHideVenue ? "left-5" : "left-0.5"}`} />
+                  <span className="text-xs font-bold uppercase tracking-widest text-zinc-400 group-hover:text-zinc-600 transition-colors">Privacy & access</span>
+                  <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${editPrivacyOpen ? "rotate-180" : ""}`} />
                 </button>
+                {editPrivacyOpen && (
+                  <div className="pb-1">
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="text-xs font-medium text-zinc-700">Hide venue until RSVP</p>
+                        <p className="text-xs text-zinc-400">Show only neighborhood on public page</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditCalHideVenue(!editCalHideVenue)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${editCalHideVenue ? "bg-zinc-900" : "bg-zinc-200"}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalHideVenue ? "left-5" : "left-0.5"}`} />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="text-xs font-medium text-zinc-700">Require approval to attend by default</p>
+                        <p className="text-xs text-zinc-400">New plans require host approval before RSVPs are confirmed</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditCalRequireApprovalDefault(!editCalRequireApprovalDefault)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${editCalRequireApprovalDefault ? "bg-zinc-900" : "bg-zinc-200"}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalRequireApprovalDefault ? "left-5" : "left-0.5"}`} />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="text-xs font-medium text-zinc-700">Private calendar</p>
+                        <p className="text-xs text-zinc-400">Visitors must request to follow before seeing plans</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditCalIsPrivate(!editCalIsPrivate)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${editCalIsPrivate ? "bg-zinc-900" : "bg-zinc-200"}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalIsPrivate ? "left-5" : "left-0.5"}`} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-              {/* Require approval default toggle */}
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <p className="text-xs font-medium text-zinc-700">Require approval to attend by default</p>
-                  <p className="text-xs text-zinc-400">New plans require host approval before RSVPs are confirmed</p>
-                </div>
+
+              {/* Member features */}
+              <div className="border-t border-zinc-100 pt-2">
                 <button
                   type="button"
-                  onClick={() => setEditCalRequireApprovalDefault(!editCalRequireApprovalDefault)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${editCalRequireApprovalDefault ? "bg-zinc-900" : "bg-zinc-200"}`}
+                  onClick={() => setEditFeaturesOpen(!editFeaturesOpen)}
+                  className="w-full flex items-center justify-between py-2 group"
                 >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalRequireApprovalDefault ? "left-5" : "left-0.5"}`} />
+                  <span className="text-xs font-bold uppercase tracking-widest text-zinc-400 group-hover:text-zinc-600 transition-colors">Member features</span>
+                  <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${editFeaturesOpen ? "rotate-180" : ""}`} />
                 </button>
-              </div>
-              {/* Private calendar toggle */}
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <p className="text-xs font-medium text-zinc-700">Private calendar</p>
-                  <p className="text-xs text-zinc-400">Visitors must request to follow before seeing plans</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEditCalIsPrivate(!editCalIsPrivate)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${editCalIsPrivate ? "bg-zinc-900" : "bg-zinc-200"}`}
-                >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalIsPrivate ? "left-5" : "left-0.5"}`} />
-                </button>
-              </div>
-              {/* Show Plan Ideas toggle */}
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <p className="text-xs font-medium text-zinc-700">Show plan ideas</p>
-                  <p className="text-xs text-zinc-400">Let members browse and host AI-generated plan ideas</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEditCalHidePlanIdeas(!editCalHidePlanIdeas)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${!editCalHidePlanIdeas ? "bg-zinc-900" : "bg-zinc-200"}`}
-                >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${!editCalHidePlanIdeas ? "left-5" : "left-0.5"}`} />
-                </button>
-              </div>
-              {!editCalHidePlanIdeas && (
-                <button
-                  type="button"
-                  onClick={() => { setEditingCalId(null); setActiveTab("settings"); }}
-                  className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors underline -mt-2.5"
-                >
-                  Automated plan idea settings
-                </button>
-              )}
-              {/* Hide Custom Plan Proposals toggle */}
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <p className="text-xs font-medium text-zinc-700">Hide custom plan proposals</p>
-                  <p className="text-xs text-zinc-400">Prevent members from proposing their own plan ideas</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEditCalHideCustomPlans(!editCalHideCustomPlans)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${editCalHideCustomPlans ? "bg-zinc-900" : "bg-zinc-200"}`}
-                >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalHideCustomPlans ? "left-5" : "left-0.5"}`} />
-                </button>
-              </div>
-              {/* Show Local Deals toggle */}
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <p className="text-xs font-medium text-zinc-700">Show local deals</p>
-                  <p className="text-xs text-zinc-400">Surface a strip of deals from nearby businesses</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEditCalHideDeals(!editCalHideDeals)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${!editCalHideDeals ? "bg-zinc-900" : "bg-zinc-200"}`}
-                >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${!editCalHideDeals ? "left-5" : "left-0.5"}`} />
-                </button>
+                {editFeaturesOpen && (
+                  <div className="pb-1">
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="text-xs font-medium text-zinc-700">Show plan ideas</p>
+                        <p className="text-xs text-zinc-400">Let members browse and host AI-generated plan ideas</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditCalHidePlanIdeas(!editCalHidePlanIdeas)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${!editCalHidePlanIdeas ? "bg-zinc-900" : "bg-zinc-200"}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${!editCalHidePlanIdeas ? "left-5" : "left-0.5"}`} />
+                      </button>
+                    </div>
+                    {!editCalHidePlanIdeas && (
+                      <button
+                        type="button"
+                        onClick={() => { setEditingCalId(null); setActiveTab("settings"); }}
+                        className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors underline -mt-1 mb-1"
+                      >
+                        Automated plan idea settings
+                      </button>
+                    )}
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="text-xs font-medium text-zinc-700">Hide custom plan proposals</p>
+                        <p className="text-xs text-zinc-400">Prevent members from proposing their own plan ideas</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditCalHideCustomPlans(!editCalHideCustomPlans)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${editCalHideCustomPlans ? "bg-zinc-900" : "bg-zinc-200"}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalHideCustomPlans ? "left-5" : "left-0.5"}`} />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="text-xs font-medium text-zinc-700">Show local deals</p>
+                        <p className="text-xs text-zinc-400">Surface a strip of deals from nearby businesses</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditCalHideDeals(!editCalHideDeals)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${!editCalHideDeals ? "bg-zinc-900" : "bg-zinc-200"}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${!editCalHideDeals ? "left-5" : "left-0.5"}`} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <button
