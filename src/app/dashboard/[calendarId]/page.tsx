@@ -354,6 +354,10 @@ export default function OrgDashboardPage() {
   const [newCalDesc, setNewCalDesc] = useState("");
   const [newCalCity, setNewCalCity] = useState("");
   const [newCalCitySelected, setNewCalCitySelected] = useState(false);
+  // Captured for apartment_complex orgs so each sub-calendar has its own
+  // geo (different building = different radius matching for deals).
+  const [newCalLat, setNewCalLat] = useState<number | null>(null);
+  const [newCalLng, setNewCalLng] = useState<number | null>(null);
   const [addingCalendar, setAddingCalendar] = useState(false);
 
   // Regenerate (per calendar)
@@ -366,6 +370,8 @@ export default function OrgDashboardPage() {
   const [editCalSlug, setEditCalSlug] = useState("");
   const [editCalCity, setEditCalCity] = useState("");
   const [editCalCitySelected, setEditCalCitySelected] = useState(false);
+  const [editCalLat, setEditCalLat] = useState<number | null>(null);
+  const [editCalLng, setEditCalLng] = useState<number | null>(null);
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [slugChecking, setSlugChecking] = useState(false);
   const [savingCal, setSavingCal] = useState(false);
@@ -619,7 +625,7 @@ export default function OrgDashboardPage() {
     if (!editingCalId) return;
     setSavingCal(true);
     try {
-      const params: Record<string, string | boolean> = {
+      const params: Record<string, string | boolean | number> = {
         calendarId: editingCalId,
         name: editCalName,
         description: editCalDesc,
@@ -629,6 +635,10 @@ export default function OrgDashboardPage() {
       }
       if (editCalCitySelected && editCalCity) {
         params.city = editCalCity;
+        if (editCalLat != null && editCalLng != null) {
+          params.lat = editCalLat;
+          params.lng = editCalLng;
+        }
       }
       if (editCalImageBase64) {
         params.imageBase64 = editCalImageBase64;
@@ -733,17 +743,24 @@ export default function OrgDashboardPage() {
     if (!newCalName || !newCalCity || !newCalCitySelected) return;
     setAddingCalendar(true);
     try {
-      await Parse.Cloud.run("createCalendarUnderOrg", {
+      const params: Record<string, string | number> = {
         organizationId: calendarId,
         name: newCalName,
         description: newCalDesc,
         city: newCalCity,
-      });
+      };
+      if (newCalLat != null && newCalLng != null) {
+        params.lat = newCalLat;
+        params.lng = newCalLng;
+      }
+      await Parse.Cloud.run("createCalendarUnderOrg", params);
       setShowAddCalendar(false);
       setNewCalName("");
       setNewCalDesc("");
       setNewCalCity("");
       setNewCalCitySelected(false);
+      setNewCalLat(null);
+      setNewCalLng(null);
       fetchDashboard();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to add calendar";
@@ -3024,13 +3041,31 @@ export default function OrgDashboardPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">City</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">
+                  {dashboard.orgType === "apartment_complex" ? "Building address" : "City"}
+                </label>
                 <CityAutocomplete
                   value={newCalCity}
-                  onChange={(v) => { setNewCalCity(v); setNewCalCitySelected(false); }}
-                  onSelect={(place) => { setNewCalCity(place.description); setNewCalCitySelected(true); }}
+                  onChange={(v) => { setNewCalCity(v); setNewCalCitySelected(false); setNewCalLat(null); setNewCalLng(null); }}
+                  onSelect={(place) => {
+                    setNewCalCity(place.description);
+                    setNewCalCitySelected(true);
+                    if (place.lat != null && place.lng != null) {
+                      setNewCalLat(place.lat);
+                      setNewCalLng(place.lng);
+                    }
+                  }}
+                  types={dashboard.orgType === "apartment_complex" ? ["address"] : undefined}
+                  errorText={dashboard.orgType === "apartment_complex" ? "Pick the building address from the suggestions" : undefined}
+                  fetchCoordinates={dashboard.orgType === "apartment_complex"}
+                  placeholder={dashboard.orgType === "apartment_complex" ? "e.g., 123 Main St, Brooklyn, NY" : undefined}
                   className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
                 />
+                {dashboard.orgType === "apartment_complex" && (
+                  <p className="text-[11px] text-zinc-400 mt-1">
+                    Used to match deals near this specific building.
+                  </p>
+                )}
               </div>
               <button
                 onClick={handleAddCalendar}
@@ -3149,13 +3184,25 @@ export default function OrgDashboardPage() {
               </div>
               {dashboard?.tier === "pro" && (
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">City</label>
+                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">
+                    {dashboard.orgType === "apartment_complex" ? "Building address" : "City"}
+                  </label>
                   <CityAutocomplete
                     value={editCalCity}
-                    onChange={(v) => { setEditCalCity(v); setEditCalCitySelected(false); }}
-                    onSelect={(place) => { setEditCalCity(place.description); setEditCalCitySelected(true); }}
+                    onChange={(v) => { setEditCalCity(v); setEditCalCitySelected(false); setEditCalLat(null); setEditCalLng(null); }}
+                    onSelect={(place) => {
+                      setEditCalCity(place.description);
+                      setEditCalCitySelected(true);
+                      if (place.lat != null && place.lng != null) {
+                        setEditCalLat(place.lat);
+                        setEditCalLng(place.lng);
+                      }
+                    }}
+                    types={dashboard.orgType === "apartment_complex" ? ["address"] : undefined}
+                    errorText={dashboard.orgType === "apartment_complex" ? "Pick the building address from the suggestions" : undefined}
+                    fetchCoordinates={dashboard.orgType === "apartment_complex"}
+                    placeholder={dashboard.orgType === "apartment_complex" ? "e.g., 123 Main St, Brooklyn, NY" : "Enter a city"}
                     className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
-                    placeholder="Enter a city"
                   />
                 </div>
               )}

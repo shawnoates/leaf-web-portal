@@ -11,7 +11,12 @@ declare global {
 interface CityAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
-  onSelect: (place: { description: string; placeId: string }) => void;
+  onSelect: (place: {
+    description: string;
+    placeId: string;
+    lat?: number;
+    lng?: number;
+  }) => void;
   placeholder?: string;
   className?: string;
   required?: boolean;
@@ -22,6 +27,13 @@ interface CityAutocompleteProps {
   types?: string[];
   /** Override the inline error shown when text doesn't match a suggestion. */
   errorText?: string;
+  /**
+   * When true, fires a Places Details lookup on select so `onSelect`
+   * receives `lat`/`lng`. Costs one extra Places API call per selection
+   * (negligible) — only enable when the caller actually needs coordinates
+   * (e.g. apartment building address → calendar.geo).
+   */
+  fetchCoordinates?: boolean;
 }
 
 let googleMapsLoading = false;
@@ -71,9 +83,11 @@ export default function CityAutocomplete({
   required = false,
   types = ["locality", "sublocality", "administrative_area_level_3"],
   errorText = "Please select a city from the suggestions",
+  fetchCoordinates = false,
 }: CityAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
   const [suggestions, setSuggestions] = useState<google.maps.places.AutocompletePrediction[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -84,6 +98,11 @@ export default function CityAutocomplete({
     loadGoogleMaps().then(() => {
       if (window.google) {
         autocompleteRef.current = new window.google.maps.places.AutocompleteService();
+        if (fetchCoordinates) {
+          // PlacesService needs a DOM node; an off-screen div is fine.
+          const div = document.createElement("div");
+          placesServiceRef.current = new window.google.maps.places.PlacesService(div);
+        }
       }
     });
   }, []);
@@ -130,8 +149,30 @@ export default function CityAutocomplete({
 
   const handleSelect = (prediction: google.maps.places.AutocompletePrediction) => {
     onChange(prediction.description);
-    onSelect({ description: prediction.description, placeId: prediction.place_id });
     setHasSelected(true);
+    if (fetchCoordinates && placesServiceRef.current) {
+      placesServiceRef.current.getDetails(
+        { placeId: prediction.place_id, fields: ["geometry"] },
+        (result, status) => {
+          if (
+            status === google.maps.places.PlacesServiceStatus.OK &&
+            result?.geometry?.location
+          ) {
+            onSelect({
+              description: prediction.description,
+              placeId: prediction.place_id,
+              lat: result.geometry.location.lat(),
+              lng: result.geometry.location.lng(),
+            });
+          } else {
+            // Fall back to no-coords select if details lookup fails.
+            onSelect({ description: prediction.description, placeId: prediction.place_id });
+          }
+        }
+      );
+    } else {
+      onSelect({ description: prediction.description, placeId: prediction.place_id });
+    }
     setSuggestions([]);
     setShowDropdown(false);
   };
