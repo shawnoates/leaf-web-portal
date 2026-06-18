@@ -28,6 +28,7 @@ interface Redemption {
     terms: string | null;
     promoCode: string | null;
     imageUrl: string | null;
+    imageAttribution: { displayName: string | null; uri: string | null } | null;
   } | null;
   business: {
     objectId: string;
@@ -199,13 +200,33 @@ export default function RedeemPage({
     <div className="min-h-screen bg-zinc-50 px-4 py-8 flex items-center justify-center">
       <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm w-full max-w-md overflow-hidden">
         {redemption.deal?.imageUrl ? (
-          <div className="aspect-[4/3] bg-zinc-100">
-            <img
-              src={redemption.deal.imageUrl}
-              alt={redemption.deal.title}
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <>
+            <div className="aspect-[4/3] bg-zinc-100">
+              <img
+                src={redemption.deal.imageUrl}
+                alt={redemption.deal.title}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            {redemption.deal.imageAttribution?.displayName && (
+              <p className="px-6 pt-2 text-[10px] text-zinc-400 leading-tight">
+                Photo:{" "}
+                {redemption.deal.imageAttribution.uri ? (
+                  <a
+                    href={redemption.deal.imageAttribution.uri}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-zinc-600"
+                  >
+                    {redemption.deal.imageAttribution.displayName}
+                  </a>
+                ) : (
+                  redemption.deal.imageAttribution.displayName
+                )}{" "}
+                / Google
+              </p>
+            )}
+          </>
         ) : (
           <div className="aspect-[4/3] bg-zinc-100 flex items-center justify-center">
             <Tag className="w-12 h-12 text-zinc-300" />

@@ -16,6 +16,7 @@ export interface Deal {
   discountValue: number | null;
   promoCode: string | null;
   imageUrl: string | null;
+  imageAttribution: { displayName: string | null; uri: string | null } | null;
   dealType: "public" | "exclusive";
   redeemRadiusMeters: number;
   redeemWindowMinutes: number;
@@ -28,6 +29,32 @@ export interface Deal {
     category: string | null;
     formattedAddress: string | null;
   } | null;
+}
+
+// Small caption shown under deal images sourced from Google Places. Required
+// by the Places TOS when displaying their photos. Renders nothing when the
+// deal has no attribution (CSV-supplied imageUrl or no image at all).
+function PhotoCredit({ attribution }: { attribution: Deal["imageAttribution"] }) {
+  if (!attribution || !attribution.displayName) return null;
+  return (
+    <p className="px-2.5 pt-1 text-[9px] text-zinc-400 leading-tight line-clamp-1">
+      Photo:{" "}
+      {attribution.uri ? (
+        <a
+          href={attribution.uri}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="underline hover:text-zinc-600"
+        >
+          {attribution.displayName}
+        </a>
+      ) : (
+        attribution.displayName
+      )}
+      {" "}/ Google
+    </p>
+  );
 }
 
 // ─── Interest tracking (anonymous, cookie-based) ─────────────────────────
@@ -375,6 +402,7 @@ function CompactDealCard({
           </span>
         )}
       </div>
+      {deal.imageUrl && <PhotoCredit attribution={deal.imageAttribution} />}
       <div className="p-2.5 flex-1 flex flex-col gap-1">
         <p className="text-[9px] tracking-wider uppercase font-bold text-zinc-500 line-clamp-1">
           {deal.business?.name ?? "Local Business"}
@@ -516,6 +544,7 @@ function DealCard({
           </span>
         )}
       </div>
+      {deal.imageUrl && <PhotoCredit attribution={deal.imageAttribution} />}
 
       <div className="p-4 flex-1 flex flex-col gap-2">
         <p className="text-[10px] tracking-wider uppercase font-bold text-zinc-500 line-clamp-1">
