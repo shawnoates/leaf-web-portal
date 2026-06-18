@@ -1010,6 +1010,10 @@ export default function OrgCalendarPage() {
   // Custom plan creation state
   const [creatingCustomPlan, setCreatingCustomPlan] = useState(false);
   const [customTitle, setCustomTitle] = useState("");
+  // True when the custom-plan modal was opened by tapping a deal card. Hides
+  // the "Or host one of these ideas" carousel since the user has already
+  // committed to a specific venue and intent.
+  const [customFromDeal, setCustomFromDeal] = useState(false);
   const [customDescription, setCustomDescription] = useState("");
   const [customCategory, setCustomCategory] = useState("");
   const [customCapacity, setCustomCapacity] = useState("");
@@ -2031,6 +2035,7 @@ export default function OrgCalendarPage() {
           setCustomTitle(deal.title);
           setCustomDescription(deal.description || "");
           setCustomCategory("");
+          setCustomFromDeal(true);
           setCreatingCustomPlan(true);
         }}
       />
@@ -2929,6 +2934,7 @@ export default function OrgCalendarPage() {
             <button
               onClick={() => {
                 setCreatingCustomPlan(false);
+                setCustomFromDeal(false);
                 setCustomSuccess(false);
                 setSelectedImageUrl(null);
                 setUnsplashPhotos([]);
@@ -2976,7 +2982,7 @@ export default function OrgCalendarPage() {
                     </p>
                   </div>
 
-                  {!org.hidePlanIdeas && org.planIdeas.length > 0 && (
+                  {!org.hidePlanIdeas && !customFromDeal && org.planIdeas.length > 0 && (
                     <div className="space-y-3">
                       <p className="text-xs tracking-wider uppercase font-bold text-zinc-500">
                         Or host one of these ideas
@@ -3075,6 +3081,41 @@ export default function OrgCalendarPage() {
                       </div>
                     </div>
 
+                    {customFromDeal && selectedVenue ? (
+                      <div className="space-y-3">
+                        <label className="text-xs tracking-wider uppercase font-bold">
+                          Venue <span className="text-zinc-400">(from this deal)</span>
+                        </label>
+                        <div className="border border-zinc-200 rounded-xl p-3 flex items-center gap-3 bg-zinc-50">
+                          <div className="w-14 h-14 rounded-lg bg-zinc-100 overflow-hidden shrink-0">
+                            {selectedVenue.photoUrl ? (
+                              <img
+                                src={selectedVenue.photoUrl}
+                                alt={selectedVenue.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <MapPin className="w-5 h-5 text-zinc-300" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-zinc-900 truncate">
+                              {selectedVenue.name}
+                            </p>
+                            <p className="text-xs text-zinc-500 truncate">
+                              {selectedVenue.address}
+                            </p>
+                          </div>
+                          <Lock className="w-3.5 h-3.5 text-zinc-400 ml-auto shrink-0" />
+                        </div>
+                        <p className="text-[11px] text-zinc-400">
+                          Deals are tied to a specific business — venue can&apos;t be changed.
+                        </p>
+                      </div>
+                    ) : (
+                    <>
                     {/* Venue search */}
                     <div className="space-y-3">
                       <label className="text-xs tracking-wider uppercase font-bold">
@@ -3159,6 +3200,8 @@ export default function OrgCalendarPage() {
                         </div>
                       )}
                     </div>
+                    </>
+                    )}
 
                     {/* Cover Image Picker */}
                     {selectedVenue && customTitle.trim() && (
