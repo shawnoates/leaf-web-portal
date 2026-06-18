@@ -2971,10 +2971,10 @@ export default function OrgCalendarPage() {
               ) : (
                 <>
                   <div className="space-y-2">
-                    <p className="text-xs tracking-wider uppercase font-bold text-emerald-700 flex items-center gap-2">
-                      <Sparkles className="w-3.5 h-3.5" /> Be the Host
+                    <p className="text-xs tracking-wider uppercase font-bold text-emerald-700">
+                      Be the Host
                     </p>
-                    <h3 className="text-3xl font-light italic">Propose a custom plan</h3>
+                    <h3 className="text-3xl font-light italic">Propose a plan</h3>
                     <p className="text-zinc-500 font-light">
                       {org.isOwner || org.isHost
                         ? `Create a new plan for ${org.name}. It will go live immediately.`
