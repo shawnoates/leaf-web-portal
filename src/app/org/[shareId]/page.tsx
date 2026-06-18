@@ -1928,7 +1928,7 @@ export default function OrgCalendarPage() {
               )
             )}
             {(org.isOwner || org.isHost) && (
-              <>
+              <div className="flex items-center gap-2">
                 <button
                   onClick={async () => {
                     const url = window.location.href;
@@ -1959,7 +1959,7 @@ export default function OrgCalendarPage() {
                   <Settings className="w-3.5 h-3.5" />
                   Manage
                 </Link>
-              </>
+              </div>
             )}
             {!org.isOwner && !org.isHost && (
               parseUser ? (
