@@ -663,7 +663,7 @@ export default function OrgDashboardPage() {
       setDashboard((d) => d ? {
         ...d,
         calendars: d.calendars.map((c) =>
-          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId, city: editCalCity || c.city, calendarImage: editCalImageBase64 ? newCalImage : (editCalRemoveImage ? null : c.calendarImage), hideVenueUntilRsvp: editCalHideVenue, requireApprovalDefault: editCalRequireApprovalDefault, isPrivate: editCalIsPrivate, hidePlanIdeas: editCalHidePlanIdeas, hideCustomPlans: editCalHideCustomPlans } : c
+          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId, city: editCalCity || c.city, calendarImage: editCalImageBase64 ? newCalImage : (editCalRemoveImage ? null : c.calendarImage), hideVenueUntilRsvp: editCalHideVenue, requireApprovalDefault: editCalRequireApprovalDefault, isPrivate: editCalIsPrivate, hidePlanIdeas: editCalHidePlanIdeas, hideCustomPlans: editCalHideCustomPlans, hideDeals: editCalHideDeals } : c
         ),
       } : d);
       setEditingCalId(null);
