@@ -2274,8 +2274,9 @@ export default function OrgCalendarPage() {
                   </div>
                 </div>
               )}
-              {/* Plan idea cards — only if plan ideas enabled */}
-              {!org.hidePlanIdeas && org.planIdeas.map((idea) => (
+              {/* Plan idea cards — only if plan ideas enabled. Filter out
+                  ideas with no image to avoid showing broken-image cards. */}
+              {!org.hidePlanIdeas && org.planIdeas.filter((idea) => idea.image).map((idea) => (
                 <div
                   key={idea.id}
                   className={`min-w-[280px] max-w-[300px] snap-start group ${org.rsvpLimitReached ? "cursor-default" : "cursor-pointer"}`}
@@ -2988,7 +2989,7 @@ export default function OrgCalendarPage() {
                         Or host one of these ideas
                       </p>
                       <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory -mx-8 md:-mx-16 px-8 md:px-16 pb-2">
-                        {org.planIdeas.map((idea) => (
+                        {org.planIdeas.filter((idea) => idea.image).map((idea) => (
                           <button
                             type="button"
                             key={idea.id}
