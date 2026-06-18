@@ -3277,14 +3277,14 @@ export default function OrgDashboardPage() {
                 )}
               </div>
 
-              {/* Member features */}
+              {/* Advanced settings */}
               <div className="border-t border-zinc-100 pt-2">
                 <button
                   type="button"
                   onClick={() => setEditFeaturesOpen(!editFeaturesOpen)}
                   className="w-full flex items-center justify-between py-2 group"
                 >
-                  <span className="text-xs font-bold uppercase tracking-widest text-zinc-400 group-hover:text-zinc-600 transition-colors">Member features</span>
+                  <span className="text-xs font-bold uppercase tracking-widest text-zinc-400 group-hover:text-zinc-600 transition-colors">Advanced settings</span>
                   <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${editFeaturesOpen ? "rotate-180" : ""}`} />
                 </button>
                 {editFeaturesOpen && (
