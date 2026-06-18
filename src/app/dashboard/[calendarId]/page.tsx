@@ -3042,7 +3042,7 @@ export default function OrgDashboardPage() {
               </div>
               <div>
                 <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">
-                  {dashboard.orgType === "apartment_complex" ? "Building address" : "City"}
+                  Location
                 </label>
                 <CityAutocomplete
                   value={newCalCity}
@@ -3055,17 +3055,12 @@ export default function OrgDashboardPage() {
                       setNewCalLng(place.lng);
                     }
                   }}
-                  types={dashboard.orgType === "apartment_complex" ? ["address"] : undefined}
-                  errorText={dashboard.orgType === "apartment_complex" ? "Pick the building address from the suggestions" : undefined}
-                  fetchCoordinates={dashboard.orgType === "apartment_complex"}
-                  placeholder={dashboard.orgType === "apartment_complex" ? "e.g., 123 Main St, Brooklyn, NY" : undefined}
+                  placeholder="City, neighborhood, or building address"
                   className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
                 />
-                {dashboard.orgType === "apartment_complex" && (
-                  <p className="text-[11px] text-zinc-400 mt-1">
-                    Used to match deals near this specific building.
-                  </p>
-                )}
+                <p className="text-[11px] text-zinc-400 mt-1">
+                  More specific = more accurate nearby-deal matching.
+                </p>
               </div>
               <button
                 onClick={handleAddCalendar}
@@ -3185,7 +3180,7 @@ export default function OrgDashboardPage() {
               {dashboard?.tier === "pro" && (
                 <div>
                   <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">
-                    {dashboard.orgType === "apartment_complex" ? "Building address" : "City"}
+                    Location
                   </label>
                   <CityAutocomplete
                     value={editCalCity}
@@ -3198,10 +3193,7 @@ export default function OrgDashboardPage() {
                         setEditCalLng(place.lng);
                       }
                     }}
-                    types={dashboard.orgType === "apartment_complex" ? ["address"] : undefined}
-                    errorText={dashboard.orgType === "apartment_complex" ? "Pick the building address from the suggestions" : undefined}
-                    fetchCoordinates={dashboard.orgType === "apartment_complex"}
-                    placeholder={dashboard.orgType === "apartment_complex" ? "e.g., 123 Main St, Brooklyn, NY" : "Enter a city"}
+                    placeholder="City, neighborhood, or building address"
                     className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
                   />
                 </div>

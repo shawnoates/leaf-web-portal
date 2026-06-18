@@ -54,6 +54,8 @@ interface FormData {
   description: string;
   primaryCity: string;
   primaryCitySelected: boolean;
+  primaryLat: number | null;
+  primaryLng: number | null;
   tier: string;
 }
 
@@ -99,6 +101,8 @@ function SetupPageInner() {
     description: "",
     primaryCity: "",
     primaryCitySelected: false,
+    primaryLat: null,
+    primaryLng: null,
     tier: initialTier,
   });
 
@@ -221,6 +225,8 @@ function SetupPageInner() {
         orgType: form.orgType,
         description: form.description,
         primaryCity: form.primaryCity,
+        primaryLat: form.primaryLat ?? undefined,
+        primaryLng: form.primaryLng ?? undefined,
         daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
         maxEvents: 5,
         capacityLimit: 50,
@@ -570,54 +576,37 @@ function SetupPageInner() {
             </div>
           </Field>
 
-          {/* City / building address — apartment complexes capture the full
-              building address so deals + leads can be tied to a specific
-              property. Other org types stay at city granularity for now. */}
-          {form.orgType === "apartment_complex" ? (
-            <Field
-              label="Building address"
-              icon={<MapPin className="w-3.5 h-3.5" />}
-              hint="Used to scope deals + resident matching to your building."
-            >
-              <CityAutocomplete
-                value={form.primaryCity}
-                onChange={(val) =>
-                  updateForm({ primaryCity: val, primaryCitySelected: false })
-                }
-                onSelect={(place) =>
-                  updateForm({
-                    primaryCity: place.description,
-                    primaryCitySelected: true,
-                  })
-                }
-                placeholder="e.g., 123 Main St, Brooklyn, NY"
-                types={["address"]}
-                errorText="Pick the building address from the suggestions"
-                className="w-full border-b border-zinc-300 pb-3 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors placeholder:text-zinc-300"
-              />
-            </Field>
-          ) : (
-            <Field
-              label="Your city"
-              icon={<MapPin className="w-3.5 h-3.5" />}
-              hint="Plans are scoped here by default — you can travel later."
-            >
-              <CityAutocomplete
-                value={form.primaryCity}
-                onChange={(val) =>
-                  updateForm({ primaryCity: val, primaryCitySelected: false })
-                }
-                onSelect={(place) =>
-                  updateForm({
-                    primaryCity: place.description,
-                    primaryCitySelected: true,
-                  })
-                }
-                placeholder="e.g., Austin, TX"
-                className="w-full border-b border-zinc-300 pb-3 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors placeholder:text-zinc-300"
-              />
-            </Field>
-          )}
+          {/* Location — accepts city, neighborhood, or full address. The
+              user picks the granularity that fits their community. We capture
+              lat/lng either way so radius-based features (nearby deals,
+              boost audience) work regardless of zoom level. */}
+          <Field
+            label="Location"
+            icon={<MapPin className="w-3.5 h-3.5" />}
+            hint="City, neighborhood, or building address — your choice."
+          >
+            <CityAutocomplete
+              value={form.primaryCity}
+              onChange={(val) =>
+                updateForm({
+                  primaryCity: val,
+                  primaryCitySelected: false,
+                  primaryLat: null,
+                  primaryLng: null,
+                })
+              }
+              onSelect={(place) =>
+                updateForm({
+                  primaryCity: place.description,
+                  primaryCitySelected: true,
+                  primaryLat: place.lat ?? null,
+                  primaryLng: place.lng ?? null,
+                })
+              }
+              placeholder="e.g., 123 Main St · Bed-Stuy · Austin, TX"
+              className="w-full border-b border-zinc-300 pb-3 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors placeholder:text-zinc-300"
+            />
+          </Field>
 
           {/* Description */}
           <Field label="Tell us about it">

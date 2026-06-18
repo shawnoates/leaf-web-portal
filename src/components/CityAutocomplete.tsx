@@ -81,9 +81,15 @@ export default function CityAutocomplete({
   placeholder = "e.g., Austin, TX",
   className = "",
   required = false,
-  types = ["locality", "sublocality", "administrative_area_level_3"],
-  errorText = "Please select a city from the suggestions",
-  fetchCoordinates = false,
+  // Default accepts cities, neighborhoods, AND street addresses — owners
+  // pick whichever granularity fits their community. "geocode" excludes
+  // establishments (restaurants, etc.) which would muddy the picker.
+  types = ["geocode"],
+  errorText = "Please select a location from the suggestions",
+  // Default on: coordinates power radius matching (e.g. nearby-deal lookups)
+  // even when the owner only picks a neighborhood. Cheap (one extra Places
+  // call per selection).
+  fetchCoordinates = true,
 }: CityAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.AutocompleteService | null>(null);
