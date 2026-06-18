@@ -111,7 +111,7 @@ export default function VenueSearch({
       if (autoResolveInitial && !autoResolvedRef.current && initial.length >= 2) {
         autoResolvedRef.current = true;
         autocompleteRef.current.getPlacePredictions(
-          { input: initial, types: ["establishment"] },
+          { input: initial },
           (predictions, status) => {
             if (
               status !== google.maps.places.PlacesServiceStatus.OK ||
@@ -150,7 +150,7 @@ export default function VenueSearch({
     }
 
     autocompleteRef.current.getPlacePredictions(
-      { input, types: ["establishment"] },
+      { input },
       (predictions, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
           setSuggestions(predictions);
