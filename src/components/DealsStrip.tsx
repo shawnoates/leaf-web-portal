@@ -22,6 +22,8 @@ export interface Deal {
   redeemWindowMinutes: number;
   isLastMinute: boolean;
   interestCount: number;
+  // Only populated when the strip is fetched with sortBy=popular90d.
+  interestCount90d?: number;
   business: {
     objectId: string;
     googlePlaceId: string | null;
@@ -29,6 +31,43 @@ export interface Deal {
     category: string | null;
     formattedAddress: string | null;
   } | null;
+}
+
+// Two-state segment control for the strip header. Trending = unique
+// interest count in the past 90 days; Newest = createdAt DESC (default).
+function SortToggle({
+  value,
+  onChange,
+  size = "regular",
+}: {
+  value: "recent" | "popular90d";
+  onChange: (v: "recent" | "popular90d") => void;
+  size?: "compact" | "regular";
+}) {
+  const base = size === "compact" ? "text-[10px]" : "text-[11px]";
+  const pad = size === "compact" ? "px-2 py-0.5" : "px-2.5 py-1";
+  return (
+    <div className={`inline-flex items-center gap-0.5 bg-zinc-100 rounded-full p-0.5 ${base}`}>
+      <button
+        type="button"
+        onClick={() => onChange("popular90d")}
+        className={`${pad} rounded-full font-medium transition-colors ${
+          value === "popular90d" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-900"
+        }`}
+      >
+        Trending
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("recent")}
+        className={`${pad} rounded-full font-medium transition-colors ${
+          value === "recent" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-900"
+        }`}
+      >
+        Newest
+      </button>
+    </div>
+  );
 }
 
 // Small caption shown under deal images sourced from Google Places. Required
@@ -133,14 +172,16 @@ export default function DealsStrip({
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [viewAllOpen, setViewAllOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<"recent" | "popular90d">("recent");
 
   useEffect(() => {
     if (!calendarId) return;
-    Parse.Cloud.run("listDealsForCalendar", { calendarId })
+    setLoaded(false);
+    Parse.Cloud.run("listDealsForCalendar", { calendarId, sortBy })
       .then((r: ListResponse) => setDeals(r.deals || []))
       .catch(() => setDeals([]))
       .finally(() => setLoaded(true));
-  }, [calendarId]);
+  }, [calendarId, sortBy]);
 
   if (!loaded || deals.length === 0) return null;
 
@@ -150,24 +191,27 @@ export default function DealsStrip({
   if (compact) {
     return (
       <section className="max-w-6xl mx-auto px-6 pt-5 pb-1">
-        <div className="flex items-center justify-between pb-3 mb-3">
+        <div className="flex items-center justify-between pb-3 mb-3 gap-2">
           <p className="text-[11px] tracking-wider uppercase text-zinc-400 font-bold">
             Local Deals
           </p>
-          {overflowCount > 0 ? (
-            <button
-              onClick={() => setViewAllOpen(true)}
-              className="inline-flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-900 font-medium transition-colors"
-            >
-              View all <span className="text-zinc-400">({deals.length})</span>
-              <ChevronRight className="w-3 h-3" />
-            </button>
-          ) : (
-            <p className="text-[10px] text-zinc-400 hidden sm:block">
-              {deals.length} {deals.length === 1 ? "deal" : "deals"} from nearby
-              businesses
-            </p>
-          )}
+          <div className="flex items-center gap-2">
+            <SortToggle value={sortBy} onChange={setSortBy} size="compact" />
+            {overflowCount > 0 ? (
+              <button
+                onClick={() => setViewAllOpen(true)}
+                className="inline-flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-900 font-medium transition-colors"
+              >
+                View all <span className="text-zinc-400">({deals.length})</span>
+                <ChevronRight className="w-3 h-3" />
+              </button>
+            ) : (
+              <p className="text-[10px] text-zinc-400 hidden sm:block">
+                {deals.length} {deals.length === 1 ? "deal" : "deals"} from nearby
+                businesses
+              </p>
+            )}
+          </div>
         </div>
         <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2 -mx-6 px-6">
           {visibleDeals.map((deal) => (
@@ -193,24 +237,27 @@ export default function DealsStrip({
 
   return (
     <section className="max-w-6xl mx-auto px-6 pt-12 pb-2">
-      <div className="flex items-center justify-between border-b border-zinc-100 pb-6 mb-6">
+      <div className="flex items-center justify-between border-b border-zinc-100 pb-6 mb-6 gap-3">
         <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
           Local Deals
         </p>
-        {overflowCount > 0 ? (
-          <button
-            onClick={() => setViewAllOpen(true)}
-            className="inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-900 font-medium transition-colors"
-          >
-            View all <span className="text-zinc-400">({deals.length})</span>
-            <ChevronRight className="w-3 h-3" />
-          </button>
-        ) : (
-          <p className="text-[11px] text-zinc-400 hidden sm:block">
-            {deals.length} {deals.length === 1 ? "deal" : "deals"} from nearby
-            businesses
-          </p>
-        )}
+        <div className="flex items-center gap-3">
+          <SortToggle value={sortBy} onChange={setSortBy} />
+          {overflowCount > 0 ? (
+            <button
+              onClick={() => setViewAllOpen(true)}
+              className="inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-900 font-medium transition-colors"
+            >
+              View all <span className="text-zinc-400">({deals.length})</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          ) : (
+            <p className="text-[11px] text-zinc-400 hidden sm:block">
+              {deals.length} {deals.length === 1 ? "deal" : "deals"} from nearby
+              businesses
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-4 -mx-6 px-6">
