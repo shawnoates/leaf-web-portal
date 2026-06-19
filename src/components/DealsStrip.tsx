@@ -154,10 +154,10 @@ interface ListResponse {
 // where it's actually true.
 function dealsEyebrow(audienceName?: string | null): string {
   const trimmed = audienceName?.trim();
-  if (trimmed && trimmed.length <= 18) {
-    return `Nearby deals for ${trimmed} residents`;
+  if (trimmed && trimmed.length <= 22) {
+    return `Nearby deals for ${trimmed}`;
   }
-  return "Nearby deals for residents";
+  return "Nearby deals";
 }
 
 export default function DealsStrip({
@@ -166,7 +166,6 @@ export default function DealsStrip({
   compact = false,
   audienceName,
   onCreatePlanFromDeal,
-  onLoaded,
 }: {
   calendarId: string;
   brandColor?: string | null;
@@ -178,8 +177,8 @@ export default function DealsStrip({
   compact?: boolean;
   /**
    * Building / calendar name. When short enough to fit in the eyebrow,
-   * shown as "Procured for {audienceName} residents". Otherwise the
-   * generic "Procured for residents" is used.
+   * shown as "Nearby deals for {audienceName}". Otherwise the generic
+   * "Nearby deals" is used.
    */
   audienceName?: string | null;
   /**
@@ -189,12 +188,6 @@ export default function DealsStrip({
    * the lightweight solo signal.
    */
   onCreatePlanFromDeal?: (deal: Deal) => void;
-  /**
-   * Fires once per fetch with the loaded deal count. Lets the host page
-   * (e.g. org/[shareId]) reference the count in its own UI — for example,
-   * a "browse N deals" lifeline in the empty-plans state.
-   */
-  onLoaded?: (count: number) => void;
 }) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -205,17 +198,10 @@ export default function DealsStrip({
     if (!calendarId) return;
     setLoaded(false);
     Parse.Cloud.run("listDealsForCalendar", { calendarId, sortBy })
-      .then((r: ListResponse) => {
-        const list = r.deals || [];
-        setDeals(list);
-        onLoaded?.(list.length);
-      })
-      .catch(() => {
-        setDeals([]);
-        onLoaded?.(0);
-      })
+      .then((r: ListResponse) => setDeals(r.deals || []))
+      .catch(() => setDeals([]))
       .finally(() => setLoaded(true));
-  }, [calendarId, sortBy, onLoaded]);
+  }, [calendarId, sortBy]);
 
   if (!loaded || deals.length === 0) return null;
 
@@ -231,23 +217,7 @@ export default function DealsStrip({
           <p className="text-[11px] tracking-wider uppercase text-zinc-400 font-bold">
             {eyebrow}
           </p>
-          <div className="flex items-center gap-2">
-            <SortToggle value={sortBy} onChange={setSortBy} size="compact" />
-            {overflowCount > 0 ? (
-              <button
-                onClick={() => setViewAllOpen(true)}
-                className="inline-flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-900 font-medium transition-colors"
-              >
-                View all <span className="text-zinc-400">({deals.length})</span>
-                <ChevronRight className="w-3 h-3" />
-              </button>
-            ) : (
-              <p className="text-[10px] text-zinc-400 hidden sm:block">
-                {deals.length} {deals.length === 1 ? "deal" : "deals"} from nearby
-                businesses
-              </p>
-            )}
-          </div>
+          <SortToggle value={sortBy} onChange={setSortBy} size="compact" />
         </div>
         <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2 -mx-6 px-6">
           {visibleDeals.map((deal) => (
@@ -258,6 +228,13 @@ export default function DealsStrip({
               onCreatePlanFromDeal={onCreatePlanFromDeal}
             />
           ))}
+          {overflowCount > 0 && (
+            <ViewAllCard
+              totalCount={deals.length}
+              onClick={() => setViewAllOpen(true)}
+              size="compact"
+            />
+          )}
         </div>
         {viewAllOpen && (
           <AllDealsModal
@@ -277,23 +254,7 @@ export default function DealsStrip({
         <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
           {eyebrow}
         </p>
-        <div className="flex items-center gap-3">
-          <SortToggle value={sortBy} onChange={setSortBy} />
-          {overflowCount > 0 ? (
-            <button
-              onClick={() => setViewAllOpen(true)}
-              className="inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-900 font-medium transition-colors"
-            >
-              View all <span className="text-zinc-400">({deals.length})</span>
-              <ChevronRight className="w-3 h-3" />
-            </button>
-          ) : (
-            <p className="text-[11px] text-zinc-400 hidden sm:block">
-              {deals.length} {deals.length === 1 ? "deal" : "deals"} from nearby
-              businesses
-            </p>
-          )}
-        </div>
+        <SortToggle value={sortBy} onChange={setSortBy} />
       </div>
 
       <div className="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-4 -mx-6 px-6">
@@ -305,6 +266,13 @@ export default function DealsStrip({
             onCreatePlanFromDeal={onCreatePlanFromDeal}
           />
         ))}
+        {overflowCount > 0 && (
+          <ViewAllCard
+            totalCount={deals.length}
+            onClick={() => setViewAllOpen(true)}
+            size="regular"
+          />
+        )}
       </div>
       {viewAllOpen && (
         <AllDealsModal
@@ -315,6 +283,45 @@ export default function DealsStrip({
         />
       )}
     </section>
+  );
+}
+
+// ─── End-of-carousel "View all" card ────────────────────────────────────
+// Gray-backed card that lives as the last item in the deals carousel.
+// Replaces the inline "View all (N) →" link in the header so the section
+// header stays clean (eyebrow + trending/newest toggle only). Discoverable
+// when the user naturally finishes scrolling.
+function ViewAllCard({
+  totalCount,
+  onClick,
+  size,
+}: {
+  totalCount: number;
+  onClick: () => void;
+  size: "compact" | "regular";
+}) {
+  const isCompact = size === "compact";
+  const dimensions = isCompact
+    ? "min-w-[160px] max-w-[180px] rounded-lg"
+    : "min-w-[280px] max-w-[320px] rounded-xl";
+  const iconSize = isCompact ? "w-5 h-5" : "w-7 h-7";
+  const titleSize = isCompact ? "text-xs" : "text-base";
+  const subSize = isCompact ? "text-[10px]" : "text-xs";
+  return (
+    <button
+      onClick={onClick}
+      className={`${dimensions} snap-start bg-zinc-100 hover:bg-zinc-200 transition-colors flex flex-col items-center justify-center text-zinc-600 hover:text-zinc-900 group focus:outline-none focus:ring-2 focus:ring-zinc-900`}
+    >
+      <div
+        className={`${iconSize} rounded-full bg-white flex items-center justify-center mb-2 group-hover:bg-white/80 transition-colors`}
+      >
+        <ChevronRight className={isCompact ? "w-3 h-3" : "w-4 h-4"} />
+      </div>
+      <p className={`${titleSize} font-medium tracking-tight`}>View all</p>
+      <p className={`${subSize} text-zinc-400 mt-0.5`}>
+        {totalCount} {totalCount === 1 ? "deal" : "deals"}
+      </p>
+    </button>
   );
 }
 

@@ -433,7 +433,7 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
           <section id="local-deals" className="max-w-6xl mx-auto px-0 pt-12 pb-1">
             <div className="flex items-center justify-between pb-3 mb-3">
               <p className="text-[11px] tracking-wider uppercase text-zinc-400 font-bold">
-                {config.dealsHeader ?? "Nearby deals for residents"}
+                {config.dealsHeader ?? "Nearby deals"}
               </p>
               <p className="text-[10px] text-zinc-400 hidden sm:block">
                 {config.deals.length} {config.deals.length === 1 ? "deal" : "deals"} from nearby businesses

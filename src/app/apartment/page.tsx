@@ -140,7 +140,7 @@ const config: LandingConfig = {
         "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80",
     },
   ],
-  dealsHeader: "Nearby deals for Lincoln Place residents",
+  dealsHeader: "Nearby deals for Lincoln Place",
   deals: [
     {
       id: "d1",

@@ -383,11 +383,17 @@ function Frame({
 }) {
   return (
     // stopPropagation on the overlay — this modal is sometimes rendered as a
-    // child of a card-level onClick handler (e.g. DealsStrip CompactDealCard).
-    // Without this, clicking Cancel / X / backdrop bubbles up to the parent
-    // and immediately re-opens the modal.
+    // child of a card-level onClick/onKeyDown handler (e.g. DealsStrip
+    // CompactDealCard). Without this, mouse + keyboard events bubble up to
+    // the parent card and re-trigger the propose-plan flow. Need to stop
+    // keyboard events too because the parent listens for Enter/Space — a
+    // single keystroke while typing in a textarea will fire the parent.
     <div
       onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+      onKeyUp={(e) => e.stopPropagation()}
+      onKeyPress={(e) => e.stopPropagation()}
       className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm"
     >
       <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-2xl relative">
