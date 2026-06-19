@@ -1008,6 +1008,10 @@ export default function OrgCalendarPage() {
   const [nearbyVenues, setNearbyVenues] = useState<NearbyVenue[]>([]);
   const [venuesLoading, setVenuesLoading] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<NearbyVenue | null>(null);
+  // Reported by <DealsStrip /> after it loads. Used to surface a
+  // "browse N deals" lifeline link in the empty-plans state so a fresh
+  // calendar with seeded deals doesn't feel dead on day 1.
+  const [dealsCount, setDealsCount] = useState(0);
   // Custom plan creation state
   const [creatingCustomPlan, setCreatingCustomPlan] = useState(false);
   const [customTitle, setCustomTitle] = useState("");
@@ -2015,34 +2019,10 @@ export default function OrgCalendarPage() {
         </main>
       ) : (
       <>
-      {!org.hideDeals && <DealsStrip
-        calendarId={org.objectId}
-        brandColor={org.brandColor}
-        compact={isApartmentOrgType(org.orgType, org.name, org.description)}
-        onCreatePlanFromDeal={(deal: StripDeal) => {
-          // Pre-fill the org page's existing custom-plan modal with venue +
-          // title + description from this deal. Date/time stay blank — the
-          // resident picks when they want to go.
-          if (!deal.business) return;
-          setSelectedVenue({
-            placeId:
-              deal.business.googlePlaceId ||
-              `deal-business-${deal.business.objectId}`,
-            name: deal.business.name,
-            address: deal.business.formattedAddress || "",
-            rating: null,
-            photoUrl: deal.imageUrl,
-            flagged: false,
-          });
-          setCustomTitle(deal.title);
-          setCustomDescription(deal.description || "");
-          setCustomCategory("");
-          setCustomFromDeal(true);
-          setCreatingCustomPlan(true);
-        }}
-      />}
-
-      {/* Stream Header */}
+      {/* Stream Header — plans lead the page so the community-calendar
+          pitch (residents host things for each other) drives the visual
+          identity. Local deals appear below the plans stream as a
+          supporting benefit, not the main attraction. */}
       <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100">
         <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
           Upcoming Plans
@@ -2060,6 +2040,16 @@ export default function OrgCalendarPage() {
                 ? "Browse curated plan ideas below and host one for your community."
                 : `Check back soon for new events from ${org.name}.`}
             </p>
+            {dealsCount > 0 && !org.hideDeals && (
+              <p className="text-zinc-500 text-sm pt-2">
+                <a
+                  href="#local-deals"
+                  className="inline-flex items-center gap-1 underline hover:text-zinc-900 transition-colors"
+                >
+                  ↓ Or browse {dealsCount} nearby {dealsCount === 1 ? "deal" : "deals"} for residents
+                </a>
+              </p>
+            )}
           </div>
         ) : (
           <div className="space-y-32">
@@ -2186,6 +2176,43 @@ export default function OrgCalendarPage() {
               </article>
             ))}
           </div>
+        )}
+
+        {/* Local Deals — supporting benefit, sits between plans (the lead
+            community-calendar pitch) and Get Involved (engagement levers).
+            Eyebrow says "Local deals for residents" — most deals are public
+            offers sourced from nearby businesses, so we don't over-claim
+            "procured." Individual Exclusive badges on cards mark the ones
+            that actually are Leaf-negotiated. */}
+        {!org.hideDeals && (
+          <DealsStrip
+            calendarId={org.objectId}
+            brandColor={org.brandColor}
+            compact={isApartmentOrgType(org.orgType, org.name, org.description)}
+            audienceName={org.name}
+            onLoaded={setDealsCount}
+            onCreatePlanFromDeal={(deal: StripDeal) => {
+              // Pre-fill the org page's existing custom-plan modal with venue +
+              // title + description from this deal. Date/time stay blank — the
+              // resident picks when they want to go.
+              if (!deal.business) return;
+              setSelectedVenue({
+                placeId:
+                  deal.business.googlePlaceId ||
+                  `deal-business-${deal.business.objectId}`,
+                name: deal.business.name,
+                address: deal.business.formattedAddress || "",
+                rating: null,
+                photoUrl: deal.imageUrl,
+                flagged: false,
+              });
+              setCustomTitle(deal.title);
+              setCustomDescription(deal.description || "");
+              setCustomCategory("");
+              setCustomFromDeal(true);
+              setCreatingCustomPlan(true);
+            }}
+          />
         )}
 
         {/* Plan Ideas Carousel */}

@@ -147,11 +147,26 @@ interface ListResponse {
   deals?: Deal[];
 }
 
+// Eyebrow framing: state the audience without claiming procurement. Most
+// deals here are publicly available offers sourced from nearby businesses,
+// not Leaf-negotiated exclusives — "Procured" would over-claim. The
+// individual <Excl> badge on each card carries the "exclusive" signal
+// where it's actually true.
+function dealsEyebrow(audienceName?: string | null): string {
+  const trimmed = audienceName?.trim();
+  if (trimmed && trimmed.length <= 18) {
+    return `Nearby deals for ${trimmed} residents`;
+  }
+  return "Nearby deals for residents";
+}
+
 export default function DealsStrip({
   calendarId,
   brandColor,
   compact = false,
+  audienceName,
   onCreatePlanFromDeal,
+  onLoaded,
 }: {
   calendarId: string;
   brandColor?: string | null;
@@ -162,12 +177,24 @@ export default function DealsStrip({
    */
   compact?: boolean;
   /**
+   * Building / calendar name. When short enough to fit in the eyebrow,
+   * shown as "Procured for {audienceName} residents". Otherwise the
+   * generic "Procured for residents" is used.
+   */
+  audienceName?: string | null;
+  /**
    * When provided, tapping a card pre-fills the org page's custom-plan
    * modal with this deal's title/description/venue (instead of any
    * deal-specific schedule flow). The "Interested" heart still works as
    * the lightweight solo signal.
    */
   onCreatePlanFromDeal?: (deal: Deal) => void;
+  /**
+   * Fires once per fetch with the loaded deal count. Lets the host page
+   * (e.g. org/[shareId]) reference the count in its own UI — for example,
+   * a "browse N deals" lifeline in the empty-plans state.
+   */
+  onLoaded?: (count: number) => void;
 }) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -178,22 +205,31 @@ export default function DealsStrip({
     if (!calendarId) return;
     setLoaded(false);
     Parse.Cloud.run("listDealsForCalendar", { calendarId, sortBy })
-      .then((r: ListResponse) => setDeals(r.deals || []))
-      .catch(() => setDeals([]))
+      .then((r: ListResponse) => {
+        const list = r.deals || [];
+        setDeals(list);
+        onLoaded?.(list.length);
+      })
+      .catch(() => {
+        setDeals([]);
+        onLoaded?.(0);
+      })
       .finally(() => setLoaded(true));
-  }, [calendarId, sortBy]);
+  }, [calendarId, sortBy, onLoaded]);
 
   if (!loaded || deals.length === 0) return null;
+
+  const eyebrow = dealsEyebrow(audienceName);
 
   const visibleDeals = deals.slice(0, CAROUSEL_LIMIT);
   const overflowCount = deals.length - CAROUSEL_LIMIT;
 
   if (compact) {
     return (
-      <section className="max-w-6xl mx-auto px-6 pt-5 pb-1">
+      <section id="local-deals" className="max-w-6xl mx-auto px-6 pt-5 pb-1">
         <div className="flex items-center justify-between pb-3 mb-3 gap-2">
           <p className="text-[11px] tracking-wider uppercase text-zinc-400 font-bold">
-            Local Deals
+            {eyebrow}
           </p>
           <div className="flex items-center gap-2">
             <SortToggle value={sortBy} onChange={setSortBy} size="compact" />
@@ -236,10 +272,10 @@ export default function DealsStrip({
   }
 
   return (
-    <section className="max-w-6xl mx-auto px-6 pt-12 pb-2">
+    <section id="local-deals" className="max-w-6xl mx-auto px-6 pt-12 pb-2">
       <div className="flex items-center justify-between border-b border-zinc-100 pb-6 mb-6 gap-3">
         <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
-          Local Deals
+          {eyebrow}
         </p>
         <div className="flex items-center gap-3">
           <SortToggle value={sortBy} onChange={setSortBy} />

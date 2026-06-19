@@ -339,33 +339,9 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
         </div>
       </nav>
 
-      {/* Local Deals — only renders when the landing config supplies deals.
-          Visual match for the live DealsStrip on /org/[shareId] so this page
-          doubles as a faithful mockup for reps to show businesses. */}
-      {config.deals && config.deals.length > 0 && (
-        <section className="max-w-6xl mx-auto px-6 pt-5 pb-1">
-          <div className="flex items-center justify-between pb-3 mb-3">
-            <p className="text-[11px] tracking-wider uppercase text-zinc-400 font-bold">
-              {config.dealsHeader ?? "Local Deals"}
-            </p>
-            <p className="text-[10px] text-zinc-400 hidden sm:block">
-              {config.deals.length} {config.deals.length === 1 ? "deal" : "deals"} from nearby businesses
-            </p>
-          </div>
-          <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2 -mx-6 px-6">
-            {config.deals.map((deal) => (
-              <SampleDealCard
-                key={deal.id}
-                deal={deal}
-                brandColor={config.brandColor}
-                onClick={() => setShowCTA(true)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Stream Header */}
+      {/* Stream Header — plans lead the page. Local deals (when present)
+          appear below as a supporting benefit. Matches the live render on
+          /org/[shareId]. */}
       <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100">
         <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
           {plansHeader}
@@ -448,6 +424,33 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
             );
           })}
         </div>
+
+        {/* Local Deals — supporting benefit between plans and the
+            engagement levers below. Eyebrow reads "Procured for residents"
+            to reinforce the manager-pitch promise (we lined these up on
+            their behalf). */}
+        {config.deals && config.deals.length > 0 && (
+          <section id="local-deals" className="max-w-6xl mx-auto px-0 pt-12 pb-1">
+            <div className="flex items-center justify-between pb-3 mb-3">
+              <p className="text-[11px] tracking-wider uppercase text-zinc-400 font-bold">
+                {config.dealsHeader ?? "Nearby deals for residents"}
+              </p>
+              <p className="text-[10px] text-zinc-400 hidden sm:block">
+                {config.deals.length} {config.deals.length === 1 ? "deal" : "deals"} from nearby businesses
+              </p>
+            </div>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2">
+              {config.deals.map((deal) => (
+                <SampleDealCard
+                  key={deal.id}
+                  deal={deal}
+                  brandColor={config.brandColor}
+                  onClick={() => setShowCTA(true)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Plan Ideas Carousel */}
         {config.planIdeas.length > 0 && (
