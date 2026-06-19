@@ -1887,12 +1887,16 @@ export default function OrgCalendarPage() {
               <h1 className="text-sm md:text-2xl font-light tracking-[0.1em] md:tracking-wider uppercase line-clamp-2 md:truncate">
                 {org.name}
               </h1>
-              <span className="text-xs tracking-wider uppercase font-bold text-zinc-400">
-                {followerCount} followers
+              <span className="text-xs tracking-wider uppercase font-bold text-zinc-400 block">
+                <span className="block sm:inline">
+                  {followerCount} followers
+                </span>
                 {org.pastPlanCount > 0 && (
                   <>
-                    <span className="mx-1.5 text-zinc-300">·</span>
-                    {org.pastPlanCount} past plan{org.pastPlanCount === 1 ? "" : "s"}
+                    <span className="mx-1.5 text-zinc-300 hidden sm:inline">·</span>
+                    <span className="block sm:inline">
+                      {org.pastPlanCount} past plan{org.pastPlanCount === 1 ? "" : "s"}
+                    </span>
                   </>
                 )}
               </span>
