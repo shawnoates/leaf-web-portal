@@ -70,17 +70,6 @@ function buildPrefillUrl(
   return qs ? `${base}?${qs}` : base;
 }
 
-function formatIdeaDate(iso: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 export default function HostTheNextOne({
   viewerRole,
   calendar,
@@ -145,7 +134,6 @@ export default function HostTheNextOne({
     ? nextPlanIdea!.description
     : event.description;
   const cardLocation = hasPlanIdea ? nextPlanIdea!.location : event.location;
-  const cardDateLabel = hasPlanIdea ? formatIdeaDate(nextPlanIdea!.date) : null;
 
   const venueAddress = cardLocation?.address || "";
   const venueName = cardLocation?.name || "";
@@ -182,16 +170,7 @@ export default function HostTheNextOne({
       ? "Pre-filled with what worked. Pick a new date."
       : `Send ${calendar.name || "the host"} a date for the next one. They approve, it goes live.`;
 
-  // Stats — for plan ideas, show the suggested date + venue. For "repeat this
-  // plan", omit RSVP count (per spec — that was last time's number, not this
-  // future plan's) and just show venue if present.
   const stats: { icon: React.ReactNode; label: string }[] = [];
-  if (cardDateLabel) {
-    stats.push({
-      icon: <Calendar className="w-3.5 h-3.5" />,
-      label: cardDateLabel,
-    });
-  }
   if (venueName) {
     stats.push({
       icon: <MapPin className="w-3.5 h-3.5" />,
