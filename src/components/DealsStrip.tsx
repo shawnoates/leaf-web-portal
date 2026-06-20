@@ -212,7 +212,7 @@ export default function DealsStrip({
 
   if (compact) {
     return (
-      <section id="local-deals" className="max-w-6xl mx-auto px-6 pt-5 pb-1">
+      <section id="local-deals" className="pt-5 pb-1">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 mb-3 gap-2">
           <p className="text-[11px] tracking-wider uppercase text-zinc-400 font-bold">
             {eyebrow}
@@ -251,7 +251,7 @@ export default function DealsStrip({
   }
 
   return (
-    <section id="local-deals" className="max-w-6xl mx-auto px-6 pt-12 pb-2">
+    <section id="local-deals" className="pt-12 pb-2">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-zinc-100 pb-6 mb-6 gap-3">
         <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
           {eyebrow}
