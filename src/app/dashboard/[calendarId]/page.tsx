@@ -219,7 +219,7 @@ const TABS = [
   { id: "followers", label: "Followers", icon: Heart },
   { id: "members", label: "Users", icon: Users, ownerOnly: true },
   { id: "analytics", label: "Analytics", icon: TrendingUp, proOnly: true },
-  { id: "marketplace", label: "Marketplace", icon: Ticket, growthOnly: true },
+  { id: "marketplace", label: "Marketplace", icon: Ticket, paidOnly: true },
   { id: "settings", label: "Settings", icon: Settings, ownerOnly: true },
 ];
 
@@ -786,7 +786,7 @@ export default function OrgDashboardPage() {
     try {
       if (tier === "starter") {
         // Downgrade to free — schedule Stripe cancel-at-period-end
-        if (!confirm("Switching to Starter will cancel your subscription at the end of the current billing period. Continue?")) {
+        if (!confirm("Switching to Free will cancel your subscription at the end of the current billing period. Continue?")) {
           setSubscriptionLoading(false);
           return;
         }
@@ -816,7 +816,7 @@ export default function OrgDashboardPage() {
   }
 
   async function handleCancelSubscription() {
-    if (!confirm("Are you sure you want to cancel your subscription? You will be downgraded to Starter (Free) at the end of your current billing period.")) return;
+    if (!confirm("Are you sure you want to cancel your subscription? You will be downgraded to the Free plan at the end of your current billing period.")) return;
     setSubscriptionLoading(true);
     try {
       const result = await Parse.Cloud.run("cancelOrgSubscription", { calendarId });
@@ -966,8 +966,10 @@ export default function OrgDashboardPage() {
     );
   }
 
-  const isGrowthPlus = dashboard.tier === "growth" || dashboard.tier === "pro";
-  const tierLabel = dashboard.tier === "pro" ? "The Organizer" : dashboard.tier === "growth" ? "The Social" : "Starter";
+  // `growth` is the retired Social tier — existing subscribers still carry it
+  // in the DB until the server-side migration runs, so treat them as Pro.
+  const isPaid = dashboard.tier === "pro" || dashboard.tier === "growth";
+  const tierLabel = isPaid ? "Pro" : "Free";
 
   // ── Render ──
 
@@ -998,8 +1000,8 @@ export default function OrgDashboardPage() {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               const isLocked =
-                (tab.proOnly && dashboard.tier !== "pro") ||
-                ((tab as { growthOnly?: boolean }).growthOnly && dashboard.tier === "starter");
+                (tab.proOnly && !isPaid) ||
+                ((tab as { paidOnly?: boolean }).paidOnly && !isPaid);
               return (
                 <button
                   key={tab.id}
@@ -1824,7 +1826,7 @@ export default function OrgDashboardPage() {
               <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
                 Calendars ({dashboard.calendars.length}{dashboard.calendarLimit ? `/${dashboard.calendarLimit}` : ""})
               </h2>
-              {isGrowthPlus && (
+              {isPaid && (
                 <button
                   onClick={() => {
                     if (dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit) {
@@ -2284,14 +2286,14 @@ export default function OrgDashboardPage() {
 
             {/* AI Idea Generation */}
             <div className="relative">
-              {!isGrowthPlus && (
+              {!isPaid && (
                 <div className="absolute top-4 right-4 z-10" onClick={() => setShowSubscription(true)}>
                   <div className="flex items-center gap-2 bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest cursor-pointer hover:bg-zinc-800 transition-colors">
                     <Lock className="w-3 h-3" /> Upgrade
                   </div>
                 </div>
               )}
-              <section className={`border border-zinc-200 rounded-xl p-6 space-y-8 ${!isGrowthPlus ? "opacity-40 pointer-events-none" : ""}`}>
+              <section className={`border border-zinc-200 rounded-xl p-6 space-y-8 ${!isPaid ? "opacity-40 pointer-events-none" : ""}`}>
                 <div>
                   <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Automated Plan Ideas</h2>
                   <p className="text-xs text-zinc-500 mt-1">Control how Leaf generates plan ideas for your community.</p>
@@ -2506,14 +2508,14 @@ export default function OrgDashboardPage() {
                   {dashboard.tier === "starter"
                     ? "Free — basic features"
                     : dashboard.tier === "growth"
-                    ? dashboard.billingInterval === "year" ? "$49.99/year — premium features" : "$4.99/month — premium features"
-                    : dashboard.billingInterval === "year" ? "$99.99/year — full features" : "$9.99/month — full features"}
+                    ? dashboard.billingInterval === "year" ? "$49.99/year — legacy Social plan, grandfathered into Pro features" : "$4.99/month — legacy Social plan, grandfathered into Pro features"
+                    : dashboard.billingInterval === "year" ? "$99/year — full features" : "$9.99/month — full features"}
                 </p>
                 {dashboard.subscriptionStatus === "cancelling" && (
                   <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
                     <p className="text-sm font-medium text-amber-800">Subscription cancelling</p>
                     <p className="text-xs text-amber-600 mt-0.5">
-                      Your plan remains active until {(cancelAt || dashboard.subscriptionCancelAt) ? new Date((cancelAt || dashboard.subscriptionCancelAt!) * 1000).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "the end of your billing period"}. After that, you&apos;ll be downgraded to the Starter (Free) plan.
+                      Your plan remains active until {(cancelAt || dashboard.subscriptionCancelAt) ? new Date((cancelAt || dashboard.subscriptionCancelAt!) * 1000).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "the end of your billing period"}. After that, you&apos;ll be downgraded to the Free plan.
                     </p>
                   </div>
                 )}

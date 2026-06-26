@@ -3,72 +3,59 @@
 import { useState } from "react";
 import { Check, Plus } from "lucide-react";
 
-const TIERS = [
+type Tier = {
+  id: string;
+  name: string;
+  monthlyPrice: string;
+  yearlyPrice: string;
+  monthlyPeriod: string;
+  yearlyPeriod: string;
+  yearlySavings?: string;
+  description: string;
+  highlight?: boolean;
+  features: string[];
+};
+
+const TIERS: Tier[] = [
   {
     id: "starter",
-    name: "Starter",
+    name: "Free",
     monthlyPrice: "Free",
     yearlyPrice: "Free",
     monthlyPeriod: "",
     yearlyPeriod: "",
-    description: "For the casual host",
+    description: "For getting your community off the ground",
     features: [
       "1 calendar",
       "5 AI plan ideas per week",
       "Up to 50 RSVPs",
-      "Web chat for attendees",
+      "Phone-number RSVP with SMS confirmations",
+      "Member hosting",
       "Automated follower notifications",
       "Attendance reporting",
       "Photo collection",
       "Access to local events database",
-    ],
-  },
-  {
-    id: "growth",
-    name: "The Social",
-    monthlyPrice: "$4.99",
-    yearlyPrice: "$49.99",
-    monthlyPeriod: "/mo",
-    yearlyPeriod: "/yr",
-    yearlySavings: "Save 17%",
-    description: "For the individual connector who wants more control and a premium look",
-    highlight: true,
-    features: [
-      "1 calendar",
-      "10 AI plan ideas per week",
-      "Unlimited RSVPs",
-      "Web chat for attendees",
-      "Automated follower notifications",
-      "Attendance reporting",
-      "Photo collection",
-      "Access to local events database",
-      "Unlimited scheduling",
-      "Custom branding",
-      "Custom plan idea preferences",
     ],
   },
   {
     id: "pro",
-    name: "The Organizer",
+    name: "Pro",
     monthlyPrice: "$9.99",
-    yearlyPrice: "$99.99",
+    yearlyPrice: "$99",
     monthlyPeriod: "/mo",
     yearlyPeriod: "/yr",
-    yearlySavings: "Save 17%",
-    description: "For building a brand, managing co-hosts, and scaling your community",
+    yearlySavings: "2 months free",
+    description: "For organizers who want their own brand and room to grow",
+    highlight: true,
     features: [
-      "5 calendars",
+      "Up to 5 calendars",
       "15 AI plan ideas per week",
       "Unlimited RSVPs",
-      "Web chat for attendees",
-      "Automated follower notifications",
-      "Attendance reporting",
-      "Photo collection",
-      "Access to local events database",
       "Unlimited scheduling",
-      "Custom branding",
-      "Advanced plan idea preferences",
+      "Custom branding (logo + brand color)",
+      "Custom plan idea preferences",
       "Analytics dashboard",
+      "Co-host management",
     ],
   },
 ];
@@ -129,7 +116,7 @@ export default function SubscriptionModal({
           </button>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-2 gap-4">
           {TIERS.map((tier) => {
             const isCurrent = tier.id === currentTier;
             const price = billingPeriod === "yearly" ? tier.yearlyPrice : tier.monthlyPrice;

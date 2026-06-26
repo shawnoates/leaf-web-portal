@@ -16,83 +16,69 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-const PRICING_TIERS = [
+type PricingTier = {
+  id: string;
+  name: string;
+  monthlyPrice: string;
+  yearlyPrice: string;
+  monthlyPeriod: string;
+  yearlyPeriod: string;
+  yearlySavings?: string;
+  description: string;
+  cta: string;
+  highlight: boolean;
+  inheritsLabel?: string;
+  features: string[];
+  excluded: string[];
+};
+
+const PRICING_TIERS: PricingTier[] = [
   {
     id: "starter",
-    name: "Starter",
+    name: "Free",
     monthlyPrice: "Free",
     yearlyPrice: "Free",
     monthlyPeriod: "",
     yearlyPeriod: "",
-    description: "For the casual host",
-    cta: "Get Started Free",
+    description: "For getting your calendar off the ground",
+    cta: "Get started free",
     highlight: false,
     features: [
       "1 calendar",
       "5 AI plan ideas per week",
       "Up to 50 RSVPs",
-      "Web chat for attendees",
+      "Phone-number RSVP with SMS confirmations",
+      "Co-host with friends",
       "Automated follower notifications",
       "Attendance reporting",
       "Photo collection",
       "Access to local events database",
     ],
     excluded: [
-      "Custom plan idea preferences",
-      "Analytics",
-    ],
-  },
-  {
-    id: "growth",
-    name: "The Social",
-    monthlyPrice: "$4.99",
-    yearlyPrice: "$49.99",
-    monthlyPeriod: "/mo",
-    yearlyPeriod: "/yr",
-    yearlySavings: "Save 17%",
-    description: "For the individual connector who wants more control and a premium look",
-    cta: "Start with The Social",
-    highlight: true,
-    features: [
-      "1 calendar",
-      "10 AI plan ideas per week",
-      "Unlimited RSVPs",
-      "Web chat for attendees",
-      "Automated follower notifications",
-      "Attendance reporting",
-      "Photo collection",
-      "Access to local events database",
-      "Unlimited scheduling",
       "Custom branding",
-      "Custom plan idea preferences",
-    ],
-    excluded: [
       "Analytics",
+      "Unlimited scheduling",
     ],
   },
   {
     id: "pro",
-    name: "The Organizer",
+    name: "Pro",
     monthlyPrice: "$9.99",
-    yearlyPrice: "$99.99",
+    yearlyPrice: "$99",
     monthlyPeriod: "/mo",
     yearlyPeriod: "/yr",
-    yearlySavings: "Save 17%",
-    description: "For building a brand, managing co-hosts, and scaling your circle",
-    cta: "Start with The Organizer",
-    highlight: false,
+    yearlySavings: "2 months free",
+    description: "For planners who want their own brand and room to grow",
+    cta: "Start with Pro",
+    highlight: true,
+    inheritsLabel: "Everything in Free, plus:",
     features: [
-      "5 calendars",
+      "Up to 5 calendars",
       "15 AI plan ideas per week",
       "Unlimited RSVPs",
-      "Web chat for attendees",
-      "Automated follower notifications",
-      "Attendance reporting",
-      "Photo collection",
-      "Access to local events database",
       "Unlimited scheduling",
-      "Custom branding",
-      "Advanced plan idea preferences",
+      "Custom branding (logo + brand color)",
+      "Custom plan idea preferences",
       "Analytics dashboard",
     ],
     excluded: [],
@@ -353,9 +339,12 @@ export default function PersonalPage() {
             <p className="text-xs tracking-wider uppercase text-zinc-500 font-semibold mb-3">
               Pricing
             </p>
-            <h2 className="text-4xl font-light tracking-tight italic mb-8">
-              Start free, grow when ready
+            <h2 className="text-4xl font-light tracking-tight italic mb-3">
+              Simple pricing that grows with you
             </h2>
+            <p className="text-zinc-500 font-light mb-8 max-w-xl mx-auto">
+              Start free. Upgrade when you want your own brand and more room to grow.
+            </p>
             <div className="inline-flex items-center gap-1 bg-zinc-100 rounded-full p-1">
               <button
                 onClick={() => setBillingPeriod("monthly")}
@@ -379,7 +368,7 @@ export default function PersonalPage() {
               </button>
             </div>
           </div>
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
             {PRICING_TIERS.map((tier) => {
               const price = billingPeriod === "yearly" ? tier.yearlyPrice : tier.monthlyPrice;
               const period = billingPeriod === "yearly" ? tier.yearlyPeriod : tier.monthlyPeriod;
@@ -421,6 +410,11 @@ export default function PersonalPage() {
                   </p>
                 </div>
                 <div className="flex-1 space-y-3 mb-8">
+                  {tier.inheritsLabel && (
+                    <p className="text-xs font-semibold tracking-wide text-zinc-700 mb-4">
+                      {tier.inheritsLabel}
+                    </p>
+                  )}
                   {tier.features.map((feature) => (
                     <div
                       key={feature}
@@ -512,9 +506,9 @@ export default function PersonalPage() {
             <div>
               <h3 className="text-sm font-bold mb-1">What does custom branding include?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                On The Social and The Organizer plans, you can upload your own
-                logo and set a brand color for your calendar page — so it feels
-                like yours, not Leaf's.
+                On the Pro plan, you can upload your own logo and set a brand
+                color for your calendar page — so it feels like yours, not
+                Leaf's.
               </p>
             </div>
           </div>

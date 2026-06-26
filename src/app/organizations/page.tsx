@@ -16,84 +16,98 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-const PRICING_TIERS = [
+type PricingTier = {
+  id: string;
+  name: string;
+  monthlyPrice: string;
+  yearlyPrice: string;
+  monthlyPeriod: string;
+  yearlyPeriod: string;
+  yearlySavings?: string;
+  customPrice?: string;
+  description: string;
+  cta: string;
+  ctaHref?: string;
+  highlight: boolean;
+  dark?: boolean;
+  inheritsLabel?: string;
+  features: string[];
+  excluded: string[];
+};
+
+const PRICING_TIERS: PricingTier[] = [
   {
     id: "starter",
-    name: "Starter",
+    name: "Free",
     monthlyPrice: "Free",
     yearlyPrice: "Free",
     monthlyPeriod: "",
     yearlyPeriod: "",
-    description: "For the casual host",
-    cta: "Get Started Free",
+    description: "For getting your community off the ground",
+    cta: "Get started free",
     highlight: false,
     features: [
       "1 calendar",
       "5 AI plan ideas per week",
       "Up to 50 RSVPs",
-      "Web chat for attendees",
+      "Phone-number RSVP with SMS confirmations",
+      "Member hosting",
       "Automated follower notifications",
       "Attendance reporting",
       "Photo collection",
       "Access to local events database",
     ],
     excluded: [
-      "Custom plan idea preferences",
-      "Analytics",
-    ],
-  },
-  {
-    id: "growth",
-    name: "The Social",
-    monthlyPrice: "$4.99",
-    yearlyPrice: "$49.99",
-    monthlyPeriod: "/mo",
-    yearlyPeriod: "/yr",
-    yearlySavings: "Save 17%",
-    description: "For the individual connector who wants more control and a premium look",
-    cta: "Start with The Social",
-    highlight: true,
-    features: [
-      "1 calendar",
-      "10 AI plan ideas per week",
-      "Unlimited RSVPs",
-      "Web chat for attendees",
-      "Automated follower notifications",
-      "Attendance reporting",
-      "Photo collection",
-      "Access to local events database",
-      "Unlimited scheduling",
       "Custom branding",
-      "Custom plan idea preferences",
-    ],
-    excluded: [
       "Analytics",
+      "Unlimited scheduling",
     ],
   },
   {
     id: "pro",
-    name: "The Organizer",
+    name: "Pro",
     monthlyPrice: "$9.99",
-    yearlyPrice: "$99.99",
+    yearlyPrice: "$99",
     monthlyPeriod: "/mo",
     yearlyPeriod: "/yr",
-    yearlySavings: "Save 17%",
-    description: "For building a brand, managing co-hosts, and scaling your community",
-    cta: "Start with The Organizer",
-    highlight: false,
+    yearlySavings: "2 months free",
+    description: "For organizers who want their own brand and room to grow",
+    cta: "Start with Pro",
+    highlight: true,
+    inheritsLabel: "Everything in Free, plus:",
     features: [
-      "5 calendars",
+      "Up to 5 calendars",
       "15 AI plan ideas per week",
       "Unlimited RSVPs",
-      "Web chat for attendees",
-      "Automated follower notifications",
-      "Attendance reporting",
-      "Photo collection",
-      "Access to local events database",
       "Unlimited scheduling",
-      "Custom branding",
-      "Advanced plan idea preferences",
+      "Custom branding (logo + brand color)",
+      "Custom plan idea preferences",
       "Analytics dashboard",
+      "Co-host management",
+    ],
+    excluded: [],
+  },
+  {
+    id: "managed",
+    name: "Concierge",
+    monthlyPrice: "Starting at $499",
+    yearlyPrice: "Starting at $499",
+    monthlyPeriod: "/mo",
+    yearlyPeriod: "/mo",
+    customPrice: "Starting at $499",
+    description: "For organizations that want Leaf run for them",
+    cta: "Talk to us",
+    ctaHref: "mailto:team@getleaflets.co?subject=Concierge%20plan%20inquiry",
+    highlight: false,
+    dark: true,
+    inheritsLabel: "Everything in Pro, plus:",
+    features: [
+      "A dedicated Leaf host who plans and coordinates your events",
+      "Member survey + personalized monthly event plan",
+      "Vendor coordination, setup, and member communication handled for you",
+      "Local merchant deals featured on your calendar",
+      "Volume pricing across multiple communities or locations",
+      "Priority support",
     ],
     excluded: [],
   },
@@ -325,9 +339,12 @@ export default function OrganizationsPage() {
             <p className="text-xs tracking-wider uppercase text-zinc-500 font-semibold mb-3">
               Pricing
             </p>
-            <h2 className="text-4xl font-light tracking-tight italic mb-8">
-              Start free, grow when ready
+            <h2 className="text-4xl font-light tracking-tight italic mb-3">
+              Simple pricing that grows with you
             </h2>
+            <p className="text-zinc-500 font-light mb-8 max-w-xl mx-auto">
+              Start free. Upgrade when you want your own brand — or let us run it for you.
+            </p>
             {/* Billing period toggle */}
             <div className="inline-flex items-center gap-1 bg-zinc-100 rounded-full p-1">
               <button
@@ -354,15 +371,32 @@ export default function OrganizationsPage() {
           </div>
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {PRICING_TIERS.map((tier) => {
-              const price = billingPeriod === "yearly" ? tier.yearlyPrice : tier.monthlyPrice;
-              const period = billingPeriod === "yearly" ? tier.yearlyPeriod : tier.monthlyPeriod;
+              const price = tier.customPrice
+                ? tier.customPrice
+                : billingPeriod === "yearly"
+                  ? tier.yearlyPrice
+                  : tier.monthlyPrice;
+              const period = tier.customPrice
+                ? "/mo"
+                : billingPeriod === "yearly"
+                  ? tier.yearlyPeriod
+                  : tier.monthlyPeriod;
+              const isMailto = tier.ctaHref?.startsWith("mailto:");
+              const href = tier.ctaHref
+                ? tier.ctaHref
+                : isLoggedIn
+                  ? "/dashboard"
+                  : `/organizations/setup?tier=${tier.id}&billingPeriod=${billingPeriod}`;
+              const ctaLabel = !tier.ctaHref && isLoggedIn ? "Go to dashboard" : tier.cta;
               return (
               <div
                 key={tier.name}
-                className={`bg-white p-8 flex flex-col ${
-                  tier.highlight
-                    ? "ring-2 ring-zinc-900 relative"
-                    : "border border-zinc-200"
+                className={`p-8 flex flex-col ${
+                  tier.dark
+                    ? "bg-zinc-900 text-white relative"
+                    : tier.highlight
+                      ? "bg-white ring-2 ring-zinc-900 relative"
+                      : "bg-white border border-zinc-200"
                 }`}
               >
                 {tier.highlight && (
@@ -371,42 +405,57 @@ export default function OrganizationsPage() {
                   </div>
                 )}
                 <div className="mb-8">
-                  <h3 className="text-xs tracking-wider uppercase font-semibold text-zinc-500 mb-4">
+                  <h3 className={`text-xs tracking-wider uppercase font-semibold mb-4 ${
+                    tier.dark ? "text-white/60" : "text-zinc-500"
+                  }`}>
                     {tier.name}
                   </h3>
-                  <div className="flex items-baseline gap-1">
+                  <div className="flex items-baseline gap-1 flex-wrap">
                     <span className="text-4xl font-light tracking-tight">
                       {price}
                     </span>
                     {period && (
-                      <span className="text-zinc-400 text-sm">
+                      <span className={`text-sm ${tier.dark ? "text-white/50" : "text-zinc-400"}`}>
                         {period}
                       </span>
                     )}
                   </div>
-                  {billingPeriod === "yearly" && tier.yearlySavings && (
+                  {!tier.customPrice && billingPeriod === "yearly" && tier.yearlySavings && (
                     <span className="text-xs text-green-600 font-medium mt-1 inline-block">
                       {tier.yearlySavings}
                     </span>
                   )}
-                  <p className="text-sm text-zinc-500 font-light mt-2">
+                  <p className={`text-sm font-light mt-2 ${
+                    tier.dark ? "text-white/70" : "text-zinc-500"
+                  }`}>
                     {tier.description}
                   </p>
                 </div>
                 <div className="flex-1 space-y-3 mb-8">
+                  {tier.inheritsLabel && (
+                    <p className={`text-xs font-semibold tracking-wide mb-4 ${
+                      tier.dark ? "text-white/80" : "text-zinc-700"
+                    }`}>
+                      {tier.inheritsLabel}
+                    </p>
+                  )}
                   {tier.features.map((feature) => (
                     <div
                       key={feature}
                       className="flex items-start gap-3 text-sm"
                     >
-                      <Check className="w-4 h-4 text-zinc-900 mt-0.5 shrink-0" />
+                      <Check className={`w-4 h-4 mt-0.5 shrink-0 ${
+                        tier.dark ? "text-white" : "text-zinc-900"
+                      }`} />
                       <span>{feature}</span>
                     </div>
                   ))}
                   {tier.excluded.map((feature) => (
                     <div
                       key={feature}
-                      className="flex items-start gap-3 text-sm text-zinc-300"
+                      className={`flex items-start gap-3 text-sm ${
+                        tier.dark ? "text-white/30" : "text-zinc-300"
+                      }`}
                     >
                       <span className="w-4 h-4 flex items-center justify-center mt-0.5 shrink-0">
                         &mdash;
@@ -415,20 +464,36 @@ export default function OrganizationsPage() {
                     </div>
                   ))}
                 </div>
-                <Link
-                  href={isLoggedIn ? "/dashboard" : `/organizations/setup?tier=${tier.id}&billingPeriod=${billingPeriod}`}
-                  className={`w-full py-3.5 text-sm font-semibold text-center flex items-center justify-center gap-2 rounded-full transition-colors ${
-                    tier.highlight
-                      ? "bg-zinc-900 text-white hover:bg-zinc-800"
-                      : "border border-zinc-200 text-zinc-900 hover:bg-zinc-50"
-                  }`}
-                >
-                  {isLoggedIn ? "Go to dashboard" : tier.cta} <ChevronRight className="w-3.5 h-3.5" />
-                </Link>
+                {isMailto ? (
+                  <a
+                    href={href}
+                    className={`w-full py-3.5 text-sm font-semibold text-center flex items-center justify-center gap-2 rounded-full transition-colors ${
+                      tier.dark
+                        ? "bg-white text-zinc-900 hover:bg-white/90"
+                        : "border border-zinc-200 text-zinc-900 hover:bg-zinc-50"
+                    }`}
+                  >
+                    {ctaLabel} <ChevronRight className="w-3.5 h-3.5" />
+                  </a>
+                ) : (
+                  <Link
+                    href={href}
+                    className={`w-full py-3.5 text-sm font-semibold text-center flex items-center justify-center gap-2 rounded-full transition-colors ${
+                      tier.highlight
+                        ? "bg-zinc-900 text-white hover:bg-zinc-800"
+                        : "border border-zinc-200 text-zinc-900 hover:bg-zinc-50"
+                    }`}
+                  >
+                    {ctaLabel} <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                )}
               </div>
               );
             })}
           </div>
+          <p className="text-center text-sm text-zinc-500 font-light mt-10 max-w-2xl mx-auto">
+            You keep your event budget — we make it effortless. Curated, locally-sponsored events with zero work for your team. Perfect for apartment buildings, churches, clubs, and any community that wants a thriving calendar without the lift.
+          </p>
         </div>
       </section>
 
@@ -463,7 +528,7 @@ export default function OrganizationsPage() {
             <div>
               <h3 className="text-sm font-bold mb-1">What counts as an RSVP?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                An RSVP is counted each time someone confirms attendance to one of your plans. On the Starter plan, you get up to 50 RSVPs total. Growth and Organizer plans have unlimited RSVPs.
+                An RSVP is counted each time someone confirms attendance to one of your plans. On the Free plan you get up to 50 RSVPs total. Pro and Concierge plans have unlimited RSVPs.
               </p>
             </div>
             <div>
@@ -475,7 +540,13 @@ export default function OrganizationsPage() {
             <div>
               <h3 className="text-sm font-bold mb-1">What does custom branding include?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                On Growth and Organizer plans, you can upload your own logo and set a brand color for your calendar page. This replaces the default Leaf branding so your community sees your identity.
+                On the Pro and Concierge plans, you can upload your own logo and set a brand color for your calendar page. This replaces the default Leaf branding so your community sees your identity.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold mb-1">What's the Concierge plan?</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                Concierge is our done-for-you service for organizations that want Leaf run for them — apartment buildings, churches, clubs, HOAs, and more. We survey your members, build a personalized monthly event plan, and handle the coordination, setup, and communication — plus we feature local merchant deals on your calendar. You get a thriving community calendar without adding any work for your team. Pricing starts at $499/mo, with volume rates for multiple communities or locations. Talk to us to get set up.
               </p>
             </div>
           </div>

@@ -42,8 +42,7 @@ const TIER_LABELS: Record<
   string,
   { name: string; monthly: string; yearly: string }
 > = {
-  growth: { name: "The Social", monthly: "$4.99/mo", yearly: "$49.99/yr" },
-  pro: { name: "The Organizer", monthly: "$9.99/mo", yearly: "$99.99/yr" },
+  pro: { name: "Pro", monthly: "$9.99/mo", yearly: "$99/yr" },
 };
 
 // --- Types ---
@@ -76,8 +75,12 @@ function SetupPageInner() {
   // the user in a paid plan. If a paid tier is requested, we create the org as
   // starter first, then redirect to Stripe Checkout to upgrade.
   const requestedTier = searchParams.get("tier");
+  // Legacy `growth` slug maps to `pro` — the retired Social tier customers
+  // get the new Pro feature set.
   const initialTier =
-    requestedTier === "growth" || requestedTier === "pro" ? requestedTier : "starter";
+    requestedTier === "pro" || requestedTier === "growth"
+      ? "pro"
+      : "starter";
   const requestedBillingPeriod = searchParams.get("billingPeriod");
   const initialBillingPeriod: "monthly" | "yearly" =
     requestedBillingPeriod === "yearly" ? "yearly" : "monthly";
@@ -253,7 +256,7 @@ function SetupPageInner() {
       }
 
       // If a paid tier was requested, kick off Stripe Checkout
-      if (form.tier === "growth" || form.tier === "pro") {
+      if (form.tier === "pro") {
         setRedirectingToCheckout(true);
         try {
           const checkout = await Parse.Cloud.run("createOrgSubscriptionCheckout", {

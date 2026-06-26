@@ -538,7 +538,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   if (pollAllowed) { setMode("poll"); return; }
                   if (onUpgrade) onUpgrade();
                 }}
-                title={pollAllowed ? "" : "Date polls require The Social or The Organizer plan"}
+                title={pollAllowed ? "" : "Date polls require the Pro plan"}
                 className={`group border rounded-lg p-2.5 text-left transition-all ${
                   mode === "poll" ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
                 } ${pollAllowed ? "" : "opacity-50 hover:opacity-100 hover:border-zinc-400"}`}
@@ -556,7 +556,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                     "Followers vote on a date"
                   ) : (
                     <>
-                      <span className="group-hover:hidden">The Social or The Organizer</span>
+                      <span className="group-hover:hidden">Pro plan only</span>
                       <span className="hidden group-hover:inline-flex items-center gap-1 font-bold uppercase tracking-widest text-zinc-700">
                         <Lock className="w-2.5 h-2.5" /> Upgrade
                       </span>
@@ -719,7 +719,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                 {pollConvertMode ? (
                   <p className="text-xs text-zinc-400 mt-1">Locked to the winning vote</p>
                 ) : tier === "starter" ? (
-                  <p className="text-xs text-amber-600 mt-1">Starter: 2 weeks ahead max</p>
+                  <p className="text-xs text-amber-600 mt-1">Free plan: 2 weeks ahead max</p>
                 ) : null}
               </div>
               <div>
