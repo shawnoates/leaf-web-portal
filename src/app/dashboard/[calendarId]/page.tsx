@@ -1331,22 +1331,22 @@ export default function OrgDashboardPage() {
               </section>
             )}
 
-            {/* Concierge Ad */}
+            {/* Virtual Host Ad */}
             <div className="border border-emerald-200 rounded-xl p-6 bg-gradient-to-br from-emerald-50/60 to-white">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-base font-medium text-zinc-900">Book a Strategy Session</h3>
+                <h3 className="text-base font-medium text-zinc-900">Hire a Virtual Host</h3>
                 <span className="bg-emerald-600 text-white text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full">New</span>
               </div>
               <p className="text-sm text-zinc-500 leading-relaxed mb-4">
-                Planning shouldn&apos;t feel like a second job. Meet with a Leaf consultant to iron out the details and get your community moving.
+                Don&apos;t have time to plan, post, and show up? Bring on a Leaf virtual host to run your calendar and host plans on behalf of your community.
               </p>
               <ul className="space-y-2 mb-5 list-disc list-inside">
-                <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Tailored Plan Ideas</strong> — Personalized suggestions for your specific community type, from gyms to creative clubs.</li>
-                <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Direct Venue Sourcing</strong> — Access our network of preferred venues and unique spaces to host your next gathering.</li>
-                <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Logistical Audit</strong> — We&apos;ll review your upcoming schedule to ensure every plan has the right timing and &ldquo;vibe&rdquo; to succeed.</li>
+                <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Plans Posted For You</strong> — Your host drafts, schedules, and publishes plans to your calendar on a steady cadence.</li>
+                <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Hosted On Your Behalf</strong> — A real person shows up, greets attendees, and represents your community at every gathering.</li>
+                <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">RSVP &amp; Chat Management</strong> — From approvals to day-of reminders, your host handles the back-and-forth so you don&apos;t have to.</li>
               </ul>
               <a href="https://calendly.com/shawn-58c/leaf-info-call" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors">
-                Schedule Your Session
+                Meet Your Host
               </a>
             </div>
 
