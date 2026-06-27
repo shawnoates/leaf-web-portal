@@ -49,7 +49,7 @@ const PRICING_TIERS: PricingTier[] = [
     features: [
       "1 calendar",
       "5 AI plan ideas per week",
-      "Up to 50 RSVPs",
+      "Up to 50 RSVPs per month",
       "Phone-number RSVP with SMS confirmations",
       "Member hosting",
       "Automated follower notifications",
@@ -528,7 +528,7 @@ export default function OrganizationsPage() {
             <div>
               <h3 className="text-sm font-bold mb-1">What counts as an RSVP?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                An RSVP is counted each time someone confirms attendance to one of your plans. On the Free plan you get up to 50 RSVPs total. Pro and Concierge plans have unlimited RSVPs.
+                An RSVP is counted each time someone confirms attendance to one of your plans. On the Free plan you get up to 50 RSVPs per month, which resets at the start of each calendar month. Pro and Concierge plans have unlimited RSVPs.
               </p>
             </div>
             <div>

@@ -92,6 +92,7 @@ interface OrgDashboard {
   memberCount: number;
   totalRsvpCount: number;
   rsvpLimit: number | null;
+  rsvpsThisMonth: number;
   planIdeaCount: number;
   upcomingPlanCount: number;
   followerCount: number;
@@ -1285,7 +1286,12 @@ export default function OrgDashboardPage() {
               {[
                 { label: "Followers", value: dashboard.followerCount },
                 { label: "Calendars", value: dashboard.calendars.length },
-                { label: "Plan RSVPs", value: `${dashboard.totalRsvpCount}${dashboard.rsvpLimit ? `/${dashboard.rsvpLimit}` : ""}` },
+                {
+                  label: dashboard.rsvpLimit ? "RSVPs (this mo.)" : "Plan RSVPs",
+                  value: dashboard.rsvpLimit
+                    ? `${dashboard.rsvpsThisMonth}/${dashboard.rsvpLimit}`
+                    : dashboard.totalRsvpCount,
+                },
                 { label: "Active Plans", value: dashboard.upcomingPlanCount },
               ].map((stat) => (
                 <div key={stat.label} className="border border-zinc-200 rounded-xl p-4">
@@ -1294,6 +1300,35 @@ export default function OrgDashboardPage() {
                 </div>
               ))}
             </div>
+
+            {dashboard.rsvpLimit !== null && dashboard.rsvpsThisMonth >= 40 && (
+              <div className={`border rounded-xl p-4 flex items-start gap-3 ${
+                dashboard.rsvpsThisMonth >= dashboard.rsvpLimit
+                  ? "border-red-200 bg-red-50"
+                  : "border-amber-200 bg-amber-50"
+              }`}>
+                <div className="flex-1">
+                  <p className={`text-sm font-medium ${
+                    dashboard.rsvpsThisMonth >= dashboard.rsvpLimit ? "text-red-900" : "text-amber-900"
+                  }`}>
+                    {dashboard.rsvpsThisMonth >= dashboard.rsvpLimit
+                      ? "You've hit this month's RSVP limit."
+                      : "You're near this month's RSVP limit."}
+                  </p>
+                  <p className={`text-xs mt-0.5 ${
+                    dashboard.rsvpsThisMonth >= dashboard.rsvpLimit ? "text-red-700" : "text-amber-700"
+                  }`}>
+                    {dashboard.rsvpsThisMonth}/{dashboard.rsvpLimit} RSVPs used. Upgrade to Pro for unlimited — resets on the 1st.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowSubscription(true)}
+                  className="bg-zinc-900 text-white px-3 py-1.5 text-xs font-semibold rounded-full hover:bg-zinc-800 transition-colors shrink-0"
+                >
+                  Upgrade
+                </button>
+              </div>
+            )}
 
             {/* Recent Photos — attendee uploads from past plans */}
             {dashboard.recentPhotos && dashboard.recentPhotos.length > 0 && (

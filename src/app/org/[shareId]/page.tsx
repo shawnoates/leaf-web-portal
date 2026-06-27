@@ -2239,7 +2239,7 @@ export default function OrgCalendarPage() {
               <div className="flex items-center gap-3 bg-zinc-100 border border-zinc-200 px-6 py-4">
                 <Lock className="w-4 h-4 text-zinc-400 flex-shrink-0" />
                 <p className="text-sm text-zinc-500">
-                  This calendar has reached its RSVP limit. New RSVPs and hosting are temporarily paused. Please contact the organization administrator.
+                  This calendar has reached its RSVP limit for the month. New RSVPs and hosting are paused until the 1st, when the monthly allowance resets.
                 </p>
               </div>
             )}
@@ -2488,7 +2488,7 @@ export default function OrgCalendarPage() {
                       <Lock className="w-3.5 h-3.5" /> RSVPs Paused
                     </button>
                     <p className="text-xs text-zinc-400 text-center">
-                      This calendar has reached its RSVP limit. Please contact the organization administrator.
+                      This calendar has reached its monthly RSVP limit. New RSVPs open up on the 1st of next month.
                     </p>
                   </div>
                 ) : pendingRsvpIds.has(selectedEvent.id) ? (

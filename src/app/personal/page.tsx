@@ -46,7 +46,7 @@ const PRICING_TIERS: PricingTier[] = [
     features: [
       "1 calendar",
       "5 AI plan ideas per week",
-      "Up to 50 RSVPs",
+      "Up to 50 RSVPs per month",
       "Phone-number RSVP with SMS confirmations",
       "Co-host with friends",
       "Automated follower notifications",
