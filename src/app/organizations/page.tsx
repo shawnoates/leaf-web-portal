@@ -103,7 +103,7 @@ const PRICING_TIERS: PricingTier[] = [
     inheritsLabel: "Everything in Pro, plus:",
     features: [
       "A dedicated Leaf host who plans and coordinates your events",
-      "Member survey + personalized monthly event plan",
+      "A personalized monthly event plan built for your community",
       "Vendor coordination, setup, and member communication handled for you",
       "Local merchant deals featured on your calendar",
       "Volume pricing across multiple communities or locations",
@@ -566,7 +566,7 @@ export default function OrganizationsPage() {
             <div>
               <h3 className="text-sm font-bold mb-1">What's the Concierge plan?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                Concierge is our done-for-you service for organizations that want Leaf run for them — apartment buildings, churches, clubs, HOAs, and more. We survey your members, build a personalized monthly event plan, and handle the coordination, setup, and communication — plus we feature local merchant deals on your calendar. You get a thriving community calendar without adding any work for your team. $499/mo, with volume rates for multiple communities or locations. Book a demo to get set up.
+                Concierge is our done-for-you service for organizations that want Leaf run for them — apartment buildings, churches, clubs, HOAs, and more. We build a personalized monthly event plan for your community and handle the coordination, setup, and communication — plus we feature local merchant deals on your calendar. You get a thriving community calendar without adding any work for your team. $499/mo, with volume rates for multiple communities or locations. Book a demo to get set up.
               </p>
             </div>
           </div>
