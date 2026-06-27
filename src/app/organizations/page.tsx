@@ -106,7 +106,6 @@ const PRICING_TIERS: PricingTier[] = [
       "Post-event surveys feed a personalized monthly event plan tuned to what's landing",
       "Vendor coordination, setup, and member communication handled for you",
       "Local merchant deals featured on your calendar",
-      "Volume pricing across multiple communities or locations",
       "Priority support",
     ],
     excluded: [],
@@ -524,7 +523,7 @@ export default function OrganizationsPage() {
             <div>
               <h3 className="text-sm font-bold mb-1">How many calendars can I run?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                Free includes one calendar. Pro lets you run up to five — useful when one organization covers multiple buildings, chapters, or cohorts. Concierge supports volume across multiple communities or locations.
+                Free includes one calendar. Pro lets you run up to five — useful when one organization covers multiple buildings, chapters, or cohorts. Concierge is set up per calendar; talk to us if you need to run several.
               </p>
             </div>
             <div>
@@ -566,7 +565,7 @@ export default function OrganizationsPage() {
             <div>
               <h3 className="text-sm font-bold mb-1">What's the Concierge plan?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                Concierge is our done-for-you service for organizations that want Leaf run for them — apartment buildings, churches, clubs, HOAs, and more. We build a personalized monthly event plan for your community and handle the coordination, setup, and communication — plus we feature local merchant deals on your calendar. You get a thriving community calendar without adding any work for your team. $499/mo, with volume rates for multiple communities or locations. Book a demo to get set up.
+                Concierge is our done-for-you service for organizations that want Leaf run for them — apartment buildings, churches, clubs, HOAs, and more. We build a personalized monthly event plan for your community and handle the coordination, setup, and communication — plus we feature local merchant deals on your calendar. You get a thriving community calendar without adding any work for your team. $499/mo. Book a demo to get set up.
               </p>
             </div>
           </div>
