@@ -485,6 +485,23 @@ export default function PersonalPage() {
                 Every week, Leaf drops a handful of personalized plan ideas into
                 your calendar based on your city, vibe, and preferences. Real
                 venues, smart timing, beautiful images — host them as-is or tweak.
+                Free gets 5 per week; Pro gets 15.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold mb-1">What counts as an RSVP?</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                Every confirmed attendee on one of your plans. Free includes 50
+                RSVPs per calendar month, resetting on the 1st. Pro is
+                unlimited.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold mb-1">How far in advance can I plan?</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                Free schedules up to two weeks out — enough for an active
+                week-to-week calendar. Pro removes the window so you can
+                schedule farther ahead.
               </p>
             </div>
             <div>

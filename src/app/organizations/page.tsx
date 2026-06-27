@@ -90,14 +90,14 @@ const PRICING_TIERS: PricingTier[] = [
   {
     id: "managed",
     name: "Concierge",
-    monthlyPrice: "Starting at $499",
-    yearlyPrice: "Starting at $499",
+    monthlyPrice: "$499",
+    yearlyPrice: "$499",
     monthlyPeriod: "/mo",
     yearlyPeriod: "/mo",
-    customPrice: "Starting at $499",
+    customPrice: "$499",
     description: "For organizations that want Leaf run for them",
-    cta: "Talk to us",
-    ctaHref: "mailto:team@getleaflets.co?subject=Concierge%20plan%20inquiry",
+    cta: "Book a demo",
+    ctaHref: "https://calendar.app.google/4v3mg4Ry4i5Bn7fG8",
     highlight: false,
     dark: true,
     inheritsLabel: "Everything in Pro, plus:",
@@ -381,7 +381,7 @@ export default function OrganizationsPage() {
                 : billingPeriod === "yearly"
                   ? tier.yearlyPeriod
                   : tier.monthlyPeriod;
-              const isMailto = tier.ctaHref?.startsWith("mailto:");
+              const isExternal = /^(mailto:|https?:)/.test(tier.ctaHref || "");
               const href = tier.ctaHref
                 ? tier.ctaHref
                 : isLoggedIn
@@ -464,9 +464,11 @@ export default function OrganizationsPage() {
                     </div>
                   ))}
                 </div>
-                {isMailto ? (
+                {isExternal ? (
                   <a
                     href={href}
+                    target={href.startsWith("mailto:") ? undefined : "_blank"}
+                    rel={href.startsWith("mailto:") ? undefined : "noopener noreferrer"}
                     className={`w-full py-3.5 text-sm font-semibold text-center flex items-center justify-center gap-2 rounded-full transition-colors ${
                       tier.dark
                         ? "bg-white text-zinc-900 hover:bg-white/90"
@@ -510,13 +512,31 @@ export default function OrganizationsPage() {
             <div>
               <h3 className="text-sm font-bold mb-1">What are AI plan ideas?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                Every week, Leaf automatically generates personalized event ideas for your calendar based on your location, vibe, and preferences. These include real venues, smart timing, and images — ready for you or your members to host.
+                Every week, Leaf automatically generates personalized event ideas for your calendar based on your location, vibe, and preferences. These include real venues, smart timing, and images — ready for you or your members to host. Free includes 5 ideas per week; Pro and Concierge get 15.
               </p>
             </div>
             <div>
               <h3 className="text-sm font-bold mb-1">What is the events database?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                The events database gives you access to local events happening in your area. Browse concerts, shows, festivals, and more — then turn them into plans for your community with one tap.
+                The events database gives you access to local events happening in your area. Browse concerts, shows, festivals, and more — then turn them into plans for your community with one tap. Available on every plan.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold mb-1">How many calendars can I run?</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                Free includes one calendar. Pro lets you run up to five — useful when one organization covers multiple buildings, chapters, or cohorts. Concierge supports volume across multiple communities or locations.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold mb-1">How far in advance can I schedule plans?</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                On Free, plans can be scheduled up to two weeks out. Pro and Concierge remove the window — schedule as far ahead as you want.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold mb-1">What's the difference between member hosting and co-host management?</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                Member hosting (included on every plan) lets anyone you've added as a member claim a plan idea and run that single event. Co-host management (Pro and Concierge) lets you invite trusted people who can manage every plan, approve RSVPs, and co-run the whole calendar.
               </p>
             </div>
             <div>
@@ -546,7 +566,7 @@ export default function OrganizationsPage() {
             <div>
               <h3 className="text-sm font-bold mb-1">What's the Concierge plan?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                Concierge is our done-for-you service for organizations that want Leaf run for them — apartment buildings, churches, clubs, HOAs, and more. We survey your members, build a personalized monthly event plan, and handle the coordination, setup, and communication — plus we feature local merchant deals on your calendar. You get a thriving community calendar without adding any work for your team. Pricing starts at $499/mo, with volume rates for multiple communities or locations. Talk to us to get set up.
+                Concierge is our done-for-you service for organizations that want Leaf run for them — apartment buildings, churches, clubs, HOAs, and more. We survey your members, build a personalized monthly event plan, and handle the coordination, setup, and communication — plus we feature local merchant deals on your calendar. You get a thriving community calendar without adding any work for your team. $499/mo, with volume rates for multiple communities or locations. Book a demo to get set up.
               </p>
             </div>
           </div>
