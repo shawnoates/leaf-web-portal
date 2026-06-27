@@ -13,6 +13,7 @@ import {
   Check,
   ShieldCheck,
   UserCheck,
+  Star,
 } from "lucide-react";
 import HostTheNextOne from "@/components/HostTheNextOne";
 
@@ -83,6 +84,19 @@ type AttendeeMemoryInfo = {
   photoCount: number;
   uploadsClosed?: boolean;
   limits: { maxBytes: number; maxPerAttendee: number; maxPerEvent: number };
+  survey?: {
+    acceptingResponses: boolean;
+    existing: {
+      objectId: string;
+      rating: number;
+      comment: string | null;
+      submittedAt: string;
+      updatedAt: string;
+    } | null;
+    ratingMin: number;
+    ratingMax: number;
+    commentMaxLen: number;
+  };
 };
 
 function formatEventDate(iso: string | null): string {
@@ -114,6 +128,16 @@ export default function MemoryClient({
   const [showHostOtp, setShowHostOtp] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [surveyRating, setSurveyRating] = useState<number>(
+    initialInfo?.survey?.existing?.rating ?? 0
+  );
+  const [surveyComment, setSurveyComment] = useState<string>(
+    initialInfo?.survey?.existing?.comment ?? ""
+  );
+  const [surveySubmitting, setSurveySubmitting] = useState(false);
+  const [surveyError, setSurveyError] = useState<string | null>(null);
+  const [surveyJustSaved, setSurveyJustSaved] = useState(false);
 
   async function refreshInfo() {
     try {
@@ -212,6 +236,38 @@ export default function MemoryClient({
 
   function removeStaged(id: string) {
     setStaged((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  async function submitSurvey() {
+    if (!info?.survey || surveyRating < 1) return;
+    setSurveyError(null);
+    setSurveySubmitting(true);
+    setSurveyJustSaved(false);
+    try {
+      const result = (await Parse.Cloud.run("submitAttendeeSurvey", {
+        notificationId,
+        rating: surveyRating,
+        comment: surveyComment.trim() || undefined,
+      })) as {
+        objectId: string;
+        rating: number;
+        comment: string | null;
+        submittedAt: string;
+        updatedAt: string;
+      };
+      setInfo((prev) =>
+        prev && prev.survey
+          ? { ...prev, survey: { ...prev.survey, existing: result } }
+          : prev
+      );
+      setSurveyJustSaved(true);
+    } catch (err: unknown) {
+      setSurveyError(
+        err instanceof Error ? err.message : "Couldn't save your rating."
+      );
+    } finally {
+      setSurveySubmitting(false);
+    }
   }
 
   async function submitStaged() {
@@ -360,6 +416,106 @@ export default function MemoryClient({
           <p className="text-xs text-red-600 mt-3 text-center">{error}</p>
         )}
       </div>
+      )}
+
+      {/* Post-event rating — single 1-5 stars + optional comment. Only shown
+          once the event has actually ended (server gates with acceptingResponses). */}
+      {info.survey?.acceptingResponses && (
+        <div className="border border-zinc-200 rounded-xl p-5 mb-6">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-1">
+            How was it?
+          </h2>
+          <p className="text-xs text-zinc-500 mb-4">
+            {info.survey.existing
+              ? "Update your rating below — the host can see your response."
+              : "Rate the event so the host knows what's landing. Optional."}
+          </p>
+
+          <div
+            className="flex items-center gap-1 mb-4"
+            role="radiogroup"
+            aria-label="Rate this event from 1 to 5 stars"
+          >
+            {Array.from({ length: info.survey.ratingMax }, (_, i) => i + 1).map(
+              (n) => {
+                const filled = surveyRating >= n;
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    role="radio"
+                    aria-checked={surveyRating === n}
+                    aria-label={`${n} star${n === 1 ? "" : "s"}`}
+                    onClick={() => {
+                      setSurveyRating(n);
+                      setSurveyJustSaved(false);
+                    }}
+                    disabled={surveySubmitting}
+                    className="p-1 disabled:opacity-50 transition-transform hover:scale-110"
+                  >
+                    <Star
+                      className={`w-7 h-7 ${
+                        filled
+                          ? "fill-amber-400 text-amber-400"
+                          : "fill-zinc-100 text-zinc-300"
+                      }`}
+                    />
+                  </button>
+                );
+              }
+            )}
+            {surveyRating > 0 && (
+              <span className="text-xs text-zinc-500 ml-2">
+                {surveyRating} of {info.survey.ratingMax}
+              </span>
+            )}
+          </div>
+
+          <label className="block">
+            <span className="sr-only">Optional comment</span>
+            <textarea
+              value={surveyComment}
+              onChange={(e) => {
+                setSurveyComment(e.target.value);
+                setSurveyJustSaved(false);
+              }}
+              maxLength={info.survey.commentMaxLen}
+              rows={2}
+              disabled={surveySubmitting}
+              placeholder="Anything you'd want the host to know? (optional)"
+              className="w-full text-sm border border-zinc-200 rounded-lg p-3 focus:outline-none focus:border-zinc-400 resize-y disabled:opacity-50"
+            />
+          </label>
+
+          <div className="flex items-center justify-between mt-3">
+            <p className="text-[11px] text-zinc-400">
+              Visible to the host as {info.attendee.name}.
+            </p>
+            <button
+              type="button"
+              onClick={submitSurvey}
+              disabled={surveySubmitting || surveyRating < 1}
+              className="inline-flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
+            >
+              {surveySubmitting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : surveyJustSaved ? (
+                <Check className="w-3.5 h-3.5" />
+              ) : null}
+              {surveySubmitting
+                ? "Saving…"
+                : surveyJustSaved
+                ? "Saved"
+                : info.survey.existing
+                ? "Update"
+                : "Submit"}
+            </button>
+          </div>
+
+          {surveyError && (
+            <p className="text-xs text-red-600 mt-2">{surveyError}</p>
+          )}
+        </div>
       )}
 
       {/* Mark Attendance — host-only. Visible when the link belongs to the host

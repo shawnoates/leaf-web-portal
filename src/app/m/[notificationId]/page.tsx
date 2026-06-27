@@ -66,6 +66,19 @@ type AttendeeMemoryInfo = {
     maxPerAttendee: number;
     maxPerEvent: number;
   };
+  survey?: {
+    acceptingResponses: boolean;
+    existing: {
+      objectId: string;
+      rating: number;
+      comment: string | null;
+      submittedAt: string;
+      updatedAt: string;
+    } | null;
+    ratingMin: number;
+    ratingMax: number;
+    commentMaxLen: number;
+  };
 };
 
 async function fetchInfo(

@@ -102,8 +102,8 @@ const PRICING_TIERS: PricingTier[] = [
     dark: true,
     inheritsLabel: "Everything in Pro, plus:",
     features: [
-      "A dedicated Leaf host who plans and coordinates your events",
-      "A personalized monthly event plan built for your community",
+      "A dedicated host who plans and coordinates your events",
+      "Post-event surveys feed a personalized monthly event plan tuned to what's landing",
       "Vendor coordination, setup, and member communication handled for you",
       "Local merchant deals featured on your calendar",
       "Volume pricing across multiple communities or locations",
