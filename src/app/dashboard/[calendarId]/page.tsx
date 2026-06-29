@@ -1932,7 +1932,7 @@ export default function OrgDashboardPage() {
                                 <Code className="w-4 h-4" />
                               </button>
                               <Link
-                                href={`/org/${cal.shareId}/promote`}
+                                href={`/org/${cal.shareId}/promote?org=${calendarId}`}
                                 onClick={(e) => e.stopPropagation()}
                                 className="text-zinc-300 hover:text-emerald-600 transition-colors"
                                 title="Promote — print flyers and door hangers"

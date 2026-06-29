@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
@@ -9,7 +9,22 @@ import { Calendar } from "lucide-react";
 import { getRandomStreakQuote, type StreakQuote } from "@/lib/streak-quotes";
 
 export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <DashboardPageInner />
+    </Suspense>
+  );
+}
+
+function DashboardPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<Parse.User | null>(null);
   const [hasOrg, setHasOrg] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -43,7 +58,10 @@ export default function DashboardPage() {
       // Single-org model: redirect straight into the user's organization.
       if (organizations.length > 0) {
         setHasOrg(true);
-        router.push(`/dashboard/${organizations[0].objectId}`);
+        const qs = searchParams.toString();
+        router.push(
+          `/dashboard/${organizations[0].objectId}${qs ? `?${qs}` : ""}`
+        );
         return;
       }
       // New user with no org — send straight to setup

@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -152,6 +153,11 @@ export default function PromotePage({
   params: Promise<{ shareId: string }>;
 }) {
   const { shareId } = use(params);
+  const searchParams = useSearchParams();
+  const orgId = searchParams.get("org");
+  const dashboardHref = orgId
+    ? `/dashboard/${orgId}?tab=calendars`
+    : `/dashboard?tab=calendars`;
   const [calendar, setCalendar] = useState<CalendarInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -278,7 +284,7 @@ export default function PromotePage({
         <div className="max-w-5xl mx-auto px-4 md:px-6 py-4 md:py-8 space-y-6">
           <div className="no-print">
             <Link
-              href={`/dashboard/${calendar.objectId}?tab=calendars`}
+              href={dashboardHref}
               className="text-sm text-zinc-500 hover:text-zinc-900 inline-flex items-center gap-1"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Back to dashboard
