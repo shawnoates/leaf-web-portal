@@ -1372,24 +1372,28 @@ export default function OrgDashboardPage() {
               </section>
             )}
 
-            {/* Concierge upsell */}
-            <div className="border border-emerald-200 rounded-xl p-6 bg-gradient-to-br from-emerald-50/60 to-white">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-base font-medium text-zinc-900">Concierge</h3>
-                <span className="bg-emerald-600 text-white text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full">New</span>
+            {/* Concierge upsell — hidden once the calendar is already on the
+                Concierge tier (server reverts tier on cancellation, so this
+                also re-appears if they churn). */}
+            {dashboard.tier !== "concierge" && (
+              <div className="border border-emerald-200 rounded-xl p-6 bg-gradient-to-br from-emerald-50/60 to-white">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-base font-medium text-zinc-900">Concierge</h3>
+                  <span className="bg-emerald-600 text-white text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full">New</span>
+                </div>
+                <p className="text-sm text-zinc-500 leading-relaxed mb-4">
+                  Don&apos;t have time to plan, post, and show up? Bring on a dedicated host to run your calendar and host plans on behalf of your community. From $499/mo.
+                </p>
+                <ul className="space-y-2 mb-5 list-disc list-inside">
+                  <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Plans posted for you</strong> — your host drafts, schedules, and publishes plans to your calendar on a steady cadence.</li>
+                  <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Hosted on your behalf</strong> — a real person shows up, greets attendees, and represents your community at every gathering.</li>
+                  <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">RSVP &amp; chat management</strong> — from approvals to day-of reminders, your host handles the back-and-forth so you don&apos;t have to.</li>
+                </ul>
+                <a href="https://calendar.app.google/4v3mg4Ry4i5Bn7fG8" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors">
+                  Book a demo
+                </a>
               </div>
-              <p className="text-sm text-zinc-500 leading-relaxed mb-4">
-                Don&apos;t have time to plan, post, and show up? Bring on a dedicated host to run your calendar and host plans on behalf of your community. From $499/mo.
-              </p>
-              <ul className="space-y-2 mb-5 list-disc list-inside">
-                <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Plans posted for you</strong> — your host drafts, schedules, and publishes plans to your calendar on a steady cadence.</li>
-                <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Hosted on your behalf</strong> — a real person shows up, greets attendees, and represents your community at every gathering.</li>
-                <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">RSVP &amp; chat management</strong> — from approvals to day-of reminders, your host handles the back-and-forth so you don&apos;t have to.</li>
-              </ul>
-              <a href="https://calendar.app.google/4v3mg4Ry4i5Bn7fG8" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors">
-                Book a demo
-              </a>
-            </div>
+            )}
 
           </div>
         )}
