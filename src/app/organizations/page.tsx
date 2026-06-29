@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
+import ConciergeCta from "@/components/ConciergeCta";
 import {
   Sparkles,
   Calendar,
@@ -463,7 +464,9 @@ export default function OrganizationsPage() {
                     </div>
                   ))}
                 </div>
-                {isExternal ? (
+                {tier.id === "managed" ? (
+                  <ConciergeCta dark={tier.dark} />
+                ) : isExternal ? (
                   <a
                     href={href}
                     target={href.startsWith("mailto:") ? undefined : "_blank"}

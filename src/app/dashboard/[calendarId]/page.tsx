@@ -7,6 +7,7 @@ import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import SubscriptionModal from "@/components/SubscriptionModal";
+import ConciergeDashboardBanner from "@/components/ConciergeDashboardBanner";
 import MarketplaceTab, { type MarketplaceEvent, type OrgSettings } from "@/components/MarketplaceTab";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
 import PlanDetailModal from "@/components/PlanDetailModal";
@@ -976,6 +977,9 @@ export default function OrgDashboardPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Concierge state banner (renders only when relevant) */}
+      <ConciergeDashboardBanner calendarId={calendarId} />
+
       {/* Header */}
       <header className="border-b border-zinc-100">
         <div className="max-w-5xl mx-auto px-6 py-5 flex items-center gap-4">
