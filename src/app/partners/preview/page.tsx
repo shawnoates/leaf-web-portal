@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import CalendarLandingPage from "@/components/CalendarLandingPage";
-import { config as apartmentConfig } from "@/app/apartment/page";
+import { config as apartmentConfig } from "@/app/apartment/config";
 
 /**
  * Merchant-facing preview of the resident calendar. Reuses the
