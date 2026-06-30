@@ -70,8 +70,8 @@ export default function Calculator() {
         <div className="lbl">is cycling through turnover at your building every year.</div>
       </div>
       <p className="calc__save">
-        Help residents stay and <b>save just 5 renewals a year</b> &mdash; that&rsquo;s about{" "}
-        <b>{fmt(savedFive)}</b> back, many times the cost of Concierge.
+        Keep just <b>5 more residents a year</b> and you save about <b>{fmt(savedFive)}</b>{" "}
+        &mdash; many times what Concierge costs.
       </p>
       <div className="inline-cta">
         <CTA to="demo" variant="primary" arrow>
