@@ -34,6 +34,13 @@ interface CityAutocompleteProps {
    * (e.g. apartment building address → calendar.geo).
    */
   fetchCoordinates?: boolean;
+  /**
+   * When true, treat the current `value` as already verified (e.g. a
+   * BuildingLead prefill from a claim token) and skip the "please select
+   * from suggestions" warning. The internal `hasSelected` state syncs to
+   * this flag — the user can still type to clear it and re-pick.
+   */
+  valueIsVerified?: boolean;
 }
 
 let googleMapsLoading = false;
@@ -90,6 +97,7 @@ export default function CityAutocomplete({
   // even when the owner only picks a neighborhood. Cheap (one extra Places
   // call per selection).
   fetchCoordinates = true,
+  valueIsVerified = false,
 }: CityAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.AutocompleteService | null>(null);
@@ -97,7 +105,16 @@ export default function CityAutocomplete({
   const [suggestions, setSuggestions] = useState<google.maps.places.AutocompletePrediction[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [hasSelected, setHasSelected] = useState(!!value);
+  const [hasSelected, setHasSelected] = useState(!!value || valueIsVerified);
+
+  // Sync the internal "user has selected" state when the caller flips
+  // valueIsVerified (e.g. a claim-token prefill arrives after mount).
+  // Typing into the input still calls handleInputChange → setHasSelected(false),
+  // which the parent's onChange resets verified→false too, so this effect
+  // doesn't fight the user's typing.
+  useEffect(() => {
+    if (valueIsVerified) setHasSelected(true);
+  }, [valueIsVerified]);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

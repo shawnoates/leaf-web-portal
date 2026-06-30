@@ -60,7 +60,7 @@ export default function StandalonePlanCard({
     !!location && !revealedAddress && variant === "standalone";
 
   return (
-    <div className="min-h-dvh bg-zinc-50 px-4 py-6 md:py-10 flex justify-center items-start md:items-center">
+    <div className="min-h-dvh bg-zinc-50 px-4 py-6 md:py-10 flex flex-col justify-center items-center gap-5">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm overflow-hidden">
         {image ? (
           <div
@@ -184,6 +184,17 @@ export default function StandalonePlanCard({
           ) : null}
         </div>
       </div>
+
+      <a
+        href="https://www.joinleaf.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-2 text-zinc-500 hover:opacity-70 transition-opacity"
+      >
+        <span className="text-sm">Powered by</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/leaf-logo-black.png" alt="Leaf" className="h-6 w-auto" />
+      </a>
     </div>
   );
 }

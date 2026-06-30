@@ -604,6 +604,7 @@ function SetupPageInner() {
           >
             <CityAutocomplete
               value={form.primaryCity}
+              valueIsVerified={form.primaryCitySelected}
               onChange={(val) =>
                 updateForm({
                   primaryCity: val,
