@@ -34,7 +34,12 @@ export default function Hero() {
               <CTA to="free" variant="ghost">
                 Start your free resident calendar
               </CTA>
-              <a className="cta-stack__hint" href="/apartment">
+              <a
+                className="cta-stack__hint"
+                href="/apartment"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 See example calendar →
               </a>
             </div>

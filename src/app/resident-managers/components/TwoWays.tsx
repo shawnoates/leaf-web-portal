@@ -35,7 +35,12 @@ export default function TwoWays() {
               <CTA to="free" variant="ghost">
                 Start free today
               </CTA>
-              <a className="cta-stack__hint" href="/apartment">
+              <a
+                className="cta-stack__hint"
+                href="/apartment"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 See example calendar →
               </a>
             </div>
