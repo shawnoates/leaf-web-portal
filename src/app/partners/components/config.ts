@@ -5,8 +5,11 @@
 // Calendar slot as /organizations and /resident-managers so every
 // "book a demo" CTA across the site funnels into one calendar.
 //
-// SAMPLE_URL = the example resident calendar at /apartment — what a
-// partner deal looks like in the wild.
+// SAMPLE_URL = the merchant-facing preview at /partners/preview. Same
+// rendering as the /apartment demo but with a "Merchant preview"
+// banner and numbered callouts that point to where each of the three
+// offerings (post a deal / host an event / sponsor an event) appears
+// for residents.
 //
 // DEAL_URL = self-serve "post a deal" link. This is the FREE on-ramp
 // (merchant equivalent of the property-managers' free calendar) and
@@ -16,5 +19,5 @@
 // ships. Falls back to PARTNER_URL so the button still lands
 // somewhere actionable in the meantime.
 export const PARTNER_URL = "https://calendar.app.google/4v3mg4Ry4i5Bn7fG8";
-export const SAMPLE_URL = "/apartment";
+export const SAMPLE_URL = "/partners/preview";
 export const DEAL_URL = PARTNER_URL;

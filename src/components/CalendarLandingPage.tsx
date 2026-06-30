@@ -32,6 +32,12 @@ export interface Plan {
   hostName: string;
   attendeeCount: number;
   location: string;
+  /**
+   * When set, the plan card shows a "Sponsored by {sponsoredBy}" badge
+   * instead of (or alongside) the "Hosted by" line. Drives the
+   * Sponsor-an-event callout on the merchant preview surface.
+   */
+  sponsoredBy?: string;
 }
 
 export interface PlanIdea {
@@ -291,7 +297,21 @@ function CTAModal({
 
 // --- Main ---
 
-export default function CalendarLandingPage({ config }: { config: LandingConfig }) {
+/**
+ * Renders the resident-facing calendar landing.
+ *
+ * `merchantPreview` is the /partners/preview switch — adds a sticky
+ * banner at the top with the three offerings and inline numbered
+ * callouts above each placement (deals strip, host event, sponsored
+ * event). Otherwise the page is identical to /apartment.
+ */
+export default function CalendarLandingPage({
+  config,
+  merchantPreview = false,
+}: {
+  config: LandingConfig;
+  merchantPreview?: boolean;
+}) {
   const [showCTA, setShowCTA] = useState(false);
   const [showScrollPopup, setShowScrollPopup] = useState(false);
   const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
@@ -332,6 +352,8 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
 
   return (
     <div className="min-h-screen">
+      {merchantPreview && <MerchantPreviewBanner />}
+
       {/* Navigation */}
       <nav className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-zinc-100 px-6 py-6 md:py-8">
         <div className="max-w-6xl mx-auto flex justify-between items-center gap-3">
@@ -373,6 +395,14 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
       {/* Stream Header — plans lead the page. Local deals (when present)
           appear below as a supporting benefit. Matches the live render on
           /org/[shareId]. */}
+      {merchantPreview && (
+        <MerchantCallout
+          n={2}
+          label="Host an event appears here"
+          sub="Your own event on the building's calendar. Residents RSVP, we promote, you host."
+          anchorId="upcoming-plans"
+        />
+      )}
       <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100">
         <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
           {plansHeader}
@@ -384,10 +414,12 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
         <div className="space-y-32">
           {config.plans.map((plan, index) => {
             const date = futureDate(plan.daysFromNow);
-            return (
+            const isSponsored = !!plan.sponsoredBy;
+            const card = (
               <article
                 key={plan.id}
-                className={`group flex flex-col md:flex-row gap-12 md:items-center ${
+                id={merchantPreview && isSponsored ? "sponsored-plan" : undefined}
+                className={`group flex flex-col md:flex-row gap-12 md:items-center scroll-mt-32 ${
                   index % 2 !== 0 ? "md:flex-row-reverse" : ""
                 }`}
               >
@@ -410,7 +442,7 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
                     <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
                       {plan.title}
                     </h3>
-                    <div className="pt-2">
+                    <div className="pt-2 space-y-1.5">
                       <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
                         <span
                           className="w-2 h-2 rounded-full"
@@ -418,6 +450,12 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
                         />
                         Hosted by {plan.hostName}
                       </p>
+                      {plan.sponsoredBy && (
+                        <p className="text-xs tracking-wider uppercase font-bold flex items-center gap-2 text-amber-700">
+                          <span className="w-2 h-2 rounded-full bg-amber-500" />
+                          Sponsored by {plan.sponsoredBy}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -453,6 +491,21 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
                 </div>
               </article>
             );
+            if (merchantPreview && isSponsored) {
+              return (
+                <div key={plan.id}>
+                  <div className="mb-4">
+                    <MerchantCallout
+                      n={3}
+                      label="Sponsor an event appears like this"
+                      sub="A partner-funded event already on the calendar — they back the room, we plan it."
+                    />
+                  </div>
+                  {card}
+                </div>
+              );
+            }
+            return card;
           })}
         </div>
 
@@ -461,7 +514,16 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
             to reinforce the manager-pitch promise (we lined these up on
             their behalf). */}
         {config.deals && config.deals.length > 0 && (
-          <section id="local-deals" className="max-w-6xl mx-auto px-0 pt-12 pb-1">
+          <section id="local-deals" className="max-w-6xl mx-auto px-0 pt-12 pb-1 scroll-mt-32">
+            {merchantPreview && (
+              <div className="mb-4 px-0">
+                <MerchantCallout
+                  n={1}
+                  label="Post a deal appears here"
+                  sub="Your offer in the neighborhood deals feed. Free and instant to add."
+                />
+              </div>
+            )}
             <div className="flex items-center justify-between pb-3 mb-3">
               <p className="text-[11px] tracking-wider uppercase text-zinc-400 font-bold">
                 {config.dealsHeader ?? "Nearby deals"}
@@ -635,6 +697,78 @@ export default function CalendarLandingPage({ config }: { config: LandingConfig 
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+
+// ─── Merchant preview helpers (rendered only on /partners/preview) ───
+
+/**
+ * Sticky top banner that frames the page as a merchant tour and offers
+ * three jump-links to where each offering appears. Sits ABOVE the
+ * residents-facing sticky nav so it does not interfere with the actual
+ * calendar UI.
+ */
+function MerchantPreviewBanner() {
+  const chips = [
+    { n: 1, label: "Post a deal", href: "#local-deals" },
+    { n: 2, label: "Host an event", href: "#upcoming-plans" },
+    { n: 3, label: "Sponsor an event", href: "#sponsored-plan" },
+  ];
+  return (
+    <div className="bg-amber-50 border-b border-amber-200 px-6 py-4">
+      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+        <p className="text-[11px] tracking-wider uppercase font-bold text-amber-900 shrink-0">
+          Merchant preview &mdash; your three offerings on a real calendar
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {chips.map((c) => (
+            <a
+              key={c.n}
+              href={c.href}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-amber-200 text-xs font-bold text-emerald-900 hover:border-emerald-500 transition-colors"
+            >
+              <span className="w-4 h-4 rounded-full bg-emerald-700 text-white text-[10px] flex items-center justify-center">
+                {c.n}
+              </span>
+              {c.label}
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Inline numbered marker placed above each placement on the preview
+ * page. The number ties back to the banners chip; the label tells the
+ * merchant what they are looking at.
+ */
+function MerchantCallout({
+  n,
+  label,
+  sub,
+  anchorId,
+}: {
+  n: number;
+  label: string;
+  sub?: string;
+  anchorId?: string;
+}) {
+  return (
+    <div
+      id={anchorId}
+      className="max-w-6xl mx-auto px-6 mt-10 mb-2 flex items-start gap-3 scroll-mt-32"
+    >
+      <span className="w-8 h-8 rounded-full bg-emerald-700 text-white text-sm font-bold flex items-center justify-center shrink-0">
+        {n}
+      </span>
+      <div>
+        <p className="text-xs uppercase tracking-wider font-bold text-emerald-800">{label}</p>
+        {sub && <p className="text-[11px] text-zinc-500 mt-0.5 max-w-prose">{sub}</p>}
+      </div>
     </div>
   );
 }

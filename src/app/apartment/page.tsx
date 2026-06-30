@@ -4,7 +4,7 @@ import CalendarLandingPage, {
   type LandingConfig,
 } from "@/components/CalendarLandingPage";
 
-const config: LandingConfig = {
+export const config: LandingConfig = {
   profileName: "Lincoln Place Residents",
   profilePhoto:
     "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400&q=80",
