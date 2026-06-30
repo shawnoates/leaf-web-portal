@@ -113,6 +113,14 @@
 .rm-landing .btn-arrow { font-size: 1.05em; line-height: 1; }
 
 .rm-landing .cta-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.rm-landing .cta-stack { display: inline-flex; flex-direction: column; align-items: center; gap: 8px; }
+.rm-landing .cta-stack__hint {
+  font-size: 0.82rem; font-weight: 600; color: var(--mid);
+  text-decoration: none; transition: color .15s ease;
+}
+.rm-landing .cta-stack__hint:hover { color: var(--forest); text-decoration: underline; }
+.rm-landing .band-forest .cta-stack__hint { color: var(--light); }
+.rm-landing .band-forest .cta-stack__hint:hover { color: var(--white); }
 .rm-landing .trust { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 20px; font-size: 0.86rem; color: var(--muted); }
 .rm-landing .band-forest .trust { color: var(--light); }
 .rm-landing .trust span { display: inline-flex; align-items: center; gap: 7px; }

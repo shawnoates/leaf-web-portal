@@ -30,11 +30,16 @@ export default function Hero() {
             longer, and your NOI holds. Your team does nothing.
           </p>
           <div className="cta-row" style={{ marginTop: 28 }}>
+            <div className="cta-stack">
+              <CTA to="free" variant="ghost">
+                Start your calendar free
+              </CTA>
+              <a className="cta-stack__hint" href="/apartment">
+                See example calendar →
+              </a>
+            </div>
             <CTA to="demo" variant="primary" arrow>
               Book a demo
-            </CTA>
-            <CTA to="free" variant="ghost">
-              Start your calendar free
             </CTA>
           </div>
           <TrustStrip />
