@@ -24,8 +24,25 @@ const REASONS: [string, string, string][] = [
 
 interface SessionUser {
   email: string;
+  username: string;
   displayName: string;
   ownedCalendarsCount?: number;
+}
+
+/**
+ * Accept either the Parse user's `email` OR `username` as a valid match.
+ * Some accounts (e.g., older Google sign-ins) have an empty `email` field
+ * while username carries the actual address — comparing only against
+ * `email` would silently keep the Delete button disabled with no feedback.
+ */
+function emailConfirmationMatches(typed: string, user: SessionUser | null): boolean {
+  if (!user) return false;
+  const normalized = typed.trim().toLowerCase();
+  if (!normalized) return false;
+  const candidates = [user.email, user.username]
+    .map((v) => (v || "").trim().toLowerCase())
+    .filter(Boolean);
+  return candidates.includes(normalized);
 }
 
 export default function DeleteAccountPage() {
@@ -66,8 +83,14 @@ function DeleteAccountPageInner() {
       return;
     }
     setSessionUser({
-      email: u.get("email") || u.get("username") || "",
-      displayName: u.get("full_name") || u.get("name") || u.get("email") || "",
+      email: u.get("email") || "",
+      username: u.get("username") || "",
+      displayName:
+        u.get("full_name") ||
+        u.get("name") ||
+        u.get("email") ||
+        u.get("username") ||
+        "",
     });
     setLoading(false);
   }, [router]);
@@ -78,10 +101,7 @@ function DeleteAccountPageInner() {
       setError("Tell us a bit about why — it's required when reason is 'Other'.");
       return;
     }
-    if (
-      confirmEmail.trim().toLowerCase() !==
-      (sessionUser?.email || "").toLowerCase()
-    ) {
+    if (!emailConfirmationMatches(confirmEmail, sessionUser)) {
       setError("Email confirmation doesn't match the account email.");
       return;
     }
@@ -115,6 +135,10 @@ function DeleteAccountPageInner() {
       </Centered>
     );
   }
+
+  const matches = emailConfirmationMatches(confirmEmail, sessionUser);
+  const showMismatchHint =
+    confirmEmail.trim().length > 0 && !matches;
 
   if (stage === "done") {
     return (
@@ -265,10 +289,27 @@ function DeleteAccountPageInner() {
                 type="email"
                 value={confirmEmail}
                 onChange={(e) => setConfirmEmail(e.target.value)}
-                placeholder={sessionUser.email}
+                placeholder={sessionUser.email || sessionUser.username}
                 autoComplete="off"
                 className="mt-1 w-full px-3 py-2 border border-zinc-300 rounded text-sm focus:outline-none focus:border-red-600 bg-white"
               />
+              <span className="text-[11px] text-zinc-500 mt-1 block">
+                We expect{" "}
+                <strong className="text-zinc-700">
+                  {sessionUser.email || sessionUser.username}
+                </strong>
+                {sessionUser.email && sessionUser.username && sessionUser.email !== sessionUser.username && (
+                  <>
+                    {" "}or <strong className="text-zinc-700">{sessionUser.username}</strong>
+                  </>
+                )}
+                .
+              </span>
+              {showMismatchHint && (
+                <span className="text-[11px] text-red-600 mt-1 block">
+                  That doesn&apos;t match. Check for typos or extra spaces.
+                </span>
+              )}
             </label>
 
             {error && (
@@ -287,11 +328,7 @@ function DeleteAccountPageInner() {
               </button>
               <button
                 onClick={submit}
-                disabled={
-                  submitting ||
-                  confirmEmail.trim().toLowerCase() !==
-                    sessionUser.email.toLowerCase()
-                }
+                disabled={submitting || !matches}
                 className="inline-flex items-center gap-2 bg-red-700 hover:bg-red-800 disabled:bg-red-300 text-white text-sm font-bold uppercase tracking-widest px-4 py-2 rounded-lg"
               >
                 {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
