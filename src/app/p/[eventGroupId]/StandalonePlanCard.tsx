@@ -15,11 +15,13 @@ type Props = {
   description: string;
   image: string | null;
   expiryDate: string | null;
-  // `address` is null when the viewer hasn't proven they belong on the
-  // guest list — server-side gating in getPlanShareInfo. After a successful
-  // RSVP, rsvpToPlanViaWeb returns the address and StandalonePlanRsvp
-  // hands it back via onAddressRevealed so the card swaps in the value.
-  location: { name: string; address: string | null; timezone: string | null } | null;
+  // Both `name` and `address` are null when the viewer hasn't proven they
+  // belong on the guest list — server-side gating in getPlanShareInfo
+  // strips the pair together so a venue name like "Home" doesn't leak the
+  // same signal the address does. After a successful RSVP,
+  // rsvpToPlanViaWeb returns both fields and StandalonePlanRsvp hands
+  // them back via onLocationRevealed so the card swaps in the values.
+  location: { name: string | null; address: string | null; timezone: string | null } | null;
   hostName: string | null;
   calendarName: string | null;
   calendarProfilePhoto: string | null;
@@ -52,12 +54,15 @@ export default function StandalonePlanCard({
   const blurDetails = variant === "privateCalendar";
 
   // Server returns null for non-attendees; revealed once the RSVP child
-  // reports a successful Accepted RSVP and hands us the address.
+  // reports a successful Accepted RSVP and hands us the location pair.
+  const [revealedName, setRevealedName] = useState<string | null>(
+    location?.name ?? null
+  );
   const [revealedAddress, setRevealedAddress] = useState<string | null>(
     location?.address ?? null
   );
-  const addressIsHidden =
-    !!location && !revealedAddress && variant === "standalone";
+  const locationGated =
+    !!location && !revealedName && !revealedAddress && variant === "standalone";
 
   return (
     <div className="min-h-dvh bg-zinc-50 px-4 py-6 md:py-10 flex flex-col justify-center items-center gap-5">
@@ -93,17 +98,19 @@ export default function StandalonePlanCard({
           ) : null}
 
           {location ? (
-            <div className="text-sm text-zinc-700">
-              <div>{location.name}</div>
-              {revealedAddress ? (
-                <div className="text-zinc-500">{revealedAddress}</div>
-              ) : addressIsHidden ? (
-                <div className="flex items-center gap-1.5 text-zinc-400 italic">
-                  <Lock className="w-3 h-3" />
-                  <span>Full address shared after you RSVP</span>
-                </div>
-              ) : null}
-            </div>
+            locationGated ? (
+              <div className="flex items-center gap-1.5 text-sm text-zinc-400 italic">
+                <Lock className="w-3 h-3" />
+                <span>Location shared after you RSVP</span>
+              </div>
+            ) : (
+              <div className="text-sm text-zinc-700">
+                {revealedName ? <div>{revealedName}</div> : null}
+                {revealedAddress ? (
+                  <div className="text-zinc-500">{revealedAddress}</div>
+                ) : null}
+              </div>
+            )
           ) : null}
 
           {hostName ? (
@@ -142,7 +149,7 @@ export default function StandalonePlanCard({
                 location={
                   location
                     ? {
-                        name: location.name,
+                        name: revealedName,
                         address: revealedAddress,
                         timezone: location.timezone,
                       }
@@ -150,7 +157,10 @@ export default function StandalonePlanCard({
                 }
                 requireApproval={requireApproval}
                 autoOpenRsvp={autoOpenRsvp}
-                onAddressRevealed={(addr) => setRevealedAddress(addr)}
+                onLocationRevealed={(loc) => {
+                  if (loc.name) setRevealedName(loc.name);
+                  if (loc.address) setRevealedAddress(loc.address);
+                }}
               />
               {/* /open/p/<id> is the Universal Link bouncer — iOS intercepts
                   and opens the Leaf app when installed; otherwise the bouncer

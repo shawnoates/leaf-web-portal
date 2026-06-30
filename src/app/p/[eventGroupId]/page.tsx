@@ -13,12 +13,13 @@ type PlanShareInfo = {
   description: string;
   image: string | null;
   expiryDate: string | null;
-  // `address` is null when the viewer hasn't proven they belong on the
-  // guest list — `getPlanShareInfo` redacts it for anonymous and
-  // pending-approval viewers so the public share page can't leak the
-  // host's street address. Only attendees (Accepted/Owned) and approved
-  // followers/owners see the address inline.
-  location: { name: string; address: string | null; timezone: string | null } | null;
+  // Both `name` and `address` are null when the viewer hasn't proven
+  // they belong on the guest list — `getPlanShareInfo` redacts the whole
+  // pair for anonymous and pending-approval viewers (a venue name like
+  // "Home" leaks the same signal the street address does). Only
+  // attendees (Accepted/Owned) and approved followers/owners see them
+  // inline.
+  location: { name: string | null; address: string | null; timezone: string | null } | null;
   host: { name: string } | null;
   shareId: string | null;
   calendarName: string | null;
@@ -123,13 +124,6 @@ export async function generateMetadata({
   // renders a giant empty grey preview bubble.
   const ogImageUrl = info.image ?? "https://os.joinleaf.com/api/og/plan-fallback";
 
-  const icons = info.calendarProfilePhoto
-    ? {
-        icon: info.calendarProfilePhoto,
-        apple: info.calendarProfilePhoto,
-      }
-    : undefined;
-
   const canonicalUrl =
     mode === "copy"
       ? `https://os.joinleaf.com/p/${eventGroupId}?copy=1`
@@ -138,7 +132,16 @@ export async function generateMetadata({
   return {
     title: `${title} · Leaf`,
     description,
-    icons,
+    // Conditionally spread — Next.js metadata merging is shallow, so
+    // including `icons: undefined` would clobber the root layout's
+    // /favicon.png and leave the tab iconless. Only override when the
+    // calendar has its own profile photo to use as the favicon.
+    ...(info.calendarProfilePhoto && {
+      icons: {
+        icon: info.calendarProfilePhoto,
+        apple: info.calendarProfilePhoto,
+      },
+    }),
     openGraph: {
       title,
       description,

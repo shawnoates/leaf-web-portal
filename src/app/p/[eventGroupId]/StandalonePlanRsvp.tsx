@@ -49,19 +49,21 @@ type Props = {
   planTitle: string;
   planDescription: string;
   expiryDate: string | null;
-  // `address` is null when the viewer hasn't RSVP'd yet (server redacts).
-  // The card revealed it post-RSVP via onAddressRevealed.
-  location: { name: string; address: string | null; timezone: string | null } | null;
+  // Both `name` and `address` are null when the viewer hasn't RSVP'd yet
+  // (server redacts the pair together). The card reveals them post-RSVP
+  // via onLocationRevealed.
+  location: { name: string | null; address: string | null; timezone: string | null } | null;
   requireApproval: boolean;
   // True when the visitor was bounced back from /open/p/<id>?rsvp=1
   // because iOS didn't intercept the Universal Link (no app installed).
   // Opens the RSVP modal on mount so the tap that started the journey
   // doesn't get dropped on the floor.
   autoOpenRsvp: boolean;
-  // Invoked when rsvpToPlanViaWeb returns an address on a confirmed
-  // (Accepted/Owned) RSVP. Parent uses this to swap the redacted address
-  // line for the real address inline, and to populate the ICS download.
-  onAddressRevealed?: (address: string) => void;
+  // Invoked when rsvpToPlanViaWeb returns location data on a confirmed
+  // (Accepted/Owned) RSVP. Parent uses this to swap the redacted location
+  // line for the real name/address inline, and to populate the ICS
+  // download. Either field may be null if the host didn't set one.
+  onLocationRevealed?: (loc: { name: string | null; address: string | null }) => void;
 };
 
 // Mirror of buildIcsHref in org/[shareId]/page.tsx — keeps the standalone
@@ -102,7 +104,7 @@ export default function StandalonePlanRsvp({
   location,
   requireApproval,
   autoOpenRsvp,
-  onAddressRevealed,
+  onLocationRevealed,
 }: Props) {
   const [open, setOpen] = useState(autoOpenRsvp);
 
@@ -142,7 +144,7 @@ export default function StandalonePlanRsvp({
           location={location}
           requireApproval={requireApproval}
           onClose={() => setOpen(false)}
-          onAddressRevealed={onAddressRevealed}
+          onLocationRevealed={onLocationRevealed}
         />
       ) : null}
     </>
@@ -157,19 +159,23 @@ function RsvpModal({
   location,
   requireApproval,
   onClose,
-  onAddressRevealed,
+  onLocationRevealed,
 }: {
   eventGroupId: string;
   planTitle: string;
   planDescription: string;
   expiryDate: string | null;
-  location: { name: string; address: string | null; timezone: string | null } | null;
+  location: { name: string | null; address: string | null; timezone: string | null } | null;
   requireApproval: boolean;
   onClose: () => void;
-  onAddressRevealed?: (address: string) => void;
+  onLocationRevealed?: (loc: { name: string | null; address: string | null }) => void;
 }) {
-  // Tracks the address the server hands back on a confirmed RSVP — keeps
-  // the success modal's ICS download in sync with what the card displays.
+  // Tracks the location pair the server hands back on a confirmed RSVP —
+  // keeps the success modal's ICS download in sync with what the card
+  // displays.
+  const [revealedName, setRevealedName] = useState<string | null>(
+    location?.name ?? null
+  );
   const [revealedAddress, setRevealedAddress] = useState<string | null>(
     location?.address ?? null
   );
@@ -246,6 +252,7 @@ function RsvpModal({
         | {
             eventNotificationId?: string;
             pendingApproval?: boolean;
+            locationName?: string | null;
             address?: string | null;
           }
         | null
@@ -259,12 +266,17 @@ function RsvpModal({
         setNotificationId(result.eventNotificationId);
       }
       if (result?.pendingApproval) setIsPendingResult(true);
-      // Server returns the address on confirmed (Accepted/Owned) RSVPs;
-      // pending requests come back with address=null and stay redacted
-      // until the host approves.
-      if (result?.address) {
-        setRevealedAddress(result.address);
-        onAddressRevealed?.(result.address);
+      // Server returns name + address on confirmed (Accepted/Owned) RSVPs;
+      // pending requests come back with both null and stay redacted until
+      // the host approves.
+      const revealedLoc = {
+        name: result?.locationName ?? null,
+        address: result?.address ?? null,
+      };
+      if (revealedLoc.name) setRevealedName(revealedLoc.name);
+      if (revealedLoc.address) setRevealedAddress(revealedLoc.address);
+      if (revealedLoc.name || revealedLoc.address) {
+        onLocationRevealed?.(revealedLoc);
       }
       setFormStep("success");
     } catch (err: unknown) {
@@ -461,10 +473,11 @@ function RsvpModal({
                 title: planTitle,
                 dateISO: expiryDate,
                 description: planDescription,
-                locationName: location?.name ?? null,
-                // revealedAddress is what the server handed back on this
-                // RSVP — falls back to whatever prop value we already had
-                // (non-null only for revisiting attendees / followers).
+                // revealedName/revealedAddress are what the server handed
+                // back on this RSVP — falls back to whatever prop value we
+                // already had (non-null only for revisiting attendees or
+                // followers).
+                locationName: revealedName ?? location?.name ?? null,
                 locationAddress: revealedAddress ?? location?.address ?? null,
                 url: typeof window !== "undefined" ? `${window.location.origin}/p/${eventGroupId}` : undefined,
               });
