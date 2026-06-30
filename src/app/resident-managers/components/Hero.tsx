@@ -25,7 +25,7 @@ export default function Hero() {
             <span className="underline-amber">don&rsquo;t leave.</span>
           </h1>
           <p className="lead" style={{ marginTop: 22 }}>
-            Leaf runs the social side of your building for you &mdash; one great resident
+            Leaf OS runs the social side of your building for you &mdash; one great resident
             event a month, fully done&#8209;for&#8209;you &mdash; so residents connect, stay
             longer, and your NOI holds. Your team does nothing.
           </p>
