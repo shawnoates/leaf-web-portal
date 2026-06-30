@@ -49,13 +49,19 @@ type Props = {
   planTitle: string;
   planDescription: string;
   expiryDate: string | null;
-  location: { name: string; address: string; timezone: string | null } | null;
+  // `address` is null when the viewer hasn't RSVP'd yet (server redacts).
+  // The card revealed it post-RSVP via onAddressRevealed.
+  location: { name: string; address: string | null; timezone: string | null } | null;
   requireApproval: boolean;
   // True when the visitor was bounced back from /open/p/<id>?rsvp=1
   // because iOS didn't intercept the Universal Link (no app installed).
   // Opens the RSVP modal on mount so the tap that started the journey
   // doesn't get dropped on the floor.
   autoOpenRsvp: boolean;
+  // Invoked when rsvpToPlanViaWeb returns an address on a confirmed
+  // (Accepted/Owned) RSVP. Parent uses this to swap the redacted address
+  // line for the real address inline, and to populate the ICS download.
+  onAddressRevealed?: (address: string) => void;
 };
 
 // Mirror of buildIcsHref in org/[shareId]/page.tsx — keeps the standalone
@@ -96,6 +102,7 @@ export default function StandalonePlanRsvp({
   location,
   requireApproval,
   autoOpenRsvp,
+  onAddressRevealed,
 }: Props) {
   const [open, setOpen] = useState(autoOpenRsvp);
 
@@ -135,6 +142,7 @@ export default function StandalonePlanRsvp({
           location={location}
           requireApproval={requireApproval}
           onClose={() => setOpen(false)}
+          onAddressRevealed={onAddressRevealed}
         />
       ) : null}
     </>
@@ -149,15 +157,22 @@ function RsvpModal({
   location,
   requireApproval,
   onClose,
+  onAddressRevealed,
 }: {
   eventGroupId: string;
   planTitle: string;
   planDescription: string;
   expiryDate: string | null;
-  location: { name: string; address: string; timezone: string | null } | null;
+  location: { name: string; address: string | null; timezone: string | null } | null;
   requireApproval: boolean;
   onClose: () => void;
+  onAddressRevealed?: (address: string) => void;
 }) {
+  // Tracks the address the server hands back on a confirmed RSVP — keeps
+  // the success modal's ICS download in sync with what the card displays.
+  const [revealedAddress, setRevealedAddress] = useState<string | null>(
+    location?.address ?? null
+  );
   const cached = getVerifiedUserCookie();
   const [name, setName] = useState(cached?.name ?? "");
   const [phone, setPhone] = useState(cached?.phone ?? "");
@@ -228,7 +243,11 @@ function RsvpModal({
         rsvpNote: requireApproval && rsvpNote.trim() ? rsvpNote.trim() : undefined,
         sharePhoneWithHost: sharePhone,
       })) as
-        | { eventNotificationId?: string; pendingApproval?: boolean }
+        | {
+            eventNotificationId?: string;
+            pendingApproval?: boolean;
+            address?: string | null;
+          }
         | null
         | undefined;
       setVerifiedUserCookie(name, phone);
@@ -240,6 +259,13 @@ function RsvpModal({
         setNotificationId(result.eventNotificationId);
       }
       if (result?.pendingApproval) setIsPendingResult(true);
+      // Server returns the address on confirmed (Accepted/Owned) RSVPs;
+      // pending requests come back with address=null and stay redacted
+      // until the host approves.
+      if (result?.address) {
+        setRevealedAddress(result.address);
+        onAddressRevealed?.(result.address);
+      }
       setFormStep("success");
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to RSVP. Please try again.");
@@ -436,7 +462,10 @@ function RsvpModal({
                 dateISO: expiryDate,
                 description: planDescription,
                 locationName: location?.name ?? null,
-                locationAddress: location?.address ?? null,
+                // revealedAddress is what the server handed back on this
+                // RSVP — falls back to whatever prop value we already had
+                // (non-null only for revisiting attendees / followers).
+                locationAddress: revealedAddress ?? location?.address ?? null,
                 url: typeof window !== "undefined" ? `${window.location.origin}/p/${eventGroupId}` : undefined,
               });
               if (!icsUrl) return null;

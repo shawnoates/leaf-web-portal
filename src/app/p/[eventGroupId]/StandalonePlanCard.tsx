@@ -1,4 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
+import { Lock } from "lucide-react";
 import PlanWhen from "./PlanWhen";
 import StandalonePlanRsvp from "./StandalonePlanRsvp";
 
@@ -11,7 +15,11 @@ type Props = {
   description: string;
   image: string | null;
   expiryDate: string | null;
-  location: { name: string; address: string; timezone: string | null } | null;
+  // `address` is null when the viewer hasn't proven they belong on the
+  // guest list — server-side gating in getPlanShareInfo. After a successful
+  // RSVP, rsvpToPlanViaWeb returns the address and StandalonePlanRsvp
+  // hands it back via onAddressRevealed so the card swaps in the value.
+  location: { name: string; address: string | null; timezone: string | null } | null;
   hostName: string | null;
   calendarName: string | null;
   calendarProfilePhoto: string | null;
@@ -42,6 +50,14 @@ export default function StandalonePlanCard({
 }: Props) {
   const showWhen = variant !== "copy" && expiryDate !== null;
   const blurDetails = variant === "privateCalendar";
+
+  // Server returns null for non-attendees; revealed once the RSVP child
+  // reports a successful Accepted RSVP and hands us the address.
+  const [revealedAddress, setRevealedAddress] = useState<string | null>(
+    location?.address ?? null
+  );
+  const addressIsHidden =
+    !!location && !revealedAddress && variant === "standalone";
 
   return (
     <div className="min-h-dvh bg-zinc-50 px-4 py-6 md:py-10 flex justify-center items-start md:items-center">
@@ -79,8 +95,13 @@ export default function StandalonePlanCard({
           {location ? (
             <div className="text-sm text-zinc-700">
               <div>{location.name}</div>
-              {location.address ? (
-                <div className="text-zinc-500">{location.address}</div>
+              {revealedAddress ? (
+                <div className="text-zinc-500">{revealedAddress}</div>
+              ) : addressIsHidden ? (
+                <div className="flex items-center gap-1.5 text-zinc-400 italic">
+                  <Lock className="w-3 h-3" />
+                  <span>Full address shared after you RSVP</span>
+                </div>
               ) : null}
             </div>
           ) : null}
@@ -118,9 +139,18 @@ export default function StandalonePlanCard({
                 planTitle={title}
                 planDescription={description}
                 expiryDate={expiryDate}
-                location={location}
+                location={
+                  location
+                    ? {
+                        name: location.name,
+                        address: revealedAddress,
+                        timezone: location.timezone,
+                      }
+                    : null
+                }
                 requireApproval={requireApproval}
                 autoOpenRsvp={autoOpenRsvp}
+                onAddressRevealed={(addr) => setRevealedAddress(addr)}
               />
               {/* /open/p/<id> is the Universal Link bouncer — iOS intercepts
                   and opens the Leaf app when installed; otherwise the bouncer

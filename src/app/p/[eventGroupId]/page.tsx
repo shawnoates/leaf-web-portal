@@ -13,12 +13,18 @@ type PlanShareInfo = {
   description: string;
   image: string | null;
   expiryDate: string | null;
-  location: { name: string; address: string; timezone: string | null } | null;
+  // `address` is null when the viewer hasn't proven they belong on the
+  // guest list — `getPlanShareInfo` redacts it for anonymous and
+  // pending-approval viewers so the public share page can't leak the
+  // host's street address. Only attendees (Accepted/Owned) and approved
+  // followers/owners see the address inline.
+  location: { name: string; address: string | null; timezone: string | null } | null;
   host: { name: string } | null;
   shareId: string | null;
   calendarName: string | null;
   calendarIsPrivate: boolean;
   viewerIsFollower: boolean;
+  viewerIsAttendee: boolean;
   calendarProfilePhoto: string | null;
   requireApproval: boolean;
 };

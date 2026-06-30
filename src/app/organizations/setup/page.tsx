@@ -121,6 +121,8 @@ function SetupPageInner() {
           leadId?: string;
           buildingName?: string;
           formattedAddress?: string;
+          lat?: number | null;
+          lng?: number | null;
           rmEmail?: string;
           linkedOrgCalendarId?: string | null;
         }) => {
@@ -150,6 +152,18 @@ function SetupPageInner() {
             description:
               prev.description ||
               `A shared calendar for residents of ${r.buildingName} to organize and RSVP to building events.`,
+            // Prefill LOCATION from the lead so the RM doesn't have to re-pick
+            // the building from Google. primaryCitySelected=true gates the
+            // submit button which would otherwise refuse to advance without
+            // a confirmed Google selection.
+            primaryCity: prev.primaryCity || r.formattedAddress || "",
+            primaryLat:
+              prev.primaryLat ?? (typeof r.lat === "number" ? r.lat : null),
+            primaryLng:
+              prev.primaryLng ?? (typeof r.lng === "number" ? r.lng : null),
+            primaryCitySelected:
+              prev.primaryCitySelected ||
+              (typeof r.lat === "number" && typeof r.lng === "number"),
           }));
         }
       )
