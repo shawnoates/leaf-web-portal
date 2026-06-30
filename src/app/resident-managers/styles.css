@@ -264,6 +264,9 @@
 .rm-landing .way li { display: flex; gap: 10px; font-size: 0.95rem; }
 .rm-landing .way li::before { content: "→"; color: var(--amber); font-weight: 700; }
 .rm-landing .way .btn { margin-top: auto; }
+.rm-landing .way__cta-stack { margin-top: auto; align-items: stretch; }
+.rm-landing .way__cta-stack .btn { width: 100%; }
+.rm-landing .way__cta-stack .cta-stack__hint { text-align: center; }
 .rm-landing .way--reco .btn-ghost { display: none; }
 
 /* ---------- calculator ---------- */

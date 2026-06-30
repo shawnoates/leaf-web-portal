@@ -31,9 +31,14 @@ export default function TwoWays() {
               <li>Resident-led</li>
               <li>No app to download</li>
             </ul>
-            <CTA to="free" variant="ghost">
-              Start free today
-            </CTA>
+            <div className="cta-stack way__cta-stack">
+              <CTA to="free" variant="ghost">
+                Start free today
+              </CTA>
+              <a className="cta-stack__hint" href="/apartment">
+                See example calendar →
+              </a>
+            </div>
           </Reveal>
 
           <Reveal className="way way--reco" delay={100}>
