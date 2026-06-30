@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect } from "react";
-import { CTA, LeafMark } from "./ui";
+import { CTA } from "./ui";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type WindowWithDataLayer = Window & { dataLayer?: any[] };
 
 /**
- * Sticky landing-page header. Also wires a delegated click listener that
- * forwards `data-cta` attributes on any CTA to the page dataLayer (picked
- * up by GTM if installed). CTAs elsewhere on the page benefit too, since
- * the listener is delegated at the document level.
+ * Sticky landing-page header. Mirrors the os.joinleaf.com brand mark
+ * (leaf-logo-black.png + "OS" wordmark) so this marketing route reads
+ * as part of the same site. A delegated click listener forwards
+ * [data-cta] attributes to window.dataLayer for GTM analytics.
  */
 export default function Header() {
   useEffect(() => {
@@ -35,10 +35,9 @@ export default function Header() {
     <header className="header">
       <div className="container header__in">
         <a className="brand" href="#top">
-          <span className="brand__mark">
-            <LeafMark size={18} />
-          </span>
-          Leaf
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/leaf-logo-black.png" alt="Leaf" className="brand__logo" />
+          <span className="brand__os">OS</span>
         </a>
         <div className="header__cta">
           <a className="link-ghost" href="#how">

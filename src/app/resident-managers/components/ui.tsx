@@ -23,12 +23,10 @@ export function Eyebrow({ children }: { children: ReactNode }) {
 }
 
 export function Plaque({ children }: { children: ReactNode }) {
-  return (
-    <span className="plaque">
-      <span className="plaque__dot" />
-      {children}
-    </span>
-  );
+  // Plain inline source citation — no pill, no dot. Quiet grey text
+  // prefixed with "Source:" reads as a citation without competing with
+  // the surrounding copy.
+  return <span className="plaque">Source: {children}</span>;
 }
 
 export type CTATarget = "demo" | "free";

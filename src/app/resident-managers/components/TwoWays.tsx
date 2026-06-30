@@ -42,8 +42,20 @@ export default function TwoWays() {
               Concierge
             </h3>
             <div className="way__price" style={{ color: "var(--amber)" }}>
-              Done&#8209;for&#8209;you
+              $499<span style={{ fontSize: "1rem", fontWeight: 400 }}>/mo</span>
             </div>
+            <p
+              style={{
+                color: "var(--amber)",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                letterSpacing: "0.04em",
+                marginTop: 2,
+                marginBottom: 8,
+              }}
+            >
+              Done-for-you
+            </p>
             <p style={{ color: "var(--light)" }}>
               We plan and run one great resident event a month, start to finish. Your first
               event is free.

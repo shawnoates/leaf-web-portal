@@ -27,9 +27,11 @@ export default function HowItWorks() {
           <Eyebrow>How Leaf works</Eyebrow>
           <h2 className="h-lg">We run the fun. You keep your tools.</h2>
           <p className="lead">
-            Leaf is the <strong style={{ color: "#fff" }}>social</strong> layer of your
-            building &mdash; deliberately separate from the utility apps residents use to pay
-            rent and file tickets. Keep all of that. We do the part those tools can&rsquo;t.
+            Leaf is the{" "}
+            <strong style={{ color: "#fff" }}>social layer</strong>{" "}
+            of your building &mdash; deliberately separate from the utility apps residents
+            use to pay rent and file tickets. Keep all of that. We do the part those tools
+            can&rsquo;t.
           </p>
         </Reveal>
 

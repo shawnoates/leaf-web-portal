@@ -82,17 +82,18 @@
   background: var(--amber); opacity: 0.42; border-radius: 3px; z-index: -1;
 }
 
-/* source plaque */
+/* source citation — quiet inline text, no pill */
 .rm-landing .plaque {
-  display: inline-flex; align-items: center; gap: 7px;
-  font-family: var(--body); font-size: 10.5px; font-weight: 700;
-  letter-spacing: 0.1em; text-transform: uppercase; color: var(--mid);
-  background: var(--mint); border: 1px solid var(--line);
-  padding: 4px 9px; border-radius: 999px;
+  display: inline-block;
+  font-family: var(--body); font-size: 0.78rem; font-weight: 500;
+  letter-spacing: 0; text-transform: none; color: var(--muted);
+  background: transparent; border: 0;
+  padding: 0;
 }
-.rm-landing .band-forest .plaque { color: var(--light); background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.14); }
-.rm-landing .plaque__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--mid); flex: none; }
-.rm-landing .band-forest .plaque__dot { background: var(--light); }
+.rm-landing .band-forest .plaque { color: var(--light); opacity: 0.7; }
+/* Legacy dot kept for backwards-compat but hidden — chip in Hero.tsx
+   still uses the markup. */
+.rm-landing .plaque__dot { display: none; }
 
 /* ---------- buttons ---------- */
 .rm-landing .btn {
@@ -127,6 +128,8 @@
 .rm-landing .header__in { display: flex; align-items: center; justify-content: space-between; height: 66px; }
 .rm-landing .brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 600; font-size: 1.25rem; color: var(--forest); }
 .rm-landing .brand__mark { width: 30px; height: 30px; border-radius: 9px; background: var(--forest); display: grid; place-items: center; }
+.rm-landing .brand__logo { height: 30px; width: auto; display: block; }
+.rm-landing .brand__os { font-family: var(--body); font-size: 1rem; font-weight: 300; letter-spacing: 0.18em; text-transform: uppercase; color: var(--forest); }
 .rm-landing .header__cta { display: flex; align-items: center; gap: 12px; }
 .rm-landing .header__cta .btn { padding: 10px 18px; font-size: 0.9rem; }
 .rm-landing .header .link-ghost { color: var(--forest); font-weight: 600; font-size: 0.92rem; }
@@ -138,12 +141,10 @@
 @media (max-width: 900px) { .rm-landing .hero__grid { grid-template-columns: 1fr; } }
 .rm-landing .hero__art {
   position: relative; aspect-ratio: 4/4.4; border-radius: 20px; overflow: hidden;
-  background:
-    radial-gradient(120% 90% at 20% 10%, #54a07a 0%, transparent 55%),
-    radial-gradient(120% 120% at 90% 90%, #173d2c 0%, transparent 60%),
-    linear-gradient(155deg, #2d6a4f, #1b4332);
+  background: linear-gradient(155deg, #2d6a4f, #1b4332);
   box-shadow: 0 30px 60px rgba(27,67,50,0.22);
 }
+.rm-landing .hero__photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .rm-landing .hero__art-note { position: absolute; left: 18px; bottom: 16px; color: rgba(255,255,255,0.6); font-size: 11px; letter-spacing: 0.04em; }
 .rm-landing .hero__people { position: absolute; inset: 0; }
 .rm-landing .chip {
@@ -164,6 +165,9 @@
 .rm-landing .card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; }
 .rm-landing .band-mint .card { background: var(--white); }
 .rm-landing .card--mint { background: var(--mint); border-color: transparent; }
+.rm-landing .card--mint h3 { color: var(--forest); }
+.rm-landing .band-forest .card h3,
+.rm-landing .band-forest .card--mint h3 { color: var(--forest); }
 .rm-landing .card--forest { background: var(--green); border-color: transparent; color: var(--white); }
 .rm-landing .card--forest h3 { color: var(--white); }
 
