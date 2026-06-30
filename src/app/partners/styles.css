@@ -244,13 +244,17 @@
 .partner-landing .acc__item[data-open="true"] .acc__a { padding: 0 22px 22px; max-height: 320px; }
 .partner-landing .acc__a p { color: var(--ink); }
 
-/* ---------- two ways ---------- */
+/* ---------- two ways → three ways ---------- */
 .partner-landing .ways { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.partner-landing .ways--3up { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 960px) { .partner-landing .ways--3up { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .partner-landing .ways { grid-template-columns: 1fr; } }
-.partner-landing .way { border-radius: var(--radius); padding: 30px; border: 1px solid var(--line); background: var(--white); display: flex; flex-direction: column; }
-.partner-landing .way--reco { background: var(--forest); color: #fff; border-color: transparent; position: relative; }
+.partner-landing .way { border-radius: var(--radius); padding: 30px; border: 1px solid var(--line); background: var(--white); display: flex; flex-direction: column; position: relative; }
+.partner-landing .way--free { background: var(--paper); }
+.partner-landing .way--reco { background: var(--forest); color: #fff; border-color: transparent; }
 .partner-landing .way--reco h3 { color: #fff; }
 .partner-landing .way__tag { position: absolute; top: 18px; right: 18px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #1c1304; background: var(--amber); padding: 5px 10px; border-radius: 999px; }
+.partner-landing .way__tag--quiet { background: var(--mint); color: var(--green); border: 1px solid var(--line); }
 .partner-landing .way__price { font-family: var(--display); font-size: 2.2rem; margin: 14px 0 6px; }
 .partner-landing .way ul { list-style: none; padding: 0; margin: 12px 0 24px; display: grid; gap: 10px; }
 .partner-landing .way li { display: flex; gap: 10px; font-size: 0.95rem; }
@@ -275,7 +279,45 @@
  * Merchant-specific additions
  * ============================================================ */
 
-/* Offer cards (two-product breakdown) */
+/* On-ramp band — "Post a deal — Free" at the top of the Offer section.
+   Slim, horizontal, visually lighter than the two event cards below
+   so it reads as the easy first step rather than a third premium tier. */
+.partner-landing .offer-free {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 24px; padding: 22px 26px; border-radius: var(--radius);
+  background: var(--mint); border: 1px solid var(--line);
+}
+.partner-landing .offer-free__body { flex: 1; min-width: 0; }
+.partner-landing .offer-free__badge {
+  display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: #1c1304; background: var(--amber);
+  padding: 4px 9px; border-radius: 999px; margin-bottom: 10px;
+}
+.partner-landing .offer-free h3 { font-size: 1.4rem; margin: 0 0 6px; color: var(--forest); }
+.partner-landing .offer-free__desc { color: var(--muted); margin: 0; font-size: 0.95rem; }
+.partner-landing .offer-free .btn { flex: 0 0 auto; }
+@media (max-width: 640px) {
+  .partner-landing .offer-free { flex-direction: column; align-items: flex-start; }
+}
+
+/* "Or get on the calendar" — quiet divider before the host/sponsor pair */
+.partner-landing .offer-section-banner {
+  text-align: center; color: var(--muted);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  position: relative;
+}
+.partner-landing .offer-section-banner::before,
+.partner-landing .offer-section-banner::after {
+  content: ""; position: absolute; top: 50%; height: 1px; background: var(--line); width: 30%;
+}
+.partner-landing .offer-section-banner::before { left: 0; }
+.partner-landing .offer-section-banner::after { right: 0; }
+@media (max-width: 540px) {
+  .partner-landing .offer-section-banner::before,
+  .partner-landing .offer-section-banner::after { display: none; }
+}
+
+/* Offer cards — paired event options (Host vs Sponsor) */
 .partner-landing .offer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
 @media (max-width: 820px) { .partner-landing .offer-grid { grid-template-columns: 1fr; } }
 .partner-landing .offer { border-radius: var(--radius); padding: 30px; background: var(--white); border: 1px solid var(--line); display: flex; flex-direction: column; position: relative; }

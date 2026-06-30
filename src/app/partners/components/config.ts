@@ -1,9 +1,20 @@
 // CTAs for the /partners landing.
-// PARTNER_URL = partner contact / signup link. Reuses the same Google
-// Calendar booking slot as /organizations and /resident-managers so
-// every "book a demo / become a partner" CTA across the site funnels
-// into one calendar; swap for a dedicated partner form when ready.
+//
+// PARTNER_URL = partner contact / booking link, used by every paid
+// offering (host, sponsor, "become a partner"). Reuses the same Google
+// Calendar slot as /organizations and /resident-managers so every
+// "book a demo" CTA across the site funnels into one calendar.
+//
 // SAMPLE_URL = the example resident calendar at /apartment — what a
 // partner deal looks like in the wild.
+//
+// DEAL_URL = self-serve "post a deal" link. This is the FREE on-ramp
+// (merchant equivalent of the property-managers' free calendar) and
+// must NOT route through the demo calendar — adding a deal should be
+// instant.
+// TODO: replace with the real self-serve deal-submission URL once it
+// ships. Falls back to PARTNER_URL so the button still lands
+// somewhere actionable in the meantime.
 export const PARTNER_URL = "https://calendar.app.google/4v3mg4Ry4i5Bn7fG8";
 export const SAMPLE_URL = "/apartment";
+export const DEAL_URL = PARTNER_URL;

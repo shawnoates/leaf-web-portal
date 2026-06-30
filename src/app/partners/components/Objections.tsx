@@ -14,7 +14,7 @@ const items = [
   },
   {
     q: "I'm too busy to host an event.",
-    a: "Then just feature a deal. It's always on and takes zero effort — you give us the offer, we place it in nearby buildings, and you handle the counter.",
+    a: "Then post a deal for free — it's always on and takes zero effort. Or sponsor an event we've already planned for you — back the room, no logistics on your end. Hosting your own is just one path of three.",
   },
   {
     q: "Is it expensive?",

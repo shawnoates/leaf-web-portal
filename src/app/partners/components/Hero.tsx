@@ -101,8 +101,8 @@ export default function Hero() {
           </h1>
           <p className="lead" style={{ marginTop: 22 }}>
             Leaf OS puts your business in front of the residents who live minutes from your
-            door &mdash; inside the community calendar they actually trust. Feature a deal,
-            or let us fill an event for you.
+            door &mdash; inside the community calendar they actually trust. Post a deal, host
+            an event, or sponsor one.
           </p>
           <div className="cta-row" style={{ marginTop: 28 }}>
             <CTA to="partner" variant="primary" arrow>
