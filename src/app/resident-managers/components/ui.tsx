@@ -68,10 +68,13 @@ export function CTA({
 }
 
 export function TrustStrip() {
+  // "First event on us" intentionally removed from this strip — it lives
+  // next to the free-calendar CTAs and could read as "the free calendar
+  // includes a free event," which isn't true. The promise still appears
+  // (correctly scoped to Concierge) in Objections + TwoWays.
   return (
     <div className="trust">
       <span>No app for residents to download</span>
-      <span>First event on us</span>
       <span>Start free in minutes</span>
     </div>
   );
