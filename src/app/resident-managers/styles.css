@@ -116,10 +116,15 @@
 /* Match button widths in the Hero + FinalCta rows so the ghost
    ("Start your free resident calendar") and primary ("Book a demo")
    share a baseline. The longer label sets the floor; the shorter pads
-   up to it. Mobile keeps natural widths. */
+   up to it. Mobile keeps natural widths.
+   260px keeps both buttons side-by-side inside the Hero text column
+   (~560px usable) at 1140px containers; the wider FinalCta still has
+   plenty of room. */
 @media (min-width: 480px) {
   .rm-landing .cta-row > .btn,
-  .rm-landing .cta-row > .cta-stack > .btn { min-width: 290px; }
+  .rm-landing .cta-row > .cta-stack > .btn { min-width: 260px; }
+  .rm-landing .cta-row > .btn { padding-left: 18px; padding-right: 18px; }
+  .rm-landing .cta-row > .cta-stack > .btn { padding-left: 18px; padding-right: 18px; }
 }
 .rm-landing .cta-stack { display: inline-flex; flex-direction: column; align-items: center; gap: 8px; }
 .rm-landing .cta-stack__hint {
