@@ -118,7 +118,10 @@
    column; text wraps inside if the viewport is very narrow. */
 .rm-landing .cta-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Asymmetric split: the longer-labeled ghost CTA (column 1) gets a
+     bit more room to breathe; the shorter primary "Book a demo"
+     (column 2) tightens up so neither button is over-padded. */
+  grid-template-columns: 1.2fr 0.8fr;
   gap: 14px;
   align-items: start;
   max-width: 620px;
