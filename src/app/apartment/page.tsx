@@ -150,6 +150,7 @@ const config: LandingConfig = {
       address: "127 Lincoln Ave · 2 blocks away",
       promoCode: "LEAFBOCCA",
       dealType: "public",
+      interestCount: 14,
       imageUrl:
         "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80",
     },
@@ -161,6 +162,7 @@ const config: LandingConfig = {
       address: "44 Park St · across the street",
       promoCode: "LEAFQUARTER",
       dealType: "public",
+      interestCount: 9,
       imageUrl:
         "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=800&q=80",
     },
@@ -172,6 +174,7 @@ const config: LandingConfig = {
       address: "210 River Rd · 8 min walk",
       promoCode: "LEAFFRAMES",
       dealType: "public",
+      interestCount: 5,
       imageUrl:
         "https://images.unsplash.com/photo-1545056453-f0359c3df6db?w=800&q=80",
     },
@@ -183,6 +186,7 @@ const config: LandingConfig = {
       address: "12 Lincoln Park N · 1 block",
       dealType: "exclusive",
       redeemWindowMinutes: 60,
+      interestCount: 22,
       imageUrl:
         "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&q=80",
     },
@@ -194,6 +198,7 @@ const config: LandingConfig = {
       address: "300 River Rd · 6 min walk",
       promoCode: "LEAFRIVER",
       dealType: "public",
+      interestCount: 7,
       imageUrl:
         "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80",
     },
@@ -205,6 +210,7 @@ const config: LandingConfig = {
       address: "88 5th Ave · 5 min walk",
       promoCode: "LEAFREAD",
       dealType: "public",
+      interestCount: 3,
       imageUrl:
         "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=800&q=80",
     },

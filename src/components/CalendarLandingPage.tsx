@@ -14,10 +14,8 @@ import {
   Check,
   ArrowRight,
   Tag,
-  MapPin,
-  Clock,
   Lock,
-  Copy,
+  Flag,
 } from "lucide-react";
 
 const SETUP_URL = "https://www.os.joinleaf.com/organizations/setup";
@@ -54,6 +52,11 @@ export interface SampleDeal {
   imageUrl?: string;
   dealType: "public" | "exclusive";
   redeemWindowMinutes?: number;
+  /**
+   * Seed for the cosmetic interest count on the card. Optional — when
+   * omitted the heart shows the "Interested" prompt instead.
+   */
+  interestCount?: number;
 }
 
 export interface LandingConfig {
@@ -115,29 +118,32 @@ function SampleDealCard({
   brandColor: string;
   onClick?: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
+  // Mirrors the CompactDealCard used on real org pages (see
+  // src/components/DealsStrip.tsx): same width/aspect/typography plus
+  // an Interested heart + Report row in the footer. The footer
+  // interactions are cosmetic on /apartment (it's a mock) — the heart
+  // toggles local state without a Cloud call, and Report has no modal.
   const isExclusive = deal.dealType === "exclusive";
-
-  const copy = async () => {
-    if (!deal.promoCode) return;
-    try {
-      await navigator.clipboard.writeText(deal.promoCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* ignore */
-    }
-  };
+  const [interested, setInterested] = useState(false);
+  const [interestCount, setInterestCount] = useState(deal.interestCount ?? 0);
 
   return (
-    <button
-      type="button"
+    <div
       onClick={onClick}
-      className="min-w-[160px] max-w-[180px] snap-start bg-white border border-zinc-200 rounded-lg overflow-hidden flex flex-col text-left hover:border-zinc-300 hover:shadow-sm transition-all cursor-pointer"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+      className="min-w-[160px] max-w-[180px] snap-start bg-white border border-zinc-200 rounded-lg overflow-hidden flex flex-col text-left hover:border-zinc-300 hover:shadow-sm transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-zinc-900"
     >
       <div className="relative">
         {deal.imageUrl ? (
           <div className="aspect-[16/10] bg-zinc-100 overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={deal.imageUrl}
               alt={deal.title}
@@ -167,21 +173,46 @@ function SampleDealCard({
           {deal.title}
         </h3>
         {deal.address && (
-          <div className="flex items-center gap-1 text-[10px] text-zinc-400 mt-auto pt-0.5">
-            <MapPin className="w-2.5 h-2.5 shrink-0" />
-            <span className="line-clamp-1">{deal.address}</span>
-          </div>
+          <p className="text-[10px] text-zinc-400 mt-auto pt-0.5 line-clamp-1">
+            {deal.address}
+          </p>
         )}
-        {isExclusive && (
-          <div
-            className="mt-1 w-full px-2 py-1 rounded text-white text-[10px] font-bold uppercase tracking-wider text-center"
-            style={{ backgroundColor: brandColor }}
+        <div className="mt-1 flex items-center justify-between">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (interested) return;
+              setInterested(true);
+              setInterestCount((n) => n + 1);
+            }}
+            disabled={interested}
+            className={`inline-flex items-center gap-1 text-[10px] font-medium transition-colors ${
+              interested
+                ? "text-red-600 cursor-default"
+                : "text-zinc-500 hover:text-red-600"
+            }`}
+            aria-label={interested ? "You're interested" : "Mark as interested"}
           >
-            Schedule to redeem
-          </div>
-        )}
+            <Heart
+              className="w-3 h-3"
+              fill={interested ? "currentColor" : "none"}
+            />
+            <span>
+              {interestCount > 0 ? interestCount : ""}
+              {interestCount === 0 && !interested && "Interested"}
+              {interested && interestCount === 1 && " You"}
+            </span>
+          </button>
+          <button
+            onClick={(e) => e.stopPropagation()}
+            className="text-[9px] text-zinc-300 hover:text-zinc-600 inline-flex items-center gap-0.5"
+          >
+            <Flag className="w-2 h-2" />
+            Report
+          </button>
+        </div>
       </div>
-    </button>
+    </div>
   );
 }
 
