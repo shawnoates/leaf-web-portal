@@ -15,7 +15,7 @@ export function FinalCta() {
           </p>
           <div className="cta-row" style={{ justifyContent: "center", marginTop: 30 }}>
             <CTA to="demo" variant="primary" arrow>
-              Book a Concierge demo
+              Book a demo
             </CTA>
             <CTA to="free" variant="ghost">
               Start your calendar free

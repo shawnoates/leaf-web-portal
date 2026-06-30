@@ -31,7 +31,7 @@ export default function Hero() {
           </p>
           <div className="cta-row" style={{ marginTop: 28 }}>
             <CTA to="demo" variant="primary" arrow>
-              Book a Concierge demo
+              Book a demo
             </CTA>
             <CTA to="free" variant="ghost">
               Start your calendar free

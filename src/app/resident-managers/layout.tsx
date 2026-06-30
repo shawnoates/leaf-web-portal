@@ -5,11 +5,11 @@ import "./styles.css";
 export const metadata: Metadata = {
   title: "Leaf — Build community. Keep residents. Protect your NOI.",
   description:
-    "Leaf runs the social side of your building for you — one done-for-you resident event a month — so neighbors connect, residents renew, and your NOI holds. Book a Concierge demo or start your calendar free.",
+    "Leaf runs the social side of your building for you — one done-for-you resident event a month — so neighbors connect, residents renew, and your NOI holds. Book a demo or start your calendar free.",
   openGraph: {
     title: "Leaf — Neighbors who know each other don't leave",
     description:
-      "Done-for-you resident events that build community and drive renewals. Book a Concierge demo or start your building's calendar free.",
+      "Done-for-you resident events that build community and drive renewals. Book a demo or start your building's calendar free.",
     type: "website",
   },
   twitter: { card: "summary_large_image" },

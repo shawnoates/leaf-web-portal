@@ -97,7 +97,7 @@ export default function HowItWorks() {
 
         <Reveal className="inline-cta">
           <CTA to="demo" variant="primary" arrow>
-            Book a Concierge demo
+            Book a demo
           </CTA>
         </Reveal>
       </div>
