@@ -75,7 +75,13 @@
 .partner-landing .band-forest .eyebrow { color: var(--amber); }
 .partner-landing .eyebrow::before { content: ""; width: 18px; height: 2px; background: currentColor; display: inline-block; }
 
-.partner-landing .h-xl { font-size: clamp(2.4rem, 6vw, 4.1rem); }
+.partner-landing .h-xl {
+  font-size: clamp(2.4rem, 6vw, 4.1rem);
+  /* Balance line lengths so the hero headline breaks into 2 even
+     rows instead of leaving an orphaned word ("live") on its own. */
+  text-wrap: balance;
+}
+.partner-landing .h-lg { text-wrap: balance; }
 .partner-landing .h-lg { font-size: clamp(1.9rem, 4.2vw, 3rem); }
 .partner-landing .h-md { font-size: clamp(1.4rem, 2.6vw, 1.9rem); }
 .partner-landing .lead { font-size: clamp(1.05rem, 1.6vw, 1.28rem); color: var(--muted); max-width: 56ch; }
@@ -297,9 +303,34 @@
 .partner-landing .barpair__track { height: 26px; background: var(--mint-deep); border-radius: 7px; overflow: hidden; }
 .partner-landing .barpair__fill { height: 100%; border-radius: 7px; }
 
-/* 5-min walk radius (Opportunity section) */
+/* 5-min walk radius (Opportunity section) — image fills the box, soft
+   forest gradient sits behind in case the image is slow / missing. */
 .partner-landing .radius {
   position: relative; aspect-ratio: 1/0.82; border-radius: var(--radius); overflow: hidden;
-  background: radial-gradient(circle at 50% 56%, #2d6a4f 0 8%, rgba(45,106,79,0.18) 8% 30%, rgba(45,106,79,0.10) 30% 55%, transparent 55%), var(--mint);
+  background: linear-gradient(155deg, #2d6a4f, #1b4332);
   border: 1px solid var(--line);
+}
+.partner-landing .radius__photo {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block;
+}
+
+/* Opportunity-section stat cards — switched off the flex side-by-side
+   layout because the ~$150/mo figure was wider than the minWidth and
+   overlapped the description. New: explicit grid columns with a
+   shrink-safe figure column + a body column that wraps cleanly. */
+.partner-landing .opportunity-stat {
+  display: grid;
+  grid-template-columns: minmax(140px, max-content) 1fr;
+  gap: 22px;
+  align-items: center;
+  padding: 22px;
+}
+.partner-landing .opportunity-stat__fig {
+  font-size: 1.85rem;
+  white-space: nowrap;
+}
+.partner-landing .opportunity-stat__body { min-width: 0; }
+@media (max-width: 540px) {
+  .partner-landing .opportunity-stat { grid-template-columns: 1fr; gap: 10px; }
+  .partner-landing .opportunity-stat__fig { font-size: 2.2rem; }
 }
