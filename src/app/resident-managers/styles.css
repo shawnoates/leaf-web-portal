@@ -112,7 +112,15 @@
 .rm-landing .band-forest .btn-ghost:hover { background: rgba(255,255,255,0.08); border-color: var(--white); }
 .rm-landing .btn-arrow { font-size: 1.05em; line-height: 1; }
 
-.rm-landing .cta-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.rm-landing .cta-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+/* Match button widths in the Hero + FinalCta rows so the ghost
+   ("Start your free resident calendar") and primary ("Book a demo")
+   share a baseline. The longer label sets the floor; the shorter pads
+   up to it. Mobile keeps natural widths. */
+@media (min-width: 480px) {
+  .rm-landing .cta-row > .btn,
+  .rm-landing .cta-row > .cta-stack > .btn { min-width: 290px; }
+}
 .rm-landing .cta-stack { display: inline-flex; flex-direction: column; align-items: center; gap: 8px; }
 .rm-landing .cta-stack__hint {
   font-size: 0.82rem; font-weight: 600; color: var(--mid);

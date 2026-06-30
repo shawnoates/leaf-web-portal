@@ -14,11 +14,16 @@ export function FinalCta() {
             a thing to your team&rsquo;s plate.
           </p>
           <div className="cta-row" style={{ justifyContent: "center", marginTop: 30 }}>
+            <div className="cta-stack">
+              <CTA to="free" variant="ghost">
+                Start your free resident calendar
+              </CTA>
+              <a className="cta-stack__hint" href="/apartment">
+                See example calendar →
+              </a>
+            </div>
             <CTA to="demo" variant="primary" arrow>
               Book a demo
-            </CTA>
-            <CTA to="free" variant="ghost">
-              Start your calendar free
             </CTA>
           </div>
           <div style={{ display: "flex", justifyContent: "center" }}>

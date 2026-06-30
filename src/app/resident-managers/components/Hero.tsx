@@ -32,7 +32,7 @@ export default function Hero() {
           <div className="cta-row" style={{ marginTop: 28 }}>
             <div className="cta-stack">
               <CTA to="free" variant="ghost">
-                Start your calendar free
+                Start your free resident calendar
               </CTA>
               <a className="cta-stack__hint" href="/apartment">
                 See example calendar →
