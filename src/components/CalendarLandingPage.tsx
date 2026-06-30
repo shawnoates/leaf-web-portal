@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type CSSProperties } from "react";
 import {
   Plus,
   Users,
@@ -297,13 +297,22 @@ function CTAModal({
 
 // --- Main ---
 
+type MerchantSection = "deal" | "host" | "sponsor";
+
+const MERCHANT_TARGET_IDS: Record<MerchantSection, string> = {
+  deal: "local-deals",
+  host: "host-plan",
+  sponsor: "sponsored-plan",
+};
+
 /**
  * Renders the resident-facing calendar landing.
  *
- * `merchantPreview` is the /partners/preview switch — adds a sticky
- * banner at the top with the three offerings and inline numbered
- * callouts above each placement (deals strip, host event, sponsored
- * event). Otherwise the page is identical to /apartment.
+ * `merchantPreview` is the /partners/preview switch — adds a side
+ * panel with the three offerings as clickable chips. Tapping a chip
+ * scrolls to its placement AND spotlights it: the rest of the page
+ * dims to black while the highlighted section pops above. Click
+ * anywhere outside the section (or ESC) to dismiss.
  */
 export default function CalendarLandingPage({
   config,
@@ -315,12 +324,68 @@ export default function CalendarLandingPage({
   const [showCTA, setShowCTA] = useState(false);
   const [showScrollPopup, setShowScrollPopup] = useState(false);
   const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
+  const [highlightedSection, setHighlightedSection] =
+    useState<MerchantSection | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowScrollPopup(true), 5000);
     return () => clearTimeout(timer);
   }, []);
+
+  // Spotlight tour: clicking a chip scrolls the target into view and
+  // raises it above a dimmed backdrop. Click anywhere outside the
+  // target (or hit ESC) to dismiss.
+  useEffect(() => {
+    if (!highlightedSection) return;
+    const targetId = MERCHANT_TARGET_IDS[highlightedSection];
+    const target = document.getElementById(targetId);
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setHighlightedSection(null);
+    };
+    const onClick = (e: MouseEvent) => {
+      const el = document.getElementById(targetId);
+      const sidePanel = document.getElementById("merchant-side-panel");
+      const node = e.target as Node | null;
+      if (!node) return;
+      if (el?.contains(node) || sidePanel?.contains(node)) return;
+      setHighlightedSection(null);
+    };
+    document.addEventListener("keydown", onKey);
+    // Defer click attach so the click that opened the spotlight
+    // doesn't immediately close it.
+    const timer = setTimeout(
+      () => document.addEventListener("click", onClick),
+      80,
+    );
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("click", onClick);
+      clearTimeout(timer);
+    };
+  }, [highlightedSection]);
+
+  const handleSelectMerchantSection = (section: MerchantSection) => {
+    setHighlightedSection((cur) => (cur === section ? null : section));
+  };
+
+  // Style object that turns its element into the spotlight "hero" — a
+  // dimming inset shadow extends 9999px outward, simulating a backdrop
+  // without needing a separate fixed overlay element. The element pops
+  // above its surroundings via z-index.
+  const spotlightStyle = (active: boolean): CSSProperties =>
+    active
+      ? {
+          position: "relative",
+          zIndex: 50,
+          borderRadius: 16,
+          boxShadow:
+            "0 0 0 9999px rgba(0,0,0,0.65), 0 0 0 10px white, 0 20px 50px rgba(0,0,0,0.35)",
+          transition: "box-shadow 0.35s ease",
+        }
+      : { transition: "box-shadow 0.35s ease" };
 
   const scroll = (dir: "left" | "right") => {
     scrollRef.current?.scrollBy({
@@ -352,7 +417,12 @@ export default function CalendarLandingPage({
 
   return (
     <div className="min-h-screen">
-      {merchantPreview && <MerchantPreviewBanner />}
+      {merchantPreview && (
+        <MerchantPreviewSidePanel
+          active={highlightedSection}
+          onSelect={handleSelectMerchantSection}
+        />
+      )}
 
       {/* Navigation */}
       <nav className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-zinc-100 px-6 py-6 md:py-8">
@@ -412,14 +482,31 @@ export default function CalendarLandingPage({
       {/* Plans Stream */}
       <main className="max-w-6xl mx-auto px-6 py-12">
         <div className="space-y-32">
-          {config.plans.map((plan, index) => {
+          {(() => {
+            let firstHostIndex = -1;
+            if (merchantPreview) {
+              firstHostIndex = config.plans.findIndex((p) => !p.sponsoredBy);
+            }
+            return config.plans.map((plan, index) => {
             const date = futureDate(plan.daysFromNow);
             const isSponsored = !!plan.sponsoredBy;
+            const isHostTarget = merchantPreview && index === firstHostIndex;
+            const isSpotlit =
+              (highlightedSection === "sponsor" && isSponsored) ||
+              (highlightedSection === "host" && isHostTarget);
+            const cardId = isSponsored
+              ? "sponsored-plan"
+              : isHostTarget
+                ? "host-plan"
+                : undefined;
             const card = (
               <article
                 key={plan.id}
-                id={merchantPreview && isSponsored ? "sponsored-plan" : undefined}
+                id={merchantPreview ? cardId : undefined}
+                style={merchantPreview ? spotlightStyle(isSpotlit) : undefined}
                 className={`group flex flex-col md:flex-row gap-12 md:items-center scroll-mt-32 ${
+                  isSpotlit ? "p-6 bg-white" : ""
+                } ${
                   index % 2 !== 0 ? "md:flex-row-reverse" : ""
                 }`}
               >
@@ -506,7 +593,8 @@ export default function CalendarLandingPage({
               );
             }
             return card;
-          })}
+            });
+          })()}
         </div>
 
         {/* Local Deals — supporting benefit between plans and the
@@ -514,7 +602,17 @@ export default function CalendarLandingPage({
             to reinforce the manager-pitch promise (we lined these up on
             their behalf). */}
         {config.deals && config.deals.length > 0 && (
-          <section id="local-deals" className="max-w-6xl mx-auto px-0 pt-12 pb-1 scroll-mt-32">
+          <section
+            id="local-deals"
+            style={
+              merchantPreview
+                ? spotlightStyle(highlightedSection === "deal")
+                : undefined
+            }
+            className={`max-w-6xl mx-auto px-0 pt-12 pb-1 scroll-mt-32 ${
+              highlightedSection === "deal" ? "p-6 bg-white" : ""
+            }`}
+          >
             {merchantPreview && (
               <div className="mb-4 px-0">
                 <MerchantCallout
@@ -705,39 +803,77 @@ export default function CalendarLandingPage({
 // ─── Merchant preview helpers (rendered only on /partners/preview) ───
 
 /**
- * Sticky top banner that frames the page as a merchant tour and offers
- * three jump-links to where each offering appears. Sits ABOVE the
- * residents-facing sticky nav so it does not interfere with the actual
- * calendar UI.
+ * Floating side panel that lists the three merchant offerings and acts
+ * as a guided tour. Each chip is a state-driven spotlight trigger
+ * rather than a plain anchor — selecting one scrolls the relevant
+ * placement into view AND dims everything else so the merchant can
+ * focus on what their offering looks like in the wild.
+ *
+ * Layout: right rail on desktop (vertically centered), bottom-right
+ * floating card on mobile. Always above the spotlight backdrop so the
+ * tour controls remain reachable while a section is highlighted.
  */
-function MerchantPreviewBanner() {
-  const chips = [
-    { n: 1, label: "Post a deal", href: "#local-deals" },
-    { n: 2, label: "Host an event", href: "#upcoming-plans" },
-    { n: 3, label: "Sponsor an event", href: "#sponsored-plan" },
+function MerchantPreviewSidePanel({
+  active,
+  onSelect,
+}: {
+  active: MerchantSection | null;
+  onSelect: (s: MerchantSection) => void;
+}) {
+  const chips: { key: MerchantSection; n: number; label: string }[] = [
+    { key: "deal", n: 1, label: "Post a deal" },
+    { key: "host", n: 2, label: "Host an event" },
+    { key: "sponsor", n: 3, label: "Sponsor an event" },
   ];
   return (
-    <div className="bg-amber-50 border-b border-amber-200 px-6 py-4">
-      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
-        <p className="text-[11px] tracking-wider uppercase font-bold text-amber-900 shrink-0">
-          Merchant preview &mdash; your three offerings on a real calendar
+    <aside
+      id="merchant-side-panel"
+      className="fixed right-3 sm:right-5 top-auto bottom-4 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2 z-[60]"
+    >
+      <div className="bg-white rounded-2xl shadow-2xl border border-amber-200 p-2.5 w-[220px] sm:w-[240px]">
+        <p className="text-[10px] tracking-wider uppercase font-bold text-amber-900 px-2.5 pt-1 pb-2 border-b border-amber-100 mb-2 leading-tight">
+          Merchant preview
+          <span className="block text-[9px] font-medium text-zinc-500 normal-case tracking-wide mt-0.5">
+            Tap to spotlight a placement
+          </span>
         </p>
-        <div className="flex flex-wrap gap-2">
-          {chips.map((c) => (
-            <a
-              key={c.n}
-              href={c.href}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-amber-200 text-xs font-bold text-emerald-900 hover:border-emerald-500 transition-colors"
-            >
-              <span className="w-4 h-4 rounded-full bg-emerald-700 text-white text-[10px] flex items-center justify-center">
-                {c.n}
-              </span>
-              {c.label}
-            </a>
-          ))}
+        <div className="space-y-1">
+          {chips.map((c) => {
+            const isActive = active === c.key;
+            return (
+              <button
+                key={c.key}
+                onClick={() => onSelect(c.key)}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs font-bold transition-colors ${
+                  isActive
+                    ? "bg-emerald-700 text-white"
+                    : "text-emerald-900 hover:bg-amber-50"
+                }`}
+              >
+                <span
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] shrink-0 ${
+                    isActive
+                      ? "bg-white text-emerald-700"
+                      : "bg-emerald-700 text-white"
+                  }`}
+                >
+                  {c.n}
+                </span>
+                <span className="flex-1">{c.label}</span>
+              </button>
+            );
+          })}
         </div>
+        {active && (
+          <button
+            onClick={() => onSelect(active)}
+            className="mt-2 w-full text-[10px] uppercase tracking-wider font-bold text-zinc-400 hover:text-zinc-900 py-1.5"
+          >
+            Dismiss spotlight
+          </button>
+        )}
       </div>
-    </div>
+    </aside>
   );
 }
 
