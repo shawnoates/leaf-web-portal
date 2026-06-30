@@ -50,8 +50,8 @@ export function Footer() {
           <a href="#cost">The math</a>
         </nav>
         <p className="footer__copy">
-          Leaf builds the social side of better buildings. &copy; {new Date().getFullYear()}{" "}
-          Leaf by One Common LLC.
+          Leaf OS builds the social side of better buildings. &copy;{" "}
+          {new Date().getFullYear()} Leaf by One Common LLC.
         </p>
       </div>
     </footer>
