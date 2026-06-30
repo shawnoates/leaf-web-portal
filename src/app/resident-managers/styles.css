@@ -130,6 +130,8 @@
 .rm-landing .brand__mark { width: 30px; height: 30px; border-radius: 9px; background: var(--forest); display: grid; place-items: center; }
 .rm-landing .brand__logo { height: 30px; width: auto; display: block; }
 .rm-landing .brand__os { font-family: var(--body); font-size: 1rem; font-weight: 300; letter-spacing: 0.18em; text-transform: uppercase; color: var(--forest); }
+.rm-landing .brand--light { color: var(--white); }
+.rm-landing .brand__os--light { color: var(--white); }
 .rm-landing .header__cta { display: flex; align-items: center; gap: 12px; }
 .rm-landing .header__cta .btn { padding: 10px 18px; font-size: 0.9rem; }
 .rm-landing .header .link-ghost { color: var(--forest); font-weight: 600; font-size: 0.92rem; }

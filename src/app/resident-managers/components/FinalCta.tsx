@@ -1,4 +1,4 @@
-import { CTA, LeafMark, TrustStrip } from "./ui";
+import { CTA, TrustStrip } from "./ui";
 import Reveal from "./Reveal";
 
 export function FinalCta() {
@@ -34,11 +34,10 @@ export function Footer() {
   return (
     <footer className="footer">
       <div className="container footer__in">
-        <a className="brand" href="#top" style={{ color: "#fff" }}>
-          <span className="brand__mark">
-            <LeafMark size={18} />
-          </span>
-          Leaf
+        <a className="brand brand--light" href="#top">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/leaf-logo-white.svg" alt="Leaf" className="brand__logo" />
+          <span className="brand__os brand__os--light">OS</span>
         </a>
         <nav className="footer__links">
           <a href="#why">Why community</a>
