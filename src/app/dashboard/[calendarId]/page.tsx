@@ -288,6 +288,12 @@ export default function OrgDashboardPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [dashboard, setDashboard] = useState<OrgDashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  // Mirror of `dashboard` for use inside stable callbacks without re-creating
+  // them (see fetchDashboard's stale-while-revalidate check).
+  const dashboardRef = useRef<OrgDashboard | null>(null);
+  useEffect(() => { dashboardRef.current = dashboard; }, [dashboard]);
+  // Per-calendar cache key for the last successful getOrgDashboard payload.
+  const dashboardCacheKey = `org_dashboard_cache_${calendarId}`;
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(initialTab);
 
@@ -493,11 +499,33 @@ export default function OrgDashboardPage() {
     setAuthChecked(true);
   }, []);
 
+  // Hydrate instantly from the last-known dashboard so returning owners see
+  // their data on paint instead of a blank spinner; fetchDashboard then
+  // revalidates in the background.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(dashboardCacheKey);
+      if (raw) {
+        const cached = JSON.parse(raw);
+        dashboardRef.current = cached; // sync, so fetchDashboard skips the spinner
+        setDashboard(cached);
+        setLoading(false);
+      }
+    } catch { /* corrupt cache — ignore, fall back to network */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarId]);
+
   const fetchDashboard = useCallback(async () => {
-    setLoading(true);
+    // Only block the whole page on the spinner when we have nothing to show.
+    // If a cached (or already-loaded) dashboard is on screen, revalidate in the
+    // background so login feels instant instead of staring at a spinner.
+    if (!dashboardRef.current) setLoading(true);
     try {
       const result = await Parse.Cloud.run("getOrgDashboard", { calendarId });
       setDashboard(result);
+      try {
+        localStorage.setItem(dashboardCacheKey, JSON.stringify(result));
+      } catch { /* quota / serialization — cache is best-effort */ }
       setNameValue(result.name);
       setDescValue(result.description);
       setSettingsDaysOfWeek(result.daysOfWeek);
@@ -512,10 +540,16 @@ export default function OrgDashboardPage() {
       setError(null);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to load dashboard";
-      setError(message);
+      // A background revalidation failure shouldn't wipe out a cached dashboard
+      // that's already on screen — only surface the error screen when we have
+      // nothing to show.
+      if (!dashboardRef.current) setError(message);
+      else console.warn("[Dashboard] background refresh failed:", message);
     } finally {
       setLoading(false);
     }
+    // dashboardCacheKey is derived from calendarId, so [calendarId] is exhaustive.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarId]);
 
   useEffect(() => {
@@ -838,6 +872,9 @@ export default function OrgDashboardPage() {
     } catch {
       // ignore
     }
+    // Drop the cached dashboard so the next (possibly different) user never
+    // flashes this owner's data before their own load completes.
+    try { localStorage.removeItem(dashboardCacheKey); } catch { /* ignore */ }
     router.push("/dashboard");
   }
 
@@ -1376,20 +1413,20 @@ export default function OrgDashboardPage() {
                 Concierge tier (server reverts tier on cancellation, so this
                 also re-appears if they churn). */}
             {dashboard.tier !== "concierge" && (
-              <div className="border border-emerald-200 rounded-xl p-6 bg-gradient-to-br from-emerald-50/60 to-white">
+              <div className="border border-zinc-800 rounded-xl p-6 bg-gradient-to-br from-zinc-900 to-black">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-base font-medium text-zinc-900">Concierge</h3>
-                  <span className="bg-emerald-600 text-white text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full">New</span>
+                  <h3 className="text-base font-medium text-white">Concierge</h3>
+                  <span className="bg-emerald-500 text-black text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full">New</span>
                 </div>
-                <p className="text-sm text-zinc-500 leading-relaxed mb-4">
+                <p className="text-sm text-zinc-400 leading-relaxed mb-4">
                   Don&apos;t have time to plan, post, and show up? Bring on a dedicated host to run your calendar and host plans on behalf of your community. From $499/mo.
                 </p>
-                <ul className="space-y-2 mb-5 list-disc list-inside">
-                  <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Plans posted for you</strong> — your host drafts, schedules, and publishes plans to your calendar on a steady cadence.</li>
-                  <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Hosted on your behalf</strong> — a real person shows up, greets attendees, and represents your community at every gathering.</li>
-                  <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">RSVP &amp; chat management</strong> — from approvals to day-of reminders, your host handles the back-and-forth so you don&apos;t have to.</li>
+                <ul className="space-y-2 mb-5 list-disc list-inside marker:text-zinc-600">
+                  <li className="text-xs text-zinc-400 leading-relaxed"><strong className="text-zinc-100">Plans posted for you</strong> — your host drafts, schedules, and publishes plans to your calendar on a steady cadence.</li>
+                  <li className="text-xs text-zinc-400 leading-relaxed"><strong className="text-zinc-100">Hosted on your behalf</strong> — a real person shows up, greets attendees, and represents your community at every gathering.</li>
+                  <li className="text-xs text-zinc-400 leading-relaxed"><strong className="text-zinc-100">RSVP &amp; chat management</strong> — from approvals to day-of reminders, your host handles the back-and-forth so you don&apos;t have to.</li>
                 </ul>
-                <a href="https://calendar.app.google/NCUYc6LUKSiwLUa67" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors">
+                <a href="https://calendar.app.google/NCUYc6LUKSiwLUa67" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-200 transition-colors">
                   Book a demo
                 </a>
               </div>
