@@ -343,7 +343,12 @@ export default function CalendarLandingPage({
   const [showCTA, setShowCTA] = useState(false);
   const [showScrollPopup, setShowScrollPopup] = useState(false);
   const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
-  const [tourStep, setTourStep] = useState<number | null>(null);
+  // Auto-start the tour when merchantPreview is on so the merchant
+  // lands directly on step 1 (Post a deal spotlit) instead of having
+  // to click a "Take the tour" pill first.
+  const [tourStep, setTourStep] = useState<number | null>(
+    merchantPreview ? 0 : null,
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -362,7 +367,10 @@ export default function CalendarLandingPage({
     if (tourStep === null) return;
     const step = TOUR_STEPS[tourStep];
     const target = document.getElementById(step.targetId);
-    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // block: "start" (with the section's scroll-mt-32) puts the target
+    // near the top of the viewport, leaving the whole bottom half
+    // clear for the floating callout — no arrow-overlaps-spotlight.
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setTourStep(null);
@@ -844,16 +852,14 @@ function MerchantTourCallout({
   return (
     <div
       id="merchant-tour-callout"
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] w-[92vw] max-w-md"
+      className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[70] w-[92vw] max-w-sm"
     >
-      {/* Forest / amber palette matches the /partners landing brand. */}
-      <div className="relative bg-[#1b4332] text-white rounded-2xl shadow-2xl px-5 py-4">
-        {/* Upward pointer triangle so the callout reads as anchored to
-            whatever's above (the spotlit placement). */}
-        <span
-          aria-hidden="true"
-          className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-[#1b4332] rotate-45 rounded-sm"
-        />
+      {/* Forest / amber palette matches the /partners landing brand.
+          No pointer arrow — with block:"start" scroll the target sits
+          near the top of the viewport, so a downward-pointing arrow
+          would just float in empty space. The dim + halo do all the
+          "which section?" work. */}
+      <div className="relative bg-[#1b4332] rounded-2xl shadow-2xl px-5 py-4">
         <button
           onClick={onSkip}
           className="absolute top-2 right-2 text-white/70 hover:text-white p-1"
@@ -864,16 +870,16 @@ function MerchantTourCallout({
         <p className="text-[10px] tracking-widest uppercase font-bold text-[#e8a33d] mb-1.5">
           Step {step + 1} of {totalSteps}
         </p>
-        <h3 className="text-base sm:text-lg font-semibold leading-tight mb-1.5 pr-6">
+        <h3 className="text-white text-base sm:text-lg font-semibold leading-tight mb-1.5 pr-6">
           {content.title}
         </h3>
-        <p className="text-sm text-[#cdeede] leading-relaxed mb-4">
+        <p className="text-sm text-white/90 leading-relaxed mb-4">
           {content.description}
         </p>
         <div className="flex items-center justify-between gap-3">
           <button
             onClick={onSkip}
-            className="text-xs text-[#95d5b2] hover:text-white font-medium"
+            className="text-xs text-white/70 hover:text-white font-medium"
           >
             Skip tour
           </button>
@@ -881,7 +887,7 @@ function MerchantTourCallout({
             {!isFirst && (
               <button
                 onClick={onPrev}
-                className="px-3.5 py-1.5 border border-white/40 rounded-full text-xs font-bold hover:bg-white/10 transition-colors"
+                className="px-3.5 py-1.5 border border-white/40 text-white rounded-full text-xs font-bold hover:bg-white/10 transition-colors"
               >
                 Back
               </button>
