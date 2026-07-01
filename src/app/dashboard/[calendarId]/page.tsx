@@ -1389,7 +1389,7 @@ export default function OrgDashboardPage() {
                   <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Hosted on your behalf</strong> — a real person shows up, greets attendees, and represents your community at every gathering.</li>
                   <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">RSVP &amp; chat management</strong> — from approvals to day-of reminders, your host handles the back-and-forth so you don&apos;t have to.</li>
                 </ul>
-                <a href="https://calendar.app.google/4v3mg4Ry4i5Bn7fG8" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors">
+                <a href="https://calendar.app.google/NCUYc6LUKSiwLUa67" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors">
                   Book a demo
                 </a>
               </div>

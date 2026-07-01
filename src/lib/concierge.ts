@@ -120,7 +120,7 @@ export function deriveConciergeCta(summary: UserConciergeSummary): {
   // Not logged in OR no eligible calendars → existing demo flow
   const DEFAULT = {
     label: "Book a demo",
-    href: "https://calendar.app.google/4v3mg4Ry4i5Bn7fG8",
+    href: "https://calendar.app.google/NCUYc6LUKSiwLUa67",
     external: true,
   };
 

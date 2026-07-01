@@ -17,7 +17,7 @@
 // TODO: replace with the real self-serve deal-submission URL once it
 // ships. Falls back to PARTNER_URL so the button still lands
 // somewhere actionable in the meantime.
-export const PARTNER_URL = "https://calendar.app.google/4v3mg4Ry4i5Bn7fG8";
+export const PARTNER_URL = "https://calendar.app.google/NCUYc6LUKSiwLUa67";
 export const SAMPLE_URL = "/partners/preview";
 export const DEAL_URL = PARTNER_URL;
 // CLAIM_URL = the "Claim your business for free" form. Runs outside

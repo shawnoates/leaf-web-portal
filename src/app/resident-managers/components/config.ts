@@ -5,5 +5,5 @@
 // FREE_URL = the free-calendar setup flow at /organizations/setup
 // (relative path so it stays within os.joinleaf.com without a
 // hard-coded host).
-export const DEMO_URL = "https://calendar.app.google/4v3mg4Ry4i5Bn7fG8";
+export const DEMO_URL = "https://calendar.app.google/NCUYc6LUKSiwLUa67";
 export const FREE_URL = "/organizations/setup";

@@ -98,7 +98,7 @@ const PRICING_TIERS: PricingTier[] = [
     customPrice: "$499",
     description: "For organizations that want Leaf run for them",
     cta: "Book a demo",
-    ctaHref: "https://calendar.app.google/4v3mg4Ry4i5Bn7fG8",
+    ctaHref: "https://calendar.app.google/NCUYc6LUKSiwLUa67",
     highlight: false,
     dark: true,
     inheritsLabel: "Everything in Pro, plus:",
