@@ -1419,6 +1419,21 @@ export default function OrgDashboardPage() {
                     for depth, and a hairline sheen along the top edge. */}
                 <div aria-hidden className="pointer-events-none absolute inset-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black" />
+                  {/* Darkened photo anchored right, faded into the card so the
+                      copy on the left stays legible (md+ only — too tight on
+                      mobile). */}
+                  <div className="absolute inset-y-0 right-0 hidden w-3/5 md:block">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="https://images.unsplash.com/photo-1545315003-c5ad6226c272?w=900&q=70&auto=format&fit=crop"
+                      alt=""
+                      className="h-full w-full object-cover object-[center_30%] opacity-60"
+                    />
+                    {/* Horizontal scrim: solid card-dark at the left seam →
+                        clear at the right, so the image reads as texture. */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/70 to-zinc-950/10" />
+                    <div className="absolute inset-0 bg-black/40" />
+                  </div>
                   <div className="absolute -top-24 -right-16 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl" />
                   <div className="absolute -bottom-24 -left-12 h-56 w-56 rounded-full bg-sky-500/10 blur-3xl" />
                   {/* Fine film-grain texture for an editorial, tactile finish. */}
@@ -1432,7 +1447,7 @@ export default function OrgDashboardPage() {
                   <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
                 </div>
 
-                <div className="relative">
+                <div className="relative md:max-w-[60%]">
                   <div className="flex items-center justify-between gap-3 mb-2">
                     <h3 className="text-lg font-semibold tracking-tight text-white">We&apos;ll run your events for you</h3>
                     <span className="shrink-0 bg-emerald-500 text-black text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full">New</span>
