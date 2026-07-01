@@ -323,6 +323,35 @@ export default function OrgDashboardPage() {
   const [settingsImageStyle, setSettingsImageStyle] = useState("default");
   const [settingsHidePlanIdeas, setSettingsHidePlanIdeas] = useState(false);
   const [settingsHideCustomPlans, setSettingsHideCustomPlans] = useState(false);
+  // Local-business (merchant-paid) event policy for this calendar.
+  const [settingsMerchantOptOut, setSettingsMerchantOptOut] = useState(false);
+  const [settingsMerchantRequireApproval, setSettingsMerchantRequireApproval] =
+    useState(false);
+  const [merchantPolicySaving, setMerchantPolicySaving] = useState(false);
+
+  // Optimistically toggle the merchant-events policy; revert on failure.
+  const saveMerchantPolicy = async (patch: {
+    optOut?: boolean;
+    requireApproval?: boolean;
+  }) => {
+    const prevOptOut = settingsMerchantOptOut;
+    const prevRequire = settingsMerchantRequireApproval;
+    if (typeof patch.optOut === "boolean") setSettingsMerchantOptOut(patch.optOut);
+    if (typeof patch.requireApproval === "boolean")
+      setSettingsMerchantRequireApproval(patch.requireApproval);
+    setMerchantPolicySaving(true);
+    try {
+      await Parse.Cloud.run("setCalendarMerchantEventPolicy", {
+        calendarId,
+        ...patch,
+      });
+    } catch {
+      setSettingsMerchantOptOut(prevOptOut);
+      setSettingsMerchantRequireApproval(prevRequire);
+    } finally {
+      setMerchantPolicySaving(false);
+    }
+  };
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsSection, setSettingsSection] = useState<"general" | "subscription">("general");
 
@@ -542,6 +571,10 @@ export default function OrgDashboardPage() {
       setSettingsExcludeKeywords(result.excludeKeywords || []);
       setSettingsBrandColor(result.brandColor);
       setSettingsImageStyle(result.imageStyle || "default");
+      setSettingsMerchantOptOut(result.merchantEventsOptOut || false);
+      setSettingsMerchantRequireApproval(
+        result.merchantEventsRequireApproval || false
+      );
       setSettingsHidePlanIdeas(result.hidePlanIdeas || false);
       setSettingsHideCustomPlans(result.hideCustomPlans || false);
       if (result.leafAppConnected) setLeafAppConnected(true);
@@ -2407,6 +2440,49 @@ export default function OrgDashboardPage() {
 
             {settingsSection === "general" && (
             <div className="space-y-8">
+            {/* Local business events */}
+            <div className="rounded-xl border border-zinc-200 p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-zinc-900">
+                    Local business events
+                  </h3>
+                  <p className="text-xs text-zinc-500 mt-1 max-w-md">
+                    Let nearby businesses pay to host events on your calendar —
+                    tastings, classes, happy hours. Residents RSVP; you never get
+                    charged. We suppress SMS for these, so they only reach the app
+                    and email.
+                  </p>
+                </div>
+                <SettingsSwitch
+                  checked={!settingsMerchantOptOut}
+                  disabled={merchantPolicySaving}
+                  onChange={(allow) => saveMerchantPolicy({ optOut: !allow })}
+                  label="Allow local business events"
+                />
+              </div>
+
+              {!settingsMerchantOptOut && (
+                <div className="mt-4 pt-4 border-t border-zinc-100 flex items-start justify-between gap-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-zinc-800">
+                      Review each event first
+                    </h4>
+                    <p className="text-xs text-zinc-500 mt-1 max-w-md">
+                      When on, a business event won&apos;t go live on your calendar
+                      until you approve it. When off, approved events publish
+                      automatically.
+                    </p>
+                  </div>
+                  <SettingsSwitch
+                    checked={settingsMerchantRequireApproval}
+                    disabled={merchantPolicySaving}
+                    onChange={(v) => saveMerchantPolicy({ requireApproval: v })}
+                    label="Require approval"
+                  />
+                </div>
+              )}
+            </div>
             {/* Phone / Leaf App Connection */}
             <div className="flex items-center justify-between py-3 border-b border-zinc-100">
               <div className="flex items-center gap-2">
@@ -3819,5 +3895,37 @@ export default function OrgDashboardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function SettingsSwitch({
+  checked,
+  onChange,
+  disabled,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+        checked ? "bg-emerald-600" : "bg-zinc-300"
+      }`}
+    >
+      <span
+        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+          checked ? "translate-x-5" : "translate-x-0.5"
+        }`}
+      />
+    </button>
   );
 }
