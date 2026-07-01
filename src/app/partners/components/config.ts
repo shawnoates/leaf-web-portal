@@ -1,15 +1,14 @@
 // CTAs for the /partners landing.
 //
 // PARTNER_URL = partner contact / booking link, used by every paid
-// offering (host, sponsor, "become a partner"). Reuses the same Google
-// Calendar slot as /organizations and /resident-managers so every
-// "book a demo" CTA across the site funnels into one calendar.
+// offering (host, "become a partner"). Reuses the same Google Calendar
+// slot as /organizations and /resident-managers so every "book a demo"
+// CTA across the site funnels into one calendar.
 //
 // SAMPLE_URL = the merchant-facing preview at /partners/preview. Same
-// rendering as the /apartment demo but with a "Merchant preview"
-// banner and numbered callouts that point to where each of the three
-// offerings (post a deal / host an event / sponsor an event) appears
-// for residents.
+// rendering as the /apartment demo but with a two-step guided tour
+// pointing to where the two offerings (post a deal / host an event)
+// appear for residents.
 //
 // DEAL_URL = self-serve "post a deal" link. This is the FREE on-ramp
 // (merchant equivalent of the property-managers' free calendar) and

@@ -2,13 +2,14 @@ import { CTA, Eyebrow } from "./ui";
 import Reveal from "./Reveal";
 
 /**
- * Three-product surface, framed as one free on-ramp + two event paths
- * under a shared "Get on the calendar" banner.
+ * Two offerings framed as a free on-ramp + one paid event path.
  *
- *   Post a deal      — FREE   self-serve, on-ramp
- *   Host an event    — paid   business runs it; we promote + RSVP
- *   Sponsor an event — paid   business backs someone else's event,
- *                              concierge-matched (NOT a marketplace)
+ *   Post a deal     — FREE   self-serve, on-ramp
+ *   Host an event   — paid   business runs it; we promote + RSVP
+ *
+ * Sponsorship is handled in the sales conversation, not on this page.
+ * The card copy for "Sponsor an event" is parked in git history if we
+ * ever reintroduce it under a different frame.
  */
 export default function Offer() {
   return (
@@ -16,10 +17,10 @@ export default function Offer() {
       <div className="container">
         <Reveal className="section-head">
           <Eyebrow>What we offer</Eyebrow>
-          <h2 className="h-lg">Three ways to reach your neighbors.</h2>
+          <h2 className="h-lg">Two simple ways to reach your neighbors.</h2>
           <p className="lead">
-            Post a deal for free, host your own event, or sponsor one that&rsquo;s already
-            happening. Start wherever fits.
+            Be on the calendar, or be the event. Start with one &mdash; add the other when
+            you&rsquo;re ready.
           </p>
         </Reveal>
 
@@ -39,13 +40,14 @@ export default function Offer() {
           </CTA>
         </Reveal>
 
-        {/* Get on the calendar — host vs sponsor fork inside one banner */}
+        {/* Or get on the calendar — the one paid path */}
         <Reveal style={{ marginTop: 48, marginBottom: 18 }}>
           <p className="offer-section-banner">Or get on the calendar</p>
         </Reveal>
 
-        <div className="offer-grid">
-          <Reveal className="offer">
+        <div className="offer-grid offer-grid--single">
+          <Reveal className="offer offer--reco">
+            <span className="offer__tag">Highest impact</span>
             <div className="offer__kind">Done-with-you &middot; you run it</div>
             <h3>Host an event</h3>
             <p className="offer__desc">
@@ -64,35 +66,13 @@ export default function Offer() {
               </span>
             </div>
           </Reveal>
-
-          <Reveal className="offer offer--reco" delay={100}>
-            <span className="offer__tag">Highest impact</span>
-            <div className="offer__kind">Concierge-matched &middot; zero planning</div>
-            <h3>Sponsor an event</h3>
-            <p className="offer__desc">
-              Get in front of a room you didn&rsquo;t have to plan. Back an event that&rsquo;s
-              already happening near you and meet the neighbors who show up. Tell us your
-              budget and vibe &mdash; we match you to the right one.
-            </p>
-            <ul className="offer__list">
-              <li>We match you to the right event</li>
-              <li>Fund or supply &mdash; no logistics on you</li>
-              <li>Show up, meet the room, become memorable</li>
-            </ul>
-            <div className="offer__out">
-              <span>→</span>
-              <span>
-                High-impact exposure, <b>zero planning.</b>
-              </span>
-            </div>
-          </Reveal>
         </div>
 
         <Reveal style={{ marginTop: 20, textAlign: "center" }}>
           <p style={{ color: "var(--muted)" }}>
             Not sure where to start?{" "}
             <strong style={{ color: "var(--forest)" }}>Start free with a deal.</strong> Step
-            up to hosting or sponsoring an event when you&rsquo;re ready.
+            up to hosting an event when you&rsquo;re ready.
           </p>
           <div className="inline-cta" style={{ display: "inline-block" }}>
             <CTA to="partner" variant="primary" arrow>

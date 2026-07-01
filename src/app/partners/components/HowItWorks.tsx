@@ -5,7 +5,7 @@ const steps = [
   {
     n: "1",
     h: "Tell us your offer",
-    b: "Share a deal, an event you’d host, or one you’d like to sponsor. We help shape it to land with residents.",
+    b: "Share a deal or an event you’d host. We help shape it to land with residents.",
   },
   {
     n: "2",

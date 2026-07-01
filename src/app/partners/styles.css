@@ -300,7 +300,7 @@
   .partner-landing .offer-free { flex-direction: column; align-items: flex-start; }
 }
 
-/* "Or get on the calendar" — quiet divider before the host/sponsor pair */
+/* "Or get on the calendar" — quiet divider before the host card */
 .partner-landing .offer-section-banner {
   text-align: center; color: var(--muted);
   font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
@@ -317,8 +317,15 @@
   .partner-landing .offer-section-banner::after { display: none; }
 }
 
-/* Offer cards — paired event options (Host vs Sponsor) */
+/* Offer card — the one paid path (Host an event) */
 .partner-landing .offer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+/* Single-card variant used after the sponsor offer was removed —
+   center the lone Host card and cap its width so it doesn't stretch
+   full-container. */
+.partner-landing .offer-grid--single {
+  grid-template-columns: minmax(0, 560px);
+  justify-content: center;
+}
 @media (max-width: 820px) { .partner-landing .offer-grid { grid-template-columns: 1fr; } }
 .partner-landing .offer { border-radius: var(--radius); padding: 30px; background: var(--white); border: 1px solid var(--line); display: flex; flex-direction: column; position: relative; }
 .partner-landing .offer--reco { background: var(--forest); color: #fff; border-color: transparent; }

@@ -5,11 +5,11 @@ import "./styles.css";
 export const metadata: Metadata = {
   title: "Leaf OS for local businesses — Your next regulars live around the corner",
   description:
-    "Get your business in front of the residents who live minutes from your door — through their building's community calendar, or an event we fill for you. Post a deal, host an event, or sponsor one.",
+    "Get your business in front of the residents who live minutes from your door — through their building's community calendar, or an event we fill for you. Post a deal or host an event.",
   openGraph: {
     title: "Leaf OS — Your next regulars live around the corner",
     description:
-      "Reach nearby residents inside the community they trust. Post a deal, host an event, or sponsor one — we bring the people.",
+      "Reach nearby residents inside the community they trust. Post a deal or host an event — we bring the people.",
     type: "website",
   },
   twitter: { card: "summary_large_image" },
