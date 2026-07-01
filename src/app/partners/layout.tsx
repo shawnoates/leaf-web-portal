@@ -2,6 +2,10 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "./styles.css";
 
+const OG_IMAGE = "/partners-opportunity.png";
+const OG_ALT =
+  "A local storefront with neighbors walking up from nearby buildings";
+
 export const metadata: Metadata = {
   title: "Leaf OS for local businesses — Your next regulars live around the corner",
   description:
@@ -11,8 +15,17 @@ export const metadata: Metadata = {
     description:
       "Reach nearby residents inside the community they trust. Post a deal or host an event — we bring the people.",
     type: "website",
+    url: "https://os.joinleaf.com/partners",
+    siteName: "Leaf OS",
+    images: [{ url: OG_IMAGE, alt: OG_ALT }],
   },
-  twitter: { card: "summary_large_image" },
+  twitter: {
+    card: "summary_large_image",
+    title: "Leaf OS — Your next regulars live around the corner",
+    description:
+      "Reach nearby residents inside the community they trust. Post a deal or host an event — we bring the people.",
+    images: [OG_IMAGE],
+  },
 };
 
 export const viewport: Viewport = {

@@ -2,6 +2,10 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "./styles.css";
 
+const OG_IMAGE = "/resident-managers-hero.png";
+const OG_ALT =
+  "Neighbors gathering at a resident event on a rooftop at dusk";
+
 export const metadata: Metadata = {
   title: "Leaf — Build community. Keep residents. Protect your NOI.",
   description:
@@ -11,8 +15,17 @@ export const metadata: Metadata = {
     description:
       "Done-for-you resident events that build community and drive renewals. Book a demo or start your building's calendar free.",
     type: "website",
+    url: "https://os.joinleaf.com/resident-managers",
+    siteName: "Leaf OS",
+    images: [{ url: OG_IMAGE, alt: OG_ALT }],
   },
-  twitter: { card: "summary_large_image" },
+  twitter: {
+    card: "summary_large_image",
+    title: "Leaf — Neighbors who know each other don't leave",
+    description:
+      "Done-for-you resident events that build community and drive renewals. Book a demo or start your building's calendar free.",
+    images: [OG_IMAGE],
+  },
 };
 
 export const viewport: Viewport = {

@@ -84,7 +84,6 @@ function StorefrontArt() {
           />
         ))}
       </svg>
-      <span className="hero__art-note">Swap in a photo of your storefront</span>
     </div>
   );
 }
