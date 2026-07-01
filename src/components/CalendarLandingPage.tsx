@@ -530,7 +530,7 @@ export default function CalendarLandingPage({
                 id={merchantPreview ? cardId : undefined}
                 style={merchantPreview ? spotlightStyle(isSpotlit) : undefined}
                 className={`group flex flex-col md:flex-row gap-12 md:items-center scroll-mt-32 ${
-                  isSpotlit ? "p-8 bg-white rounded-2xl" : ""
+                  isSpotlit ? "p-12 md:p-14 bg-white rounded-2xl" : ""
                 } ${
                   index % 2 !== 0 ? "md:flex-row-reverse" : ""
                 }`}
@@ -621,7 +621,7 @@ export default function CalendarLandingPage({
                 : undefined
             }
             className={`max-w-6xl mx-auto px-0 pt-12 pb-1 scroll-mt-32 ${
-              activeSection === "deal" ? "p-8 bg-white rounded-2xl" : ""
+              activeSection === "deal" ? "p-12 md:p-14 bg-white rounded-2xl" : ""
             }`}
           >
             <div className="flex items-center justify-between pb-3 mb-3">
@@ -849,37 +849,59 @@ function MerchantTourCallout({
 }) {
   const isFirst = step === 0;
   const isLast = step === totalSteps - 1;
+  // Inline styles rather than Tailwind classes so nothing in the site
+  // globals.css (typography plugin, h3 defaults, etc.) can override
+  // the callout copy back to a dark color. The bubble is a fixed
+  // brand-forest so text has to stay explicitly white to be legible.
+  const titleStyle: CSSProperties = { color: "#ffffff" };
+  const descStyle: CSSProperties = { color: "rgba(255,255,255,0.92)" };
+  const eyebrowStyle: CSSProperties = { color: "#e8a33d" };
+  const skipStyle: CSSProperties = { color: "rgba(255,255,255,0.75)" };
   return (
     <div
       id="merchant-tour-callout"
-      className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[70] w-[92vw] max-w-sm"
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] w-[92vw] max-w-sm"
     >
       {/* Forest / amber palette matches the /partners landing brand.
-          No pointer arrow — with block:"start" scroll the target sits
-          near the top of the viewport, so a downward-pointing arrow
-          would just float in empty space. The dim + halo do all the
-          "which section?" work. */}
-      <div className="relative bg-[#1b4332] rounded-2xl shadow-2xl px-5 py-4">
+          Up-pointing arrow triangle re-added so the callout reads as
+          anchored to whatever's spotlit above. */}
+      <div
+        className="relative rounded-2xl shadow-2xl px-6 py-5"
+        style={{ backgroundColor: "#1b4332" }}
+      >
+        <span
+          aria-hidden="true"
+          className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rotate-45 rounded-sm"
+          style={{ backgroundColor: "#1b4332" }}
+        />
         <button
           onClick={onSkip}
-          className="absolute top-2 right-2 text-white/70 hover:text-white p-1"
+          className="absolute top-2 right-2 p-1 hover:opacity-100"
+          style={{ color: "rgba(255,255,255,0.75)" }}
           aria-label="Skip tour"
         >
           <X className="w-4 h-4" />
         </button>
-        <p className="text-[10px] tracking-widest uppercase font-bold text-[#e8a33d] mb-1.5">
+        <p
+          className="text-[10px] tracking-widest uppercase font-bold mb-2"
+          style={eyebrowStyle}
+        >
           Step {step + 1} of {totalSteps}
         </p>
-        <h3 className="text-white text-base sm:text-lg font-semibold leading-tight mb-1.5 pr-6">
+        <h3
+          className="text-base sm:text-lg font-semibold leading-tight mb-2 pr-6"
+          style={titleStyle}
+        >
           {content.title}
         </h3>
-        <p className="text-sm text-white/90 leading-relaxed mb-4">
+        <p className="text-sm leading-relaxed mb-4" style={descStyle}>
           {content.description}
         </p>
         <div className="flex items-center justify-between gap-3">
           <button
             onClick={onSkip}
-            className="text-xs text-white/70 hover:text-white font-medium"
+            className="text-xs font-medium hover:opacity-100"
+            style={skipStyle}
           >
             Skip tour
           </button>
@@ -887,14 +909,16 @@ function MerchantTourCallout({
             {!isFirst && (
               <button
                 onClick={onPrev}
-                className="px-3.5 py-1.5 border border-white/40 text-white rounded-full text-xs font-bold hover:bg-white/10 transition-colors"
+                className="px-3.5 py-1.5 border border-white/40 rounded-full text-xs font-bold hover:bg-white/10 transition-colors"
+                style={titleStyle}
               >
                 Back
               </button>
             )}
             <button
               onClick={onNext}
-              className="px-3.5 py-1.5 bg-[#e8a33d] text-[#1c1304] rounded-full text-xs font-bold hover:bg-[#f0b052] transition-colors inline-flex items-center gap-1.5"
+              className="px-3.5 py-1.5 rounded-full text-xs font-bold hover:opacity-90 transition-opacity inline-flex items-center gap-1.5"
+              style={{ backgroundColor: "#e8a33d", color: "#1c1304" }}
             >
               {isLast ? "Finish" : "Next"}
               {!isLast && <ArrowRight className="w-3 h-3" />}
