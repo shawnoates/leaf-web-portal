@@ -68,6 +68,8 @@ interface OrgDashboard {
   shareId: string;
   orgType: string | null;
   tier: string;
+  /** The single calendar the concierge host runs (null unless on concierge). */
+  conciergeServicedCalendarId: string | null;
   subscriptionStatus: string | null;
   subscriptionCancelAt: number | null;
   billingInterval: string | null; // "month" or "year"
@@ -157,6 +159,7 @@ interface OrgDashboard {
     hideCustomPlans: boolean;
     hideDeals: boolean;
     pendingFollowerCount: number;
+    isConciergeServiced?: boolean;
   }[];
   calendarLimit: number | null;
   hostRequests: {
@@ -2020,6 +2023,11 @@ export default function OrgDashboardPage() {
                           {cal.isPrimary && (
                             <span className="text-xs font-bold uppercase tracking-widest bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">
                               Primary
+                            </span>
+                          )}
+                          {cal.isConciergeServiced && (
+                            <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-widest bg-zinc-900 text-white px-2 py-0.5 rounded-full">
+                              <Sparkles className="w-3 h-3 text-emerald-400" /> Concierge
                             </span>
                           )}
                           {cal.role === "Host" && (
