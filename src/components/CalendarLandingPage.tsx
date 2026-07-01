@@ -392,14 +392,19 @@ export default function CalendarLandingPage({
   // dimming inset shadow extends 9999px outward, simulating a backdrop
   // without needing a separate fixed overlay element. The element pops
   // above its surroundings via z-index.
+  // Spotlight = the target lifts above a 9999px inset shadow that dims
+  // the rest of the page. 20px white halo + 24px inner padding on the
+  // section together give the placement enough breathing room that the
+  // section header, right-side meta, and card edges never crowd the
+  // white edge.
   const spotlightStyle = (active: boolean): CSSProperties =>
     active
       ? {
           position: "relative",
           zIndex: 50,
-          borderRadius: 16,
+          borderRadius: 20,
           boxShadow:
-            "0 0 0 9999px rgba(0,0,0,0.65), 0 0 0 10px white, 0 20px 50px rgba(0,0,0,0.35)",
+            "0 0 0 9999px rgba(0,0,0,0.65), 0 0 0 20px white, 0 25px 60px rgba(0,0,0,0.35)",
           transition: "box-shadow 0.35s ease",
         }
       : { transition: "box-shadow 0.35s ease" };
@@ -517,7 +522,7 @@ export default function CalendarLandingPage({
                 id={merchantPreview ? cardId : undefined}
                 style={merchantPreview ? spotlightStyle(isSpotlit) : undefined}
                 className={`group flex flex-col md:flex-row gap-12 md:items-center scroll-mt-32 ${
-                  isSpotlit ? "p-6 bg-white" : ""
+                  isSpotlit ? "p-8 bg-white rounded-2xl" : ""
                 } ${
                   index % 2 !== 0 ? "md:flex-row-reverse" : ""
                 }`}
@@ -608,7 +613,7 @@ export default function CalendarLandingPage({
                 : undefined
             }
             className={`max-w-6xl mx-auto px-0 pt-12 pb-1 scroll-mt-32 ${
-              activeSection === "deal" ? "p-6 bg-white" : ""
+              activeSection === "deal" ? "p-8 bg-white rounded-2xl" : ""
             }`}
           >
             <div className="flex items-center justify-between pb-3 mb-3">
@@ -841,12 +846,13 @@ function MerchantTourCallout({
       id="merchant-tour-callout"
       className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] w-[92vw] max-w-md"
     >
-      <div className="relative bg-sky-600 text-white rounded-2xl shadow-2xl px-5 py-4">
+      {/* Forest / amber palette matches the /partners landing brand. */}
+      <div className="relative bg-[#1b4332] text-white rounded-2xl shadow-2xl px-5 py-4">
         {/* Upward pointer triangle so the callout reads as anchored to
             whatever's above (the spotlit placement). */}
         <span
           aria-hidden="true"
-          className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-sky-600 rotate-45 rounded-sm"
+          className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-[#1b4332] rotate-45 rounded-sm"
         />
         <button
           onClick={onSkip}
@@ -855,19 +861,19 @@ function MerchantTourCallout({
         >
           <X className="w-4 h-4" />
         </button>
-        <p className="text-[10px] tracking-widest uppercase font-bold text-sky-100 mb-1.5">
+        <p className="text-[10px] tracking-widest uppercase font-bold text-[#e8a33d] mb-1.5">
           Step {step + 1} of {totalSteps}
         </p>
         <h3 className="text-base sm:text-lg font-semibold leading-tight mb-1.5 pr-6">
           {content.title}
         </h3>
-        <p className="text-sm text-sky-50 leading-relaxed mb-4">
+        <p className="text-sm text-[#cdeede] leading-relaxed mb-4">
           {content.description}
         </p>
         <div className="flex items-center justify-between gap-3">
           <button
             onClick={onSkip}
-            className="text-xs text-sky-200 hover:text-white font-medium"
+            className="text-xs text-[#95d5b2] hover:text-white font-medium"
           >
             Skip tour
           </button>
@@ -882,7 +888,7 @@ function MerchantTourCallout({
             )}
             <button
               onClick={onNext}
-              className="px-3.5 py-1.5 bg-white text-sky-700 rounded-full text-xs font-bold hover:bg-sky-50 transition-colors inline-flex items-center gap-1.5"
+              className="px-3.5 py-1.5 bg-[#e8a33d] text-[#1c1304] rounded-full text-xs font-bold hover:bg-[#f0b052] transition-colors inline-flex items-center gap-1.5"
             >
               {isLast ? "Finish" : "Next"}
               {!isLast && <ArrowRight className="w-3 h-3" />}
