@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import CalendarLandingPage from "@/components/CalendarLandingPage";
+import CalendarLandingPage, {
+  type LandingConfig,
+} from "@/components/CalendarLandingPage";
 import { config as apartmentConfig } from "@/app/apartment/config";
 
 /**
@@ -26,6 +28,27 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// Preview-only overrides on top of the shared apartment config. The
+// first plan is retitled and re-hosted so the merchant sees what a
+// business-hosted event looks like on a real calendar (with the venue
+// name as a clickable link in amber, distinct from the green "resident
+// host" styling).
+const previewConfig: LandingConfig = {
+  ...apartmentConfig,
+  plans: apartmentConfig.plans.map((plan, i) =>
+    i === 0
+      ? {
+          ...plan,
+          title: "Bowling Night 🎳",
+          hostName: "Frames Bowling",
+          // TODO: swap for the real venue URL when we have a partner
+          // to feature here.
+          hostUrl: "https://framesnyc.com",
+        }
+      : plan,
+  ),
+};
+
 export default function PartnersPreviewPage() {
-  return <CalendarLandingPage config={apartmentConfig} merchantPreview />;
+  return <CalendarLandingPage config={previewConfig} merchantPreview />;
 }

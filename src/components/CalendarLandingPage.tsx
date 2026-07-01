@@ -38,6 +38,13 @@ export interface Plan {
    * Sponsor-an-event callout on the merchant preview surface.
    */
   sponsoredBy?: string;
+  /**
+   * Optional URL for the host. When set, "Hosted by {hostName}" renders
+   * as a hyperlink with amber accent (used to signal a business/venue
+   * host on the merchant preview — e.g. "Hosted by Frames Bowling" as
+   * a clickable link to the venue).
+   */
+  hostUrl?: string;
 }
 
 export interface PlanIdea {
@@ -555,12 +562,34 @@ export default function CalendarLandingPage({
                       {plan.title}
                     </h3>
                     <div className="pt-2 space-y-1.5">
-                      <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
+                      <p className="text-xs tracking-wider uppercase font-bold flex items-center gap-2">
                         <span
                           className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: config.brandColor }}
+                          style={{
+                            backgroundColor: plan.hostUrl
+                              ? "#e8a33d"
+                              : config.brandColor,
+                          }}
                         />
-                        Hosted by {plan.hostName}
+                        <span
+                          style={{
+                            color: plan.hostUrl ? "#b9791f" : "#18181b",
+                          }}
+                        >
+                          Hosted by{" "}
+                          {plan.hostUrl ? (
+                            <a
+                              href={plan.hostUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline decoration-1 underline-offset-2 hover:decoration-2"
+                            >
+                              {plan.hostName}
+                            </a>
+                          ) : (
+                            plan.hostName
+                          )}
+                        </span>
                       </p>
                       {plan.sponsoredBy && (
                         <p className="text-xs tracking-wider uppercase font-bold flex items-center gap-2 text-amber-700">
