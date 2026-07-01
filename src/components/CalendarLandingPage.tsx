@@ -297,22 +297,41 @@ function CTAModal({
 
 // --- Main ---
 
-type MerchantSection = "deal" | "host" | "sponsor";
+type MerchantSection = "deal" | "host";
 
-const MERCHANT_TARGET_IDS: Record<MerchantSection, string> = {
-  deal: "local-deals",
-  host: "host-plan",
-  sponsor: "sponsored-plan",
-};
+interface TourStep {
+  section: MerchantSection;
+  targetId: string;
+  title: string;
+  description: string;
+}
+
+const TOUR_STEPS: TourStep[] = [
+  {
+    section: "deal",
+    targetId: "local-deals",
+    title: "Post a deal appears here",
+    description:
+      "Your offer lands in the neighborhood deals feed — free to add, instant, and self-serve.",
+  },
+  {
+    section: "host",
+    targetId: "host-plan",
+    title: "Host an event appears here",
+    description:
+      "Your own event on the building's calendar. Residents RSVP, we promote it, you host.",
+  },
+];
 
 /**
  * Renders the resident-facing calendar landing.
  *
- * `merchantPreview` is the /partners/preview switch — adds a side
- * panel with the three offerings as clickable chips. Tapping a chip
- * scrolls to its placement AND spotlights it: the rest of the page
- * dims to black while the highlighted section pops above. Click
- * anywhere outside the section (or ESC) to dismiss.
+ * `merchantPreview` is the /partners/preview switch — turns the page
+ * into a two-step guided tour. A "Take the tour" trigger sits in the
+ * bottom-right; tapping it starts the walkthrough. Each step dims the
+ * rest of the page, spotlights the target placement, and floats a
+ * callout with Back / Next / Skip controls. Finish or Skip returns
+ * the page to normal.
  */
 export default function CalendarLandingPage({
   config,
@@ -324,8 +343,7 @@ export default function CalendarLandingPage({
   const [showCTA, setShowCTA] = useState(false);
   const [showScrollPopup, setShowScrollPopup] = useState(false);
   const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
-  const [highlightedSection, setHighlightedSection] =
-    useState<MerchantSection | null>(null);
+  const [tourStep, setTourStep] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -333,43 +351,42 @@ export default function CalendarLandingPage({
     return () => clearTimeout(timer);
   }, []);
 
-  // Spotlight tour: clicking a chip scrolls the target into view and
-  // raises it above a dimmed backdrop. Click anywhere outside the
-  // target (or hit ESC) to dismiss.
+  const activeSection: MerchantSection | null =
+    tourStep === null ? null : TOUR_STEPS[tourStep].section;
+
+  // Walkthrough tour: each step scrolls its target into view + spotlights
+  // it. Escape ends the tour early. Explicit Back / Next / Skip buttons
+  // in the callout advance or exit — no click-outside dismiss (the
+  // dimmed background is the whole point).
   useEffect(() => {
-    if (!highlightedSection) return;
-    const targetId = MERCHANT_TARGET_IDS[highlightedSection];
-    const target = document.getElementById(targetId);
+    if (tourStep === null) return;
+    const step = TOUR_STEPS[tourStep];
+    const target = document.getElementById(step.targetId);
     target?.scrollIntoView({ behavior: "smooth", block: "center" });
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setHighlightedSection(null);
-    };
-    const onClick = (e: MouseEvent) => {
-      const el = document.getElementById(targetId);
-      const sidePanel = document.getElementById("merchant-side-panel");
-      const node = e.target as Node | null;
-      if (!node) return;
-      if (el?.contains(node) || sidePanel?.contains(node)) return;
-      setHighlightedSection(null);
+      if (e.key === "Escape") setTourStep(null);
+      if (e.key === "ArrowRight") {
+        setTourStep((s) =>
+          s === null || s >= TOUR_STEPS.length - 1 ? null : s + 1,
+        );
+      }
+      if (e.key === "ArrowLeft") {
+        setTourStep((s) => (s === null || s <= 0 ? s : s - 1));
+      }
     };
     document.addEventListener("keydown", onKey);
-    // Defer click attach so the click that opened the spotlight
-    // doesn't immediately close it.
-    const timer = setTimeout(
-      () => document.addEventListener("click", onClick),
-      80,
-    );
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("click", onClick);
-      clearTimeout(timer);
-    };
-  }, [highlightedSection]);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [tourStep]);
 
-  const handleSelectMerchantSection = (section: MerchantSection) => {
-    setHighlightedSection((cur) => (cur === section ? null : section));
-  };
+  const startTour = () => setTourStep(0);
+  const nextTourStep = () =>
+    setTourStep((s) =>
+      s === null || s >= TOUR_STEPS.length - 1 ? null : s + 1,
+    );
+  const prevTourStep = () =>
+    setTourStep((s) => (s === null || s <= 0 ? s : s - 1));
+  const endTour = () => setTourStep(null);
 
   // Style object that turns its element into the spotlight "hero" — a
   // dimming inset shadow extends 9999px outward, simulating a backdrop
@@ -417,10 +434,17 @@ export default function CalendarLandingPage({
 
   return (
     <div className="min-h-screen">
-      {merchantPreview && (
-        <MerchantPreviewSidePanel
-          active={highlightedSection}
-          onSelect={handleSelectMerchantSection}
+      {merchantPreview && tourStep === null && (
+        <MerchantTourTrigger onStart={startTour} />
+      )}
+      {merchantPreview && tourStep !== null && (
+        <MerchantTourCallout
+          step={tourStep}
+          totalSteps={TOUR_STEPS.length}
+          content={TOUR_STEPS[tourStep]}
+          onNext={nextTourStep}
+          onPrev={prevTourStep}
+          onSkip={endTour}
         />
       )}
 
@@ -465,15 +489,10 @@ export default function CalendarLandingPage({
       {/* Stream Header — plans lead the page. Local deals (when present)
           appear below as a supporting benefit. Matches the live render on
           /org/[shareId]. */}
-      {merchantPreview && (
-        <MerchantCallout
-          n={2}
-          label="Host an event appears here"
-          sub="Your own event on the building's calendar. Residents RSVP, we promote, you host."
-          anchorId="upcoming-plans"
-        />
-      )}
-      <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100">
+      <div
+        id={merchantPreview ? "upcoming-plans" : undefined}
+        className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100 scroll-mt-32"
+      >
         <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
           {plansHeader}
         </p>
@@ -483,22 +502,15 @@ export default function CalendarLandingPage({
       <main className="max-w-6xl mx-auto px-6 py-12">
         <div className="space-y-32">
           {(() => {
-            let firstHostIndex = -1;
-            if (merchantPreview) {
-              firstHostIndex = config.plans.findIndex((p) => !p.sponsoredBy);
-            }
+            // In preview mode the first plan in the stream becomes the
+            // "host-plan" anchor so the tour's step 2 has a target to
+            // scroll to and spotlight.
+            const firstHostIndex = merchantPreview ? 0 : -1;
             return config.plans.map((plan, index) => {
             const date = futureDate(plan.daysFromNow);
-            const isSponsored = !!plan.sponsoredBy;
             const isHostTarget = merchantPreview && index === firstHostIndex;
-            const isSpotlit =
-              (highlightedSection === "sponsor" && isSponsored) ||
-              (highlightedSection === "host" && isHostTarget);
-            const cardId = isSponsored
-              ? "sponsored-plan"
-              : isHostTarget
-                ? "host-plan"
-                : undefined;
+            const isSpotlit = activeSection === "host" && isHostTarget;
+            const cardId = isHostTarget ? "host-plan" : undefined;
             const card = (
               <article
                 key={plan.id}
@@ -578,20 +590,6 @@ export default function CalendarLandingPage({
                 </div>
               </article>
             );
-            if (merchantPreview && isSponsored) {
-              return (
-                <div key={plan.id}>
-                  <div className="mb-4">
-                    <MerchantCallout
-                      n={3}
-                      label="Sponsor an event appears like this"
-                      sub="A partner-funded event already on the calendar — they back the room, we plan it."
-                    />
-                  </div>
-                  {card}
-                </div>
-              );
-            }
             return card;
             });
           })()}
@@ -606,22 +604,13 @@ export default function CalendarLandingPage({
             id="local-deals"
             style={
               merchantPreview
-                ? spotlightStyle(highlightedSection === "deal")
+                ? spotlightStyle(activeSection === "deal")
                 : undefined
             }
             className={`max-w-6xl mx-auto px-0 pt-12 pb-1 scroll-mt-32 ${
-              highlightedSection === "deal" ? "p-6 bg-white" : ""
+              activeSection === "deal" ? "p-6 bg-white" : ""
             }`}
           >
-            {merchantPreview && (
-              <div className="mb-4 px-0">
-                <MerchantCallout
-                  n={1}
-                  label="Post a deal appears here"
-                  sub="Your offer in the neighborhood deals feed. Free and instant to add."
-                />
-              </div>
-            )}
             <div className="flex items-center justify-between pb-3 mb-3">
               <p className="text-[11px] tracking-wider uppercase text-zinc-400 font-bold">
                 {config.dealsHeader ?? "Nearby deals"}
@@ -803,107 +792,103 @@ export default function CalendarLandingPage({
 // ─── Merchant preview helpers (rendered only on /partners/preview) ───
 
 /**
- * Floating side panel that lists the three merchant offerings and acts
- * as a guided tour. Each chip is a state-driven spotlight trigger
- * rather than a plain anchor — selecting one scrolls the relevant
- * placement into view AND dims everything else so the merchant can
- * focus on what their offering looks like in the wild.
- *
- * Layout: right rail on desktop (vertically centered), bottom-right
- * floating card on mobile. Always above the spotlight backdrop so the
- * tour controls remain reachable while a section is highlighted.
+ * Floating pill that appears bottom-right when the merchant lands on
+ * the preview page. Clicking it starts the guided walkthrough.
  */
-function MerchantPreviewSidePanel({
-  active,
-  onSelect,
-}: {
-  active: MerchantSection | null;
-  onSelect: (s: MerchantSection) => void;
-}) {
-  const chips: { key: MerchantSection; n: number; label: string }[] = [
-    { key: "deal", n: 1, label: "Post a deal" },
-    { key: "host", n: 2, label: "Host an event" },
-    { key: "sponsor", n: 3, label: "Sponsor an event" },
-  ];
+function MerchantTourTrigger({ onStart }: { onStart: () => void }) {
   return (
-    <aside
-      id="merchant-side-panel"
-      className="fixed right-3 sm:right-5 top-auto bottom-4 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2 z-[60]"
+    <button
+      onClick={onStart}
+      className="fixed bottom-5 right-5 z-[70] inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-zinc-900 rounded-full shadow-2xl px-4 py-3 text-sm font-bold transition-colors"
     >
-      <div className="bg-white rounded-2xl shadow-2xl border border-amber-200 p-2.5 w-[220px] sm:w-[240px]">
-        <p className="text-[10px] tracking-wider uppercase font-bold text-amber-900 px-2.5 pt-1 pb-2 border-b border-amber-100 mb-2 leading-tight">
-          Merchant preview
-          <span className="block text-[9px] font-medium text-zinc-500 normal-case tracking-wide mt-0.5">
-            Tap to spotlight a placement
-          </span>
-        </p>
-        <div className="space-y-1">
-          {chips.map((c) => {
-            const isActive = active === c.key;
-            return (
-              <button
-                key={c.key}
-                onClick={() => onSelect(c.key)}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs font-bold transition-colors ${
-                  isActive
-                    ? "bg-emerald-700 text-white"
-                    : "text-emerald-900 hover:bg-amber-50"
-                }`}
-              >
-                <span
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] shrink-0 ${
-                    isActive
-                      ? "bg-white text-emerald-700"
-                      : "bg-emerald-700 text-white"
-                  }`}
-                >
-                  {c.n}
-                </span>
-                <span className="flex-1">{c.label}</span>
-              </button>
-            );
-          })}
-        </div>
-        {active && (
-          <button
-            onClick={() => onSelect(active)}
-            className="mt-2 w-full text-[10px] uppercase tracking-wider font-bold text-zinc-400 hover:text-zinc-900 py-1.5"
-          >
-            Dismiss spotlight
-          </button>
-        )}
-      </div>
-    </aside>
+      <span
+        aria-hidden="true"
+        className="w-5 h-5 rounded-full bg-emerald-700 text-white text-[11px] flex items-center justify-center shrink-0"
+      >
+        1
+      </span>
+      Take the merchant tour
+    </button>
   );
 }
 
 /**
- * Inline numbered marker placed above each placement on the preview
- * page. The number ties back to the banners chip; the label tells the
- * merchant what they are looking at.
+ * Floating callout for each step of the walkthrough. Blue tooltip
+ * anchored to the bottom-center of the viewport with a small triangle
+ * pointing up toward the spotlit placement, Back / Next / Skip
+ * controls, and a step counter. Modeled after the Humanity /
+ * ShiftPlanning tutorial pattern the user referenced.
  */
-function MerchantCallout({
-  n,
-  label,
-  sub,
-  anchorId,
+function MerchantTourCallout({
+  step,
+  totalSteps,
+  content,
+  onNext,
+  onPrev,
+  onSkip,
 }: {
-  n: number;
-  label: string;
-  sub?: string;
-  anchorId?: string;
+  step: number;
+  totalSteps: number;
+  content: { title: string; description: string };
+  onNext: () => void;
+  onPrev: () => void;
+  onSkip: () => void;
 }) {
+  const isFirst = step === 0;
+  const isLast = step === totalSteps - 1;
   return (
     <div
-      id={anchorId}
-      className="max-w-6xl mx-auto px-6 mt-10 mb-2 flex items-start gap-3 scroll-mt-32"
+      id="merchant-tour-callout"
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] w-[92vw] max-w-md"
     >
-      <span className="w-8 h-8 rounded-full bg-emerald-700 text-white text-sm font-bold flex items-center justify-center shrink-0">
-        {n}
-      </span>
-      <div>
-        <p className="text-xs uppercase tracking-wider font-bold text-emerald-800">{label}</p>
-        {sub && <p className="text-[11px] text-zinc-500 mt-0.5 max-w-prose">{sub}</p>}
+      <div className="relative bg-sky-600 text-white rounded-2xl shadow-2xl px-5 py-4">
+        {/* Upward pointer triangle so the callout reads as anchored to
+            whatever's above (the spotlit placement). */}
+        <span
+          aria-hidden="true"
+          className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-sky-600 rotate-45 rounded-sm"
+        />
+        <button
+          onClick={onSkip}
+          className="absolute top-2 right-2 text-white/70 hover:text-white p-1"
+          aria-label="Skip tour"
+        >
+          <X className="w-4 h-4" />
+        </button>
+        <p className="text-[10px] tracking-widest uppercase font-bold text-sky-100 mb-1.5">
+          Step {step + 1} of {totalSteps}
+        </p>
+        <h3 className="text-base sm:text-lg font-semibold leading-tight mb-1.5 pr-6">
+          {content.title}
+        </h3>
+        <p className="text-sm text-sky-50 leading-relaxed mb-4">
+          {content.description}
+        </p>
+        <div className="flex items-center justify-between gap-3">
+          <button
+            onClick={onSkip}
+            className="text-xs text-sky-200 hover:text-white font-medium"
+          >
+            Skip tour
+          </button>
+          <div className="flex gap-2">
+            {!isFirst && (
+              <button
+                onClick={onPrev}
+                className="px-3.5 py-1.5 border border-white/40 rounded-full text-xs font-bold hover:bg-white/10 transition-colors"
+              >
+                Back
+              </button>
+            )}
+            <button
+              onClick={onNext}
+              className="px-3.5 py-1.5 bg-white text-sky-700 rounded-full text-xs font-bold hover:bg-sky-50 transition-colors inline-flex items-center gap-1.5"
+            >
+              {isLast ? "Finish" : "Next"}
+              {!isLast && <ArrowRight className="w-3 h-3" />}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
