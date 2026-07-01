@@ -1421,16 +1421,21 @@ export default function OrgDashboardPage() {
                   <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black" />
                   <div className="absolute -top-24 -right-16 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl" />
                   <div className="absolute -bottom-24 -left-12 h-56 w-56 rounded-full bg-sky-500/10 blur-3xl" />
+                  {/* Fine film-grain texture for an editorial, tactile finish. */}
+                  <div
+                    className="absolute inset-0 opacity-[0.18] mix-blend-overlay"
+                    style={{
+                      backgroundImage:
+                        "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+                    }}
+                  />
                   <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
                 </div>
 
                 <div className="relative">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-emerald-400" />
-                      <h3 className="text-base font-medium text-white">Concierge</h3>
-                    </div>
-                    <span className="bg-emerald-500 text-black text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full">New</span>
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <h3 className="text-lg font-semibold tracking-tight text-white">We&apos;ll run your events for you</h3>
+                    <span className="shrink-0 bg-emerald-500 text-black text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full">New</span>
                   </div>
                   <p className="text-sm text-zinc-400 leading-relaxed mb-4">
                     Don&apos;t have time to plan, post, and show up? Bring on a dedicated host to run your calendar and host plans on behalf of your community. From $499/mo.
