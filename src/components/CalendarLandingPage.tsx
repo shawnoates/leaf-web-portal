@@ -359,9 +359,14 @@ export default function CalendarLandingPage({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Skip the "A calendar for your building" prospect popup when this
+    // page is running as a merchant preview — merchants aren't looking
+    // to spin up their own calendar, and the popup collides with the
+    // "Take the merchant tour" pill in the same corner.
+    if (merchantPreview) return;
     const timer = setTimeout(() => setShowScrollPopup(true), 5000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [merchantPreview]);
 
   const activeSection: MerchantSection | null =
     tourStep === null ? null : TOUR_STEPS[tourStep].section;
