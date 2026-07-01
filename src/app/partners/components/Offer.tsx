@@ -2,14 +2,12 @@ import { CTA, Eyebrow } from "./ui";
 import Reveal from "./Reveal";
 
 /**
- * Two offerings framed as a free on-ramp + one paid event path.
+ * "What we offer" — two side-by-side offer cards:
  *
- *   Post a deal     — FREE   self-serve, on-ramp
- *   Host an event   — paid   business runs it; we promote + RSVP
+ *   Post a deal    — FREE  self-serve, on-ramp
+ *   Host an event  — paid  business runs it; we promote + RSVP
  *
  * Sponsorship is handled in the sales conversation, not on this page.
- * The card copy for "Sponsor an event" is parked in git history if we
- * ever reintroduce it under a different frame.
  */
 export default function Offer() {
   return (
@@ -24,29 +22,29 @@ export default function Offer() {
           </p>
         </Reveal>
 
-        {/* On-ramp band — FREE self-serve. Visually lightest so it
-            reads as "the easy first step," not a premium product. */}
-        <Reveal className="offer-free">
-          <div className="offer-free__body">
-            <span className="offer-free__badge">Free &middot; on-ramp</span>
+        <div className="offer-grid">
+          <Reveal className="offer">
+            <span className="offer__tag offer__tag--quiet">Free</span>
+            <div className="offer__kind">Always-on &middot; hands-off</div>
             <h3>Post a deal</h3>
-            <p className="offer-free__desc">
-              Add your offer to the neighborhood deals feed. Free, instant, and the easiest
-              way to start &mdash; the merchant equivalent of switching on a free calendar.
+            <p className="offer__desc">
+              Put an offer in the community calendars of the buildings around you. Residents
+              see it where they already make plans &mdash; and walk in. You give us the
+              offer; we handle placement.
             </p>
-          </div>
-          <CTA to="deal" variant="primary" arrow>
-            Start free
-          </CTA>
-        </Reveal>
+            <ul className="offer__list">
+              <li>Choose your buildings, or a neighborhood radius</li>
+              <li>Any offer &mdash; % off, a freebie, a first-timer deal</li>
+              <li>Always on, zero effort from you</li>
+            </ul>
+            <div className="offer__cta">
+              <CTA to="claim" variant="ghost">
+                Claim your business &mdash; FREE
+              </CTA>
+            </div>
+          </Reveal>
 
-        {/* Or get on the calendar — the one paid path */}
-        <Reveal style={{ marginTop: 48, marginBottom: 18 }}>
-          <p className="offer-section-banner">Or get on the calendar</p>
-        </Reveal>
-
-        <div className="offer-grid offer-grid--single">
-          <Reveal className="offer offer--reco">
+          <Reveal className="offer offer--reco" delay={100}>
             <span className="offer__tag">Highest impact</span>
             <div className="offer__kind">Done-with-you &middot; you run it</div>
             <h3>Host an event</h3>
@@ -59,26 +57,22 @@ export default function Offer() {
               <li>You provide the experience or the space</li>
               <li>A captive room of nearby neighbors</li>
             </ul>
-            <div className="offer__out">
-              <span>→</span>
-              <span>
-                A packed room of <b>future regulars.</b>
-              </span>
+            <div className="offer__cta">
+              <CTA to="demo" variant="primary" arrow>
+                Book a demo
+              </CTA>
             </div>
           </Reveal>
         </div>
 
-        <Reveal style={{ marginTop: 20, textAlign: "center" }}>
+        <Reveal style={{ marginTop: 28, textAlign: "center" }}>
           <p style={{ color: "var(--muted)" }}>
             Not sure where to start?{" "}
-            <strong style={{ color: "var(--forest)" }}>Start free with a deal.</strong> Step
-            up to hosting an event when you&rsquo;re ready.
+            <strong style={{ color: "var(--forest)" }}>
+              Claim your business for free.
+            </strong>{" "}
+            Add a hosted event when you&rsquo;re ready.
           </p>
-          <div className="inline-cta" style={{ display: "inline-block" }}>
-            <CTA to="partner" variant="primary" arrow>
-              Talk to a partner manager
-            </CTA>
-          </div>
         </Reveal>
       </div>
     </section>

@@ -325,16 +325,20 @@
   .partner-landing .offer-section-banner::after { display: none; }
 }
 
-/* Offer card — the one paid path (Host an event) */
+/* Offer cards — two side-by-side (Post a deal + Host an event) */
 .partner-landing .offer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-/* Single-card variant used after the sponsor offer was removed —
-   center the lone Host card and cap its width so it doesn't stretch
-   full-container. */
-.partner-landing .offer-grid--single {
-  grid-template-columns: minmax(0, 560px);
-  justify-content: center;
-}
 @media (max-width: 820px) { .partner-landing .offer-grid { grid-template-columns: 1fr; } }
+/* CTA container pinned to the bottom of the card so both cards' buttons
+   line up regardless of copy length. */
+.partner-landing .offer__cta { margin-top: auto; padding-top: 4px; }
+/* Quiet Free tag on the Post a deal card — mint background instead of
+   the amber "Highest impact" treatment, so the free on-ramp reads as
+   the lighter option. */
+.partner-landing .offer__tag--quiet {
+  background: var(--mint);
+  color: var(--green);
+  border: 1px solid var(--line);
+}
 .partner-landing .offer { border-radius: var(--radius); padding: 30px; background: var(--white); border: 1px solid var(--line); display: flex; flex-direction: column; position: relative; }
 .partner-landing .offer--reco { background: var(--forest); color: #fff; border-color: transparent; }
 .partner-landing .offer--reco h3,

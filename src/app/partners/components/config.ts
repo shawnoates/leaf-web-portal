@@ -17,9 +17,15 @@
 // TODO: replace with the real self-serve deal-submission URL once it
 // ships. Falls back to PARTNER_URL so the button still lands
 // somewhere actionable in the meantime.
-export const PARTNER_URL = "https://calendar.app.google/NCUYc6LUKSiwLUa67";
+// "Become a partner" / self-serve claim form. Every CTA that isn't
+// explicitly a "Book a demo" now funnels here.
+export const PARTNER_URL = "https://partner.joinleaf.com/request";
 export const SAMPLE_URL = "/partners/preview";
+// Post-a-deal self-serve entry — aliases the same claim form for now.
+// TODO: replace with the real self-serve deal-submission URL when it ships.
 export const DEAL_URL = PARTNER_URL;
-// CLAIM_URL = the "Claim your business for free" form. Runs outside
-// os.joinleaf.com on the dedicated partner.joinleaf.com subdomain.
-export const CLAIM_URL = "https://partner.joinleaf.com/request";
+// CLAIM_URL is a semantic alias — currently the same partner form.
+export const CLAIM_URL = PARTNER_URL;
+// Dedicated "Book a demo" calendar for the paid Host-an-event path.
+export const DEMO_URL =
+  "https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ3dkMyfIKR2I5qXFGgk3-bkHxtddPY-AkQu2KZnFELQq1AvajnYAL-Ltwn-QREem2qnujqds22i";

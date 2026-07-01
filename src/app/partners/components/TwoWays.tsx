@@ -43,8 +43,8 @@ export default function TwoWays() {
               <li>Pick your buildings or a radius</li>
               <li>Zero effort &mdash; you give us the offer</li>
             </ul>
-            <CTA to="deal" variant="ghost">
-              Start free
+            <CTA to="claim" variant="ghost">
+              Claim your business &mdash; FREE
             </CTA>
           </Reveal>
 
@@ -65,8 +65,8 @@ export default function TwoWays() {
               <li>Promotion &amp; RSVPs handled</li>
               <li>A captive room of new regulars</li>
             </ul>
-            <CTA to="partner" variant="primary" arrow>
-              Plan an event
+            <CTA to="demo" variant="primary" arrow>
+              Book a demo
             </CTA>
           </Reveal>
         </div>
