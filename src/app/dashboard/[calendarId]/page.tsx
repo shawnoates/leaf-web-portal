@@ -1489,6 +1489,11 @@ export default function OrgDashboardPage() {
               />
             )}
 
+            {/* Concierge post-event reports — attendee feedback + recaps. */}
+            {dashboard.tier === "concierge" && (
+              <ConciergeEventReports calendarId={calendarId} />
+            )}
+
             {/* Concierge upsell — hidden once the calendar is already on the
                 Concierge tier (server reverts tier on cancellation, so this
                 also re-appears if they churn). */}
