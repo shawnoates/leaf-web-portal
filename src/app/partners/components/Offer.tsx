@@ -73,6 +73,11 @@ export default function Offer() {
             </strong>{" "}
             Add a hosted event when you&rsquo;re ready.
           </p>
+          <div className="inline-cta" style={{ display: "inline-block" }}>
+            <CTA to="manager" variant="primary" arrow>
+              Talk to a partner manager
+            </CTA>
+          </div>
         </Reveal>
       </div>
     </section>

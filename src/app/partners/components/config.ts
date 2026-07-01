@@ -29,3 +29,7 @@ export const CLAIM_URL = PARTNER_URL;
 // Dedicated "Book a demo" calendar for the paid Host-an-event path.
 export const DEMO_URL =
   "https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ3dkMyfIKR2I5qXFGgk3-bkHxtddPY-AkQu2KZnFELQq1AvajnYAL-Ltwn-QREem2qnujqds22i";
+// Separate calendar for the "Talk to a partner manager" catch-all
+// conversation — distinct from Book-a-demo so partner managers can see
+// which intent booked the slot.
+export const MANAGER_URL = "https://calendar.app.google/8g6grhz61m5w2uqh9";

@@ -3,6 +3,7 @@ import {
   CLAIM_URL,
   DEAL_URL,
   DEMO_URL,
+  MANAGER_URL,
   PARTNER_URL,
   SAMPLE_URL,
 } from "./config";
@@ -35,13 +36,22 @@ export function Plaque({ children }: { children: ReactNode }) {
   return <span className="plaque">Source: {children}</span>;
 }
 
-export type CTATarget = "partner" | "sample" | "deal" | "claim" | "demo";
+export type CTATarget =
+  | "partner"
+  | "sample"
+  | "deal"
+  | "claim"
+  | "demo"
+  | "manager";
 export type CTAVariant = "primary" | "ghost";
 
 // Track names are distinct even when several targets alias the same
 // URL, so we can see funnel volume per CTA in dataLayer / GA.
 //   partner / claim / deal → partner.joinleaf.com/request (claim form)
 //   demo                    → the "Book a demo" calendar
+//   manager                 → the "Talk to a partner manager" catch-all
+//                             calendar (separate slot so partner managers
+//                             can see intent)
 //   sample                  → /partners/preview (merchant tour), currently
 //                             not wired into any CTA but kept in case we
 //                             re-add a "See where you show up" link later
@@ -51,6 +61,7 @@ const MAP: Record<CTATarget, { href: string; track: string }> = {
   deal: { href: DEAL_URL, track: "post_deal" },
   claim: { href: CLAIM_URL, track: "claim_business" },
   demo: { href: DEMO_URL, track: "book_demo" },
+  manager: { href: MANAGER_URL, track: "talk_to_manager" },
 };
 
 export function CTA({
