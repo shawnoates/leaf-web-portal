@@ -1431,9 +1431,8 @@ export default function OrgDashboardPage() {
                       alt=""
                       className="h-full w-full object-cover object-[center_30%] opacity-60"
                     />
-                    {/* Horizontal scrim: solid card-dark at the left where the
-                        copy sits → clearer at the right so the image reads. */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/80 to-zinc-950/30" />
+                    {/* Even dark scrim so the copy reads across the full width. */}
+                    <div className="absolute inset-0 bg-zinc-950/70" />
                     <div className="absolute inset-0 bg-black/40" />
                   </div>
                   <div className="absolute -top-24 -right-16 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl" />
@@ -1449,7 +1448,7 @@ export default function OrgDashboardPage() {
                   <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
                 </div>
 
-                <div className="relative md:max-w-[60%]">
+                <div className="relative">
                   <div className="flex items-center justify-between gap-3 mb-2">
                     <h3 className="text-lg font-semibold tracking-tight text-white">We&apos;ll run your events for you</h3>
                     <span className="shrink-0 bg-emerald-500 text-black text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full">New</span>
