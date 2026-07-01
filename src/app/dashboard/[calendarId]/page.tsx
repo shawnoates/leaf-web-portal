@@ -8,6 +8,8 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import ConciergeDashboardBanner from "@/components/ConciergeDashboardBanner";
+import ConciergeMenuCard, { type ConciergeMenu } from "@/components/ConciergeMenuCard";
+import ConciergeThread from "@/components/ConciergeThread";
 import MarketplaceTab, { type MarketplaceEvent, type OrgSettings } from "@/components/MarketplaceTab";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
 import PlanDetailModal from "@/components/PlanDetailModal";
@@ -40,6 +42,7 @@ import {
   Sparkles,
   Code,
   Megaphone,
+  MessageSquare,
   Ticket,
   Phone,
   Smartphone,
@@ -221,6 +224,7 @@ const BLACKLIST_PRESETS: string[] = [
 const TABS = [
   { id: "overview", label: "Overview", icon: Calendar },
   { id: "calendars", label: "Calendars", icon: Layers },
+  { id: "messages", label: "Messages", icon: MessageSquare, conciergeOnly: true },
   { id: "followers", label: "Followers", icon: Heart },
   { id: "members", label: "Users", icon: Users, ownerOnly: true },
   { id: "analytics", label: "Analytics", icon: TrendingUp, proOnly: true },
@@ -634,6 +638,58 @@ export default function OrgDashboardPage() {
     });
   }, [dashboard, calendarId]);
 
+  // Pending concierge menu (the owner's "choose this month's event" card).
+  // Only relevant on concierge calendars; refetched after a selection so the
+  // card disappears once the pick is locked and the event is published.
+  const [pendingMenu, setPendingMenu] = useState<ConciergeMenu | null>(null);
+  const loadPendingMenu = useCallback(async () => {
+    if (!dashboard || dashboard.tier !== "concierge") {
+      setPendingMenu(null);
+      return;
+    }
+    try {
+      const r: { menu: ConciergeMenu | null } = await Parse.Cloud.run(
+        "getPendingConciergeMenu",
+        { calendarId }
+      );
+      setPendingMenu(r.menu);
+    } catch (err) {
+      console.warn("[Concierge] pending menu load failed:", err);
+      setPendingMenu(null);
+    }
+  }, [dashboard, calendarId]);
+
+  useEffect(() => {
+    loadPendingMenu();
+  }, [loadPendingMenu]);
+
+  // Concierge unread badge on the Messages tab. Clears while the tab is open
+  // (the thread marks messages read server-side); polled otherwise.
+  const [conciergeUnread, setConciergeUnread] = useState(0);
+  useEffect(() => {
+    if (!dashboard || dashboard.tier !== "concierge") {
+      setConciergeUnread(0);
+      return;
+    }
+    if (activeTab === "messages") {
+      setConciergeUnread(0);
+      return;
+    }
+    let alive = true;
+    const tick = () =>
+      Parse.Cloud.run("getConciergeUnread", { calendarId })
+        .then((r: { unread: number }) => {
+          if (alive) setConciergeUnread(r?.unread || 0);
+        })
+        .catch(() => {});
+    tick();
+    const t = setInterval(tick, 20000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [dashboard, calendarId, activeTab]);
+
   // Analytics fetcher — Pro tier only
   const fetchAnalytics = useCallback(
     async (range: "7d" | "30d" | "90d" | "all", calFilter?: string) => {
@@ -1042,6 +1098,8 @@ export default function OrgDashboardPage() {
           <nav className="flex gap-1 -mb-px overflow-x-auto no-scrollbar">
             {TABS.map((tab) => {
               if (tab.ownerOnly && !dashboard.isOwner) return null;
+              if ((tab as { conciergeOnly?: boolean }).conciergeOnly && dashboard.tier !== "concierge")
+                return null;
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               const isLocked =
@@ -1068,6 +1126,11 @@ export default function OrgDashboardPage() {
                   {tab.id === "followers" && dashboard.pendingFollowerCount > 0 && (
                     <span className="bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[18px] text-center">
                       {dashboard.pendingFollowerCount}
+                    </span>
+                  )}
+                  {tab.id === "messages" && conciergeUnread > 0 && (
+                    <span className="bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[18px] text-center">
+                      {conciergeUnread}
                     </span>
                   )}
                   {isLocked && <Lock className="w-3 h-3 ml-0.5" />}
@@ -1410,6 +1473,19 @@ export default function OrgDashboardPage() {
                   )}
                 </div>
               </section>
+            )}
+
+            {/* Concierge menu — owner picks this month's event; selecting it
+                publishes the plan to the calendar. Only present on concierge
+                calendars with a menu awaiting selection. */}
+            {pendingMenu && (
+              <ConciergeMenuCard
+                menu={pendingMenu}
+                onSelected={() => {
+                  loadPendingMenu();
+                  fetchDashboard();
+                }}
+              />
             )}
 
             {/* Concierge upsell — hidden once the calendar is already on the
@@ -2230,6 +2306,9 @@ export default function OrgDashboardPage() {
             </div>
           </div>
         )}
+
+        {/* ──────── MESSAGES TAB (concierge) ──────── */}
+        {activeTab === "messages" && <ConciergeThread calendarId={calendarId} />}
 
         {/* ──────── MARKETPLACE TAB ──────── */}
         {activeTab === "marketplace" && (
