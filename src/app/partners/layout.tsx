@@ -2,11 +2,17 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "./styles.css";
 
-const OG_IMAGE = "/partners-opportunity.png";
+// Absolute URL — iMessage / Slack / Twitter reject relative image paths
+// and skip the preview card entirely. Next.js needs an explicit
+// metadataBase to convert relative paths to absolute at build time; we
+// set both so the OG tags render as fully qualified URLs regardless of
+// which layout is authoritative in the app tree.
+const OG_IMAGE = "https://os.joinleaf.com/partners-opportunity.png";
 const OG_ALT =
   "A local storefront with neighbors walking up from nearby buildings";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://os.joinleaf.com"),
   title: "Leaf OS for local businesses — Your next regulars live around the corner",
   description:
     "Get your business in front of the residents who live minutes from your door — through their building's community calendar, or an event we fill for you. Post a deal or host an event.",
@@ -17,7 +23,17 @@ export const metadata: Metadata = {
     type: "website",
     url: "https://os.joinleaf.com/partners",
     siteName: "Leaf OS",
-    images: [{ url: OG_IMAGE, alt: OG_ALT }],
+    // width/height help iMessage + Twitter render the large card
+    // without probing the image bytes first.
+    images: [
+      {
+        url: OG_IMAGE,
+        width: 1200,
+        height: 630,
+        alt: OG_ALT,
+        type: "image/png",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
