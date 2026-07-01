@@ -186,10 +186,10 @@ export const config: LandingConfig = {
       id: "d4",
       businessName: "Lincoln Park Café",
       title: "Buy one coffee, get one free",
-      description: "Right now only — limited to ten redemptions in the next hour.",
+      description: "Show the code at the counter. One redemption per resident.",
       address: "12 Lincoln Park N · 1 block",
-      dealType: "exclusive",
-      redeemWindowMinutes: 60,
+      promoCode: "LEAFCAFE",
+      dealType: "public",
       interestCount: 22,
       imageUrl:
         "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&q=80",
