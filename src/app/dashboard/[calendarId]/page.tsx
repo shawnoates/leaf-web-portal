@@ -1422,19 +1422,18 @@ export default function OrgDashboardPage() {
                     for depth, and a hairline sheen along the top edge. */}
                 <div aria-hidden className="pointer-events-none absolute inset-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black" />
-                  {/* Darkened photo anchored right, faded into the card so the
-                      copy on the left stays legible (md+ only — too tight on
-                      mobile). */}
-                  <div className="absolute inset-y-0 right-0 hidden w-3/5 md:block">
+                  {/* Full-bleed photo behind the whole card, darkened so the
+                      copy layered on top stays legible. */}
+                  <div className="absolute inset-0">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src="https://images.unsplash.com/photo-1545315003-c5ad6226c272?w=900&q=70&auto=format&fit=crop"
+                      src="https://images.unsplash.com/photo-1545315003-c5ad6226c272?w=1600&q=70&auto=format&fit=crop"
                       alt=""
                       className="h-full w-full object-cover object-[center_30%] opacity-60"
                     />
-                    {/* Horizontal scrim: solid card-dark at the left seam →
-                        clear at the right, so the image reads as texture. */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/70 to-zinc-950/10" />
+                    {/* Horizontal scrim: solid card-dark at the left where the
+                        copy sits → clearer at the right so the image reads. */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/80 to-zinc-950/30" />
                     <div className="absolute inset-0 bg-black/40" />
                   </div>
                   <div className="absolute -top-24 -right-16 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl" />
