@@ -121,10 +121,10 @@
 .partner-landing .band-forest .btn-ghost:hover { background: rgba(255,255,255,0.08); border-color: var(--white); }
 .partner-landing .btn-arrow { font-size: 1.05em; line-height: 1; }
 
-/* CTA row — primary + ghost side-by-side, equal-width columns so the
-   two buttons read as a matched pair. Tightened font size + padding
-   below 900px so "Claim your business for free" (the longer label)
-   fits on one line at any container width. */
+/* CTA row — primary + ghost ALWAYS side-by-side, equal-width columns.
+   No single-column fallback at any breakpoint; instead font-size and
+   padding shrink progressively so "Claim your business for free"
+   (the longer label) stays on one line even on narrow phones. */
 .partner-landing .cta-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -138,13 +138,17 @@
   padding-left: 14px;
   padding-right: 14px;
   font-size: 0.92rem;
+  white-space: nowrap;
 }
 @media (max-width: 900px) {
-  .partner-landing .cta-row > .btn { font-size: 0.82rem; padding: 12px 12px; }
+  .partner-landing .cta-row > .btn { font-size: 0.82rem; padding: 12px 10px; }
 }
-@media (max-width: 420px) {
-  .partner-landing .cta-row { grid-template-columns: 1fr; }
-  .partner-landing .cta-row > .btn { font-size: 0.9rem; padding: 14px 16px; }
+@media (max-width: 560px) {
+  .partner-landing .cta-row { gap: 8px; }
+  .partner-landing .cta-row > .btn { font-size: 0.72rem; padding: 11px 8px; letter-spacing: -0.005em; }
+}
+@media (max-width: 380px) {
+  .partner-landing .cta-row > .btn { font-size: 0.66rem; padding: 10px 6px; }
 }
 
 .partner-landing .trust { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 20px; font-size: 0.86rem; color: var(--muted); }
