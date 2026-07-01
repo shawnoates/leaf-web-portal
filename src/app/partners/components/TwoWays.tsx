@@ -25,7 +25,7 @@ export default function TwoWays() {
           </p>
         </Reveal>
 
-        <div className="ways">
+        <div className="ways" id="get-started-cards">
           <Reveal className="way way--free">
             <span className="way__tag way__tag--quiet">Free</span>
             <h3 className="h-md" style={{ fontSize: "1.3rem" }}>
@@ -69,6 +69,17 @@ export default function TwoWays() {
               Book a demo
             </CTA>
           </Reveal>
+        </div>
+
+        <div className="cta-hint__row">
+          <a
+            className="cta-hint"
+            href="/partners/preview"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            See where you show up →
+          </a>
         </div>
       </div>
     </section>

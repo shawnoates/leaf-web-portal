@@ -111,6 +111,14 @@ export default function Hero() {
               Claim your business for free
             </CTA>
           </div>
+          <a
+            className="cta-hint"
+            href="/partners/preview"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            See where you show up →
+          </a>
           <TrustStrip />
         </Reveal>
 

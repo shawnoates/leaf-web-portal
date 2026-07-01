@@ -151,6 +151,23 @@
   .partner-landing .cta-row > .btn { font-size: 0.66rem; padding: 10px 6px; }
 }
 
+/* Small text-link that sits under the CTA row (Hero) / the "Get
+   started" cards (TwoWays), pointing at the merchant preview at
+   /partners/preview. Quiet weight so it doesn't compete with the
+   primary + ghost buttons above. */
+.partner-landing .cta-hint {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--mid);
+  transition: color 0.15s ease;
+}
+.partner-landing .cta-hint:hover { color: var(--forest); text-decoration: underline; }
+.partner-landing .band-forest .cta-hint { color: var(--light); }
+.partner-landing .band-forest .cta-hint:hover { color: var(--white); }
+.partner-landing .cta-hint__row { text-align: center; margin-top: 18px; }
+
 .partner-landing .trust { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 20px; font-size: 0.86rem; color: var(--muted); }
 .partner-landing .band-forest .trust { color: var(--light); }
 .partner-landing .trust span { display: inline-flex; align-items: center; gap: 7px; }
