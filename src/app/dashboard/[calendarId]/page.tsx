@@ -328,6 +328,47 @@ export default function OrgDashboardPage() {
   const [settingsMerchantRequireApproval, setSettingsMerchantRequireApproval] =
     useState(false);
   const [merchantPolicySaving, setMerchantPolicySaving] = useState(false);
+  // Pending business-event requests (concierge second gate) for this calendar.
+  const [eventApprovals, setEventApprovals] = useState<
+    {
+      objectId: string;
+      eventTitle: string;
+      businessName: string | null;
+      eventDate: string | null;
+    }[]
+  >([]);
+  const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null);
+
+  const loadEventApprovals = useCallback(async () => {
+    try {
+      const r: { approvals?: typeof eventApprovals } = await Parse.Cloud.run(
+        "listCalendarEventApprovals",
+        { calendarId }
+      );
+      setEventApprovals(r.approvals || []);
+    } catch {
+      /* not permitted / none — leave empty */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarId]);
+
+  const decideEventApproval = useCallback(
+    async (approvalId: string, approve: boolean) => {
+      setApprovalBusyId(approvalId);
+      try {
+        await Parse.Cloud.run("decideCalendarEventApproval", {
+          approvalId,
+          approve,
+        });
+        setEventApprovals((prev) =>
+          prev.filter((a) => a.objectId !== approvalId)
+        );
+      } finally {
+        setApprovalBusyId(null);
+      }
+    },
+    []
+  );
 
   // Optimistically toggle the merchant-events policy; revert on failure.
   const saveMerchantPolicy = async (patch: {
@@ -352,6 +393,11 @@ export default function OrgDashboardPage() {
       setMerchantPolicySaving(false);
     }
   };
+  useEffect(() => {
+    // Load once on mount so the top banner can surface pending requests from
+    // any tab. Server-gated to the owner; non-owners get an empty list.
+    loadEventApprovals();
+  }, [loadEventApprovals]);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsSection, setSettingsSection] = useState<"general" | "subscription">("general");
 
@@ -1174,6 +1220,30 @@ export default function OrgDashboardPage() {
           </nav>
         </div>
       </header>
+
+      {/* Pending business-event requests — thin banner, jumps to Settings */}
+      {dashboard.isOwner && eventApprovals.length > 0 && (
+        <div className="max-w-5xl mx-auto px-6 pt-4">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("settings");
+              setSettingsSection("general");
+            }}
+            className="w-full flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-left hover:bg-amber-100/70 transition-colors"
+          >
+            <span className="text-sm text-amber-900">
+              <span className="font-semibold">{eventApprovals.length}</span>{" "}
+              business event{" "}
+              {eventApprovals.length === 1 ? "request" : "requests"} awaiting your
+              review
+            </span>
+            <span className="text-xs font-semibold text-amber-800 shrink-0">
+              Review →
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Leaf app connection banner (owners and co-hosts) */}
       {!leafAppConnected && (
@@ -2483,6 +2553,59 @@ export default function OrgDashboardPage() {
                 </div>
               )}
             </div>
+
+            {/* Pending business-event requests (concierge second gate) */}
+            {eventApprovals.length > 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 sm:p-5">
+                <h3 className="text-sm font-semibold text-zinc-900">
+                  Business event requests
+                </h3>
+                <p className="text-xs text-zinc-500 mt-1">
+                  Approve to publish to your calendar, or decline.
+                </p>
+                <ul className="mt-3 space-y-2">
+                  {eventApprovals.map((a) => (
+                    <li
+                      key={a.objectId}
+                      className="flex items-center justify-between gap-3 bg-white border border-zinc-200 rounded-lg px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate">
+                          {a.eventTitle}
+                        </div>
+                        <div className="text-xs text-zinc-500">
+                          {a.businessName || "A local business"}
+                          {a.eventDate
+                            ? ` · ${new Date(a.eventDate).toLocaleDateString(
+                                "en-US",
+                                { month: "short", day: "numeric" }
+                              )}`
+                            : ""}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          disabled={approvalBusyId === a.objectId}
+                          onClick={() => decideEventApproval(a.objectId, true)}
+                          className="text-xs font-medium px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          disabled={approvalBusyId === a.objectId}
+                          onClick={() => decideEventApproval(a.objectId, false)}
+                          className="text-xs font-medium px-3 py-1.5 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {/* Phone / Leaf App Connection */}
             <div className="flex items-center justify-between py-3 border-b border-zinc-100">
               <div className="flex items-center gap-2">
