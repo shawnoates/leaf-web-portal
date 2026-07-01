@@ -10,6 +10,7 @@ import SubscriptionModal from "@/components/SubscriptionModal";
 import ConciergeDashboardBanner from "@/components/ConciergeDashboardBanner";
 import ConciergeMenuCard, { type ConciergeMenu } from "@/components/ConciergeMenuCard";
 import ConciergeThread from "@/components/ConciergeThread";
+import ConciergeEventReports from "@/components/ConciergeEventReports";
 import MarketplaceTab, { type MarketplaceEvent, type OrgSettings } from "@/components/MarketplaceTab";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
 import PlanDetailModal from "@/components/PlanDetailModal";
