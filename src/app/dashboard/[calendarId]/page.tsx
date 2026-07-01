@@ -1413,22 +1413,37 @@ export default function OrgDashboardPage() {
                 Concierge tier (server reverts tier on cancellation, so this
                 also re-appears if they churn). */}
             {dashboard.tier !== "concierge" && (
-              <div className="border border-zinc-800 rounded-xl p-6 bg-gradient-to-br from-zinc-900 to-black">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-base font-medium text-white">Concierge</h3>
-                  <span className="bg-emerald-500 text-black text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full">New</span>
+              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-xl shadow-black/40">
+                {/* Layered ambient background — dark base + an emerald glow
+                    bleeding from the top-right, a faint cool glow bottom-left
+                    for depth, and a hairline sheen along the top edge. */}
+                <div aria-hidden className="pointer-events-none absolute inset-0">
+                  <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black" />
+                  <div className="absolute -top-24 -right-16 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl" />
+                  <div className="absolute -bottom-24 -left-12 h-56 w-56 rounded-full bg-sky-500/10 blur-3xl" />
+                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
                 </div>
-                <p className="text-sm text-zinc-400 leading-relaxed mb-4">
-                  Don&apos;t have time to plan, post, and show up? Bring on a dedicated host to run your calendar and host plans on behalf of your community. From $499/mo.
-                </p>
-                <ul className="space-y-2 mb-5 list-disc list-inside marker:text-zinc-600">
-                  <li className="text-xs text-zinc-400 leading-relaxed"><strong className="text-zinc-100">Plans posted for you</strong> — your host drafts, schedules, and publishes plans to your calendar on a steady cadence.</li>
-                  <li className="text-xs text-zinc-400 leading-relaxed"><strong className="text-zinc-100">Hosted on your behalf</strong> — a real person shows up, greets attendees, and represents your community at every gathering.</li>
-                  <li className="text-xs text-zinc-400 leading-relaxed"><strong className="text-zinc-100">RSVP &amp; chat management</strong> — from approvals to day-of reminders, your host handles the back-and-forth so you don&apos;t have to.</li>
-                </ul>
-                <a href="https://calendar.app.google/NCUYc6LUKSiwLUa67" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-200 transition-colors">
-                  Book a demo
-                </a>
+
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-emerald-400" />
+                      <h3 className="text-base font-medium text-white">Concierge</h3>
+                    </div>
+                    <span className="bg-emerald-500 text-black text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full">New</span>
+                  </div>
+                  <p className="text-sm text-zinc-400 leading-relaxed mb-4">
+                    Don&apos;t have time to plan, post, and show up? Bring on a dedicated host to run your calendar and host plans on behalf of your community. From $499/mo.
+                  </p>
+                  <ul className="space-y-2 mb-5 list-disc list-inside marker:text-emerald-500/60">
+                    <li className="text-xs text-zinc-400 leading-relaxed"><strong className="text-zinc-100">Plans posted for you</strong> — your host drafts, schedules, and publishes plans to your calendar on a steady cadence.</li>
+                    <li className="text-xs text-zinc-400 leading-relaxed"><strong className="text-zinc-100">Hosted on your behalf</strong> — a real person shows up, greets attendees, and represents your community at every gathering.</li>
+                    <li className="text-xs text-zinc-400 leading-relaxed"><strong className="text-zinc-100">RSVP &amp; chat management</strong> — from approvals to day-of reminders, your host handles the back-and-forth so you don&apos;t have to.</li>
+                  </ul>
+                  <a href="https://calendar.app.google/NCUYc6LUKSiwLUa67" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-200 transition-colors">
+                    Book a demo
+                  </a>
+                </div>
               </div>
             )}
 
