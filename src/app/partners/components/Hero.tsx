@@ -109,7 +109,7 @@ export default function Hero() {
               Become a partner
             </CTA>
             <CTA to="sample" variant="ghost">
-              See where your deal appears
+              See where you show up
             </CTA>
           </div>
           <TrustStrip />

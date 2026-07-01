@@ -121,14 +121,16 @@
 .partner-landing .band-forest .btn-ghost:hover { background: rgba(255,255,255,0.08); border-color: var(--white); }
 .partner-landing .btn-arrow { font-size: 1.05em; line-height: 1; }
 
-/* CTA row — two equal columns, asymmetric below so the longer ghost
-   label ("See where your deal appears") gets a touch more room. */
+/* CTA stack — primary ("Become a partner") on top, ghost ("See where
+   you show up") below. Both buttons share the same width so they read
+   as a single group; ghost sits underneath to signal that it's the
+   secondary action / preview path. */
 .partner-landing .cta-row {
-  display: grid;
-  grid-template-columns: 0.85fr 1.15fr;
-  gap: 14px;
-  align-items: start;
-  max-width: 620px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+  max-width: 320px;
 }
 .partner-landing .cta-row > .btn {
   width: 100%;
@@ -137,10 +139,7 @@
   padding-right: 18px;
 }
 @media (max-width: 720px) {
-  .partner-landing .cta-row > .btn { font-size: 0.88rem; padding: 12px 14px; }
-}
-@media (max-width: 400px) {
-  .partner-landing .cta-row { grid-template-columns: 1fr; }
+  .partner-landing .cta-row > .btn { font-size: 0.9rem; padding: 12px 14px; }
 }
 
 .partner-landing .trust { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 20px; font-size: 0.86rem; color: var(--muted); }

@@ -13,12 +13,15 @@ export function FinalCta() {
             Reach the residents minutes from your door, turn them into regulars, and let us
             bring the people. Start with a single deal or one event.
           </p>
-          <div className="cta-row" style={{ justifyContent: "center", marginTop: 30 }}>
+          <div
+            className="cta-row"
+            style={{ marginTop: 30, marginInline: "auto" }}
+          >
             <CTA to="partner" variant="primary" arrow>
               Become a partner
             </CTA>
             <CTA to="sample" variant="ghost">
-              See where your deal appears
+              See where you show up
             </CTA>
           </div>
           <div style={{ display: "flex", justifyContent: "center" }}>
