@@ -20,3 +20,6 @@
 export const PARTNER_URL = "https://calendar.app.google/4v3mg4Ry4i5Bn7fG8";
 export const SAMPLE_URL = "/partners/preview";
 export const DEAL_URL = PARTNER_URL;
+// CLAIM_URL = the "Claim your business for free" form. Runs outside
+// os.joinleaf.com on the dedicated partner.joinleaf.com subdomain.
+export const CLAIM_URL = "https://partner.joinleaf.com/request";

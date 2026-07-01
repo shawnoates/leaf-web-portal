@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { DEAL_URL, PARTNER_URL, SAMPLE_URL } from "./config";
+import { CLAIM_URL, DEAL_URL, PARTNER_URL, SAMPLE_URL } from "./config";
 
 export function LeafMark({
   size = 18,
@@ -29,16 +29,21 @@ export function Plaque({ children }: { children: ReactNode }) {
   return <span className="plaque">Source: {children}</span>;
 }
 
-export type CTATarget = "partner" | "sample" | "deal";
+export type CTATarget = "partner" | "sample" | "deal" | "claim";
 export type CTAVariant = "primary" | "ghost";
 
 // `deal` is the self-serve free-deal submission entry. Tracking it
 // separately from `partner` lets us see the deal-funnel volume even
 // while DEAL_URL temporarily points at the booking calendar.
+// `claim` opens the "Claim your business for free" form on
+// partner.joinleaf.com.
+// `sample` is kept for the /partners/preview merchant tour link, even
+// though it's not wired into any CTA on the current page.
 const MAP: Record<CTATarget, { href: string; track: string }> = {
   partner: { href: PARTNER_URL, track: "become_partner" },
   sample: { href: SAMPLE_URL, track: "view_sample" },
   deal: { href: DEAL_URL, track: "post_deal" },
+  claim: { href: CLAIM_URL, track: "claim_business" },
 };
 
 export function CTA({

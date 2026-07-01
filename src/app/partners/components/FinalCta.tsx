@@ -20,8 +20,8 @@ export function FinalCta() {
             <CTA to="partner" variant="primary" arrow>
               Become a partner
             </CTA>
-            <CTA to="sample" variant="ghost">
-              See where you show up
+            <CTA to="claim" variant="ghost">
+              Claim your business for free
             </CTA>
           </div>
           <div style={{ display: "flex", justifyContent: "center" }}>
