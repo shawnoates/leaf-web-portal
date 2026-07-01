@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
-import { Sparkles, X } from "lucide-react";
+import { X } from "lucide-react";
 
 type Subscription =
   | "pending"
@@ -145,13 +145,12 @@ export default function ConciergeDashboardBanner({ calendarId }: { calendarId: s
   return (
     <div className="bg-zinc-900 text-white border-b border-zinc-800">
       <div className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-4">
-        <Sparkles className="w-4 h-4 shrink-0 text-zinc-300" />
         <div className="flex-1 min-w-0 text-sm">
           {state.kind === "eligible" && (
             <>
-              <strong className="font-semibold">You&apos;re invited to Leaf Concierge.</strong>{" "}
+              <strong className="font-semibold">You&apos;re invited to enroll in Concierge.</strong>{" "}
               <span className="text-zinc-300">
-                Curated events for your building, every month. We run them, you choose.
+                Bring on a dedicated host to run your calendar and host plans for your community, every month. We run them, you choose.
               </span>
             </>
           )}
