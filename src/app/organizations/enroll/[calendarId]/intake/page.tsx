@@ -211,7 +211,7 @@ export default function ConciergeIntakePage({
             {busy
               ? "Saving…"
               : stepIndex === SECTIONS.length - 1
-              ? "Submit intake →"
+              ? "Continue to payment →"
               : "Save & continue →"}
           </button>
         </div>
