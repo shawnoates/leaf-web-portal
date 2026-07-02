@@ -104,9 +104,18 @@ export default function ConciergeIntakePage({
         setStepIndex(stepIndex + 1);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
-        // Final step → submit
+        // Final step → save answers, then head to payment (Stripe). Enrollment
+        // only goes live once payment clears (checkout webhook).
         await ParseAny.Cloud.run("submitConciergeIntake", { calendarId });
-        router.push(`/dashboard/${calendarId}?concierge=welcome`);
+        const result = await ParseAny.Cloud.run("createConciergeCheckout", {
+          calendarId,
+          billingPeriod: "monthly",
+          returnUrl: typeof window !== "undefined"
+            ? `${window.location.origin}/dashboard/${calendarId}?concierge=welcome`
+            : undefined,
+        });
+        if (result?.url) window.location.href = result.url;
+        else throw new Error("Checkout URL missing from response");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save.");
