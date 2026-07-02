@@ -14,15 +14,15 @@ const items = [
   },
   {
     q: "It's not in the budget.",
-    a: "One saved renewal is worth roughly $4,000. Concierge is a fraction of a single move-out — and your first event is on us, so you can see it work before you commit.",
+    a: "One saved renewal is worth roughly $4,000. Concierge is a fraction of a single move-out — and your first event is guaranteed: don't love it and that month's on us, no questions asked.",
   },
   {
     q: "Our residents won't show up.",
-    a: "Switch on the free resident calendar today and watch. We curate events to your building, bring in local sponsors, and handle all the promotion — turnout is our job, not yours.",
+    a: "Switch on the free resident calendar today and watch. We curate events to your building, bring in local partners, and handle all the promotion — turnout is our job, not yours.",
   },
   {
     q: "We already do a few events.",
-    a: "Then you know the time they eat. We make them consistent and effortless, and stretch your budget further by bringing local businesses in to sponsor.",
+    a: "Then you know the time they eat. We make them consistent and effortless, and stretch your budget further by bringing local businesses in as partners.",
   },
 ];
 

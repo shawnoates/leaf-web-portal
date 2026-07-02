@@ -67,19 +67,29 @@ export default function TwoWays() {
               Done-for-you
             </p>
             <p style={{ color: "var(--light)" }}>
-              We plan and run one great resident event a month, start to finish. Your first
-              event is free.
+              We plan and run one great resident event a month, start to finish &mdash; backed
+              by our guarantee: don&rsquo;t love your first event and it&rsquo;s on us.
             </p>
             <ul>
               <li>A dedicated concierge</li>
               <li>Vendors, promo &amp; RSVPs handled</li>
-              <li>Local businesses sponsor events</li>
+              <li>Local businesses partner on events</li>
+              <li>Satisfaction guaranteed &mdash; refund or make-it-right</li>
             </ul>
             <CTA to="demo" variant="primary" arrow>
               Book a demo
             </CTA>
           </Reveal>
         </div>
+
+        <Reveal className="way__guarantee">
+          <p>
+            <strong>Backed by the Leaf Concierge Guarantee</strong> &mdash; don&rsquo;t love
+            your first event and that month&rsquo;s on us, no questions asked. Every month
+            after, if an event doesn&rsquo;t land we&rsquo;ll make it right &mdash; refund or
+            a comped event.
+          </p>
+        </Reveal>
       </div>
     </section>
   );

@@ -10,7 +10,7 @@ const steps = [
   {
     n: "2",
     h: "We run it",
-    b: "Vendors booked, flyers made, RSVPs and reminders handled — and local businesses help sponsor.",
+    b: "Vendors booked, flyers made, RSVPs and reminders handled — and local businesses partner on the event.",
   },
   {
     n: "3",
