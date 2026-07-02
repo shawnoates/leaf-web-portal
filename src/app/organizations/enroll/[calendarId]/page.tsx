@@ -127,9 +127,9 @@ export default function ConciergeEnrollPage({
           <div className="flex items-center justify-between text-xs tracking-wide font-medium">
             <StepDot active label="Plan" />
             <span className="flex-1 h-px bg-zinc-300 mx-2" />
-            <StepDot label="Pay" />
+            <StepDot label="Questions" />
             <span className="flex-1 h-px bg-zinc-300 mx-2" />
-            <StepDot label="Intake" />
+            <StepDot label="Pay" />
           </div>
         </div>
       </div>
@@ -216,10 +216,10 @@ export default function ConciergeEnrollPage({
           disabled={submitting}
           className="w-full bg-zinc-900 text-white font-semibold py-4 rounded-full hover:bg-zinc-800 transition-colors disabled:opacity-60 disabled:cursor-wait"
         >
-          {submitting ? "Opening secure checkout…" : "Continue to payment →"}
+          {submitting ? "Loading…" : "Continue →"}
         </button>
         <p className="text-center text-xs text-zinc-500 mt-3">
-          Payments processed by Stripe. Cancel anytime from your dashboard.
+          A few quick questions next — you&apos;ll set up payment at the end.
         </p>
       </div>
     </main>
