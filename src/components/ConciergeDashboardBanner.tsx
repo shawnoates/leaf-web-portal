@@ -138,7 +138,10 @@ export default function ConciergeDashboardBanner({ calendarId }: { calendarId: s
     }
   };
 
-  if (state.loading || !state.visible || dismissed) return null;
+  if (state.loading || !state.visible) return null;
+  // Dismissal only silences the (soft) eligible invite — actionable states
+  // (enrolling, cancelling, paused, past_due) always show.
+  if (dismissed && state.kind === "eligible") return null;
 
   const formatDate = (d?: Date) =>
     d
