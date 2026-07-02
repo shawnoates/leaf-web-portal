@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
@@ -16,12 +16,11 @@ import { Check } from "lucide-react";
  * Reached after Stripe Checkout success returns the user here.
  */
 
-type SectionId = "about" | "spaces" | "budget" | "vibe" | "members" | "wrap";
+type SectionId = "about" | "spaces" | "vibe" | "members" | "wrap";
 
 const SECTIONS: { id: SectionId; title: string; description: string }[] = [
   { id: "about", title: "About your community", description: "The basics so we can ground everything else." },
-  { id: "spaces", title: "Spaces & logistics", description: "What's possible to run, and what's not." },
-  { id: "budget", title: "Your involvement", description: "How hands-on you want to be each month." },
+  { id: "spaces", title: "Spaces & logistics", description: "Where events happen, and what's possible to run." },
   { id: "vibe", title: "Vibe & guardrails", description: "What lands with your community — and what doesn't." },
   { id: "members", title: "Members & branding", description: "How you reach members and how your community sounds." },
   { id: "wrap", title: "Last step", description: "Anything else before we get started." },
@@ -41,7 +40,6 @@ export default function ConciergeIntakePage({
   const [values, setValues] = useState<Record<SectionId, Values>>({
     about: {},
     spaces: {},
-    budget: {},
     vibe: {},
     members: {},
     wrap: {},
@@ -61,7 +59,7 @@ export default function ConciergeIntakePage({
       .then((r: { values?: Record<SectionId, Values>; sectionsCompleted?: SectionId[] }) => {
         if (!mounted) return;
         const next: Record<SectionId, Values> = {
-          about: {}, spaces: {}, budget: {}, vibe: {}, members: {}, wrap: {},
+          about: {}, spaces: {}, vibe: {}, members: {}, wrap: {},
         };
         SECTIONS.forEach(({ id }) => {
           next[id] = { ...(r?.values?.[id] || {}) };
@@ -73,12 +71,7 @@ export default function ConciergeIntakePage({
     return () => { mounted = false; };
   }, [calendarId, ParseAny]);
 
-  // Off-premise communities have no on-site spaces, so skip Spaces & logistics.
-  const activeSections = useMemo(
-    () => SECTIONS.filter((s) => s.id !== "spaces" || values.about.venueMode !== "off_premise"),
-    [values.about.venueMode]
-  );
-  const currentSection = activeSections[Math.min(stepIndex, activeSections.length - 1)];
+  const currentSection = SECTIONS[stepIndex];
 
   const updateField = useCallback((section: SectionId, key: string, value: unknown) => {
     setValues((prev) => ({
@@ -357,17 +350,6 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
             value={(values.memberCommsChannels as string[]) || []}
             onChange={(v) => onChange("memberCommsChannels", v)}
             options={["email_list", "building_app", "printed_flyers", "text_blast", "word_of_mouth"]}
-          />
-          <SelectField
-            label="Community voice"
-            value={values.buildingVoice as string}
-            onChange={(v) => onChange("buildingVoice", v)}
-            options={[
-              { value: "warm_casual", label: "Warm & casual" },
-              { value: "polished_professional", label: "Polished & professional" },
-              { value: "playful", label: "Playful" },
-              { value: "neutral", label: "Neutral" },
-            ]}
           />
           <ToggleField
             label="OK to photograph members at events for recaps/marketing?"
