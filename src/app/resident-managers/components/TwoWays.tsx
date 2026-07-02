@@ -84,7 +84,7 @@ export default function TwoWays() {
 
         <Reveal className="way__guarantee">
           <p>
-            <strong>Backed by the Leaf Concierge Guarantee</strong> &mdash; don&rsquo;t love
+            <strong>Backed by the Leaf OS Guarantee</strong> &mdash; don&rsquo;t love
             your first event and that month&rsquo;s on us, no questions asked. Every month
             after, if an event doesn&rsquo;t land we&rsquo;ll make it right &mdash; refund or
             a comped event.
