@@ -305,21 +305,6 @@
 .rm-landing .way__cta-stack .cta-stack__hint { text-align: center; }
 .rm-landing .way--reco .btn-ghost { display: none; }
 
-/* Guarantee trust line under the two "ways to start" cards. Central,
-   quiet weight, but enough presence to signal the risk-reversal since
-   "first event free" is gone from the copy. */
-.rm-landing .way__guarantee {
-  margin-top: 28px;
-  text-align: center;
-  color: var(--muted);
-  font-size: 0.94rem;
-  line-height: 1.55;
-  max-width: 62ch;
-  margin-left: auto;
-  margin-right: auto;
-}
-.rm-landing .way__guarantee strong { color: var(--forest); }
-
 /* ---------- calculator ---------- */
 .rm-landing .calc { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; }
 .rm-landing .calc__row { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }

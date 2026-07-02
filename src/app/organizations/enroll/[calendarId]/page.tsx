@@ -181,7 +181,8 @@ export default function ConciergeEnrollPage({
           </div>
           {calendar.tier === "pro" && (
             <p className="text-xs text-zinc-500 italic mt-4">
-              Concierge includes everything in Pro, plus a dedicated host to run it.
+              Concierge includes everything in Pro, plus one free event per month —
+              planned and hosted by us for your community.
             </p>
           )}
         </div>
@@ -212,8 +213,7 @@ export default function ConciergeEnrollPage({
             <p className="text-sm text-emerald-900/80 leading-relaxed">
               Don&apos;t love your first event? Get that month back, no questions
               asked. And every month after, if an event doesn&apos;t land, we&apos;ll
-              make it right — refund or a comped event, your call. Just tell us
-              within 7 days.
+              make it right. Just tell us within 7 days.
             </p>
           </div>
         </div>
