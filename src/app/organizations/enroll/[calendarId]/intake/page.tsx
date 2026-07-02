@@ -19,11 +19,11 @@ import { Check, ChevronLeft } from "lucide-react";
 type SectionId = "about" | "spaces" | "budget" | "vibe" | "members" | "wrap";
 
 const SECTIONS: { id: SectionId; title: string; description: string }[] = [
-  { id: "about", title: "About your building", description: "The basics so we can ground everything else." },
+  { id: "about", title: "About your community", description: "The basics so we can ground everything else." },
   { id: "spaces", title: "Spaces & logistics", description: "What's possible to run, and what's not." },
   { id: "budget", title: "Budget & autonomy", description: "How involved you want to be each month." },
-  { id: "vibe", title: "Vibe & guardrails", description: "What lands at your building — and what doesn't." },
-  { id: "members", title: "Members & branding", description: "How you reach members and how your building sounds." },
+  { id: "vibe", title: "Vibe & guardrails", description: "What lands with your community — and what doesn't." },
+  { id: "members", title: "Members & branding", description: "How you reach members and how your community sounds." },
   { id: "wrap", title: "Last step", description: "Anything else, and a quick kickoff call." },
 ];
 
@@ -53,30 +53,23 @@ export default function ConciergeIntakePage({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ParseAny = Parse as any;
 
-  // Load any prior partial intake on mount
+  // Prefill on mount: merges what's already saved with the rep-entered lead
+  // and the owner's account, so we never re-ask what we already know.
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      try {
-        const cal = await new ParseAny.Query("Groups").get(calendarId);
-        const intakeQ = new ParseAny.Query("ConciergeAccountIntake");
-        intakeQ.equalTo("calendar", cal);
-        const existing = await intakeQ.first();
-        if (!mounted || !existing) return;
+    ParseAny.Cloud.run("getConciergeIntakePrefill", { calendarId })
+      .then((r: { values?: Record<SectionId, Values>; sectionsCompleted?: SectionId[] }) => {
+        if (!mounted) return;
         const next: Record<SectionId, Values> = {
           about: {}, spaces: {}, budget: {}, vibe: {}, members: {}, wrap: {},
         };
-        // We can't iterate Parse fields generically without a list — copy known ones lazily
         SECTIONS.forEach(({ id }) => {
-          (next[id] as Record<string, unknown>)._loaded = true;
+          next[id] = { ...(r?.values?.[id] || {}) };
         });
         setValues(next);
-        const sc = (existing.get("sectionsCompleted") as SectionId[]) || [];
-        setCompleted(new Set(sc));
-      } catch (err) {
-        console.warn("[Concierge] intake prefetch failed:", err);
-      }
-    })();
+        setCompleted(new Set(r?.sectionsCompleted || []));
+      })
+      .catch((err: unknown) => console.warn("[Concierge] intake prefill failed:", err));
     return () => { mounted = false; };
   }, [calendarId, ParseAny]);
 
@@ -237,11 +230,11 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
           <TextField label="Contact email" type="email" value={values.contactEmail as string} onChange={(v) => onChange("contactEmail", v)} />
           <TextField label="Contact phone" value={values.contactPhone as string} onChange={(v) => onChange("contactPhone", v)} />
           <SelectField
-            label="Building type"
+            label="Community type"
             value={values.buildingType as string}
             onChange={(v) => onChange("buildingType", v)}
             options={[
-              { value: "apartment", label: "Apartment" },
+              { value: "apartment", label: "Apartment complex" },
               { value: "condo", label: "Condo" },
               { value: "co_op", label: "Co-op" },
               { value: "congregation", label: "Religious / congregation" },
@@ -249,7 +242,9 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
               { value: "other", label: "Other" },
             ]}
           />
-          <NumberField label="Unit count" value={values.unitCount as number} onChange={(v) => onChange("unitCount", v)} />
+          {values.buildingType === "apartment" && (
+            <NumberField label="Unit count" value={values.unitCount as number} onChange={(v) => onChange("unitCount", v)} />
+          )}
           <NumberField label="Estimated members" value={values.estimatedMembers as number} onChange={(v) => onChange("estimatedMembers", v)} />
         </div>
       );
@@ -355,7 +350,7 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
             options={["email_list", "building_app", "printed_flyers", "text_blast", "word_of_mouth"]}
           />
           <SelectField
-            label="Building voice"
+            label="Community voice"
             value={values.buildingVoice as string}
             onChange={(v) => onChange("buildingVoice", v)}
             options={[

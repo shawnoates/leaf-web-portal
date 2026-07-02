@@ -89,29 +89,10 @@ export default function ConciergeEnrollPage({
     };
   }, [calendarId, router]);
 
-  const handleContinue = async () => {
+  const handleContinue = () => {
+    // Questions come before payment — go to intake; checkout happens at the end.
     setSubmitting(true);
-    setError(null);
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ParseAny = Parse as any;
-      const result = await ParseAny.Cloud.run("createConciergeCheckout", {
-        calendarId,
-        billingPeriod: "monthly",
-        returnUrl: typeof window !== "undefined"
-          ? `${window.location.origin}/organizations/enroll/${calendarId}/intake`
-          : undefined,
-      });
-      if (result?.url) {
-        window.location.href = result.url;
-      } else {
-        throw new Error("Checkout URL missing from response");
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to start checkout.";
-      setError(message);
-      setSubmitting(false);
-    }
+    router.push(`/organizations/enroll/${calendarId}/intake`);
   };
 
   if (loading) {
