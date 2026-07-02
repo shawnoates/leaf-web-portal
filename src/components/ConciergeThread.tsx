@@ -78,8 +78,12 @@ export default function ConciergeThread({ calendarId }: { calendarId: string }) 
     }
   };
 
-  const fmtTime = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const me = Parse.User.current() as any;
+  const myAvatar =
+    me?.get?.("profilePicture")?.url?.() ||
+    me?.get?.("profilePhoto")?.url?.() ||
+    null;
 
   return (
     <div className="max-w-2xl">
@@ -113,21 +117,38 @@ export default function ConciergeThread({ calendarId }: { calendarId: string }) 
         ) : (
           messages.map((m) => {
             const mine = m.senderRole === "owner";
+            const avatarUrl = mine ? myAvatar : persona.avatarUrl;
             return (
-              <div key={m.objectId} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
-                <div
-                  className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
-                    mine
-                      ? "bg-zinc-900 text-white rounded-br-sm"
-                      : "bg-white border border-zinc-200 text-zinc-800 rounded-bl-sm"
-                  }`}
-                >
-                  {!mine && (
-                    <div className="text-[11px] font-semibold text-emerald-600 mb-0.5">{m.authorName}</div>
+              <div
+                key={m.objectId}
+                className={`flex items-start gap-2 ${mine ? "flex-row-reverse" : "flex-row"}`}
+              >
+                <div className="w-8 shrink-0">
+                  {avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={avatarUrl} alt={m.authorName} className="w-8 h-8 rounded-full object-cover" />
+                  ) : mine ? (
+                    <div className="w-8 h-8 rounded-full bg-zinc-200 flex items-center justify-center text-zinc-600 text-xs font-bold">
+                      {(m.authorName || "?").charAt(0).toUpperCase()}
+                    </div>
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                      <Sparkles className="w-4 h-4 text-emerald-600" />
+                    </div>
                   )}
-                  <div className="whitespace-pre-wrap">{m.body}</div>
                 </div>
-                <span className="text-[10px] text-zinc-400 mt-1 px-1">{fmtTime(m.createdAt)}</span>
+                <div className={`max-w-[75%] flex flex-col ${mine ? "items-end" : "items-start"}`}>
+                  <span className="text-[11px] text-zinc-400 mb-0.5 px-1">{m.authorName}</span>
+                  <div
+                    className={`rounded-2xl px-3.5 py-2 text-sm ${
+                      mine
+                        ? "bg-zinc-900 text-white"
+                        : "bg-white border border-zinc-200 text-zinc-900"
+                    }`}
+                  >
+                    <span className="whitespace-pre-wrap break-words">{m.body}</span>
+                  </div>
+                </div>
               </div>
             );
           })

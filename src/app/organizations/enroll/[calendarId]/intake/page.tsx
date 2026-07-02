@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
@@ -73,7 +73,12 @@ export default function ConciergeIntakePage({
     return () => { mounted = false; };
   }, [calendarId, ParseAny]);
 
-  const currentSection = SECTIONS[stepIndex];
+  // Off-premise communities have no on-site spaces, so skip Spaces & logistics.
+  const activeSections = useMemo(
+    () => SECTIONS.filter((s) => s.id !== "spaces" || values.about.venueMode !== "off_premise"),
+    [values.about.venueMode]
+  );
+  const currentSection = activeSections[Math.min(stepIndex, activeSections.length - 1)];
 
   const updateField = useCallback((section: SectionId, key: string, value: unknown) => {
     setValues((prev) => ({
@@ -100,7 +105,7 @@ export default function ConciergeIntakePage({
     setError(null);
     try {
       await saveCurrentSection();
-      if (stepIndex < SECTIONS.length - 1) {
+      if (stepIndex < activeSections.length - 1) {
         setStepIndex(stepIndex + 1);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
@@ -141,7 +146,7 @@ export default function ConciergeIntakePage({
       <div className="border-b bg-white sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between">
           <p className="text-xs text-zinc-500">
-            Section {stepIndex + 1} of {SECTIONS.length}
+            Section {stepIndex + 1} of {activeSections.length}
           </p>
           <button
             onClick={handleSaveExit}
@@ -152,7 +157,7 @@ export default function ConciergeIntakePage({
           </button>
         </div>
         <div className="max-w-2xl mx-auto px-6 pb-3 flex gap-1">
-          {SECTIONS.map((s, i) => (
+          {activeSections.map((s, i) => (
             <div
               key={s.id}
               className={`flex-1 h-1 rounded-full ${
@@ -202,7 +207,7 @@ export default function ConciergeIntakePage({
           >
             {busy
               ? "Saving…"
-              : stepIndex === SECTIONS.length - 1
+              : stepIndex === activeSections.length - 1
               ? "Continue to payment →"
               : "Save & continue →"}
           </button>
@@ -247,6 +252,21 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
             <NumberField label="Unit count" value={values.unitCount as number} onChange={(v) => onChange("unitCount", v)} />
           )}
           <NumberField label="Estimated members" value={values.estimatedMembers as number} onChange={(v) => onChange("estimatedMembers", v)} />
+          <SelectField
+            label="Where do events happen?"
+            value={values.venueMode as string}
+            onChange={(v) => onChange("venueMode", v)}
+            options={[
+              { value: "on_premise", label: "At our own spaces (on-site)" },
+              { value: "off_premise", label: "At outside venues (off-site)" },
+              { value: "mixed", label: "A mix of both" },
+            ]}
+          />
+          {values.venueMode === "off_premise" && (
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Since your events are off-site, we&apos;ll skip the spaces &amp; logistics questions.
+            </p>
+          )}
         </div>
       );
     case "spaces":
