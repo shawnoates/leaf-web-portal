@@ -20,6 +20,7 @@ interface BannerState {
   kind:
     | "none"
     | "eligible"
+    | "enrolling"
     | "cancelling"
     | "paused_voluntary"
     | "paused_involuntary"
@@ -62,6 +63,8 @@ export default function ConciergeDashboardBanner({ calendarId }: { calendarId: s
       else if (sub === "paused") {
         kind = pauseReason === "involuntary_past_due" ? "paused_involuntary" : "paused_voluntary";
       } else if (sub === "past_due") kind = "past_due";
+      // Started enrollment (checkout created) but hasn't completed payment.
+      else if (eligibility === "enrolling" || sub === "pending") kind = "enrolling";
       else if (["eligible", "invited"].includes(eligibility) && !["active", "pending"].includes(sub || ""))
         kind = "eligible";
 
@@ -154,6 +157,14 @@ export default function ConciergeDashboardBanner({ calendarId }: { calendarId: s
               </span>
             </>
           )}
+          {state.kind === "enrolling" && (
+            <>
+              <strong className="font-semibold">Finish setting up Concierge.</strong>{" "}
+              <span className="text-zinc-300">
+                You started enrolling — pick up where you left off.
+              </span>
+            </>
+          )}
           {state.kind === "cancelling" && (
             <>
               <strong className="font-semibold">
@@ -189,6 +200,14 @@ export default function ConciergeDashboardBanner({ calendarId }: { calendarId: s
               className="bg-white text-zinc-900 px-4 py-2 text-xs font-semibold rounded-full hover:bg-white/90"
             >
               Start enrollment
+            </Link>
+          )}
+          {state.kind === "enrolling" && (
+            <Link
+              href={`/organizations/enroll/${calendarId}`}
+              className="bg-white text-zinc-900 px-4 py-2 text-xs font-semibold rounded-full hover:bg-white/90"
+            >
+              Resume enrollment
             </Link>
           )}
           {state.kind === "cancelling" && (
