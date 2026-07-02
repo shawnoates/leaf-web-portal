@@ -7,13 +7,12 @@ import Parse from "@/lib/parse-client";
 import { Check } from "lucide-react";
 
 /**
- * Concierge enrollment — Step 3 of 3: intake form.
+ * Concierge enrollment — Step 2 of 3: intake questions (before payment).
  *
- * Six sections, save & continue per section, save & exit at any point.
- * Submits via `submitConciergeIntake` Cloud function which fires the
- * concierge_assigned transition and queues first menu curation.
- *
- * Reached after Stripe Checkout success returns the user here.
+ * Save & continue per section, save & exit at any point. The final step calls
+ * `submitConciergeIntake` (saves answers only — no enrollment) then
+ * `createConciergeCheckout` to send the owner to Stripe. Enrollment goes live
+ * in the checkout webhook once payment clears.
  */
 
 type SectionId = "about" | "spaces" | "vibe" | "members" | "wrap";
