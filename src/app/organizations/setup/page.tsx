@@ -15,20 +15,7 @@ import {
 } from "lucide-react";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
-
-// --- Constants ---
-
-const ORG_TYPES = [
-  { value: "community", label: "Friends / Community", emoji: "\u{1F31F}" },
-  { value: "apartment_complex", label: "Apartment Complex", emoji: "\u{1F3E2}" },
-  { value: "gym", label: "Gym / Fitness", emoji: "\u{1F3CB}\u{FE0F}" },
-  { value: "church", label: "Church", emoji: "⛪" },
-  { value: "school", label: "School / University", emoji: "\u{1F393}" },
-  { value: "company", label: "Company", emoji: "\u{1F3E2}" },
-  { value: "brick_and_mortar", label: "Brick & Mortar", emoji: "\u{1F3EA}" },
-  { value: "consumer_brand", label: "Consumer Brand", emoji: "\u{1F4E6}" },
-  { value: "other", label: "Other", emoji: "\u{1F4CC}" },
-];
+import { ORG_TYPES } from "@/lib/orgTypes";
 
 const GENERATION_MESSAGES = [
   "Finding venues near you...",

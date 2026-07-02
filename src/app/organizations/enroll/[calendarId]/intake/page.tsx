@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { Check } from "lucide-react";
+import { ORG_TYPES } from "@/lib/orgTypes";
 
 /**
  * Concierge enrollment — Step 2 of 3: intake questions (before payment).
@@ -231,16 +232,12 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
             label="Community type"
             value={values.buildingType as string}
             onChange={(v) => onChange("buildingType", v)}
-            options={[
-              { value: "apartment", label: "Apartment complex" },
-              { value: "condo", label: "Condo" },
-              { value: "co_op", label: "Co-op" },
-              { value: "congregation", label: "Religious / congregation" },
-              { value: "community", label: "Community / club" },
-              { value: "other", label: "Other" },
-            ]}
+            options={ORG_TYPES.map((t) => ({
+              value: t.value,
+              label: `${t.emoji}  ${t.label}`,
+            }))}
           />
-          {values.buildingType === "apartment" && (
+          {values.buildingType === "apartment_complex" && (
             <NumberField label="Unit count" value={values.unitCount as number} onChange={(v) => onChange("unitCount", v)} />
           )}
           <NumberField label="Estimated members" value={values.estimatedMembers as number} onChange={(v) => onChange("estimatedMembers", v)} />
