@@ -166,21 +166,24 @@ export default function ConciergeEnrollPage({
           Upgrade {calendar.name} to Concierge
         </h1>
         <p className="text-sm text-zinc-500 mb-10">
-          We curate, you choose. One menu of options each month.
+          A dedicated host to plan, post, and show up for your community — every
+          month. You approve the picks, we run them.
         </p>
 
-        <div className="bg-white border border-zinc-200 rounded-2xl p-6 mb-8 space-y-4">
-          <div className="flex justify-between text-sm">
-            <span className="text-zinc-500">You&apos;re on</span>
+        <div className="bg-white border border-zinc-200 rounded-2xl p-6 mb-8">
+          <div className="flex items-baseline gap-4 text-sm">
+            <span className="text-zinc-500 w-24 shrink-0">You&apos;re on</span>
             <span className="font-medium">{fromTierLabel}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-zinc-500">Upgrading to</span>
+          <div className="flex items-baseline gap-4 text-sm mt-2.5">
+            <span className="text-zinc-500 w-24 shrink-0">Upgrading to</span>
             <span className="font-medium">Concierge · $499/mo</span>
           </div>
           {calendar.tier === "pro" && (
-            <p className="text-xs text-zinc-500 italic">
-              Pro pauses while Concierge is active. We&apos;ll prorate any unused Pro time.
+            <p className="text-xs text-zinc-500 italic mt-4">
+              Concierge includes everything in Pro, so your current Pro plan ends
+              when Concierge starts — you&apos;re credited for the days you already
+              paid but won&apos;t use.
             </p>
           )}
         </div>
@@ -190,10 +193,12 @@ export default function ConciergeEnrollPage({
             Included
           </p>
           <ul className="space-y-2 text-sm">
-            <FeatureLine>3–4 curated options each month, picked for your building</FeatureLine>
-            <FeatureLine>Sara, your concierge — backed by the Leaf team</FeatureLine>
-            <FeatureLine>Promo kit + member coordination for every event</FeatureLine>
-            <FeatureLine>$100 welcome credit on your first upcharge option</FeatureLine>
+            <FeatureLine>Plans posted for you — drafted, scheduled, and published to your calendar on a steady cadence</FeatureLine>
+            <FeatureLine>Hosted on your behalf — a real person shows up, greets attendees, and represents your community</FeatureLine>
+            <FeatureLine>RSVP &amp; chat management — from approvals to day-of reminders, handled for you</FeatureLine>
+            <FeatureLine>3–4 curated options each month, picked for your community</FeatureLine>
+            <FeatureLine>A dedicated concierge, backed by the Leaf OS team</FeatureLine>
+            <FeatureLine>$100 welcome credit toward your first add-on event</FeatureLine>
             <FeatureLine>Cancel anytime — your calendar stays</FeatureLine>
           </ul>
         </div>
@@ -205,7 +210,7 @@ export default function ConciergeEnrollPage({
           </div>
           <div className="flex justify-between text-xs text-zinc-500">
             <span>Welcome credit</span>
-            <span>$100.00 (auto-applied)</span>
+            <span>$100.00 toward your first add-on event</span>
           </div>
         </div>
 
