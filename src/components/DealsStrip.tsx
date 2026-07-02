@@ -33,14 +33,29 @@ export interface Deal {
   } | null;
 }
 
-// Two-state segment control for the strip header. Trending = unique
-// interest count in the past 90 days; Newest = createdAt DESC (default).
+// Fisher-Yates shuffle. Used for the default "random" sort so the deal
+// strip order varies on every page load — prevents the same handful of
+// deals from always leading and gives every advertiser fairer exposure.
+// Non-mutating: returns a fresh array.
+function shuffle<T>(input: T[]): T[] {
+  const arr = input.slice();
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// Segment control for the strip header. Trending = unique interest count
+// in the past 90 days; Newest = createdAt DESC. The default page-load
+// state is "random" (neither button highlighted) — visitors see fresh
+// order each visit, but can lock in a stable sort by clicking either.
 function SortToggle({
   value,
   onChange,
   size = "regular",
 }: {
-  value: "recent" | "popular90d";
+  value: "random" | "recent" | "popular90d";
   onChange: (v: "recent" | "popular90d") => void;
   size?: "compact" | "regular";
 }) {
@@ -192,13 +207,26 @@ export default function DealsStrip({
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [viewAllOpen, setViewAllOpen] = useState(false);
-  const [sortBy, setSortBy] = useState<"recent" | "popular90d">("recent");
+  // Default is "random" — visitors get a fresh order on every page load.
+  // Backend has no random mode, so we fetch by "recent" and shuffle
+  // client-side. Clicking Trending / Newest switches to a stable server
+  // sort for the rest of the visit.
+  const [sortBy, setSortBy] = useState<"random" | "recent" | "popular90d">(
+    "random"
+  );
 
   useEffect(() => {
     if (!calendarId) return;
     setLoaded(false);
-    Parse.Cloud.run("listDealsForCalendar", { calendarId, sortBy })
-      .then((r: ListResponse) => setDeals(r.deals || []))
+    const serverSort = sortBy === "random" ? "recent" : sortBy;
+    Parse.Cloud.run("listDealsForCalendar", {
+      calendarId,
+      sortBy: serverSort,
+    })
+      .then((r: ListResponse) => {
+        const list = r.deals || [];
+        setDeals(sortBy === "random" ? shuffle(list) : list);
+      })
       .catch(() => setDeals([]))
       .finally(() => setLoaded(true));
   }, [calendarId, sortBy]);
