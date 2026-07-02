@@ -193,6 +193,7 @@ function RsvpModal({
   const [rsvpNote, setRsvpNote] = useState("");
   const [sharePhone, setSharePhone] = useState(true);
   const [isPendingResult, setIsPendingResult] = useState(false);
+  const [isHostResult, setIsHostResult] = useState(false);
   const [notificationId, setNotificationId] = useState<string | null>(null);
 
   const isVerified = step === "verified";
@@ -252,6 +253,7 @@ function RsvpModal({
         | {
             eventNotificationId?: string;
             pendingApproval?: boolean;
+            isHost?: boolean;
             locationName?: string | null;
             address?: string | null;
           }
@@ -266,6 +268,7 @@ function RsvpModal({
         setNotificationId(result.eventNotificationId);
       }
       if (result?.pendingApproval) setIsPendingResult(true);
+      if (result?.isHost) setIsHostResult(true);
       // Server returns name + address on confirmed (Accepted/Owned) RSVPs;
       // pending requests come back with both null and stay redacted until
       // the host approves.
@@ -448,12 +451,18 @@ function RsvpModal({
             </div>
             <div>
               <h4 className="text-2xl font-light mb-2">
-                {isPendingResult ? "Request Sent!" : "You’re in!"}
+                {isPendingResult
+                  ? "Request Sent!"
+                  : isHostResult
+                    ? "You’re hosting this plan"
+                    : "You’re in!"}
               </h4>
               <p className="text-sm text-zinc-500 max-w-xs mx-auto">
                 {isPendingResult
                   ? "You’ll receive a text when your request is approved."
-                  : "Coordinate with the group. Join the Plan Chat."}
+                  : isHostResult
+                    ? "Open the Plan Chat in Leaf to coordinate with your attendees."
+                    : "Coordinate with the group. Join the Plan Chat."}
               </p>
             </div>
 
