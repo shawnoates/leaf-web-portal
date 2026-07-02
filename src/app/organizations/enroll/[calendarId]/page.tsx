@@ -181,9 +181,7 @@ export default function ConciergeEnrollPage({
           </div>
           {calendar.tier === "pro" && (
             <p className="text-xs text-zinc-500 italic mt-4">
-              Concierge includes everything in Pro, so your current Pro plan ends
-              when Concierge starts — you&apos;re credited for the days you already
-              paid but won&apos;t use.
+              Concierge includes everything in Pro, plus a dedicated host to run it.
             </p>
           )}
         </div>
@@ -193,25 +191,32 @@ export default function ConciergeEnrollPage({
             Included
           </p>
           <ul className="space-y-2 text-sm">
-            <FeatureLine>Plans posted for you — drafted, scheduled, and published to your calendar on a steady cadence</FeatureLine>
-            <FeatureLine>Hosted on your behalf — a real person shows up, greets attendees, and represents your community</FeatureLine>
-            <FeatureLine>RSVP &amp; chat management — from approvals to day-of reminders, handled for you</FeatureLine>
+            <FeatureLine>One done-for-you event every month — you approve the picks</FeatureLine>
             <FeatureLine>3–4 curated options each month, picked for your community</FeatureLine>
             <FeatureLine>A dedicated concierge, backed by the Leaf OS team</FeatureLine>
-            <FeatureLine>$100 welcome credit toward your first add-on event</FeatureLine>
+            <FeatureLine>Promo kit, RSVPs &amp; vendor coordination handled — standard vendor costs covered by Leaf</FeatureLine>
             <FeatureLine>Cancel anytime — your calendar stays</FeatureLine>
           </ul>
         </div>
 
+        {/* The Leaf Concierge Guarantee — the risk-reversal (replaces the old
+            welcome-credit framing). Tier 1: first event unconditional; Tier 2:
+            make-it-right on every event after. */}
+        <div className="border border-emerald-200 bg-emerald-50/60 rounded-2xl p-6 mb-8">
+          <p className="text-sm font-semibold text-emerald-900 mb-1">The Leaf Concierge Guarantee</p>
+          <p className="text-sm text-emerald-900/80 leading-relaxed">
+            Don&apos;t love your first event? Get that month back, no questions asked.
+            And every month after, if an event doesn&apos;t land, we&apos;ll make it
+            right — refund or a comped event, your call. Just tell us within 7 days.
+          </p>
+        </div>
+
         <div className="bg-white border border-zinc-200 rounded-2xl p-6 mb-8">
-          <div className="flex justify-between text-sm mb-2">
+          <div className="flex justify-between text-sm">
             <span>Today&apos;s charge</span>
             <span className="font-medium">$499.00</span>
           </div>
-          <div className="flex justify-between text-xs text-zinc-500">
-            <span>Welcome credit</span>
-            <span>$100.00 toward your first add-on event</span>
-          </div>
+          <p className="text-xs text-zinc-500 mt-1">Then $499/mo. Cancel anytime.</p>
         </div>
 
         {error && (
