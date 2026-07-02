@@ -98,7 +98,7 @@ export default function ConciergeIntakePage({
     setError(null);
     try {
       await saveCurrentSection();
-      if (stepIndex < activeSections.length - 1) {
+      if (stepIndex < SECTIONS.length - 1) {
         setStepIndex(stepIndex + 1);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
@@ -139,7 +139,7 @@ export default function ConciergeIntakePage({
       <div className="border-b bg-white sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between">
           <p className="text-xs text-zinc-500">
-            Section {stepIndex + 1} of {activeSections.length}
+            Section {stepIndex + 1} of {SECTIONS.length}
           </p>
           <button
             onClick={handleSaveExit}
@@ -150,7 +150,7 @@ export default function ConciergeIntakePage({
           </button>
         </div>
         <div className="max-w-2xl mx-auto px-6 pb-3 flex gap-1">
-          {activeSections.map((s, i) => (
+          {SECTIONS.map((s, i) => (
             <div
               key={s.id}
               className={`flex-1 h-1 rounded-full ${
@@ -200,7 +200,7 @@ export default function ConciergeIntakePage({
           >
             {busy
               ? "Saving…"
-              : stepIndex === activeSections.length - 1
+              : stepIndex === SECTIONS.length - 1
               ? "Continue to payment →"
               : "Save & continue →"}
           </button>
@@ -245,6 +245,11 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
             <NumberField label="Unit count" value={values.unitCount as number} onChange={(v) => onChange("unitCount", v)} />
           )}
           <NumberField label="Estimated members" value={values.estimatedMembers as number} onChange={(v) => onChange("estimatedMembers", v)} />
+        </div>
+      );
+    case "spaces":
+      return (
+        <div className="space-y-5">
           <SelectField
             label="Where do events happen?"
             value={values.venueMode as string}
@@ -255,50 +260,33 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
               { value: "mixed", label: "A mix of both" },
             ]}
           />
-          {values.venueMode === "off_premise" && (
+          {values.venueMode === "off_premise" ? (
             <p className="text-xs text-zinc-500 leading-relaxed">
-              Since your events are off-site, we&apos;ll skip the spaces &amp; logistics questions.
+              Since your events are off-site, we&apos;ll handle venue sourcing — nothing else needed here.
             </p>
-          )}
-        </div>
-      );
-    case "spaces":
-      return (
-        <div className="space-y-5">
-          <ChipMultiField
-            label="Available spaces"
-            value={(values.availableSpaces as string[]) || []}
-            onChange={(v) => onChange("availableSpaces", v)}
-            options={["rooftop", "indoor_lounge", "courtyard", "gym", "lobby", "co_working", "pool_deck", "other"]}
-          />
-          <NumberField label="Largest space capacity" value={values.largestSpaceCapacity as number} onChange={(v) => onChange("largestSpaceCapacity", v)} />
-          <SelectField
-            label="Outdoor capability"
-            value={values.outdoorCapability as string}
-            onChange={(v) => onChange("outdoorCapability", v)}
-            options={[
-              { value: "yes", label: "Yes" },
-              { value: "seasonal", label: "Seasonal" },
-              { value: "no", label: "No" },
-            ]}
-          />
-          <TextField label="Access window" placeholder="e.g. weekdays after 6pm, weekends 10am–10pm" value={values.accessWindow as string} onChange={(v) => onChange("accessWindow", v)} />
-          <ToggleField label="COI required for vendors" value={values.coiRequired as boolean} onChange={(v) => onChange("coiRequired", v)} />
-        </div>
-      );
-    case "budget":
-      return (
-        <div className="space-y-5">
-          <SelectField
-            label="How involved do you want to be?"
-            value={values.autonomyMode as string}
-            onChange={(v) => onChange("autonomyMode", v)}
-            options={[
-              { value: "approve", label: "I'll choose from the options each month" },
-              { value: "veto_window", label: "Show me the plan — I'll speak up if I don't love it" },
-              { value: "autopilot", label: "You decide; just keep me in the loop" },
-            ]}
-          />
+          ) : values.venueMode ? (
+            <>
+              <ChipMultiField
+                label="Available spaces"
+                value={(values.availableSpaces as string[]) || []}
+                onChange={(v) => onChange("availableSpaces", v)}
+                options={["rooftop", "indoor_lounge", "courtyard", "gym", "lobby", "co_working", "pool_deck", "other"]}
+              />
+              <NumberField label="Largest space capacity" value={values.largestSpaceCapacity as number} onChange={(v) => onChange("largestSpaceCapacity", v)} />
+              <SelectField
+                label="Outdoor capability"
+                value={values.outdoorCapability as string}
+                onChange={(v) => onChange("outdoorCapability", v)}
+                options={[
+                  { value: "yes", label: "Yes" },
+                  { value: "seasonal", label: "Seasonal" },
+                  { value: "no", label: "No" },
+                ]}
+              />
+              <TextField label="Access window" placeholder="e.g. weekdays after 6pm, weekends 10am–10pm" value={values.accessWindow as string} onChange={(v) => onChange("accessWindow", v)} />
+              <ToggleField label="COI required for vendors" value={values.coiRequired as boolean} onChange={(v) => onChange("coiRequired", v)} />
+            </>
+          ) : null}
         </div>
       );
     case "vibe":
