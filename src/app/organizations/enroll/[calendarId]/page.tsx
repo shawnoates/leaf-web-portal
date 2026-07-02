@@ -199,16 +199,23 @@ export default function ConciergeEnrollPage({
           </ul>
         </div>
 
-        {/* The Leaf Concierge Guarantee — the risk-reversal (replaces the old
-            welcome-credit framing). Tier 1: first event unconditional; Tier 2:
-            make-it-right on every event after. */}
-        <div className="border border-emerald-200 bg-emerald-50/60 rounded-2xl p-6 mb-8">
-          <p className="text-sm font-semibold text-emerald-900 mb-1">The Leaf Concierge Guarantee</p>
-          <p className="text-sm text-emerald-900/80 leading-relaxed">
-            Don&apos;t love your first event? Get that month back, no questions asked.
-            And every month after, if an event doesn&apos;t land, we&apos;ll make it
-            right — refund or a comped event, your call. Just tell us within 7 days.
-          </p>
+        {/* The Leaf OS Guarantee — prominent risk-reversal seal (replaces the
+            old welcome-credit framing). Tier 1: first event unconditional;
+            Tier 2: make-it-right on every event after. */}
+        <div className="border-2 border-emerald-500/40 bg-emerald-50 rounded-2xl p-6 mb-8 flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
+          <div className="shrink-0 w-24 h-24 rounded-full bg-emerald-600 text-white flex flex-col items-center justify-center text-center leading-none shadow-lg shadow-emerald-600/25 ring-4 ring-emerald-600/15">
+            <span className="text-2xl font-extrabold tracking-tight">100%</span>
+            <span className="text-[9px] font-bold uppercase tracking-[0.15em] mt-1">Guarantee</span>
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-emerald-900 mb-1.5">The Leaf OS Guarantee</h3>
+            <p className="text-sm text-emerald-900/80 leading-relaxed">
+              Don&apos;t love your first event? Get that month back, no questions
+              asked. And every month after, if an event doesn&apos;t land, we&apos;ll
+              make it right — refund or a comped event, your call. Just tell us
+              within 7 days.
+            </p>
+          </div>
         </div>
 
         <div className="bg-white border border-zinc-200 rounded-2xl p-6 mb-8">
