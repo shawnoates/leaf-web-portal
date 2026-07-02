@@ -162,6 +162,8 @@ interface OrgDashboard {
     hidePlanIdeas: boolean;
     hideCustomPlans: boolean;
     hideDeals: boolean;
+    merchantEventsOptOut: boolean;
+    merchantEventsRequireApproval: boolean;
     pendingFollowerCount: number;
     isConciergeServiced?: boolean;
   }[];
@@ -323,12 +325,10 @@ export default function OrgDashboardPage() {
   const [settingsImageStyle, setSettingsImageStyle] = useState("default");
   const [settingsHidePlanIdeas, setSettingsHidePlanIdeas] = useState(false);
   const [settingsHideCustomPlans, setSettingsHideCustomPlans] = useState(false);
-  // Local-business (merchant-paid) event policy for this calendar.
-  const [settingsMerchantOptOut, setSettingsMerchantOptOut] = useState(false);
-  const [settingsMerchantRequireApproval, setSettingsMerchantRequireApproval] =
-    useState(false);
-  const [merchantPolicySaving, setMerchantPolicySaving] = useState(false);
-  // Pending business-event requests (concierge second gate) for this calendar.
+  // Pending business-event requests for THIS org's primary calendar.
+  // The banner links to the primary calendar's edit page where owners can
+  // review + decide. Per-child-calendar approvals live on each child's own
+  // edit page.
   const [eventApprovals, setEventApprovals] = useState<
     {
       objectId: string;
@@ -337,7 +337,6 @@ export default function OrgDashboardPage() {
       eventDate: string | null;
     }[]
   >([]);
-  const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null);
 
   const loadEventApprovals = useCallback(async () => {
     try {
@@ -351,48 +350,6 @@ export default function OrgDashboardPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarId]);
-
-  const decideEventApproval = useCallback(
-    async (approvalId: string, approve: boolean) => {
-      setApprovalBusyId(approvalId);
-      try {
-        await Parse.Cloud.run("decideCalendarEventApproval", {
-          approvalId,
-          approve,
-        });
-        setEventApprovals((prev) =>
-          prev.filter((a) => a.objectId !== approvalId)
-        );
-      } finally {
-        setApprovalBusyId(null);
-      }
-    },
-    []
-  );
-
-  // Optimistically toggle the merchant-events policy; revert on failure.
-  const saveMerchantPolicy = async (patch: {
-    optOut?: boolean;
-    requireApproval?: boolean;
-  }) => {
-    const prevOptOut = settingsMerchantOptOut;
-    const prevRequire = settingsMerchantRequireApproval;
-    if (typeof patch.optOut === "boolean") setSettingsMerchantOptOut(patch.optOut);
-    if (typeof patch.requireApproval === "boolean")
-      setSettingsMerchantRequireApproval(patch.requireApproval);
-    setMerchantPolicySaving(true);
-    try {
-      await Parse.Cloud.run("setCalendarMerchantEventPolicy", {
-        calendarId,
-        ...patch,
-      });
-    } catch {
-      setSettingsMerchantOptOut(prevOptOut);
-      setSettingsMerchantRequireApproval(prevRequire);
-    } finally {
-      setMerchantPolicySaving(false);
-    }
-  };
   useEffect(() => {
     // Load once on mount so the top banner can surface pending requests from
     // any tab. Server-gated to the owner; non-owners get an empty list.
@@ -458,58 +415,6 @@ export default function OrgDashboardPage() {
 
   // Regenerate (per calendar)
   const [regeneratingCalId, setRegeneratingCalId] = useState<string | null>(null);
-
-  // Edit calendar
-  const [editingCalId, setEditingCalId] = useState<string | null>(null);
-  const [editCalName, setEditCalName] = useState("");
-  const [editCalDesc, setEditCalDesc] = useState("");
-  const [editCalSlug, setEditCalSlug] = useState("");
-  const [editCalCity, setEditCalCity] = useState("");
-  const [editCalCitySelected, setEditCalCitySelected] = useState(false);
-  const [editCalLat, setEditCalLat] = useState<number | null>(null);
-  const [editCalLng, setEditCalLng] = useState<number | null>(null);
-  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
-  const [slugChecking, setSlugChecking] = useState(false);
-  const [savingCal, setSavingCal] = useState(false);
-  const [editCalImagePreview, setEditCalImagePreview] = useState<string | null>(null);
-  const [editCalImageBase64, setEditCalImageBase64] = useState<string | null>(null);
-  const [editCalRemoveImage, setEditCalRemoveImage] = useState(false);
-  const [editCalHideVenue, setEditCalHideVenue] = useState(true);
-  const [editCalRequireApprovalDefault, setEditCalRequireApprovalDefault] = useState(false);
-  const [editCalIsPrivate, setEditCalIsPrivate] = useState(false);
-  const [editCalHidePlanIdeas, setEditCalHidePlanIdeas] = useState(false);
-  const [editCalHideDeals, setEditCalHideDeals] = useState(false);
-  const [editCalHideCustomPlans, setEditCalHideCustomPlans] = useState(false);
-  const [editPrivacyOpen, setEditPrivacyOpen] = useState(false);
-  const [editFeaturesOpen, setEditFeaturesOpen] = useState(false);
-  const slugTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const originalSlugRef = useRef<string>("");
-
-  function handleSlugChange(raw: string) {
-    const cleaned = raw.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").slice(0, 40);
-    setEditCalSlug(cleaned);
-    setSlugAvailable(null);
-    if (slugTimerRef.current) clearTimeout(slugTimerRef.current);
-    if (cleaned === originalSlugRef.current) {
-      setSlugAvailable(null);
-      return;
-    }
-    if (cleaned.length < 3) {
-      setSlugAvailable(false);
-      return;
-    }
-    setSlugChecking(true);
-    slugTimerRef.current = setTimeout(async () => {
-      try {
-        const result = await Parse.Cloud.run("checkSlugAvailable", { slug: cleaned, excludeCalendarId: editingCalId });
-        setSlugAvailable(result.available);
-      } catch {
-        setSlugAvailable(null);
-      } finally {
-        setSlugChecking(false);
-      }
-    }, 400);
-  }
 
   // Plan detail modal
   const [selectedActivePlan, setSelectedActivePlan] = useState<{
@@ -617,10 +522,6 @@ export default function OrgDashboardPage() {
       setSettingsExcludeKeywords(result.excludeKeywords || []);
       setSettingsBrandColor(result.brandColor);
       setSettingsImageStyle(result.imageStyle || "default");
-      setSettingsMerchantOptOut(result.merchantEventsOptOut || false);
-      setSettingsMerchantRequireApproval(
-        result.merchantEventsRequireApproval || false
-      );
       setSettingsHidePlanIdeas(result.hidePlanIdeas || false);
       setSettingsHideCustomPlans(result.hideCustomPlans || false);
       if (result.leafAppConnected) setLeafAppConnected(true);
@@ -643,32 +544,18 @@ export default function OrgDashboardPage() {
     if (user) fetchDashboard();
   }, [user, fetchDashboard]);
 
-  // Auto-open Edit Calendar modal when ?editCal=<id> is in the URL
+  // Legacy compat: ?editCal=<id> used to open a modal on this page. The
+  // edit surface is now its own route — redirect once dashboard is loaded
+  // enough to know the calendar exists and is accessible.
   useEffect(() => {
     if (!dashboard) return;
     const editCalParam = searchParams.get("editCal");
     if (!editCalParam) return;
     const cal = dashboard.calendars.find((c) => c.objectId === editCalParam);
     if (cal) {
-      setEditingCalId(cal.objectId);
-      setEditCalName(cal.name);
-      setEditCalDesc(cal.description || "");
-      setEditCalSlug(cal.shareId || "");
-      originalSlugRef.current = cal.shareId || "";
-      setSlugAvailable(null);
-      setEditCalCity(cal.city || "");
-      setEditCalCitySelected(false);
-      setEditCalImagePreview(cal.calendarImage || null);
-      setEditCalImageBase64(null);
-      setEditCalRemoveImage(false);
-      setEditCalHideVenue(cal.hideVenueUntilRsvp !== false);
-      setEditCalRequireApprovalDefault(cal.requireApprovalDefault === true);
-      setEditCalIsPrivate(cal.isPrivate || false);
-      setEditCalHidePlanIdeas(cal.hidePlanIdeas || false);
-      setEditCalHideCustomPlans(cal.hideCustomPlans || false);
-      setActiveTab("calendars");
+      router.replace(`/dashboard/${calendarId}/calendars/${cal.objectId}/edit`);
     }
-  }, [dashboard, searchParams]);
+  }, [dashboard, searchParams, router, calendarId]);
 
   // Auto-open the plan detail modal when ?openPoll=<eventGroupId> is in the URL.
   // Used by the "Pick a date" button in the poll-expired notification email.
@@ -803,55 +690,6 @@ export default function OrgDashboardPage() {
   }, [activeTab, analyticsRange, analyticsCalFilter, dashboard, fetchAnalytics]);
 
   // ── Handlers ──
-
-  async function handleSaveCalendar() {
-    if (!editingCalId) return;
-    setSavingCal(true);
-    try {
-      const params: Record<string, string | boolean | number> = {
-        calendarId: editingCalId,
-        name: editCalName,
-        description: editCalDesc,
-      };
-      if (editCalSlug !== originalSlugRef.current) {
-        params.slug = editCalSlug;
-      }
-      if (editCalCitySelected && editCalCity) {
-        params.city = editCalCity;
-        if (editCalLat != null && editCalLng != null) {
-          params.lat = editCalLat;
-          params.lng = editCalLng;
-        }
-      }
-      if (editCalImageBase64) {
-        params.imageBase64 = editCalImageBase64;
-      } else if (editCalRemoveImage) {
-        params.removeImage = true;
-      }
-      params.hideVenueUntilRsvp = editCalHideVenue;
-      params.requireApprovalDefault = editCalRequireApprovalDefault;
-      params.isPrivate = editCalIsPrivate;
-      params.hidePlanIdeas = editCalHidePlanIdeas;
-      params.hideCustomPlans = editCalHideCustomPlans;
-      params.hideDeals = editCalHideDeals;
-      const result = await Parse.Cloud.run("updateCalendar", params);
-      const newShareId = result.shareId;
-      const newCalImage = editCalRemoveImage ? null : (editCalImagePreview || null);
-      setDashboard((d) => d ? {
-        ...d,
-        calendars: d.calendars.map((c) =>
-          c.objectId === editingCalId ? { ...c, name: editCalName, description: editCalDesc, shareId: newShareId, city: editCalCity || c.city, calendarImage: editCalImageBase64 ? newCalImage : (editCalRemoveImage ? null : c.calendarImage), hideVenueUntilRsvp: editCalHideVenue, requireApprovalDefault: editCalRequireApprovalDefault, isPrivate: editCalIsPrivate, hidePlanIdeas: editCalHidePlanIdeas, hideCustomPlans: editCalHideCustomPlans, hideDeals: editCalHideDeals } : c
-        ),
-      } : d);
-      setEditingCalId(null);
-    } catch (err: unknown) {
-      console.error("Failed to update calendar:", err);
-      const msg = err instanceof Error ? err.message : "Failed to update calendar.";
-      alert(msg);
-    } finally {
-      setSavingCal(false);
-    }
-  }
 
   async function handleSaveOverview() {
     setSaving(true);
@@ -1221,15 +1059,12 @@ export default function OrgDashboardPage() {
         </div>
       </header>
 
-      {/* Pending business-event requests — thin banner, jumps to Settings */}
+      {/* Pending business-event requests — thin banner, jumps to the
+          primary calendar's edit page (where approvals now live). */}
       {dashboard.isOwner && eventApprovals.length > 0 && (
         <div className="max-w-5xl mx-auto px-6 pt-4">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("settings");
-              setSettingsSection("general");
-            }}
+          <Link
+            href={`/dashboard/${calendarId}/calendars/${calendarId}/edit`}
             className="w-full flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-left hover:bg-amber-100/70 transition-colors"
           >
             <span className="text-sm text-amber-900">
@@ -1241,7 +1076,7 @@ export default function OrgDashboardPage() {
             <span className="text-xs font-semibold text-amber-800 shrink-0">
               Review →
             </span>
-          </button>
+          </Link>
         </div>
       )}
 
@@ -2237,12 +2072,12 @@ export default function OrgDashboardPage() {
                           </button>
                         ) : (
                           <>
-                            <button
-                              onClick={() => { setEditingCalId(cal.objectId); setEditCalName(cal.name); setEditCalDesc(cal.description || ""); setEditCalSlug(cal.shareId || ""); originalSlugRef.current = cal.shareId || ""; setSlugAvailable(null); setEditCalCity(cal.city || ""); setEditCalCitySelected(false); setEditCalImagePreview(cal.calendarImage || null); setEditCalImageBase64(null); setEditCalRemoveImage(false); setEditCalHideVenue(cal.hideVenueUntilRsvp !== false); setEditCalRequireApprovalDefault(cal.requireApprovalDefault === true); setEditCalIsPrivate(cal.isPrivate || false); setEditCalHidePlanIdeas(cal.hidePlanIdeas || false); setEditCalHideCustomPlans(cal.hideCustomPlans || false); setEditCalHideDeals(cal.hideDeals || false); }}
+                            <Link
+                              href={`/dashboard/${calendarId}/calendars/${cal.objectId}/edit`}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
                             >
                               <Pencil className="w-3 h-3" /> Edit
-                            </button>
+                            </Link>
                             <Link
                               href={`/dashboard/${cal.objectId}/plans?orgId=${calendarId}`}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
@@ -2510,102 +2345,6 @@ export default function OrgDashboardPage() {
 
             {settingsSection === "general" && (
             <div className="space-y-8">
-            {/* Local business events */}
-            <div className="rounded-xl border border-zinc-200 p-4 sm:p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-zinc-900">
-                    Local business events
-                  </h3>
-                  <p className="text-xs text-zinc-500 mt-1 max-w-md">
-                    Let nearby businesses pay to host events on your calendar —
-                    tastings, classes, happy hours. Residents RSVP; you never get
-                    charged. We suppress SMS for these, so they only reach the app
-                    and email.
-                  </p>
-                </div>
-                <SettingsSwitch
-                  checked={!settingsMerchantOptOut}
-                  disabled={merchantPolicySaving}
-                  onChange={(allow) => saveMerchantPolicy({ optOut: !allow })}
-                  label="Allow local business events"
-                />
-              </div>
-
-              {!settingsMerchantOptOut && (
-                <div className="mt-4 pt-4 border-t border-zinc-100 flex items-start justify-between gap-4">
-                  <div>
-                    <h4 className="text-sm font-medium text-zinc-800">
-                      Review each event first
-                    </h4>
-                    <p className="text-xs text-zinc-500 mt-1 max-w-md">
-                      When on, a business event won&apos;t go live on your calendar
-                      until you approve it. When off, approved events publish
-                      automatically.
-                    </p>
-                  </div>
-                  <SettingsSwitch
-                    checked={settingsMerchantRequireApproval}
-                    disabled={merchantPolicySaving}
-                    onChange={(v) => saveMerchantPolicy({ requireApproval: v })}
-                    label="Require approval"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Pending business-event requests (concierge second gate) */}
-            {eventApprovals.length > 0 && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 sm:p-5">
-                <h3 className="text-sm font-semibold text-zinc-900">
-                  Business event requests
-                </h3>
-                <p className="text-xs text-zinc-500 mt-1">
-                  Approve to publish to your calendar, or decline.
-                </p>
-                <ul className="mt-3 space-y-2">
-                  {eventApprovals.map((a) => (
-                    <li
-                      key={a.objectId}
-                      className="flex items-center justify-between gap-3 bg-white border border-zinc-200 rounded-lg px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium truncate">
-                          {a.eventTitle}
-                        </div>
-                        <div className="text-xs text-zinc-500">
-                          {a.businessName || "A local business"}
-                          {a.eventDate
-                            ? ` · ${new Date(a.eventDate).toLocaleDateString(
-                                "en-US",
-                                { month: "short", day: "numeric" }
-                              )}`
-                            : ""}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          disabled={approvalBusyId === a.objectId}
-                          onClick={() => decideEventApproval(a.objectId, true)}
-                          className="text-xs font-medium px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          type="button"
-                          disabled={approvalBusyId === a.objectId}
-                          onClick={() => decideEventApproval(a.objectId, false)}
-                          className="text-xs font-medium px-3 py-1.5 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
-                        >
-                          Decline
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
             {/* Phone / Leaf App Connection */}
             <div className="flex items-center justify-between py-3 border-b border-zinc-100">
               <div className="flex items-center gap-2">
@@ -3515,299 +3254,6 @@ export default function OrgDashboardPage() {
         />
       )}
 
-      {/* Edit Calendar Modal */}
-      {editingCalId && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-lg rounded-t-2xl md:rounded-xl p-8 relative max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setEditingCalId(null)}
-              className="absolute top-4 right-4 p-2 rounded-full hover:bg-zinc-100"
-            >
-              <Plus className="w-5 h-5 rotate-45" />
-            </button>
-            <h2 className="text-xl font-light tracking-tight mb-6">Edit Calendar</h2>
-            <div className="space-y-4">
-              {/* Calendar image */}
-              <div className="flex items-center gap-4">
-                <div className="relative group">
-                  {editCalImagePreview ? (
-                    <img src={editCalImagePreview} alt="Calendar" className="w-16 h-16 rounded-xl object-cover" />
-                  ) : (
-                    <div className="w-16 h-16 rounded-xl bg-zinc-100 flex items-center justify-center">
-                      <ImagePlus className="w-6 h-6 text-zinc-300" />
-                    </div>
-                  )}
-                  <label className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                    <ImagePlus className="w-5 h-5 text-white" />
-                    <input
-                      type="file"
-                      accept={IMAGE_ACCEPT}
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5MB"); return; }
-                        try {
-                          const { preview, base64 } = await processImageFile(file);
-                          setEditCalImagePreview(preview);
-                          setEditCalImageBase64(base64);
-                          setEditCalRemoveImage(false);
-                        } catch {
-                          alert("Could not process this image. Please try a different file.");
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-zinc-500">Calendar image</p>
-                  <p className="text-xs text-zinc-400">Overrides org logo on public page</p>
-                  {editCalImagePreview && (
-                    <button
-                      onClick={() => { setEditCalImagePreview(null); setEditCalImageBase64(null); setEditCalRemoveImage(true); }}
-                      className="text-xs text-red-500 hover:text-red-700 mt-1"
-                    >
-                      Remove image
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name</label>
-                <input
-                  value={editCalName}
-                  onChange={(e) => setEditCalName(e.target.value)}
-                  className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
-                <textarea
-                  value={editCalDesc}
-                  onChange={(e) => setEditCalDesc(e.target.value)}
-                  rows={3}
-                  className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-y"
-                  placeholder="What is this calendar about?"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">URL Slug</label>
-                <div className="flex items-center gap-0">
-                  <span className="text-sm text-zinc-400 font-light whitespace-nowrap">os.joinleaf.com/org/</span>
-                  <input
-                    value={editCalSlug}
-                    onChange={(e) => handleSlugChange(e.target.value)}
-                    className="flex-1 border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 ml-1"
-                    placeholder="my-calendar"
-                  />
-                </div>
-                {editCalSlug && editCalSlug !== originalSlugRef.current && (
-                  <p className={`text-xs mt-1 ${slugChecking ? "text-zinc-400" : slugAvailable === true ? "text-green-600" : slugAvailable === false ? "text-red-500" : "text-zinc-400"}`}>
-                    {slugChecking ? "Checking..." : slugAvailable === true ? "Available!" : slugAvailable === false ? (editCalSlug.length < 3 ? "Must be at least 3 characters" : "Already taken") : ""}
-                  </p>
-                )}
-              </div>
-              {dashboard?.tier === "pro" && (
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">
-                    Location
-                  </label>
-                  <CityAutocomplete
-                    value={editCalCity}
-                    onChange={(v) => { setEditCalCity(v); setEditCalCitySelected(false); setEditCalLat(null); setEditCalLng(null); }}
-                    onSelect={(place) => {
-                      setEditCalCity(place.description);
-                      setEditCalCitySelected(true);
-                      if (place.lat != null && place.lng != null) {
-                        setEditCalLat(place.lat);
-                        setEditCalLng(place.lng);
-                      }
-                    }}
-                    placeholder="City, neighborhood, or building address"
-                    className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
-                  />
-                </div>
-              )}
-              {/* Privacy & access */}
-              <div className="border-t border-zinc-100 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setEditPrivacyOpen(!editPrivacyOpen)}
-                  className="w-full flex items-center justify-between py-2 group"
-                >
-                  <span className="text-xs font-bold uppercase tracking-widest text-zinc-400 group-hover:text-zinc-600 transition-colors">Privacy & access</span>
-                  <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${editPrivacyOpen ? "rotate-180" : ""}`} />
-                </button>
-                {editPrivacyOpen && (
-                  <div className="pb-1">
-                    <div className="flex items-center justify-between py-2">
-                      <div>
-                        <p className="text-xs font-medium text-zinc-700">Hide venue until RSVP</p>
-                        <p className="text-xs text-zinc-400">Show only neighborhood on public page</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setEditCalHideVenue(!editCalHideVenue)}
-                        className={`relative w-10 h-5 rounded-full transition-colors ${editCalHideVenue ? "bg-zinc-900" : "bg-zinc-200"}`}
-                      >
-                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalHideVenue ? "left-5" : "left-0.5"}`} />
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between py-2">
-                      <div>
-                        <p className="text-xs font-medium text-zinc-700">Require approval to attend by default</p>
-                        <p className="text-xs text-zinc-400">New plans require host approval before RSVPs are confirmed</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setEditCalRequireApprovalDefault(!editCalRequireApprovalDefault)}
-                        className={`relative w-10 h-5 rounded-full transition-colors ${editCalRequireApprovalDefault ? "bg-zinc-900" : "bg-zinc-200"}`}
-                      >
-                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalRequireApprovalDefault ? "left-5" : "left-0.5"}`} />
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between py-2">
-                      <div>
-                        <p className="text-xs font-medium text-zinc-700">Private calendar</p>
-                        <p className="text-xs text-zinc-400">Visitors must request to follow before seeing plans</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setEditCalIsPrivate(!editCalIsPrivate)}
-                        className={`relative w-10 h-5 rounded-full transition-colors ${editCalIsPrivate ? "bg-zinc-900" : "bg-zinc-200"}`}
-                      >
-                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalIsPrivate ? "left-5" : "left-0.5"}`} />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Advanced settings */}
-              <div className="border-t border-zinc-100 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setEditFeaturesOpen(!editFeaturesOpen)}
-                  className="w-full flex items-center justify-between py-2 group"
-                >
-                  <span className="text-xs font-bold uppercase tracking-widest text-zinc-400 group-hover:text-zinc-600 transition-colors">Advanced settings</span>
-                  <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${editFeaturesOpen ? "rotate-180" : ""}`} />
-                </button>
-                {editFeaturesOpen && (
-                  <div className="pb-1">
-                    <div className="flex items-center justify-between py-2">
-                      <div>
-                        <p className="text-xs font-medium text-zinc-700">Show plan ideas</p>
-                        <p className="text-xs text-zinc-400">Let members browse and host AI-generated plan ideas</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setEditCalHidePlanIdeas(!editCalHidePlanIdeas)}
-                        className={`relative w-10 h-5 rounded-full transition-colors ${!editCalHidePlanIdeas ? "bg-zinc-900" : "bg-zinc-200"}`}
-                      >
-                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${!editCalHidePlanIdeas ? "left-5" : "left-0.5"}`} />
-                      </button>
-                    </div>
-                    {!editCalHidePlanIdeas && (
-                      <button
-                        type="button"
-                        onClick={() => { setEditingCalId(null); setActiveTab("settings"); }}
-                        className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors underline -mt-1 mb-1"
-                      >
-                        Automated plan idea settings
-                      </button>
-                    )}
-                    <div className="flex items-center justify-between py-2">
-                      <div>
-                        <p className="text-xs font-medium text-zinc-700">Hide custom plan proposals</p>
-                        <p className="text-xs text-zinc-400">Prevent members from proposing their own plan ideas</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setEditCalHideCustomPlans(!editCalHideCustomPlans)}
-                        className={`relative w-10 h-5 rounded-full transition-colors ${editCalHideCustomPlans ? "bg-zinc-900" : "bg-zinc-200"}`}
-                      >
-                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editCalHideCustomPlans ? "left-5" : "left-0.5"}`} />
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between py-2">
-                      <div>
-                        <p className="text-xs font-medium text-zinc-700">Show local deals</p>
-                        <p className="text-xs text-zinc-400">Surface a strip of deals from nearby businesses</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setEditCalHideDeals(!editCalHideDeals)}
-                        className={`relative w-10 h-5 rounded-full transition-colors ${!editCalHideDeals ? "bg-zinc-900" : "bg-zinc-200"}`}
-                      >
-                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${!editCalHideDeals ? "left-5" : "left-0.5"}`} />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={handleSaveCalendar}
-                disabled={!editCalName || savingCal || (editCalSlug !== originalSlugRef.current && (slugAvailable === false || slugChecking))}
-                className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50 mt-2"
-              >
-                {savingCal ? "Saving..." : "Save Changes"}
-              </button>
-
-              {/* Make primary — owner-only, non-primary sub-calendars only */}
-              {!dashboard.calendars.find((c) => c.objectId === editingCalId)?.isPrimary
-                && dashboard.calendars.find((c) => c.objectId === editingCalId)?.role === "Owner" && (
-                <button
-                  onClick={async () => {
-                    const calName = dashboard.calendars.find((c) => c.objectId === editingCalId)?.name || "this calendar";
-                    if (!confirm(`Make "${calName}" your primary calendar? Billing, ownership, and org-level settings will move to this calendar. The dashboard URL will change — existing bookmarks may need updating.`)) return;
-                    try {
-                      const result = await Parse.Cloud.run("makePrimaryCalendar", { calendarId: editingCalId, orgId: calendarId });
-                      setEditingCalId(null);
-                      if (result?.newOrgId && result.newOrgId !== calendarId) {
-                        router.push(`/dashboard/${result.newOrgId}`);
-                      } else {
-                        fetchDashboard();
-                      }
-                    } catch (err) {
-                      console.error("Failed to make calendar primary:", err);
-                      alert(err instanceof Error ? err.message : "Failed to make calendar primary.");
-                    }
-                  }}
-                  className="w-full text-center py-2 mt-3 text-xs font-bold uppercase tracking-widest text-zinc-700 hover:text-zinc-900 transition-colors"
-                >
-                  Make Primary
-                </button>
-              )}
-
-              {/* Delete calendar — owner-only, non-primary sub-calendars only */}
-              {!dashboard.calendars.find((c) => c.objectId === editingCalId)?.isPrimary
-                && dashboard.calendars.find((c) => c.objectId === editingCalId)?.role === "Owner" && (
-                <button
-                  onClick={async () => {
-                    const calName = dashboard.calendars.find((c) => c.objectId === editingCalId)?.name || "this calendar";
-                    if (!confirm(`Permanently delete "${calName}"? This will remove all its plans, followers, and data. This cannot be undone.`)) return;
-                    try {
-                      await Parse.Cloud.run("deleteCalendar", { calendarId: editingCalId, orgId: calendarId });
-                      setEditingCalId(null);
-                      fetchDashboard();
-                    } catch (err) {
-                      console.error("Failed to delete calendar:", err);
-                      alert(err instanceof Error ? err.message : "Failed to delete calendar.");
-                    }
-                  }}
-                  className="w-full text-center py-2 mt-3 text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
-                >
-                  Delete Calendar
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
 
       {/* Edit Co-Host Scope Modal */}
       {editScopeFor && (
@@ -4021,34 +3467,3 @@ export default function OrgDashboardPage() {
   );
 }
 
-function SettingsSwitch({
-  checked,
-  onChange,
-  disabled,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
-        checked ? "bg-emerald-600" : "bg-zinc-300"
-      }`}
-    >
-      <span
-        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-          checked ? "translate-x-5" : "translate-x-0.5"
-        }`}
-      />
-    </button>
-  );
-}
