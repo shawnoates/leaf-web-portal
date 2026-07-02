@@ -4,7 +4,7 @@ import { use, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
-import { Check, ChevronLeft } from "lucide-react";
+import { Check } from "lucide-react";
 
 /**
  * Concierge enrollment — Step 3 of 3: intake form.
@@ -21,10 +21,10 @@ type SectionId = "about" | "spaces" | "budget" | "vibe" | "members" | "wrap";
 const SECTIONS: { id: SectionId; title: string; description: string }[] = [
   { id: "about", title: "About your community", description: "The basics so we can ground everything else." },
   { id: "spaces", title: "Spaces & logistics", description: "What's possible to run, and what's not." },
-  { id: "budget", title: "Budget & autonomy", description: "How involved you want to be each month." },
+  { id: "budget", title: "Your involvement", description: "How hands-on you want to be each month." },
   { id: "vibe", title: "Vibe & guardrails", description: "What lands with your community — and what doesn't." },
   { id: "members", title: "Members & branding", description: "How you reach members and how your community sounds." },
-  { id: "wrap", title: "Last step", description: "Anything else, and a quick kickoff call." },
+  { id: "wrap", title: "Last step", description: "Anything else before we get started." },
 ];
 
 type Values = Record<string, unknown>;
@@ -168,14 +168,6 @@ export default function ConciergeIntakePage({
       </div>
 
       <div className="max-w-2xl mx-auto px-6 py-12">
-        <Link
-          href={`/dashboard/${calendarId}`}
-          className="inline-flex items-center text-xs text-zinc-500 hover:text-zinc-900 mb-6"
-        >
-          <ChevronLeft className="w-3.5 h-3.5 mr-1" />
-          Dashboard
-        </Link>
-
         <h1 className="text-3xl font-light tracking-tight mb-2">
           {currentSection.title}
         </h1>
@@ -284,18 +276,6 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
     case "budget":
       return (
         <div className="space-y-5">
-          <NumberField label="Budget ceiling per event ($)" value={values.budgetCeilingPerEvent as number} onChange={(v) => onChange("budgetCeilingPerEvent", v)} />
-          <SelectField
-            label="Cadence"
-            value={values.cadencePreference as string}
-            onChange={(v) => onChange("cadencePreference", v)}
-            options={[
-              { value: "one_signature", label: "One signature event per month" },
-              { value: "two_smaller", label: "Two smaller events per month" },
-              { value: "mix", label: "Mix" },
-              { value: "let_host_decide", label: "Let Sara decide" },
-            ]}
-          />
           <SelectField
             label="How involved do you want to be?"
             value={values.autonomyMode as string}
@@ -386,7 +366,7 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
             onChange={(v) => onChange("anythingElse", v)}
           />
           <p className="text-xs text-zinc-500 leading-relaxed">
-            After you submit, the Leaf team will reach out to schedule a 15-min kickoff call. Your first menu doesn&apos;t wait on it — Sara starts curating immediately.
+            Once payment&apos;s set up, your concierge starts curating your first month&apos;s options right away — no call required. You can reach them anytime in Messages.
           </p>
         </div>
       );
