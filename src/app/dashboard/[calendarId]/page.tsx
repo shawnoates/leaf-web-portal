@@ -43,8 +43,6 @@ import {
   Sparkles,
   Code,
   Megaphone,
-  MessageSquare,
-  X,
   Ticket,
   Phone,
   Smartphone,
