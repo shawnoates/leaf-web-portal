@@ -230,14 +230,11 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
           <TextField label="Contact name" value={values.contactName as string} onChange={(v) => onChange("contactName", v)} />
           <TextField label="Contact email" type="email" value={values.contactEmail as string} onChange={(v) => onChange("contactEmail", v)} />
           <TextField label="Contact phone" value={values.contactPhone as string} onChange={(v) => onChange("contactPhone", v)} />
-          <SelectField
+          <CardSelect
             label="Community type"
             value={values.buildingType as string}
             onChange={(v) => onChange("buildingType", v)}
-            options={ORG_TYPES.map((t) => ({
-              value: t.value,
-              label: `${t.emoji}  ${t.label}`,
-            }))}
+            options={ORG_TYPES.map((t) => ({ value: t.value, label: t.label, emoji: t.emoji }))}
           />
           {values.buildingType === "apartment_complex" && (
             <NumberField label="Unit count" value={values.unitCount as number} onChange={(v) => onChange("unitCount", v)} />
@@ -248,14 +245,15 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
     case "spaces":
       return (
         <div className="space-y-5">
-          <SelectField
+          <CardSelect
             label="Where should events be hosted?"
             value={values.venueMode as string}
             onChange={(v) => onChange("venueMode", v)}
+            cols={3}
             options={[
-              { value: "on_premise", label: "At our own spaces (on-site)" },
-              { value: "off_premise", label: "At outside venues (off-site)" },
-              { value: "mixed", label: "A mix of both" },
+              { value: "on_premise", label: "Our own spaces", emoji: "🏠", hint: "On-site" },
+              { value: "off_premise", label: "Outside venues", emoji: "📍", hint: "Off-site" },
+              { value: "mixed", label: "A mix of both", emoji: "🔀" },
             ]}
           />
           {values.venueMode === "off_premise" ? (
@@ -271,14 +269,15 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
                 options={["rooftop", "indoor_lounge", "courtyard", "gym", "lobby", "co_working", "pool_deck", "other"]}
               />
               <NumberField label="Largest space capacity" value={values.largestSpaceCapacity as number} onChange={(v) => onChange("largestSpaceCapacity", v)} />
-              <SelectField
+              <CardSelect
                 label="Outdoor capability"
                 value={values.outdoorCapability as string}
                 onChange={(v) => onChange("outdoorCapability", v)}
+                cols={3}
                 options={[
-                  { value: "yes", label: "Yes" },
-                  { value: "seasonal", label: "Seasonal" },
-                  { value: "no", label: "No" },
+                  { value: "yes", label: "Yes", emoji: "☀️" },
+                  { value: "seasonal", label: "Seasonal", emoji: "🌤️" },
+                  { value: "no", label: "No", emoji: "🏢" },
                 ]}
               />
               <TextField label="Access window" placeholder="e.g. weekdays after 6pm, weekends 10am–10pm" value={values.accessWindow as string} onChange={(v) => onChange("accessWindow", v)} />
@@ -290,14 +289,15 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
     case "vibe":
       return (
         <div className="space-y-5">
-          <SelectField
+          <CardSelect
             label="Vibe"
             value={values.vibePreference as string}
             onChange={(v) => onChange("vibePreference", v)}
+            cols={3}
             options={[
-              { value: "small_intimate", label: "Small & intimate" },
-              { value: "big_mixer", label: "Big mixer" },
-              { value: "either", label: "Either works" },
+              { value: "small_intimate", label: "Small & intimate", emoji: "☕" },
+              { value: "big_mixer", label: "Big mixer", emoji: "🎉" },
+              { value: "either", label: "Either works", emoji: "🔀" },
             ]}
           />
           <ChipMultiField
@@ -319,16 +319,16 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
     case "members":
       return (
         <div className="space-y-5">
-          <SelectField
-            label="Prior event frequency"
+          <CardSelect
+            label="How often do you run events today?"
             value={values.priorEventFrequency as string}
             onChange={(v) => onChange("priorEventFrequency", v)}
             options={[
-              { value: "never", label: "Never" },
-              { value: "once_or_twice_a_year", label: "Once or twice a year" },
-              { value: "quarterly", label: "Quarterly" },
-              { value: "monthly", label: "Monthly" },
-              { value: "more_than_monthly", label: "More than monthly" },
+              { value: "never", label: "Never", emoji: "🚫" },
+              { value: "once_or_twice_a_year", label: "Once or twice a year", emoji: "🗓️" },
+              { value: "quarterly", label: "Quarterly", emoji: "📅" },
+              { value: "monthly", label: "Monthly", emoji: "🔁" },
+              { value: "more_than_monthly", label: "More than monthly", emoji: "⚡" },
             ]}
           />
           <ChipMultiField
@@ -415,44 +415,64 @@ function NumberField({ label, value, onChange }: { label: string; value: number 
   );
 }
 
-function SelectField({
-  label, value, onChange, options,
+// Big icon choice-cards (Switch-style single-select) instead of a dropdown.
+function CardSelect({
+  label, value, onChange, options, cols = 2,
 }: {
   label: string;
   value: string | undefined;
   onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; emoji: string; hint?: string }[];
+  cols?: 2 | 3;
 }) {
   return (
-    <label className="block">
-      <span className="text-xs font-medium text-zinc-700 mb-1.5 block">{label}</span>
-      <select
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2 border border-zinc-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900"
-      >
-        <option value="">Select…</option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div>
+      <span className="text-xs font-medium text-zinc-700 mb-2 block">{label}</span>
+      <div className={`grid gap-2.5 grid-cols-2 ${cols === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+        {options.map((o) => {
+          const active = value === o.value;
+          return (
+            <button
+              type="button"
+              key={o.value}
+              onClick={() => onChange(o.value)}
+              className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+                active
+                  ? "border-zinc-900 ring-1 ring-zinc-900 bg-zinc-50"
+                  : "border-zinc-200 hover:border-zinc-400"
+              }`}
+            >
+              <span className="text-xl leading-none shrink-0">{o.emoji}</span>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-zinc-900 leading-tight">{o.label}</span>
+                {o.hint && <span className="block text-[11px] text-zinc-400">{o.hint}</span>}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
+// Yes/No as a switch.
 function ToggleField({ label, value, onChange }: { label: string; value: boolean | undefined; onChange: (v: boolean) => void }) {
+  const on = value === true;
   return (
-    <label className="flex items-start gap-3 cursor-pointer">
-      <input
-        type="checkbox"
-        checked={value === true}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-1 w-4 h-4 accent-zinc-900"
-      />
+    <button
+      type="button"
+      onClick={() => onChange(!on)}
+      className="w-full flex items-center justify-between gap-4 rounded-xl border border-zinc-200 p-3.5 text-left hover:border-zinc-400 transition-colors"
+    >
       <span className="text-sm text-zinc-700">{label}</span>
-    </label>
+      <span
+        className={`relative w-10 h-6 rounded-full shrink-0 transition-colors ${on ? "bg-zinc-900" : "bg-zinc-200"}`}
+      >
+        <span
+          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-4" : ""}`}
+        />
+      </span>
+    </button>
   );
 }
 
