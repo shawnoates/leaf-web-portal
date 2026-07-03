@@ -634,17 +634,11 @@ export default function OrgDashboardPage() {
     loadPendingMenu();
   }, [loadPendingMenu]);
 
-  // Concierge chat lives on the serviced calendar's card (not a global tab),
-  // opened in a modal. Unread badge on the button clears while the modal is
-  // open (the thread marks messages read server-side); polled otherwise.
-  const [showConciergeMessages, setShowConciergeMessages] = useState(false);
+  // Unread concierge messages — badges the serviced calendar in the list. The
+  // inline thread marks messages read server-side, so the next poll clears it.
   const [conciergeUnread, setConciergeUnread] = useState(0);
   useEffect(() => {
     if (!dashboard || dashboard.tier !== "concierge") {
-      setConciergeUnread(0);
-      return;
-    }
-    if (showConciergeMessages) {
       setConciergeUnread(0);
       return;
     }
@@ -661,7 +655,10 @@ export default function OrgDashboardPage() {
       alive = false;
       clearInterval(t);
     };
-  }, [dashboard, calendarId, showConciergeMessages]);
+  }, [dashboard, calendarId]);
+
+  // Selected calendar in the Calendars tab's master/detail layout.
+  const [calendarsSelectedId, setCalendarsSelectedId] = useState<string | null>(null);
 
   // Change which calendar the concierge serves (no cancel needed — it's a
   // pointer on the org). Refetches so the highlight + Messages move over.
@@ -1972,8 +1969,16 @@ export default function OrgDashboardPage() {
           </div>
         )}
 
-        {/* ──────── CALENDARS TAB ──────── */}
-        {activeTab === "calendars" && (
+        {/* ──────── CALENDARS TAB (3-panel: list · concierge chat · plans) ──────── */}
+        {activeTab === "calendars" && (() => {
+          const cals = dashboard.calendars;
+          const selectedCal =
+            cals.find((c) => c.objectId === calendarsSelectedId) ||
+            cals.find((c) => c.isConciergeServiced) ||
+            cals.find((c) => c.isPrimary) ||
+            cals[0];
+          const showChat = dashboard.tier === "concierge" && selectedCal?.isConciergeServiced === true;
+          return (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
@@ -1998,14 +2003,62 @@ export default function OrgDashboardPage() {
                 </button>
               )}
             </div>
-            <div className="space-y-3">
-              {dashboard.calendars.map((cal) => {
+            <div className={`grid grid-cols-1 gap-4 items-start ${showChat ? "lg:grid-cols-[240px_360px_minmax(0,1fr)]" : "lg:grid-cols-[260px_minmax(0,1fr)]"}`}>
+              {/* LEFT — calendar list */}
+              <div className="border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden">
+                {cals.map((c) => {
+                  const isSel = selectedCal?.objectId === c.objectId;
+                  const off = c.isActive === false;
+                  return (
+                    <button
+                      key={c.objectId}
+                      onClick={() => setCalendarsSelectedId(c.objectId)}
+                      className={`w-full text-left px-3 py-2.5 flex items-center gap-2.5 transition-colors hover:bg-zinc-50 ${isSel ? "bg-zinc-50" : ""} ${off ? "opacity-60" : ""}`}
+                    >
+                      {c.calendarImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c.calendarImage} alt={c.name} className="w-8 h-8 rounded-lg object-cover shrink-0" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0">
+                          <Calendar className="w-4 h-4 text-zinc-300" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-medium text-zinc-900 truncate">{c.name}</span>
+                          {c.isConciergeServiced && <Sparkles className="w-3 h-3 text-emerald-500 shrink-0" />}
+                        </div>
+                        <div className="text-[11px] text-zinc-400 truncate">
+                          {c.isPrimary ? "Primary · " : ""}{c.city || "No city set"}
+                        </div>
+                      </div>
+                      {c.isConciergeServiced && conciergeUnread > 0 ? (
+                        <span className="bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[16px] text-center shrink-0">
+                          {conciergeUnread}
+                        </span>
+                      ) : isSel ? (
+                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-900 shrink-0" />
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* MIDDLE — concierge chat (serviced calendar only) */}
+              {showChat && (
+                <div className="border border-zinc-200 rounded-xl p-4 max-h-[74vh] overflow-y-auto">
+                  <ConciergeThread calendarId={calendarId} />
+                </div>
+              )}
+
+              {/* RIGHT — selected calendar detail */}
+              {selectedCal && (() => {
+                const cal = selectedCal;
                 const activePlans = ((cal as Record<string, unknown>).activePlans as { objectId: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null }[]) || [];
                 const suggestedPlans = ((cal as Record<string, unknown>).suggestedPlans as { id: string; type: string; title: string; description?: string; subtitle: string; recommendedDate: string; recommendedTime?: string | null; venue?: { name: string; address: string } | null; image?: string | null; isSuggestion: true }[]) || [];
                 const inactive = cal.isActive === false;
                 return (
                   <div
-                    key={cal.objectId}
                     className={`border rounded-xl p-5 ${
                       inactive
                         ? "border-zinc-100 bg-zinc-50 opacity-60"
@@ -2090,30 +2143,17 @@ export default function OrgDashboardPage() {
                           </button>
                         ) : (
                           <>
-                            {dashboard.tier === "concierge" &&
-                              (cal.isConciergeServiced ? (
-                                <button
-                                  onClick={() => setShowConciergeMessages(true)}
-                                  className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
-                                >
-                                  <MessageSquare className="w-3 h-3" /> Messages
-                                  {conciergeUnread > 0 && (
-                                    <span className="ml-0.5 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[16px] text-center">
-                                      {conciergeUnread}
-                                    </span>
-                                  )}
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => setServicedCalendar(cal.objectId)}
-                                  disabled={settingServicedId === cal.objectId}
-                                  title="Make this the calendar your concierge runs"
-                                  className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 disabled:opacity-50"
-                                >
-                                  <Sparkles className="w-3 h-3 text-emerald-500" />
-                                  {settingServicedId === cal.objectId ? "Setting…" : "Make concierge"}
-                                </button>
-                              ))}
+                            {dashboard.tier === "concierge" && !cal.isConciergeServiced && (
+                              <button
+                                onClick={() => setServicedCalendar(cal.objectId)}
+                                disabled={settingServicedId === cal.objectId}
+                                title="Make this the calendar your concierge runs"
+                                className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 disabled:opacity-50"
+                              >
+                                <Sparkles className="w-3 h-3 text-emerald-500" />
+                                {settingServicedId === cal.objectId ? "Setting…" : "Make concierge"}
+                              </button>
+                            )}
                             <Link
                               href={`/dashboard/${calendarId}/calendars/${cal.objectId}/edit`}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
@@ -2288,10 +2328,11 @@ export default function OrgDashboardPage() {
                     )}
                   </div>
                 );
-              })}
+              })()}
             </div>
           </div>
-        )}
+          );
+        })()}
 
 
         {/* ──────── MARKETPLACE TAB ──────── */}
@@ -3294,28 +3335,6 @@ export default function OrgDashboardPage() {
         />
       )}
 
-
-      {/* Concierge messages — opened from the serviced calendar's card */}
-      {showConciergeMessages && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 backdrop-blur-sm p-4"
-          onClick={() => setShowConciergeMessages(false)}
-        >
-          <div
-            className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6 relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setShowConciergeMessages(false)}
-              className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700"
-              aria-label="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <ConciergeThread calendarId={calendarId} />
-          </div>
-        </div>
-      )}
 
       {/* Edit Co-Host Scope Modal */}
       {editScopeFor && (
