@@ -4,7 +4,6 @@ import { use, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
-import { Check } from "lucide-react";
 import { ORG_TYPES } from "@/lib/orgTypes";
 
 /**
@@ -27,6 +26,21 @@ const SECTIONS: { id: SectionId; title: string; description: string }[] = [
 ];
 
 type Values = Record<string, unknown>;
+
+// Emoji per multi-select option value, so chips read as friendly icon buttons.
+const OPTION_EMOJI: Record<string, string> = {
+  // spaces
+  rooftop: "🏙️", indoor_lounge: "🛋️", courtyard: "🌳", gym: "🏋️", lobby: "🏛️",
+  co_working: "💻", pool_deck: "🏊", other: "➕",
+  // categories
+  happy_hour: "🍸", fitness: "💪", food_tasting: "🍽️", family_kids: "👨‍👩‍👧",
+  games_trivia: "🎲", crafts_diy: "🎨", wellness: "🧘", professional: "💼",
+  seasonal: "🍂", outdoor: "🌤️", pet: "🐾", movie_night: "🎬", music_live: "🎵",
+  // comms
+  email_list: "📧", building_app: "📱", printed_flyers: "📄", text_blast: "💬", word_of_mouth: "🗣️",
+};
+
+const humanize = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 export default function ConciergeIntakePage({
   params,
@@ -499,14 +513,14 @@ function ChipMultiField({
               type="button"
               key={opt}
               onClick={() => toggle(opt)}
-              className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-full border transition-colors ${
                 active
                   ? "bg-zinc-900 text-white border-zinc-900"
                   : "bg-white text-zinc-700 border-zinc-300 hover:border-zinc-500"
               }`}
             >
-              {active && <Check className="w-3 h-3 inline mr-1" />}
-              {opt.replace(/_/g, " ")}
+              {OPTION_EMOJI[opt] && <span className="leading-none">{OPTION_EMOJI[opt]}</span>}
+              {humanize(opt)}
             </button>
           );
         })}

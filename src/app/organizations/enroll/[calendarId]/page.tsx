@@ -37,7 +37,7 @@ export default function ConciergeEnrollPage({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // Which calendar concierge should run — the org itself or one of its children.
-  const [servicedOptions, setServicedOptions] = useState<{ id: string; name: string }[]>([]);
+  const [servicedOptions, setServicedOptions] = useState<{ id: string; name: string; image: string | null }[]>([]);
   const [servicedId, setServicedId] = useState<string>("");
 
   useEffect(() => {
@@ -86,11 +86,16 @@ export default function ConciergeEnrollPage({
         childQ.ascending("createdAt");
         const children = await childQ.find();
         if (mounted) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const imgOf = (g: any): string | null =>
+            g.get("profilePhoto")?.url?.() || g.get("group_profile_photo_url") || null;
           const opts = [
-            { id: cal.id, name: cal.get("name") || "Primary calendar" },
-            ...children.map((c: { id: string; get: (k: string) => string }) => ({
+            { id: cal.id, name: cal.get("name") || "Primary calendar", image: imgOf(cal) },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ...children.map((c: any) => ({
               id: c.id,
               name: c.get("name") || "Calendar",
+              image: imgOf(c),
             })),
           ];
           setServicedOptions(opts);
@@ -206,23 +211,35 @@ export default function ConciergeEnrollPage({
         {/* Serviced-calendar picker — only when the org has more than one. */}
         {servicedOptions.length > 1 && (
           <div className="bg-white border border-zinc-200 rounded-2xl p-6 mb-8">
-            <label className="block">
-              <span className="text-sm font-medium text-zinc-900">Which calendar should Concierge run?</span>
-              <p className="text-xs text-zinc-500 mt-0.5 mb-3">
-                Your host plans and hosts one event a month for this calendar. You can change it later.
-              </p>
-              <select
-                value={servicedId}
-                onChange={(e) => setServicedId(e.target.value)}
-                className="w-full px-3 py-2.5 border border-zinc-300 rounded-lg text-sm bg-white focus:outline-none focus:border-zinc-500"
-              >
-                {servicedOptions.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <span className="text-sm font-medium text-zinc-900">Which calendar should Concierge run?</span>
+            <p className="text-xs text-zinc-500 mt-0.5 mb-3">
+              Your host plans and hosts one event a month for this calendar. You can change it later.
+            </p>
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              {servicedOptions.map((o) => {
+                const active = servicedId === o.id;
+                return (
+                  <button
+                    type="button"
+                    key={o.id}
+                    onClick={() => setServicedId(o.id)}
+                    className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+                      active ? "border-zinc-900 ring-1 ring-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-400"
+                    }`}
+                  >
+                    {o.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={o.image} alt={o.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0">
+                        <Sparkles className="w-4 h-4 text-zinc-300" />
+                      </div>
+                    )}
+                    <span className="text-sm font-medium text-zinc-900 min-w-0 truncate">{o.name}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
