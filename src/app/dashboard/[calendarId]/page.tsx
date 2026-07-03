@@ -663,6 +663,24 @@ export default function OrgDashboardPage() {
     };
   }, [dashboard, calendarId, showConciergeMessages]);
 
+  // Change which calendar the concierge serves (no cancel needed — it's a
+  // pointer on the org). Refetches so the highlight + Messages move over.
+  const [settingServicedId, setSettingServicedId] = useState<string | null>(null);
+  const setServicedCalendar = async (targetCalendarId: string) => {
+    setSettingServicedId(targetCalendarId);
+    try {
+      await Parse.Cloud.run("setConciergeServicedCalendar", {
+        orgId: calendarId,
+        calendarId: targetCalendarId,
+      });
+      await fetchDashboard();
+    } catch (err) {
+      console.warn("[Concierge] set serviced calendar failed:", err);
+    } finally {
+      setSettingServicedId(null);
+    }
+  };
+
   // Analytics fetcher — Pro tier only
   const fetchAnalytics = useCallback(
     async (range: "7d" | "30d" | "90d" | "all", calFilter?: string) => {
@@ -2072,19 +2090,30 @@ export default function OrgDashboardPage() {
                           </button>
                         ) : (
                           <>
-                            {cal.isConciergeServiced && (
-                              <button
-                                onClick={() => setShowConciergeMessages(true)}
-                                className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
-                              >
-                                <MessageSquare className="w-3 h-3" /> Messages
-                                {conciergeUnread > 0 && (
-                                  <span className="ml-0.5 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[16px] text-center">
-                                    {conciergeUnread}
-                                  </span>
-                                )}
-                              </button>
-                            )}
+                            {dashboard.tier === "concierge" &&
+                              (cal.isConciergeServiced ? (
+                                <button
+                                  onClick={() => setShowConciergeMessages(true)}
+                                  className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
+                                >
+                                  <MessageSquare className="w-3 h-3" /> Messages
+                                  {conciergeUnread > 0 && (
+                                    <span className="ml-0.5 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[16px] text-center">
+                                      {conciergeUnread}
+                                    </span>
+                                  )}
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => setServicedCalendar(cal.objectId)}
+                                  disabled={settingServicedId === cal.objectId}
+                                  title="Make this the calendar your concierge runs"
+                                  className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 disabled:opacity-50"
+                                >
+                                  <Sparkles className="w-3 h-3 text-emerald-500" />
+                                  {settingServicedId === cal.objectId ? "Setting…" : "Make concierge"}
+                                </button>
+                              ))}
                             <Link
                               href={`/dashboard/${calendarId}/calendars/${cal.objectId}/edit`}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
