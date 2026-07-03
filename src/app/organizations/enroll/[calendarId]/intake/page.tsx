@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { Check } from "lucide-react";
@@ -35,6 +35,7 @@ export default function ConciergeIntakePage({
 }) {
   const { calendarId } = use(params);
   const router = useRouter();
+  const servicedCalendarId = useSearchParams().get("serviced") || undefined;
 
   const [stepIndex, setStepIndex] = useState(0);
   const [values, setValues] = useState<Record<SectionId, Values>>({
@@ -108,6 +109,7 @@ export default function ConciergeIntakePage({
         const result = await ParseAny.Cloud.run("createConciergeCheckout", {
           calendarId,
           billingPeriod: "monthly",
+          servicedCalendarId,
           returnUrl: typeof window !== "undefined"
             ? `${window.location.origin}/dashboard/${calendarId}?concierge=welcome`
             : undefined,

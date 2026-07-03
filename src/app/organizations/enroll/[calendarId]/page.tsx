@@ -36,6 +36,9 @@ export default function ConciergeEnrollPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Which calendar concierge should run — the org itself or one of its children.
+  const [servicedOptions, setServicedOptions] = useState<{ id: string; name: string }[]>([]);
+  const [servicedId, setServicedId] = useState<string>("");
 
   useEffect(() => {
     let mounted = true;
@@ -76,6 +79,23 @@ export default function ConciergeEnrollPage({
           return;
         }
         setCalendar(info);
+
+        // Serviced-calendar options: the org + its child calendars.
+        const childQ = new ParseAny.Query("Groups");
+        childQ.equalTo("parentOrganization", cal);
+        childQ.ascending("createdAt");
+        const children = await childQ.find();
+        if (mounted) {
+          const opts = [
+            { id: cal.id, name: cal.get("name") || "Primary calendar" },
+            ...children.map((c: { id: string; get: (k: string) => string }) => ({
+              id: c.id,
+              name: c.get("name") || "Calendar",
+            })),
+          ];
+          setServicedOptions(opts);
+          setServicedId(cal.id);
+        }
         setLoading(false);
       } catch (err) {
         if (mounted) {
@@ -91,8 +111,10 @@ export default function ConciergeEnrollPage({
 
   const handleContinue = () => {
     // Questions come before payment — go to intake; checkout happens at the end.
+    // Carry the chosen serviced calendar through to the checkout call.
     setSubmitting(true);
-    router.push(`/organizations/enroll/${calendarId}/intake`);
+    const serviced = servicedId && servicedId !== calendarId ? `?serviced=${servicedId}` : "";
+    router.push(`/organizations/enroll/${calendarId}/intake${serviced}`);
   };
 
   if (loading) {
@@ -180,6 +202,29 @@ export default function ConciergeEnrollPage({
             <FeatureLine>Cancel anytime — your calendar stays</FeatureLine>
           </ul>
         </div>
+
+        {/* Serviced-calendar picker — only when the org has more than one. */}
+        {servicedOptions.length > 1 && (
+          <div className="bg-white border border-zinc-200 rounded-2xl p-6 mb-8">
+            <label className="block">
+              <span className="text-sm font-medium text-zinc-900">Which calendar should Concierge run?</span>
+              <p className="text-xs text-zinc-500 mt-0.5 mb-3">
+                Your host plans and hosts one event a month for this calendar. You can change it later.
+              </p>
+              <select
+                value={servicedId}
+                onChange={(e) => setServicedId(e.target.value)}
+                className="w-full px-3 py-2.5 border border-zinc-300 rounded-lg text-sm bg-white focus:outline-none focus:border-zinc-500"
+              >
+                {servicedOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
 
         {/* The Leaf OS Guarantee — prominent risk-reversal seal (replaces the
             old welcome-credit framing). Tier 1: first event unconditional;
