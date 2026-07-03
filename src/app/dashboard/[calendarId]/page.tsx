@@ -235,6 +235,10 @@ const TABS = [
   { id: "settings", label: "Settings", icon: Settings, ownerOnly: true },
 ];
 
+// Tiers that unlock paid features. Concierge includes everything in Pro, and
+// `growth` is the retired Social tier treated as Pro.
+const PAID_TIERS = ["pro", "growth", "concierge"];
+
 // ── Analytics types ────────────────────────────────────────────────────
 
 interface AnalyticsSeriesPoint {
@@ -660,7 +664,7 @@ export default function OrgDashboardPage() {
   // Analytics fetcher — Pro tier only
   const fetchAnalytics = useCallback(
     async (range: "7d" | "30d" | "90d" | "all", calFilter?: string) => {
-      if (!dashboard || dashboard.tier !== "pro") return;
+      if (!dashboard || !PAID_TIERS.includes(dashboard.tier)) return;
       setAnalyticsLoading(true);
       setAnalyticsError(null);
       try {
@@ -684,7 +688,7 @@ export default function OrgDashboardPage() {
 
   // Auto-load analytics when the tab opens, range changes, or calendar filter changes
   useEffect(() => {
-    if (activeTab === "analytics" && dashboard?.tier === "pro") {
+    if (activeTab === "analytics" && dashboard && PAID_TIERS.includes(dashboard.tier)) {
       fetchAnalytics(analyticsRange);
     }
   }, [activeTab, analyticsRange, analyticsCalFilter, dashboard, fetchAnalytics]);
@@ -984,8 +988,8 @@ export default function OrgDashboardPage() {
 
   // `growth` is the retired Social tier — existing subscribers still carry it
   // in the DB until the server-side migration runs, so treat them as Pro.
-  const isPaid = dashboard.tier === "pro" || dashboard.tier === "growth";
-  const tierLabel = isPaid ? "Pro" : "Free";
+  const isPaid = PAID_TIERS.includes(dashboard.tier);
+  const tierLabel = dashboard.tier === "concierge" ? "Concierge" : isPaid ? "Pro" : "Free";
 
   // ── Render ──
 
@@ -1492,7 +1496,7 @@ export default function OrgDashboardPage() {
         )}
 
         {/* ──────── ANALYTICS TAB ──────── */}
-        {activeTab === "analytics" && dashboard.tier === "pro" && (
+        {activeTab === "analytics" && PAID_TIERS.includes(dashboard.tier) && (
           <div className="space-y-8">
             {/* Range selector + calendar filter */}
             <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -1989,7 +1993,13 @@ export default function OrgDashboardPage() {
                 return (
                   <div
                     key={cal.objectId}
-                    className={`border rounded-xl p-5 ${inactive ? "border-zinc-100 bg-zinc-50 opacity-60" : "border-zinc-200"}`}
+                    className={`border rounded-xl p-5 ${
+                      inactive
+                        ? "border-zinc-100 bg-zinc-50 opacity-60"
+                        : cal.isConciergeServiced
+                        ? "border-emerald-300 ring-1 ring-emerald-200 bg-emerald-50/30"
+                        : "border-zinc-200"
+                    }`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
                       <div className="flex items-center gap-3 min-w-0">
@@ -2041,11 +2051,6 @@ export default function OrgDashboardPage() {
                           {cal.isPrimary && (
                             <span className="text-xs font-bold uppercase tracking-widest bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">
                               Primary
-                            </span>
-                          )}
-                          {cal.isConciergeServiced && (
-                            <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-widest bg-zinc-900 text-white px-2 py-0.5 rounded-full">
-                              <Sparkles className="w-3 h-3 text-emerald-400" /> Concierge
                             </span>
                           )}
                           {cal.role === "Host" && (
@@ -2159,7 +2164,7 @@ export default function OrgDashboardPage() {
                             );
                           })}
                           {suggestedPlans.map((suggestion) => {
-                            const isLocked = dashboard.tier !== "pro";
+                            const isLocked = !PAID_TIERS.includes(dashboard.tier);
                             return (
                               <div
                                 key={suggestion.id}
