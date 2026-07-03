@@ -237,6 +237,105 @@ const TABS = [
 // `growth` is the retired Social tier treated as Pro.
 const PAID_TIERS = ["pro", "growth", "concierge"];
 
+type CalActivePlan = { objectId: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null };
+type CalSuggestion = { id: string; type: string; title: string; description?: string; subtitle: string; recommendedDate: string; recommendedTime?: string | null; venue?: { name: string; address: string } | null; image?: string | null; isSuggestion: true };
+
+// Vertical carousel of a calendar's plans + suggestions (stacked rows).
+function PlansCarousel({
+  activePlans, suggestedPlans, locked, onOpen, onUpgrade, onAdd,
+}: {
+  activePlans: CalActivePlan[];
+  suggestedPlans: CalSuggestion[];
+  locked: boolean;
+  onOpen: (p: CalActivePlan) => void;
+  onUpgrade: () => void;
+  onAdd: (s: CalSuggestion) => void;
+}) {
+  const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  if (activePlans.length === 0 && suggestedPlans.length === 0) {
+    return <p className="text-xs text-zinc-400">No active plans yet.</p>;
+  }
+  return (
+    <div className="flex flex-col gap-2 max-h-[68vh] overflow-y-auto pr-0.5">
+      {activePlans.map((plan) => {
+        const poll = plan.isPoll === true;
+        const closesAtMs = plan.pollClosesAt ? new Date(plan.pollClosesAt).getTime() : null;
+        const isExpired = poll && closesAtMs !== null && closesAtMs <= Date.now();
+        return (
+          <button
+            key={plan.objectId}
+            type="button"
+            onClick={() => onOpen(plan)}
+            className={`flex items-center gap-3 w-full text-left rounded-lg border p-2 transition-colors ${
+              isExpired ? "border-amber-300 bg-amber-50/30 hover:border-amber-400" : "border-zinc-100 hover:border-zinc-300"
+            }`}
+          >
+            {plan.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={plan.image} alt={plan.title} className="w-14 h-14 rounded-md object-cover shrink-0" />
+            ) : (
+              <div className="w-14 h-14 rounded-md bg-zinc-100 flex items-center justify-center shrink-0">
+                <Calendar className="w-5 h-5 text-zinc-300" />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                {poll && (
+                  <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-widest px-1 py-0.5 rounded shrink-0 ${isExpired ? "bg-amber-600 text-white" : "bg-zinc-900 text-white"}`}>
+                    <Vote className="w-2.5 h-2.5" /> {isExpired ? "Pick" : "Poll"}
+                  </span>
+                )}
+                <h4 className="text-sm font-medium text-zinc-900 truncate">{plan.title}</h4>
+              </div>
+              <p className="text-xs text-zinc-400 truncate">
+                {poll ? `${plan.pollOptionCount ?? 0} options${isExpired ? " · closed" : ""}` : fmtDate(plan.date)}
+              </p>
+              <div className="flex items-center justify-between text-xs text-zinc-400">
+                <span className="truncate">{plan.hostName}</span>
+                <span className="shrink-0 ml-2">{poll ? `${plan.pollVoteCount ?? 0} votes` : `${plan.rsvpCount} RSVPs`}</span>
+              </div>
+            </div>
+          </button>
+        );
+      })}
+      {suggestedPlans.map((s) => (
+        <button
+          key={s.id}
+          type="button"
+          onClick={() => (locked ? onUpgrade() : onAdd(s))}
+          className={`flex items-center gap-3 w-full text-left rounded-lg border p-2 transition-colors ${
+            locked ? "border-zinc-200 bg-zinc-50" : "border-dashed border-emerald-300 hover:border-emerald-400"
+          }`}
+        >
+          <div className="w-14 h-14 rounded-md overflow-hidden shrink-0 relative bg-gradient-to-br from-emerald-50 to-zinc-100">
+            {s.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={s.image} alt={s.title} className="w-full h-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-emerald-400" />
+              </div>
+            )}
+            {locked && (
+              <div className="absolute inset-0 bg-zinc-900/50 flex items-center justify-center">
+                <Lock className="w-3.5 h-3.5 text-white" />
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] font-bold uppercase tracking-widest bg-emerald-600 text-white px-1 py-0.5 rounded shrink-0">Suggested</span>
+              <h4 className="text-sm font-medium text-zinc-900 truncate">{s.title}</h4>
+            </div>
+            <p className="text-xs text-zinc-400 truncate">{fmtDate(s.recommendedDate)}</p>
+            <p className="text-xs text-emerald-600 truncate" title={s.subtitle}>{s.subtitle}</p>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── Analytics types ────────────────────────────────────────────────────
 
 interface AnalyticsSeriesPoint {
@@ -2001,7 +2100,7 @@ export default function OrgDashboardPage() {
                 </button>
               )}
             </div>
-            <div className={`grid grid-cols-1 gap-4 items-start ${showChat ? "lg:grid-cols-[240px_360px_minmax(0,1fr)]" : "lg:grid-cols-[260px_minmax(0,1fr)]"}`}>
+            <div className={`grid grid-cols-1 gap-4 items-start ${showChat ? "lg:grid-cols-[240px_minmax(0,1fr)_320px]" : "lg:grid-cols-[240px_minmax(0,1fr)]"}`}>
               {/* LEFT — calendar list */}
               <div className="border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden">
                 {cals.map((c) => {
@@ -2042,30 +2141,51 @@ export default function OrgDashboardPage() {
                 })}
               </div>
 
-              {/* MIDDLE — concierge chat (serviced calendar only) */}
-              {showChat && (
-                <div className="border border-zinc-200 rounded-xl p-4 max-h-[74vh] overflow-y-auto">
-                  <ConciergeThread calendarId={calendarId} />
-                </div>
-              )}
-
-              {/* RIGHT — selected calendar detail */}
+              {/* MIDDLE (header + chat|plans) + RIGHT (plans, concierge only) */}
               {selectedCal && (() => {
                 const cal = selectedCal;
-                const activePlans = ((cal as Record<string, unknown>).activePlans as { objectId: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null }[]) || [];
-                const suggestedPlans = ((cal as Record<string, unknown>).suggestedPlans as { id: string; type: string; title: string; description?: string; subtitle: string; recommendedDate: string; recommendedTime?: string | null; venue?: { name: string; address: string } | null; image?: string | null; isSuggestion: true }[]) || [];
+                const activePlans = ((cal as Record<string, unknown>).activePlans as CalActivePlan[]) || [];
+                const suggestedPlans = ((cal as Record<string, unknown>).suggestedPlans as CalSuggestion[]) || [];
                 const inactive = cal.isActive === false;
+                const plansPanel = (
+                  <div className="border border-zinc-200 rounded-xl p-4">
+                    <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-3">Active Plans</p>
+                    <PlansCarousel
+                      activePlans={activePlans}
+                      suggestedPlans={suggestedPlans}
+                      locked={!PAID_TIERS.includes(dashboard.tier)}
+                      onOpen={(p) => setSelectedActivePlan(p)}
+                      onUpgrade={() => setShowSubscription(true)}
+                      onAdd={(s) => {
+                        const recDate = new Date(s.recommendedDate);
+                        setCreatePlanPrefill({
+                          title: s.title,
+                          description: s.description || "",
+                          venue: s.venue || null,
+                          date: recDate.toISOString().slice(0, 10),
+                          time: s.recommendedTime || "",
+                          capacity: "",
+                          imageUrl: s.image || null,
+                          justification: s.subtitle,
+                        });
+                        setShowCreatePlanModal(true);
+                      }}
+                    />
+                  </div>
+                );
                 return (
-                  <div
-                    className={`border rounded-xl p-5 ${
-                      inactive
-                        ? "border-zinc-100 bg-zinc-50 opacity-60"
-                        : cal.isConciergeServiced
-                        ? "border-zinc-900 ring-1 ring-zinc-900"
-                        : "border-zinc-200"
-                    }`}
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                  <>
+                  <div className="space-y-4 min-w-0">
+                    <div
+                      className={`border rounded-xl px-4 py-3 ${
+                        inactive
+                          ? "border-zinc-100 bg-zinc-50 opacity-70"
+                          : cal.isConciergeServiced
+                          ? "border-zinc-900"
+                          : "border-zinc-200"
+                      }`}
+                    >
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
                         {cal.calendarImage ? (
                           <img src={cal.calendarImage} alt={cal.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
@@ -2168,144 +2288,9 @@ export default function OrgDashboardPage() {
                         )}
                       </div>
                     </div>
-                    {!inactive && (activePlans.length > 0 || suggestedPlans.length > 0) && (
-                      <div className="border-t border-zinc-100 pt-3">
-                        <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-3">Active Plans</p>
-                        <div className="flex gap-3 overflow-x-auto no-scrollbar">
-                          {activePlans.map((plan) => {
-                            if (plan.isPoll) {
-                              const closesAtMs = plan.pollClosesAt ? new Date(plan.pollClosesAt).getTime() : null;
-                              const isExpired = closesAtMs !== null && closesAtMs <= Date.now();
-                              const closesIn = closesAtMs !== null && !isExpired
-                                ? Math.max(0, Math.ceil((closesAtMs - Date.now()) / (24 * 60 * 60 * 1000)))
-                                : null;
-                              return (
-                                <button
-                                  key={plan.objectId}
-                                  type="button"
-                                  onClick={() => setSelectedActivePlan(plan)}
-                                  className={`text-left rounded-lg overflow-hidden transition-colors shrink-0 w-52 cursor-pointer border ${
-                                    isExpired
-                                      ? "border-amber-300 hover:border-amber-400 bg-amber-50/30"
-                                      : "border-zinc-100 hover:border-zinc-200"
-                                  }`}
-                                >
-                                  <div className="relative">
-                                    {plan.image ? (
-                                      <img src={plan.image} alt={plan.title} className="w-full h-28 object-cover" />
-                                    ) : (
-                                      <div className="w-full h-28 bg-zinc-100 flex items-center justify-center">
-                                        <Calendar className="w-6 h-6 text-zinc-300" />
-                                      </div>
-                                    )}
-                                    <div className={`absolute top-1.5 left-1.5 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded ${
-                                      isExpired ? "bg-amber-600 text-white" : "bg-zinc-900 text-white"
-                                    }`}>
-                                      <Vote className="w-2.5 h-2.5" /> {isExpired ? "Pick winner" : "Poll"}
-                                    </div>
-                                  </div>
-                                  <div className="p-3">
-                                    <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
-                                    <p className={`text-xs mb-1 ${isExpired ? "text-amber-700 font-medium" : "text-zinc-400"}`}>
-                                      {plan.pollOptionCount} options
-                                      {isExpired ? " · voting closed" : closesIn !== null ? ` · ${closesIn}d left` : ""}
-                                    </p>
-                                    <div className="flex items-center justify-between text-xs text-zinc-400">
-                                      <span className="truncate">{plan.hostName}</span>
-                                      <span className="shrink-0 ml-2">{plan.pollVoteCount} {plan.pollVoteCount === 1 ? "vote" : "votes"}</span>
-                                    </div>
-                                  </div>
-                                </button>
-                              );
-                            }
-                            return (
-                              <div key={plan.objectId} onClick={() => setSelectedActivePlan(plan)} className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer">
-                                {plan.image ? (
-                                  <img src={plan.image} alt={plan.title} className="w-full h-28 object-cover" />
-                                ) : (
-                                  <div className="w-full h-28 bg-zinc-100 flex items-center justify-center">
-                                    <Calendar className="w-6 h-6 text-zinc-300" />
-                                  </div>
-                                )}
-                                <div className="p-3">
-                                  <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
-                                  <p className="text-xs text-zinc-400 mb-1">{new Date(plan.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</p>
-                                  <div className="flex items-center justify-between text-xs text-zinc-400">
-                                    <span className="truncate">{plan.hostName}</span>
-                                    <span className="shrink-0 ml-2">{plan.rsvpCount} RSVPs</span>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                          {suggestedPlans.map((suggestion) => {
-                            const isLocked = !PAID_TIERS.includes(dashboard.tier);
-                            return (
-                              <div
-                                key={suggestion.id}
-                                onClick={() => {
-                                  if (isLocked) {
-                                    setShowSubscription(true);
-                                    return;
-                                  }
-                                  // Pre-fill the create plan modal with the suggestion's data
-                                  const recDate = new Date(suggestion.recommendedDate);
-                                  setCreatePlanPrefill({
-                                    title: suggestion.title,
-                                    description: suggestion.description || "",
-                                    venue: suggestion.venue || null,
-                                    date: recDate.toISOString().slice(0, 10),
-                                    time: suggestion.recommendedTime || "",
-                                    capacity: "",
-                                    imageUrl: suggestion.image || null,
-                                    justification: suggestion.subtitle,
-                                  });
-                                  setShowCreatePlanModal(true);
-                                }}
-                                className={`group relative border rounded-lg overflow-hidden shrink-0 w-52 cursor-pointer transition-colors ${
-                                  isLocked ? "border-zinc-200 bg-zinc-50" : "border-dashed border-emerald-300 hover:border-emerald-400"
-                                }`}
-                              >
-                                <div className="w-full h-28 relative bg-gradient-to-br from-emerald-50 to-zinc-100 overflow-hidden">
-                                  {suggestion.image ? (
-                                    <img src={suggestion.image} alt={suggestion.title} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                      <Sparkles className="w-6 h-6 text-emerald-400" />
-                                    </div>
-                                  )}
-                                  <div className="absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded">
-                                    Suggested
-                                  </div>
-                                  {!isLocked && (
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center">
-                                      <span className="bg-white text-zinc-900 px-4 py-2 text-xs tracking-wider uppercase font-bold shadow-xl">
-                                        Add to Calendar
-                                      </span>
-                                    </div>
-                                  )}
-                                  {isLocked && (
-                                    <div className="absolute inset-0 bg-zinc-900/50 backdrop-blur-sm flex flex-col items-center justify-center">
-                                      <Lock className="w-4 h-4 text-white mb-1" />
-                                      <span className="text-[9px] font-bold uppercase tracking-widest text-white">Upgrade to unlock</span>
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="p-3">
-                                  <h4 className="font-medium text-sm mb-1 truncate">{suggestion.title}</h4>
-                                  <p className="text-xs text-zinc-400 mb-1">
-                                    {new Date(suggestion.recommendedDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                                  </p>
-                                  <p className="text-xs text-emerald-600 leading-snug line-clamp-2" title={suggestion.subtitle}>{suggestion.subtitle}</p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
+                    </div>
                     {embedCalId === cal.objectId && (
-                      <div className="border-t border-zinc-100 pt-3 mt-3">
+                      <div className="border border-zinc-200 rounded-xl p-4">
                         <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-2">Embed on Your Website</p>
                         <p className="text-xs text-zinc-500 mb-3">Copy this code and paste it into your website&apos;s HTML to show upcoming events.</p>
                         <div className="relative">
@@ -2324,7 +2309,16 @@ export default function OrgDashboardPage() {
                         </div>
                       </div>
                     )}
+                    {showChat ? (
+                      <div className="border border-zinc-200 rounded-xl p-4 max-h-[74vh] overflow-y-auto">
+                        <ConciergeThread calendarId={calendarId} />
+                      </div>
+                    ) : (
+                      plansPanel
+                    )}
                   </div>
+                  {showChat && <div className="min-w-0">{plansPanel}</div>}
+                  </>
                 );
               })()}
             </div>
