@@ -1458,6 +1458,65 @@ export default function OrgDashboardPage() {
               ))}
             </div>
 
+            {/* Upcoming plans across all calendars */}
+            {(() => {
+              const upcoming = dashboard.calendars
+                .flatMap((c) => ((c as Record<string, unknown>).activePlans as CalActivePlan[]) || [])
+                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+              if (upcoming.length === 0) return null;
+              return (
+                <section>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Upcoming Plans</h3>
+                    <button
+                      onClick={() => setActiveTab("calendars")}
+                      className="text-xs uppercase tracking-widest font-bold text-zinc-400 hover:text-zinc-900 transition-colors"
+                    >
+                      See all
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {upcoming.slice(0, 8).map((plan) => (
+                      <button
+                        key={plan.objectId}
+                        type="button"
+                        onClick={() => setSelectedActivePlan(plan)}
+                        className="text-left border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors"
+                      >
+                        {plan.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={plan.image} alt={plan.title} className="w-full h-28 object-cover" />
+                        ) : (
+                          <div className="w-full h-28 bg-zinc-100 flex items-center justify-center">
+                            <Calendar className="w-6 h-6 text-zinc-300" />
+                          </div>
+                        )}
+                        <div className="p-3">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            {plan.isPoll && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-widest px-1 py-0.5 rounded bg-zinc-900 text-white shrink-0">
+                                <Vote className="w-2.5 h-2.5" /> Poll
+                              </span>
+                            )}
+                            <h4 className="font-medium text-sm truncate">{plan.title}</h4>
+                          </div>
+                          <p className="text-xs text-zinc-400 mb-1">
+                            {new Date(plan.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                          </p>
+                          <div className="flex items-center justify-between text-xs text-zinc-400">
+                            <span className="truncate">{plan.hostName}</span>
+                            <span className="shrink-0 ml-2">
+                              {plan.isPoll ? `${plan.pollVoteCount ?? 0} votes` : `${plan.rsvpCount} RSVPs`}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              );
+            })()}
+
             {dashboard.rsvpLimit !== null && dashboard.rsvpsThisMonth >= 40 && (
               <div className={`border rounded-xl p-4 flex items-start gap-3 ${
                 dashboard.rsvpsThisMonth >= dashboard.rsvpLimit
@@ -2100,53 +2159,52 @@ export default function OrgDashboardPage() {
                 </button>
               )}
             </div>
-            <div className={`grid grid-cols-1 gap-4 items-start ${showChat ? "lg:grid-cols-[240px_minmax(0,1fr)_320px]" : "lg:grid-cols-[240px_minmax(0,1fr)]"}`}>
-              {/* LEFT — calendar list */}
-              <div className="border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden">
-                {cals.map((c) => {
-                  const isSel = selectedCal?.objectId === c.objectId;
-                  const off = c.isActive === false;
-                  return (
-                    <button
-                      key={c.objectId}
-                      onClick={() => setCalendarsSelectedId(c.objectId)}
-                      className={`w-full text-left px-3 py-2.5 flex items-center gap-2.5 transition-colors hover:bg-zinc-50 ${isSel ? "bg-zinc-50" : ""} ${off ? "opacity-60" : ""}`}
-                    >
-                      {c.calendarImage ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={c.calendarImage} alt={c.name} className="w-8 h-8 rounded-lg object-cover shrink-0" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0">
-                          <Calendar className="w-4 h-4 text-zinc-300" />
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-medium text-zinc-900 truncate">{c.name}</span>
-                          {c.isConciergeServiced && <Sparkles className="w-3 h-3 text-emerald-500 shrink-0" />}
-                        </div>
-                        <div className="text-[11px] text-zinc-400 truncate">
-                          {c.isPrimary ? "Primary · " : ""}{c.city || "No city set"}
-                        </div>
-                      </div>
-                      {c.isConciergeServiced && conciergeUnread > 0 ? (
-                        <span className="bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[16px] text-center shrink-0">
-                          {conciergeUnread}
-                        </span>
-                      ) : isSel ? (
-                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-900 shrink-0" />
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* MIDDLE (header + chat|plans) + RIGHT (plans, concierge only) */}
+            <div className="grid grid-cols-1 gap-4 items-start lg:grid-cols-[260px_minmax(0,1fr)]">
               {selectedCal && (() => {
                 const cal = selectedCal;
                 const activePlans = ((cal as Record<string, unknown>).activePlans as CalActivePlan[]) || [];
                 const suggestedPlans = ((cal as Record<string, unknown>).suggestedPlans as CalSuggestion[]) || [];
                 const inactive = cal.isActive === false;
+                const listPanel = (
+                  <div className="border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden">
+                    {cals.map((c) => {
+                      const isSel = selectedCal?.objectId === c.objectId;
+                      const off = c.isActive === false;
+                      return (
+                        <button
+                          key={c.objectId}
+                          onClick={() => setCalendarsSelectedId(c.objectId)}
+                          className={`w-full text-left px-3 py-2.5 flex items-center gap-2.5 transition-colors hover:bg-zinc-50 ${isSel ? "bg-zinc-50" : ""} ${off ? "opacity-60" : ""}`}
+                        >
+                          {c.calendarImage ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={c.calendarImage} alt={c.name} className="w-8 h-8 rounded-lg object-cover shrink-0" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0">
+                              <Calendar className="w-4 h-4 text-zinc-300" />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-medium text-zinc-900 truncate">{c.name}</span>
+                              {c.isConciergeServiced && <Sparkles className="w-3 h-3 text-emerald-500 shrink-0" />}
+                            </div>
+                            <div className="text-[11px] text-zinc-400 truncate">
+                              {c.isPrimary ? "Primary · " : ""}{c.city || "No city set"}
+                            </div>
+                          </div>
+                          {c.isConciergeServiced && conciergeUnread > 0 ? (
+                            <span className="bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[16px] text-center shrink-0">
+                              {conciergeUnread}
+                            </span>
+                          ) : isSel ? (
+                            <span className="w-1.5 h-1.5 rounded-full bg-zinc-900 shrink-0" />
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
                 const plansPanel = (
                   <div className="border border-zinc-200 rounded-xl p-4">
                     <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-3">Active Plans</p>
@@ -2175,6 +2233,12 @@ export default function OrgDashboardPage() {
                 );
                 return (
                   <>
+                  {/* LEFT — calendar list, with active plans stacked below (concierge) */}
+                  <div className="space-y-4 min-w-0">
+                    {listPanel}
+                    {showChat && plansPanel}
+                  </div>
+                  {/* RIGHT — header + chat (wide) or header + plans */}
                   <div className="space-y-4 min-w-0">
                     <div
                       className={`border rounded-xl px-4 py-3 ${
@@ -2310,14 +2374,13 @@ export default function OrgDashboardPage() {
                       </div>
                     )}
                     {showChat ? (
-                      <div className="border border-zinc-200 rounded-xl p-4 max-h-[74vh] overflow-y-auto">
+                      <div className="border border-zinc-200 rounded-xl p-4 max-h-[80vh] overflow-y-auto">
                         <ConciergeThread calendarId={calendarId} />
                       </div>
                     ) : (
                       plansPanel
                     )}
                   </div>
-                  {showChat && <div className="min-w-0">{plansPanel}</div>}
                   </>
                 );
               })()}
