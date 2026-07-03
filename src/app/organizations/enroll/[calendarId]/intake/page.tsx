@@ -20,7 +20,7 @@ type SectionId = "about" | "spaces" | "vibe" | "members" | "wrap";
 
 const SECTIONS: { id: SectionId; title: string; description: string }[] = [
   { id: "about", title: "About your community", description: "The basics so we can ground everything else." },
-  { id: "spaces", title: "Spaces & logistics", description: "Where events happen, and what's possible to run." },
+  { id: "spaces", title: "Spaces & logistics", description: "Where events should be hosted, and what's possible to run." },
   { id: "vibe", title: "Vibe & guardrails", description: "What lands with your community — and what doesn't." },
   { id: "members", title: "Members & branding", description: "How you reach members and how your community sounds." },
   { id: "wrap", title: "Last step", description: "Anything else before we get started." },
@@ -247,7 +247,7 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
       return (
         <div className="space-y-5">
           <SelectField
-            label="Where do events happen?"
+            label="Where should events be hosted?"
             value={values.venueMode as string}
             onChange={(v) => onChange("venueMode", v)}
             options={[
