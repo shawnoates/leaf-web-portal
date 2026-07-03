@@ -44,6 +44,7 @@ import {
   Code,
   Megaphone,
   MessageSquare,
+  X,
   Ticket,
   Phone,
   Smartphone,
@@ -227,7 +228,6 @@ const BLACKLIST_PRESETS: string[] = [
 const TABS = [
   { id: "overview", label: "Overview", icon: Calendar },
   { id: "calendars", label: "Calendars", icon: Layers },
-  { id: "messages", label: "Messages", icon: MessageSquare, conciergeOnly: true },
   { id: "followers", label: "Followers", icon: Heart },
   { id: "members", label: "Users", icon: Users, ownerOnly: true },
   { id: "analytics", label: "Analytics", icon: TrendingUp, proOnly: true },
@@ -634,15 +634,17 @@ export default function OrgDashboardPage() {
     loadPendingMenu();
   }, [loadPendingMenu]);
 
-  // Concierge unread badge on the Messages tab. Clears while the tab is open
-  // (the thread marks messages read server-side); polled otherwise.
+  // Concierge chat lives on the serviced calendar's card (not a global tab),
+  // opened in a modal. Unread badge on the button clears while the modal is
+  // open (the thread marks messages read server-side); polled otherwise.
+  const [showConciergeMessages, setShowConciergeMessages] = useState(false);
   const [conciergeUnread, setConciergeUnread] = useState(0);
   useEffect(() => {
     if (!dashboard || dashboard.tier !== "concierge") {
       setConciergeUnread(0);
       return;
     }
-    if (activeTab === "messages") {
+    if (showConciergeMessages) {
       setConciergeUnread(0);
       return;
     }
@@ -659,7 +661,7 @@ export default function OrgDashboardPage() {
       alive = false;
       clearInterval(t);
     };
-  }, [dashboard, calendarId, activeTab]);
+  }, [dashboard, calendarId, showConciergeMessages]);
 
   // Analytics fetcher — Pro tier only
   const fetchAnalytics = useCallback(
@@ -1020,8 +1022,6 @@ export default function OrgDashboardPage() {
           <nav className="flex gap-1 -mb-px overflow-x-auto no-scrollbar">
             {TABS.map((tab) => {
               if (tab.ownerOnly && !dashboard.isOwner) return null;
-              if ((tab as { conciergeOnly?: boolean }).conciergeOnly && dashboard.tier !== "concierge")
-                return null;
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               const isLocked =
@@ -1048,11 +1048,6 @@ export default function OrgDashboardPage() {
                   {tab.id === "followers" && dashboard.pendingFollowerCount > 0 && (
                     <span className="bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[18px] text-center">
                       {dashboard.pendingFollowerCount}
-                    </span>
-                  )}
-                  {tab.id === "messages" && conciergeUnread > 0 && (
-                    <span className="bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[18px] text-center">
-                      {conciergeUnread}
                     </span>
                   )}
                   {isLocked && <Lock className="w-3 h-3 ml-0.5" />}
@@ -1997,7 +1992,7 @@ export default function OrgDashboardPage() {
                       inactive
                         ? "border-zinc-100 bg-zinc-50 opacity-60"
                         : cal.isConciergeServiced
-                        ? "border-emerald-300 ring-1 ring-emerald-200 bg-emerald-50/30"
+                        ? "border-zinc-900 ring-1 ring-zinc-900"
                         : "border-zinc-200"
                     }`}
                   >
@@ -2077,6 +2072,19 @@ export default function OrgDashboardPage() {
                           </button>
                         ) : (
                           <>
+                            {cal.isConciergeServiced && (
+                              <button
+                                onClick={() => setShowConciergeMessages(true)}
+                                className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
+                              >
+                                <MessageSquare className="w-3 h-3" /> Messages
+                                {conciergeUnread > 0 && (
+                                  <span className="ml-0.5 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[16px] text-center">
+                                    {conciergeUnread}
+                                  </span>
+                                )}
+                              </button>
+                            )}
                             <Link
                               href={`/dashboard/${calendarId}/calendars/${cal.objectId}/edit`}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
@@ -2256,8 +2264,6 @@ export default function OrgDashboardPage() {
           </div>
         )}
 
-        {/* ──────── MESSAGES TAB (concierge) ──────── */}
-        {activeTab === "messages" && <ConciergeThread calendarId={calendarId} />}
 
         {/* ──────── MARKETPLACE TAB ──────── */}
         {activeTab === "marketplace" && (
@@ -3259,6 +3265,28 @@ export default function OrgDashboardPage() {
         />
       )}
 
+
+      {/* Concierge messages — opened from the serviced calendar's card */}
+      {showConciergeMessages && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 backdrop-blur-sm p-4"
+          onClick={() => setShowConciergeMessages(false)}
+        >
+          <div
+            className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowConciergeMessages(false)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <ConciergeThread calendarId={calendarId} />
+          </div>
+        </div>
+      )}
 
       {/* Edit Co-Host Scope Modal */}
       {editScopeFor && (
