@@ -107,19 +107,33 @@ export default function PlanDetailModal({
   const [closingPoll, setClosingPoll] = useState(false);
   const [planRsvps, setPlanRsvps] = useState<Rsvp[]>([]);
   const [planRsvpsLoading, setPlanRsvpsLoading] = useState(false);
+  const [planRsvpsError, setPlanRsvpsError] = useState<string | null>(null);
+  const [planRsvpsRefreshTick, setPlanRsvpsRefreshTick] = useState(0);
 
-  // Load attendees for non-poll plans.
+  // Load attendees for non-poll plans. Re-fires when the parent triggers a
+  // refresh (planRsvpsRefreshTick) so RSVPs that land after the modal
+  // opened get picked up. Errors used to be swallowed silently, which
+  // masked auth failures and any server-side inconsistency; we now log
+  // them and surface a short message so the "Attendees (1)" state has an
+  // explanation when it doesn't match reality.
   useEffect(() => {
     if (plan.isPoll) {
       setPlanRsvps([]);
       return;
     }
     setPlanRsvpsLoading(true);
+    setPlanRsvpsError(null);
     Parse.Cloud.run("getPlanRsvps", { eventGroupId: plan.objectId })
       .then((result: Rsvp[]) => setPlanRsvps(result || []))
-      .catch(() => setPlanRsvps([]))
+      .catch((err: unknown) => {
+        console.error("[PlanDetailModal] getPlanRsvps failed:", err);
+        setPlanRsvps([]);
+        setPlanRsvpsError(
+          err instanceof Error ? err.message : "Failed to load attendees."
+        );
+      })
       .finally(() => setPlanRsvpsLoading(false));
-  }, [plan.objectId, plan.isPoll]);
+  }, [plan.objectId, plan.isPoll, planRsvpsRefreshTick]);
 
   // Load poll detail for poll plans.
   useEffect(() => {
@@ -440,13 +454,22 @@ export default function PlanDetailModal({
             // Non-poll branch — attendees table
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
-                <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
+                <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400 flex items-center gap-2">
                   Attendees{!planRsvpsLoading && ` (${planRsvps.filter((r) => r.status === "Accepted").length})`}
                   {!planRsvpsLoading && planRsvps.some((r) => (r.status === "pendingRsvp" || r.status === "Requested")) && (
-                    <span className="text-amber-500 ml-2">
+                    <span className="text-amber-500">
                       {planRsvps.filter((r) => (r.status === "pendingRsvp" || r.status === "Requested")).length} pending
                     </span>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => setPlanRsvpsRefreshTick((n) => n + 1)}
+                    disabled={planRsvpsLoading}
+                    className="text-[10px] font-medium text-zinc-400 hover:text-zinc-700 underline disabled:opacity-40"
+                    title="Reload attendees"
+                  >
+                    Refresh
+                  </button>
                 </h4>
                 {(() => {
                   // iOS Safari treats `+` in `sms:` URLs as a space and is inconsistent
@@ -469,6 +492,11 @@ export default function PlanDetailModal({
                   );
                 })()}
               </div>
+              {planRsvpsError && (
+                <div className="border border-red-200 bg-red-50 text-red-700 rounded-lg px-3 py-2 text-xs">
+                  Couldn&apos;t load attendees: {planRsvpsError}
+                </div>
+              )}
               {planRsvpsLoading ? (
                 <p className="text-sm text-zinc-400">Loading...</p>
               ) : planRsvps.length > 0 ? (
