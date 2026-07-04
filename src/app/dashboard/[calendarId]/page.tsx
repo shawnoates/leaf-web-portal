@@ -48,6 +48,7 @@ import {
   Phone,
   Smartphone,
   Vote,
+  X,
 } from "lucide-react";
 
 import {
@@ -689,6 +690,9 @@ export default function OrgDashboardPage() {
   const [managePlansCalId, setManagePlansCalId] = useState<string | null>(null);
   const [managePlansPrefill, setManagePlansPrefill] = useState<CreatePlanPrefill | null>(null);
   const [managePlansReturnTo, setManagePlansReturnTo] = useState<string | null>(null);
+  // Concierge chat slide-over — the serviced calendar looks like any other; the
+  // concierge conversation opens as a drawer from its "Concierge" button.
+  const [showConciergeChat, setShowConciergeChat] = useState(false);
   const managePlansOpenedRef = useRef(false);
   useEffect(() => {
     if (!dashboard || managePlansOpenedRef.current) return;
@@ -1599,7 +1603,7 @@ export default function OrgDashboardPage() {
                     Recent Photos
                   </h3>
                   <button
-                    onClick={() => setManagePlansCalId(calendarId)}
+                    onClick={() => { setActiveTab("calendars"); setCalendarsSelectedId(calendarId); setManagePlansCalId(calendarId); }}
                     className="text-xs uppercase tracking-widest font-bold text-zinc-400 hover:text-zinc-900 transition-colors"
                   >
                     See all
@@ -2178,7 +2182,6 @@ export default function OrgDashboardPage() {
             cals.find((c) => c.isConciergeServiced) ||
             cals.find((c) => c.isPrimary) ||
             cals[0];
-          const showChat = dashboard.tier === "concierge" && selectedCal?.isConciergeServiced === true;
           return (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -2277,12 +2280,11 @@ export default function OrgDashboardPage() {
                 );
                 return (
                   <>
-                  {/* LEFT — calendar list, with active plans stacked below (concierge) */}
+                  {/* LEFT — calendar list */}
                   <div className="space-y-4 min-w-0">
                     {listPanel}
-                    {showChat && plansPanel}
                   </div>
-                  {/* RIGHT — header + chat (wide) or header + plans */}
+                  {/* RIGHT — header + plans (or the Manage Plans surface) */}
                   <div className="space-y-4 min-w-0">
                     <div
                       className={`border rounded-xl px-4 py-3 ${
@@ -2369,6 +2371,19 @@ export default function OrgDashboardPage() {
                           </button>
                         ) : (
                           <>
+                            {cal.isConciergeServiced && (
+                              <button
+                                onClick={() => setShowConciergeChat(true)}
+                                className="relative flex items-center gap-1.5 bg-zinc-900 text-white px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
+                              >
+                                <Sparkles className="w-3.5 h-3.5 text-emerald-400" /> Concierge
+                                {conciergeUnread > 0 && (
+                                  <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[16px] text-center">
+                                    {conciergeUnread}
+                                  </span>
+                                )}
+                              </button>
+                            )}
                             {dashboard.tier === "concierge" && !cal.isConciergeServiced && (
                               <button
                                 onClick={() => setServicedCalendar(cal.objectId)}
@@ -2387,7 +2402,7 @@ export default function OrgDashboardPage() {
                               <Pencil className="w-3 h-3" /> Edit
                             </Link>
                             <button
-                              onClick={() => setManagePlansCalId(cal.objectId)}
+                              onClick={() => { setCalendarsSelectedId(cal.objectId); setManagePlansCalId(cal.objectId); }}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
                             >
                               Manage Plans <ChevronRight className="w-3 h-3" />
@@ -2417,12 +2432,17 @@ export default function OrgDashboardPage() {
                         </div>
                       </div>
                     )}
-                    {showChat ? (
-                      <div className="border border-zinc-200 rounded-xl p-4 max-h-[80vh] overflow-y-auto">
-                        <ConciergeThread
-                          calendarId={calendarId}
-                          onMenuResolved={() => {
-                            loadPendingMenu();
+                    {managePlansCalId === cal.objectId ? (
+                      <div className="border border-zinc-200 rounded-xl overflow-hidden h-[78vh]">
+                        <PlansManager
+                          calendarId={cal.objectId}
+                          orgId={calendarId}
+                          initialPrefill={managePlansPrefill}
+                          returnTo={managePlansReturnTo}
+                          onClose={() => {
+                            setManagePlansCalId(null);
+                            setManagePlansPrefill(null);
+                            setManagePlansReturnTo(null);
                             fetchDashboard();
                           }}
                         />
@@ -3511,32 +3531,27 @@ export default function OrgDashboardPage() {
         </div>
       )}
 
-      {/* Manage-plans slide-over — full plan management (upcoming/past/ideas,
-          create/edit) for a calendar, opened from the Calendars tab. Replaces
-          the former standalone /plans route. */}
-      {managePlansCalId && (
+      {/* Concierge chat slide-over — opened from the serviced calendar's
+          "Concierge" button. The calendar itself looks like any other. */}
+      {showConciergeChat && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => {
-              setManagePlansCalId(null);
-              setManagePlansPrefill(null);
-              setManagePlansReturnTo(null);
-            }}
-          />
-          <div className="relative bg-white w-full max-w-2xl h-full shadow-2xl">
-            <PlansManager
-              calendarId={managePlansCalId}
-              orgId={calendarId}
-              initialPrefill={managePlansPrefill}
-              returnTo={managePlansReturnTo}
-              onClose={() => {
-                setManagePlansCalId(null);
-                setManagePlansPrefill(null);
-                setManagePlansReturnTo(null);
-                fetchDashboard();
-              }}
-            />
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowConciergeChat(false)} />
+          <div className="relative bg-white w-full max-w-lg h-full shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 shrink-0">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Concierge</h2>
+              <button onClick={() => setShowConciergeChat(false)} className="text-zinc-400 hover:text-zinc-900 transition-colors" aria-label="Close">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <ConciergeThread
+                calendarId={calendarId}
+                onMenuResolved={() => {
+                  loadPendingMenu();
+                  fetchDashboard();
+                }}
+              />
+            </div>
           </div>
         </div>
       )}
