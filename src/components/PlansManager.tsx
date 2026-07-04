@@ -10,6 +10,40 @@ import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailMod
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { Calendar, Camera, Check, Lock, MapPin, Plus, RefreshCw, Repeat, Settings, Trash2, UserCheck, Users, X } from "lucide-react";
 
+// Renders a plan cover image with a Calendar-icon placeholder fallback when
+// the src is missing OR 404s (attendee-uploaded / expired signed URLs go
+// stale). Sized via `className` on the outer wrapper so callers keep full
+// control of the layout.
+function PlanImage({
+  src,
+  alt,
+  className,
+  iconSize = "w-6 h-6",
+}: {
+  src?: string | null;
+  alt: string;
+  className: string;
+  iconSize?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return (
+      <div className={`${className} bg-zinc-100 flex items-center justify-center`}>
+        <Calendar className={`${iconSize} text-zinc-300`} />
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      className={`${className} object-cover`}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 interface PlanIdea {
   objectId: string;
   title: string;
@@ -143,6 +177,15 @@ export default function PlansManager({
   useEffect(() => {
     fetchOrgInfo();
     fetchPlanIdeas();
+    // Reset per-calendar caches when the parent switches calendars so
+    // fetchPastPlans() actually re-runs against the newly-selected id.
+    // Without this the null-short-circuit at the top of fetchPastPlans()
+    // keeps rendering the previously-loaded calendar's plans.
+    setPastPlans(null);
+    setLoadingPast(false);
+    if (planTense === "past") {
+      fetchPastPlans();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarId]);
 
@@ -496,14 +539,7 @@ export default function PlansManager({
               <div className="flex gap-3 overflow-x-auto pb-1">
                 {upcomingPlans.map((plan) => (
                   <div key={plan.objectId} onClick={() => setSelectedPlan(plan)} className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer">
-                    {plan.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={plan.image} alt={plan.title} className="w-full h-28 object-cover" />
-                    ) : (
-                      <div className="w-full h-28 bg-zinc-100 flex items-center justify-center">
-                        <Calendar className="w-6 h-6 text-zinc-300" />
-                      </div>
-                    )}
+                    <PlanImage src={plan.image} alt={plan.title} className="w-full h-28" />
                     <div className="p-3">
                       <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
                       <p className="text-xs text-zinc-400 mb-1">
@@ -532,14 +568,11 @@ export default function PlansManager({
                   onClick={() => openPhotosModal(plan)}
                   className="text-left border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors flex"
                 >
-                  {plan.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={plan.image} alt={plan.title} className="w-24 h-24 object-cover flex-shrink-0" />
-                  ) : (
-                    <div className="w-24 h-24 bg-zinc-100 flex items-center justify-center flex-shrink-0">
-                      <Calendar className="w-6 h-6 text-zinc-300" />
-                    </div>
-                  )}
+                  <PlanImage
+                    src={plan.image}
+                    alt={plan.title}
+                    className="w-24 h-24 flex-shrink-0"
+                  />
                   <div className="p-3 flex-1 min-w-0">
                     <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
                     <p className="text-xs text-zinc-400 mb-2">
@@ -632,7 +665,16 @@ export default function PlansManager({
                 >
                   {idea.image && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={idea.image} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                    <img
+                      src={idea.image}
+                      alt=""
+                      className="w-12 h-12 rounded-lg object-cover shrink-0"
+                      onError={(e) => {
+                        // 404 on the idea cover — hide the slot rather than
+                        // leaving a broken-image placeholder.
+                        (e.currentTarget as HTMLImageElement).style.display = "none";
+                      }}
+                    />
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">

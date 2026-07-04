@@ -143,8 +143,8 @@ export default function ConciergeThread({
     null;
 
   return (
-    <div className="w-full">
-      <div className="flex items-center gap-3 mb-4">
+    <div className="w-full h-full flex flex-col">
+      <div className="flex items-center gap-3 mb-4 shrink-0">
         <div className="w-9 h-9 rounded-full bg-zinc-900 flex items-center justify-center overflow-hidden shrink-0">
           {persona.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -161,7 +161,7 @@ export default function ConciergeThread({
 
       <div
         ref={scrollRef}
-        className="border border-zinc-200 rounded-xl bg-zinc-50/50 p-4 h-[30rem] overflow-y-auto flex flex-col gap-3"
+        className="border border-zinc-200 rounded-xl bg-zinc-50/50 p-4 flex-1 min-h-0 overflow-y-auto flex flex-col gap-3"
       >
         {loading ? (
           <div className="m-auto flex items-center gap-2 text-sm text-zinc-400">
@@ -316,7 +316,7 @@ export default function ConciergeThread({
 
       {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
 
-      <div className="mt-3 flex items-end gap-2">
+      <div className="mt-3 flex items-end gap-2 shrink-0">
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

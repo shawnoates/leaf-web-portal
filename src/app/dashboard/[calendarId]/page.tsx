@@ -2243,9 +2243,10 @@ export default function OrgDashboardPage() {
                               <button
                                 onClick={() => setShowConciergeChat(true)}
                                 title="Concierge"
-                                className="relative text-zinc-500 hover:text-zinc-900 transition-colors"
+                                className="relative text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 transition-colors"
                               >
                                 <MessageCircle className="w-4 h-4" />
+                                <span>Concierge</span>
                                 {conciergeUnread > 0 && (
                                   <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[16px] text-center">
                                     {conciergeUnread}
@@ -3391,12 +3392,17 @@ export default function OrgDashboardPage() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowConciergeChat(false)} />
           <div className="relative bg-white w-full lg:w-1/2 h-full shadow-2xl flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 shrink-0">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Concierge</h2>
-              <button onClick={() => setShowConciergeChat(false)} className="text-zinc-400 hover:text-zinc-900 transition-colors" aria-label="Close">
+              <div className="min-w-0">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Concierge</h2>
+                <p className="text-xs text-zinc-400 truncate">
+                  {dashboard.calendars.find((c) => c.isConciergeServiced)?.name || dashboard.name}
+                </p>
+              </div>
+              <button onClick={() => setShowConciergeChat(false)} className="text-zinc-400 hover:text-zinc-900 transition-colors shrink-0" aria-label="Close">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 min-h-0 p-4">
               <ConciergeThread
                 calendarId={calendarId}
                 onMenuResolved={() => {
