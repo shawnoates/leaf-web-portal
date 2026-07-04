@@ -22,7 +22,6 @@ import {
   Calendar,
   Check,
   ChevronDown,
-  ChevronRight,
   Clock,
   Copy,
   Download,
@@ -241,106 +240,6 @@ const TABS = [
 const PAID_TIERS = ["pro", "growth", "concierge"];
 
 type CalActivePlan = { objectId: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null };
-type CalSuggestion = { id: string; type: string; title: string; description?: string; subtitle: string; recommendedDate: string; recommendedTime?: string | null; venue?: { name: string; address: string } | null; image?: string | null; isSuggestion: true };
-
-// Vertical carousel of a calendar's plans + suggestions (stacked rows).
-function PlansCarousel({
-  activePlans, suggestedPlans, locked, onOpen, onUpgrade, onAdd,
-}: {
-  activePlans: CalActivePlan[];
-  suggestedPlans: CalSuggestion[];
-  locked: boolean;
-  onOpen: (p: CalActivePlan) => void;
-  onUpgrade: () => void;
-  onAdd: (s: CalSuggestion) => void;
-}) {
-  const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-  // Snapshot once per render — poll expiry is day-level, so a stable value is fine.
-  // eslint-disable-next-line react-hooks/purity
-  const nowMs = Date.now();
-  if (activePlans.length === 0 && suggestedPlans.length === 0) {
-    return <p className="text-xs text-zinc-400">No active plans yet.</p>;
-  }
-  return (
-    <div className="flex flex-col gap-2 max-h-[68vh] overflow-y-auto pr-0.5">
-      {activePlans.map((plan) => {
-        const poll = plan.isPoll === true;
-        const closesAtMs = plan.pollClosesAt ? new Date(plan.pollClosesAt).getTime() : null;
-        const isExpired = poll && closesAtMs !== null && closesAtMs <= nowMs;
-        return (
-          <button
-            key={plan.objectId}
-            type="button"
-            onClick={() => onOpen(plan)}
-            className={`flex items-center gap-3 w-full text-left rounded-lg border p-2 transition-colors ${
-              isExpired ? "border-amber-300 bg-amber-50/30 hover:border-amber-400" : "border-zinc-100 hover:border-zinc-300"
-            }`}
-          >
-            {plan.image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={plan.image} alt={plan.title} className="w-14 h-14 rounded-md object-cover shrink-0" />
-            ) : (
-              <div className="w-14 h-14 rounded-md bg-zinc-100 flex items-center justify-center shrink-0">
-                <Calendar className="w-5 h-5 text-zinc-300" />
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                {poll && (
-                  <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-widest px-1 py-0.5 rounded shrink-0 ${isExpired ? "bg-amber-600 text-white" : "bg-zinc-900 text-white"}`}>
-                    <Vote className="w-2.5 h-2.5" /> {isExpired ? "Pick" : "Poll"}
-                  </span>
-                )}
-                <h4 className="text-xs font-medium text-zinc-900 truncate">{plan.title}</h4>
-              </div>
-              <p className="text-xs text-zinc-400 truncate">
-                {poll ? `${plan.pollOptionCount ?? 0} options${isExpired ? " · closed" : ""}` : fmtDate(plan.date)}
-              </p>
-              <div className="flex items-center justify-between text-xs text-zinc-400">
-                <span className="truncate">{plan.hostName}</span>
-                <span className="shrink-0 ml-2">{poll ? `${plan.pollVoteCount ?? 0} votes` : `${plan.rsvpCount} RSVPs`}</span>
-              </div>
-            </div>
-          </button>
-        );
-      })}
-      {suggestedPlans.map((s) => (
-        <button
-          key={s.id}
-          type="button"
-          onClick={() => (locked ? onUpgrade() : onAdd(s))}
-          className={`flex items-center gap-3 w-full text-left rounded-lg border p-2 transition-colors ${
-            locked ? "border-zinc-200 bg-zinc-50" : "border-dashed border-emerald-300 hover:border-emerald-400"
-          }`}
-        >
-          <div className="w-14 h-14 rounded-md overflow-hidden shrink-0 relative bg-gradient-to-br from-emerald-50 to-zinc-100">
-            {s.image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={s.image} alt={s.title} className="w-full h-full object-cover" />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-emerald-400" />
-              </div>
-            )}
-            {locked && (
-              <div className="absolute inset-0 bg-zinc-900/50 flex items-center justify-center">
-                <Lock className="w-3.5 h-3.5 text-white" />
-              </div>
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[9px] font-bold uppercase tracking-widest bg-emerald-600 text-white px-1 py-0.5 rounded shrink-0">Suggested</span>
-              <h4 className="text-xs font-medium text-zinc-900 truncate">{s.title}</h4>
-            </div>
-            <p className="text-xs text-zinc-400 truncate">{fmtDate(s.recommendedDate)}</p>
-            <p className="text-xs text-emerald-600 truncate" title={s.subtitle}>{s.subtitle}</p>
-          </div>
-        </button>
-      ))}
-    </div>
-  );
-}
 
 // ── Analytics types ────────────────────────────────────────────────────
 
@@ -2193,8 +2092,6 @@ export default function OrgDashboardPage() {
             <div className="grid grid-cols-1 gap-4 items-start lg:grid-cols-[260px_minmax(0,1fr)]">
               {selectedCal && (() => {
                 const cal = selectedCal;
-                const activePlans = ((cal as Record<string, unknown>).activePlans as CalActivePlan[]) || [];
-                const suggestedPlans = ((cal as Record<string, unknown>).suggestedPlans as CalSuggestion[]) || [];
                 const inactive = cal.isActive === false;
                 const listPanel = (
                   <div className="border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden">
@@ -2233,32 +2130,6 @@ export default function OrgDashboardPage() {
                         </button>
                       );
                     })}
-                  </div>
-                );
-                const plansPanel = (
-                  <div className="border border-zinc-200 rounded-xl p-4">
-                    <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-3">Active Plans</p>
-                    <PlansCarousel
-                      activePlans={activePlans}
-                      suggestedPlans={suggestedPlans}
-                      locked={!PAID_TIERS.includes(dashboard.tier)}
-                      onOpen={(p) => setSelectedActivePlan(p)}
-                      onUpgrade={() => setShowSubscription(true)}
-                      onAdd={(s) => {
-                        const recDate = new Date(s.recommendedDate);
-                        setCreatePlanPrefill({
-                          title: s.title,
-                          description: s.description || "",
-                          venue: s.venue || null,
-                          date: recDate.toISOString().slice(0, 10),
-                          time: s.recommendedTime || "",
-                          capacity: "",
-                          imageUrl: s.image || null,
-                          justification: s.subtitle,
-                        });
-                        setShowCreatePlanModal(true);
-                      }}
-                    />
                   </div>
                 );
                 return (
@@ -2399,22 +2270,6 @@ export default function OrgDashboardPage() {
                             >
                               <Pencil className="w-3 h-3" /> Edit
                             </Link>
-                            <button
-                              onClick={() => {
-                                if (managePlansCalId === cal.objectId) {
-                                  setManagePlansCalId(null);
-                                  setManagePlansPrefill(null);
-                                  setManagePlansReturnTo(null);
-                                  fetchDashboard();
-                                } else {
-                                  setCalendarsSelectedId(cal.objectId);
-                                  setManagePlansCalId(cal.objectId);
-                                }
-                              }}
-                              className={`text-xs flex items-center gap-1 transition-colors ${managePlansCalId === cal.objectId ? "text-zinc-900 font-semibold" : "text-zinc-500 hover:text-zinc-900"}`}
-                            >
-                              {managePlansCalId === cal.objectId ? "Close Plans" : <>Manage Plans <ChevronRight className="w-3 h-3" /></>}
-                            </button>
                           </>
                         )}
                       </div>
@@ -2440,18 +2295,14 @@ export default function OrgDashboardPage() {
                         </div>
                       </div>
                     )}
-                    {managePlansCalId === cal.objectId ? (
-                      <div className="px-1 pt-2">
-                        <PlansManager
-                          calendarId={cal.objectId}
-                          orgId={calendarId}
-                          initialPrefill={managePlansPrefill}
-                          returnTo={managePlansReturnTo}
-                        />
-                      </div>
-                    ) : (
-                      plansPanel
-                    )}
+                    <div className="pt-2">
+                      <PlansManager
+                        calendarId={cal.objectId}
+                        orgId={calendarId}
+                        initialPrefill={managePlansCalId === cal.objectId ? managePlansPrefill : null}
+                        returnTo={managePlansCalId === cal.objectId ? managePlansReturnTo : null}
+                      />
+                    </div>
                   </div>
                   </>
                 );

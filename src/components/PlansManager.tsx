@@ -97,7 +97,6 @@ export default function PlansManager({
 }) {
   const router = useRouter();
 
-  const [orgName, setOrgName] = useState("");
   const [tier, setTier] = useState("starter");
 
   // Modals
@@ -196,16 +195,9 @@ export default function PlansManager({
     try {
       const result = await Parse.Cloud.run("getOrgDashboard", { calendarId: orgId });
       if (orgId !== calendarId && result.calendars) {
-        const child = result.calendars.find((c: { objectId: string; name: string; hidePlanIdeas?: boolean }) => c.objectId === calendarId);
-        if (child) {
-          setOrgName(child.name);
-          setHidePlanIdeas(child.hidePlanIdeas || false);
-        } else {
-          setOrgName(result.name);
-          setHidePlanIdeas(result.hidePlanIdeas || false);
-        }
+        const child = result.calendars.find((c: { objectId: string; hidePlanIdeas?: boolean }) => c.objectId === calendarId);
+        setHidePlanIdeas((child ? child.hidePlanIdeas : result.hidePlanIdeas) || false);
       } else {
-        setOrgName(result.name);
         setHidePlanIdeas(result.hidePlanIdeas || false);
       }
       setTier(result.tier);
@@ -462,23 +454,7 @@ export default function PlansManager({
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="min-w-0">
-          <h2 className="text-lg font-medium tracking-tight">Plans</h2>
-          <p className="text-xs text-zinc-400 truncate">{orgName}</p>
-        </div>
-        <button
-          onClick={() => { resetForm(); setShowCreateModal(true); }}
-          className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          New Plan
-        </button>
-      </div>
-
-      <div className="space-y-10">
+    <div className="space-y-10">
         {/* Plans (Upcoming / Past) */}
         <section>
           <div className="flex items-center justify-between mb-4">
@@ -487,23 +463,31 @@ export default function PlansManager({
                 ? `Upcoming Plans (${upcomingPlans.length})`
                 : `Past Plans${pastPlans ? ` (${pastPlans.length})` : ""}`}
             </h2>
-            <div className="flex gap-1 border border-zinc-200 rounded-lg p-0.5">
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setPlanTense("upcoming")}
-                className={`px-3 py-1.5 text-xs uppercase tracking-widest font-bold rounded-md transition-colors ${
-                  planTense === "upcoming" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"
-                }`}
+                onClick={() => { resetForm(); setShowCreateModal(true); }}
+                className="flex items-center gap-1.5 bg-zinc-900 text-white px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
               >
-                Upcoming
+                <Plus className="w-3.5 h-3.5" /> New Plan
               </button>
-              <button
-                onClick={() => { setPlanTense("past"); fetchPastPlans(); }}
-                className={`px-3 py-1.5 text-xs uppercase tracking-widest font-bold rounded-md transition-colors ${
-                  planTense === "past" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"
-                }`}
-              >
-                Past
-              </button>
+              <div className="flex gap-1 border border-zinc-200 rounded-lg p-0.5">
+                <button
+                  onClick={() => setPlanTense("upcoming")}
+                  className={`px-3 py-1.5 text-xs uppercase tracking-widest font-bold rounded-md transition-colors ${
+                    planTense === "upcoming" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"
+                  }`}
+                >
+                  Upcoming
+                </button>
+                <button
+                  onClick={() => { setPlanTense("past"); fetchPastPlans(); }}
+                  className={`px-3 py-1.5 text-xs uppercase tracking-widest font-bold rounded-md transition-colors ${
+                    planTense === "past" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"
+                  }`}
+                >
+                  Past
+                </button>
+              </div>
             </div>
           </div>
 
@@ -693,7 +677,6 @@ export default function PlansManager({
             </div>
           )}
         </section>
-      </div>
 
       {/* Plan Detail Modal */}
       {selectedPlan && (
