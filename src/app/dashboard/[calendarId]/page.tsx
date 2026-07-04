@@ -8,7 +8,7 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import ConciergeDashboardBanner from "@/components/ConciergeDashboardBanner";
-import ConciergeMenuCard, { type ConciergeMenu } from "@/components/ConciergeMenuCard";
+import { type ConciergeMenu } from "@/components/ConciergeMenuCard";
 import ConciergeThread from "@/components/ConciergeThread";
 import PlansManager from "@/components/PlansManager";
 import ConciergeEventReports from "@/components/ConciergeEventReports";
@@ -1209,6 +1209,41 @@ export default function OrgDashboardPage() {
         {/* ──────── OVERVIEW TAB ──────── */}
         {activeTab === "overview" && (
           <div className="space-y-8">
+            {/* Concierge — compact entry card. The chat drawer is the canonical
+                surface (menu selection, messages); this just opens it. */}
+            {dashboard.tier === "concierge" && (
+              <button
+                onClick={() => setShowConciergeChat(true)}
+                className="w-full text-left relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 px-5 py-4 flex items-center gap-4 hover:bg-zinc-900 transition-colors"
+              >
+                <div aria-hidden className="pointer-events-none absolute inset-0">
+                  <div className="absolute -top-16 -right-12 h-40 w-40 rounded-full bg-emerald-500/20 blur-3xl" />
+                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                </div>
+                <div className="relative w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div className="relative min-w-0 flex-1">
+                  <h3 className="text-sm font-semibold text-white">
+                    {pendingMenu
+                      ? `Your ${pendingMenu.month ? new Date(`${pendingMenu.month}-01T12:00:00Z`).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : "new"} menu is ready`
+                      : "Your concierge"}
+                  </h3>
+                  <p className="text-xs text-zinc-400 truncate">
+                    {pendingMenu
+                      ? "Tap to pick the event you'd like us to run."
+                      : "Message your concierge — ideas, questions, dates."}
+                  </p>
+                </div>
+                {conciergeUnread > 0 && (
+                  <span className="relative shrink-0 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full leading-none">
+                    {conciergeUnread}
+                  </span>
+                )}
+                <MessageCircle className="relative w-5 h-5 text-zinc-500 shrink-0" />
+              </button>
+            )}
+
             {/* Pending Host Requests */}
             {dashboard.hostRequests && dashboard.hostRequests.length > 0 && (
               <section className="border border-amber-200 bg-amber-50/50 rounded-xl p-6">
@@ -1562,19 +1597,6 @@ export default function OrgDashboardPage() {
                   )}
                 </div>
               </section>
-            )}
-
-            {/* Concierge menu — owner picks this month's event; selecting it
-                publishes the plan to the calendar. Only present on concierge
-                calendars with a menu awaiting selection. */}
-            {pendingMenu && (
-              <ConciergeMenuCard
-                menu={pendingMenu}
-                onSelected={() => {
-                  loadPendingMenu();
-                  fetchDashboard();
-                }}
-              />
             )}
 
             {/* Concierge post-event reports — attendee feedback + recaps. */}
@@ -2764,15 +2786,15 @@ export default function OrgDashboardPage() {
                 </button>
               )}
 
-              {/* Dev — Leaf-admin-only concierge reset */}
-              {isLeafAdmin && (
+              {/* Dev — concierge reset (Leaf admins + the org owner) */}
+              {(isLeafAdmin || dashboard.isOwner) && (
                 <section className="border border-dashed border-zinc-300 rounded-xl p-6">
                   <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-1">
                     Developer · Concierge
                   </h2>
                   <p className="text-xs text-zinc-500 mb-4">
                     Reset this org&apos;s concierge state to re-run onboarding (deletes the current
-                    intake, chat messages, and menu). Leaf admins only.
+                    intake, chat messages, and menu).
                   </p>
                   <div className="flex flex-wrap gap-3">
                     <button
