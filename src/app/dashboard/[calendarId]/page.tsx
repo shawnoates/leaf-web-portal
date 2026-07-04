@@ -2682,6 +2682,8 @@ export default function OrgDashboardPage() {
                 <p className="text-xs text-zinc-500">
                   {dashboard.tier === "starter"
                     ? "Free — basic features"
+                    : dashboard.tier === "concierge"
+                    ? "$499/month — done-for-you resident events"
                     : dashboard.tier === "growth"
                     ? dashboard.billingInterval === "year" ? "$49.99/year — legacy Social plan, grandfathered into Pro features" : "$4.99/month — legacy Social plan, grandfathered into Pro features"
                     : dashboard.billingInterval === "year" ? "$99/year — full features" : "$9.99/month — full features"}
