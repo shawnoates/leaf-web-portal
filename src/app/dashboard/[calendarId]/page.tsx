@@ -663,6 +663,19 @@ export default function OrgDashboardPage() {
     setActiveTab("calendars");
   }, [dashboard, searchParams]);
 
+  // After concierge checkout, Stripe returns with ?concierge_enrolled=1 — drop
+  // the owner straight into the concierge chat on the Calendars tab, then strip
+  // the params so a refresh doesn't re-open it.
+  const conciergeEnrolledRef = useRef(false);
+  useEffect(() => {
+    if (!dashboard || conciergeEnrolledRef.current) return;
+    if (searchParams.get("concierge_enrolled") !== "1") return;
+    conciergeEnrolledRef.current = true;
+    setActiveTab("calendars");
+    setShowConciergeChat(true);
+    router.replace(`/dashboard/${calendarId}?tab=calendars`);
+  }, [dashboard, searchParams, router, calendarId]);
+
   // Prefetch marketplace data as soon as dashboard is available
   const [prefetchedMarketplace, setPrefetchedMarketplace] = useState<MarketplaceEvent[] | null>(null);
   const marketplacePrefetched = useRef(false);

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Parse from "@/lib/parse-client";
-import { Send, Loader2, Sparkles, Check } from "lucide-react";
+import { Send, Loader2, Sparkles, Check, MessageCirclePlus } from "lucide-react";
 import type { ConciergeMenu } from "./ConciergeMenuCard";
 
 interface ConciergeMessage {
@@ -42,11 +42,16 @@ export default function ConciergeThread({
   const [menu, setMenu] = useState<ConciergeMenu | null>(null);
   const [selectingId, setSelectingId] = useState<string | null>(null);
   const [menuError, setMenuError] = useState<string | null>(null);
+  // Step 2 of the menu flow: after choosing an event, pick a date/time.
+  const [timeFor, setTimeFor] = useState<ConciergeMenu["options"][number] | null>(null);
+  const [pickDate, setPickDate] = useState("");
+  const [pickTime, setPickTime] = useState("");
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -100,30 +105,37 @@ export default function ConciergeThread({
     }
   };
 
-  const selectOption = async (optionId: string) => {
-    if (!menu || selectingId) return;
-    setSelectingId(optionId);
+  // Step 2 → post: schedule the chosen event with the owner's date/time.
+  const postPlan = async () => {
+    if (!menu || !timeFor || !pickDate || selectingId) return;
+    setSelectingId(timeFor.objectId);
     setMenuError(null);
     try {
-      await Parse.Cloud.run("selectMenuOption", { menuId: menu.menuId, optionId });
+      await Parse.Cloud.run("selectMenuOption", {
+        menuId: menu.menuId,
+        optionId: timeFor.objectId,
+        scheduledDate: pickDate,
+        scheduledTime: pickTime || undefined,
+      });
       setMenu(null);
+      setTimeFor(null);
+      setPickDate("");
+      setPickTime("");
       onMenuResolved?.();
       load();
     } catch (e) {
-      setMenuError(e instanceof Error ? e.message : "Couldn't select that option.");
+      setMenuError(e instanceof Error ? e.message : "Couldn't schedule that event.");
     } finally {
       setSelectingId(null);
     }
   };
 
-  const fmtDate = (iso: string | null) =>
-    iso
-      ? new Date(iso).toLocaleDateString(undefined, {
-          weekday: "short",
-          month: "short",
-          day: "numeric",
-        })
-      : null;
+  // "Something else" — nudge the owner into the composer to tell us what they
+  // want instead of the offered options.
+  const askForSomethingElse = () => {
+    setDraft("I'd like something different — ");
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  };
 
   const monthLabel = menu?.month
     ? new Date(`${menu.month}-01T12:00:00Z`).toLocaleDateString(undefined, {
@@ -241,71 +253,106 @@ export default function ConciergeThread({
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-zinc-500 leading-relaxed mb-1">
-                  {menu.autonomyMode === "approve"
-                    ? "Pick the event you'd like us to run"
-                    : "We'll run the highlighted pick unless you choose another"}
-                  {menu.calendarName ? ` for ${menu.calendarName}` : ""}.
-                </p>
-                {menu.hostNote && (
-                  <p className="text-xs text-zinc-400 italic mb-2">“{menu.hostNote}”</p>
-                )}
-
-                <div className="mt-2 flex gap-3 overflow-x-auto pb-1 snap-x">
-                  {menu.options.map((opt) => {
-                    const isPreselected = opt.objectId === menu.preselectedOptionId;
-                    const busy = selectingId === opt.objectId;
-                    const date = fmtDate(opt.suggestedDate);
-                    return (
-                      <div
-                        key={opt.objectId}
-                        className={`snap-start shrink-0 w-52 flex flex-col rounded-xl border bg-white overflow-hidden ${
-                          isPreselected ? "border-emerald-400 ring-1 ring-emerald-400" : "border-zinc-200"
-                        }`}
+                {timeFor ? (
+                  /* ── Step 2 — pick a date & time, then post ── */
+                  <div>
+                    <p className="text-xs text-zinc-500 leading-relaxed mb-3">
+                      <span className="font-medium text-zinc-700">{timeFor.title}</span> — when
+                      should we run it? Pick a date and time and I&apos;ll post it.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                      <label className="flex-1">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Date</span>
+                        <input
+                          type="date"
+                          value={pickDate}
+                          onChange={(e) => setPickDate(e.target.value)}
+                          className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"
+                        />
+                      </label>
+                      <label className="flex-1">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Time <span className="text-zinc-300">(optional)</span></span>
+                        <input
+                          type="time"
+                          value={pickTime}
+                          onChange={(e) => setPickTime(e.target.value)}
+                          className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"
+                        />
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => { setTimeFor(null); setPickDate(""); setPickTime(""); }}
+                        disabled={!!selectingId}
+                        className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors disabled:opacity-50"
                       >
-                        {opt.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={opt.image} alt={opt.title} className="h-24 w-full object-cover" />
+                        Back
+                      </button>
+                      <button
+                        onClick={postPlan}
+                        disabled={!pickDate || !!selectingId}
+                        className="ml-auto inline-flex items-center gap-1.5 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-60"
+                      >
+                        {selectingId ? (
+                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Posting…</>
                         ) : (
-                          <div className="h-24 w-full bg-gradient-to-br from-zinc-100 to-zinc-200" />
+                          <><Check className="w-3.5 h-3.5" /> Post plan</>
                         )}
-                        <div className="flex flex-1 flex-col p-3">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <h5 className="text-sm font-medium text-zinc-900 truncate">{opt.title}</h5>
-                            {isPreselected && (
-                              <span className="shrink-0 text-[8px] font-bold uppercase tracking-widest bg-emerald-500 text-white px-1.5 py-0.5 rounded-full">
-                                Pick
-                              </span>
-                            )}
-                          </div>
-                          {(date || opt.suggestedTime) && (
-                            <p className="text-xs text-emerald-600 mb-1">
-                              {[date, opt.suggestedTime].filter(Boolean).join(" · ")}
-                            </p>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* ── Step 1 — choose an event ── */
+                  <>
+                    <p className="text-xs text-zinc-500 leading-relaxed mb-1">
+                      Pick the event you&apos;d like us to run
+                      {menu.calendarName ? ` for ${menu.calendarName}` : ""} — you&apos;ll set the
+                      date next.
+                    </p>
+                    {menu.hostNote && (
+                      <p className="text-xs text-zinc-400 italic mb-2">“{menu.hostNote}”</p>
+                    )}
+
+                    <div className="mt-2 flex gap-3 overflow-x-auto pb-1 snap-x">
+                      {menu.options.map((opt) => (
+                        <div
+                          key={opt.objectId}
+                          className="snap-start shrink-0 w-52 flex flex-col rounded-xl border border-zinc-200 bg-white overflow-hidden"
+                        >
+                          {opt.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={opt.image} alt={opt.title} className="h-24 w-full object-cover" />
+                          ) : (
+                            <div className="h-24 w-full bg-gradient-to-br from-zinc-100 to-zinc-200" />
                           )}
-                          <p className="text-xs text-zinc-500 leading-snug line-clamp-3 flex-1">
-                            {opt.description}
-                          </p>
-                          <button
-                            onClick={() => selectOption(opt.objectId)}
-                            disabled={!!selectingId}
-                            className="mt-3 inline-flex items-center justify-center gap-1.5 bg-zinc-900 text-white px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-60"
-                          >
-                            {busy ? (
-                              <>
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Scheduling…
-                              </>
-                            ) : (
-                              <>
-                                <Check className="w-3.5 h-3.5" /> Choose this
-                              </>
-                            )}
-                          </button>
+                          <div className="flex flex-1 flex-col p-3">
+                            <h5 className="text-sm font-medium text-zinc-900 truncate mb-1">{opt.title}</h5>
+                            <p className="text-xs text-zinc-500 leading-snug line-clamp-3 flex-1">
+                              {opt.description}
+                            </p>
+                            <button
+                              onClick={() => { setTimeFor(opt); setMenuError(null); }}
+                              disabled={!!selectingId}
+                              className="mt-3 inline-flex items-center justify-center gap-1.5 bg-zinc-900 text-white px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-60"
+                            >
+                              <Check className="w-3.5 h-3.5" /> Choose this
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      ))}
+
+                      {/* Something else — none of these; tell the concierge */}
+                      <button
+                        onClick={askForSomethingElse}
+                        className="snap-start shrink-0 w-52 flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-white p-3 text-zinc-500 hover:border-zinc-400 hover:text-zinc-800 transition-colors"
+                      >
+                        <MessageCirclePlus className="w-6 h-6" />
+                        <span className="text-sm font-medium">Something else</span>
+                        <span className="text-xs text-zinc-400 text-center leading-snug">Tell {persona.name} what you have in mind</span>
+                      </button>
+                    </div>
+                  </>
+                )}
 
                 {menuError && <p className="mt-2 text-xs text-red-500">{menuError}</p>}
               </div>
@@ -318,6 +365,7 @@ export default function ConciergeThread({
 
       <div className="mt-3 flex items-end gap-2 shrink-0">
         <textarea
+          ref={textareaRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
