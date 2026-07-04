@@ -11,7 +11,6 @@ import {
   ArrowLeft,
   ChevronDown,
   ImagePlus,
-  Sparkles,
 } from "lucide-react";
 
 // Per-calendar edit page. Replaces the modal that lived on the dashboard
@@ -37,6 +36,7 @@ interface CalendarEntry {
   hideDeals: boolean;
   merchantEventsOptOut: boolean;
   merchantEventsRequireApproval: boolean;
+  isConciergeServiced?: boolean;
 }
 
 interface DashboardShape {
@@ -97,8 +97,46 @@ export default function EditCalendarPage() {
   const originalSlugRef = useRef<string>("");
   const slugTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Concierge — org-level plan; one calendar is "serviced" at a time. The
+  // owner can move it here from the edit page (with a confirmation).
+  const [confirmConcierge, setConfirmConcierge] = useState(false);
+  const [settingConcierge, setSettingConcierge] = useState(false);
+
   const targetCalendar =
     dashboard?.calendars.find((c) => c.objectId === targetId) || null;
+  const isConciergeOrg = dashboard?.tier === "concierge";
+  const isServicedHere = targetCalendar?.isConciergeServiced === true;
+  const currentServicedName =
+    dashboard?.calendars.find((c) => c.isConciergeServiced)?.name || null;
+
+  async function handleAddConcierge() {
+    setSettingConcierge(true);
+    try {
+      await Parse.Cloud.run("setConciergeServicedCalendar", {
+        orgId,
+        calendarId: targetId,
+      });
+      setDashboard((prev) =>
+        prev
+          ? {
+              ...prev,
+              calendars: prev.calendars.map((c) => ({
+                ...c,
+                isConciergeServiced: c.objectId === targetId,
+              })),
+            }
+          : prev
+      );
+      setConfirmConcierge(false);
+    } catch (err) {
+      alert(
+        err instanceof Error ? err.message : "Failed to update concierge calendar."
+      );
+    } finally {
+      setSettingConcierge(false);
+    }
+  }
+
   const canManageMerchant = targetCalendar?.role === "Owner";
   const isPrimary = targetCalendar?.isPrimary ?? false;
   const canDelete = targetCalendar && !isPrimary && targetCalendar.role === "Owner";
@@ -625,6 +663,42 @@ export default function EditCalendarPage() {
           />
         </Section>
 
+        {/* ─── Concierge ─────────────────────────────────────────── */}
+        {isConciergeOrg && (
+          <Section title="Concierge">
+            {isServicedHere ? (
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-900">
+                  Your concierge runs this calendar
+                </h3>
+                <p className="text-xs text-zinc-500 mt-1 max-w-md">
+                  Your dedicated concierge plans and arranges events for this
+                  calendar. To move it, add concierge to a different calendar.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-zinc-900">
+                    Add concierge to this calendar
+                  </h3>
+                  <p className="text-xs text-zinc-500 mt-1 max-w-md">
+                    Move your dedicated concierge here. They&apos;ll plan and
+                    arrange events for this calendar going forward.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setConfirmConcierge(true)}
+                  className="shrink-0 text-xs font-bold uppercase tracking-widest text-zinc-700 hover:text-zinc-900 transition-colors"
+                >
+                  Add Concierge
+                </button>
+              </div>
+            )}
+          </Section>
+        )}
+
         {/* ─── Advanced ──────────────────────────────────────────── */}
         <Section title="Advanced" defaultOpen={false}>
           <ToggleRow
@@ -688,6 +762,46 @@ export default function EditCalendarPage() {
           </div>
         )}
       </div>
+
+      {/* Move-concierge confirmation */}
+      {confirmConcierge && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          onClick={() => !settingConcierge && setConfirmConcierge(false)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-medium text-zinc-900 mb-2">
+              Move your concierge here?
+            </h3>
+            <p className="text-sm text-zinc-600 leading-relaxed">
+              You&apos;re moving your concierge to{" "}
+              <span className="font-medium text-zinc-900">{targetCalendar.name}</span>.
+              Your dedicated concierge will now plan and arrange events for this
+              calendar
+              {currentServicedName ? ` and stop running ${currentServicedName}` : ""}.
+            </p>
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setConfirmConcierge(false)}
+                disabled={settingConcierge}
+                className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddConcierge}
+                disabled={settingConcierge}
+                className="px-4 py-2 rounded-lg bg-zinc-900 text-white text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-60"
+              >
+                {settingConcierge ? "Moving…" : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
