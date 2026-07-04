@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   ChevronDown,
   ImagePlus,
+  Sparkles,
 } from "lucide-react";
 
 // Per-calendar edit page. Replaces the modal that lived on the dashboard

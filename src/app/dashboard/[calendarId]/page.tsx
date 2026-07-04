@@ -2149,9 +2149,9 @@ export default function OrgDashboardPage() {
                         className="w-full flex items-center justify-center gap-2 border border-dashed border-zinc-300 text-zinc-500 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest hover:border-zinc-400 hover:text-zinc-900 transition-colors"
                       >
                         {dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit ? (
-                          <><Lock className="w-3.5 h-3.5" /> Upgrade to Add</>
+                          <><Lock className="w-3.5 h-3.5" /> Upgrade to Create</>
                         ) : (
-                          <><Plus className="w-3.5 h-3.5" /> Add Calendar</>
+                          <><Plus className="w-3.5 h-3.5" /> Create Calendar</>
                         )}
                       </button>
                     )}
@@ -2163,7 +2163,7 @@ export default function OrgDashboardPage() {
                         inactive ? "border-zinc-100 bg-zinc-50 opacity-70" : "border-zinc-200"
                       }`}
                     >
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
                         {cal.calendarImage ? (
                           <img src={cal.calendarImage} alt={cal.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
@@ -2229,7 +2229,7 @@ export default function OrgDashboardPage() {
                         <p className="text-xs text-zinc-400">{cal.city || "No city set"}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 shrink-0 pl-[52px] sm:pl-0">
+                      <div className="flex items-start gap-4 shrink-0 pl-[52px] sm:pl-0">
                         {inactive ? (
                           <button
                             onClick={() => setShowSubscription(true)}
@@ -3236,7 +3236,7 @@ export default function OrgDashboardPage() {
             >
               <Plus className="w-5 h-5 rotate-45" />
             </button>
-            <h2 className="text-xl font-light tracking-tight mb-6">Add Calendar</h2>
+            <h2 className="text-xl font-light tracking-tight mb-6">Create Calendar</h2>
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name</label>

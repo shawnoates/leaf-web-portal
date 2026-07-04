@@ -161,7 +161,7 @@ export default function ConciergeThread({
 
       <div
         ref={scrollRef}
-        className="border border-zinc-200 rounded-xl bg-zinc-50/50 p-4 flex-1 min-h-0 overflow-y-auto flex flex-col gap-3"
+        className="border border-zinc-200 rounded-xl bg-zinc-50/50 p-4 flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-3"
       >
         {loading ? (
           <div className="m-auto flex items-center gap-2 text-sm text-zinc-400">

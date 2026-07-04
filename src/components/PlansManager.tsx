@@ -509,7 +509,7 @@ export default function PlansManager({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => { resetForm(); setShowCreateModal(true); }}
-                className="flex items-center gap-1.5 bg-zinc-900 text-white px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
+                className="flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" /> New Plan
               </button>
