@@ -20,7 +20,7 @@ type SectionId = "about" | "spaces" | "vibe" | "members" | "wrap";
 const SECTIONS: { id: SectionId; title: string; description: string }[] = [
   { id: "about", title: "About your community", description: "The basics so we can ground everything else." },
   { id: "spaces", title: "Spaces & logistics", description: "Where events should be hosted, and what's possible to run." },
-  { id: "vibe", title: "Vibe & guardrails", description: "What lands with your community — and what doesn't." },
+  { id: "vibe", title: "Event styles", description: "The kinds of events that fit your community." },
   { id: "members", title: "Members & branding", description: "How you reach members and how your community sounds." },
   { id: "wrap", title: "Last step", description: "Anything else before we get started." },
 ];
@@ -32,6 +32,9 @@ const OPTION_EMOJI: Record<string, string> = {
   // spaces
   rooftop: "🏙️", indoor_lounge: "🛋️", courtyard: "🌳", gym: "🏋️", lobby: "🏛️",
   co_working: "💻", pool_deck: "🏊", other: "➕",
+  // event formats (structure)
+  networking: "🤝", activities: "🎯", sit_down: "🍴", tours: "🗺️",
+  tastings: "🍷", classes: "🛠️", games: "🎲", performances: "🎤",
   // categories
   happy_hour: "🍸", fitness: "💪", food_tasting: "🍽️", family_kids: "👨‍👩‍👧",
   games_trivia: "🎲", crafts_diy: "🎨", wellness: "🧘", professional: "💼",
@@ -59,7 +62,9 @@ export default function ConciergeIntakePage({
     members: {},
     wrap: {},
   });
-  const [completed, setCompleted] = useState<Set<SectionId>>(new Set());
+  // Section completion is tracked server-side (saveConciergeIntakeSection); we
+  // keep the setter for that round-trip but the progress bar is position-based.
+  const [, setCompleted] = useState<Set<SectionId>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -170,7 +175,7 @@ export default function ConciergeIntakePage({
             <div
               key={s.id}
               className={`flex-1 h-1 rounded-full ${
-                i < stepIndex || completed.has(s.id)
+                i < stepIndex
                   ? "bg-zinc-900"
                   : i === stepIndex
                   ? "bg-zinc-700"
@@ -303,16 +308,11 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
     case "vibe":
       return (
         <div className="space-y-5">
-          <CardSelect
-            label="Vibe"
-            value={values.vibePreference as string}
-            onChange={(v) => onChange("vibePreference", v)}
-            cols={3}
-            options={[
-              { value: "small_intimate", label: "Small & intimate", emoji: "☕" },
-              { value: "big_mixer", label: "Big mixer", emoji: "🎉" },
-              { value: "either", label: "Either works", emoji: "🔀" },
-            ]}
+          <ChipMultiField
+            label="Event formats you're into"
+            value={(values.eventFormats as string[]) || []}
+            onChange={(v) => onChange("eventFormats", v)}
+            options={["networking", "activities", "sit_down", "tours", "tastings", "classes", "games", "performances"]}
           />
           <ChipMultiField
             label="Categories you're drawn to"
@@ -326,8 +326,6 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
             onChange={(v) => onChange("categoriesToAvoid", v)}
             options={["happy_hour", "fitness", "food_tasting", "family_kids", "games_trivia", "crafts_diy", "wellness", "professional", "seasonal", "outdoor", "pet", "movie_night", "music_live"]}
           />
-          <TextField multiline label="What's worked here before?" value={values.pastEventWins as string} onChange={(v) => onChange("pastEventWins", v)} />
-          <TextField multiline label="Anything that fell flat?" value={values.pastEventFlops as string} onChange={(v) => onChange("pastEventFlops", v)} />
         </div>
       );
     case "members":
