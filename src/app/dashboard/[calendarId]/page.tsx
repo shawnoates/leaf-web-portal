@@ -364,6 +364,42 @@ export default function OrgDashboardPage() {
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsSection, setSettingsSection] = useState<"general" | "subscription">("general");
 
+  // Dev helper — Leaf-admin-only concierge reset (see _resetConciergeForTesting).
+  const [resettingConcierge, setResettingConcierge] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const _me = user as any;
+  const isLeafAdmin = !!(
+    _me &&
+    (_me.get?.("is_admin") === true ||
+      _me.get?.("is_admin") === "yes" ||
+      _me.get?.("isLeafTeam") === true ||
+      (Array.isArray(_me.get?.("roles")) &&
+        _me.get("roles").some((r: string) => ["super_admin", "growth", "sales", "admin"].includes(r))))
+  );
+  const handleResetConcierge = async (simulate: boolean) => {
+    if (
+      !confirm(
+        simulate
+          ? "Reset concierge AND simulate onboarding (welcome + first menu)? This deletes the current intake, messages, and menu for this org."
+          : "Reset this org's concierge back to eligible? This deletes the current intake, messages, and menu."
+      )
+    )
+      return;
+    setResettingConcierge(true);
+    try {
+      const r = await Parse.Cloud.run("_resetConciergeForTesting", { calendarId, simulate });
+      console.log("[dev] reset concierge:", r);
+      setToast(simulate ? "Reset + simulated onboarding" : "Concierge reset to eligible");
+      setTimeout(() => setToast(null), 2500);
+      await fetchDashboard();
+      loadPendingMenu();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Reset failed");
+    } finally {
+      setResettingConcierge(false);
+    }
+  };
+
   // Migration
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 
@@ -2713,6 +2749,35 @@ export default function OrgDashboardPage() {
                 >
                   Cancel Subscription
                 </button>
+              )}
+
+              {/* Dev — Leaf-admin-only concierge reset */}
+              {isLeafAdmin && (
+                <section className="border border-dashed border-zinc-300 rounded-xl p-6">
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-1">
+                    Developer · Concierge
+                  </h2>
+                  <p className="text-xs text-zinc-500 mb-4">
+                    Reset this org&apos;s concierge state to re-run onboarding (deletes the current
+                    intake, chat messages, and menu). Leaf admins only.
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={() => handleResetConcierge(false)}
+                      disabled={resettingConcierge}
+                      className="text-xs font-bold uppercase tracking-widest text-zinc-700 hover:text-zinc-900 border border-zinc-300 rounded-lg px-4 py-2 transition-colors disabled:opacity-50"
+                    >
+                      {resettingConcierge ? "Working…" : "Reset Concierge"}
+                    </button>
+                    <button
+                      onClick={() => handleResetConcierge(true)}
+                      disabled={resettingConcierge}
+                      className="text-xs font-bold uppercase tracking-widest text-white bg-zinc-900 hover:bg-zinc-800 rounded-lg px-4 py-2 transition-colors disabled:opacity-50"
+                    >
+                      {resettingConcierge ? "Working…" : "Reset + Simulate Onboarding"}
+                    </button>
+                  </div>
+                </section>
               )}
             </div>
             )}
