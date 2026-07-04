@@ -10,6 +10,7 @@ import SubscriptionModal from "@/components/SubscriptionModal";
 import ConciergeDashboardBanner from "@/components/ConciergeDashboardBanner";
 import ConciergeMenuCard, { type ConciergeMenu } from "@/components/ConciergeMenuCard";
 import ConciergeThread from "@/components/ConciergeThread";
+import PlansManager from "@/components/PlansManager";
 import ConciergeEventReports from "@/components/ConciergeEventReports";
 import MarketplaceTab, { type MarketplaceEvent, type OrgSettings } from "@/components/MarketplaceTab";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
@@ -252,6 +253,9 @@ function PlansCarousel({
   onAdd: (s: CalSuggestion) => void;
 }) {
   const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  // Snapshot once per render — poll expiry is day-level, so a stable value is fine.
+  // eslint-disable-next-line react-hooks/purity
+  const nowMs = Date.now();
   if (activePlans.length === 0 && suggestedPlans.length === 0) {
     return <p className="text-xs text-zinc-400">No active plans yet.</p>;
   }
@@ -260,7 +264,7 @@ function PlansCarousel({
       {activePlans.map((plan) => {
         const poll = plan.isPoll === true;
         const closesAtMs = plan.pollClosesAt ? new Date(plan.pollClosesAt).getTime() : null;
-        const isExpired = poll && closesAtMs !== null && closesAtMs <= Date.now();
+        const isExpired = poll && closesAtMs !== null && closesAtMs <= nowMs;
         return (
           <button
             key={plan.objectId}
@@ -285,7 +289,7 @@ function PlansCarousel({
                     <Vote className="w-2.5 h-2.5" /> {isExpired ? "Pick" : "Poll"}
                   </span>
                 )}
-                <h4 className="text-sm font-medium text-zinc-900 truncate">{plan.title}</h4>
+                <h4 className="text-xs font-medium text-zinc-900 truncate">{plan.title}</h4>
               </div>
               <p className="text-xs text-zinc-400 truncate">
                 {poll ? `${plan.pollOptionCount ?? 0} options${isExpired ? " · closed" : ""}` : fmtDate(plan.date)}
@@ -325,7 +329,7 @@ function PlansCarousel({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <span className="text-[9px] font-bold uppercase tracking-widest bg-emerald-600 text-white px-1 py-0.5 rounded shrink-0">Suggested</span>
-              <h4 className="text-sm font-medium text-zinc-900 truncate">{s.title}</h4>
+              <h4 className="text-xs font-medium text-zinc-900 truncate">{s.title}</h4>
             </div>
             <p className="text-xs text-zinc-400 truncate">{fmtDate(s.recommendedDate)}</p>
             <p className="text-xs text-emerald-600 truncate" title={s.subtitle}>{s.subtitle}</p>
@@ -676,6 +680,47 @@ export default function OrgDashboardPage() {
         break;
       }
     }
+  }, [dashboard, searchParams]);
+
+  // Manage-plans slide-over — opened from the Calendars tab; replaces the old
+  // standalone /dashboard/[calendarId]/plans route. ?managePlans=<calId>
+  // auto-opens it, carrying prefill/returnTo for the /m "Host Another"
+  // deep-link (which used to target the /plans page).
+  const [managePlansCalId, setManagePlansCalId] = useState<string | null>(null);
+  const [managePlansPrefill, setManagePlansPrefill] = useState<CreatePlanPrefill | null>(null);
+  const [managePlansReturnTo, setManagePlansReturnTo] = useState<string | null>(null);
+  const managePlansOpenedRef = useRef(false);
+  useEffect(() => {
+    if (!dashboard || managePlansOpenedRef.current) return;
+    const mp = searchParams.get("managePlans");
+    if (!mp) return;
+    managePlansOpenedRef.current = true;
+    const prefillTitle = searchParams.get("prefillTitle");
+    let prefill: CreatePlanPrefill | null = null;
+    if (prefillTitle) {
+      let venue: { name: string; address: string } | null = null;
+      const venueStr = searchParams.get("prefillVenue");
+      if (venueStr) {
+        try {
+          const v = JSON.parse(venueStr);
+          venue = { name: v.name, address: v.address };
+        } catch {
+          // Invalid venue JSON — ignore
+        }
+      }
+      prefill = {
+        title: prefillTitle,
+        description: searchParams.get("prefillDescription") || "",
+        date: searchParams.get("prefillDate") || "",
+        time: searchParams.get("prefillTime") || "",
+        capacity: searchParams.get("prefillCapacity") || "",
+        venue,
+      };
+    }
+    setManagePlansPrefill(prefill);
+    setManagePlansReturnTo(searchParams.get("returnTo"));
+    setManagePlansCalId(mp);
+    setActiveTab("calendars");
   }, [dashboard, searchParams]);
 
   // Prefetch marketplace data as soon as dashboard is available
@@ -1553,12 +1598,12 @@ export default function OrgDashboardPage() {
                   <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
                     Recent Photos
                   </h3>
-                  <Link
-                    href={`/dashboard/${calendarId}/plans`}
+                  <button
+                    onClick={() => setManagePlansCalId(calendarId)}
                     className="text-xs uppercase tracking-widest font-bold text-zinc-400 hover:text-zinc-900 transition-colors"
                   >
                     See all
-                  </Link>
+                  </button>
                 </div>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 [&>*:nth-child(n+4)]:hidden sm:[&>*:nth-child(-n+4)]:block sm:[&>*:nth-child(n+5)]:hidden md:[&>*:nth-child(-n+6)]:block md:[&>*:nth-child(n+7)]:hidden">
                   {dashboard.recentPhotos.slice(0, 6).map((photo) =>
@@ -2187,7 +2232,6 @@ export default function OrgDashboardPage() {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
                               <span className="text-sm font-medium text-zinc-900 truncate">{c.name}</span>
-                              {c.isConciergeServiced && <Sparkles className="w-3 h-3 text-emerald-500 shrink-0" />}
                             </div>
                             <div className="text-[11px] text-zinc-400 truncate">
                               {c.isPrimary ? "Primary · " : ""}{c.city || "No city set"}
@@ -2342,12 +2386,12 @@ export default function OrgDashboardPage() {
                             >
                               <Pencil className="w-3 h-3" /> Edit
                             </Link>
-                            <Link
-                              href={`/dashboard/${cal.objectId}/plans?orgId=${calendarId}`}
+                            <button
+                              onClick={() => setManagePlansCalId(cal.objectId)}
                               className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
                             >
                               Manage Plans <ChevronRight className="w-3 h-3" />
-                            </Link>
+                            </button>
                           </>
                         )}
                       </div>
@@ -2375,7 +2419,13 @@ export default function OrgDashboardPage() {
                     )}
                     {showChat ? (
                       <div className="border border-zinc-200 rounded-xl p-4 max-h-[80vh] overflow-y-auto">
-                        <ConciergeThread calendarId={calendarId} />
+                        <ConciergeThread
+                          calendarId={calendarId}
+                          onMenuResolved={() => {
+                            loadPendingMenu();
+                            fetchDashboard();
+                          }}
+                        />
                       </div>
                     ) : (
                       plansPanel
@@ -3457,6 +3507,36 @@ export default function OrgDashboardPage() {
             >
               {savingScope ? "Saving…" : "Save Changes"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Manage-plans slide-over — full plan management (upcoming/past/ideas,
+          create/edit) for a calendar, opened from the Calendars tab. Replaces
+          the former standalone /plans route. */}
+      {managePlansCalId && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => {
+              setManagePlansCalId(null);
+              setManagePlansPrefill(null);
+              setManagePlansReturnTo(null);
+            }}
+          />
+          <div className="relative bg-white w-full max-w-2xl h-full shadow-2xl">
+            <PlansManager
+              calendarId={managePlansCalId}
+              orgId={calendarId}
+              initialPrefill={managePlansPrefill}
+              returnTo={managePlansReturnTo}
+              onClose={() => {
+                setManagePlansCalId(null);
+                setManagePlansPrefill(null);
+                setManagePlansReturnTo(null);
+                fetchDashboard();
+              }}
+            />
           </div>
         </div>
       )}
