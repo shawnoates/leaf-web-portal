@@ -49,6 +49,7 @@ import {
   Smartphone,
   Vote,
   X,
+  MessageCircle,
 } from "lucide-react";
 
 import {
@@ -2188,24 +2189,6 @@ export default function OrgDashboardPage() {
               <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
                 Calendars ({dashboard.calendars.length}{dashboard.calendarLimit ? `/${dashboard.calendarLimit}` : ""})
               </h2>
-              {isPaid && (
-                <button
-                  onClick={() => {
-                    if (dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit) {
-                      setShowSubscription(true);
-                    } else {
-                      setShowAddCalendar(true);
-                    }
-                  }}
-                  className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
-                >
-                  {dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit ? (
-                    <><Lock className="w-3.5 h-3.5" /> Upgrade to Add</>
-                  ) : (
-                    <><Plus className="w-3.5 h-3.5" /> Add Calendar</>
-                  )}
-                </button>
-              )}
             </div>
             <div className="grid grid-cols-1 gap-4 items-start lg:grid-cols-[260px_minmax(0,1fr)]">
               {selectedCal && (() => {
@@ -2222,7 +2205,7 @@ export default function OrgDashboardPage() {
                         <button
                           key={c.objectId}
                           onClick={() => setCalendarsSelectedId(c.objectId)}
-                          className={`w-full text-left px-3 py-2.5 flex items-center gap-2.5 transition-colors hover:bg-zinc-50 ${isSel ? "bg-zinc-50" : ""} ${off ? "opacity-60" : ""}`}
+                          className={`w-full text-left px-3 py-2.5 flex items-center gap-2.5 transition-colors hover:bg-zinc-50 focus:outline-none ${isSel ? "bg-zinc-50" : ""} ${off ? "opacity-60" : ""}`}
                         >
                           {c.calendarImage ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -2280,19 +2263,33 @@ export default function OrgDashboardPage() {
                 );
                 return (
                   <>
-                  {/* LEFT — calendar list */}
-                  <div className="space-y-4 min-w-0">
+                  {/* LEFT — calendar list + add-calendar */}
+                  <div className="space-y-3 min-w-0">
                     {listPanel}
+                    {isPaid && (
+                      <button
+                        onClick={() => {
+                          if (dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit) {
+                            setShowSubscription(true);
+                          } else {
+                            setShowAddCalendar(true);
+                          }
+                        }}
+                        className="w-full flex items-center justify-center gap-2 border border-dashed border-zinc-300 text-zinc-500 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest hover:border-zinc-400 hover:text-zinc-900 transition-colors"
+                      >
+                        {dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit ? (
+                          <><Lock className="w-3.5 h-3.5" /> Upgrade to Add</>
+                        ) : (
+                          <><Plus className="w-3.5 h-3.5" /> Add Calendar</>
+                        )}
+                      </button>
+                    )}
                   </div>
                   {/* RIGHT — header + plans (or the Manage Plans surface) */}
                   <div className="space-y-4 min-w-0">
                     <div
                       className={`border rounded-xl px-4 py-3 ${
-                        inactive
-                          ? "border-zinc-100 bg-zinc-50 opacity-70"
-                          : cal.isConciergeServiced
-                          ? "border-zinc-900"
-                          : "border-zinc-200"
+                        inactive ? "border-zinc-100 bg-zinc-50 opacity-70" : "border-zinc-200"
                       }`}
                     >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -2374,11 +2371,12 @@ export default function OrgDashboardPage() {
                             {cal.isConciergeServiced && (
                               <button
                                 onClick={() => setShowConciergeChat(true)}
-                                className="relative flex items-center gap-1.5 bg-zinc-900 text-white px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
+                                title="Concierge"
+                                className="relative text-zinc-500 hover:text-zinc-900 transition-colors"
                               >
-                                <Sparkles className="w-3.5 h-3.5 text-emerald-400" /> Concierge
+                                <MessageCircle className="w-4 h-4" />
                                 {conciergeUnread > 0 && (
-                                  <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[16px] text-center">
+                                  <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[16px] text-center">
                                     {conciergeUnread}
                                   </span>
                                 )}
@@ -2402,10 +2400,20 @@ export default function OrgDashboardPage() {
                               <Pencil className="w-3 h-3" /> Edit
                             </Link>
                             <button
-                              onClick={() => { setCalendarsSelectedId(cal.objectId); setManagePlansCalId(cal.objectId); }}
-                              className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
+                              onClick={() => {
+                                if (managePlansCalId === cal.objectId) {
+                                  setManagePlansCalId(null);
+                                  setManagePlansPrefill(null);
+                                  setManagePlansReturnTo(null);
+                                  fetchDashboard();
+                                } else {
+                                  setCalendarsSelectedId(cal.objectId);
+                                  setManagePlansCalId(cal.objectId);
+                                }
+                              }}
+                              className={`text-xs flex items-center gap-1 transition-colors ${managePlansCalId === cal.objectId ? "text-zinc-900 font-semibold" : "text-zinc-500 hover:text-zinc-900"}`}
                             >
-                              Manage Plans <ChevronRight className="w-3 h-3" />
+                              {managePlansCalId === cal.objectId ? "Close Plans" : <>Manage Plans <ChevronRight className="w-3 h-3" /></>}
                             </button>
                           </>
                         )}
@@ -2433,18 +2441,12 @@ export default function OrgDashboardPage() {
                       </div>
                     )}
                     {managePlansCalId === cal.objectId ? (
-                      <div className="border border-zinc-200 rounded-xl overflow-hidden h-[78vh]">
+                      <div className="px-1 pt-2">
                         <PlansManager
                           calendarId={cal.objectId}
                           orgId={calendarId}
                           initialPrefill={managePlansPrefill}
                           returnTo={managePlansReturnTo}
-                          onClose={() => {
-                            setManagePlansCalId(null);
-                            setManagePlansPrefill(null);
-                            setManagePlansReturnTo(null);
-                            fetchDashboard();
-                          }}
                         />
                       </div>
                     ) : (
@@ -3536,7 +3538,7 @@ export default function OrgDashboardPage() {
       {showConciergeChat && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowConciergeChat(false)} />
-          <div className="relative bg-white w-full max-w-lg h-full shadow-2xl flex flex-col">
+          <div className="relative bg-white w-full lg:w-1/2 h-full shadow-2xl flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 shrink-0">
               <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Concierge</h2>
               <button onClick={() => setShowConciergeChat(false)} className="text-zinc-400 hover:text-zinc-900 transition-colors" aria-label="Close">

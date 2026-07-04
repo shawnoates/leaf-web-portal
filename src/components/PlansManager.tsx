@@ -89,13 +89,11 @@ export default function PlansManager({
   orgId,
   initialPrefill = null,
   returnTo = null,
-  onClose,
 }: {
   calendarId: string;
   orgId: string;
   initialPrefill?: CreatePlanPrefill | null;
   returnTo?: string | null;
-  onClose?: () => void;
 }) {
   const router = useRouter();
 
@@ -464,32 +462,23 @@ export default function PlansManager({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="space-y-8">
       {/* Header */}
-      <header className="border-b border-zinc-100 shrink-0">
-        <div className="px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            {onClose && (
-              <button onClick={onClose} className="p-2 -ml-2 hover:bg-zinc-50 rounded-full transition-colors shrink-0" aria-label="Close">
-                <X className="w-5 h-5" />
-              </button>
-            )}
-            <div className="min-w-0">
-              <h1 className="text-lg font-medium tracking-tight">Plans</h1>
-              <p className="text-xs text-zinc-400 truncate">{orgName}</p>
-            </div>
-          </div>
-          <button
-            onClick={() => { resetForm(); setShowCreateModal(true); }}
-            className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            New Plan
-          </button>
+      <div className="flex items-center justify-between">
+        <div className="min-w-0">
+          <h2 className="text-lg font-medium tracking-tight">Plans</h2>
+          <p className="text-xs text-zinc-400 truncate">{orgName}</p>
         </div>
-      </header>
+        <button
+          onClick={() => { resetForm(); setShowCreateModal(true); }}
+          className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors shrink-0"
+        >
+          <Plus className="w-4 h-4" />
+          New Plan
+        </button>
+      </div>
 
-      <main className="flex-1 overflow-y-auto px-6 py-8 space-y-10">
+      <div className="space-y-10">
         {/* Plans (Upcoming / Past) */}
         <section>
           <div className="flex items-center justify-between mb-4">
@@ -520,9 +509,9 @@ export default function PlansManager({
 
           {planTense === "upcoming" ? (
             upcomingPlans.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="flex gap-3 overflow-x-auto pb-1">
                 {upcomingPlans.map((plan) => (
-                  <div key={plan.objectId} onClick={() => setSelectedPlan(plan)} className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors cursor-pointer">
+                  <div key={plan.objectId} onClick={() => setSelectedPlan(plan)} className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer">
                     {plan.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={plan.image} alt={plan.title} className="w-full h-28 object-cover" />
@@ -704,7 +693,7 @@ export default function PlansManager({
             </div>
           )}
         </section>
-      </main>
+      </div>
 
       {/* Plan Detail Modal */}
       {selectedPlan && (

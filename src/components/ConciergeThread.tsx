@@ -143,7 +143,7 @@ export default function ConciergeThread({
     null;
 
   return (
-    <div className="max-w-3xl">
+    <div className="w-full">
       <div className="flex items-center gap-3 mb-4">
         <div className="w-9 h-9 rounded-full bg-zinc-900 flex items-center justify-center overflow-hidden shrink-0">
           {persona.avatarUrl ? (
