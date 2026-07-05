@@ -45,6 +45,7 @@ export default function ConciergeThread({
   const [menuError, setMenuError] = useState<string | null>(null);
   // Step 2 of the menu flow: after choosing an event, pick a date/time.
   const [timeFor, setTimeFor] = useState<ConciergeMenu["options"][number] | null>(null);
+  const [scheduleMode, setScheduleMode] = useState<"pick" | "auto">("pick");
   const [pickDate, setPickDate] = useState("");
   const [pickTime, setPickTime] = useState("");
   const [loading, setLoading] = useState(true);
@@ -108,20 +109,28 @@ export default function ConciergeThread({
     }
   };
 
-  // Step 2 → post: schedule the chosen event with the owner's date/time.
+  // Step 2 → post: schedule the chosen event with the owner's date/time, or
+  // defer to the concierge to pick the best day within 90 days.
   const postPlan = async () => {
-    if (!menu || !timeFor || !pickDate || selectingId) return;
+    if (!menu || !timeFor || selectingId) return;
+    if (scheduleMode === "pick" && !pickDate) return;
     setSelectingId(timeFor.objectId);
     setMenuError(null);
     try {
-      await Parse.Cloud.run("selectMenuOption", {
-        menuId: menu.menuId,
-        optionId: timeFor.objectId,
-        scheduledDate: pickDate,
-        scheduledTime: pickTime || undefined,
-      });
+      await Parse.Cloud.run(
+        "selectMenuOption",
+        scheduleMode === "auto"
+          ? { menuId: menu.menuId, optionId: timeFor.objectId, autoSchedule: true }
+          : {
+              menuId: menu.menuId,
+              optionId: timeFor.objectId,
+              scheduledDate: pickDate,
+              scheduledTime: pickTime || undefined,
+            }
+      );
       setMenu(null);
       setTimeFor(null);
+      setScheduleMode("pick");
       setPickDate("");
       setPickTime("");
       onMenuResolved?.();
@@ -260,35 +269,62 @@ export default function ConciergeThread({
                   )}
                 </div>
                 {timeFor ? (
-                  /* ── Step 2 — pick a date & time, then post ── */
+                  /* ── Step 2 — pick a date, or let us choose the best day ── */
                   <div>
                     <p className="text-xs text-zinc-500 leading-relaxed mb-3">
                       <span className="font-medium text-zinc-700">{timeFor.title}</span> — when
-                      should we run it? Pick a date and time and I&apos;ll post it.
+                      should we run it?
                     </p>
-                    <div className="flex flex-col sm:flex-row gap-2 mb-3">
-                      <label className="flex-1">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Date</span>
-                        <input
-                          type="date"
-                          value={pickDate}
-                          onChange={(e) => setPickDate(e.target.value)}
-                          className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"
-                        />
-                      </label>
-                      <label className="flex-1">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Time <span className="text-zinc-300">(optional)</span></span>
-                        <input
-                          type="time"
-                          value={pickTime}
-                          onChange={(e) => setPickTime(e.target.value)}
-                          className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"
-                        />
-                      </label>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <button
+                        onClick={() => setScheduleMode("pick")}
+                        className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+                          scheduleMode === "pick" ? "border-zinc-900 bg-zinc-50 text-zinc-900" : "border-zinc-200 text-zinc-500 hover:border-zinc-400"
+                        }`}
+                      >
+                        I have a date
+                      </button>
+                      <button
+                        onClick={() => setScheduleMode("auto")}
+                        className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+                          scheduleMode === "auto" ? "border-zinc-900 bg-zinc-50 text-zinc-900" : "border-zinc-200 text-zinc-500 hover:border-zinc-400"
+                        }`}
+                      >
+                        Pick the best day for us
+                      </button>
                     </div>
+
+                    {scheduleMode === "pick" ? (
+                      <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                        <label className="flex-1">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Date</span>
+                          <input
+                            type="date"
+                            value={pickDate}
+                            onChange={(e) => setPickDate(e.target.value)}
+                            className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"
+                          />
+                        </label>
+                        <label className="flex-1">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Time <span className="text-zinc-300">(optional)</span></span>
+                          <input
+                            type="time"
+                            value={pickTime}
+                            onChange={(e) => setPickTime(e.target.value)}
+                            className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"
+                          />
+                        </label>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-zinc-500 leading-relaxed mb-3 bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2">
+                        We&apos;ll find the best day within the next 90 days and confirm it with you
+                        here before anything goes out.
+                      </p>
+                    )}
+
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => { setTimeFor(null); setPickDate(""); setPickTime(""); }}
+                        onClick={() => { setTimeFor(null); setScheduleMode("pick"); setPickDate(""); setPickTime(""); }}
                         disabled={!!selectingId}
                         className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors disabled:opacity-50"
                       >
@@ -296,13 +332,13 @@ export default function ConciergeThread({
                       </button>
                       <button
                         onClick={postPlan}
-                        disabled={!pickDate || !!selectingId}
+                        disabled={(scheduleMode === "pick" && !pickDate) || !!selectingId}
                         className="ml-auto inline-flex items-center gap-1.5 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-60"
                       >
                         {selectingId ? (
                           <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Posting…</>
                         ) : (
-                          <><Check className="w-3.5 h-3.5" /> Post plan</>
+                          <><Check className="w-3.5 h-3.5" /> {scheduleMode === "auto" ? "Hand it to us" : "Post plan"}</>
                         )}
                       </button>
                     </div>
