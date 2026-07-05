@@ -40,6 +40,7 @@ export default function ConciergeThread({
   const [messages, setMessages] = useState<ConciergeMessage[]>([]);
   const [persona, setPersona] = useState<Persona>({ name: "Leaf Concierge", avatarUrl: null });
   const [menu, setMenu] = useState<ConciergeMenu | null>(null);
+  const [responseLabel, setResponseLabel] = useState("Typically replies within a few hours");
   const [selectingId, setSelectingId] = useState<string | null>(null);
   const [menuError, setMenuError] = useState<string | null>(null);
   // Step 2 of the menu flow: after choosing an event, pick a date/time.
@@ -59,6 +60,7 @@ export default function ConciergeThread({
         Parse.Cloud.run("getConciergeThread", { calendarId }) as Promise<{
           persona: Persona;
           messages: ConciergeMessage[];
+          responseTimeLabel?: string;
         }>,
         Parse.Cloud.run("getPendingConciergeMenu", { calendarId }).catch(
           () => ({ menu: null }) as { menu: ConciergeMenu | null }
@@ -66,6 +68,7 @@ export default function ConciergeThread({
       ]);
       setPersona(thread.persona || { name: "Leaf Concierge", avatarUrl: null });
       setMessages(thread.messages || []);
+      if (thread.responseTimeLabel) setResponseLabel(thread.responseTimeLabel);
       setMenu((menuRes as { menu: ConciergeMenu | null }).menu || null);
       setError(null);
     } catch (e) {
@@ -167,7 +170,10 @@ export default function ConciergeThread({
         </div>
         <div>
           <h2 className="text-sm font-semibold text-zinc-900">{persona.name}</h2>
-          <p className="text-xs text-zinc-400">Your concierge — replies here</p>
+          <p className="text-xs text-zinc-400 flex items-center gap-1">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Your concierge · {responseLabel.replace(/^Typically/, "typically")}
+          </p>
         </div>
       </div>
 
