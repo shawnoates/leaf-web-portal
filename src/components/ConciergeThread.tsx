@@ -317,7 +317,7 @@ export default function ConciergeThread({
                       </div>
                     ) : (
                       <p className="text-xs text-zinc-500 leading-relaxed mb-3 bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2">
-                        We&apos;ll find the best day within the next 90 days and confirm it with you
+                        We&apos;ll find the best day within the next 30 days and confirm it with you
                         here before anything goes out.
                       </p>
                     )}
