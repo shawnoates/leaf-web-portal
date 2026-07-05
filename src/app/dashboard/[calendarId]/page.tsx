@@ -80,6 +80,7 @@ interface OrgDashboard {
   billingInterval: string | null; // "month" or "year"
   isOwner: boolean;
   isOrgCoHost: boolean;
+  conciergePersona?: { name: string; avatarUrl: string | null } | null;
   viewerCalendarRole: "Owner" | "Host" | null;
   calendarRoles: Record<string, "Owner" | "Host">;
   profilePhoto: string | null;
@@ -1220,8 +1221,17 @@ export default function OrgDashboardPage() {
                   <div className="absolute -top-16 -right-12 h-40 w-40 rounded-full bg-emerald-500/20 blur-3xl" />
                   <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                 </div>
-                <div className="relative w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-                  <Sparkles className="w-5 h-5 text-emerald-400" />
+                <div className="relative w-10 h-10 rounded-full bg-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                  {dashboard.conciergePersona?.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={dashboard.conciergePersona.avatarUrl}
+                      alt={dashboard.conciergePersona.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Sparkles className="w-5 h-5 text-emerald-400" />
+                  )}
                 </div>
                 <div className="relative min-w-0 flex-1">
                   <h3 className="text-sm font-semibold text-white">
