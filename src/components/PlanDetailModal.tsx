@@ -123,8 +123,19 @@ export default function PlanDetailModal({
     }
     setPlanRsvpsLoading(true);
     setPlanRsvpsError(null);
+    // Log the plan id we're querying so the user can grep it out of the
+    // devtools console when app RSVPs aren't showing up — quicker than
+    // rooting around the URL for the EventGroup objectId.
+    console.info("[PlanDetailModal] getPlanRsvps →", plan.objectId);
     Parse.Cloud.run("getPlanRsvps", { eventGroupId: plan.objectId })
-      .then((result: Rsvp[]) => setPlanRsvps(result || []))
+      .then((result: Rsvp[]) => {
+        console.info(
+          "[PlanDetailModal] getPlanRsvps result",
+          plan.objectId,
+          result
+        );
+        setPlanRsvps(result || []);
+      })
       .catch((err: unknown) => {
         console.error("[PlanDetailModal] getPlanRsvps failed:", err);
         setPlanRsvps([]);
