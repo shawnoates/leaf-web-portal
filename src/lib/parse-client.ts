@@ -18,4 +18,15 @@ if (PARSE_APP_ID) {
   );
 }
 
+// Expose Parse on window so devtools console can call Parse.Cloud.run
+// directly for diagnostics / one-off inspections. No security impact —
+// the JS key already ships to the browser via the environment vars
+// above, so an authenticated user could reconstruct it from any
+// network request. Making it addressable in the console just skips a
+// couple of steps.
+if (typeof window !== "undefined") {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as unknown as { Parse: unknown }).Parse = Parse;
+}
+
 export default Parse;
