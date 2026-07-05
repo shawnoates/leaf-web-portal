@@ -15,6 +15,8 @@ export interface ConciergeMenuOption {
   category: string | null;
   costType: string | null;
   ownerPrice: number | null;
+  residentCost?: string | null;
+  location?: string | null;
 }
 
 export interface ConciergeMenu {

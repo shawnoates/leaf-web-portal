@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Parse from "@/lib/parse-client";
-import { Send, Loader2, Sparkles, Check, MessageCirclePlus } from "lucide-react";
+import { Send, Loader2, Sparkles, Check, MessageCirclePlus, MapPin, Wallet } from "lucide-react";
 import type { ConciergeMenu } from "./ConciergeMenuCard";
 
 interface ConciergeMessage {
@@ -333,9 +333,21 @@ export default function ConciergeThread({
                           )}
                           <div className="flex flex-1 flex-col p-3">
                             <h5 className="text-sm font-medium text-zinc-900 truncate mb-1">{opt.title}</h5>
-                            <p className="text-xs text-zinc-500 leading-snug line-clamp-3 flex-1">
+                            <p className="text-xs text-zinc-500 leading-snug line-clamp-2 flex-1">
                               {opt.description}
                             </p>
+                            <div className="mt-2 space-y-0.5">
+                              <p className="flex items-center gap-1 text-[11px] text-zinc-500">
+                                <MapPin className="w-3 h-3 shrink-0 text-zinc-400" />
+                                <span className="truncate">{opt.location || "On-premise"}</span>
+                              </p>
+                              {opt.residentCost && (
+                                <p className="flex items-center gap-1 text-[11px] text-zinc-500">
+                                  <Wallet className="w-3 h-3 shrink-0 text-zinc-400" />
+                                  <span className="truncate">{opt.residentCost}</span>
+                                </p>
+                              )}
+                            </div>
                             <button
                               onClick={() => { setTimeFor(opt); setMenuError(null); }}
                               disabled={!!selectingId}
