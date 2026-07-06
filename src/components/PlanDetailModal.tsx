@@ -6,6 +6,8 @@ import Parse from "@/lib/parse-client";
 import { renderLinkedText } from "@/lib/linkify";
 import {
   Calendar,
+  Check,
+  CheckCircle2,
   Clock,
   Copy,
   EyeOff,
@@ -16,6 +18,7 @@ import {
   Trash2,
   Users,
   Vote,
+  X,
 } from "lucide-react";
 
 export type PlanDetailData = {
@@ -511,21 +514,23 @@ export default function PlanDetailModal({
               {planRsvpsLoading ? (
                 <p className="text-sm text-zinc-400">Loading...</p>
               ) : planRsvps.length > 0 ? (
-                <div className="border border-zinc-200 rounded-xl overflow-x-auto">
-                  <table className="w-full text-sm min-w-0">
+                <div className="border border-zinc-200 rounded-xl">
+                  <table className="w-full text-sm table-fixed">
                     <thead className="bg-zinc-50 text-left">
                       <tr>
-                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400 min-w-[220px] w-[45%]">Name</th>
-                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400 whitespace-nowrap">Phone</th>
-                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400 whitespace-nowrap">Status</th>
-                        <th className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400 w-1"></th>
+                        <th className="px-3 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400">Name</th>
+                        <th className="px-3 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400 w-[40%]">Phone</th>
+                        <th className="px-3 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400 text-center w-14">Status</th>
+                        <th className="px-3 py-2 w-16"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
-                      {planRsvps.map((r, i) => (
+                      {planRsvps.map((r, i) => {
+                        const isPending = r.status === "pendingRsvp" || r.status === "Requested";
+                        return (
                         <tr key={i}>
-                          <td className="px-4 py-2.5">
-                            <div>{r.name}</div>
+                          <td className="px-3 py-2.5">
+                            <div className="truncate" title={r.name}>{r.name}</div>
                             {r.rsvpNote && (
                               <p
                                 className="text-[11px] text-zinc-400 italic line-clamp-3 whitespace-pre-wrap break-words"
@@ -535,23 +540,35 @@ export default function PlanDetailModal({
                               </p>
                             )}
                           </td>
-                          <td className="px-4 py-2.5 text-zinc-400">
+                          <td className="px-3 py-2.5 text-zinc-400">
                             {r.phone
-                              ? r.phone
+                              ? <span className="truncate block" title={r.phone}>{r.phone}</span>
                               : r.sharePhoneWithHost
                                 ? "—"
-                                : <span className="inline-flex items-center gap-1 text-zinc-300"><EyeOff className="w-3 h-3" /> Hidden</span>}
+                                : <span className="inline-flex items-center gap-1 text-zinc-300" title="Hidden"><EyeOff className="w-3 h-3" /></span>}
                           </td>
-                          <td className="px-4 py-2.5">
-                            {(r.status === "pendingRsvp" || r.status === "Requested") ? (
-                              <span className="text-xs font-bold uppercase tracking-widest text-amber-500">Pending</span>
+                          <td className="px-3 py-2.5">
+                            {isPending ? (
+                              <span
+                                className="flex items-center justify-center text-amber-500"
+                                title="Pending approval"
+                                aria-label="Pending approval"
+                              >
+                                <Clock className="w-4 h-4" />
+                              </span>
                             ) : (
-                              <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">Confirmed</span>
+                              <span
+                                className="flex items-center justify-center text-emerald-600"
+                                title="Confirmed"
+                                aria-label="Confirmed"
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                              </span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5">
-                            {(r.status === "pendingRsvp" || r.status === "Requested") ? (
-                              <div className="flex gap-2">
+                          <td className="px-3 py-2.5">
+                            {isPending ? (
+                              <div className="flex gap-1 justify-end">
                                 <button
                                   onClick={async () => {
                                     try {
@@ -562,9 +579,11 @@ export default function PlanDetailModal({
                                       console.error("Failed to approve:", err);
                                     }
                                   }}
-                                  className="px-2 py-1 bg-emerald-600 text-white text-xs font-bold uppercase tracking-widest rounded hover:bg-emerald-700 transition-colors"
+                                  className="p-1 rounded text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                  title="Approve"
+                                  aria-label={`Approve ${r.name}`}
                                 >
-                                  Approve
+                                  <Check className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={async () => {
@@ -576,31 +595,38 @@ export default function PlanDetailModal({
                                       console.error("Failed to decline:", err);
                                     }
                                   }}
-                                  className="px-2 py-1 bg-white text-zinc-600 text-xs font-bold uppercase tracking-widest rounded border border-zinc-300 hover:bg-zinc-50 transition-colors"
+                                  className="p-1 rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
+                                  title="Decline"
+                                  aria-label={`Decline ${r.name}`}
                                 >
-                                  Decline
+                                  <X className="w-4 h-4" />
                                 </button>
                               </div>
                             ) : (
-                              <button
-                                onClick={async () => {
-                                  if (!confirm(`Remove ${r.name} from this plan?`)) return;
-                                  try {
-                                    await Parse.Cloud.run("removeAttendeeFromPlan", { notificationId: r.notificationId });
-                                    setPlanRsvps((prev) => prev.filter((rsvp) => rsvp.notificationId !== r.notificationId));
-                                  } catch (err) {
-                                    console.error("Failed to remove attendee:", err);
-                                    alert("Failed to remove attendee.");
-                                  }
-                                }}
-                                className="text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
-                              >
-                                Remove
-                              </button>
+                              <div className="flex justify-end">
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm(`Remove ${r.name} from this plan?`)) return;
+                                    try {
+                                      await Parse.Cloud.run("removeAttendeeFromPlan", { notificationId: r.notificationId });
+                                      setPlanRsvps((prev) => prev.filter((rsvp) => rsvp.notificationId !== r.notificationId));
+                                    } catch (err) {
+                                      console.error("Failed to remove attendee:", err);
+                                      alert("Failed to remove attendee.");
+                                    }
+                                  }}
+                                  className="p-1 rounded text-zinc-300 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                  title="Remove attendee"
+                                  aria-label={`Remove ${r.name}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
