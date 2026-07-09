@@ -94,7 +94,7 @@ export default function PersonalGeneratorTry() {
       className="relative py-24 md:py-28"
       style={{ background: "#FBFAF6" }}
     >
-      <div className="max-w-2xl mx-auto px-6">
+      <div className="max-w-3xl mx-auto px-6">
         <div
           className="bg-white rounded-3xl border p-8 md:p-12"
           style={{ borderColor: "#E3E5DE" }}
