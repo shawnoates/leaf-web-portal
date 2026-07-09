@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
-import PersonalGeneratorTry from "./PersonalGeneratorTry";
+import PersonalHero from "./PersonalHero";
 import {
   Sparkles,
   Calendar,
@@ -160,101 +160,7 @@ export default function PersonalPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Hero with background video */}
-      <section className="relative h-[100vh] min-h-[600px] overflow-hidden">
-        <div className="absolute inset-0 bg-zinc-900">
-          <video
-            className="w-full h-full object-cover opacity-50 scale-105"
-            src="/hero-video.mp4"
-            autoPlay
-            muted
-            loop
-            playsInline
-            poster="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&q=80&w=2000"
-          />
-        </div>
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/50 to-black/80 z-10" />
-
-        <nav className="absolute top-0 left-0 right-0 z-30 px-6 py-6">
-          <div className="max-w-6xl mx-auto flex justify-between items-center">
-            <Link href="/" className="flex items-center gap-3">
-              <img src="/leaf-logo-white.svg" alt="Leaf" className="h-8" />
-              <span className="text-xl font-light tracking-wider uppercase text-white">OS</span>
-            </Link>
-            <div className="flex gap-6 items-center">
-              <a
-                href="#pricing"
-                className="text-sm font-medium text-white/70 hover:text-white transition-colors hidden sm:block"
-              >
-                Pricing
-              </a>
-              <Link
-                href="/organizations"
-                className="text-sm font-medium text-white/70 hover:text-white transition-colors hidden sm:block"
-              >
-                For organizations
-              </Link>
-              {!isLoggedIn && (
-                <Link
-                  href="/dashboard"
-                  className="text-sm font-medium text-white/70 hover:text-white transition-colors"
-                >
-                  Sign in
-                </Link>
-              )}
-              <Link
-                href={isLoggedIn ? "/dashboard" : "/organizations/setup"}
-                className="bg-white text-zinc-900 px-5 py-2.5 text-sm font-semibold rounded-full hover:bg-white/90 transition-colors"
-              >
-                {isLoggedIn ? "Dashboard" : "Get Started"}
-              </Link>
-            </div>
-          </div>
-        </nav>
-
-        <div className="relative z-20 h-full flex items-center">
-          <div className="max-w-6xl mx-auto px-6 w-full">
-            <div className="max-w-3xl space-y-8">
-              <h1 className="text-5xl md:text-7xl font-light tracking-tight leading-[1.05] text-white">
-                The easiest way to bring your people{" "}
-                <span className="italic">together.</span>
-              </h1>
-              <p className="text-xl text-white/70 font-light leading-relaxed max-w-xl">
-                Spin up a personal calendar in two minutes. Leaf comes up with
-                the plans. Your friends RSVP with just a phone number. No app
-                required.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 pt-4 items-start">
-                <div className="flex flex-col items-center gap-3">
-                  <Link
-                    href={isLoggedIn ? "/dashboard" : "/organizations/setup"}
-                    className="bg-white text-zinc-900 px-8 py-4 text-base font-semibold rounded-full hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
-                  >
-                    {isLoggedIn ? "Dashboard" : "Start your calendar"} <ArrowRight className="w-4 h-4" />
-                  </Link>
-                  <Link
-                    href="/summer"
-                    className="text-sm font-medium text-white/70 hover:text-white underline underline-offset-4 decoration-white/30 hover:decoration-white transition-colors inline-flex items-center gap-1.5"
-                  >
-                    See it in action <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
-                </div>
-                <a
-                  href="#how-it-works"
-                  className="border border-white/30 text-white px-8 py-4 text-base font-medium rounded-full hover:bg-white/10 transition-colors text-center"
-                >
-                  How it works
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Phase 1 AI generator "try it" entry — sits directly below the
-          video hero. Additive to the existing marketing surface per the
-          /personal spec Part 6. */}
-      <PersonalGeneratorTry />
+      <PersonalHero isLoggedIn={isLoggedIn} />
 
       {/* Who it's for */}
       <section className="py-24">
