@@ -426,7 +426,7 @@ function GenerationSurface({ prompt }: { prompt: string }) {
                 color: "#8A5F1E",
               }}
             >
-              AI-picked venues — double-check hours before you go.
+              These venues weren&apos;t verified against Google Places — double-check hours before you go.
             </p>
           )}
 

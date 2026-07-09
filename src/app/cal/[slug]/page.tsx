@@ -277,8 +277,7 @@ export default function PublicCalendarPage() {
               color: "#8A5F1E",
             }}
           >
-            AI-generated venues — double-check hours before you go. We&apos;re
-            adding real venue verification next.
+            These venues weren&apos;t verified against Google Places — double-check hours before you go.
           </div>
         )}
 
