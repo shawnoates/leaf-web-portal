@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
+import PersonalGeneratorTry from "./PersonalGeneratorTry";
 import {
   Sparkles,
   Calendar,
@@ -249,6 +250,11 @@ export default function PersonalPage() {
           </div>
         </div>
       </section>
+
+      {/* Phase 1 AI generator "try it" entry — sits directly below the
+          video hero. Additive to the existing marketing surface per the
+          /personal spec Part 6. */}
+      <PersonalGeneratorTry />
 
       {/* Who it's for */}
       <section className="py-24">
