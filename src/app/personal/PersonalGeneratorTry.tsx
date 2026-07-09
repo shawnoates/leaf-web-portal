@@ -136,6 +136,7 @@ export default function PersonalGeneratorTry() {
 
             <form
               onSubmit={handleFreeformSubmit}
+              autoComplete="off"
               className="flex items-center gap-2 bg-white rounded-full pl-6 pr-2 py-2 border transition-all"
               style={{
                 borderColor: isTyping ? "#1B4332" : "#E3E5DE",
@@ -145,10 +146,18 @@ export default function PersonalGeneratorTry() {
               }}
             >
               <input
+                type="search"
+                name="calendar-prompt"
                 value={typed}
                 onChange={(e) => handleTyping(e.target.value)}
                 placeholder="Try “date night in Fort Greene” or “Thursday happy hours”"
                 aria-label="Describe a vibe"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                data-1p-ignore
+                data-lpignore="true"
                 className="flex-1 border-0 outline-none bg-transparent py-2.5 text-base min-w-0"
                 style={{ color: "#131714" }}
               />

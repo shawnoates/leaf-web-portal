@@ -130,6 +130,7 @@ function PromptBar({ initial = "" }: { initial?: string }) {
         if (!isTyping) return;
         router.push(`/calendars?q=${encodeURIComponent(typed.trim())}`);
       }}
+      autoComplete="off"
       className="flex items-center gap-2 bg-white rounded-full pl-6 pr-2 py-2 border transition-all"
       style={{
         borderColor: isTyping ? "#1B4332" : "#E3E5DE",
@@ -139,10 +140,18 @@ function PromptBar({ initial = "" }: { initial?: string }) {
       }}
     >
       <input
+        type="search"
+        name="calendar-prompt"
         value={typed}
         onChange={(e) => setTyped(e.target.value)}
         placeholder='Try "date night in Fort Greene"'
         aria-label="Describe a vibe"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        data-1p-ignore
+        data-lpignore="true"
         className="flex-1 border-0 outline-none bg-transparent py-2.5 text-base min-w-0"
         style={{ color: "#131714" }}
       />
