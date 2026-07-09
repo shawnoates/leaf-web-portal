@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
+import { pickSeeds, type SeedCalendar } from "@/lib/aiCalendarSeed";
 
 // Phase 1 "try it" entry to the AI calendar generator. Sits below the
 // video hero on /personal. Design intent + interaction states are
@@ -16,88 +17,9 @@ import { ArrowRight } from "lucide-react";
 //                   /calendars?q=... where full generation happens
 //                   with skeletons / streaming / retries.
 //
-// Everything below is stubbed: the seed pool is static, the sign-in
-// modal is a route push, and generation is a route push. Phase 1 wires
-// these to real backends; Phase 5 wires the seed calendars to
-// getWeeklyPlanRecommendation as `signalSources: "public_calendar_seed"`.
-
-interface SeededEvent {
-  tag: string;
-  tagVariant?: "default" | "amber";
-  name: string;
-  time: string;
-  venueLine: string;
-}
-
-interface SeededCalendar {
-  slug: string;
-  chipLabel: string;
-  previewKicker: string;
-  previewTitle: string;
-  sourceName: string;
-  adoptionCount: number;
-  events: SeededEvent[];
-}
-
-// Seed pool. Production pulls from a cached-calendar table; today
-// this is hand-curated so /personal always has something to show
-// before the gallery is populated (cold-start plan from the spec).
-const SEED_POOL: SeededCalendar[] = [
-  {
-    slug: "family-fun-this-month",
-    chipLabel: "Family fun this month",
-    previewKicker: "Preview · 4 weekends",
-    previewTitle: "Family fun · Brooklyn",
-    sourceName: "Brooklyn Parents Group",
-    adoptionCount: 147,
-    events: [
-      { tag: "Museum", name: "Brooklyn Children's Museum", time: "Sat · 10:30 AM", venueLine: "145 Brooklyn Ave" },
-      { tag: "Outdoor", name: "Prospect Park Zoo", time: "Sun · 11:00 AM", venueLine: "450 Flatbush Ave" },
-      { tag: "Workshop", name: "Powerhouse Arena Kids Story Hour", time: "Sat · 11:00 AM", venueLine: "28 Adams St" },
-      { tag: "Play", tagVariant: "amber", name: "Kolo Klub", time: "Sun · 2:00 PM", venueLine: "142 Sackett St · indoor" },
-    ],
-  },
-  {
-    slug: "fort-greene-date-night",
-    chipLabel: "Date night in Fort Greene",
-    previewKicker: "Preview · 5 nights, 4 stops",
-    previewTitle: "Fort Greene · Date night",
-    sourceName: "Fort Greene Regulars",
-    adoptionCount: 213,
-    events: [
-      { tag: "Cocktails", name: "Bar Camillo", time: "Fri · 7:30 PM", venueLine: "210 Grand Ave" },
-      { tag: "Dinner", name: "Cafe Erzulie", time: "Fri · 8:30 PM", venueLine: "894 Fulton St · Haitian" },
-      { tag: "Dinner", name: "Roman's", time: "Sat · 8:00 PM", venueLine: "243 DeKalb Ave · Italian, walk-in" },
-      { tag: "Nightcap", tagVariant: "amber", name: "The Great Georgiana", time: "Sat · 11:00 PM", venueLine: "351 Grand Ave · Natural wine" },
-    ],
-  },
-  {
-    slug: "park-slope-thursday-happy-hours",
-    chipLabel: "Thursday happy hours · Park Slope",
-    previewKicker: "Preview · every Thursday",
-    previewTitle: "Thursday happy hours · Park Slope",
-    sourceName: "Park Slope After-Work",
-    adoptionCount: 89,
-    events: [
-      { tag: "Beer", name: "Union Hall", time: "Thu · 5:30 PM", venueLine: "702 Union St · $6 pints" },
-      { tag: "Wine", name: "Sea Witch", time: "Thu · 6:30 PM", venueLine: "703 Sackett St · $8 glasses" },
-      { tag: "Cocktails", name: "Bar Toto", time: "Thu · 7:30 PM", venueLine: "411 11th St · half-off apps" },
-      { tag: "Snacks", tagVariant: "amber", name: "Talde", time: "Thu · 8:30 PM", venueLine: "369 7th Ave · Asian-American" },
-    ],
-  },
-];
-
-// Rotate 3 chips per visit out of the pool. Deterministic per mount so
-// re-renders don't shuffle mid-interaction. Production picks weighted
-// by adoption_count + area match.
-function pickChips(pool: SeededCalendar[]): SeededCalendar[] {
-  const copy = [...pool];
-  const picks: SeededCalendar[] = [];
-  while (picks.length < Math.min(3, pool.length) && copy.length) {
-    picks.push(copy.splice(Math.floor(Math.random() * copy.length), 1)[0]);
-  }
-  return picks;
-}
+// The seed pool is shared with /calendars via @/lib/aiCalendarSeed —
+// both surfaces show the same starter supply while the real
+// cached-calendar table is populated.
 
 // Analytics — thin dataLayer.push so GTM/Segment can pick up the
 // /personal funnel from launch. All Phase 1 events for the generator
@@ -119,7 +41,7 @@ function trackPersonalGen(event: PersonalGenEvent, detail?: Record<string, unkno
 
 export default function PersonalGeneratorTry() {
   const router = useRouter();
-  const chips = useMemo(() => pickChips(SEED_POOL), []);
+  const chips = useMemo(() => pickSeeds(3), []);
   const [typed, setTyped] = useState("");
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [promptTypedFired, setPromptTypedFired] = useState(false);
@@ -145,7 +67,7 @@ export default function PersonalGeneratorTry() {
     router.push(`/calendars?q=${encodeURIComponent(typed.trim())}`);
   }
 
-  function handleChipTap(cal: SeededCalendar) {
+  function handleChipTap(cal: SeedCalendar) {
     setActiveSlug(cal.slug);
     // Chip taps count as generation_completed since the cached calendar
     // is the "generated" artifact — no LLM ran but the visitor got the
@@ -159,12 +81,11 @@ export default function PersonalGeneratorTry() {
   function handleAdopt() {
     if (!activeCalendar) return;
     trackPersonalGen("adopt_clicked", { slug: activeCalendar.slug });
-    // Phase 1 stub: route to sign-in with a return path that carries
-    // the calendar we want to fork. The signed-in landing then calls
-    // the adopt endpoint and routes to /c/<owned-slug>.
-    router.push(
-      `/dashboard?adoptFrom=${encodeURIComponent(activeCalendar.slug)}`
-    );
+    // Route to the calendar's detail page where the adopt CTA lives on
+    // a proper surface (sign-in modal + adopt confirmation). Handling
+    // it here would require an auth check inline, which duplicates
+    // logic /c/<slug> already needs.
+    router.push(`/c/${activeCalendar.slug}?adopt=1`);
   }
 
   return (
@@ -293,7 +214,7 @@ export default function PersonalGeneratorTry() {
                         fontWeight: 400,
                       }}
                     >
-                      {activeCalendar.previewTitle}
+                      {activeCalendar.title}
                     </h3>
                   </div>
                   <button
