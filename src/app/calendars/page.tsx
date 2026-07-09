@@ -515,16 +515,20 @@ function GenerationSurface({ prompt }: { prompt: string }) {
             >
               {reason === "prompt_not_meaningful"
                 ? "Try a bit more detail."
-                : reason === "thin_result" || reason === "generation_failed"
-                  ? "We can only do place-based calendars for now."
-                  : "Something went sideways."}
+                : reason === "no_events_found"
+                  ? "Nothing on the schedule right now."
+                  : reason === "thin_result" || reason === "generation_failed"
+                    ? "Couldn't ground this one in real venues."
+                    : "Something went sideways."}
             </h2>
             <p className="text-[14px] leading-relaxed m-0" style={{ color: "#6B7168" }}>
               {reason === "prompt_not_meaningful"
                 ? 'A neighborhood + a vibe usually works — like "date night in Fort Greene".'
-                : reason === "thin_result" || reason === "generation_failed"
-                  ? "Fixed-date events (games, concerts, museum openings) need a live schedule feed we haven't wired up yet. Try a vibe grounded in venues — a neighborhood + a mood — and we'll build it. Or pick one of these adopted calendars close to what you asked for."
-                  : "Try another prompt, or pick one of these adopted calendars close to what you asked for."}
+                : reason === "no_events_found"
+                  ? "We searched Ticketmaster for the NYC area and the next 90 days but didn't find upcoming events matching your ask. Try a different team, artist, or window."
+                  : reason === "thin_result" || reason === "generation_failed"
+                    ? "Try a vibe grounded in venues — a neighborhood + a mood — and we'll build it. Or pick one of these adopted calendars close to what you asked for."
+                    : "Try another prompt, or pick one of these adopted calendars close to what you asked for."}
             </p>
           </div>
 
