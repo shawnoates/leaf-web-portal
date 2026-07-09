@@ -208,7 +208,7 @@ function GallerySurface() {
 function GalleryCard({ calendar }: { calendar: SeedCalendar }) {
   return (
     <Link
-      href={`/c/${calendar.slug}`}
+      href={`/cal/${calendar.slug}`}
       onClick={() =>
         trackCalendarsEvent("gallery_calendar_opened", { slug: calendar.slug })
       }
@@ -453,7 +453,7 @@ function GenerationSurface({ prompt }: { prompt: string }) {
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Link
-              href={`/c/${generated.slug}?adopt=1`}
+              href={`/cal/${generated.slug}?adopt=1`}
               className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[13px] font-semibold"
               style={{ background: "#131714", color: "#fff" }}
             >
@@ -461,7 +461,7 @@ function GenerationSurface({ prompt }: { prompt: string }) {
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
             <Link
-              href={`/c/${generated.slug}`}
+              href={`/cal/${generated.slug}`}
               className="inline-flex items-center gap-2 text-[13px] font-semibold"
               style={{ color: "#6B7168" }}
             >
@@ -502,7 +502,7 @@ function GenerationSurface({ prompt }: { prompt: string }) {
             {SEED_POOL.slice(0, 3).map((c) => (
               <Link
                 key={c.slug}
-                href={`/c/${c.slug}`}
+                href={`/cal/${c.slug}`}
                 onClick={() =>
                   trackCalendarsEvent("gen_stub_fallback_gallery", {
                     slug: c.slug,

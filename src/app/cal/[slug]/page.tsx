@@ -178,7 +178,7 @@ export default function PublicCalendarPage() {
     const current = (Parse as any).User?.current?.();
     if (!current) {
       trackCalendarEvent("sign_in_from_adopt", { slug: cal.slug });
-      const returnTo = encodeURIComponent(`/c/${cal.slug}?adopt=1`);
+      const returnTo = encodeURIComponent(`/cal/${cal.slug}?adopt=1`);
       router.push(`/dashboard?signInReturnTo=${returnTo}`);
       return;
     }
@@ -204,7 +204,7 @@ export default function PublicCalendarPage() {
         templateSlug: cal.slug,
         ownedSlug: result.ownedSlug,
       });
-      router.push(`/c/${result.ownedSlug}`);
+      router.push(`/cal/${result.ownedSlug}`);
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Something went wrong. Try again.";

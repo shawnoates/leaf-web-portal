@@ -85,7 +85,7 @@ export default function PersonalGeneratorTry() {
     // a proper surface (sign-in modal + adopt confirmation). Handling
     // it here would require an auth check inline, which duplicates
     // logic /c/<slug> already needs.
-    router.push(`/c/${activeCalendar.slug}?adopt=1`);
+    router.push(`/cal/${activeCalendar.slug}?adopt=1`);
   }
 
   return (
