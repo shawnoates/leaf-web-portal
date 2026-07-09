@@ -95,6 +95,14 @@ function CalendarsInner() {
 // ─── Layout shell ─────────────────────────────────────────────────
 
 function CalendarsShell({ children }: { children: React.ReactNode }) {
+  // Show "Your calendars" link only when signed in — otherwise the link
+  // lands on the /dashboard sign-in bounce which is confusing for a
+  // marketing-flow visitor.
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => {
+    setSignedIn(!!Parse.User.current());
+  }, []);
+
   return (
     <div className="min-h-screen" style={{ background: "#FBFAF6" }}>
       <header className="sticky top-0 z-30" style={{ background: "#FBFAF6", borderBottom: "1px solid #E3E5DE" }}>
@@ -109,13 +117,24 @@ function CalendarsShell({ children }: { children: React.ReactNode }) {
               OS
             </span>
           </Link>
-          <Link
-            href="/personal"
-            className="text-sm font-medium hover:opacity-70 transition-opacity"
-            style={{ color: "#6B7168" }}
-          >
-            About
-          </Link>
+          <div className="flex items-center gap-5">
+            {signedIn && (
+              <Link
+                href="/dashboard?tab=calendars"
+                className="text-sm font-medium hover:opacity-70 transition-opacity"
+                style={{ color: "#1B4332" }}
+              >
+                Your calendars
+              </Link>
+            )}
+            <Link
+              href="/personal"
+              className="text-sm font-medium hover:opacity-70 transition-opacity"
+              style={{ color: "#6B7168" }}
+            >
+              About
+            </Link>
+          </div>
         </div>
       </header>
       <main className="max-w-5xl mx-auto px-6 py-12 md:py-16">{children}</main>

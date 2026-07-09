@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { findSeed, type SeedCalendar } from "@/lib/aiCalendarSeed";
+import SignInModal from "@/components/SignInModal";
 
 // Public calendar detail view + owner editing surface.
 //
@@ -119,6 +120,7 @@ export default function PublicCalendarPage() {
   );
   const [adopting, setAdopting] = useState(false);
   const [adoptError, setAdoptError] = useState<string | null>(null);
+  const [showSignIn, setShowSignIn] = useState(false);
 
   const loadCalendar = useCallback(async () => {
     // Seed first — fast, always available.
@@ -177,12 +179,20 @@ export default function PublicCalendarPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const current = (Parse as any).User?.current?.();
     if (!current) {
+      // Show the sign-in popup in-place instead of routing to /dashboard.
+      // Keeps the visitor on the calendar they're looking at — after
+      // successful sign-in the modal's callback fires runAdopt() so the
+      // fork happens without a second click.
       trackCalendarEvent("sign_in_from_adopt", { slug: cal.slug });
-      const returnTo = encodeURIComponent(`/cal/${cal.slug}?adopt=1`);
-      router.push(`/dashboard?signInReturnTo=${returnTo}`);
+      setShowSignIn(true);
       return;
     }
 
+    await runAdopt();
+  }
+
+  async function runAdopt() {
+    if (!cal) return;
     setAdopting(true);
     setAdoptError(null);
     try {
@@ -312,14 +322,25 @@ export default function PublicCalendarPage() {
               </p>
             )}
             <p className="text-[12px] max-w-md" style={{ color: "#6B7168" }}>
-              Adopting creates your own editable copy. The original template
-              stays put for the next person.
+              Make it yours to save your own editable copy and start planning.
             </p>
           </div>
         ) : (
           <DangerZone cal={cal} />
         )}
       </div>
+
+      {showSignIn && cal && (
+        <SignInModal
+          title={`Sign in to make "${cal.title}" yours`}
+          subtitle="One tap creates your editable copy. You can edit, share, and turn any event into a real plan."
+          onClose={() => setShowSignIn(false)}
+          onSignedIn={async () => {
+            setShowSignIn(false);
+            await runAdopt();
+          }}
+        />
+      )}
     </Shell>
   );
 }
@@ -832,6 +853,14 @@ function DangerZone({ cal }: { cal: AICalendarPayload }) {
 // ─── Layout shell ─────────────────────────────────────────────────
 
 function Shell({ children }: { children: React.ReactNode }) {
+  // Show "Your calendars" link only when signed in — it goes to a page
+  // that requires auth, and hiding it for signed-out visitors keeps
+  // the /calendars marketing flow clean.
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => {
+    setSignedIn(!!Parse.User.current());
+  }, []);
+
   return (
     <div className="min-h-screen" style={{ background: "#FBFAF6" }}>
       <header
@@ -849,13 +878,24 @@ function Shell({ children }: { children: React.ReactNode }) {
               OS
             </span>
           </Link>
-          <Link
-            href="/calendars"
-            className="text-sm font-medium hover:opacity-70 transition-opacity"
-            style={{ color: "#6B7168" }}
-          >
-            Gallery
-          </Link>
+          <div className="flex items-center gap-5">
+            {signedIn && (
+              <Link
+                href="/dashboard?tab=calendars"
+                className="text-sm font-medium hover:opacity-70 transition-opacity"
+                style={{ color: "#1B4332" }}
+              >
+                Your calendars
+              </Link>
+            )}
+            <Link
+              href="/calendars"
+              className="text-sm font-medium hover:opacity-70 transition-opacity"
+              style={{ color: "#6B7168" }}
+            >
+              Gallery
+            </Link>
+          </div>
         </div>
       </header>
       <main className="max-w-5xl mx-auto px-6 py-12 md:py-16">{children}</main>

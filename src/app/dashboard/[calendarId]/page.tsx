@@ -22,6 +22,7 @@ import {
   Calendar,
   Check,
   ChevronDown,
+  ChevronRight,
   Clock,
   Copy,
   Download,
@@ -755,6 +756,25 @@ export default function OrgDashboardPage() {
 
   // Selected calendar in the Calendars tab's master/detail layout.
   const [calendarsSelectedId, setCalendarsSelectedId] = useState<string | null>(null);
+
+  // Personal AI calendars (adopted from /calendars) — surfaced on the
+  // Calendars tab so an org owner sees their own AI-generated calendars
+  // alongside the org's Groups calendars.
+  const [myAICalendars, setMyAICalendars] = useState<{
+    objectId: string;
+    slug: string;
+    title: string;
+    area: string | null;
+    theme: string | null;
+    events: { name: string; time: string }[];
+    updatedAt: string;
+  }[]>([]);
+  useEffect(() => {
+    Parse.Cloud.run("listMyAICalendars")
+      .then((r: { calendars: typeof myAICalendars }) => setMyAICalendars(r.calendars || []))
+      .catch(() => setMyAICalendars([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Analytics fetcher — Pro tier only
   const fetchAnalytics = useCallback(
@@ -2361,6 +2381,51 @@ export default function OrgDashboardPage() {
                 );
               })()}
             </div>
+
+            {/* Personal AI calendars (adopted from /calendars) — same
+                tab as the org's Groups calendars so owners have one home
+                for everything calendar-shaped. */}
+            {myAICalendars.length > 0 && (
+              <div className="pt-8 mt-8 border-t border-zinc-100 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
+                    Your AI calendars ({myAICalendars.length})
+                  </h2>
+                  <Link
+                    href="/calendars"
+                    className="text-xs font-semibold text-emerald-700 hover:text-emerald-900 transition-colors inline-flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> Adopt from gallery
+                  </Link>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {myAICalendars.map((c) => (
+                    <Link
+                      key={c.objectId}
+                      href={`/cal/${c.slug}`}
+                      className="group bg-white border border-zinc-200 rounded-xl p-4 hover:border-zinc-400 transition-colors flex items-start gap-3"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+                        <Calendar className="w-4 h-4 text-emerald-700" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 truncate">
+                          {c.area || "Somewhere"} · {c.theme || "mix"}
+                        </div>
+                        <div className="text-sm font-medium text-zinc-900 truncate mt-0.5">
+                          {c.title}
+                        </div>
+                        <div className="text-[11px] text-zinc-400 mt-1">
+                          {c.events?.length ?? 0} {c.events?.length === 1 ? "event" : "events"} · updated{" "}
+                          {new Date(c.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-zinc-900 transition-colors shrink-0 mt-1" />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           );
         })()}
