@@ -3,8 +3,31 @@
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Loader2, Sparkles } from "lucide-react";
+import Parse from "@/lib/parse-client";
 import { SEED_POOL, type SeedCalendar } from "@/lib/aiCalendarSeed";
+
+interface GeneratedCalendar {
+  slug: string;
+  title: string;
+  area: string | null;
+  theme: string | null;
+  events: {
+    name: string;
+    time: string;
+    venueLine: string;
+    tag: string;
+    tagVariant?: "default" | "amber";
+  }[];
+  venuesVerified: boolean;
+}
+
+interface GenerateResponse {
+  ok: boolean;
+  reason?: string;
+  fromCache?: boolean;
+  calendar: GeneratedCalendar | null;
+}
 
 // AI-generator gallery + freeform generation destination.
 //
@@ -259,29 +282,53 @@ function GalleryCard({ calendar }: { calendar: SeedCalendar }) {
   );
 }
 
-// ─── Generation surface (Phase 1 stub) ────────────────────────────
+// ─── Generation surface — real Gemini via generateAICalendar ──────
 
 function GenerationSurface({ prompt }: { prompt: string }) {
   const router = useRouter();
-  const [phase, setPhase] = useState<"working" | "fallback">("working");
+  const [phase, setPhase] = useState<"working" | "success" | "fallback">(
+    "working"
+  );
+  const [generated, setGenerated] = useState<GeneratedCalendar | null>(null);
+  const [fromCache, setFromCache] = useState(false);
+  const [reason, setReason] = useState<string | null>(null);
 
   useEffect(() => {
-    // Phase 1 stub — pretend to generate for 3.5s, then fall back to
-    // the gallery with a friendly "we couldn't make this yet" message.
-    // Replaces with real streaming generation in Phase 2.
-    const t = window.setTimeout(() => setPhase("fallback"), 3500);
-    return () => window.clearTimeout(t);
-  }, []);
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = (await Parse.Cloud.run("generateAICalendar", {
+          prompt,
+        })) as GenerateResponse;
+        if (cancelled) return;
+        if (result.ok && result.calendar) {
+          setGenerated(result.calendar);
+          setFromCache(!!result.fromCache);
+          setPhase("success");
+        } else {
+          setReason(result.reason || "generation_failed");
+          setPhase("fallback");
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setReason(err instanceof Error ? err.message : "generation_failed");
+        setPhase("fallback");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [prompt]);
 
   return (
-    <div className="flex flex-col gap-8 max-w-2xl mx-auto py-8">
+    <div className="flex flex-col gap-8 max-w-2xl mx-auto py-4">
       <div className="flex flex-col gap-3">
         <span
           className="text-[11px] font-bold uppercase tracking-[0.18em] inline-flex items-center gap-2.5"
           style={{ color: "#1B4332" }}
         >
           <span className="inline-block h-px w-4" style={{ background: "#1B4332" }} />
-          Generating
+          {phase === "working" ? "Generating" : phase === "success" ? "Ready" : "Couldn't make it"}
         </span>
         <h1
           className="font-serif font-normal text-balance m-0"
@@ -296,17 +343,135 @@ function GenerationSurface({ prompt }: { prompt: string }) {
         </h1>
       </div>
 
-      {phase === "working" ? (
+      {phase === "working" && (
         <div className="flex flex-col gap-3">
           <SkeletonRow />
           <SkeletonRow width="80%" />
           <SkeletonRow width="65%" />
+          <SkeletonRow width="72%" />
           <div className="flex items-center gap-2 text-[13px] mt-4" style={{ color: "#6B7168" }}>
             <Sparkles className="w-4 h-4" style={{ color: "#1B4332" }} />
-            <span>Grounding your calendar in real Brooklyn venues…</span>
+            <span>Building your calendar with real venues…</span>
           </div>
         </div>
-      ) : (
+      )}
+
+      {phase === "success" && generated && (
+        <div
+          className="bg-white rounded-2xl border p-6 md:p-8 flex flex-col gap-5"
+          style={{ borderColor: "#E3E5DE" }}
+        >
+          {fromCache && (
+            <span
+              className="text-[11px] font-semibold uppercase tracking-[0.16em] self-start rounded px-2 py-0.5"
+              style={{ background: "#E8EFE9", color: "#1B4332" }}
+            >
+              From cache
+            </span>
+          )}
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="flex flex-col gap-1 min-w-0">
+              <span
+                className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+                style={{ color: "#6B7168" }}
+              >
+                {generated.area || "New York"} · {generated.theme || "mix"}
+              </span>
+              <h2
+                className="m-0 text-[24px] tracking-tight"
+                style={{
+                  color: "#131714",
+                  fontFamily: 'ui-serif, Georgia, "Times New Roman", serif',
+                  fontWeight: 400,
+                }}
+              >
+                {generated.title}
+              </h2>
+            </div>
+          </div>
+
+          {!generated.venuesVerified && (
+            <p
+              className="text-[12px] leading-relaxed rounded-lg px-3 py-2"
+              style={{
+                background: "rgba(200,138,59,0.08)",
+                color: "#8A5F1E",
+              }}
+            >
+              AI-picked venues — double-check hours before you go.
+            </p>
+          )}
+
+          <ul className="flex flex-col gap-4 m-0 p-0 list-none">
+            {generated.events.map((ev, i) => (
+              <li
+                key={i}
+                className="flex items-start gap-4 pb-4"
+                style={{
+                  borderBottom:
+                    i < generated.events.length - 1 ? "1px solid #E3E5DE" : "none",
+                }}
+              >
+                <div className="flex flex-col items-end w-20 shrink-0 pt-0.5">
+                  <span
+                    className="text-[11px] font-bold uppercase tracking-[0.12em] rounded px-1.5 py-0.5"
+                    style={{
+                      background:
+                        ev.tagVariant === "amber"
+                          ? "rgba(200,138,59,0.14)"
+                          : "#E8EFE9",
+                      color: ev.tagVariant === "amber" ? "#C88A3B" : "#1B4332",
+                    }}
+                  >
+                    {ev.tag}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1 min-w-0 flex-1">
+                  <span
+                    className="tabular-nums text-[13px] font-medium"
+                    style={{ color: "#131714" }}
+                  >
+                    {ev.time}
+                  </span>
+                  <h3
+                    className="m-0 text-[17px] tracking-tight"
+                    style={{
+                      color: "#131714",
+                      fontFamily: 'ui-serif, Georgia, "Times New Roman", serif',
+                      fontWeight: 400,
+                    }}
+                  >
+                    {ev.name}
+                  </h3>
+                  <span className="text-[13px]" style={{ color: "#6B7168" }}>
+                    {ev.venueLine}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <Link
+              href={`/c/${generated.slug}?adopt=1`}
+              className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[13px] font-semibold"
+              style={{ background: "#131714", color: "#fff" }}
+            >
+              Make it yours
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+            <Link
+              href={`/c/${generated.slug}`}
+              className="inline-flex items-center gap-2 text-[13px] font-semibold"
+              style={{ color: "#6B7168" }}
+            >
+              Or open the full page
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {phase === "fallback" && (
         <div
           className="bg-white rounded-2xl border p-6 md:p-8 flex flex-col gap-5"
           style={{ borderColor: "#E3E5DE" }}
@@ -320,11 +485,16 @@ function GenerationSurface({ prompt }: { prompt: string }) {
                 fontWeight: 400,
               }}
             >
-              We couldn&apos;t make this one yet.
+              {reason === "prompt_not_meaningful"
+                ? "Try a bit more detail."
+                : reason === "thin_result"
+                  ? "We couldn't confidently ground this one."
+                  : "Something went sideways."}
             </h2>
             <p className="text-[14px] leading-relaxed m-0" style={{ color: "#6B7168" }}>
-              Freeform generation is coming soon. In the meantime, one of these
-              adopted calendars is close to what you asked for.
+              {reason === "prompt_not_meaningful"
+                ? "A neighborhood + a vibe usually works — like \"date night in Fort Greene\"."
+                : "Try another prompt, or pick one of these adopted calendars close to what you asked for."}
             </p>
           </div>
 

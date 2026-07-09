@@ -60,9 +60,21 @@ function DashboardPageInner() {
     setAuthChecked(true);
   }, []);
 
+  // signInReturnTo bounce — when a page routes an unauth visitor to
+  // /dashboard for sign-in and includes ?signInReturnTo=<url>, once
+  // they authenticate we send them back to complete whatever they
+  // were doing (adopt a calendar, RSVP, etc.) instead of dumping them
+  // into the org picker. Whitelisted to same-origin relative paths so
+  // this can't be turned into an open redirect.
   useEffect(() => {
     if (!user) return;
+    const returnTo = searchParams.get("signInReturnTo");
+    if (returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")) {
+      router.replace(returnTo);
+      return;
+    }
     fetchOrg();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   async function fetchOrg() {
