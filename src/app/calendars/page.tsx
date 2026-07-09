@@ -62,12 +62,28 @@ export default function CalendarsPage() {
 
 function CalendarsInner() {
   const searchParams = useSearchParams();
-  const query = searchParams.get("q")?.trim() || "";
+  // Read the query only post-mount so SSR and the client's first paint
+  // both render the same "unknown" state. Reading during render was
+  // producing React error #418 (hydration text mismatch) because SSR
+  // sees no `q` while the client has one from the router.push.
+  const [mounted, setMounted] = useState(false);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
-    if (query) trackCalendarsEvent("gen_stub_shown", { prompt: query });
+    const q = searchParams.get("q")?.trim() || "";
+    setQuery(q);
+    setMounted(true);
+    if (q) trackCalendarsEvent("gen_stub_shown", { prompt: q });
     else trackCalendarsEvent("gallery_viewed");
-  }, [query]);
+  }, [searchParams]);
+
+  if (!mounted) {
+    return (
+      <CalendarsShell>
+        <ShellSkeleton />
+      </CalendarsShell>
+    );
+  }
 
   return (
     <CalendarsShell>

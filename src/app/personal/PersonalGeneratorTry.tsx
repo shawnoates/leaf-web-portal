@@ -1,9 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
-import { pickSeeds, type SeedCalendar } from "@/lib/aiCalendarSeed";
+import {
+  pickSeeds,
+  SEED_POOL,
+  type SeedCalendar,
+} from "@/lib/aiCalendarSeed";
 
 // Phase 1 "try it" entry to the AI calendar generator. Sits below the
 // video hero on /personal. Design intent + interaction states are
@@ -41,7 +45,15 @@ function trackPersonalGen(event: PersonalGenEvent, detail?: Record<string, unkno
 
 export default function PersonalGeneratorTry() {
   const router = useRouter();
-  const chips = useMemo(() => pickSeeds(3), []);
+  // Seed the chip row with a deterministic slice (first 3 of the pool)
+  // so SSR and the client's initial hydration render the same HTML —
+  // Math.random() at render time was causing React error #418
+  // (hydration text mismatch). We then reshuffle in a post-mount
+  // useEffect so visitors still get the rotated pool experience.
+  const [chips, setChips] = useState<SeedCalendar[]>(() => SEED_POOL.slice(0, 3));
+  useEffect(() => {
+    setChips(pickSeeds(3));
+  }, []);
   const [typed, setTyped] = useState("");
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [promptTypedFired, setPromptTypedFired] = useState(false);
