@@ -85,8 +85,11 @@ function CalendarsShell({ children }: { children: React.ReactNode }) {
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/leaf-logo-black.png" alt="Leaf" className="h-6 w-6" />
-            <span className="text-sm font-light tracking-[0.14em] uppercase" style={{ color: "#131714" }}>
+            <img src="/leaf-logo-black.png" alt="Leaf" className="h-7" />
+            <span
+              className="text-base font-light tracking-[0.14em] uppercase"
+              style={{ color: "#131714" }}
+            >
               OS
             </span>
           </Link>
