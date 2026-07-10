@@ -44,6 +44,72 @@ function PlanImage({
   );
 }
 
+// Resolve an AI starter event's display date. Mirrors the logic in
+// /org/[shareId]/page.tsx — dateISO present ⇒ locked calendar date;
+// weekday-style time strings ("Sat · 7:00 PM") resolve to the next
+// occurrence of that weekday. Returns null if the event can't be dated
+// or its fixed date has already passed (keeps stale suggestions out of
+// the manager's Upcoming list).
+function resolveAIStarterDate(ev: {
+  time?: string;
+  isoDatetime?: string | null;
+  dateISO?: string | null;
+}): Date | null {
+  const timeStr = String(ev.time || "").trim();
+  const MONTH_RX = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i;
+  const isFixedDate = MONTH_RX.test(timeStr) || !!(ev.dateISO && /^\d{4}-\d{2}-\d{2}$/.test(ev.dateISO));
+
+  if (isFixedDate) {
+    if (!ev.isoDatetime) return null;
+    const d = new Date(ev.isoDatetime);
+    if (Number.isNaN(d.getTime())) return null;
+    // Past fixed-date starter → drop. The manager can't retro-host a
+    // date that already happened.
+    if (d.getTime() < Date.now() - 3 * 60 * 60 * 1000) return null;
+    return d;
+  }
+
+  // Weekly path — parse weekday + time and roll to next occurrence.
+  const WEEKDAYS: Record<string, number> = {
+    sun: 0, sunday: 0,
+    mon: 1, monday: 1,
+    tue: 2, tues: 2, tuesday: 2,
+    wed: 3, weds: 3, wednesday: 3,
+    thu: 4, thur: 4, thurs: 4, thursday: 4,
+    fri: 5, friday: 5,
+    sat: 6, saturday: 6,
+  };
+  const weekdayMatch = timeStr
+    .toLowerCase()
+    .match(/\b(sun|sunday|mon|monday|tue|tues|tuesday|wed|weds|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday)\b/);
+  if (!weekdayMatch) {
+    if (!ev.isoDatetime) return null;
+    const d = new Date(ev.isoDatetime);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const targetDow = WEEKDAYS[weekdayMatch[1]];
+  const timeMatch = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*([ap]m)?/i);
+  if (!timeMatch) return null;
+  let hour = parseInt(timeMatch[1], 10);
+  const minute = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+  const meridiem = timeMatch[3] ? timeMatch[3].toLowerCase() : null;
+  if (meridiem === "pm" && hour < 12) hour += 12;
+  if (meridiem === "am" && hour === 12) hour = 0;
+  if (Number.isNaN(hour) || Number.isNaN(minute) || hour > 23 || minute > 59) return null;
+  const now = new Date();
+  const currentDow = now.getDay();
+  let daysUntil = (targetDow - currentDow + 7) % 7;
+  if (daysUntil === 0) {
+    const nowH = now.getHours();
+    const nowM = now.getMinutes();
+    if (hour < nowH || (hour === nowH && minute <= nowM)) daysUntil = 7;
+  }
+  const target = new Date(now);
+  target.setDate(now.getDate() + daysUntil);
+  target.setHours(hour, minute, 0, 0);
+  return target;
+}
+
 interface PlanIdea {
   objectId: string;
   title: string;
@@ -104,6 +170,14 @@ interface UpcomingPlan {
   hideVenueUntilRsvp?: boolean;
   requireApproval?: boolean;
   planSeriesId?: string | null;
+  // AI starter plans surfaced alongside real EventGroups. These come from
+  // the parent AICalendar's aiSourceEvents; they never gain a host until a
+  // manager promotes them via "Plan This" (which creates a real EventGroup
+  // and drops the AI event index). Rendered with a "Waiting on host" byline
+  // so the manager sees what still needs claiming.
+  isAIStarter?: boolean;
+  aiEventIndex?: number;
+  aiVenueLine?: string;
 }
 
 /**
@@ -275,28 +349,64 @@ export default function PlansManager({
         requireApproval?: boolean;
         planSeriesId?: string | null;
       }[];
-      setUpcomingPlans(
-        activePlans.map((p) => ({
-          objectId: p.objectId,
-          title: p.title,
-          description: p.description || "",
-          image: p.image,
-          expiryDate: p.date,
-          timezone: p.timezone ?? null,
-          time: p.time,
-          rsvpCount: p.rsvpCount,
-          host: p.hostName ? { name: p.hostName } : null,
-          location: p.location ? { name: p.location.name, address: p.location.address } : null,
-          isPoll: p.isPoll,
-          pollOptionCount: p.pollOptionCount,
-          pollVoteCount: p.pollVoteCount,
-          pollClosesAt: p.pollClosesAt,
-          hideVenueUntilRsvp: p.hideVenueUntilRsvp,
-          requireApproval: p.requireApproval,
-          planSeriesId: p.planSeriesId,
-        }))
-      );
+      const realPlans: UpcomingPlan[] = activePlans.map((p) => ({
+        objectId: p.objectId,
+        title: p.title,
+        description: p.description || "",
+        image: p.image,
+        expiryDate: p.date,
+        timezone: p.timezone ?? null,
+        time: p.time,
+        rsvpCount: p.rsvpCount,
+        host: p.hostName ? { name: p.hostName } : null,
+        location: p.location ? { name: p.location.name, address: p.location.address } : null,
+        isPoll: p.isPoll,
+        pollOptionCount: p.pollOptionCount,
+        pollVoteCount: p.pollVoteCount,
+        pollClosesAt: p.pollClosesAt,
+        hideVenueUntilRsvp: p.hideVenueUntilRsvp,
+        requireApproval: p.requireApproval,
+        planSeriesId: p.planSeriesId,
+      }));
+      // Show real plans right away; AI events fold in on the next await.
+      setUpcomingPlans(realPlans);
       const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId });
+      // Merge AI starter events (from the adopted AICalendar's snapshot) so
+      // the manager sees them alongside real plans. Never a host until they
+      // "Plan This" and a real EventGroup gets created. Skip past dates so
+      // the section doesn't accrue stale entries — Shape B events with a
+      // locked dateISO in the past drop out here.
+      const aiEvents = (page.aiSourceEvents || []) as Array<{
+        name: string;
+        time: string;
+        venueLine: string;
+        tag: string;
+        tagVariant?: "default" | "amber";
+        isoDatetime?: string | null;
+        dateISO?: string | null;
+      }>;
+      const aiStarters: UpcomingPlan[] = aiEvents
+        .map((ev, index) => ({ ev, index, resolved: resolveAIStarterDate(ev) }))
+        .filter((r) => r.resolved !== null)
+        .map(({ ev, index, resolved }) => ({
+          objectId: `ai-${index}`,
+          title: ev.name,
+          description: "",
+          image: null,
+          expiryDate: (resolved as Date).toISOString(),
+          timezone: null,
+          time: ev.time,
+          rsvpCount: 0,
+          host: null,
+          location: ev.venueLine ? { name: ev.name, address: ev.venueLine } : null,
+          isAIStarter: true,
+          aiEventIndex: index,
+          aiVenueLine: ev.venueLine,
+        }));
+      const merged = [...realPlans, ...aiStarters].sort(
+        (a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime(),
+      );
+      setUpcomingPlans(merged);
       const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null }) => ({
         objectId: idea.objectId,
         title: idea.title,
@@ -537,21 +647,52 @@ export default function PlansManager({
           {planTense === "upcoming" ? (
             upcomingPlans.length > 0 ? (
               <div className="flex gap-3 overflow-x-auto pb-1">
-                {upcomingPlans.map((plan) => (
-                  <div key={plan.objectId} onClick={() => setSelectedPlan(plan)} className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer">
-                    <PlanImage src={plan.image} alt={plan.title} className="w-full h-28" />
+                {upcomingPlans.map((plan) => {
+                  const isAI = !!plan.isAIStarter;
+                  return (
+                  <div
+                    key={plan.objectId}
+                    onClick={() => {
+                      if (isAI) {
+                        // AI starter → open the New Plan drawer prefilled
+                        // so the manager can convert it into a real plan.
+                        setCreatePlanPrefill({
+                          title: plan.title,
+                          description: plan.description || "",
+                          venue: plan.location
+                            ? { name: plan.location.name, address: plan.aiVenueLine || plan.location.address, placeId: null }
+                            : null,
+                          date: plan.expiryDate.slice(0, 10),
+                          time: plan.time || undefined,
+                        });
+                        setShowCreateModal(true);
+                        return;
+                      }
+                      setSelectedPlan(plan);
+                    }}
+                    className={`border rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer ${isAI ? "border-emerald-200/70 bg-emerald-50/30" : "border-zinc-100"}`}
+                  >
+                    <div className="relative">
+                      <PlanImage src={plan.image} alt={plan.title} className="w-full h-28" />
+                      {isAI && (
+                        <span className="absolute top-2 left-2 bg-white/95 text-zinc-700 text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm">
+                          Suggestion
+                        </span>
+                      )}
+                    </div>
                     <div className="p-3">
                       <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
                       <p className="text-xs text-zinc-400 mb-1">
                         {new Date(plan.expiryDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", ...(plan.timezone ? { timeZone: plan.timezone } : {}) })}
                       </p>
                       <div className="flex items-center justify-between text-xs text-zinc-400">
-                        <span className="truncate">{plan.host?.name || "You"}</span>
-                        <span className="shrink-0 ml-2">{plan.rsvpCount} RSVPs</span>
+                        <span className="truncate">{isAI ? "Waiting on host" : plan.host?.name || "You"}</span>
+                        {!isAI && <span className="shrink-0 ml-2">{plan.rsvpCount} RSVPs</span>}
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-zinc-400">No upcoming plans yet.</p>
