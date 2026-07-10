@@ -19,6 +19,16 @@ interface Persona {
   avatarUrl: string | null;
 }
 
+interface LibraryItem {
+  packageId: string;
+  title: string;
+  description: string;
+  image: string | null;
+  category: string | null;
+  residentCost: string | null;
+  location: string | null;
+}
+
 /**
  * Owner-side concierge message thread — the main panel of a concierge
  * calendar. Talks to the ConciergeMessage-backed cloud functions; polls every
@@ -48,6 +58,10 @@ export default function ConciergeThread({
   const [scheduleMode, setScheduleMode] = useState<"pick" | "auto">("pick");
   const [pickDate, setPickDate] = useState("");
   const [pickTime, setPickTime] = useState("");
+  // "Something else" → browse the full curated library.
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [library, setLibrary] = useState<LibraryItem[] | null>(null);
+  const [addingPackageId, setAddingPackageId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -142,11 +156,39 @@ export default function ConciergeThread({
     }
   };
 
-  // "Something else" — nudge the owner into the composer to tell us what they
-  // want instead of the offered options.
-  const askForSomethingElse = () => {
-    setDraft("I'd like something different — ");
-    setTimeout(() => textareaRef.current?.focus(), 0);
+  // "Something else" — open the full curated library to browse and pick from.
+  const openLibrary = async () => {
+    setShowLibrary(true);
+    setMenuError(null);
+    if (library) return; // cached
+    try {
+      const r: { items: LibraryItem[] } = await Parse.Cloud.run("getConciergeMenuLibrary", { calendarId });
+      setLibrary(r.items || []);
+    } catch (e) {
+      setMenuError(e instanceof Error ? e.message : "Couldn't load the library.");
+    }
+  };
+
+  // Picking a library item creates it as a menu option, then jumps to step 2.
+  const pickLibrary = async (item: LibraryItem) => {
+    if (!menu || addingPackageId) return;
+    setAddingPackageId(item.packageId);
+    setMenuError(null);
+    try {
+      const r: { option: ConciergeMenu["options"][number] } = await Parse.Cloud.run(
+        "addLibraryOptionToMenu",
+        { menuId: menu.menuId, packageId: item.packageId }
+      );
+      setShowLibrary(false);
+      setScheduleMode("pick");
+      setPickDate("");
+      setPickTime("");
+      setTimeFor(r.option);
+    } catch (e) {
+      setMenuError(e instanceof Error ? e.message : "Couldn't add that option.");
+    } finally {
+      setAddingPackageId(null);
+    }
   };
 
   const monthLabel = menu?.month
@@ -343,6 +385,53 @@ export default function ConciergeThread({
                       </button>
                     </div>
                   </div>
+                ) : showLibrary ? (
+                  /* ── Browse the full curated library ── */
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">Menu library</p>
+                      <button
+                        onClick={() => setShowLibrary(false)}
+                        className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+                      >
+                        Back
+                      </button>
+                    </div>
+                    {!library ? (
+                      <div className="py-6 flex justify-center">
+                        <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+                      </div>
+                    ) : library.length === 0 ? (
+                      <p className="text-xs text-zinc-400 py-4">No library items available.</p>
+                    ) : (
+                      <div className="max-h-72 overflow-y-auto no-scrollbar grid grid-cols-1 sm:grid-cols-2 gap-2 pr-0.5">
+                        {library.map((item) => (
+                          <button
+                            key={item.packageId}
+                            onClick={() => pickLibrary(item)}
+                            disabled={!!addingPackageId}
+                            className="flex gap-2.5 text-left rounded-xl border border-zinc-200 bg-white p-2 hover:border-zinc-400 transition-colors disabled:opacity-60"
+                          >
+                            {item.image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={item.image} alt={item.title} className="w-14 h-14 rounded-lg object-cover shrink-0" />
+                            ) : (
+                              <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-zinc-100 to-zinc-200 shrink-0" />
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <h5 className="text-sm font-medium text-zinc-900 truncate">{item.title}</h5>
+                              <p className="text-xs text-zinc-500 leading-snug line-clamp-2">{item.description}</p>
+                              {addingPackageId === item.packageId && (
+                                <span className="text-[11px] text-zinc-400 flex items-center gap-1 mt-1">
+                                  <Loader2 className="w-3 h-3 animate-spin" /> Adding…
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 ) : (
                   /* ── Step 1 — choose an event ── */
                   <>
@@ -395,14 +484,14 @@ export default function ConciergeThread({
                         </div>
                       ))}
 
-                      {/* Something else — none of these; tell the concierge */}
+                      {/* Something else — browse the full curated library */}
                       <button
-                        onClick={askForSomethingElse}
+                        onClick={openLibrary}
                         className="snap-start shrink-0 w-52 flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-white p-3 text-zinc-500 hover:border-zinc-400 hover:text-zinc-800 transition-colors"
                       >
                         <MessageCirclePlus className="w-6 h-6" />
                         <span className="text-sm font-medium">Something else</span>
-                        <span className="text-xs text-zinc-400 text-center leading-snug">Tell {persona.name} what you have in mind</span>
+                        <span className="text-xs text-zinc-400 text-center leading-snug">Browse the full menu</span>
                       </button>
                     </div>
                   </>
