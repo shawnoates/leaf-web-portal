@@ -178,6 +178,11 @@ interface UpcomingPlan {
   isAIStarter?: boolean;
   aiEventIndex?: number;
   aiVenueLine?: string;
+  // Cover treatment inputs so the manager card matches the /org public
+  // page — the tag rendered LARGE in serif on a green/amber gradient
+  // instead of the plain calendar-icon placeholder.
+  aiTag?: string;
+  aiTagVariant?: "default" | "amber";
 }
 
 /**
@@ -402,6 +407,8 @@ export default function PlansManager({
           isAIStarter: true,
           aiEventIndex: index,
           aiVenueLine: ev.venueLine,
+          aiTag: ev.tag || "Event",
+          aiTagVariant: ev.tagVariant === "amber" ? "amber" : "default",
         }));
       const merged = [...realPlans, ...aiStarters].sort(
         (a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime(),
@@ -672,14 +679,55 @@ export default function PlansManager({
                     }}
                     className={`border rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer ${isAI ? "border-emerald-200/70 bg-emerald-50/30" : "border-zinc-100"}`}
                   >
-                    <div className="relative">
+                    {isAI ? (
+                      // Placeholder cover matches /org/<shareId>: gradient
+                      // ground + the tag rendered LARGE in serif, so the
+                      // manager and the public visitor see the SAME card.
+                      (() => {
+                        const isAmber = plan.aiTagVariant === "amber";
+                        return (
+                          <div
+                            className="relative w-full h-28 flex items-center justify-center"
+                            style={{
+                              background: isAmber
+                                ? "linear-gradient(135deg, #f5e6d0 0%, #e8d1a5 100%)"
+                                : "linear-gradient(135deg, #e8efe9 0%, #cddcd0 100%)",
+                            }}
+                          >
+                            <div
+                              className="absolute inset-0 opacity-[0.07]"
+                              style={{
+                                backgroundImage:
+                                  "radial-gradient(circle at 25% 30%, rgba(0,0,0,0.15) 1px, transparent 2px)",
+                                backgroundSize: "18px 18px",
+                              }}
+                            />
+                            <span
+                              className="relative text-2xl font-light tracking-tight text-center px-4 truncate max-w-full"
+                              style={{
+                                fontFamily: 'ui-serif, Georgia, "Times New Roman", serif',
+                                color: isAmber ? "#8A5F1E" : "#1B4332",
+                                letterSpacing: "-0.01em",
+                              }}
+                            >
+                              {(plan.aiTag || "Event").toLowerCase()}
+                            </span>
+                            <span
+                              className="absolute top-2 left-2 text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5"
+                              style={{
+                                background: "rgba(255,255,255,0.85)",
+                                color: isAmber ? "#8A5F1E" : "#1B4332",
+                                backdropFilter: "blur(4px)",
+                              }}
+                            >
+                              Suggestion
+                            </span>
+                          </div>
+                        );
+                      })()
+                    ) : (
                       <PlanImage src={plan.image} alt={plan.title} className="w-full h-28" />
-                      {isAI && (
-                        <span className="absolute top-2 left-2 bg-white/95 text-zinc-700 text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm">
-                          Suggestion
-                        </span>
-                      )}
-                    </div>
+                    )}
                     <div className="p-3">
                       <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
                       <p className="text-xs text-zinc-400 mb-1">
