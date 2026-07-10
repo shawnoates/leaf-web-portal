@@ -1005,6 +1005,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           </div>
 
           {!isPoll && (
+            <>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Date</label>
@@ -1034,6 +1035,72 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                 />
               </div>
             </div>
+            {/* Sync to calendar — pulls the manager's ranked availability
+                (past-behavior + Google Cal busy) and, when a venue is
+                selected, filters to slots within its opening hours. */}
+            {!pollConvertMode && (
+              <div>
+                <button
+                  type="button"
+                  onClick={handleSyncSlots}
+                  disabled={syncLoading || creating}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-zinc-700 hover:text-zinc-900 disabled:opacity-50 transition-colors"
+                >
+                  {syncLoading ? (
+                    <div className="w-3 h-3 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5" />
+                  )}
+                  Sync to calendar
+                  {selectedVenue && <span className="text-zinc-400 font-normal normal-case tracking-normal">· within venue hours</span>}
+                </button>
+                {syncError && (
+                  <p className="text-xs text-amber-600 mt-2">{syncError}</p>
+                )}
+                {syncSlots.length > 0 && (
+                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                    {syncSlots.map((slot) => {
+                      const active = (() => {
+                        if (!date || !time) return false;
+                        const d = new Date(slot.iso);
+                        if (Number.isNaN(d.getTime())) return false;
+                        const yyyy = d.getFullYear();
+                        const mm = String(d.getMonth() + 1).padStart(2, "0");
+                        const dd = String(d.getDate()).padStart(2, "0");
+                        const hh = String(d.getHours()).padStart(2, "0");
+                        const mi = String(d.getMinutes()).padStart(2, "0");
+                        return date === `${yyyy}-${mm}-${dd}` && time === `${hh}:${mi}`;
+                      })();
+                      return (
+                        <button
+                          key={slot.iso}
+                          type="button"
+                          onClick={() => pickSyncSlot(slot.iso)}
+                          className={`shrink-0 rounded-lg px-3 py-2 text-xs text-left border transition-colors ${
+                            active
+                              ? "border-zinc-900 bg-zinc-900 text-white"
+                              : "border-zinc-200 hover:border-zinc-400 text-zinc-700"
+                          }`}
+                        >
+                          <div className="font-medium whitespace-nowrap">{slot.label}</div>
+                          {slot.reason && (
+                            <div className={`text-[10px] mt-0.5 whitespace-nowrap ${active ? "text-zinc-300" : "text-zinc-400"}`}>
+                              {slot.reason}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {syncVenueHours?.weekdayDescriptions && syncVenueHours.weekdayDescriptions.length > 0 && (
+                  <p className="text-[11px] text-zinc-400 mt-2">
+                    Filtered to {selectedVenue?.name || "venue"} hours.
+                  </p>
+                )}
+              </div>
+            )}
+            </>
           )}
 
           {isPoll && !editMode && (
