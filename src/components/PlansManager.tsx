@@ -618,36 +618,35 @@ export default function PlansManager({
         {/* Plans (Upcoming / Past) */}
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-              {planTense === "upcoming"
-                ? `Upcoming Plans (${upcomingPlans.length})`
-                : `Past Plans${pastPlans ? ` (${pastPlans.length})` : ""}`}
-            </h2>
             <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
+                {planTense === "upcoming" ? "Upcoming" : "Past"}
+              </h2>
               <button
                 onClick={() => { resetForm(); setShowCreateModal(true); }}
-                className="flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
+                className="inline-flex items-center gap-1 border border-zinc-200 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 transition-colors"
+                aria-label="New plan"
               >
-                <Plus className="w-3.5 h-3.5" /> New Plan
+                <Plus className="w-3 h-3" /> New
               </button>
-              <div className="flex gap-1 border border-zinc-200 rounded-lg p-0.5">
-                <button
-                  onClick={() => setPlanTense("upcoming")}
-                  className={`px-3 py-1.5 text-xs uppercase tracking-widest font-bold rounded-md transition-colors ${
-                    planTense === "upcoming" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"
-                  }`}
-                >
-                  Upcoming
-                </button>
-                <button
-                  onClick={() => { setPlanTense("past"); fetchPastPlans(); }}
-                  className={`px-3 py-1.5 text-xs uppercase tracking-widest font-bold rounded-md transition-colors ${
-                    planTense === "past" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"
-                  }`}
-                >
-                  Past
-                </button>
-              </div>
+            </div>
+            <div className="flex gap-1 border border-zinc-200 rounded-lg p-0.5">
+              <button
+                onClick={() => setPlanTense("upcoming")}
+                className={`px-3 py-1.5 text-xs uppercase tracking-widest font-bold rounded-md transition-colors ${
+                  planTense === "upcoming" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"
+                }`}
+              >
+                Upcoming
+              </button>
+              <button
+                onClick={() => { setPlanTense("past"); fetchPastPlans(); }}
+                className={`px-3 py-1.5 text-xs uppercase tracking-widest font-bold rounded-md transition-colors ${
+                  planTense === "past" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"
+                }`}
+              >
+                Past
+              </button>
             </div>
           </div>
 
