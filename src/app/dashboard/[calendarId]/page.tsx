@@ -2202,24 +2202,31 @@ export default function OrgDashboardPage() {
                   {/* LEFT — calendar list + add-calendar */}
                   <div className="space-y-3 min-w-0">
                     {listPanel}
-                    {isPaid && (
-                      <button
-                        onClick={() => {
-                          if (dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit) {
-                            setShowSubscription(true);
-                          } else {
-                            setShowAddCalendar(true);
-                          }
-                        }}
-                        className="w-full flex items-center justify-center gap-2 border border-dashed border-zinc-300 text-zinc-500 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest hover:border-zinc-400 hover:text-zinc-900 transition-colors"
-                      >
-                        {dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit ? (
-                          <><Lock className="w-3.5 h-3.5" /> Upgrade to Create</>
-                        ) : (
-                          <><Plus className="w-3.5 h-3.5" /> Create Calendar</>
-                        )}
-                      </button>
-                    )}
+                    {isPaid && (() => {
+                      const atLimit = !!(dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit);
+                      if (atLimit) {
+                        // Every paid tier tops out at 5 calendars, so
+                        // "Upgrade to Create" would send the owner to a
+                        // subscription modal with nothing higher to sell
+                        // — misleading. The (5/5) counter in the section
+                        // header already signals the ceiling; render a
+                        // muted "Calendar limit reached" hint here so the
+                        // absence of a Create button isn't confusing.
+                        return (
+                          <div className="w-full text-center text-xs text-zinc-400 px-4 py-2.5">
+                            Calendar limit reached ({dashboard.calendarLimit}/{dashboard.calendarLimit})
+                          </div>
+                        );
+                      }
+                      return (
+                        <button
+                          onClick={() => setShowAddCalendar(true)}
+                          className="w-full flex items-center justify-center gap-2 border border-dashed border-zinc-300 text-zinc-500 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest hover:border-zinc-400 hover:text-zinc-900 transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Create Calendar
+                        </button>
+                      );
+                    })()}
                   </div>
                   {/* RIGHT — header + plans (or the Manage Plans surface) */}
                   <div className="space-y-4 min-w-0">
