@@ -173,6 +173,12 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   // new query (tier-1 fallback: single strong Places match → pre-fill).
   const [venueResolveKey, setVenueResolveKey] = useState(0);
   const [coverExpanded, setCoverExpanded] = useState(false);
+  // Sync to calendar — carousel of ranked slots (past-behavior + Google
+  // Cal busy) optionally filtered to the selected venue's opening hours.
+  const [syncSlots, setSyncSlots] = useState<{ iso: string; label: string; reason: string }[]>([]);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncVenueHours, setSyncVenueHours] = useState<{ weekdayDescriptions: string[] | null } | null>(null);
   function markTouched(field: PlanDraftField) {
     setUserTouched((prev) => {
       if (prev.has(field)) return prev;
@@ -339,6 +345,48 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     } finally {
       setPromptLoading(false);
     }
+  }
+
+  async function handleSyncSlots() {
+    if (syncLoading) return;
+    setSyncError(null);
+    setSyncLoading(true);
+    try {
+      const result = await Parse.Cloud.run("suggestPlanSlots", {
+        placeId: selectedVenue?.placeId || null,
+        maxSlots: 6,
+      });
+      const list = Array.isArray(result?.slots) ? result.slots : [];
+      setSyncSlots(list);
+      setSyncVenueHours(result?.venueHours || null);
+      if (list.length === 0) {
+        setSyncError(
+          selectedVenue
+            ? "No open slots in the next few weeks match this venue's hours."
+            : "No suggestions yet — try a venue or set a date manually.",
+        );
+      }
+    } catch (err: unknown) {
+      setSyncError(err instanceof Error ? err.message : "Sync failed");
+    } finally {
+      setSyncLoading(false);
+    }
+  }
+
+  function pickSyncSlot(iso: string) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return;
+    // Split into date + time using the browser's local timezone — the
+    // manager typed everything else in local time; keep consistent.
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mi = String(d.getMinutes()).padStart(2, "0");
+    setDate(`${yyyy}-${mm}-${dd}`);
+    setTime(`${hh}:${mi}`);
+    markTouched("date");
+    markTouched("time");
   }
 
   // Unsaved-changes guard on dismiss (X, scrim, Esc). "Has changes" means
