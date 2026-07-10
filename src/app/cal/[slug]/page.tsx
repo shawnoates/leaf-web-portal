@@ -8,9 +8,11 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  Copy,
   Loader2,
   Pencil,
   Plus,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -121,6 +123,10 @@ export default function PublicCalendarPage() {
   const [adopting, setAdopting] = useState(false);
   const [adoptError, setAdoptError] = useState<string | null>(null);
   const [showSignIn, setShowSignIn] = useState(false);
+  // Welcome popup fires when the visitor lands on their newly-adopted
+  // owned copy (adopt flow pushes ?welcome=1). Shows once, then the
+  // param is stripped so a refresh doesn't re-open it.
+  const [showWelcome, setShowWelcome] = useState(false);
 
   const loadCalendar = useCallback(async () => {
     // Seed first — fast, always available.
@@ -172,6 +178,20 @@ export default function PublicCalendarPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadState, cal]);
 
+  // Welcome popup — fires when the visitor just adopted and landed
+  // here via /cal/<owned-slug>?welcome=1. Only shows for owners (a
+  // shared link with ?welcome=1 to a stranger wouldn't do anything
+  // meaningful). Strips the param after so a refresh doesn't re-fire.
+  useEffect(() => {
+    if (loadState !== "ready" || !cal) return;
+    if (searchParams.get("welcome") !== "1") return;
+    if (!cal.viewerIsOwner) return;
+    setShowWelcome(true);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("welcome");
+    window.history.replaceState(null, "", url.toString());
+  }, [loadState, cal, searchParams]);
+
   async function handleAdopt() {
     if (!cal || adopting) return;
     trackCalendarEvent("adopt_clicked", { slug: cal.slug });
@@ -214,7 +234,9 @@ export default function PublicCalendarPage() {
         templateSlug: cal.slug,
         ownedSlug: result.ownedSlug,
       });
-      router.push(`/cal/${result.ownedSlug}`);
+      // ?welcome=1 triggers the "Make it your own" popup on the owned
+      // copy's page — same pattern the /org calendar-creation flow uses.
+      router.push(`/cal/${result.ownedSlug}?welcome=1`);
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Something went wrong. Try again.";
@@ -340,6 +362,10 @@ export default function PublicCalendarPage() {
             await runAdopt();
           }}
         />
+      )}
+
+      {showWelcome && cal && (
+        <WelcomePopup cal={cal} onClose={() => setShowWelcome(false)} />
       )}
     </Shell>
   );
@@ -851,6 +877,170 @@ function DangerZone({ cal }: { cal: AICalendarPayload }) {
 }
 
 // ─── Layout shell ─────────────────────────────────────────────────
+
+// ─── Welcome popup (post-adopt) ──────────────────────────────────
+//
+// Mirrors the "Make it your own" pattern the /org calendar-creation
+// flow uses at /org/[shareId]?welcome=1. Three CTAs:
+//   - Copy link (with a two-second "Copied" confirmation)
+//   - Edit calendar (dismisses; the visitor is already on the surface
+//     where editing happens, so we scroll to the top so the title
+//     click-to-edit is in view)
+//   - Skip and view my calendar (plain dismiss)
+
+function WelcomePopup({
+  cal,
+  onClose,
+}: {
+  cal: AICalendarPayload;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const shareUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/cal/${cal.slug}`
+      : `/cal/${cal.slug}`;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard permission denied — do nothing; visitor can select the URL text.
+    }
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-end md:items-center justify-center px-4"
+      style={{ background: "rgba(15, 18, 16, 0.72)", backdropFilter: "blur(4px)" }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative bg-white w-full max-w-md rounded-t-2xl md:rounded-2xl shadow-2xl"
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 rounded-full hover:bg-zinc-100 transition-colors"
+          aria-label="Close"
+          style={{ color: "#6B7168" }}
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        <div className="p-8 md:p-10 flex flex-col gap-6">
+          <div
+            className="self-center w-14 h-14 rounded-full flex items-center justify-center"
+            style={{ background: "#E8EFE9", color: "#1B4332" }}
+          >
+            <Sparkles className="w-6 h-6" />
+          </div>
+
+          <div className="text-center flex flex-col gap-2">
+            <h2
+              className="m-0 text-[24px] tracking-tight"
+              style={{
+                color: "#131714",
+                fontFamily: 'ui-serif, Georgia, "Times New Roman", serif',
+                fontWeight: 400,
+                lineHeight: 1.15,
+                textWrap: "balance",
+              }}
+            >
+              It&apos;s yours.
+            </h2>
+            <p
+              className="m-0 text-[14px] leading-relaxed"
+              style={{ color: "#6B7168" }}
+            >
+              Share the link with your people, or edit the calendar first to
+              make it your own.
+            </p>
+          </div>
+
+          {/* Copy link — inline URL + copy button */}
+          <div
+            className="rounded-xl p-4 flex items-center justify-between gap-3"
+            style={{ background: "#FBFAF6", border: "1px solid #E3E5DE" }}
+          >
+            <div className="min-w-0 flex flex-col gap-0.5">
+              <span
+                className="text-[10px] font-bold uppercase tracking-[0.16em]"
+                style={{ color: "#6B7168" }}
+              >
+                Your calendar URL
+              </span>
+              <span
+                className="text-[13px] truncate font-mono"
+                style={{ color: "#131714" }}
+                title={shareUrl}
+              >
+                {shareUrl.replace(/^https?:\/\//, "")}
+              </span>
+            </div>
+            <button
+              onClick={handleCopy}
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-semibold transition-colors"
+              style={{
+                background: copied ? "#1B4332" : "#131714",
+                color: "#ffffff",
+              }}
+            >
+              {copied ? (
+                <>
+                  <Check className="w-3.5 h-3.5" /> Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" /> Copy
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }
+                onClose();
+              }}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5 text-[13px] font-semibold transition-colors"
+              style={{ background: "#131714", color: "#ffffff" }}
+            >
+              <Pencil className="w-3.5 h-3.5" /> Edit the calendar
+            </button>
+            <button
+              onClick={onClose}
+              className="w-full px-6 py-3 text-[12px] uppercase tracking-widest font-medium transition-colors"
+              style={{ color: "#6B7168" }}
+            >
+              Skip and view my calendar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Shell({ children }: { children: React.ReactNode }) {
   // Show "Your calendars" link only when signed in — it goes to a page
