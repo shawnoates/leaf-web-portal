@@ -60,6 +60,16 @@ interface Event {
 interface AdoptResponse {
   ownedSlug: string;
   ownedCalendarId: string;
+  // When the server successfully created a real Leaf sub-calendar
+  // (Groups row) under the user's primary org, we get its shareId and
+  // parentOrgId here — the client routes to /org/<shareId>?welcome=1
+  // so the adopted calendar lands in the same UX as any other Leaf
+  // calendar. Missing (null) when the user has no primary org or hit
+  // the tier calendar limit — the client falls back to /cal/<owned-slug>.
+  shareId?: string | null;
+  parentOrgId?: string | null;
+  subCalendarId?: string | null;
+  alreadyAdopted?: boolean;
 }
 
 function trackCalendarEvent(
@@ -234,9 +244,15 @@ export default function PublicCalendarPage() {
         templateSlug: cal.slug,
         ownedSlug: result.ownedSlug,
       });
-      // ?welcome=1 triggers the "Make it your own" popup on the owned
-      // copy's page — same pattern the /org calendar-creation flow uses.
-      router.push(`/cal/${result.ownedSlug}?welcome=1`);
+      // Prefer the real Leaf /org URL when the server created a real
+      // sub-calendar (has shareId). Falls back to /cal/<owned-slug> when
+      // the server skipped creation (no primary org / hit tier limit).
+      // ?welcome=1 triggers the "Make it your own" popup on either page.
+      if (result.shareId) {
+        router.push(`/org/${result.shareId}?welcome=1`);
+      } else {
+        router.push(`/cal/${result.ownedSlug}?welcome=1`);
+      }
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Something went wrong. Try again.";

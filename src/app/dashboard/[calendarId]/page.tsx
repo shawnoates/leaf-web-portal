@@ -757,39 +757,6 @@ export default function OrgDashboardPage() {
   // Selected calendar in the Calendars tab's master/detail layout.
   const [calendarsSelectedId, setCalendarsSelectedId] = useState<string | null>(null);
 
-  // Personal AI calendars (adopted from /calendars) — surfaced on the
-  // Calendars tab so an org owner sees their own AI-generated calendars
-  // alongside the org's Groups calendars.
-  const [myAICalendars, setMyAICalendars] = useState<{
-    objectId: string;
-    slug: string;
-    title: string;
-    area: string | null;
-    theme: string | null;
-    events: { name: string; time: string }[];
-    updatedAt: string;
-  }[]>([]);
-  const [aiCalendarsLoadState, setAICalendarsLoadState] = useState<
-    "loading" | "ready" | "error"
-  >("loading");
-  useEffect(() => {
-    Parse.Cloud.run("listMyAICalendars")
-      .then((r: { calendars: typeof myAICalendars }) => {
-        console.info("[dashboard] listMyAICalendars ok:", r?.calendars?.length ?? 0);
-        setMyAICalendars(r.calendars || []);
-        setAICalendarsLoadState("ready");
-      })
-      .catch((err: unknown) => {
-        // Fires when listMyAICalendars isn't deployed yet (Parse code
-        // 141 "Invalid function") or when the session is stale. Log so
-        // the failure isn't invisible — the earlier silent catch made
-        // it look like the visitor just hadn't adopted anything.
-        console.error("[dashboard] listMyAICalendars failed:", err);
-        setMyAICalendars([]);
-        setAICalendarsLoadState("error");
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Analytics fetcher — Pro tier only
   const fetchAnalytics = useCallback(
@@ -2397,81 +2364,6 @@ export default function OrgDashboardPage() {
               })()}
             </div>
 
-            {/* Personal AI calendars (adopted from /calendars) — same
-                tab as the org's Groups calendars so owners have one
-                home for everything calendar-shaped. Renders always
-                (loading / error / empty / list) so the section is
-                discoverable even before adoption, and errors surface
-                rather than silently hiding the feature. */}
-            <div className="pt-8 mt-8 border-t border-zinc-100 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-                  Your AI calendars
-                  {aiCalendarsLoadState === "ready" && myAICalendars.length > 0
-                    ? ` (${myAICalendars.length})`
-                    : ""}
-                </h2>
-                <Link
-                  href="/calendars"
-                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-900 transition-colors inline-flex items-center gap-1"
-                >
-                  <Plus className="w-3 h-3" /> Adopt from gallery
-                </Link>
-              </div>
-
-              {aiCalendarsLoadState === "loading" && (
-                <p className="text-xs text-zinc-400">Loading your calendars…</p>
-              )}
-
-              {aiCalendarsLoadState === "error" && (
-                <div className="border border-amber-200 bg-amber-50 rounded-lg px-3 py-2 text-xs text-amber-800">
-                  Couldn&apos;t load your AI calendars. Check the browser console for the exact error — the most common cause is the <code>listMyAICalendars</code> cloud function not being deployed yet.
-                </div>
-              )}
-
-              {aiCalendarsLoadState === "ready" && myAICalendars.length === 0 && (
-                <div className="border border-dashed border-zinc-200 rounded-xl px-4 py-6 text-center">
-                  <p className="text-sm text-zinc-500 mb-3">
-                    You haven&apos;t adopted any AI calendars yet.
-                  </p>
-                  <Link
-                    href="/calendars"
-                    className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-emerald-700 hover:text-emerald-900"
-                  >
-                    Browse the gallery <ChevronRight className="w-3 h-3" />
-                  </Link>
-                </div>
-              )}
-
-              {aiCalendarsLoadState === "ready" && myAICalendars.length > 0 && (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {myAICalendars.map((c) => (
-                    <Link
-                      key={c.objectId}
-                      href={`/cal/${c.slug}`}
-                      className="group bg-white border border-zinc-200 rounded-xl p-4 hover:border-zinc-400 transition-colors flex items-start gap-3"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
-                        <Calendar className="w-4 h-4 text-emerald-700" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 truncate">
-                          {c.area || "Somewhere"} · {c.theme || "mix"}
-                        </div>
-                        <div className="text-sm font-medium text-zinc-900 truncate mt-0.5">
-                          {c.title}
-                        </div>
-                        <div className="text-[11px] text-zinc-400 mt-1">
-                          {c.events?.length ?? 0} {c.events?.length === 1 ? "event" : "events"} · updated{" "}
-                          {new Date(c.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        </div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-zinc-900 transition-colors shrink-0 mt-1" />
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
           );
         })()}
