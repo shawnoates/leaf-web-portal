@@ -125,6 +125,57 @@ interface OrgData {
         isoDatetime?: string | null;
       }[]
     | null;
+  // Per-event interest counts, keyed by eventIndex → count. Server
+  // aggregates from AIEventInterest in getOrgCalendarPage so every
+  // starter card can render "N interested" without a per-card query.
+  aiSourceEventInterests?: Record<number, number>;
+}
+
+const AI_INTEREST_COOKIE_KEY = "leaf_interest_cookie";
+const AI_INTEREST_LOCAL_KEY = "leaf_ai_event_interests";
+
+// Same cookie pattern DealsStrip uses — one opaque id per browser,
+// year-long expiry, samesite=lax. Server-side dedupe keys on this so
+// a visitor can't inflate an event's interest count from a single
+// device.
+function getOrCreateAIInterestCookie(): string {
+  if (typeof document === "undefined") return "";
+  const match = document.cookie.match(
+    new RegExp(`${AI_INTEREST_COOKIE_KEY}=([^;]+)`)
+  );
+  if (match) return match[1];
+  const random = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  document.cookie = `${AI_INTEREST_COOKIE_KEY}=${random}; path=/; max-age=${365 * 24 * 3600}; samesite=lax`;
+  return random;
+}
+
+// Local snapshot of which (shareId, eventIndex) pairs this browser has
+// already tapped interested on, so the "Interested" button renders in
+// its confirmed state across reloads without a round-trip.
+function markAIEventLocallyInterested(shareId: string, eventIndex: number) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(AI_INTEREST_LOCAL_KEY);
+    const set: Record<string, boolean> = raw ? JSON.parse(raw) : {};
+    set[`${shareId}::${eventIndex}`] = true;
+    localStorage.setItem(AI_INTEREST_LOCAL_KEY, JSON.stringify(set));
+  } catch {
+    /* quota / storage disabled */
+  }
+}
+
+function isAIEventLocallyInterested(shareId: string, eventIndex: number): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(AI_INTEREST_LOCAL_KEY);
+    if (!raw) return false;
+    const set: Record<string, boolean> = JSON.parse(raw);
+    return !!set[`${shareId}::${eventIndex}`];
+  } catch {
+    return false;
+  }
 }
 
 // Resolve an AI-adopted event's actual date on every render so weekly
@@ -1132,6 +1183,12 @@ export default function OrgCalendarPage() {
   const [showHostLogin, setShowHostLogin] = useState(false);
   const [parseUser, setParseUser] = useState<Parse.User | null>(null);
   const [showWelcomeInvite, setShowWelcomeInvite] = useState(false);
+  // AI-event interest state — optimistic client-side counts + local
+  // "already interested" set. Merges with server counts from
+  // org.aiSourceEventInterests on render.
+  const [aiInterestCounts, setAIInterestCounts] = useState<Record<number, number>>({});
+  const [aiLocallyInterested, setAILocallyInterested] = useState<Set<number>>(new Set());
+  const [aiInterestPending, setAIInterestPending] = useState<Set<number>>(new Set());
   const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [rsvpedPlanIds, setRsvpedPlanIds] = useState<Set<string>>(new Set());
@@ -1144,6 +1201,89 @@ export default function OrgCalendarPage() {
   const [cancellingRsvp, setCancellingRsvp] = useState<string | null>(null);
   const [cancelRsvpModalPlan, setCancelRsvpModalPlan] = useState<{ id: string; title: string } | null>(null);
   const [cancellingPlan, setCancellingPlan] = useState(false);
+
+  // AI-event interest tap. Optimistic: bump count + mark local
+  // immediately so the button state doesn't wait on the round-trip.
+  // Rolls back on failure.
+  const handleAIEventInterest = useCallback(
+    async (eventIndex: number) => {
+      if (aiLocallyInterested.has(eventIndex)) return;
+      if (aiInterestPending.has(eventIndex)) return;
+
+      const cookie = getOrCreateAIInterestCookie();
+      const priorCount =
+        aiInterestCounts[eventIndex] ??
+        org?.aiSourceEventInterests?.[eventIndex] ??
+        0;
+
+      setAIInterestPending((prev) => {
+        const next = new Set(prev);
+        next.add(eventIndex);
+        return next;
+      });
+      setAILocallyInterested((prev) => {
+        const next = new Set(prev);
+        next.add(eventIndex);
+        return next;
+      });
+      setAIInterestCounts((prev) => ({
+        ...prev,
+        [eventIndex]: priorCount + 1,
+      }));
+      markAIEventLocallyInterested(shareId, eventIndex);
+
+      try {
+        const result = (await Parse.Cloud.run("expressInterestOnAIEvent", {
+          groupShareId: shareId,
+          eventIndex,
+          cookie,
+        })) as { count?: number; alreadyInterested?: boolean };
+        if (typeof result?.count === "number") {
+          setAIInterestCounts((prev) => ({
+            ...prev,
+            [eventIndex]: result.count!,
+          }));
+        }
+      } catch (err) {
+        console.error("[org] expressInterestOnAIEvent failed:", err);
+        // Roll back optimistic UI on failure.
+        setAILocallyInterested((prev) => {
+          const next = new Set(prev);
+          next.delete(eventIndex);
+          return next;
+        });
+        setAIInterestCounts((prev) => ({
+          ...prev,
+          [eventIndex]: priorCount,
+        }));
+      } finally {
+        setAIInterestPending((prev) => {
+          const next = new Set(prev);
+          next.delete(eventIndex);
+          return next;
+        });
+      }
+    },
+    [
+      shareId,
+      aiInterestCounts,
+      aiLocallyInterested,
+      aiInterestPending,
+      org?.aiSourceEventInterests,
+    ]
+  );
+
+  // Hydrate "already interested" from localStorage on mount so the
+  // button renders in its confirmed state across reloads without a
+  // round-trip.
+  useEffect(() => {
+    if (!org?.aiSourceEvents) return;
+    const seen = new Set<number>();
+    org.aiSourceEvents.forEach((_, idx) => {
+      if (isAIEventLocallyInterested(shareId, idx)) seen.add(idx);
+    });
+    if (seen.size > 0) setAILocallyInterested(seen);
+  }, [org?.aiSourceEvents, shareId]);
 
   const handleSharePlan = useCallback(async (planId: string, planTitle: string) => {
     const url = `https://os.joinleaf.com/p/${planId}`;
@@ -1502,6 +1642,11 @@ export default function OrgCalendarPage() {
         aiSourceEvents: Array.isArray(result.aiSourceEvents)
           ? result.aiSourceEvents
           : null,
+        aiSourceEventInterests:
+          result.aiSourceEventInterests &&
+          typeof result.aiSourceEventInterests === "object"
+            ? result.aiSourceEventInterests
+            : {},
       });
 
       // Sync RSVP cookies with backend data (handles admin-removed RSVPs)
@@ -2144,10 +2289,17 @@ export default function OrgCalendarPage() {
                 cards (alternating image/text rows, serif title, kicker,
                 CTAs) so they read as first-class plans. Weekly-vibe
                 events re-resolve dates every render; fixed-date events
-                drop from the list once past. Owner-only. */}
-            {org.aiSourceEvents && org.aiSourceEvents.length > 0 && org.isOwner && (() => {
+                drop from the list once past. Public — every visitor
+                can mark "I'm interested" to help the owner decide
+                which suggestion to plan first. Only the owner sees
+                "Plan This". */}
+            {org.aiSourceEvents && org.aiSourceEvents.length > 0 && (() => {
               const rendered = org.aiSourceEvents
-                .map((ev) => ({ ev, resolved: resolveAIEventDate(ev) }))
+                .map((ev, originalIndex) => ({
+                  ev,
+                  originalIndex,
+                  resolved: resolveAIEventDate(ev),
+                }))
                 .filter((r) => r.resolved.date !== null);
               if (rendered.length === 0) return null;
               return (
@@ -2162,8 +2314,14 @@ export default function OrgCalendarPage() {
                   </div>
 
                   <div className="space-y-32">
-                    {rendered.map(({ ev, resolved }, index) => {
+                    {rendered.map(({ ev, originalIndex, resolved }, index) => {
                       const validDate = resolved.date as Date;
+                      const interestCount =
+                        aiInterestCounts[originalIndex] ??
+                        org.aiSourceEventInterests?.[originalIndex] ??
+                        0;
+                      const isInterested = aiLocallyInterested.has(originalIndex);
+                      const isPending = aiInterestPending.has(originalIndex);
                       const kicker = `${validDate
                         .toLocaleDateString("en-US", {
                           weekday: "long",
@@ -2253,22 +2411,87 @@ export default function OrgCalendarPage() {
                             </p>
 
                             <div className="pt-2 flex flex-col gap-6">
+                              {/* Interest headcount + optional host pill,
+                                  mirrors the "AvatarStack + Attending"
+                                  block real plans use. */}
+                              {interestCount > 0 && (
+                                <div className="flex items-center gap-3">
+                                  <span
+                                    className="text-xs tracking-widest uppercase font-bold flex items-center gap-1.5"
+                                    style={{ color: "#1B4332" }}
+                                  >
+                                    <Heart className="w-3 h-3" fill="currentColor" />
+                                    {interestCount}{" "}
+                                    {interestCount === 1
+                                      ? "person interested"
+                                      : "people interested"}
+                                  </span>
+                                  {isInterested && (
+                                    <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
+                                      <Check className="w-3 h-3" /> You
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                               <div className="flex flex-col sm:flex-row gap-4">
+                                {/* Public — anyone can express interest.
+                                    Cookie-deduped server-side, optimistic
+                                    UI here. */}
                                 <button
-                                  onClick={() => {
-                                    setToast(
-                                      "Turning starter suggestions into real plans is coming next."
-                                    );
-                                    setTimeout(() => setToast(null), 3500);
-                                  }}
-                                  className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+                                  onClick={() =>
+                                    handleAIEventInterest(originalIndex)
+                                  }
+                                  disabled={isInterested || isPending}
+                                  className="border px-6 py-3 text-xs uppercase tracking-widest font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-default"
                                   style={{
-                                    backgroundColor:
-                                      org.brandColor || "#18181b",
+                                    borderColor: isInterested
+                                      ? "#1B4332"
+                                      : "#E3E5DE",
+                                    backgroundColor: isInterested
+                                      ? "#E8EFE9"
+                                      : "#ffffff",
+                                    color: isInterested ? "#1B4332" : "#131714",
                                   }}
                                 >
-                                  Plan This <ArrowUpRight className="w-4 h-4" />
+                                  {isPending ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      Marking…
+                                    </>
+                                  ) : isInterested ? (
+                                    <>
+                                      <Check className="w-3.5 h-3.5" />
+                                      You&apos;re interested
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Heart className="w-3.5 h-3.5" />
+                                      I&apos;m interested
+                                    </>
+                                  )}
                                 </button>
+
+                                {/* Owner-only — turn the suggestion into
+                                    a real plan. TBD wire-up; for now a
+                                    toast placeholder. */}
+                                {org.isOwner && (
+                                  <button
+                                    onClick={() => {
+                                      setToast(
+                                        "Turning starter suggestions into real plans is coming next."
+                                      );
+                                      setTimeout(() => setToast(null), 3500);
+                                    }}
+                                    className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+                                    style={{
+                                      backgroundColor:
+                                        org.brandColor || "#18181b",
+                                    }}
+                                  >
+                                    Plan This{" "}
+                                    <ArrowUpRight className="w-4 h-4" />
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
