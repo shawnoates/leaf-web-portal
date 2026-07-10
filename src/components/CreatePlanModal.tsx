@@ -6,8 +6,11 @@ import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { getDefaultCoverForSeed } from "@/lib/default-covers";
 import VenueSearch from "@/components/VenueSearch";
 import {
+  ArrowRight,
   Calendar,
   Check,
+  ChevronDown,
+  Image as ImageIcon,
   ImagePlus,
   Lock,
   MapPin,
@@ -17,6 +20,8 @@ import {
   Vote,
   X,
 } from "lucide-react";
+
+type PlanDraftField = "title" | "description" | "date" | "time" | "venue" | "mode";
 
 type PlanMode = "plan" | "idea" | "poll";
 
@@ -153,6 +158,40 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   // hint during that window so the amber warning doesn't flash unnecessarily.
   const autoResolvingVenue = !!prefill?.venue?.name && !prefill?.venue?.placeId;
   const [venueResolveSettled, setVenueResolveSettled] = useState(!autoResolvingVenue);
+
+  // Prompt-first drawer: the manager types a sentence, the LLM extracts a
+  // partial plan and we populate empty/AI-filled fields. Never clobber fields
+  // the manager has typed into ("user-touched" wins).
+  const showPromptBar = !editMode && !hostRequestMode && !pollConvertMode;
+  const [promptInput, setPromptInput] = useState("");
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [promptError, setPromptError] = useState<string | null>(null);
+  const [aiFilled, setAiFilled] = useState<Set<PlanDraftField>>(() => new Set());
+  const [userTouched, setUserTouched] = useState<Set<PlanDraftField>>(() => new Set());
+  // Bumped whenever the prompt sets a new venue phrase — used as a `key` on
+  // VenueSearch so it remounts and re-runs autoResolveInitial against the
+  // new query (tier-1 fallback: single strong Places match → pre-fill).
+  const [venueResolveKey, setVenueResolveKey] = useState(0);
+  const [coverExpanded, setCoverExpanded] = useState(false);
+  function markTouched(field: PlanDraftField) {
+    setUserTouched((prev) => {
+      if (prev.has(field)) return prev;
+      const next = new Set(prev);
+      next.add(field);
+      return next;
+    });
+    setAiFilled((prev) => {
+      if (!prev.has(field)) return prev;
+      const next = new Set(prev);
+      next.delete(field);
+      return next;
+    });
+  }
+  // Header context line: "Adding to · <Calendar name>"
+  const contextCalendarName =
+    calendars?.find((c) => c.objectId === selectedCalendarId)?.name ||
+    calendars?.[0]?.name ||
+    null;
   useEffect(() => {
     if (!autoResolvingVenue) return;
     const t = setTimeout(() => setVenueResolveSettled(true), 2000);
@@ -240,6 +279,102 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     return unique;
   }
 
+  async function handlePromptSubmit() {
+    const trimmed = promptInput.trim();
+    if (!trimmed || promptLoading) return;
+    setPromptError(null);
+    setPromptLoading(true);
+    try {
+      const draft = await Parse.Cloud.run("draftPlanFromPrompt", {
+        prompt: trimmed,
+        todayISO: new Date().toISOString().slice(0, 10),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+      const nextAI = new Set(aiFilled);
+      const apply = (field: PlanDraftField, setter: () => void, value: unknown) => {
+        // Skip empty payloads.
+        if (value == null || value === "") return;
+        // Never clobber a field the manager typed into.
+        if (userTouched.has(field)) return;
+        setter();
+        nextAI.add(field);
+      };
+      apply("title", () => setTitle(String(draft.title)), draft.title);
+      apply("description", () => setDescription(String(draft.description)), draft.description);
+      apply("date", () => setDate(String(draft.dateISO)), draft.dateISO);
+      apply("time", () => setTime(String(draft.timeHHMM)), draft.timeHHMM);
+      apply(
+        "venue",
+        () => {
+          setVenueQuery(String(draft.venueQuery));
+          setSelectedVenue(null);
+          // Remount VenueSearch so its autoResolveInitial fires against the
+          // fresh phrase (tier-1: single strong Places match → pre-fill).
+          setVenueResolveKey((k) => k + 1);
+          // Show the neutral "Confirming location…" hint until Places settles
+          // instead of flashing the amber "Select this venue…" warning.
+          setVenueResolveSettled(false);
+          setTimeout(() => setVenueResolveSettled(true), 2000);
+        },
+        draft.venueQuery,
+      );
+      // Only nudge mode when the LLM picked non-default and the user hasn't
+      // touched it — spec: default is Plan, never invent.
+      if (
+        !userTouched.has("mode") &&
+        (draft.planType === "idea" || draft.planType === "poll") &&
+        draft.planType !== mode
+      ) {
+        if (draft.planType === "poll" && !pollAllowed) {
+          // Silently stay on plan — starter tier can't create polls.
+        } else {
+          setMode(draft.planType);
+          nextAI.add("mode");
+        }
+      }
+      setAiFilled(nextAI);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Draft failed";
+      setPromptError(msg);
+    } finally {
+      setPromptLoading(false);
+    }
+  }
+
+  // Unsaved-changes guard on dismiss (X, scrim, Esc). "Has changes" means
+  // any user-touched field or AI-filled field currently holds a value.
+  function hasUnsavedChanges(): boolean {
+    if (creating) return false; // in-flight; don't nag
+    if (title.trim()) return true;
+    if (description.trim()) return true;
+    if (venueQuery.trim()) return true;
+    if (date) return true;
+    if (time) return true;
+    if (capacity.trim()) return true;
+    if (hostNote.trim()) return true;
+    if (imageBase64 || selectedImageUrl) return true;
+    if (promptInput.trim()) return true;
+    return false;
+  }
+  function requestDismiss() {
+    if (creating) return;
+    if (hasUnsavedChanges()) {
+      const ok = window.confirm("Discard this plan draft?");
+      if (!ok) return;
+    }
+    onClose();
+  }
+
+  // Esc key closes the drawer, matching the scrim/X behavior.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") requestDismiss();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creating, title, description, venueQuery, date, time, capacity, hostNote, imageBase64, selectedImageUrl, promptInput]);
+
   async function handleCreate() {
     if (!title) return;
 
@@ -259,6 +394,8 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
         alert(`Add at least ${MIN_POLL_OPTIONS} valid date options for the poll.`);
         return;
       }
+      // Polls still require a cover — the poll card is image-forward and the
+      // fallback gradient looks broken next to the vote options.
       if (!imageBase64 && !prefill?.imageUrl && !selectedImageUrl) {
         alert("Please upload a cover image for your poll.");
         return;
@@ -306,10 +443,8 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     }
 
     if (!date) return;
-    if (!editMode && isHosted && !imageBase64 && !prefill?.imageUrl && !selectedImageUrl) {
-      alert("Please upload a cover image for your plan.");
-      return;
-    }
+    // Cover image is optional in the drawer — the plan renders a placeholder
+    // gradient seeded from the title when none is provided.
     setCreating(true);
     try {
       // Append local timezone offset so the server stores the correct UTC time
@@ -461,24 +596,107 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
       : undefined;
 
+  const headerTitle = pollConvertMode
+    ? "Confirm & Convert Poll"
+    : hostRequestMode
+      ? "Review Plan Request"
+      : editMode
+        ? isPoll
+          ? "Edit Date Poll"
+          : "Edit Plan"
+        : isPoll
+          ? "New Date Poll"
+          : "New Plan";
+
   return (
-    <div className="fixed inset-0 z-50 sm:flex sm:items-center sm:justify-center sm:p-4">
-      <div className="absolute inset-0 bg-black/40 hidden sm:block" onClick={() => { if (!creating) onClose(); }} />
-      <div className="relative bg-white w-full h-[100dvh] overflow-y-auto sm:rounded-2xl sm:max-w-lg sm:h-auto sm:max-h-[90vh] sm:shadow-xl">
-        <div className="sticky top-0 bg-white border-b border-zinc-100 px-6 py-4 flex items-center justify-between sm:rounded-t-2xl">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{pollConvertMode ? "Confirm & Convert Poll" : hostRequestMode ? "Review Plan Request" : editMode ? (isPoll ? "Edit Date Poll" : "Edit Plan") : isPoll ? "New Date Poll" : "New Plan"}</h2>
+    <div className="fixed inset-0 z-50">
+      {/* Scrim — the drawer sits on the right at md+, so the scrim covers the
+          center plans column. On mobile the drawer is a full-screen sheet
+          and this scrim is behind it (invisible but keeps the tap-to-close
+          semantics consistent). */}
+      <div
+        className="absolute inset-0 bg-black/40"
+        onClick={requestDismiss}
+      />
+
+      {/* Drawer body — right-slide 420px on md+, full-screen sheet on mobile. */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={headerTitle}
+        className="absolute inset-0 md:left-auto md:right-0 md:top-0 md:bottom-0 md:w-[420px] bg-white shadow-2xl flex flex-col"
+      >
+        <div className="border-b border-zinc-100 px-6 pt-4 pb-3 flex items-start justify-between gap-3 shrink-0">
+          <div className="min-w-0">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{headerTitle}</h2>
+            {contextCalendarName && showPromptBar && (
+              <p className="text-xs text-zinc-500 mt-1 truncate">
+                Adding to · <span className="text-zinc-800 font-medium">{contextCalendarName}</span>
+              </p>
+            )}
+          </div>
           <button
-            onClick={() => { if (!creating) onClose(); }}
-            className="p-1.5 hover:bg-zinc-100 rounded-full transition-colors"
+            onClick={requestDismiss}
+            className="p-1.5 hover:bg-zinc-100 rounded-full transition-colors shrink-0"
+            aria-label="Close"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-5">
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {success && (
             <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg text-sm">
               <Check className="w-4 h-4" /> {pollConvertMode ? "Poll converted — voters notified" : hostRequestMode ? "Approved — requester notified" : editMode ? (isPoll ? "Poll updated!" : "Plan updated!") : isPoll ? "Poll created — followers notified" : "Plan created successfully!"}
+            </div>
+          )}
+
+          {/* Prompt bar — accent-tinted composer that turns a single sentence
+              into a plan draft. Only surfaced in create mode; edit /
+              host-request / poll-convert flows already have their subject
+              locked, so the prompt would be misleading. */}
+          {showPromptBar && (
+            <div className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-3 space-y-2">
+              <label htmlFor="new-plan-prompt" className="flex items-center gap-1.5 text-xs font-medium text-emerald-900/80">
+                <Sparkles className="w-3.5 h-3.5" />
+                Describe it, I&rsquo;ll draft the plan.
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="new-plan-prompt"
+                  type="text"
+                  value={promptInput}
+                  onChange={(e) => { setPromptInput(e.target.value); setPromptError(null); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handlePromptSubmit(); } }}
+                  placeholder="Paint & sip next Thursday at 7pm on the rooftop"
+                  disabled={promptLoading || creating}
+                  className="flex-1 bg-white border border-emerald-200/70 rounded-lg px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:border-emerald-500 disabled:opacity-60"
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
+                />
+                <button
+                  type="button"
+                  onClick={handlePromptSubmit}
+                  disabled={!promptInput.trim() || promptLoading || creating}
+                  className="shrink-0 bg-emerald-600 text-white rounded-lg h-9 w-9 flex items-center justify-center hover:bg-emerald-700 transition-colors disabled:opacity-40"
+                  aria-label="Draft plan from prompt"
+                >
+                  {promptLoading ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <ArrowRight className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+              {promptError && (
+                <p className="text-xs text-red-600">{promptError}</p>
+              )}
+              {aiFilled.size > 0 && !promptError && (
+                <p className="text-xs text-emerald-800/70">
+                  Drafted {aiFilled.size} field{aiFilled.size === 1 ? "" : "s"} — review before creating.
+                </p>
+              )}
             </div>
           )}
 
@@ -510,7 +728,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-3">Plan Type</label>
             <div className="grid grid-cols-3 gap-2">
               <button
-                onClick={() => setMode("plan")}
+                onClick={() => { setMode("plan"); markTouched("mode"); }}
                 className={`border rounded-lg p-2.5 text-left transition-all ${
                   mode === "plan" ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
                 }`}
@@ -522,7 +740,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                 <p className="text-xs text-zinc-500 leading-tight">You host, members RSVP</p>
               </button>
               <button
-                onClick={() => setMode("idea")}
+                onClick={() => { setMode("idea"); markTouched("mode"); }}
                 className={`border rounded-lg p-2.5 text-left transition-all ${
                   mode === "idea" ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
                 }`}
@@ -535,7 +753,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
               </button>
               <button
                 onClick={() => {
-                  if (pollAllowed) { setMode("poll"); return; }
+                  if (pollAllowed) { setMode("poll"); markTouched("mode"); return; }
                   if (onUpgrade) onUpgrade();
                 }}
                 title={pollAllowed ? "" : "Date polls require the Pro plan"}
@@ -571,8 +789,8 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Title</label>
             <input
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
+              onChange={(e) => { setTitle(e.target.value); markTouched("title"); }}
+              className={`w-full border-b py-2 text-lg font-light focus:outline-none focus:border-zinc-900 ${aiFilled.has("title") && !userTouched.has("title") ? "border-emerald-300 bg-emerald-50/40" : "border-zinc-300"}`}
               placeholder="Plan title"
             />
           </div>
@@ -581,16 +799,48 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
             <textarea
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => { setDescription(e.target.value); markTouched("description"); }}
               rows={2}
-              className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-y"
+              className={`w-full border rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-y ${aiFilled.has("description") && !userTouched.has("description") ? "border-emerald-300 bg-emerald-50/40" : "border-zinc-200"}`}
               placeholder="What's this plan about?"
             />
           </div>
 
-          <div>
+          {/* Cover image — collapsed to a chip by default so the primary
+              form fields (title, venue, date/time) claim the top of the drawer.
+              Chip expands into the full uploader + Unsplash suggestions on click. */}
+          {!coverExpanded && !imagePreview && !selectedImageUrl && (
+            <button
+              type="button"
+              onClick={() => setCoverExpanded(true)}
+              className="w-full inline-flex items-center justify-between gap-3 border border-dashed border-zinc-300 rounded-lg px-3 py-2 text-left text-sm text-zinc-600 hover:border-zinc-400 hover:bg-zinc-50 transition-colors"
+            >
+              <span className="inline-flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-zinc-500" />
+                Add cover image
+                <span className="text-xs text-zinc-400 font-normal">(optional)</span>
+              </span>
+              <ChevronDown className="w-4 h-4 text-zinc-400" />
+            </button>
+          )}
+          {!coverExpanded && (imagePreview || selectedImageUrl) && (
+            <button
+              type="button"
+              onClick={() => setCoverExpanded(true)}
+              className="w-full inline-flex items-center justify-between gap-3 border border-zinc-200 rounded-lg pl-1.5 pr-3 py-1.5 text-left text-sm text-zinc-700 hover:border-zinc-300 transition-colors"
+            >
+              <span className="inline-flex items-center gap-2 min-w-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={imagePreview || selectedImageUrl || ""} alt="Cover" className="w-9 h-9 rounded-md object-cover shrink-0" />
+                <span className="truncate">Cover selected · tap to change</span>
+              </span>
+              <ChevronDown className="w-4 h-4 text-zinc-400" />
+            </button>
+          )}
+
+          {coverExpanded && <div>
             <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-2">
-              Cover Image {(isHosted || isPoll) && <span className="text-red-400">*</span>}
+              Cover Image
             </label>
             {imagePreview || selectedImageUrl ? (
               <div className="relative w-full h-36 rounded-lg overflow-hidden">
@@ -668,19 +918,21 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                 })()}
               </div>
             )}
-          </div>
+          </div>}
 
           <div>
             <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Venue</label>
             <VenueSearch
+              key={`venue-${venueResolveKey}`}
               value={venueQuery}
               onChange={(v) => {
                 setVenueQuery(v);
+                markTouched("venue");
                 if (selectedVenue && v !== selectedVenue.name) setSelectedVenue(null);
               }}
               onSelect={(v) => { setSelectedVenue(v); setVenueQuery(v.name); }}
-              autoResolveInitial={!!prefill?.venue?.name && !prefill?.venue?.placeId}
-              className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+              autoResolveInitial={(!!prefill?.venue?.name && !prefill?.venue?.placeId) || venueResolveKey > 0}
+              className={`w-full border-b py-2 text-sm font-light focus:outline-none focus:border-zinc-900 ${aiFilled.has("venue") && !userTouched.has("venue") ? "border-emerald-300 bg-emerald-50/40" : "border-zinc-300"}`}
             />
             {selectedVenue ? (
               <p className="text-xs text-zinc-400 mt-1 flex items-center gap-1">
@@ -710,11 +962,11 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                 <input
                   type="date"
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(e) => { setDate(e.target.value); markTouched("date"); }}
                   min={today}
                   max={maxDate}
                   disabled={pollConvertMode}
-                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 disabled:text-zinc-500 disabled:bg-transparent"
+                  className={`w-full border-b py-2 text-sm font-light focus:outline-none focus:border-zinc-900 disabled:text-zinc-500 disabled:bg-transparent ${aiFilled.has("date") && !userTouched.has("date") ? "border-emerald-300 bg-emerald-50/40" : "border-zinc-300"}`}
                 />
                 {pollConvertMode ? (
                   <p className="text-xs text-zinc-400 mt-1">Locked to the winning vote</p>
@@ -727,9 +979,9 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                 <input
                   type="time"
                   value={time}
-                  onChange={(e) => setTime(e.target.value)}
+                  onChange={(e) => { setTime(e.target.value); markTouched("time"); }}
                   disabled={pollConvertMode}
-                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 disabled:text-zinc-500 disabled:bg-transparent"
+                  className={`w-full border-b py-2 text-sm font-light focus:outline-none focus:border-zinc-900 disabled:text-zinc-500 disabled:bg-transparent ${aiFilled.has("time") && !userTouched.has("time") ? "border-emerald-300 bg-emerald-50/40" : "border-zinc-300"}`}
                 />
               </div>
             </div>
@@ -946,6 +1198,19 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             </div>
           )}
 
+        </div>
+
+        {/* Sticky footer — always in view so the Create action never scrolls
+            off-screen (mobile keyboard covers the bottom of the drawer). */}
+        <div className="border-t border-zinc-100 px-6 py-3 flex items-center justify-end gap-2 bg-white shrink-0">
+          <button
+            type="button"
+            onClick={requestDismiss}
+            disabled={creating}
+            className="px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest text-zinc-600 hover:bg-zinc-100 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
           <button
             onClick={handleCreate}
             disabled={
@@ -953,11 +1218,11 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
               creating ||
               (isPoll
                 ? (!editMode && validPollOptions().length < MIN_POLL_OPTIONS) || (!imageBase64 && !prefill?.imageUrl && !selectedImageUrl)
-                : !date || (!editMode && !pollConvertMode && isHosted && !imageBase64 && !prefill?.imageUrl && !selectedImageUrl)) ||
+                : !date) ||
               (pollConvertMode && !selectedVenue) ||
               (recurring && (isHosted || mode === "idea") && seriesEndType === "until" && !seriesEndsAt)
             }
-            className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
+            className="bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
           >
             {creating
               ? (pollConvertMode ? "Converting..." : hostRequestMode ? "Approving..." : editMode ? "Saving..." : recurring && (isHosted || mode === "idea") ? "Starting Series..." : "Creating...")
@@ -970,8 +1235,8 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                     : isPoll
                       ? "Create Date Poll"
                       : isHosted
-                        ? (recurring ? "Start Recurring Plan" : "Create Upcoming Plan")
-                        : (recurring ? "Start Recurring Idea" : "Create Plan Idea")}
+                        ? (recurring ? "Start Recurring Plan" : "Create plan")
+                        : (recurring ? "Start Recurring Idea" : "Create plan idea")}
           </button>
         </div>
       </div>
