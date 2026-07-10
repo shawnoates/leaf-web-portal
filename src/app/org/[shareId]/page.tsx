@@ -2397,7 +2397,7 @@ export default function OrgCalendarPage() {
                                         org.brandColor || "#1B4332",
                                     }}
                                   />
-                                  From your adopted AI calendar
+                                  Waiting on host
                                 </p>
                               </div>
                             </div>
