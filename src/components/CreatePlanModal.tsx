@@ -21,7 +21,7 @@ import {
   X,
 } from "lucide-react";
 
-type PlanDraftField = "title" | "description" | "date" | "time" | "venue" | "mode";
+type PlanDraftField = "title" | "description" | "date" | "time" | "venue" | "mode" | "cover";
 
 type PlanMode = "plan" | "idea" | "poll";
 
@@ -179,6 +179,10 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncVenueHours, setSyncVenueHours] = useState<{ weekdayDescriptions: string[] | null } | null>(null);
+  // undefined = we haven't fired Sync yet, so we don't know; false = fired
+  // and user has no Google Cal auth; true = fired and connected. Only
+  // render the connect CTA when we KNOW they're disconnected.
+  const [syncGoogleConnected, setSyncGoogleConnected] = useState<boolean | undefined>(undefined);
   function markTouched(field: PlanDraftField) {
     setUserTouched((prev) => {
       if (prev.has(field)) return prev;
@@ -237,6 +241,13 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       setUnsplashPhotos([]);
       return;
     }
+    // Don't overwrite the AI-picked cover set. The prompt supplied a
+    // hand-tuned unsplashQuery ("sauna wooden steam") whose results are
+    // better-targeted than a title-based search ("Steam & Soak on Atlantic
+    // Ave"); re-searching by title would replace those with worse chips.
+    if (aiFilled.has("cover") && !userTouched.has("cover")) {
+      return;
+    }
     setUnsplashLoading(true);
     const timer = setTimeout(async () => {
       try {
@@ -251,7 +262,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [title]);
+  }, [title, aiFilled, userTouched]);
 
   async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -265,6 +276,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       setImagePreview(preview);
       setImageBase64(base64);
       setSelectedImageUrl(null);
+      markTouched("cover");
     } catch {
       alert("Could not process this image. Please try a different file.");
     }
@@ -309,6 +321,40 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       apply("description", () => setDescription(String(draft.description)), draft.description);
       apply("date", () => setDate(String(draft.dateISO)), draft.dateISO);
       apply("time", () => setTime(String(draft.timeHHMM)), draft.timeHHMM);
+      // Cover image auto-pick — LLM returns an unsplashQuery like
+      // "sauna wooden steam" tuned for stock-photo results. Fire an
+      // Unsplash search with THAT query (not the title) and use the
+      // first result as the picked cover. The carousel still renders
+      // the same batch as alternatives so the manager can swap.
+      if (
+        !userTouched.has("cover") &&
+        !imageBase64 &&
+        !selectedImageUrl &&
+        typeof draft.unsplashQuery === "string" &&
+        draft.unsplashQuery.trim()
+      ) {
+        // Fire-and-forget — don't block the prompt UI on the Unsplash call.
+        Parse.Cloud.run("searchUnsplashPhotos", { query: draft.unsplashQuery.trim() })
+          .then((results: { id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]) => {
+            if (!results || results.length === 0) return;
+            // Skip if manager has typed / uploaded / selected since we fired.
+            if (userTouched.has("cover")) return;
+            if (imageBase64 || selectedImageUrl) return;
+            setUnsplashPhotos(results);
+            setSelectedImageUrl(results[0].url);
+            setImagePreview(null);
+            setImageBase64(null);
+            // Auto-expand the cover section so the picked image + the
+            // rest of the carousel are visible at a glance. Manager can
+            // collapse if they want the space back.
+            setCoverExpanded(true);
+            nextAI.add("cover");
+            setAiFilled(new Set(nextAI));
+          })
+          .catch(() => {
+            // Silent — the debounced title-based search still runs.
+          });
+      }
       apply(
         "venue",
         () => {
@@ -361,6 +407,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       const list = Array.isArray(result?.slots) ? result.slots : [];
       setSyncSlots(list);
       setSyncVenueHours(result?.venueHours || null);
+      setSyncGoogleConnected(result?.googleConnected === true);
       if (list.length === 0) {
         setSyncError(
           selectedVenue
@@ -935,6 +982,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                         setSelectedImageUrl(selectedImageUrl === photo.url ? null : photo.url);
                         setImagePreview(null);
                         setImageBase64(null);
+                        markTouched("cover");
                       }}
                       className={`min-w-[120px] max-w-[120px] h-[80px] shrink-0 rounded-lg overflow-hidden border-2 transition-all relative ${
                         selectedImageUrl === photo.url
@@ -1118,6 +1166,20 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   <p className="text-[11px] text-zinc-400 mt-2">
                     Filtered to {selectedVenue?.name || "venue"} hours.
                   </p>
+                )}
+                {/* Google Calendar connect upsell — only surfaces after
+                    Sync has fired and the server confirmed the user has
+                    no googleCalAuth. The carousel still works without it
+                    (past-behavior + cold-start ranking) but connecting
+                    gets busy-aware suggestions that skip conflicts. */}
+                {syncGoogleConnected === false && syncSlots.length > 0 && (
+                  <div className="mt-3 flex items-start gap-2 bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2">
+                    <Calendar className="w-3.5 h-3.5 text-zinc-500 mt-0.5 shrink-0" />
+                    <div className="text-[11px] text-zinc-600 leading-snug">
+                      <span className="font-medium text-zinc-700">Connect Google Calendar</span>{" "}
+                      in the Leaf app to get busy-aware picks — we&rsquo;ll skip times that clash with your calendar.
+                    </div>
+                  </div>
                 )}
               </div>
             )}
