@@ -2206,9 +2206,6 @@ export default function OrgCalendarPage() {
                     );
                   })}
                 </ul>
-                <p className="text-[11px] text-zinc-400 text-center max-w-md mx-auto">
-                  These are suggestions — weekly-vibe dates roll forward as they pass. Create a real plan from any of them to open RSVPs and start planning.
-                </p>
               </section>
               );
             })()}
