@@ -506,7 +506,9 @@ function TitleBlock({
         style={{ color: "#6B7168" }}
       >
         Originally prompted with <em>&ldquo;{cal.prompt}&rdquo;</em>. Adopted by{" "}
-        <strong style={{ color: "#131714", fontWeight: 600 }}>
+        <strong
+          style={{ color: "#131714", fontWeight: 600, whiteSpace: "nowrap" }}
+        >
           {cal.adoptionCount} people
         </strong>{" "}
         so far.
