@@ -112,6 +112,19 @@ interface OrgData {
   isFollower?: boolean;
   followRequestPending?: boolean;
   requireApprovalDefault?: boolean;
+  // AI-adopted calendars carry the source AI events as a starter list.
+  // Renders as "Suggested starter plans" until the owner creates real
+  // plans. Empty/null when the calendar isn't AI-sourced.
+  aiSourceEvents?:
+    | {
+        name: string;
+        time: string;
+        venueLine: string;
+        tag: string;
+        tagVariant?: "default" | "amber";
+        isoDatetime?: string | null;
+      }[]
+    | null;
 }
 
 // Maps human-readable blacklist labels (set in the org dashboard) to Google
@@ -1407,6 +1420,9 @@ export default function OrgCalendarPage() {
         isFollower: result.isFollower || false,
         followRequestPending: result.followRequestPending || false,
         requireApprovalDefault: result.requireApprovalDefault === true,
+        aiSourceEvents: Array.isArray(result.aiSourceEvents)
+          ? result.aiSourceEvents
+          : null,
       });
 
       // Sync RSVP cookies with backend data (handles admin-removed RSVPs)
@@ -2032,14 +2048,85 @@ export default function OrgCalendarPage() {
       {/* Plans Stream */}
       <main className="max-w-6xl mx-auto px-6 py-12">
         {org.plans.length === 0 ? (
-          <div className={`${org.planIdeas.length > 0 ? "py-12" : "py-24"} text-center space-y-4`}>
-            <Calendar className="w-12 h-12 text-zinc-300 mx-auto" />
-            <h3 className="text-xl font-light">No upcoming plans yet</h3>
-            <p className="text-zinc-400 text-sm">
-              {org.planIdeas.length > 0
-                ? "Browse curated plan ideas below and host one for your community."
-                : `Check back soon for new events from ${org.name}.`}
-            </p>
+          <div className="space-y-8">
+            <div className={`${org.planIdeas.length > 0 || (org.aiSourceEvents && org.aiSourceEvents.length > 0) ? "py-12" : "py-24"} text-center space-y-4`}>
+              <Calendar className="w-12 h-12 text-zinc-300 mx-auto" />
+              <h3 className="text-xl font-light">No upcoming plans yet</h3>
+              <p className="text-zinc-400 text-sm">
+                {org.aiSourceEvents && org.aiSourceEvents.length > 0
+                  ? "Here's a starter list from the calendar you adopted — pick one to plan first."
+                  : org.planIdeas.length > 0
+                    ? "Browse curated plan ideas below and host one for your community."
+                    : `Check back soon for new events from ${org.name}.`}
+              </p>
+            </div>
+
+            {/* AI-adopted starter events — real dates resolved from the
+                template's day-of-week + time hints, or the Ticketmaster
+                event's real localDate/localTime. Owner-only render for
+                now; the surrounding UX assumes the visitor is choosing
+                which one to build a real plan around. */}
+            {org.aiSourceEvents && org.aiSourceEvents.length > 0 && org.isOwner && (
+              <section className="max-w-3xl mx-auto space-y-4">
+                <div className="flex items-baseline justify-between border-b border-zinc-100 pb-3">
+                  <h4 className="text-xs tracking-widest uppercase text-zinc-500 font-bold">
+                    Suggested starter plans ({org.aiSourceEvents.length})
+                  </h4>
+                  <span className="text-[11px] text-zinc-400">From your adopted AI calendar</span>
+                </div>
+                <ul className="flex flex-col divide-y divide-zinc-100 rounded-xl border border-zinc-200 bg-white">
+                  {org.aiSourceEvents.map((ev, i) => {
+                    const iso = ev.isoDatetime;
+                    const parsed = iso ? new Date(iso) : null;
+                    const validDate = parsed && !Number.isNaN(parsed.getTime()) ? parsed : null;
+                    const dateLabel = validDate
+                      ? validDate.toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                        })
+                      : ev.time;
+                    const timeLabel = validDate
+                      ? validDate.toLocaleTimeString("en-US", {
+                          hour: "numeric",
+                          minute: "2-digit",
+                          hour12: true,
+                        })
+                      : null;
+                    return (
+                      <li key={i} className="flex items-start gap-4 px-4 py-3">
+                        <div className="w-16 shrink-0 flex flex-col items-end pt-0.5">
+                          <span
+                            className="text-[10px] font-bold uppercase tracking-widest rounded px-1.5 py-0.5"
+                            style={{
+                              background: ev.tagVariant === "amber" ? "rgba(200,138,59,0.14)" : "#E8EFE9",
+                              color: ev.tagVariant === "amber" ? "#C88A3B" : "#1B4332",
+                            }}
+                          >
+                            {ev.tag || "Event"}
+                          </span>
+                        </div>
+                        <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                          <div className="text-[13px] font-medium text-zinc-900 tabular-nums">
+                            {dateLabel}
+                            {timeLabel ? ` · ${timeLabel}` : ""}
+                          </div>
+                          <div className="text-[15px] font-serif text-zinc-900" style={{ fontFamily: 'ui-serif, Georgia, "Times New Roman", serif' }}>
+                            {ev.name}
+                          </div>
+                          <div className="text-[12px] text-zinc-500">
+                            {ev.venueLine}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="text-[11px] text-zinc-400 text-center max-w-md mx-auto">
+                  These are suggestions — dates roll forward each week. Create a real plan from any of them to open RSVPs and start planning.
+                </p>
+              </section>
+            )}
           </div>
         ) : (
           <div className="space-y-32">
