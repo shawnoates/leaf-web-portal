@@ -55,6 +55,11 @@ interface Event {
   venueLine: string;
   tag: string;
   tagVariant?: "default" | "amber";
+  // Server may lock a specific calendar date for Shape B cadence prompts
+  // ("4 times over 6 weeks"). Present → treat as fixed date; missing →
+  // display-only weekly recurrence.
+  dateISO?: string | null;
+  isoDatetime?: string | null;
 }
 
 interface AdoptResponse {
@@ -594,13 +599,25 @@ function EventsList({
       </div>
 
       <ul className="flex flex-col gap-4 m-0 p-0 list-none">
-        {events.map((ev, i) => (
+        {[...events]
+          .map((ev, i) => ({ ev, i }))
+          // Client-side chronological sort. Safety net for older AICalendar
+          // rows persisted before the server sort landed; Shape B cadence
+          // events came out in emit order and are now shown in date order.
+          // Events without isoDatetime sink to the end so weekly Shape A
+          // pointers don't get randomly displaced by fixed-date siblings.
+          .sort((a, b) => {
+            const at = a.ev.isoDatetime ? Date.parse(a.ev.isoDatetime) : Number.POSITIVE_INFINITY;
+            const bt = b.ev.isoDatetime ? Date.parse(b.ev.isoDatetime) : Number.POSITIVE_INFINITY;
+            return at - bt;
+          })
+          .map(({ ev, i }, renderIndex, arr) => (
           <li
             key={i}
             className="flex items-start gap-4 pb-4"
             style={{
               borderBottom:
-                i < events.length - 1 ? "1px solid #E3E5DE" : "none",
+                renderIndex < arr.length - 1 ? "1px solid #E3E5DE" : "none",
             }}
           >
             {editing === i ? (

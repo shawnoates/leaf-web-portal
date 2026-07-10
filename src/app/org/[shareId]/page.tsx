@@ -123,6 +123,11 @@ interface OrgData {
         tag: string;
         tagVariant?: "default" | "amber";
         isoDatetime?: string | null;
+        // Present on Shape-B cadence events (e.g. "4 times over the next
+        // 6 weeks") — a locked calendar date the client MUST NOT re-resolve
+        // from weekday. Weekly Shape-A events leave this null and get the
+        // rolling "next Friday" treatment.
+        dateISO?: string | null;
       }[]
     | null;
   // Per-event interest counts, keyed by eventIndex → count. Server
@@ -195,10 +200,15 @@ function isAIEventLocallyInterested(shareId: string, eventIndex: number): boolea
 function resolveAIEventDate(ev: {
   time?: string;
   isoDatetime?: string | null;
+  dateISO?: string | null;
 }): { date: Date | null; isWeekly: boolean } {
   const timeStr = String(ev.time || "").trim();
   const MONTH_RX = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i;
-  const isFixedDate = MONTH_RX.test(timeStr);
+  // A dateISO on the event means the server locked a specific calendar
+  // date for it — Shape B cadence (e.g. "4 times over 6 weeks"), or the
+  // month-named Ticketmaster branch. Trust it; do NOT re-resolve to
+  // "next Friday" from today.
+  const isFixedDate = MONTH_RX.test(timeStr) || !!(ev.dateISO && /^\d{4}-\d{2}-\d{2}$/.test(ev.dateISO));
 
   if (isFixedDate) {
     if (!ev.isoDatetime) return { date: null, isWeekly: false };
@@ -2305,7 +2315,16 @@ export default function OrgCalendarPage() {
                   originalIndex,
                   resolved: resolveAIEventDate(ev),
                 }))
-                .filter((r) => r.resolved.date !== null);
+                .filter((r) => r.resolved.date !== null)
+                // Client-side chronological safety net — the server sorts
+                // on generate, but adopted calendars persisted before that
+                // sort landed still show in emit order. Cost is a stable
+                // n·log(n) once per render, worth the guaranteed ordering.
+                .sort((a, b) => {
+                  const at = (a.resolved.date as Date).getTime();
+                  const bt = (b.resolved.date as Date).getTime();
+                  return at - bt;
+                });
               if (rendered.length === 0) return null;
               return (
                 <section className="pt-8">
