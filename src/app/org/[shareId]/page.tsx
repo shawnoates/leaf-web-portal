@@ -2269,9 +2269,240 @@ export default function OrgCalendarPage() {
         </p>
       </div>
 
-      {/* Plans Stream */}
+      {/* Plans Stream — real EventGroup plans + AI-adopted starter
+          plans mixed into a single date-sorted list. Card style differs
+          per kind: real plans expose View Details / Share, starters
+          expose "I'm interested" + owner-only "Plan This". */}
       <main className="max-w-6xl mx-auto px-6 py-12">
-        {org.plans.length === 0 ? (
+        {(() => {
+          const aiRendered = (org.aiSourceEvents || [])
+            .map((ev, originalIndex) => ({
+              ev,
+              originalIndex,
+              resolved: resolveAIEventDate(ev),
+            }))
+            .filter((r) => r.resolved.date !== null);
+          const merged: Array<
+            | {
+                kind: "real";
+                sortDate: Date;
+                plan: Plan;
+              }
+            | {
+                kind: "ai";
+                sortDate: Date;
+                ev: NonNullable<OrgData["aiSourceEvents"]>[number];
+                originalIndex: number;
+              }
+          > = [
+            ...org.plans.map((plan) => ({
+              kind: "real" as const,
+              sortDate: plan.dateISO
+                ? new Date(plan.dateISO)
+                : new Date(Date.now() + 3650 * 24 * 3600 * 1000),
+              plan,
+            })),
+            ...aiRendered.map((r) => ({
+              kind: "ai" as const,
+              sortDate: r.resolved.date as Date,
+              ev: r.ev,
+              originalIndex: r.originalIndex,
+            })),
+          ].sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime());
+          const hasAnything = merged.length > 0;
+          if (!hasAnything) {
+            return (
+              <div className={`${org.planIdeas.length > 0 ? "py-12" : "py-24"} text-center space-y-4`}>
+                <Calendar className="w-12 h-12 text-zinc-300 mx-auto" />
+                <h3 className="text-xl font-light">No upcoming plans yet</h3>
+                <p className="text-zinc-400 text-sm">
+                  {org.planIdeas.length > 0
+                    ? "Browse curated plan ideas below and host one for your community."
+                    : `Check back soon for new events from ${org.name}.`}
+                </p>
+              </div>
+            );
+          }
+          return (
+            <div className="space-y-32">
+              {merged.map((item, index) => {
+                if (item.kind === "real") {
+                  const plan = item.plan;
+                  return renderRealPlanCard(plan, index);
+                }
+                // AI starter plan render (inline — same shape as real
+                // plans but with placeholder cover + interest CTA).
+                const { ev, originalIndex } = item;
+                const validDate = item.sortDate;
+                const kicker = `${validDate
+                  .toLocaleDateString("en-US", {
+                    weekday: "long",
+                    month: "short",
+                    day: "numeric",
+                  })
+                  .toUpperCase()} · ${validDate.toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: true,
+                })}`;
+                const isAmber = ev.tagVariant === "amber";
+                const interestCount =
+                  aiInterestCounts[originalIndex] ??
+                  org.aiSourceEventInterests?.[originalIndex] ??
+                  0;
+                const isInterested = aiLocallyInterested.has(originalIndex);
+                const isPending = aiInterestPending.has(originalIndex);
+                return (
+                  <article
+                    key={`ai-${originalIndex}`}
+                    className={`group flex flex-col md:flex-row gap-12 md:items-center ${
+                      index % 2 !== 0 ? "md:flex-row-reverse" : ""
+                    }`}
+                  >
+                    <div
+                      className="w-full md:w-3/5 aspect-[16/10] overflow-hidden shadow-sm relative flex items-center justify-center"
+                      style={{
+                        background: isAmber
+                          ? "linear-gradient(135deg, #f5e6d0 0%, #e8d1a5 100%)"
+                          : "linear-gradient(135deg, #e8efe9 0%, #cddcd0 100%)",
+                      }}
+                    >
+                      <div
+                        className="absolute inset-0 opacity-[0.07]"
+                        style={{
+                          backgroundImage:
+                            "radial-gradient(circle at 25% 30%, rgba(0,0,0,0.15) 1px, transparent 2px)",
+                          backgroundSize: "18px 18px",
+                        }}
+                      />
+                      <span
+                        className="relative text-4xl md:text-6xl font-light tracking-tight text-center px-6"
+                        style={{
+                          fontFamily:
+                            'ui-serif, Georgia, "Times New Roman", serif',
+                          color: isAmber ? "#8A5F1E" : "#1B4332",
+                          letterSpacing: "-0.01em",
+                        }}
+                      >
+                        {(ev.tag || "Event").toLowerCase()}
+                      </span>
+                      <span
+                        className="absolute top-4 left-4 text-[10px] font-bold uppercase tracking-widest rounded-full px-3 py-1"
+                        style={{
+                          background: "rgba(255,255,255,0.85)",
+                          color: isAmber ? "#8A5F1E" : "#1B4332",
+                          backdropFilter: "blur(4px)",
+                        }}
+                      >
+                        Suggestion
+                      </span>
+                    </div>
+
+                    <div className="w-full md:w-2/5 space-y-6">
+                      <div className="space-y-2">
+                        <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                          {kicker}
+                        </p>
+                        <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
+                          {ev.name}
+                        </h3>
+                        <div className="pt-2">
+                          <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
+                            <span
+                              className="w-2 h-2 rounded-full"
+                              style={{
+                                backgroundColor: org.brandColor || "#1B4332",
+                              }}
+                            />
+                            Suggestion
+                          </p>
+                        </div>
+                      </div>
+
+                      <p className="text-zinc-500 leading-relaxed font-light text-lg">
+                        {ev.venueLine}
+                      </p>
+
+                      <div className="pt-2 flex flex-col gap-6">
+                        {interestCount > 0 && (
+                          <div className="flex items-center gap-3">
+                            <span
+                              className="text-xs tracking-widest uppercase font-bold flex items-center gap-1.5"
+                              style={{ color: "#1B4332" }}
+                            >
+                              <Heart className="w-3 h-3" fill="currentColor" />
+                              {interestCount}{" "}
+                              {interestCount === 1
+                                ? "person interested"
+                                : "people interested"}
+                            </span>
+                            {isInterested && (
+                              <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
+                                <Check className="w-3 h-3" /> You
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          <button
+                            onClick={() =>
+                              handleAIEventInterest(originalIndex)
+                            }
+                            disabled={isInterested || isPending}
+                            className="border px-6 py-3 text-xs uppercase tracking-widest font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-default"
+                            style={{
+                              borderColor: isInterested ? "#1B4332" : "#E3E5DE",
+                              backgroundColor: isInterested ? "#E8EFE9" : "#ffffff",
+                              color: isInterested ? "#1B4332" : "#131714",
+                            }}
+                          >
+                            {isPending ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                Marking…
+                              </>
+                            ) : isInterested ? (
+                              <>
+                                <Check className="w-3.5 h-3.5" />
+                                You&apos;re interested
+                              </>
+                            ) : (
+                              <>
+                                <Heart className="w-3.5 h-3.5" />
+                                I&apos;m interested
+                              </>
+                            )}
+                          </button>
+                          {org.isOwner && (
+                            <button
+                              onClick={() => {
+                                setToast(
+                                  "Turning starter suggestions into real plans is coming next."
+                                );
+                                setTimeout(() => setToast(null), 3500);
+                              }}
+                              className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+                              style={{
+                                backgroundColor: org.brandColor || "#18181b",
+                              }}
+                            >
+                              Plan This <ArrowUpRight className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          );
+        })()}
+        {/* Legacy branches disabled — merged renderer above handles both
+            real and AI starter plans. Keeping this block collapsed as
+            _legacyRender until we confirm the merged path handles every
+            case (poll plans, etc.) and can be deleted. */}
+        {false && org.plans.length === 0 ? (
           <div className="space-y-8">
             <div className={`${org.planIdeas.length > 0 || (org.aiSourceEvents && org.aiSourceEvents.length > 0) ? "py-12" : "py-24"} text-center space-y-4`}>
               <Calendar className="w-12 h-12 text-zinc-300 mx-auto" />
