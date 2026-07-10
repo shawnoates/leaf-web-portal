@@ -354,7 +354,9 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     try {
       const result = await Parse.Cloud.run("suggestPlanSlots", {
         placeId: selectedVenue?.placeId || null,
-        maxSlots: 6,
+        // 10 chips fills the carousel enough to feel like real choice
+        // without overwhelming the small drawer; scroll handles the rest.
+        maxSlots: 10,
       });
       const list = Array.isArray(result?.slots) ? result.slots : [];
       setSyncSlots(list);
@@ -1044,15 +1046,17 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   type="button"
                   onClick={handleSyncSlots}
                   disabled={syncLoading || creating}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-zinc-700 hover:text-zinc-900 disabled:opacity-50 transition-colors"
+                  className="w-full inline-flex items-center justify-center gap-2 border border-zinc-300 rounded-lg px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-zinc-800 hover:border-zinc-900 hover:bg-zinc-50 disabled:opacity-50 transition-colors"
                 >
                   {syncLoading ? (
-                    <div className="w-3 h-3 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
+                    <div className="w-3.5 h-3.5 border-2 border-zinc-500 border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <Sparkles className="w-3.5 h-3.5" />
                   )}
-                  Sync to calendar
-                  {selectedVenue && <span className="text-zinc-400 font-normal normal-case tracking-normal">· within venue hours</span>}
+                  Sync to Calendar
+                  {selectedVenue && (
+                    <span className="text-zinc-400 font-normal normal-case tracking-normal">· within venue hours</span>
+                  )}
                 </button>
                 {syncError && (
                   <p className="text-xs text-amber-600 mt-2">{syncError}</p>
@@ -1060,17 +1064,31 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                 {syncSlots.length > 0 && (
                   <div className="mt-3 flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
                     {syncSlots.map((slot) => {
-                      const active = (() => {
-                        if (!date || !time) return false;
-                        const d = new Date(slot.iso);
-                        if (Number.isNaN(d.getTime())) return false;
-                        const yyyy = d.getFullYear();
-                        const mm = String(d.getMonth() + 1).padStart(2, "0");
-                        const dd = String(d.getDate()).padStart(2, "0");
-                        const hh = String(d.getHours()).padStart(2, "0");
-                        const mi = String(d.getMinutes()).padStart(2, "0");
-                        return date === `${yyyy}-${mm}-${dd}` && time === `${hh}:${mi}`;
-                      })();
+                      const d = new Date(slot.iso);
+                      if (Number.isNaN(d.getTime())) return null;
+                      const yyyy = d.getFullYear();
+                      const mm = String(d.getMonth() + 1).padStart(2, "0");
+                      const dd = String(d.getDate()).padStart(2, "0");
+                      const hh = String(d.getHours()).padStart(2, "0");
+                      const mi = String(d.getMinutes()).padStart(2, "0");
+                      const active = date === `${yyyy}-${mm}-${dd}` && time === `${hh}:${mi}`;
+                      // Build a richer label than the server's "Fri 7pm":
+                      // "Fri, Jul 25" + "7pm" so the chip carries the
+                      // actual calendar date, not just a weekday.
+                      const dateStr = d.toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      });
+                      const displayHour = d.getHours() === 0
+                        ? 12
+                        : d.getHours() > 12
+                          ? d.getHours() - 12
+                          : d.getHours();
+                      const ampm = d.getHours() >= 12 ? "pm" : "am";
+                      const timeStr = d.getMinutes() === 0
+                        ? `${displayHour}${ampm}`
+                        : `${displayHour}:${String(d.getMinutes()).padStart(2, "0")}${ampm}`;
                       return (
                         <button
                           key={slot.iso}
@@ -1082,9 +1100,12 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                               : "border-zinc-200 hover:border-zinc-400 text-zinc-700"
                           }`}
                         >
-                          <div className="font-medium whitespace-nowrap">{slot.label}</div>
+                          <div className="font-medium whitespace-nowrap">{dateStr}</div>
+                          <div className={`text-[11px] mt-0.5 whitespace-nowrap ${active ? "text-zinc-300" : "text-zinc-500"}`}>
+                            {timeStr}
+                          </div>
                           {slot.reason && (
-                            <div className={`text-[10px] mt-0.5 whitespace-nowrap ${active ? "text-zinc-300" : "text-zinc-400"}`}>
+                            <div className={`text-[10px] mt-0.5 whitespace-nowrap ${active ? "text-zinc-400" : "text-zinc-400"}`}>
                               {slot.reason}
                             </div>
                           )}
