@@ -2308,16 +2308,7 @@ export default function OrgCalendarPage() {
                 .filter((r) => r.resolved.date !== null);
               if (rendered.length === 0) return null;
               return (
-                <section className="pt-8 space-y-16">
-                  <div className="flex items-baseline justify-between border-b border-zinc-100 pb-4">
-                    <p className="text-xs tracking-widest uppercase font-bold text-zinc-500">
-                      Suggested starter plans ({rendered.length})
-                    </p>
-                    <span className="text-[11px] text-zinc-400">
-                      From your adopted AI calendar
-                    </span>
-                  </div>
-
+                <section className="pt-8">
                   <div className="space-y-32">
                     {rendered.map(({ ev, originalIndex, resolved }, index) => {
                       const validDate = resolved.date as Date;
