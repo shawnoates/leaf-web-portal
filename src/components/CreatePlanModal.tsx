@@ -619,12 +619,13 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
         onClick={requestDismiss}
       />
 
-      {/* Drawer body — right-slide 420px on md+, full-screen sheet on mobile. */}
+      {/* Drawer body — right-slide half-viewport on lg+ (matches the
+          concierge chat drawer), 480px on md, full-screen sheet on mobile. */}
       <div
         role="dialog"
         aria-modal="true"
         aria-label={headerTitle}
-        className="absolute inset-0 md:left-auto md:right-0 md:top-0 md:bottom-0 md:w-[420px] bg-white shadow-2xl flex flex-col"
+        className="absolute inset-0 md:left-auto md:right-0 md:top-0 md:bottom-0 md:w-[480px] lg:w-1/2 bg-white shadow-2xl flex flex-col"
       >
         <div className="border-b border-zinc-100 px-6 pt-4 pb-3 flex items-start justify-between gap-3 shrink-0">
           <div className="min-w-0">
