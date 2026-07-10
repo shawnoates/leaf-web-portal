@@ -2140,73 +2140,143 @@ export default function OrgCalendarPage() {
               </p>
             </div>
 
-            {/* AI-adopted starter events — real dates resolved live on
-                every render so weekly events roll forward as their date
-                passes. Fixed-date events (Ticketmaster) stay put; ones
-                whose original time was a weekday-only hint (Places
-                branch, "Fri · 7:30 PM") are recomputed to the next
-                occurrence. Past fixed-date events are hidden entirely
-                so the list stays actionable. Owner-only. */}
+            {/* AI-adopted starter events — rendered like real plan
+                cards (alternating image/text rows, serif title, kicker,
+                CTAs) so they read as first-class plans. Weekly-vibe
+                events re-resolve dates every render; fixed-date events
+                drop from the list once past. Owner-only. */}
             {org.aiSourceEvents && org.aiSourceEvents.length > 0 && org.isOwner && (() => {
               const rendered = org.aiSourceEvents
                 .map((ev) => ({ ev, resolved: resolveAIEventDate(ev) }))
                 .filter((r) => r.resolved.date !== null);
               if (rendered.length === 0) return null;
               return (
-              <section className="max-w-3xl mx-auto space-y-4">
-                <div className="flex items-baseline justify-between border-b border-zinc-100 pb-3">
-                  <h4 className="text-xs tracking-widest uppercase text-zinc-500 font-bold">
-                    Suggested starter plans ({rendered.length})
-                  </h4>
-                  <span className="text-[11px] text-zinc-400">From your adopted AI calendar</span>
-                </div>
-                <ul className="flex flex-col divide-y divide-zinc-100 rounded-xl border border-zinc-200 bg-white">
-                  {rendered.map(({ ev, resolved }, i) => {
-                    const validDate = resolved.date;
-                    const dateLabel = validDate
-                      ? validDate.toLocaleDateString("en-US", {
-                          weekday: "short",
+                <section className="pt-8 space-y-16">
+                  <div className="flex items-baseline justify-between border-b border-zinc-100 pb-4">
+                    <p className="text-xs tracking-widest uppercase font-bold text-zinc-500">
+                      Suggested starter plans ({rendered.length})
+                    </p>
+                    <span className="text-[11px] text-zinc-400">
+                      From your adopted AI calendar
+                    </span>
+                  </div>
+
+                  <div className="space-y-32">
+                    {rendered.map(({ ev, resolved }, index) => {
+                      const validDate = resolved.date as Date;
+                      const kicker = `${validDate
+                        .toLocaleDateString("en-US", {
+                          weekday: "long",
                           month: "short",
                           day: "numeric",
                         })
-                      : ev.time;
-                    const timeLabel = validDate
-                      ? validDate.toLocaleTimeString("en-US", {
-                          hour: "numeric",
-                          minute: "2-digit",
-                          hour12: true,
-                        })
-                      : null;
-                    return (
-                      <li key={i} className="flex items-start gap-4 px-4 py-3">
-                        <div className="w-16 shrink-0 flex flex-col items-end pt-0.5">
-                          <span
-                            className="text-[10px] font-bold uppercase tracking-widest rounded px-1.5 py-0.5"
+                        .toUpperCase()} · ${validDate.toLocaleTimeString(
+                        "en-US",
+                        { hour: "numeric", minute: "2-digit", hour12: true }
+                      )}`;
+                      const isAmber = ev.tagVariant === "amber";
+                      return (
+                        <article
+                          key={index}
+                          className={`group flex flex-col md:flex-row gap-12 md:items-center ${
+                            index % 2 !== 0 ? "md:flex-row-reverse" : ""
+                          }`}
+                        >
+                          {/* Placeholder cover — soft-green (or amber for
+                              the finale) gradient with the tag rendered
+                              LARGE in serif so the card reads as
+                              intentional visual work, not a missing
+                              image. */}
+                          <div
+                            className="w-full md:w-3/5 aspect-[16/10] overflow-hidden shadow-sm relative flex items-center justify-center"
                             style={{
-                              background: ev.tagVariant === "amber" ? "rgba(200,138,59,0.14)" : "#E8EFE9",
-                              color: ev.tagVariant === "amber" ? "#C88A3B" : "#1B4332",
+                              background: isAmber
+                                ? "linear-gradient(135deg, #f5e6d0 0%, #e8d1a5 100%)"
+                                : "linear-gradient(135deg, #e8efe9 0%, #cddcd0 100%)",
                             }}
                           >
-                            {ev.tag || "Event"}
-                          </span>
-                        </div>
-                        <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                          <div className="text-[13px] font-medium text-zinc-900 tabular-nums">
-                            {dateLabel}
-                            {timeLabel ? ` · ${timeLabel}` : ""}
+                            <div
+                              className="absolute inset-0 opacity-[0.07]"
+                              style={{
+                                backgroundImage:
+                                  "radial-gradient(circle at 25% 30%, rgba(0,0,0,0.15) 1px, transparent 2px)",
+                                backgroundSize: "18px 18px",
+                              }}
+                            />
+                            <span
+                              className="relative text-4xl md:text-6xl font-light tracking-tight text-center px-6"
+                              style={{
+                                fontFamily:
+                                  'ui-serif, Georgia, "Times New Roman", serif',
+                                color: isAmber ? "#8A5F1E" : "#1B4332",
+                                letterSpacing: "-0.01em",
+                              }}
+                            >
+                              {(ev.tag || "Event").toLowerCase()}
+                            </span>
+                            <span
+                              className="absolute top-4 left-4 text-[10px] font-bold uppercase tracking-widest rounded-full px-3 py-1"
+                              style={{
+                                background: "rgba(255,255,255,0.85)",
+                                color: isAmber ? "#8A5F1E" : "#1B4332",
+                                backdropFilter: "blur(4px)",
+                              }}
+                            >
+                              Suggested
+                            </span>
                           </div>
-                          <div className="text-[15px] font-serif text-zinc-900" style={{ fontFamily: 'ui-serif, Georgia, "Times New Roman", serif' }}>
-                            {ev.name}
+
+                          <div className="w-full md:w-2/5 space-y-6">
+                            <div className="space-y-2">
+                              <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                                {kicker}
+                              </p>
+                              <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
+                                {ev.name}
+                              </h3>
+                              <div className="pt-2">
+                                <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
+                                  <span
+                                    className="w-2 h-2 rounded-full"
+                                    style={{
+                                      backgroundColor:
+                                        org.brandColor || "#1B4332",
+                                    }}
+                                  />
+                                  From your adopted AI calendar
+                                </p>
+                              </div>
+                            </div>
+
+                            <p className="text-zinc-500 leading-relaxed font-light text-lg">
+                              {ev.venueLine}
+                            </p>
+
+                            <div className="pt-2 flex flex-col gap-6">
+                              <div className="flex flex-col sm:flex-row gap-4">
+                                <button
+                                  onClick={() => {
+                                    setToast(
+                                      "Turning starter suggestions into real plans is coming next."
+                                    );
+                                    setTimeout(() => setToast(null), 3500);
+                                  }}
+                                  className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+                                  style={{
+                                    backgroundColor:
+                                      org.brandColor || "#18181b",
+                                  }}
+                                >
+                                  Plan This <ArrowUpRight className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-[12px] text-zinc-500">
-                            {ev.venueLine}
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
               );
             })()}
           </div>
