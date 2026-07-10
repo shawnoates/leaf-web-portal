@@ -40,7 +40,7 @@ const OPTION_EMOJI: Record<string, string> = {
   games_trivia: "🎲", crafts_diy: "🎨", wellness: "🧘", professional: "💼",
   seasonal: "🍂", outdoor: "🌤️", pet: "🐾", movie_night: "🎬", music_live: "🎵",
   // comms
-  email_list: "📧", building_app: "📱", printed_flyers: "📄", text_blast: "💬", word_of_mouth: "🗣️",
+  email_list: "📧", mobile_app: "📱", printed_flyers: "📄", text_blast: "💬", word_of_mouth: "🗣️",
 };
 
 const humanize = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -347,7 +347,7 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
             label="How do you reach members?"
             value={(values.memberCommsChannels as string[]) || []}
             onChange={(v) => onChange("memberCommsChannels", v)}
-            options={["email_list", "building_app", "printed_flyers", "text_blast", "word_of_mouth"]}
+            options={["email_list", "mobile_app", "printed_flyers", "text_blast", "word_of_mouth"]}
           />
           <ToggleField
             label="OK to photograph members at events for recaps/marketing?"
