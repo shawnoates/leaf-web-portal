@@ -2271,29 +2271,34 @@ export default function OrgCalendarPage() {
 
       {/* Plans Stream */}
       <main className="max-w-6xl mx-auto px-6 py-12">
-        {org.plans.length === 0 ? (
-          <div className="space-y-8">
-            <div className={`${org.planIdeas.length > 0 || (org.aiSourceEvents && org.aiSourceEvents.length > 0) ? "py-12" : "py-24"} text-center space-y-4`}>
+        {org.plans.length === 0 &&
+          (!org.aiSourceEvents || org.aiSourceEvents.length === 0) && (
+            <div
+              className={`${
+                org.planIdeas.length > 0 ? "py-12" : "py-24"
+              } text-center space-y-4`}
+            >
               <Calendar className="w-12 h-12 text-zinc-300 mx-auto" />
               <h3 className="text-xl font-light">No upcoming plans yet</h3>
               <p className="text-zinc-400 text-sm">
-                {org.aiSourceEvents && org.aiSourceEvents.length > 0
-                  ? "Here's a starter list from the calendar you adopted — pick one to plan first."
-                  : org.planIdeas.length > 0
-                    ? "Browse curated plan ideas below and host one for your community."
-                    : `Check back soon for new events from ${org.name}.`}
+                {org.planIdeas.length > 0
+                  ? "Browse curated plan ideas below and host one for your community."
+                  : `Check back soon for new events from ${org.name}.`}
               </p>
             </div>
+          )}
 
-            {/* AI-adopted starter events — rendered like real plan
-                cards (alternating image/text rows, serif title, kicker,
-                CTAs) so they read as first-class plans. Weekly-vibe
-                events re-resolve dates every render; fixed-date events
-                drop from the list once past. Public — every visitor
-                can mark "I'm interested" to help the owner decide
-                which suggestion to plan first. Only the owner sees
-                "Plan This". */}
-            {org.aiSourceEvents && org.aiSourceEvents.length > 0 && (() => {
+        {/* AI-adopted starter events — always render when the calendar
+            has aiSourceEvents so they appear ALONGSIDE real plans in the
+            Upcoming Plans section, not just when the plans list is
+            empty. Same visual language as real plans (alternating
+            image/text rows, serif title, kicker, CTAs). Weekly-vibe
+            events re-resolve dates every render; fixed-date events
+            drop from the list once past. Public — every visitor can
+            mark "I'm interested"; only the owner sees "Plan This". */}
+        {org.aiSourceEvents && org.aiSourceEvents.length > 0 && (
+          <>
+            {(() => {
               const rendered = org.aiSourceEvents
                 .map((ev, originalIndex) => ({
                   ev,
@@ -2502,8 +2507,10 @@ export default function OrgCalendarPage() {
                 </section>
               );
             })()}
-          </div>
-        ) : (
+          </>
+        )}
+
+        {org.plans.length > 0 && (
           <div className="space-y-32">
             {org.plans.map((plan, index) => (
               <article
