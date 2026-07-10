@@ -127,6 +127,85 @@ interface OrgData {
     | null;
 }
 
+// Resolve an AI-adopted event's actual date on every render so weekly
+// suggestions ("Fri · 7:30 PM") roll forward as their target day
+// passes. Two shapes:
+//
+//   Fixed-date (Ticketmaster): time string contains a month name
+//   ("Sat, Sep 14 · 7:05 PM"). isoDatetime stays put. If the event has
+//   already passed, we return { date: null } so the caller can hide it.
+//
+//   Weekly (Places / Gemini): time string is weekday + time only
+//   ("Fri · 7:30 PM"). We recompute the next occurrence of that
+//   weekday/time from "now" so stale isoDatetimes stored server-side
+//   don't leak through.
+//
+// Returns { date: Date | null, isWeekly: boolean }.
+function resolveAIEventDate(ev: {
+  time?: string;
+  isoDatetime?: string | null;
+}): { date: Date | null; isWeekly: boolean } {
+  const timeStr = String(ev.time || "").trim();
+  const MONTH_RX = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i;
+  const isFixedDate = MONTH_RX.test(timeStr);
+
+  if (isFixedDate) {
+    if (!ev.isoDatetime) return { date: null, isWeekly: false };
+    const d = new Date(ev.isoDatetime);
+    if (Number.isNaN(d.getTime())) return { date: null, isWeekly: false };
+    // Hide past fixed-date events (that game is over, that concert
+    // already happened) — the list should stay actionable.
+    if (d.getTime() < Date.now() - 3 * 60 * 60 * 1000) return { date: null, isWeekly: false };
+    return { date: d, isWeekly: false };
+  }
+
+  // Weekly path — parse weekday + time from the display string and
+  // resolve to the next occurrence.
+  const WEEKDAYS: Record<string, number> = {
+    sun: 0, sunday: 0,
+    mon: 1, monday: 1,
+    tue: 2, tues: 2, tuesday: 2,
+    wed: 3, weds: 3, wednesday: 3,
+    thu: 4, thur: 4, thurs: 4, thursday: 4,
+    fri: 5, friday: 5,
+    sat: 6, saturday: 6,
+  };
+  const weekdayMatch = timeStr
+    .toLowerCase()
+    .match(/\b(sun|sunday|mon|monday|tue|tues|tuesday|wed|weds|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday)\b/);
+  if (!weekdayMatch) {
+    // No weekday in the string — fall back to the stored isoDatetime.
+    if (!ev.isoDatetime) return { date: null, isWeekly: false };
+    const d = new Date(ev.isoDatetime);
+    if (Number.isNaN(d.getTime())) return { date: null, isWeekly: false };
+    return { date: d, isWeekly: true };
+  }
+  const targetDow = WEEKDAYS[weekdayMatch[1]];
+
+  const timeMatch = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*([ap]m)?/i);
+  if (!timeMatch) return { date: null, isWeekly: true };
+  let hour = parseInt(timeMatch[1], 10);
+  const minute = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+  const meridiem = timeMatch[3] ? timeMatch[3].toLowerCase() : null;
+  if (meridiem === "pm" && hour < 12) hour += 12;
+  if (meridiem === "am" && hour === 12) hour = 0;
+  if (Number.isNaN(hour) || Number.isNaN(minute) || hour > 23 || minute > 59)
+    return { date: null, isWeekly: true };
+
+  const now = new Date();
+  const currentDow = now.getDay();
+  let daysUntil = (targetDow - currentDow + 7) % 7;
+  if (daysUntil === 0) {
+    const nowHour = now.getHours();
+    const nowMin = now.getMinutes();
+    if (hour < nowHour || (hour === nowHour && minute <= nowMin)) daysUntil = 7;
+  }
+  const target = new Date(now);
+  target.setDate(now.getDate() + daysUntil);
+  target.setHours(hour, minute, 0, 0);
+  return { date: target, isWeekly: true };
+}
+
 // Maps human-readable blacklist labels (set in the org dashboard) to Google
 // Places `types` strings and lowercase name keywords used to filter venue
 // search results. Categories without reliable Places types fall back to
@@ -2061,24 +2140,29 @@ export default function OrgCalendarPage() {
               </p>
             </div>
 
-            {/* AI-adopted starter events — real dates resolved from the
-                template's day-of-week + time hints, or the Ticketmaster
-                event's real localDate/localTime. Owner-only render for
-                now; the surrounding UX assumes the visitor is choosing
-                which one to build a real plan around. */}
-            {org.aiSourceEvents && org.aiSourceEvents.length > 0 && org.isOwner && (
+            {/* AI-adopted starter events — real dates resolved live on
+                every render so weekly events roll forward as their date
+                passes. Fixed-date events (Ticketmaster) stay put; ones
+                whose original time was a weekday-only hint (Places
+                branch, "Fri · 7:30 PM") are recomputed to the next
+                occurrence. Past fixed-date events are hidden entirely
+                so the list stays actionable. Owner-only. */}
+            {org.aiSourceEvents && org.aiSourceEvents.length > 0 && org.isOwner && (() => {
+              const rendered = org.aiSourceEvents
+                .map((ev) => ({ ev, resolved: resolveAIEventDate(ev) }))
+                .filter((r) => r.resolved.date !== null);
+              if (rendered.length === 0) return null;
+              return (
               <section className="max-w-3xl mx-auto space-y-4">
                 <div className="flex items-baseline justify-between border-b border-zinc-100 pb-3">
                   <h4 className="text-xs tracking-widest uppercase text-zinc-500 font-bold">
-                    Suggested starter plans ({org.aiSourceEvents.length})
+                    Suggested starter plans ({rendered.length})
                   </h4>
                   <span className="text-[11px] text-zinc-400">From your adopted AI calendar</span>
                 </div>
                 <ul className="flex flex-col divide-y divide-zinc-100 rounded-xl border border-zinc-200 bg-white">
-                  {org.aiSourceEvents.map((ev, i) => {
-                    const iso = ev.isoDatetime;
-                    const parsed = iso ? new Date(iso) : null;
-                    const validDate = parsed && !Number.isNaN(parsed.getTime()) ? parsed : null;
+                  {rendered.map(({ ev, resolved }, i) => {
+                    const validDate = resolved.date;
                     const dateLabel = validDate
                       ? validDate.toLocaleDateString("en-US", {
                           weekday: "short",
@@ -2123,10 +2207,11 @@ export default function OrgCalendarPage() {
                   })}
                 </ul>
                 <p className="text-[11px] text-zinc-400 text-center max-w-md mx-auto">
-                  These are suggestions — dates roll forward each week. Create a real plan from any of them to open RSVPs and start planning.
+                  These are suggestions — weekly-vibe dates roll forward as they pass. Create a real plan from any of them to open RSVPs and start planning.
                 </p>
               </section>
-            )}
+              );
+            })()}
           </div>
         ) : (
           <div className="space-y-32">
