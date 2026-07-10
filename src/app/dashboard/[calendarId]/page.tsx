@@ -1502,13 +1502,13 @@ export default function OrgDashboardPage() {
                       See all
                     </button>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {upcoming.slice(0, 8).map((plan) => (
+                  <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-6 px-6 pb-2 no-scrollbar">
+                    {upcoming.slice(0, 12).map((plan) => (
                       <button
                         key={plan.objectId}
                         type="button"
                         onClick={() => setSelectedActivePlan(plan)}
-                        className="text-left border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors"
+                        className="text-left border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 snap-start basis-[220px] sm:basis-[240px] md:basis-[260px]"
                       >
                         {plan.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
