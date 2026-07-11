@@ -394,10 +394,11 @@ export default function PersonalPage() {
             <div>
               <h3 className="text-sm font-bold mb-1">What are AI plan ideas?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                Every week, Leaf drops a handful of personalized plan ideas into
-                your calendar based on your city, vibe, and preferences. Real
-                venues, smart timing, beautiful images — host them as-is or tweak.
-                Free gets 5 per week; Pro gets 15.
+                Fresh plan ideas that keep your calendar alive between the ones
+                you host — real venues, smart timing, beautiful images. Your
+                crew can pick one up and host it themselves, so you're not the
+                only one carrying the group chat. Free gets 5 per week; Pro
+                gets 15.
               </p>
             </div>
             <div>
