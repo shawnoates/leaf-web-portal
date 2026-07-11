@@ -23,6 +23,11 @@ import {
 
 type PlanDraftField = "title" | "description" | "date" | "time" | "venue" | "mode" | "cover";
 
+// Key under which the drawer snapshots its draft before the Google Cal
+// OAuth full-page redirect. Dashboard restores from it on return so the
+// manager doesn't lose everything they typed.
+export const NEW_PLAN_DRAFT_SESSION_KEY = "leaf.newPlanDraftBeforeGoogleAuth";
+
 type PlanMode = "plan" | "idea" | "poll";
 
 type PollOptionDraft = { date: string; time: string };
@@ -94,6 +99,11 @@ interface CreatePlanModalProps {
   onCreated: () => void;
   /** Optional — called when a starter-tier user clicks the locked Date Poll button. */
   onUpgrade?: () => void;
+  /** When the drawer opens as a return from the Google Cal OAuth flow,
+   *  the caller passes true so we auto-fire the Sync-to-Calendar fetch
+   *  as soon as googleConnected resolves. Saves the manager one click
+   *  after all that redirect ceremony. */
+  autoSyncOnMount?: boolean;
 }
 
 // Convert display time ("6:30 PM") to 24h format ("18:30") for <input type="time">

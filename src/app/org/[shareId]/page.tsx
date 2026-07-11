@@ -120,6 +120,10 @@ interface OrgData {
         name: string;
         time: string;
         venueLine: string;
+        // Vibe-setting 1-sentence blurb the LLM writes per event. Null
+        // on older AICalendar rows generated before this field existed;
+        // the card falls back to just showing venueLine.
+        description?: string | null;
         tag: string;
         tagVariant?: "default" | "amber";
         isoDatetime?: string | null;
@@ -2421,9 +2425,16 @@ export default function OrgCalendarPage() {
                               </div>
                             </div>
 
-                            <p className="text-zinc-500 leading-relaxed font-light text-lg">
-                              {ev.venueLine}
-                            </p>
+                            <div className="space-y-2">
+                              {ev.description && (
+                                <p className="text-zinc-700 leading-relaxed font-light text-lg">
+                                  {ev.description}
+                                </p>
+                              )}
+                              <p className="text-zinc-500 leading-relaxed font-light text-sm">
+                                {ev.venueLine}
+                              </p>
+                            </div>
 
                             <div className="pt-2 flex flex-col gap-6">
                               {/* Interest headcount + optional host pill,

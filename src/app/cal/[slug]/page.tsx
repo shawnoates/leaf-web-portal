@@ -57,6 +57,9 @@ interface Event {
   name: string;
   time: string;
   venueLine: string;
+  // One-sentence vibe blurb the LLM writes per event; null on older
+  // AICalendar rows generated before this field existed.
+  description?: string | null;
   tag: string;
   tagVariant?: "default" | "amber";
   // Server may lock a specific calendar date for Shape B cadence prompts
@@ -677,6 +680,11 @@ function EventsList({
                   >
                     {ev.name}
                   </h3>
+                  {ev.description && (
+                    <span className="text-[14px] leading-relaxed" style={{ color: "#3D4A3F" }}>
+                      {ev.description}
+                    </span>
+                  )}
                   <span className="text-[13px]" style={{ color: "#6B7168" }}>
                     {ev.venueLine}
                   </span>
