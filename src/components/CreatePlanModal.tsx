@@ -121,7 +121,7 @@ function toTimeInputValue(t?: string | null): string {
   return `${String(h).padStart(2, "0")}:${m}`;
 }
 
-export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, requireApprovalDefault, editMode, eventGroupId, hostRequestMode, hostRequestId, pollConvertMode, pollEventGroupId, pollWinningDate, pollWinningTime, onClose, onCreated, onUpgrade }: CreatePlanModalProps) {
+export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, requireApprovalDefault, editMode, eventGroupId, hostRequestMode, hostRequestId, pollConvertMode, pollEventGroupId, pollWinningDate, pollWinningTime, onClose, onCreated, onUpgrade, autoSyncOnMount }: CreatePlanModalProps) {
   const [selectedCalendarId, setSelectedCalendarId] = useState(calendarId);
   const [hideVenue, setHideVenue] = useState(prefill?.hideVenueUntilRsvp ?? hideVenueDefault ?? true);
   const [title, setTitle] = useState(prefill?.title || "");
@@ -216,8 +216,38 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     if (connectingGoogle) return;
     setConnectingGoogle(true);
     try {
+      // Snapshot the in-flight draft so the manager doesn't lose what
+      // they typed after the full-page redirect. Dashboard restores this
+      // as `createPlanPrefill` when it detects openNewPlan=1 on return.
+      try {
+        const snapshot = {
+          calendarId: selectedCalendarId,
+          title,
+          description,
+          venue: selectedVenue,
+          venueQuery,
+          date,
+          time,
+          capacity,
+          hostNote,
+          mode,
+          hideVenue,
+          requireApproval,
+          selectedImageUrl,
+        };
+        sessionStorage.setItem(NEW_PLAN_DRAFT_SESSION_KEY, JSON.stringify(snapshot));
+      } catch {
+        // sessionStorage may be disabled (Safari private mode etc.) —
+        // still worth trying the redirect; draft loss is a lesser evil.
+      }
+      // returnTo → dashboard, Calendars tab, drawer reopened. The
+      // openNewPlan=1 flag is what tells the dashboard to reopen; the
+      // server also appends google_calendar=connected on success.
+      const returnUrl = new URL(window.location.href);
+      returnUrl.searchParams.set("tab", "calendars");
+      returnUrl.searchParams.set("openNewPlan", "1");
       const result = await Parse.Cloud.run("createGoogleCalendarConnectUrl", {
-        returnTo: window.location.href,
+        returnTo: returnUrl.toString(),
       });
       if (result?.url) {
         // Full-page redirect — a popup gets blocked by strict browsers
@@ -446,6 +476,21 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       setPromptLoading(false);
     }
   }
+
+  // When the drawer re-opens as a return from Google Cal OAuth, the
+  // caller passes autoSyncOnMount=true. As soon as syncGoogleConnected
+  // resolves to true, fire handleSyncSlots once — the manager just
+  // finished the connect flow and shouldn't have to click Sync again
+  // to get the payoff.
+  const autoSyncFiredRef = useRef(false);
+  useEffect(() => {
+    if (!autoSyncOnMount) return;
+    if (autoSyncFiredRef.current) return;
+    if (syncGoogleConnected !== true) return;
+    autoSyncFiredRef.current = true;
+    handleSyncSlots();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSyncOnMount, syncGoogleConnected]);
 
   async function handleSyncSlots() {
     if (syncLoading) return;

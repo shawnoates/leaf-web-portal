@@ -13,7 +13,7 @@ import ConciergeThread from "@/components/ConciergeThread";
 import PlansManager from "@/components/PlansManager";
 import ConciergeEventReports from "@/components/ConciergeEventReports";
 import MarketplaceTab, { type MarketplaceEvent, type OrgSettings } from "@/components/MarketplaceTab";
-import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
+import CreatePlanModal, { type CreatePlanPrefill, NEW_PLAN_DRAFT_SESSION_KEY } from "@/components/CreatePlanModal";
 import PlanDetailModal from "@/components/PlanDetailModal";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
@@ -483,6 +483,10 @@ export default function OrgDashboardPage() {
   // Create plan modal (used by marketplace + duplicate)
   const [createPlanPrefill, setCreatePlanPrefill] = useState<CreatePlanPrefill | null>(null);
   const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
+  // Flipped true when the drawer opens as a return from Google Cal OAuth
+  // (?google_calendar=connected + ?openNewPlan=1). Drawer's autoSyncOnMount
+  // effect reads this + syncGoogleConnected to auto-fire Sync exactly once.
+  const [autoSyncNewPlanOnMount, setAutoSyncNewPlanOnMount] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   const [editingHostRequestId, setEditingHostRequestId] = useState<string | null>(null);
   const [editingHostRequestCalendarId, setEditingHostRequestCalendarId] = useState<string | null>(null);
@@ -687,6 +691,7 @@ export default function OrgDashboardPage() {
     const flag = searchParams.get("google_calendar");
     if (!flag) return;
     googleCalendarReturnRef.current = true;
+    const openNewPlan = searchParams.get("openNewPlan") === "1";
     if (flag === "connected") {
       setToast("Google Calendar connected — Sync will now skip your busy times.");
     } else if (flag === "denied") {
@@ -695,9 +700,57 @@ export default function OrgDashboardPage() {
       setToast("Google Calendar connect failed — please try again.");
     }
     setTimeout(() => setToast(null), 4000);
-    // Preserve any other params (tab, etc.) but drop google_calendar.
+    // If the connect flow was kicked off from inside the New Plan drawer,
+    // reopen the drawer on the Calendars tab with the manager's snapshot
+    // restored as the prefill so they don't lose what they typed.
+    if (openNewPlan) {
+      setActiveTab("calendars");
+      try {
+        const raw = sessionStorage.getItem(NEW_PLAN_DRAFT_SESSION_KEY);
+        if (raw) {
+          const snap = JSON.parse(raw) as {
+            calendarId?: string;
+            title?: string;
+            description?: string;
+            venue?: { name: string; address: string; placeId: string } | null;
+            venueQuery?: string;
+            date?: string;
+            time?: string;
+            capacity?: string;
+            hostNote?: string;
+            mode?: "plan" | "idea" | "poll";
+            hideVenue?: boolean;
+            requireApproval?: boolean;
+            selectedImageUrl?: string | null;
+          };
+          setCreatePlanPrefill({
+            title: snap.title || undefined,
+            description: snap.description || undefined,
+            venue: snap.venue
+              ? { name: snap.venue.name, address: snap.venue.address, placeId: snap.venue.placeId || null }
+              : snap.venueQuery
+                ? { name: snap.venueQuery, address: "", placeId: null }
+                : null,
+            date: snap.date || undefined,
+            time: snap.time || undefined,
+            capacity: snap.capacity || undefined,
+            imageUrl: snap.selectedImageUrl || undefined,
+            mode: snap.mode,
+            hideVenueUntilRsvp: snap.hideVenue,
+            requireApproval: snap.requireApproval,
+          });
+        }
+      } catch {
+        // Corrupt snapshot — drop it and open the drawer empty.
+      }
+      try { sessionStorage.removeItem(NEW_PLAN_DRAFT_SESSION_KEY); } catch { /* ignore */ }
+      setAutoSyncNewPlanOnMount(true);
+      setShowCreatePlanModal(true);
+    }
+    // Preserve any other params (tab, etc.) but drop the return-flag pair.
     const next = new URLSearchParams(searchParams.toString());
     next.delete("google_calendar");
+    next.delete("openNewPlan");
     const qs = next.toString();
     router.replace(`/dashboard/${calendarId}${qs ? `?${qs}` : ""}`);
   }, [searchParams, router, calendarId]);
@@ -3653,7 +3706,8 @@ export default function OrgDashboardPage() {
           pollEventGroupId={pollConvertEventGroupId || undefined}
           pollWinningDate={pollConvertWinningDate || undefined}
           pollWinningTime={pollConvertWinningTime}
-          onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); setEditingPlanId(null); setEditingHostRequestId(null); setEditingHostRequestCalendarId(null); setPollConvertEventGroupId(null); setPollConvertWinningDate(null); setPollConvertWinningTime(null); }}
+          autoSyncOnMount={autoSyncNewPlanOnMount}
+          onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); setEditingPlanId(null); setEditingHostRequestId(null); setEditingHostRequestCalendarId(null); setPollConvertEventGroupId(null); setPollConvertWinningDate(null); setPollConvertWinningTime(null); setAutoSyncNewPlanOnMount(false); }}
           onCreated={() => fetchDashboard()}
           onUpgrade={() => { setShowCreatePlanModal(false); setShowSubscription(true); }}
         />
