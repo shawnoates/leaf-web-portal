@@ -1299,6 +1299,23 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                     Filtered to {selectedVenue?.name || "venue"} hours.
                   </p>
                 )}
+                {/* Sync-worked confirmation. Reads Google Cal busy times
+                    when googleConnected; falls back to sensible defaults
+                    when the manager has few past plans. The "we skipped
+                    N conflicts" beat is what tells them Sync actually
+                    hit their calendar — otherwise a thin list looks
+                    like nothing happened. */}
+                {syncSlots.length > 0 && syncGoogleConnected === true && (
+                  <p className="text-[11px] text-emerald-700/80 mt-2 flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    Synced to your Google Calendar — showing times that don&rsquo;t clash with your schedule.
+                  </p>
+                )}
+                {syncSlots.length > 0 && syncSlots.length < 6 && (
+                  <p className="text-[11px] text-zinc-500 mt-1">
+                    Thin list? Host a few plans on this calendar and we&rsquo;ll learn your preferred times.
+                  </p>
+                )}
               </div>
               );
             })()}
