@@ -76,11 +76,14 @@ interface AdoptResponse {
   // (Groups row) under the user's primary org, we get its shareId and
   // parentOrgId here — the client routes to /org/<shareId>?welcome=1
   // so the adopted calendar lands in the same UX as any other Leaf
-  // calendar. Missing (null) when the user has no primary org or hit
-  // the tier calendar limit — the client falls back to /cal/<owned-slug>.
+  // calendar.
   shareId?: string | null;
   parentOrgId?: string | null;
   subCalendarId?: string | null;
+  // Set when subCal creation was skipped so the client can route to a
+  // recovery surface instead of dropping the manager on an intermediate
+  // /cal/<owned-slug> page with the wrong welcome popup.
+  subCalSkipReason?: "calendar_limit_reached" | "no_primary_org" | null;
   alreadyAdopted?: boolean;
 }
 
@@ -256,15 +259,34 @@ export default function PublicCalendarPage() {
         templateSlug: cal.slug,
         ownedSlug: result.ownedSlug,
       });
-      // Prefer the real Leaf /org URL when the server created a real
-      // sub-calendar (has shareId). Falls back to /cal/<owned-slug> when
-      // the server skipped creation (no primary org / hit tier limit).
-      // ?welcome=1 triggers the "Make it your own" popup on either page.
+      // Happy path — server created the real Leaf sub-calendar (Groups
+      // row) and the manager lands on their /org page with the welcome
+      // popup keyed to that public surface.
       if (result.shareId) {
         router.push(`/org/${result.shareId}?welcome=1`);
-      } else {
-        router.push(`/cal/${result.ownedSlug}?welcome=1`);
+        return;
       }
+      // Recovery paths. Previously we dropped the manager on
+      // /cal/<owned-slug>?welcome=1, which flashed an "It's yours"
+      // popup over an intermediate URL that wasn't the public
+      // calendar they expected. Route to their dashboard with an
+      // explicit toast instead so they know WHY it didn't land.
+      if (result.subCalSkipReason === "calendar_limit_reached" && result.parentOrgId) {
+        router.push(
+          `/dashboard/${result.parentOrgId}?tab=calendars&adoptSkip=limit`,
+        );
+        return;
+      }
+      if (result.subCalSkipReason === "no_primary_org") {
+        router.push(`/dashboard?adoptSkip=needs_org`);
+        return;
+      }
+      // Belt-and-suspenders: any other reason (older server without
+      // the skip-reason flag, or a truly unexpected null-shareId) —
+      // still avoid the intermediate popup. Send them to /cal without
+      // welcome=1 so they at least see the owned calendar without the
+      // misleading "It's yours" modal on an intermediary URL.
+      router.push(`/cal/${result.ownedSlug}`);
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Something went wrong. Try again.";

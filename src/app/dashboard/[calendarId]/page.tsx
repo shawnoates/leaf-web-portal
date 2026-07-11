@@ -755,6 +755,36 @@ export default function OrgDashboardPage() {
     router.replace(`/dashboard/${calendarId}${qs ? `?${qs}` : ""}`);
   }, [searchParams, router, calendarId]);
 
+  // After an AI adopt that couldn't create a Groups sub-calendar
+  // (calendar limit reached), the /cal page routes here with
+  // ?adoptSkip=limit. Show a toast that names the ceiling and points
+  // the manager at the Calendars tab where they can free space, then
+  // strip the flag so a refresh doesn't re-fire.
+  const adoptSkipReturnRef = useRef(false);
+  useEffect(() => {
+    if (adoptSkipReturnRef.current) return;
+    const flag = searchParams.get("adoptSkip");
+    if (!flag) return;
+    adoptSkipReturnRef.current = true;
+    if (flag === "limit") {
+      setToast(
+        "Calendar limit reached — remove a calendar to publish the one you just generated.",
+      );
+      setActiveTab("calendars");
+    } else if (flag === "needs_org") {
+      setToast(
+        "Create a calendar first, then you can adopt AI-generated ones under it.",
+      );
+    } else {
+      setToast("Couldn’t publish that calendar right now.");
+    }
+    setTimeout(() => setToast(null), 5000);
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("adoptSkip");
+    const qs = next.toString();
+    router.replace(`/dashboard/${calendarId}${qs ? `?${qs}` : ""}`);
+  }, [searchParams, router, calendarId]);
+
   // Prefetch marketplace data as soon as dashboard is available
   const [prefetchedMarketplace, setPrefetchedMarketplace] = useState<MarketplaceEvent[] | null>(null);
   const marketplacePrefetched = useRef(false);
