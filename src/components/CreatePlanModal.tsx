@@ -261,6 +261,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   useEffect(() => {
     if (!title.trim()) {
       setUnsplashPhotos([]);
+      setUnsplashLoading(false);
       return;
     }
     // Don't overwrite the AI-picked cover set. The prompt supplied a
@@ -268,6 +269,10 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     // better-targeted than a title-based search ("Steam & Soak on Atlantic
     // Ave"); re-searching by title would replace those with worse chips.
     if (aiFilled.has("cover") && !userTouched.has("cover")) {
+      // Clear any loading state left over from a title-first fetch that
+      // fired before the prompt-based fetch's aiFilled flip landed; the
+      // skeletons hang forever otherwise.
+      setUnsplashLoading(false);
       return;
     }
     setUnsplashLoading(true);
