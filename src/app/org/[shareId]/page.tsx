@@ -4243,16 +4243,30 @@ export default function OrgCalendarPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-xl font-medium text-zinc-900 mb-2">
-                Host this event?
+                {(org.isOwner || org.isHost) ? "Host this event?" : "Propose to host?"}
               </h3>
               <p className="text-sm text-zinc-600 leading-relaxed mb-4">
-                You&rsquo;ll be added as the host of{" "}
-                <span className="font-medium text-zinc-900">{ev.name}</span>.
-                {" "}Followers of this calendar
-                {interestCount > 0
-                  ? ` and the ${interestCount} ${interestCount === 1 ? "person" : "people"} interested in this event`
-                  : ""}
-                {" "}will be notified when the plan is created.
+                {(org.isOwner || org.isHost) ? (
+                  <>
+                    You&rsquo;ll be added as the host of{" "}
+                    <span className="font-medium text-zinc-900">{ev.name}</span>.
+                    {" "}Followers of this calendar
+                    {interestCount > 0
+                      ? ` and the ${interestCount} ${interestCount === 1 ? "person" : "people"} interested in this event`
+                      : ""}
+                    {" "}will be notified when the plan is created.
+                  </>
+                ) : (
+                  <>
+                    You&rsquo;re proposing to host{" "}
+                    <span className="font-medium text-zinc-900">{ev.name}</span>.
+                    {" "}The calendar host will review; if they approve, followers
+                    {interestCount > 0
+                      ? ` and the ${interestCount} ${interestCount === 1 ? "person" : "people"} interested in this event`
+                      : ""}
+                    {" "}will be notified.
+                  </>
+                )}
               </p>
               <div className="flex justify-end gap-2">
                 <button
@@ -4320,15 +4334,24 @@ export default function OrgCalendarPage() {
                         );
                         return;
                       }
-                      // Follower path — proposal flow that goes to owner
-                      // approval isn't wired end-to-end on web yet. Level
-                      // with the follower rather than pretending it went
-                      // through.
-                      setToast(
-                        "Only the calendar hosts can host suggestions right now — reach out to the owner.",
-                      );
-                      setTimeout(() => setToast(null), 3500);
+                      // Follower path — server picks the auto-approve vs
+                      // pending-approval branch based on the caller's role
+                      // (delegates to requestCustomPlanViaWeb). We just
+                      // fire and reflect the outcome.
+                      const result = (await Parse.Cloud.run(
+                        "proposeAIEventPlan",
+                        { shareId, eventIndex: hostThisEventIndex },
+                      )) as { pendingApproval?: boolean };
+                      const message = result?.pendingApproval
+                        ? "Sent to the calendar host for approval — you’ll hear back when they decide."
+                        : "Plan created — followers and interested users notified.";
+                      setToast(message);
+                      setTimeout(() => setToast(null), 4000);
                       setHostThisEventIndex(null);
+                    } catch (err: unknown) {
+                      const msg = err instanceof Error ? err.message : "Couldn’t send that. Try again in a moment.";
+                      setToast(msg);
+                      setTimeout(() => setToast(null), 4000);
                     } finally {
                       setHostThisSubmitting(false);
                     }
@@ -4337,7 +4360,11 @@ export default function OrgCalendarPage() {
                   className="px-5 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
                   style={{ backgroundColor: org.brandColor || "#18181b" }}
                 >
-                  {hostThisSubmitting ? "Working…" : "Host & notify"}
+                  {hostThisSubmitting
+                    ? "Working…"
+                    : (org.isOwner || org.isHost)
+                      ? "Host & notify"
+                      : "Send proposal"}
                 </button>
               </div>
             </div>
