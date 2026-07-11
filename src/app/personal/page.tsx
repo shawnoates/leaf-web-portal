@@ -90,23 +90,23 @@ const STEPS = [
   {
     number: "01",
     icon: <Sparkles className="w-6 h-6" />,
-    title: "Tell us about you",
+    title: "Type what you're in the mood for",
     description:
-      "Your city, your vibe, the kinds of plans you actually want to host. Two minutes, tops.",
+      "\"Family fun this month.\" \"Date night in Fort Greene.\" Leaf turns it into a real calendar — actual venues, smart timing, beautiful images — in seconds. No quiz, no signup.",
   },
   {
     number: "02",
     icon: <Zap className="w-6 h-6" />,
-    title: "Get plan ideas every week",
+    title: "Make it yours",
     description:
-      "Leaf drops fresh ideas into your calendar — real venues, smart timing, beautiful images. Pick the ones you love.",
+      "Swap a venue, shift a date, cut anything you'd never show up for. Keep what you love. The calendar bends to your life, not the other way around.",
   },
   {
     number: "03",
     icon: <Users className="w-6 h-6" />,
     title: "Your people RSVP by phone",
     description:
-      "Share your calendar link. Friends sign up with just a phone number — no app required.",
+      "Share your calendar link. Friends sign up with just a phone number — SMS confirmations and reminders, no app required.",
   },
 ];
 
@@ -188,7 +188,7 @@ export default function PersonalPage() {
               How It Works
             </p>
             <h2 className="text-4xl font-light tracking-tight italic">
-              From idea to "see you Saturday" in three steps
+              From a vibe to "see you Saturday"
             </h2>
           </div>
           <div className="grid md:grid-cols-3 gap-16">
@@ -453,7 +453,7 @@ export default function PersonalPage() {
             <span className="italic">Start a calendar.</span>
           </h2>
           <p className="text-zinc-500 text-lg font-light mb-10 max-w-lg mx-auto">
-            Two minutes to set up. First plan ideas land instantly.
+            Type a vibe and watch your first calendar build in seconds. Sign up only when you want to keep it.
           </p>
           <Link
             href={isLoggedIn ? "/dashboard" : "/organizations/setup"}

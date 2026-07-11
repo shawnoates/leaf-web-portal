@@ -184,8 +184,8 @@ export default function PersonalHero({ isLoggedIn }: { isLoggedIn: boolean }) {
               lineHeight: 1.55,
             }}
           >
-            Leaf builds you a starter calendar of real venues in seconds. Adopt,
-            edit, share with your people.
+            Not a list of ideas — real places near you, on real dates.
+            Change anything, share the link, and friends RSVP with a tap.
           </p>
 
           <form
@@ -258,7 +258,7 @@ export default function PersonalHero({ isLoggedIn }: { isLoggedIn: boolean }) {
               letterSpacing: "0.02em",
             }}
           >
-            Free to try · adopt to save it as your own
+            Free to try — sign up only when you want to keep it.
           </p>
         </div>
       </div>
