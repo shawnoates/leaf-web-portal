@@ -323,6 +323,19 @@ export default function PublicCalendarPage() {
           <ArrowLeft className="w-3 h-3" /> Gallery
         </Link>
 
+        {cal.coverImageUrl && (
+          // AI-picked cover image. Squared-off banner sits above the
+          // title so the calendar has a visual identity separate from
+          // the individual event cards below.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={cal.coverImageUrl}
+            alt=""
+            className="w-full aspect-[16/9] object-cover rounded-lg"
+            style={{ background: "#E8EFE9" }}
+          />
+        )}
+
         <TitleBlock cal={cal} isOwner={isOwner} onSaved={loadCalendar} />
 
         {!cal.venuesVerified && (
