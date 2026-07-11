@@ -2309,24 +2309,24 @@ export default function OrgDashboardPage() {
                   {/* LEFT — calendar list + add-calendar */}
                   <div className="space-y-3 min-w-0">
                     {listPanel}
-                    {isPaid && dashboard.isOwner && (() => {
+                    {dashboard.isOwner && (() => {
                       // Only the org owner can add sub-calendars. Co-hosts
                       // see the calendar list without the Create affordance
                       // — creating a new calendar changes the org's billing
                       // footprint and shouldn't be a co-host decision.
                       const atLimit = !!(dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit);
+                      // Free plan has calendarLimit=1, so their first
+                      // (primary) calendar always trips this. Route the
+                      // click to the subscription modal instead of the
+                      // Create modal so we don't dead-end them.
                       if (atLimit) {
-                        // Every paid tier tops out at 5 calendars, so
-                        // "Upgrade to Create" would send the owner to a
-                        // subscription modal with nothing higher to sell
-                        // — misleading. The (5/5) counter in the section
-                        // header already signals the ceiling; render a
-                        // muted "Calendar limit reached" hint here so the
-                        // absence of a Create button isn't confusing.
                         return (
-                          <div className="w-full text-center text-xs text-zinc-400 px-4 py-2.5">
-                            Calendar limit reached ({dashboard.calendarLimit}/{dashboard.calendarLimit})
-                          </div>
+                          <button
+                            onClick={() => setShowSubscription(true)}
+                            className="w-full flex items-center justify-center gap-2 border border-dashed border-zinc-300 text-zinc-500 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest hover:border-zinc-400 hover:text-zinc-900 transition-colors"
+                          >
+                            <Lock className="w-3.5 h-3.5" /> Upgrade to add more calendars
+                          </button>
                         );
                       }
                       return (

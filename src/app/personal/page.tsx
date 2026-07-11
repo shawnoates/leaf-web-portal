@@ -74,7 +74,7 @@ const PRICING_TIERS: PricingTier[] = [
     highlight: true,
     inheritsLabel: "Everything in Free, plus:",
     features: [
-      "Up to 5 calendars",
+      "Unlimited calendars",
       "15 AI plan ideas per week",
       "Unlimited RSVPs",
       "Unlimited scheduling",

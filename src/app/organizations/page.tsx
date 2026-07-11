@@ -77,7 +77,7 @@ const PRICING_TIERS: PricingTier[] = [
     highlight: true,
     inheritsLabel: "Everything in Free, plus:",
     features: [
-      "Up to 5 calendars",
+      "Unlimited calendars",
       "15 AI plan ideas per week",
       "Unlimited RSVPs",
       "Unlimited scheduling",
@@ -96,7 +96,7 @@ const PRICING_TIERS: PricingTier[] = [
     monthlyPeriod: "/mo",
     yearlyPeriod: "/mo",
     customPrice: "$499",
-    description: "For organizations that want Leaf run for them",
+    description: "For apartment buildings and professional orgs that want Leaf run for them",
     cta: "Book a demo",
     ctaHref: "https://calendar.app.google/NCUYc6LUKSiwLUa67",
     highlight: false,
