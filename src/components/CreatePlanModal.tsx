@@ -179,11 +179,28 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncVenueHours, setSyncVenueHours] = useState<{ weekdayDescriptions: string[] | null } | null>(null);
-  // undefined = we haven't fired Sync yet, so we don't know; false = fired
-  // and user has no Google Cal auth; true = fired and connected. Only
-  // render the connect CTA when we KNOW they're disconnected.
+  // undefined = we haven't checked yet (label as neutral "Sync to Calendar");
+  // false = confirmed no Google Cal auth (label becomes "Connect Google Calendar");
+  // true = connected (label stays "Sync to Calendar").
   const [syncGoogleConnected, setSyncGoogleConnected] = useState<boolean | undefined>(undefined);
   const [connectingGoogle, setConnectingGoogle] = useState(false);
+  // Fire the presence check as soon as the drawer opens in a "create"
+  // context so the button label ships right the first time. Skipped for
+  // edit / host-request / poll-convert modes where Sync isn't offered.
+  useEffect(() => {
+    if (pollConvertMode || editMode || hostRequestMode) return;
+    let cancelled = false;
+    Parse.Cloud.run("getGoogleCalendarStatus")
+      .then((result: { connected?: boolean }) => {
+        if (cancelled) return;
+        setSyncGoogleConnected(result?.connected === true);
+      })
+      .catch(() => {
+        // Non-fatal — leave undefined so the button uses the neutral
+        // "Sync to Calendar" label rather than "Connect Google Calendar".
+      });
+    return () => { cancelled = true; };
+  }, [pollConvertMode, editMode, hostRequestMode]);
 
   async function handleConnectGoogleCalendar() {
     if (connectingGoogle) return;
@@ -427,9 +444,11 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     try {
       const result = await Parse.Cloud.run("suggestPlanSlots", {
         placeId: selectedVenue?.placeId || null,
-        // 10 chips fills the carousel enough to feel like real choice
-        // without overwhelming the small drawer; scroll handles the rest.
-        maxSlots: 10,
+        // 12 chips fills the carousel across a 14-day horizon so the
+        // manager sees real range without doom-scrolling; horizon
+        // bounded server-side so options past 2 weeks don't leak in.
+        maxSlots: 12,
+        horizonDays: 14,
       });
       const list = Array.isArray(result?.slots) ? result.slots : [];
       setSyncSlots(list);
@@ -1112,27 +1131,39 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                 />
               </div>
             </div>
-            {/* Sync to calendar — pulls the manager's ranked availability
-                (past-behavior + Google Cal busy) and, when a venue is
-                selected, filters to slots within its opening hours. */}
-            {!pollConvertMode && (
+            {/* Sync to Calendar — one button that's either the connect
+                CTA (when Google Cal isn't linked yet) or the actual sync
+                fetch (once it is). Same button, same slot, no separate
+                secondary CTA to compete with it. */}
+            {!pollConvertMode && (() => {
+              const needsConnect = syncGoogleConnected === false;
+              const busy = needsConnect ? connectingGoogle : syncLoading;
+              return (
               <div>
                 <button
                   type="button"
-                  onClick={handleSyncSlots}
-                  disabled={syncLoading || creating}
+                  onClick={needsConnect ? handleConnectGoogleCalendar : handleSyncSlots}
+                  disabled={busy || creating}
                   className="w-full inline-flex items-center justify-center gap-2 border border-zinc-300 rounded-lg px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-zinc-800 hover:border-zinc-900 hover:bg-zinc-50 disabled:opacity-50 transition-colors"
                 >
-                  {syncLoading ? (
+                  {busy ? (
                     <div className="w-3.5 h-3.5 border-2 border-zinc-500 border-t-transparent rounded-full animate-spin" />
+                  ) : needsConnect ? (
+                    <Calendar className="w-3.5 h-3.5" />
                   ) : (
                     <Sparkles className="w-3.5 h-3.5" />
                   )}
-                  Sync to Calendar
-                  {selectedVenue && (
+                  {needsConnect ? "Connect Google Calendar" : "Sync to Calendar"}
+                  {!needsConnect && selectedVenue && (
                     <span className="text-zinc-400 font-normal normal-case tracking-normal">· within venue hours</span>
                   )}
                 </button>
+                {needsConnect && (
+                  <p className="text-[11px] text-zinc-500 mt-2">
+                    We&rsquo;ll suggest times that don&rsquo;t clash with your Google Calendar
+                    {selectedVenue ? " and stay within the venue's hours" : ""}.
+                  </p>
+                )}
                 {syncError && (
                   <p className="text-xs text-amber-600 mt-2">{syncError}</p>
                 )}
@@ -1194,34 +1225,9 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                     Filtered to {selectedVenue?.name || "venue"} hours.
                   </p>
                 )}
-                {/* Google Calendar connect upsell — only surfaces after
-                    Sync has fired and the server confirmed the user has
-                    no googleCalAuth. The carousel still works without it
-                    (past-behavior + cold-start ranking) but connecting
-                    gets busy-aware suggestions that skip conflicts. */}
-                {syncGoogleConnected === false && syncSlots.length > 0 && (
-                  <div className="mt-3 bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2.5 flex items-start gap-3">
-                    <Calendar className="w-3.5 h-3.5 text-zinc-500 mt-0.5 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] text-zinc-600 leading-snug">
-                        Connect Google Calendar for busy-aware picks — we&rsquo;ll skip times that clash with your calendar.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleConnectGoogleCalendar}
-                        disabled={connectingGoogle}
-                        className="mt-2 inline-flex items-center gap-1.5 bg-white border border-zinc-300 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-widest text-zinc-800 hover:border-zinc-900 hover:bg-zinc-50 disabled:opacity-50 transition-colors"
-                      >
-                        {connectingGoogle ? (
-                          <div className="w-3 h-3 border-2 border-zinc-500 border-t-transparent rounded-full animate-spin" />
-                        ) : null}
-                        Connect
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
-            )}
+              );
+            })()}
             </>
           )}
 
