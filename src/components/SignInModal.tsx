@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { X } from "lucide-react";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
@@ -94,7 +95,16 @@ export default function SignInModal({
         />
 
         <p className="text-[11px] text-center m-0" style={{ color: "#9EA39C" }}>
-          By continuing, you agree to Leaf&apos;s terms of use.
+          By continuing, you agree to Leaf&apos;s{" "}
+          <Link
+            href="/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-zinc-700 transition-colors"
+          >
+            terms of use
+          </Link>
+          .
         </p>
       </div>
     </div>
