@@ -112,6 +112,9 @@ interface OrgData {
   isFollower?: boolean;
   followRequestPending?: boolean;
   requireApprovalDefault?: boolean;
+  // When true, followers can Host This on Suggestion cards. Owner and
+  // co-host can always host regardless of this flag.
+  allowFollowersToHost?: boolean;
   // AI-adopted calendars carry the source AI events as a starter list.
   // Renders as "Suggested starter plans" until the owner creates real
   // plans. Empty/null when the calendar isn't AI-sourced.
@@ -1205,6 +1208,10 @@ export default function OrgCalendarPage() {
   const [aiInterestPending, setAIInterestPending] = useState<Set<number>>(new Set());
   const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // Which AI event index (if any) the visitor tapped Host This on.
+  // Non-null → confirmation modal is open for that event.
+  const [hostThisEventIndex, setHostThisEventIndex] = useState<number | null>(null);
+  const [hostThisSubmitting, setHostThisSubmitting] = useState(false);
   const [rsvpedPlanIds, setRsvpedPlanIds] = useState<Set<string>>(new Set());
   const [pendingRsvpIds, setPendingRsvpIds] = useState<Set<string>>(new Set());
   // planId → EventNotification.objectId for the viewer's own RSVP. Powers
@@ -1653,6 +1660,7 @@ export default function OrgCalendarPage() {
         isFollower: result.isFollower || false,
         followRequestPending: result.followRequestPending || false,
         requireApprovalDefault: result.requireApprovalDefault === true,
+        allowFollowersToHost: result.allowFollowersToHost === true,
         aiSourceEvents: Array.isArray(result.aiSourceEvents)
           ? result.aiSourceEvents
           : null,
@@ -2497,27 +2505,54 @@ export default function OrgCalendarPage() {
                                   )}
                                 </button>
 
-                                {/* Owner-only — turn the suggestion into
-                                    a real plan. TBD wire-up; for now a
-                                    toast placeholder. */}
-                                {org.isOwner && (
-                                  <button
-                                    onClick={() => {
-                                      setToast(
-                                        "Turning starter suggestions into real plans is coming next."
-                                      );
-                                      setTimeout(() => setToast(null), 3500);
-                                    }}
-                                    className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
-                                    style={{
-                                      backgroundColor:
-                                        org.brandColor || "#18181b",
-                                    }}
-                                  >
-                                    Host This{" "}
-                                    <ArrowUpRight className="w-4 h-4" />
-                                  </button>
-                                )}
+                                {/* Host This — permission matrix:
+                                      owner/co-host                  → active
+                                      follower + allowFollowersToHost → active
+                                      non-follower + allow           → disabled + "follow to host"
+                                      not allowed                    → hidden
+
+                                    Tap always opens the confirmation modal,
+                                    which spells out that followers and
+                                    interested users will be notified when
+                                    the plan is created. */}
+                                {(() => {
+                                  const canHostAsHost = org.isOwner || org.isHost;
+                                  const canHostAsFollower =
+                                    !!org.allowFollowersToHost && !!org.isFollower;
+                                  const shouldShow =
+                                    canHostAsHost ||
+                                    canHostAsFollower ||
+                                    !!org.allowFollowersToHost; // shows disabled follow-to-host state
+                                  if (!shouldShow) return null;
+                                  const active = canHostAsHost || canHostAsFollower;
+                                  return (
+                                    <button
+                                      onClick={() => {
+                                        if (!active) return;
+                                        setHostThisEventIndex(originalIndex);
+                                      }}
+                                      disabled={!active}
+                                      title={
+                                        active
+                                          ? undefined
+                                          : "Follow the calendar to host"
+                                      }
+                                      className={`px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 transition-opacity ${
+                                        active
+                                          ? "text-white hover:opacity-90"
+                                          : "text-zinc-400 border border-zinc-200 bg-white cursor-not-allowed"
+                                      }`}
+                                      style={
+                                        active
+                                          ? { backgroundColor: org.brandColor || "#18181b" }
+                                          : undefined
+                                      }
+                                    >
+                                      Host This{" "}
+                                      <ArrowUpRight className="w-4 h-4" />
+                                    </button>
+                                  );
+                                })()}
                               </div>
                             </div>
                           </div>
@@ -4180,6 +4215,75 @@ export default function OrgCalendarPage() {
           {toast}
         </div>
       )}
+
+      {/* Host This confirmation modal — fires when a visitor with host
+          permission taps Host This on a Suggestion card. Spells out that
+          followers and interested users will be notified so the visitor
+          knows the consequence before committing. */}
+      {hostThisEventIndex !== null && org && (() => {
+        const ev = org.aiSourceEvents?.[hostThisEventIndex];
+        if (!ev) return null;
+        const interestCount =
+          aiInterestCounts[hostThisEventIndex] ??
+          org.aiSourceEventInterests?.[hostThisEventIndex] ??
+          0;
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+            onClick={() => { if (!hostThisSubmitting) setHostThisEventIndex(null); }}
+          >
+            <div
+              className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-medium text-zinc-900 mb-2">
+                Host this event?
+              </h3>
+              <p className="text-sm text-zinc-600 leading-relaxed mb-4">
+                You&rsquo;ll be added as the host of{" "}
+                <span className="font-medium text-zinc-900">{ev.name}</span>.
+                {" "}Followers of this calendar
+                {interestCount > 0
+                  ? ` and the ${interestCount} ${interestCount === 1 ? "person" : "people"} interested in this event`
+                  : ""}
+                {" "}will be notified when the plan is created.
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setHostThisEventIndex(null)}
+                  disabled={hostThisSubmitting}
+                  className="px-4 py-2 text-sm font-medium text-zinc-600 rounded-lg hover:bg-zinc-100 disabled:opacity-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    setHostThisSubmitting(true);
+                    // Real creation lands in the follow-up commit — the
+                    // routing target depends on whether the visitor is
+                    // owner (dashboard drawer with prefill) or a
+                    // follower (proposed-plan flow, TBD). For now,
+                    // confirm the intent and toast so the modal + gate
+                    // work is testable end-to-end.
+                    try {
+                      setToast("Host This is coming next — the plan will land in your calendar.");
+                      setTimeout(() => setToast(null), 3500);
+                      setHostThisEventIndex(null);
+                    } finally {
+                      setHostThisSubmitting(false);
+                    }
+                  }}
+                  disabled={hostThisSubmitting}
+                  className="px-5 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  style={{ backgroundColor: org.brandColor || "#18181b" }}
+                >
+                  {hostThisSubmitting ? "Working…" : "Host & notify"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

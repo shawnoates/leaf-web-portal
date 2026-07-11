@@ -30,6 +30,7 @@ interface CalendarEntry {
   calendarImage: string | null;
   hideVenueUntilRsvp: boolean;
   requireApprovalDefault: boolean;
+  allowFollowersToHost: boolean;
   isPrivate: boolean;
   hidePlanIdeas: boolean;
   hideCustomPlans: boolean;
@@ -78,6 +79,7 @@ export default function EditCalendarPage() {
 
   const [hideVenue, setHideVenue] = useState(true);
   const [requireApprovalDefault, setRequireApprovalDefault] = useState(false);
+  const [allowFollowersToHost, setAllowFollowersToHost] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
   const [hidePlanIdeas, setHidePlanIdeas] = useState(false);
   const [hideCustomPlans, setHideCustomPlans] = useState(false);
@@ -157,6 +159,7 @@ export default function EditCalendarPage() {
     setRemoveImage(false);
     setHideVenue(cal.hideVenueUntilRsvp !== false);
     setRequireApprovalDefault(cal.requireApprovalDefault === true);
+    setAllowFollowersToHost(cal.allowFollowersToHost === true);
     setIsPrivate(cal.isPrivate || false);
     setHidePlanIdeas(cal.hidePlanIdeas || false);
     setHideCustomPlans(cal.hideCustomPlans || false);
@@ -293,6 +296,7 @@ export default function EditCalendarPage() {
         description,
         hideVenueUntilRsvp: hideVenue,
         requireApprovalDefault,
+        allowFollowersToHost,
         isPrivate,
         hidePlanIdeas,
         hideCustomPlans,
@@ -654,6 +658,12 @@ export default function EditCalendarPage() {
             hint="New plans require host approval before RSVPs are confirmed"
             checked={requireApprovalDefault}
             onChange={setRequireApprovalDefault}
+          />
+          <ToggleRow
+            title="Let followers host suggested plans"
+            hint="When on, any follower can turn a Suggestion into a real plan and be listed as the host. Off by default — only you and co-hosts can."
+            checked={allowFollowersToHost}
+            onChange={setAllowFollowersToHost}
           />
           <ToggleRow
             title="Private calendar"
