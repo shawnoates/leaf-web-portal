@@ -163,6 +163,12 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [unsplashPhotos, setUnsplashPhotos] = useState<{ id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]>([]);
   const [unsplashLoading, setUnsplashLoading] = useState(false);
+  // When the prompt bar populates unsplashPhotos with the LLM's vibe-tuned
+  // query, this stays true. Prevents the title-based useEffect from
+  // overwriting those better-targeted results — the earlier bug where
+  // clicking an alternative photo triggered a title-based refetch that
+  // collapsed the carousel down to one weaker match.
+  const [unsplashPhotosFromPrompt, setUnsplashPhotosFromPrompt] = useState(false);
   // We trigger VenueSearch's auto-resolve when prefill gives us a venue name
   // but no placeId. The lookup is fast (~500ms); show a neutral "confirming"
   // hint during that window so the amber warning doesn't flash unnecessarily.
@@ -321,14 +327,14 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       setUnsplashLoading(false);
       return;
     }
-    // Don't overwrite the AI-picked cover set. The prompt supplied a
-    // hand-tuned unsplashQuery ("sauna wooden steam") whose results are
-    // better-targeted than a title-based search ("Steam & Soak on Atlantic
-    // Ave"); re-searching by title would replace those with worse chips.
-    if (aiFilled.has("cover") && !userTouched.has("cover")) {
-      // Clear any loading state left over from a title-first fetch that
-      // fired before the prompt-based fetch's aiFilled flip landed; the
-      // skeletons hang forever otherwise.
+    // Don't overwrite prompt-sourced results. The LLM's unsplashQuery
+    // ("sauna wooden steam") is better-targeted than a title-based search
+    // ("Steam & Soak on Atlantic Ave"); once the prompt bar populates the
+    // carousel, clicking an alternative chip (which flips userTouched
+    // -> true) previously re-triggered a title-based refetch and
+    // collapsed the carousel. Stay locked until the manager explicitly
+    // clears the cover.
+    if (unsplashPhotosFromPrompt) {
       setUnsplashLoading(false);
       return;
     }
@@ -346,7 +352,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [title, aiFilled, userTouched]);
+  }, [title, unsplashPhotosFromPrompt]);
 
   async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -425,6 +431,10 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             if (userTouched.has("cover")) return;
             if (imageBase64 || selectedImageUrl) return;
             setUnsplashPhotos(results);
+            // Lock the carousel to these results — clicking an alternative
+            // shouldn't kick off a title-based refetch that overwrites the
+            // LLM's better-targeted query.
+            setUnsplashPhotosFromPrompt(true);
             setSelectedImageUrl(results[0].url);
             setImagePreview(null);
             setImageBase64(null);
@@ -1050,7 +1060,16 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   </div>
                 )}
                 <button
-                  onClick={() => { setImagePreview(null); setImageBase64(null); setSelectedImageUrl(null); }}
+                  onClick={() => {
+                    setImagePreview(null);
+                    setImageBase64(null);
+                    setSelectedImageUrl(null);
+                    // Clearing the picked cover releases the prompt-lock,
+                    // so the title-based search re-fires (Photo Suggestions
+                    // repopulate from whatever the manager typed).
+                    setUnsplashPhotosFromPrompt(false);
+                    markTouched("cover");
+                  }}
                   className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
                 >
                   <X className="w-4 h-4" />
