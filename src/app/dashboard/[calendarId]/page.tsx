@@ -2226,7 +2226,11 @@ export default function OrgDashboardPage() {
                   {/* LEFT — calendar list + add-calendar */}
                   <div className="space-y-3 min-w-0">
                     {listPanel}
-                    {isPaid && (() => {
+                    {isPaid && dashboard.isOwner && (() => {
+                      // Only the org owner can add sub-calendars. Co-hosts
+                      // see the calendar list without the Create affordance
+                      // — creating a new calendar changes the org's billing
+                      // footprint and shouldn't be a co-host decision.
                       const atLimit = !!(dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit);
                       if (atLimit) {
                         // Every paid tier tops out at 5 calendars, so
