@@ -2305,7 +2305,7 @@ export default function OrgCalendarPage() {
             image/text rows, serif title, kicker, CTAs). Weekly-vibe
             events re-resolve dates every render; fixed-date events
             drop from the list once past. Public — every visitor can
-            mark "I'm interested"; only the owner sees "Plan This". */}
+            mark "I'm interested"; only the owner sees "Host This". */}
         {org.aiSourceEvents && org.aiSourceEvents.length > 0 && (
           <>
             {(() => {
@@ -2503,7 +2503,7 @@ export default function OrgCalendarPage() {
                                         org.brandColor || "#18181b",
                                     }}
                                   >
-                                    Plan This{" "}
+                                    Host This{" "}
                                     <ArrowUpRight className="w-4 h-4" />
                                   </button>
                                 )}
