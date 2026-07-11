@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import Link from "next/link";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
@@ -127,6 +127,11 @@ interface OrgData {
         // on older AICalendar rows generated before this field existed;
         // the card falls back to just showing venueLine.
         description?: string | null;
+        // Google Places identifier + normalized address, added at
+        // grounding time. Present on events generated after the Places
+        // merge started carrying them forward; null on older rows.
+        placeId?: string | null;
+        address?: string | null;
         tag: string;
         tagVariant?: "default" | "amber";
         isoDatetime?: string | null;
@@ -1152,6 +1157,7 @@ function FollowModal({
 export default function OrgCalendarPage() {
   const params = useParams();
   const shareId = params.shareId as string;
+  const router = useRouter();
 
   const [org, setOrg] = useState<OrgData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -4259,14 +4265,68 @@ export default function OrgCalendarPage() {
                 <button
                   onClick={async () => {
                     setHostThisSubmitting(true);
-                    // Real creation lands in the follow-up commit — the
-                    // routing target depends on whether the visitor is
-                    // owner (dashboard drawer with prefill) or a
-                    // follower (proposed-plan flow, TBD). For now,
-                    // confirm the intent and toast so the modal + gate
-                    // work is testable end-to-end.
                     try {
-                      setToast("Host This is coming next — the plan will land in your calendar.");
+                      // Owner / co-host: route to their dashboard with a
+                      // full AI-event prefill. The New Plan drawer opens
+                      // pre-populated; the VenueSearch auto-resolves the
+                      // venue name into a placeId, and clicking Create
+                      // finalizes via the existing createManualPlan path.
+                      const canHostAsHost = org.isOwner || org.isHost;
+                      if (canHostAsHost) {
+                        // Prefer the parent org's dashboard route so the
+                        // manager lands on THEIR primary calendar view,
+                        // then the ?managePlans=<calId> handoff pivots
+                        // to the correct sub-calendar's PlansManager.
+                        const dashboardTarget =
+                          org.parentOrgId || org.objectId;
+                        const params = new URLSearchParams();
+                        params.set("managePlans", org.objectId);
+                        params.set("prefillTitle", ev.name);
+                        if (ev.description) params.set("prefillDescription", ev.description);
+                        // resolved.date is a validated Date at this point;
+                        // format as the drawer's input types expect.
+                        const d = resolveAIEventDate(ev).date;
+                        if (d) {
+                          const y = d.getFullYear();
+                          const m = String(d.getMonth() + 1).padStart(2, "0");
+                          const day = String(d.getDate()).padStart(2, "0");
+                          const hh = String(d.getHours()).padStart(2, "0");
+                          const mm = String(d.getMinutes()).padStart(2, "0");
+                          params.set("prefillDate", `${y}-${m}-${day}`);
+                          params.set("prefillTime", `${hh}:${mm}`);
+                        }
+                        // Pass placeId when the AI event carries one
+                        // (Places grounding merged it in). Older events
+                        // still fall back to VenueSearch's autoResolveInitial
+                        // via the name string.
+                        params.set(
+                          "prefillVenue",
+                          JSON.stringify({
+                            name: ev.name,
+                            address: ev.address || ev.venueLine || "",
+                            placeId: ev.placeId || null,
+                          }),
+                        );
+                        // Send them back to /org after they cancel/publish
+                        // so they don't lose their spot on the calendar.
+                        if (typeof window !== "undefined") {
+                          params.set(
+                            "returnTo",
+                            window.location.pathname + window.location.search,
+                          );
+                        }
+                        router.push(
+                          `/dashboard/${dashboardTarget}?${params.toString()}`,
+                        );
+                        return;
+                      }
+                      // Follower path — proposal flow that goes to owner
+                      // approval isn't wired end-to-end on web yet. Level
+                      // with the follower rather than pretending it went
+                      // through.
+                      setToast(
+                        "Only the calendar hosts can host suggestions right now — reach out to the owner.",
+                      );
                       setTimeout(() => setToast(null), 3500);
                       setHostThisEventIndex(null);
                     } finally {

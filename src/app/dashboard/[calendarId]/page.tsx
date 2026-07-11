@@ -644,12 +644,12 @@ export default function OrgDashboardPage() {
     const prefillTitle = searchParams.get("prefillTitle");
     let prefill: CreatePlanPrefill | null = null;
     if (prefillTitle) {
-      let venue: { name: string; address: string } | null = null;
+      let venue: { name: string; address: string; placeId?: string | null } | null = null;
       const venueStr = searchParams.get("prefillVenue");
       if (venueStr) {
         try {
           const v = JSON.parse(venueStr);
-          venue = { name: v.name, address: v.address };
+          venue = { name: v.name, address: v.address, placeId: v.placeId || null };
         } catch {
           // Invalid venue JSON — ignore
         }
