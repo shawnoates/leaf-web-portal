@@ -183,6 +183,28 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   // and user has no Google Cal auth; true = fired and connected. Only
   // render the connect CTA when we KNOW they're disconnected.
   const [syncGoogleConnected, setSyncGoogleConnected] = useState<boolean | undefined>(undefined);
+  const [connectingGoogle, setConnectingGoogle] = useState(false);
+
+  async function handleConnectGoogleCalendar() {
+    if (connectingGoogle) return;
+    setConnectingGoogle(true);
+    try {
+      const result = await Parse.Cloud.run("createGoogleCalendarConnectUrl", {
+        returnTo: window.location.href,
+      });
+      if (result?.url) {
+        // Full-page redirect — a popup gets blocked by strict browsers
+        // and Google's consent screen doesn't play nice inside iframes.
+        window.location.href = result.url;
+        return;
+      }
+      alert("Could not start Google Calendar connect. Try again in a moment.");
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Google Calendar connect failed");
+    } finally {
+      setConnectingGoogle(false);
+    }
+  }
   function markTouched(field: PlanDraftField) {
     setUserTouched((prev) => {
       if (prev.has(field)) return prev;
@@ -1173,11 +1195,23 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                     (past-behavior + cold-start ranking) but connecting
                     gets busy-aware suggestions that skip conflicts. */}
                 {syncGoogleConnected === false && syncSlots.length > 0 && (
-                  <div className="mt-3 flex items-start gap-2 bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2">
+                  <div className="mt-3 bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2.5 flex items-start gap-3">
                     <Calendar className="w-3.5 h-3.5 text-zinc-500 mt-0.5 shrink-0" />
-                    <div className="text-[11px] text-zinc-600 leading-snug">
-                      <span className="font-medium text-zinc-700">Connect Google Calendar</span>{" "}
-                      in the Leaf app to get busy-aware picks — we&rsquo;ll skip times that clash with your calendar.
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] text-zinc-600 leading-snug">
+                        Connect Google Calendar for busy-aware picks — we&rsquo;ll skip times that clash with your calendar.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleConnectGoogleCalendar}
+                        disabled={connectingGoogle}
+                        className="mt-2 inline-flex items-center gap-1.5 bg-white border border-zinc-300 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-widest text-zinc-800 hover:border-zinc-900 hover:bg-zinc-50 disabled:opacity-50 transition-colors"
+                      >
+                        {connectingGoogle ? (
+                          <div className="w-3 h-3 border-2 border-zinc-500 border-t-transparent rounded-full animate-spin" />
+                        ) : null}
+                        Connect
+                      </button>
                     </div>
                   </div>
                 )}

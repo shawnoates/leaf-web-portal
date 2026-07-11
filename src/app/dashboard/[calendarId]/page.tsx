@@ -678,6 +678,30 @@ export default function OrgDashboardPage() {
     router.replace(`/dashboard/${calendarId}?tab=calendars`);
   }, [dashboard, searchParams, router, calendarId]);
 
+  // After the Google Calendar web OAuth flow, the server bounces back
+  // here with ?google_calendar=<connected|denied|...>. Show a toast, then
+  // strip the param so a refresh doesn't re-fire it.
+  const googleCalendarReturnRef = useRef(false);
+  useEffect(() => {
+    if (googleCalendarReturnRef.current) return;
+    const flag = searchParams.get("google_calendar");
+    if (!flag) return;
+    googleCalendarReturnRef.current = true;
+    if (flag === "connected") {
+      setToast("Google Calendar connected — Sync will now skip your busy times.");
+    } else if (flag === "denied") {
+      setToast("Google Calendar connect was cancelled.");
+    } else {
+      setToast("Google Calendar connect failed — please try again.");
+    }
+    setTimeout(() => setToast(null), 4000);
+    // Preserve any other params (tab, etc.) but drop google_calendar.
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("google_calendar");
+    const qs = next.toString();
+    router.replace(`/dashboard/${calendarId}${qs ? `?${qs}` : ""}`);
+  }, [searchParams, router, calendarId]);
+
   // Prefetch marketplace data as soon as dashboard is available
   const [prefetchedMarketplace, setPrefetchedMarketplace] = useState<MarketplaceEvent[] | null>(null);
   const marketplacePrefetched = useRef(false);
