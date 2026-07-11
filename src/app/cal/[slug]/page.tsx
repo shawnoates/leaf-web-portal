@@ -46,6 +46,10 @@ interface AICalendarPayload {
   derivedAdoptionCount: number;
   events: Event[];
   venuesVerified: boolean;
+  // Cover image the LLM picked for the calendar-level avatar. Applied
+  // to the Groups row's group_profile_photo_url at adopt time so the
+  // /org page picks it up too.
+  coverImageUrl?: string | null;
   viewerIsOwner: boolean;
 }
 
