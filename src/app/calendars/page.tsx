@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Loader2, Sparkles } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { SEED_POOL, type SeedCalendar } from "@/lib/aiCalendarSeed";
+import { detectCity, isNYC, type DetectedCity } from "@/lib/detectCity";
 
 interface GeneratedCalendar {
   slug: string;
@@ -157,6 +158,19 @@ function PromptBar({ initial = "" }: { initial?: string }) {
   const router = useRouter();
   const [typed, setTyped] = useState(initial);
   const isTyping = typed.trim().length > 0;
+  // Timezone-derived city for the placeholder — Chicago sees "Wicker
+  // Park", NYC keeps "Fort Greene". SSR falls back to the generic
+  // "your neighborhood" so a Chicago visitor never sees Fort Greene
+  // flash before hydration.
+  const [city, setCity] = useState<DetectedCity>({
+    city: "your area",
+    neighborhoods: ["your neighborhood", "your side of town"],
+    fallback: true,
+  });
+  useEffect(() => {
+    setCity(detectCity());
+  }, []);
+  const placeholder = `Try "date night in ${city.neighborhoods[0]}"`;
 
   return (
     <form
@@ -179,7 +193,7 @@ function PromptBar({ initial = "" }: { initial?: string }) {
         name="calendar-prompt"
         value={typed}
         onChange={(e) => setTyped(e.target.value)}
-        placeholder='Try "date night in Fort Greene"'
+        placeholder={placeholder}
         aria-label="Describe a vibe"
         autoComplete="off"
         autoCorrect="off"
@@ -213,6 +227,19 @@ function GallerySurface() {
     () => [...SEED_POOL].sort((a, b) => b.adoptionCount - a.adoptionCount),
     []
   );
+  // Detect city for the "NYC-first gallery" hint. The seed pool is all
+  // Brooklyn today; a Chicago visitor should see it's aspirational-ish
+  // and pivot to typing their own prompt rather than tapping a card
+  // for a city they don't live in.
+  const [city, setCity] = useState<DetectedCity>({
+    city: "your area",
+    neighborhoods: [],
+    fallback: true,
+  });
+  useEffect(() => {
+    setCity(detectCity());
+  }, []);
+  const showNonNYCHint = !city.fallback && !isNYC(city);
 
   return (
     <div className="flex flex-col gap-10">
@@ -239,6 +266,12 @@ function GallerySurface() {
           Pick one to preview. Copy it to your own account — you can edit,
           share, and turn any event into a real plan.
         </p>
+        {showNonNYCHint && (
+          <p className="text-[13px] leading-relaxed max-w-[54ch] m-0" style={{ color: "#8A5F1E" }}>
+            The gallery is Brooklyn-first for now. Type a prompt for {city.city}
+            and we&rsquo;ll build one there.
+          </p>
+        )}
       </div>
 
       <PromptBar />
@@ -339,6 +372,18 @@ function GenerationSurface({ prompt }: { prompt: string }) {
   const [generated, setGenerated] = useState<GeneratedCalendar | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const [reason, setReason] = useState<string | null>(null);
+  // Detect city for the error-copy examples so a Chicago visitor with
+  // an unmeaningful prompt sees "date night in Wicker Park", not
+  // "Fort Greene".
+  const [city, setCity] = useState<DetectedCity>({
+    city: "your area",
+    neighborhoods: ["your neighborhood"],
+    fallback: true,
+  });
+  useEffect(() => {
+    setCity(detectCity());
+  }, []);
+  const exampleNeighborhood = city.neighborhoods[0];
 
   useEffect(() => {
     let cancelled = false;
@@ -542,9 +587,9 @@ function GenerationSurface({ prompt }: { prompt: string }) {
             </h2>
             <p className="text-[14px] leading-relaxed m-0" style={{ color: "#6B7168" }}>
               {reason === "prompt_not_meaningful"
-                ? 'A neighborhood + a vibe usually works — like "date night in Fort Greene".'
+                ? `A neighborhood + a vibe usually works — like "date night in ${exampleNeighborhood}".`
                 : reason === "no_events_found"
-                  ? "We searched Ticketmaster for the NYC area and the next 90 days but didn't find upcoming events matching your ask. Try a different team, artist, or window."
+                  ? "We searched Ticketmaster in your area for the next 90 days but didn't find upcoming events matching your ask. Try a different team, artist, or window."
                   : reason === "thin_result" || reason === "generation_failed"
                     ? "Try a vibe grounded in venues — a neighborhood + a mood — and we'll build it. Or pick one of these popular calendars close to what you asked for."
                     : "Try another prompt, or pick one of these popular calendars close to what you asked for."}

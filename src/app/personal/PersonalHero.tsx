@@ -9,6 +9,7 @@ import {
   SEED_POOL,
   type SeedCalendar,
 } from "@/lib/aiCalendarSeed";
+import { detectCity, type DetectedCity } from "@/lib/detectCity";
 
 // /personal hero — Direction B (prompt over atmosphere).
 //
@@ -46,6 +47,19 @@ export default function PersonalHero({ isLoggedIn }: { isLoggedIn: boolean }) {
   useEffect(() => {
     setChips(pickSeeds(3));
   }, []);
+
+  // Regionalized copy — SSR renders the fallback ("your neighborhood"),
+  // client hydrates with the visitor's timezone-derived city so a
+  // Chicago visitor sees "Wicker Park" not "Fort Greene".
+  const [city, setCity] = useState<DetectedCity>({
+    city: "your area",
+    neighborhoods: ["your neighborhood", "your side of town"],
+    fallback: true,
+  });
+  useEffect(() => {
+    setCity(detectCity());
+  }, []);
+  const heroPlaceholder = `Try "date night in ${city.neighborhoods[0]}" or "Thursday happy hours"`;
 
   const [typed, setTyped] = useState("");
   const [promptTypedFired, setPromptTypedFired] = useState(false);
@@ -206,7 +220,7 @@ export default function PersonalHero({ isLoggedIn }: { isLoggedIn: boolean }) {
               name="calendar-prompt"
               value={typed}
               onChange={(e) => handleTyping(e.target.value)}
-              placeholder="Try “date night in Fort Greene” or “Thursday happy hours”"
+              placeholder={heroPlaceholder}
               aria-label="Describe a vibe"
               autoComplete="off"
               autoCorrect="off"
