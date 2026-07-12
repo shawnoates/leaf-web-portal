@@ -52,7 +52,7 @@ export default function SignInModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white w-full max-w-md rounded-t-2xl md:rounded-2xl p-8 md:p-10 relative flex flex-col gap-6"
+        className="bg-white w-full max-w-lg rounded-t-2xl md:rounded-2xl p-8 md:p-10 relative flex flex-col gap-6"
         style={{
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         }}
@@ -66,14 +66,20 @@ export default function SignInModal({
           <X className="w-4 h-4" />
         </button>
 
-        <div className="flex flex-col gap-2 pr-8">
+        {/* Center-aligned so titles that name the calendar
+            ("Sign in to make 'Family fun · Brooklyn' yours") read as a
+            single deliberate line rather than left-hugging the modal
+            edge with an awkward wrap. Bumped modal width to max-w-lg
+            for the same reason — the extra ~64px lets a two-word
+            calendar name land on one line. */}
+        <div className="flex flex-col gap-2 text-center">
           <h2
             className="m-0 text-[22px] tracking-tight"
             style={{
               color: "#131714",
               fontFamily: 'ui-serif, Georgia, "Times New Roman", serif',
               fontWeight: 400,
-              lineHeight: 1.15,
+              lineHeight: 1.2,
               textWrap: "balance",
             }}
           >
