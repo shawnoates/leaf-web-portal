@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import Parse from "@/lib/parse-client";
 import { Send, Loader2, Sparkles, Check, MessageCirclePlus, MapPin, Wallet } from "lucide-react";
 import type { ConciergeMenu } from "./ConciergeMenuCard";
+import ConciergeProposalCard, { type ConciergeProposal } from "./ConciergeProposalCard";
 
 interface ConciergeMessage {
   objectId: string;
@@ -50,6 +51,10 @@ export default function ConciergeThread({
   const [messages, setMessages] = useState<ConciergeMessage[]>([]);
   const [persona, setPersona] = useState<Persona>({ name: "Leaf Concierge", avatarUrl: null });
   const [menu, setMenu] = useState<ConciergeMenu | null>(null);
+  const [proposals, setProposals] = useState<ConciergeProposal[]>([]);
+  const [reviewMode, setReviewMode] = useState<string | null>(null);
+  const [showPrefsPrompt, setShowPrefsPrompt] = useState(false);
+  const [savingMode, setSavingMode] = useState(false);
   const [responseLabel, setResponseLabel] = useState("Typically replies within a few hours");
   const [selectingId, setSelectingId] = useState<string | null>(null);
   const [menuError, setMenuError] = useState<string | null>(null);
@@ -75,7 +80,7 @@ export default function ConciergeThread({
 
   const load = useCallback(async () => {
     try {
-      const [thread, menuRes] = await Promise.all([
+      const [thread, menuRes, propRes] = await Promise.all([
         Parse.Cloud.run("getConciergeThread", { calendarId }) as Promise<{
           persona: Persona;
           messages: ConciergeMessage[];
@@ -84,11 +89,16 @@ export default function ConciergeThread({
         Parse.Cloud.run("getPendingConciergeMenu", { calendarId }).catch(
           () => ({ menu: null }) as { menu: ConciergeMenu | null }
         ),
+        Parse.Cloud.run("getConciergeProposals", { calendarId }).catch(
+          () => ({ proposals: [], reviewMode: null }) as { proposals: ConciergeProposal[]; reviewMode: string | null }
+        ),
       ]);
       setPersona(thread.persona || { name: "Leaf Concierge", avatarUrl: null });
       setMessages(thread.messages || []);
       if (thread.responseTimeLabel) setResponseLabel(thread.responseTimeLabel);
       setMenu((menuRes as { menu: ConciergeMenu | null }).menu || null);
+      setProposals((propRes as { proposals: ConciergeProposal[] }).proposals || []);
+      setReviewMode((propRes as { reviewMode: string | null }).reviewMode || null);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't load messages.");
@@ -268,7 +278,7 @@ export default function ConciergeThread({
           <div className="m-auto flex items-center gap-2 text-sm text-zinc-400">
             <Loader2 className="w-4 h-4 animate-spin" /> Loading…
           </div>
-        ) : messages.length === 0 && !menu ? (
+        ) : messages.length === 0 && !menu && proposals.length === 0 ? (
           <div className="m-auto text-center text-sm text-zinc-400 px-6">
             No messages yet. Say hi to {persona.name} — ideas, questions, dates to plan around.
           </div>
@@ -530,6 +540,84 @@ export default function ConciergeThread({
                 )}
 
                 {menuError && <p className="mt-2 text-xs text-red-500">{menuError}</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Proposals awaiting the owner's approval (materialized by the concierge). */}
+        {proposals.map((p) => (
+          <div key={p.objectId} className="flex items-start gap-2">
+            <div className="w-8 shrink-0">
+              {persona.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={persona.avatarUrl} alt={persona.name} className="w-8 h-8 rounded-full object-cover" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-emerald-600" />
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-[11px] text-zinc-400 mb-0.5 px-1 block">{persona.name}</span>
+              <ConciergeProposalCard
+                proposal={p}
+                onChanged={() => { load(); onMenuResolved?.(); }}
+                onFirstApproval={() => { if (!reviewMode) setShowPrefsPrompt(true); }}
+              />
+            </div>
+          </div>
+        ))}
+
+        {/* B7 — first-approval review-mode preference prompt. */}
+        {showPrefsPrompt && (
+          <div className="flex items-start gap-2">
+            <div className="w-8 shrink-0">
+              {persona.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={persona.avatarUrl} alt={persona.name} className="w-8 h-8 rounded-full object-cover" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-emerald-600" />
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-[11px] text-zinc-400 mb-0.5 px-1 block">{persona.name}</span>
+              <div className="rounded-2xl border border-zinc-200 bg-white p-3.5">
+                <p className="text-sm text-zinc-800 mb-2.5">
+                  Want me to run each one by you like that — or just handle it and keep you posted?
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { mode: "review_each", label: "Run each by me" },
+                    { mode: "auto_proceed", label: "Handle it, keep me posted" },
+                    { mode: "hands_off", label: "Just handle it" },
+                  ].map((o) => (
+                    <button
+                      key={o.mode}
+                      disabled={savingMode}
+                      onClick={async () => {
+                        setSavingMode(true);
+                        try {
+                          await Parse.Cloud.run("setConciergeReviewMode", { calendarId, mode: o.mode });
+                          setReviewMode(o.mode);
+                          setShowPrefsPrompt(false);
+                        } catch {
+                          /* leave prompt open */
+                        } finally {
+                          setSavingMode(false);
+                        }
+                      }}
+                      className="text-xs font-medium border border-zinc-300 rounded-lg px-3 py-1.5 text-zinc-700 hover:border-zinc-500 hover:text-zinc-900 transition-colors disabled:opacity-50"
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setShowPrefsPrompt(false)} className="mt-2 text-[11px] text-zinc-400 hover:text-zinc-600">
+                  Maybe later
+                </button>
               </div>
             </div>
           </div>
