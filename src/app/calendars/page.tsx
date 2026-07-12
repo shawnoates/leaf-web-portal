@@ -226,14 +226,10 @@ function PromptBar({ initial = "" }: { initial?: string }) {
 // ─── Gallery surface ──────────────────────────────────────────────
 
 function GallerySurface() {
-  const ordered = useMemo(
+  const brooklynOrdered = useMemo(
     () => [...SEED_POOL].sort((a, b) => b.adoptionCount - a.adoptionCount),
     []
   );
-  // Detect city for the "NYC-first gallery" hint. The seed pool is all
-  // Brooklyn today; a Chicago visitor should see it's aspirational-ish
-  // and pivot to typing their own prompt rather than tapping a card
-  // for a city they don't live in.
   const [city, setCity] = useState<DetectedCity>({
     city: "your area",
     neighborhoods: [],
@@ -242,10 +238,51 @@ function GallerySurface() {
     lng: null,
     promptChips: [],
   });
+  // Cached AICalendar rows for the visitor's city — populated after
+  // mount. Non-null means we finished the fetch (may still be an empty
+  // array). Null → still loading OR skipped because city is NYC.
+  const [cityCache, setCityCache] = useState<SeedCalendar[] | null>(null);
   useEffect(() => {
-    setCity(detectCity());
+    const detected = detectCity();
+    setCity(detected);
+    // NYC keeps its curated Brooklyn gallery. Every other detected city
+    // gets a cache lookup — if anything comes back we show those; if
+    // empty we still show the curated seeds with a "Brooklyn-first" hint.
+    if (detected.fallback || isNYC(detected)) return;
+    (async () => {
+      try {
+        const result = (await Parse.Cloud.run("listAICalendarsByCity", {
+          city: detected.city,
+          limit: 12,
+        })) as { calendars: Array<{ objectId: string; slug: string; title: string; prompt: string; area: string | null; theme: string | null; adoptionCount: number; events: { time: string; name: string; tag: string }[] }> };
+        const adapted: SeedCalendar[] = (result?.calendars || []).map((c) => ({
+          slug: c.slug,
+          chipLabel: c.prompt || c.title,
+          title: c.title,
+          prompt: c.prompt,
+          area: c.area || detected.city,
+          theme: c.theme || "mix",
+          sourceName: "Leaf",
+          previewKicker: `Preview · ${(c.events || []).length} stops`,
+          adoptionCount: c.adoptionCount || 0,
+          events: (c.events || []).map((ev) => ({
+            name: ev.name,
+            time: ev.time,
+            venueLine: "",
+            tag: ev.tag,
+          })),
+        }));
+        setCityCache(adapted);
+      } catch {
+        setCityCache([]);
+      }
+    })();
   }, []);
-  const showNonNYCHint = !city.fallback && !isNYC(city);
+  // Use city cache when non-empty; otherwise fall back to Brooklyn.
+  // Show the Brooklyn hint when we fell back due to an empty cache.
+  const usingCityCache = cityCache !== null && cityCache.length > 0;
+  const ordered = usingCityCache ? cityCache : brooklynOrdered;
+  const showNonNYCHint = !city.fallback && !isNYC(city) && !usingCityCache;
 
   return (
     <div className="flex flex-col gap-10">
