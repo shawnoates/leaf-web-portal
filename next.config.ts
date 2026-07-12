@@ -18,6 +18,17 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Path aliases so joinleaf.com's public legal URLs keep working after
+  // the domain merges into os.joinleaf.com. Internal code uses the short
+  // /terms and /privacy paths (matches the existing /safety pattern);
+  // these aliases catch anyone who bookmarked or was linked to the
+  // marketing-site paths.
+  async redirects() {
+    return [
+      { source: "/terms-conditions", destination: "/terms", permanent: true },
+      { source: "/privacy-policy", destination: "/privacy", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -717,7 +717,25 @@ function SetupPageInner() {
 
                 <div className="pt-2 border-t border-zinc-100">
                   <p className="text-[11px] text-zinc-400 leading-relaxed">
-                    By signing in, you agree to our Terms of Service and Privacy Policy. We&apos;ll never post without your permission.
+                    By signing in, you agree to our{" "}
+                    <Link
+                      href="/terms"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-zinc-700 transition-colors"
+                    >
+                      Terms of Service
+                    </Link>
+                    {" "}and{" "}
+                    <Link
+                      href="/privacy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-zinc-700 transition-colors"
+                    >
+                      Privacy Policy
+                    </Link>
+                    . We&apos;ll never post without your permission.
                   </p>
                 </div>
               </div>

@@ -3990,6 +3990,9 @@ export default function OrgCalendarPage() {
                 <Link href="/about" className="hover:text-zinc-900 transition-colors">
                   About
                 </Link>
+                <Link href="/terms" className="hover:text-zinc-900 transition-colors">
+                  Terms
+                </Link>
                 <Link href="/safety" className="hover:text-zinc-900 transition-colors">
                   Safety
                 </Link>
