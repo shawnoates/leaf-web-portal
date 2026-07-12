@@ -50,6 +50,19 @@ interface Venue {
   placeId: string;
 }
 
+/// Draft state for one stop past the primary — the primary uses the existing
+/// `selectedVenue` / `venueQuery` state so all the ordinary create paths stay
+/// single-venue. `time` is a 24h "HH:MM" that matches how iOS stores per-stop
+/// time on eventDetail.locations[i].time. `objectId` preserves the pointer for
+/// an existing DBLocation loaded from prefill so the server doesn't have to
+/// re-resolve it via Google Places on save.
+interface AdditionalStop {
+  query: string;
+  venue: Venue | null;
+  time: string;
+  objectId?: string | null;
+}
+
 export interface CreatePlanPrefill {
   title?: string;
   description?: string;
@@ -72,6 +85,17 @@ export interface CreatePlanPrefill {
   hideVenueUntilRsvp?: boolean;
   /** Plan's current requireApproval value (used when editing an existing plan). */
   requireApproval?: boolean;
+  /** Extra stops beyond the primary venue (multi-stop itineraries added on
+   *  iOS). Rendered as a stops list under the primary Venue field; passed
+   *  through as part of `locations` on save so the dashboard can edit them
+   *  instead of silently collapsing to one stop. */
+  additionalStops?: {
+    objectId?: string | null;
+    name: string;
+    address: string;
+    placeId?: string | null;
+    time?: string | null;
+  }[];
 }
 
 interface CreatePlanModalProps {
@@ -127,6 +151,16 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [title, setTitle] = useState(prefill?.title || "");
   const [description, setDescription] = useState(prefill?.description || "");
   const [venueQuery, setVenueQuery] = useState(prefill?.venue?.name || "");
+  const [additionalStops, setAdditionalStops] = useState<AdditionalStop[]>(
+    (prefill?.additionalStops || []).map((s) => ({
+      query: s.name || "",
+      venue: s.placeId
+        ? { name: s.name, address: s.address, placeId: s.placeId }
+        : null,
+      time: s.time || "",
+      objectId: s.objectId ?? null,
+    })),
+  );
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(
     prefill?.venue?.placeId
       ? { name: prefill.venue.name, address: prefill.venue.address, placeId: prefill.venue.placeId }
@@ -725,6 +759,17 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           hideVenueUntilRsvp: hideVenue,
           requireApproval,
         });
+        // Push the edit to the manager's Google Calendar too. Fire-and-forget:
+        // if the token was only granted freebusy (pre-scope-upgrade), Google
+        // returns 403 and we log it, but we don't block the plan update.
+        Parse.Cloud.run("syncPlanToCalendar", {
+          eventGroupId,
+          action: "update",
+          userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }).catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn("[syncPlanToCalendar] update failed:", msg);
+        });
       } else if (recurring && isHosted) {
         const occInt = Math.min(
           Math.max(parseInt(seriesOccurrences, 10) || SERIES_DEFAULT_OCCURRENCES, 1),
@@ -767,7 +812,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           endsAt: seriesEndType === "until" && seriesEndsAt ? `${seriesEndsAt}T23:59:59${tzSuffix}` : undefined,
         });
       } else {
-        await Parse.Cloud.run("createManualPlan", {
+        const created = (await Parse.Cloud.run("createManualPlan", {
           calendarId: selectedCalendarId,
           title,
           description,
@@ -782,7 +827,21 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           hideVenueUntilRsvp: hideVenue,
           requireApproval: isHosted ? requireApproval : undefined,
           clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        });
+        })) as { success?: boolean; type?: string; eventGroupId?: string };
+        // Only sync HOSTED plans — ideas don't have a fixed schedule to
+        // put on the manager's calendar. Fire-and-forget: a 403 from
+        // Google (token granted only freebusy pre-scope-upgrade) is
+        // logged but doesn't block the plan creation.
+        if (isHosted && created?.eventGroupId) {
+          Parse.Cloud.run("syncPlanToCalendar", {
+            eventGroupId: created.eventGroupId,
+            action: "create",
+            userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          }).catch((err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.warn("[syncPlanToCalendar] create failed:", msg);
+          });
+        }
       }
       setSuccess(true);
       onCreated();
@@ -1235,7 +1294,8 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                 {needsConnect && (
                   <p className="text-[11px] text-zinc-500 mt-2">
                     We&rsquo;ll suggest times that don&rsquo;t clash with your Google Calendar
-                    {selectedVenue ? " and stay within the venue's hours" : ""}.
+                    {selectedVenue ? " and stay within the venue's hours" : ""}, and
+                    publish plans you host to your calendar too.
                   </p>
                 )}
                 {syncError && (
