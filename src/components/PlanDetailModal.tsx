@@ -35,6 +35,16 @@ export type PlanDetailData = {
   hostName: string;
   rsvpCount: number;
   location: { name: string; address: string } | null;
+  /** Full itinerary from the API (matches `getOrgCalendarPage.plans[i].locations`).
+   * Present when the plan has multiple stops from an iOS multi-stop edit; the
+   * dashboard's edit modal uses this to hydrate `additionalStops`. */
+  locations?: {
+    objectId?: string | null;
+    name: string | null;
+    address: string | null;
+    isPrivate?: boolean;
+    time?: string | null;
+  }[];
   isPoll?: boolean;
   pollOptionCount?: number;
   pollClosesAt?: string | null;

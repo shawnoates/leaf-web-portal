@@ -745,6 +745,31 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
         });
         await Parse.Cloud.run("approveHostRequest", { calendarPlanId: hostRequestId });
       } else if (editMode && eventGroupId) {
+        // With extra stops present we send a `locations` array instead of the
+        // single `venue` — the server treats `locations` as a full itinerary
+        // replacement (with per-stop time). Lets the dashboard truly edit
+        // multi-stop plans instead of clobbering stops 1..N via the
+        // single-venue seatbelt.
+        const hasMultiStop = additionalStops.length > 0;
+        const primaryStopTime = time || "";
+        const multiStopLocations = hasMultiStop
+          ? [
+              {
+                objectId: null,
+                name: selectedVenue?.name,
+                address: selectedVenue?.address,
+                placeId: selectedVenue?.placeId,
+                time: primaryStopTime,
+              },
+              ...additionalStops.map((s) => ({
+                objectId: s.objectId ?? null,
+                name: s.venue?.name,
+                address: s.venue?.address,
+                placeId: s.venue?.placeId,
+                time: s.time || "",
+              })),
+            ]
+          : undefined;
         await Parse.Cloud.run("updatePlanDetails", {
           eventGroupId,
           title,
@@ -753,7 +778,12 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           time: time || null,
           imageBase64: imageBase64 || undefined,
           imageUrl: !imageBase64 ? (selectedImageUrl || prefill?.imageUrl || undefined) : undefined,
-          venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
+          // Pass EITHER `locations` (plural, full replacement) OR `venue`
+          // (singular, preserves untouched stops via server seatbelt).
+          ...(hasMultiStop
+            ? { locations: multiStopLocations }
+            : { venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null }
+          ),
           capacity: capacity ? parseInt(capacity) : null,
           hostNote: hostNote.trim() || undefined,
           hideVenueUntilRsvp: hideVenue,
@@ -1231,6 +1261,81 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                 <MapPin className="w-3 h-3" /> Pick a venue so voters know where to go
               </p>
             ) : null}
+
+            {/* Multi-stop itinerary — one row per additional stop with its
+                own VenueSearch + optional per-stop time. Polls and
+                idea/host-request modes stay single-venue since their
+                downstream flows collapse to a single card anyway. */}
+            {!isPoll && mode !== "idea" && !hostRequestMode && (additionalStops.length > 0 || editMode) && (
+              <div className="mt-4 space-y-3">
+                {additionalStops.map((stop, i) => (
+                  <div key={i} className="flex gap-2 items-start">
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block">
+                        Stop {i + 2}
+                      </label>
+                      <VenueSearch
+                        key={`stop-${i}-${stop.venue?.placeId || "empty"}`}
+                        value={stop.query}
+                        onChange={(v) => {
+                          setAdditionalStops((prev) => prev.map((s, idx) =>
+                            idx === i
+                              ? { ...s, query: v, venue: s.venue && v !== s.venue.name ? null : s.venue }
+                              : s
+                          ));
+                        }}
+                        onSelect={(v) => {
+                          setAdditionalStops((prev) => prev.map((s, idx) =>
+                            idx === i ? { ...s, query: v.name, venue: v, objectId: null } : s
+                          ));
+                        }}
+                        autoResolveInitial={!!stop.query && !stop.venue?.placeId}
+                        className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                      />
+                      {stop.venue?.address && (
+                        <p className="text-xs text-zinc-400 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> {stop.venue.address}
+                        </p>
+                      )}
+                    </div>
+                    <div className="w-20 shrink-0 space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block">
+                        Time
+                      </label>
+                      <input
+                        type="time"
+                        value={stop.time}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setAdditionalStops((prev) => prev.map((s, idx) =>
+                            idx === i ? { ...s, time: v } : s
+                          ));
+                        }}
+                        className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAdditionalStops((prev) => prev.filter((_, idx) => idx !== i))}
+                      aria-label={`Remove stop ${i + 2}`}
+                      className="mt-5 p-1 text-zinc-400 hover:text-red-500"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setAdditionalStops((prev) => [
+                    ...prev,
+                    { query: "", venue: null, time: "", objectId: null },
+                  ])}
+                  className="text-xs font-semibold text-zinc-600 hover:text-zinc-900 flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Add stop
+                </button>
+              </div>
+            )}
           </div>
 
           {!isPoll && (

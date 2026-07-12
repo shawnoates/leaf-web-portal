@@ -598,6 +598,16 @@ export default function PlansManager({
       return;
     }
     const planDate = plan.date ? formatDateInputInTimezone(plan.date, plan.timezone) : "";
+    // For multi-stop plans the primary Venue field stays at stop 0; stops
+    // 1..N flow into `additionalStops`. Poll edits keep single-venue since
+    // the poll surface itself is single-card.
+    const extraStops = (plan.locations || []).slice(1).map((loc) => ({
+      objectId: loc.objectId ?? null,
+      name: loc.name || "",
+      address: loc.address || "",
+      placeId: null,
+      time: loc.time || null,
+    }));
     setCreatePlanPrefill({
       title: plan.title,
       description: plan.description,
@@ -607,6 +617,7 @@ export default function PlansManager({
       imageUrl: plan.image,
       hideVenueUntilRsvp: plan.hideVenueUntilRsvp,
       requireApproval: plan.requireApproval,
+      additionalStops: extraStops.length > 0 ? extraStops : undefined,
     });
     setEditingPlanId(plan.objectId);
     setSelectedPlan(null);
