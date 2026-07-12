@@ -166,6 +166,8 @@ function PromptBar({ initial = "" }: { initial?: string }) {
     city: "your area",
     neighborhoods: ["your neighborhood", "your side of town"],
     fallback: true,
+    lat: null,
+    lng: null,
   });
   useEffect(() => {
     setCity(detectCity());
@@ -235,6 +237,8 @@ function GallerySurface() {
     city: "your area",
     neighborhoods: [],
     fallback: true,
+    lat: null,
+    lng: null,
   });
   useEffect(() => {
     setCity(detectCity());
@@ -379,6 +383,8 @@ function GenerationSurface({ prompt }: { prompt: string }) {
     city: "your area",
     neighborhoods: ["your neighborhood"],
     fallback: true,
+    lat: null,
+    lng: null,
   });
   useEffect(() => {
     setCity(detectCity());
@@ -389,8 +395,16 @@ function GenerationSurface({ prompt }: { prompt: string }) {
     let cancelled = false;
     (async () => {
       try {
+        // Regionalize server-side. City → LLM prompt system hint;
+        // coords → Ticketmaster + Places bias. Server falls back to
+        // NYC when either is missing so an SSR / bot request still
+        // works.
+        const detected = detectCity();
         const result = (await Parse.Cloud.run("generateAICalendar", {
           prompt,
+          originCity: detected.fallback ? undefined : detected.city,
+          originLat: detected.lat ?? undefined,
+          originLng: detected.lng ?? undefined,
         })) as GenerateResponse;
         if (cancelled) return;
         if (result.ok && result.calendar) {

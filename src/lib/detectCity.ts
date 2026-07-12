@@ -23,14 +23,24 @@ export interface DetectedCity {
   /** True when we couldn't identify a specific city — copy should fall
    *  back to "your neighborhood" style generics. */
   fallback: boolean;
+  /** Downtown-ish center used to bias Ticketmaster event search and
+   *  Google Places grounding on the server. Null when fallback=true. */
+  lat: number | null;
+  lng: number | null;
 }
 
 const NYC: DetectedCity = {
   city: "NYC",
   neighborhoods: ["Fort Greene", "Williamsburg", "the Lower East Side", "Park Slope"],
   fallback: false,
+  lat: 40.7128,
+  lng: -74.006,
 };
 
+// Coords are downtown-ish centroids used as the biasing origin for
+// Ticketmaster event search + Places areaHint. Not precise, and not
+// meant to be — the search radius on the server side is generous
+// (50 miles) and covers the whole metro from any of these anchors.
 const CITY_BY_TIMEZONE: Record<string, DetectedCity> = {
   // US
   "America/New_York": NYC,
@@ -38,53 +48,73 @@ const CITY_BY_TIMEZONE: Record<string, DetectedCity> = {
     city: "Detroit",
     neighborhoods: ["Corktown", "Midtown", "Eastern Market"],
     fallback: false,
+    lat: 42.3314,
+    lng: -83.0458,
   },
   "America/Chicago": {
     city: "Chicago",
     neighborhoods: ["Wicker Park", "Logan Square", "the West Loop"],
     fallback: false,
+    lat: 41.8781,
+    lng: -87.6298,
   },
   "America/Denver": {
     city: "Denver",
     neighborhoods: ["RiNo", "Highlands", "Baker"],
     fallback: false,
+    lat: 39.7392,
+    lng: -104.9903,
   },
   "America/Phoenix": {
     city: "Phoenix",
     neighborhoods: ["Roosevelt Row", "Arcadia", "Melrose"],
     fallback: false,
+    lat: 33.4484,
+    lng: -112.074,
   },
   "America/Los_Angeles": {
     city: "LA",
     neighborhoods: ["Silver Lake", "Highland Park", "Venice", "Echo Park"],
     fallback: false,
+    lat: 34.0522,
+    lng: -118.2437,
   },
   "America/Anchorage": {
     city: "Anchorage",
     neighborhoods: ["Downtown", "Midtown", "Spenard"],
     fallback: false,
+    lat: 61.2181,
+    lng: -149.9003,
   },
   "Pacific/Honolulu": {
     city: "Honolulu",
     neighborhoods: ["Kaka'ako", "Kailua", "Chinatown"],
     fallback: false,
+    lat: 21.3069,
+    lng: -157.8583,
   },
   // Canada
   "America/Toronto": {
     city: "Toronto",
     neighborhoods: ["Ossington", "Kensington Market", "Leslieville"],
     fallback: false,
+    lat: 43.6532,
+    lng: -79.3832,
   },
   "America/Vancouver": {
     city: "Vancouver",
     neighborhoods: ["Mount Pleasant", "Gastown", "Commercial Drive"],
     fallback: false,
+    lat: 49.2827,
+    lng: -123.1207,
   },
   // UK / EU seeds — if these ever ship, we've got the shapes ready.
   "Europe/London": {
     city: "London",
     neighborhoods: ["Peckham", "Hackney", "Notting Hill"],
     fallback: false,
+    lat: 51.5074,
+    lng: -0.1278,
   },
 };
 
@@ -101,6 +131,8 @@ export function detectCity(): DetectedCity {
       city: "your area",
       neighborhoods: ["your neighborhood", "your side of town"],
       fallback: true,
+      lat: null,
+      lng: null,
     };
   }
   try {
@@ -115,6 +147,8 @@ export function detectCity(): DetectedCity {
       city: "your area",
       neighborhoods: ["your neighborhood", "your side of town"],
       fallback: true,
+      lat: null,
+      lng: null,
     };
   }
 }

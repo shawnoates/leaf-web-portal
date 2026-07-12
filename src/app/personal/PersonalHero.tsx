@@ -55,6 +55,8 @@ export default function PersonalHero({ isLoggedIn }: { isLoggedIn: boolean }) {
     city: "your area",
     neighborhoods: ["your neighborhood", "your side of town"],
     fallback: true,
+    lat: null,
+    lng: null,
   });
   useEffect(() => {
     setCity(detectCity());
