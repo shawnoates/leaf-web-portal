@@ -28,24 +28,22 @@ const nextConfig: NextConfig = {
       //
       // Scoped via `has: host` so os.joinleaf.com traffic never trips
       // these — they only fire when the incoming Host header matches
-      // the marketing domain. Path-specific rules above run first, so
-      // /terms-conditions and /privacy-policy on joinleaf.com continue
-      // to serve their real pages (same codebase renders them). Every
-      // other path on joinleaf.com — including the bare root — 301s
-      // to /personal on the app domain.
+      // the marketing domain.
       //
-      // Requires joinleaf.com to be added as an alternate domain on
-      // this Amplify app (Hosting → Domain management). Until then
-      // these rules don't fire because the app never sees the
-      // marketing hostname.
+      // Source uses a negative lookahead to skip /terms-conditions
+      // and /privacy-policy so the legal deep-links continue to serve
+      // their real pages on joinleaf.com. Next.js evaluates redirects
+      // BEFORE page routing, so without this exclusion the catch-all
+      // would eat those paths and bounce them to /personal. Anything
+      // else — including the bare root — 308s to /personal.
       {
-        source: "/:path*",
+        source: "/((?!terms-conditions|privacy-policy).*)",
         has: [{ type: "host", value: "joinleaf.com" }],
         destination: "https://www.os.joinleaf.com/personal",
         permanent: true,
       },
       {
-        source: "/:path*",
+        source: "/((?!terms-conditions|privacy-policy).*)",
         has: [{ type: "host", value: "www.joinleaf.com" }],
         destination: "https://www.os.joinleaf.com/personal",
         permanent: true,
