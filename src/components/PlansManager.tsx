@@ -163,6 +163,16 @@ interface UpcomingPlan {
   rsvpCount: number;
   host: { name: string } | null;
   location: { name: string; address: string } | null;
+  /** Full itinerary (server `getOrgDashboard` calendar.activePlans[i].locations).
+   *  Threaded into `PlanDetailData.locations` for the edit modal to hydrate its
+   *  multi-stop compose UI. */
+  locations?: {
+    objectId?: string | null;
+    name: string | null;
+    address: string | null;
+    placeId?: string | null;
+    time?: string | null;
+  }[];
   isPoll?: boolean;
   pollOptionCount?: number;
   pollVoteCount?: number;
@@ -346,6 +356,13 @@ export default function PlansManager({
         hostName: string;
         rsvpCount: number;
         location: { name: string; address: string; placeId?: string | null } | null;
+        locations?: {
+          objectId?: string | null;
+          name: string | null;
+          address: string | null;
+          placeId?: string | null;
+          time?: string | null;
+        }[];
         isPoll?: boolean;
         pollOptionCount?: number;
         pollVoteCount?: number;
@@ -365,6 +382,7 @@ export default function PlansManager({
         rsvpCount: p.rsvpCount,
         host: p.hostName ? { name: p.hostName } : null,
         location: p.location ? { name: p.location.name, address: p.location.address } : null,
+        locations: p.locations,
         isPoll: p.isPoll,
         pollOptionCount: p.pollOptionCount,
         pollVoteCount: p.pollVoteCount,
@@ -933,6 +951,7 @@ export default function PlansManager({
             hostName: selectedPlan.host?.name || "You",
             rsvpCount: selectedPlan.rsvpCount,
             location: selectedPlan.location,
+            locations: selectedPlan.locations,
             isPoll: selectedPlan.isPoll,
             pollOptionCount: selectedPlan.pollOptionCount,
             pollVoteCount: selectedPlan.pollVoteCount,
