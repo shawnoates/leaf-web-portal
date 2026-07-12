@@ -103,7 +103,7 @@ export default function SignInModal({
         <p className="text-[11px] text-center m-0" style={{ color: "#9EA39C" }}>
           By continuing, you agree to Leaf&apos;s{" "}
           <Link
-            href="/terms"
+            href="/terms-conditions"
             target="_blank"
             rel="noopener noreferrer"
             className="underline hover:text-zinc-700 transition-colors"

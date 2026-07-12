@@ -20,7 +20,7 @@ export default function SafetyPage() {
             Leaf
           </Link>
           <Link
-            href="/privacy"
+            href="/privacy-policy"
             className="text-xs tracking-wider uppercase text-zinc-500 hover:text-zinc-900 transition-colors"
           >
             Privacy
@@ -72,7 +72,7 @@ export default function SafetyPage() {
               <li>
                 We protect your personal information as described in our{" "}
                 <Link
-                  href="/privacy"
+                  href="/privacy-policy"
                   className="text-zinc-900 underline underline-offset-4 hover:text-zinc-600"
                 >
                   Privacy Policy
@@ -282,7 +282,7 @@ export default function SafetyPage() {
             <Link href="/safety" className="hover:text-zinc-900 transition-colors">
               Safety
             </Link>
-            <Link href="/privacy" className="hover:text-zinc-900 transition-colors">
+            <Link href="/privacy-policy" className="hover:text-zinc-900 transition-colors">
               Privacy
             </Link>
             <a

@@ -719,7 +719,7 @@ function SetupPageInner() {
                   <p className="text-[11px] text-zinc-400 leading-relaxed">
                     By signing in, you agree to our{" "}
                     <Link
-                      href="/terms"
+                      href="/terms-conditions"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="underline hover:text-zinc-700 transition-colors"
@@ -728,7 +728,7 @@ function SetupPageInner() {
                     </Link>
                     {" "}and{" "}
                     <Link
-                      href="/privacy"
+                      href="/privacy-policy"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="underline hover:text-zinc-700 transition-colors"

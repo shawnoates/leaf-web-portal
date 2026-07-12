@@ -18,15 +18,14 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // Path aliases so joinleaf.com's public legal URLs keep working after
-  // the domain merges into os.joinleaf.com. Internal code uses the short
-  // /terms and /privacy paths (matches the existing /safety pattern);
-  // these aliases catch anyone who bookmarked or was linked to the
-  // marketing-site paths.
+  // Real legal pages live at the joinleaf.com-matching slugs so the
+  // marketing-site deep links keep working after the domain merges into
+  // os.joinleaf.com. The short /terms + /privacy aliases stay so any
+  // bookmarks or old internal links still resolve.
   async redirects() {
     return [
-      { source: "/terms-conditions", destination: "/terms", permanent: true },
-      { source: "/privacy-policy", destination: "/privacy", permanent: true },
+      { source: "/terms", destination: "/terms-conditions", permanent: true },
+      { source: "/privacy", destination: "/privacy-policy", permanent: true },
     ];
   },
 };
