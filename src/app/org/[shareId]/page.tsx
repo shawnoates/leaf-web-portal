@@ -57,6 +57,18 @@ interface Plan {
     neighborhood?: string | null;
     isPrivate?: boolean;
   } | null;
+  /** Full itinerary from the server (matches getOrgCalendarPage's `locations`
+   * payload). Preferred over `location` (singular) when length > 1. When
+   * absent or single-item, callers should fall back to `location`. */
+  locations?: {
+    objectId?: string | null;
+    name: string | null;
+    address: string | null;
+    neighborhood?: string | null;
+    isPrivate?: boolean;
+    timezone?: string | null;
+    time?: string | null;
+  }[];
   hostNote: string | null;
   requireApproval?: boolean;
   isPoll?: boolean;
@@ -1620,6 +1632,17 @@ export default function OrgCalendarPage() {
           neighborhood: (p.location as Record<string, unknown>).neighborhood as string | null || null,
           isPrivate: (p.location as Record<string, unknown>).isPrivate as boolean || false,
         } : null,
+        locations: Array.isArray(p.locations)
+          ? (p.locations as Record<string, unknown>[]).map((loc) => ({
+              objectId: (loc.objectId as string | null) ?? null,
+              name: (loc.name as string | null) ?? null,
+              address: (loc.address as string | null) ?? null,
+              neighborhood: (loc.neighborhood as string | null) ?? null,
+              isPrivate: (loc.isPrivate as boolean) || false,
+              timezone: (loc.timezone as string | null) ?? null,
+              time: (loc.time as string | null) ?? null,
+            }))
+          : undefined,
         hostNote: p.hostNote as string || null,
         requireApproval: p.requireApproval as boolean || false,
         isPoll: p.isPoll as boolean || false,
@@ -2961,9 +2984,41 @@ export default function OrgCalendarPage() {
                 {selectedEvent.location && (
                   <div className="space-y-2">
                     <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
-                      Location
+                      {selectedEvent.locations && selectedEvent.locations.length > 1 ? "Itinerary" : "Location"}
                     </h4>
-                    {selectedEvent.isPoll ? (
+                    {selectedEvent.locations && selectedEvent.locations.length > 1 ? (
+                      // Multi-stop itinerary — render each stop with its time.
+                      // Same privacy gate as the single-venue path below: for
+                      // non-poll plans that require approval OR mark venues
+                      // private, show a collapsed "N stops · revealed after
+                      // {RSVP,approval}" line instead of exposing addresses.
+                      (!selectedEvent.isPoll && (
+                        selectedEvent.location.isPrivate ||
+                        (selectedEvent.requireApproval && !rsvpedPlanIds.has(selectedEvent.id))
+                      )) ? (
+                        <p className="text-sm text-zinc-400 flex items-center gap-1.5">
+                          <Lock className="w-3 h-3" />
+                          {selectedEvent.locations.length} stops · revealed after {selectedEvent.requireApproval ? "approval" : "RSVP"}
+                        </p>
+                      ) : (
+                        <ol className="space-y-2">
+                          {selectedEvent.locations.map((loc, i) => (
+                            <li key={loc.objectId || `${i}-${loc.name}`} className="flex gap-2 text-sm">
+                              <span className="text-zinc-400 font-mono w-4 shrink-0">{i + 1}.</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-zinc-700">
+                                  {loc.name || loc.neighborhood || "TBD"}
+                                  {loc.time && <span className="text-zinc-400 font-normal"> · {loc.time}</span>}
+                                </p>
+                                {loc.address && (
+                                  <p className="text-zinc-500 text-xs">{loc.address}</p>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      )
+                    ) : selectedEvent.isPoll ? (
                       // Polls don't gate location behind RSVP — date isn't picked yet
                       // and the venue (if set) is shown as informational context.
                       selectedEvent.location.name ? (
