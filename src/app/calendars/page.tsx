@@ -233,10 +233,10 @@ function GallerySurface() {
             lineHeight: 1.15,
           }}
         >
-          Calendars people <em style={{ color: "#1B4332" }}>actually adopted</em>.
+          Calendars people <em style={{ color: "#1B4332" }}>actually use</em>.
         </h1>
         <p className="text-[15px] leading-relaxed max-w-[54ch] m-0" style={{ color: "#6B7168" }}>
-          Pick one to preview. Adopt to save it as your own — you can edit,
+          Pick one to preview. Copy it to your own account — you can edit,
           share, and turn any event into a real plan.
         </p>
       </div>
@@ -286,7 +286,7 @@ function GalleryCard({ calendar }: { calendar: SeedCalendar }) {
             className="shrink-0 text-[11px] font-semibold rounded-full px-2.5 py-1 tabular-nums"
             style={{ background: "#E8EFE9", color: "#1B4332" }}
           >
-            {calendar.adoptionCount} adopted
+            {calendar.adoptionCount} using
           </span>
         </div>
 
@@ -546,8 +546,8 @@ function GenerationSurface({ prompt }: { prompt: string }) {
                 : reason === "no_events_found"
                   ? "We searched Ticketmaster for the NYC area and the next 90 days but didn't find upcoming events matching your ask. Try a different team, artist, or window."
                   : reason === "thin_result" || reason === "generation_failed"
-                    ? "Try a vibe grounded in venues — a neighborhood + a mood — and we'll build it. Or pick one of these adopted calendars close to what you asked for."
-                    : "Try another prompt, or pick one of these adopted calendars close to what you asked for."}
+                    ? "Try a vibe grounded in venues — a neighborhood + a mood — and we'll build it. Or pick one of these popular calendars close to what you asked for."
+                    : "Try another prompt, or pick one of these popular calendars close to what you asked for."}
             </p>
           </div>
 
@@ -570,7 +570,7 @@ function GenerationSurface({ prompt }: { prompt: string }) {
                     {c.title}
                   </span>
                   <span className="text-[12px]" style={{ color: "#6B7168" }}>
-                    {c.area} · {c.adoptionCount} adopted
+                    {c.area} · {c.adoptionCount} using
                   </span>
                 </div>
                 <ArrowRight className="w-4 h-4 shrink-0" style={{ color: "#1B4332" }} />
