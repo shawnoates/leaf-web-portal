@@ -57,6 +57,7 @@ export default function PersonalHero({ isLoggedIn }: { isLoggedIn: boolean }) {
     fallback: true,
     lat: null,
     lng: null,
+    promptChips: [],
   });
   useEffect(() => {
     setCity(detectCity());
@@ -89,6 +90,18 @@ export default function PersonalHero({ isLoggedIn }: { isLoggedIn: boolean }) {
     });
     router.push(`/cal/${cal.slug}`);
   }
+
+  // Regionalized prompt chips fire the generator with the visitor's
+  // detected city — a Chicago visitor tapping "Date night in Wicker
+  // Park" ends up on /calendars?q=... which passes originCity through
+  // to the server and returns a Chicago calendar. NYC visitors fall
+  // back to the SEED_POOL chips (their curated Brooklyn cards) so the
+  // gallery cards get eyeballs.
+  function handlePromptChipTap(prompt: string) {
+    trackPersonalGen("prompt_submitted", { prompt, source: "regional_chip" });
+    router.push(`/calendars?q=${encodeURIComponent(prompt)}`);
+  }
+  const useRegionalChips = !city.fallback && city.promptChips.length > 0 && city.city !== "NYC";
 
   return (
     <section
@@ -248,23 +261,41 @@ export default function PersonalHero({ isLoggedIn }: { isLoggedIn: boolean }) {
           </form>
 
           <div className="flex flex-wrap justify-center gap-2 max-w-xl">
-            {chips.map((c) => (
-              <button
-                key={c.slug}
-                type="button"
-                onClick={() => handleChipTap(c)}
-                className="rounded-full px-4 py-2 text-sm font-medium transition-all hover:-translate-y-0.5"
-                style={{
-                  background: "rgba(255,255,255,0.1)",
-                  color: "rgba(247,245,239,0.92)",
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  backdropFilter: "blur(10px)",
-                  WebkitBackdropFilter: "blur(10px)",
-                }}
-              >
-                {c.chipLabel}
-              </button>
-            ))}
+            {useRegionalChips
+              ? city.promptChips.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => handlePromptChipTap(prompt)}
+                    className="rounded-full px-4 py-2 text-sm font-medium transition-all hover:-translate-y-0.5"
+                    style={{
+                      background: "rgba(255,255,255,0.1)",
+                      color: "rgba(247,245,239,0.92)",
+                      border: "1px solid rgba(255,255,255,0.14)",
+                      backdropFilter: "blur(10px)",
+                      WebkitBackdropFilter: "blur(10px)",
+                    }}
+                  >
+                    {prompt}
+                  </button>
+                ))
+              : chips.map((c) => (
+                  <button
+                    key={c.slug}
+                    type="button"
+                    onClick={() => handleChipTap(c)}
+                    className="rounded-full px-4 py-2 text-sm font-medium transition-all hover:-translate-y-0.5"
+                    style={{
+                      background: "rgba(255,255,255,0.1)",
+                      color: "rgba(247,245,239,0.92)",
+                      border: "1px solid rgba(255,255,255,0.14)",
+                      backdropFilter: "blur(10px)",
+                      WebkitBackdropFilter: "blur(10px)",
+                    }}
+                  >
+                    {c.chipLabel}
+                  </button>
+                ))}
           </div>
 
           <p

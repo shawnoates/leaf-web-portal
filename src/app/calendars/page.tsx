@@ -168,6 +168,7 @@ function PromptBar({ initial = "" }: { initial?: string }) {
     fallback: true,
     lat: null,
     lng: null,
+    promptChips: [],
   });
   useEffect(() => {
     setCity(detectCity());
@@ -239,6 +240,7 @@ function GallerySurface() {
     fallback: true,
     lat: null,
     lng: null,
+    promptChips: [],
   });
   useEffect(() => {
     setCity(detectCity());
@@ -385,6 +387,7 @@ function GenerationSurface({ prompt }: { prompt: string }) {
     fallback: true,
     lat: null,
     lng: null,
+    promptChips: [],
   });
   useEffect(() => {
     setCity(detectCity());

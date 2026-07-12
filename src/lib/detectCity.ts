@@ -27,6 +27,11 @@ export interface DetectedCity {
    *  Google Places grounding on the server. Null when fallback=true. */
   lat: number | null;
   lng: number | null;
+  /** Ready-to-tap prompt suggestions surfaced as chips on /personal.
+   *  Each chip fires the generator via /calendars?q=<chip>, which
+   *  regionalizes the resulting calendar to this city via the server
+   *  originCity pass-through. Empty when fallback=true. */
+  promptChips: string[];
 }
 
 const NYC: DetectedCity = {
@@ -35,6 +40,12 @@ const NYC: DetectedCity = {
   fallback: false,
   lat: 40.7128,
   lng: -74.006,
+  promptChips: [
+    "Date night in Fort Greene",
+    "Thursday happy hours in Park Slope",
+    "Williamsburg brunch spots",
+    "Family fun in Brooklyn",
+  ],
 };
 
 // Coords are downtown-ish centroids used as the biasing origin for
@@ -50,6 +61,12 @@ const CITY_BY_TIMEZONE: Record<string, DetectedCity> = {
     fallback: false,
     lat: 42.3314,
     lng: -83.0458,
+    promptChips: [
+      "Date night in Corktown",
+      "Weekend brunch in Midtown",
+      "Eastern Market Saturday",
+      "Family fun in Detroit",
+    ],
   },
   "America/Chicago": {
     city: "Chicago",
@@ -57,6 +74,12 @@ const CITY_BY_TIMEZONE: Record<string, DetectedCity> = {
     fallback: false,
     lat: 41.8781,
     lng: -87.6298,
+    promptChips: [
+      "Date night in Wicker Park",
+      "Logan Square happy hours",
+      "West Loop brunch spots",
+      "Family fun in Lincoln Park",
+    ],
   },
   "America/Denver": {
     city: "Denver",
@@ -64,6 +87,12 @@ const CITY_BY_TIMEZONE: Record<string, DetectedCity> = {
     fallback: false,
     lat: 39.7392,
     lng: -104.9903,
+    promptChips: [
+      "Date night in RiNo",
+      "Highlands happy hours",
+      "Baker brunch spots",
+      "Family fun in Denver",
+    ],
   },
   "America/Phoenix": {
     city: "Phoenix",
@@ -71,6 +100,12 @@ const CITY_BY_TIMEZONE: Record<string, DetectedCity> = {
     fallback: false,
     lat: 33.4484,
     lng: -112.074,
+    promptChips: [
+      "Date night on Roosevelt Row",
+      "Arcadia brunch spots",
+      "Melrose happy hours",
+      "Family fun in Phoenix",
+    ],
   },
   "America/Los_Angeles": {
     city: "LA",
@@ -78,6 +113,12 @@ const CITY_BY_TIMEZONE: Record<string, DetectedCity> = {
     fallback: false,
     lat: 34.0522,
     lng: -118.2437,
+    promptChips: [
+      "Date night in Silver Lake",
+      "Echo Park happy hours",
+      "Venice brunch spots",
+      "Family fun in Highland Park",
+    ],
   },
   "America/Anchorage": {
     city: "Anchorage",
@@ -85,6 +126,12 @@ const CITY_BY_TIMEZONE: Record<string, DetectedCity> = {
     fallback: false,
     lat: 61.2181,
     lng: -149.9003,
+    promptChips: [
+      "Date night downtown",
+      "Spenard happy hours",
+      "Midtown brunch spots",
+      "Family fun in Anchorage",
+    ],
   },
   "Pacific/Honolulu": {
     city: "Honolulu",
@@ -92,6 +139,12 @@ const CITY_BY_TIMEZONE: Record<string, DetectedCity> = {
     fallback: false,
     lat: 21.3069,
     lng: -157.8583,
+    promptChips: [
+      "Date night in Kaka'ako",
+      "Kailua brunch spots",
+      "Chinatown happy hours",
+      "Family fun in Honolulu",
+    ],
   },
   // Canada
   "America/Toronto": {
@@ -100,6 +153,12 @@ const CITY_BY_TIMEZONE: Record<string, DetectedCity> = {
     fallback: false,
     lat: 43.6532,
     lng: -79.3832,
+    promptChips: [
+      "Date night on Ossington",
+      "Kensington Market Saturday",
+      "Leslieville brunch spots",
+      "Family fun in Toronto",
+    ],
   },
   "America/Vancouver": {
     city: "Vancouver",
@@ -107,6 +166,12 @@ const CITY_BY_TIMEZONE: Record<string, DetectedCity> = {
     fallback: false,
     lat: 49.2827,
     lng: -123.1207,
+    promptChips: [
+      "Date night in Mount Pleasant",
+      "Gastown happy hours",
+      "Commercial Drive brunch spots",
+      "Family fun in Vancouver",
+    ],
   },
   // UK / EU seeds — if these ever ship, we've got the shapes ready.
   "Europe/London": {
@@ -115,6 +180,12 @@ const CITY_BY_TIMEZONE: Record<string, DetectedCity> = {
     fallback: false,
     lat: 51.5074,
     lng: -0.1278,
+    promptChips: [
+      "Date night in Peckham",
+      "Hackney happy hours",
+      "Notting Hill brunch",
+      "Family fun in London",
+    ],
   },
 };
 
@@ -133,6 +204,7 @@ export function detectCity(): DetectedCity {
       fallback: true,
       lat: null,
       lng: null,
+      promptChips: [],
     };
   }
   try {
@@ -149,6 +221,7 @@ export function detectCity(): DetectedCity {
       fallback: true,
       lat: null,
       lng: null,
+      promptChips: [],
     };
   }
 }
