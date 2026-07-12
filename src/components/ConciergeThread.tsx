@@ -66,6 +66,10 @@ export default function ConciergeThread({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Part A: light stagger of the onboarding burst (greeting → menu-ready →
+  // carousel) so it doesn't land as one wall. Only the first small batch.
+  const [revealCount, setRevealCount] = useState(0);
+  const staggerDoneRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -99,10 +103,38 @@ export default function ConciergeThread({
     return () => clearInterval(t);
   }, [load]);
 
+  // Opening the drawer = engagement — suppresses the bounce welcome email.
+  useEffect(() => {
+    Parse.Cloud.run("markConciergeEngaged", { calendarId }).catch(() => {});
+  }, [calendarId]);
+
+  // Reveal the initial burst with a light 1.2s beat (first small batch only);
+  // afterwards everything shows immediately.
+  useEffect(() => {
+    if (staggerDoneRef.current) {
+      setRevealCount(messages.length);
+      return;
+    }
+    if (messages.length === 0) return;
+    staggerDoneRef.current = true;
+    if (messages.length > 4) {
+      setRevealCount(messages.length);
+      return;
+    }
+    let i = 1;
+    setRevealCount(1);
+    const t = setInterval(() => {
+      i += 1;
+      setRevealCount(i);
+      if (i >= messages.length) clearInterval(t);
+    }, 1200);
+    return () => clearInterval(t);
+  }, [messages]);
+
   // Keep pinned to the newest message / the menu when it appears.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages, menu]);
+  }, [messages, menu, revealCount]);
 
   const send = async () => {
     const body = draft.trim();
@@ -241,7 +273,7 @@ export default function ConciergeThread({
             No messages yet. Say hi to {persona.name} — ideas, questions, dates to plan around.
           </div>
         ) : (
-          messages.map((m) => {
+          messages.slice(0, revealCount).map((m) => {
             const mine = m.senderRole === "owner";
             const avatarUrl = mine ? myAvatar : persona.avatarUrl;
             return (
@@ -282,7 +314,7 @@ export default function ConciergeThread({
 
         {/* Pending menu — inline carousel the owner picks from, styled as a
             rich concierge-side message. */}
-        {menu && menu.options.length > 0 && (
+        {menu && menu.options.length > 0 && revealCount >= messages.length && (
           <div className="flex items-start gap-2">
             <div className="w-8 shrink-0">
               {persona.avatarUrl ? (
