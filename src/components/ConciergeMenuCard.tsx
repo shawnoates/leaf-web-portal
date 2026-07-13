@@ -18,6 +18,8 @@ export interface ConciergeMenuOption {
   ownerPrice: number | null;
   residentCost?: string | null;
   location?: string | null;
+  leadDays?: number;
+  timelyOccasion?: string | null;
 }
 
 export interface ConciergeMenu {

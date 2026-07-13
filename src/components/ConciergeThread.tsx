@@ -170,7 +170,13 @@ export default function ConciergeThread({
   // defer to the concierge to pick the best day within 90 days.
   const postPlan = async () => {
     if (!menu || !timeFor || selectingId) return;
-    if (scheduleMode === "pick" && !pickDate) return;
+    if (scheduleMode === "pick") {
+      if (!pickDate) return;
+      if (pickDate < dateBounds.min || pickDate > dateBounds.max) {
+        setMenuError(`Pick a date between ${dateBounds.min} and ${dateBounds.max}.`);
+        return;
+      }
+    }
     setSelectingId(timeFor.objectId);
     setMenuError(null);
     try {
@@ -233,6 +239,19 @@ export default function ConciergeThread({
       setAddingPackageId(null);
     }
   };
+
+  // Allowed scheduling window for step 2 — no sooner than the event's execution
+  // lead time (2d on-premise / 7d off-site), no further than 30 days out.
+  const dateBounds = (() => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const toStr = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const lead = timeFor?.leadDays ?? 2;
+    const min = new Date();
+    min.setDate(min.getDate() + lead);
+    const max = new Date();
+    max.setDate(max.getDate() + 30);
+    return { min: toStr(min), max: toStr(max) };
+  })();
 
   const monthLabel = menu?.month
     ? new Date(`${menu.month}-01T12:00:00Z`).toLocaleDateString(undefined, {
@@ -386,6 +405,8 @@ export default function ConciergeThread({
                           <input
                             type="date"
                             value={pickDate}
+                            min={dateBounds.min}
+                            max={dateBounds.max}
                             onChange={(e) => setPickDate(e.target.value)}
                             className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"
                           />
@@ -508,6 +529,11 @@ export default function ConciergeThread({
                             </div>
                           )}
                           <div className="flex flex-1 flex-col p-3">
+                            {opt.timelyOccasion && (
+                              <span className="self-start mb-1 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+                                🔥 {opt.timelyOccasion}
+                              </span>
+                            )}
                             <h5 className="text-sm font-medium text-zinc-900 truncate mb-1">{opt.title}</h5>
                             <p className="text-xs text-zinc-500 leading-snug line-clamp-2 flex-1">
                               {opt.whatItIs || opt.description}
