@@ -8,6 +8,7 @@ export interface ConciergeMenuOption {
   objectId: string;
   title: string;
   description: string;
+  whatItIs?: string | null;
   suggestedDate: string | null;
   suggestedTime: string | null;
   expectedTurnout: number | null;

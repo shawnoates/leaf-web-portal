@@ -24,6 +24,7 @@ interface LibraryItem {
   packageId: string;
   title: string;
   description: string;
+  whatItIs?: string | null;
   image: string | null;
   category: string | null;
   residentCost: string | null;
@@ -464,7 +465,7 @@ export default function ConciergeThread({
                             )}
                             <div className="min-w-0 flex-1">
                               <h5 className="text-sm font-medium text-zinc-900 truncate">{item.title}</h5>
-                              <p className="text-xs text-zinc-500 leading-snug line-clamp-2">{item.description}</p>
+                              <p className="text-xs text-zinc-500 leading-snug line-clamp-2">{item.whatItIs || item.description}</p>
                               {addingPackageId === item.packageId && (
                                 <span className="text-[11px] text-zinc-400 flex items-center gap-1 mt-1">
                                   <Loader2 className="w-3 h-3 animate-spin" /> Adding…
@@ -505,7 +506,7 @@ export default function ConciergeThread({
                           <div className="flex flex-1 flex-col p-3">
                             <h5 className="text-sm font-medium text-zinc-900 truncate mb-1">{opt.title}</h5>
                             <p className="text-xs text-zinc-500 leading-snug line-clamp-2 flex-1">
-                              {opt.description}
+                              {opt.whatItIs || opt.description}
                             </p>
                             <div className="mt-2 space-y-0.5">
                               <p className="flex items-center gap-1 text-[11px] text-zinc-500">
