@@ -2772,12 +2772,14 @@ export default function OrgCalendarPage() {
             <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
               <div className="space-y-2">
                 <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
-                  Get Involved
+                  {org.isOwner || org.isHost ? "Add to Your Calendar" : "Get Involved"}
                 </p>
                 <h2 className="text-4xl font-light tracking-tight italic">
-                  {org.aiSourceEvents && org.aiSourceEvents.length > 0
-                    ? "Have one we missed? Pitch it."
-                    : "Host Something for the Community"}
+                  {org.isOwner || org.isHost
+                    ? "Have one in mind? Add it."
+                    : org.aiSourceEvents && org.aiSourceEvents.length > 0
+                      ? "Have one we missed? Pitch it."
+                      : "Host Something for the Community"}
                 </h2>
               </div>
               {org.planIdeas.length > 0 && !org.hidePlanIdeas && (
@@ -2834,23 +2836,27 @@ export default function OrgCalendarPage() {
                       </div>
                       <div className="space-y-2">
                         <p className="text-xs tracking-wider uppercase font-bold text-emerald-700">
-                          Your Idea
+                          {org.isOwner || org.isHost ? "New Plan" : "Your Idea"}
                         </p>
                         <h4 className="text-lg font-medium tracking-tight text-zinc-900">
-                          Suggest a Plan
+                          {org.isOwner || org.isHost ? "Add a Plan" : "Suggest a Plan"}
                         </h4>
                         <p className="text-xs text-zinc-500 leading-relaxed font-light">
-                          Have something in mind? Share your idea and we&apos;ll review it.
+                          {org.isOwner || org.isHost
+                            ? "Pick a date, venue, and details — publishes straight to your calendar."
+                            : "Have something in mind? Share your idea and we’ll review it."}
                         </p>
                       </div>
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <h4 className="text-base font-medium tracking-tight group-hover:italic">
-                      Custom Plan
+                      {org.isOwner || org.isHost ? "Add a plan" : "Custom Plan"}
                     </h4>
                     <p className="text-sm text-zinc-500 font-light line-clamp-2 leading-relaxed">
-                      Pitch a date, venue, and details — pending organizer approval.
+                      {org.isOwner || org.isHost
+                        ? "Pick a date, venue, and details — goes live on your calendar."
+                        : "Pitch a date, venue, and details — pending organizer approval."}
                     </p>
                   </div>
                 </div>
