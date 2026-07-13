@@ -421,9 +421,9 @@ export default function ConciergeThread({
                         className="ml-auto inline-flex items-center gap-1.5 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-60"
                       >
                         {selectingId ? (
-                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Posting…</>
+                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending…</>
                         ) : (
-                          <><Check className="w-3.5 h-3.5" /> {scheduleMode === "auto" ? "Hand it to us" : "Post plan"}</>
+                          <><Check className="w-3.5 h-3.5" /> {scheduleMode === "auto" ? "Hand it to us" : "Send it over"}</>
                         )}
                       </button>
                     </div>

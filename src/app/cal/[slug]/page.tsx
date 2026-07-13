@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { findSeed, type SeedCalendar } from "@/lib/aiCalendarSeed";
 import SignInModal from "@/components/SignInModal";
+import SubscriptionModal from "@/components/SubscriptionModal";
 
 // Public calendar detail view + owner editing surface.
 //
@@ -152,6 +153,13 @@ export default function PublicCalendarPage() {
   // owned copy (adopt flow pushes ?welcome=1). Shows once, then the
   // param is stripped so a refresh doesn't re-open it.
   const [showWelcome, setShowWelcome] = useState(false);
+  // Starter-tier upgrade paywall. Opens in-place when adoptCalendar
+  // returned `subCalSkipReason=calendar_limit_reached` so the visitor can
+  // pay for Pro without leaving the calendar they just made. Carries the
+  // parentOrgId because the Stripe Checkout is scoped to the org (owner's
+  // primary Groups row), not the AICalendar row on this page.
+  const [paywall, setPaywall] = useState<{ parentOrgId: string } | null>(null);
+  const [upgrading, setUpgrading] = useState(false);
 
   const loadCalendar = useCallback(async () => {
     // Seed first — fast, always available.
@@ -196,10 +204,44 @@ export default function PublicCalendarPage() {
     if (loadState !== "ready" || !cal) return;
     if (searchParams.get("adopt") !== "1") return;
     if (cal.viewerIsOwner) return; // already owned; nothing to adopt
+    // Skip the vanilla single-shot when we're returning from Stripe —
+    // the upgrade-return effect below owns the retry loop and would
+    // race with a bare handleAdopt() here.
+    if (searchParams.get("upgraded") === "1") return;
     handleAdopt();
     const url = new URL(window.location.href);
     url.searchParams.delete("adopt");
     window.history.replaceState(null, "", url.toString());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadState, cal]);
+
+  // Stripe returned with ?upgraded=1&session_id=... — the webhook that
+  // flips orgSubscriptionTier=pro usually lands within a second, but the
+  // Checkout redirect can beat it. Retry adopt a few times with a small
+  // spacing so the Groups row lands as soon as the tier is through.
+  // On persistent failure the paywall reopens (adoptCalendar still
+  // reports calendar_limit_reached), and the visitor can retry manually.
+  useEffect(() => {
+    if (loadState !== "ready" || !cal) return;
+    if (searchParams.get("upgraded") !== "1") return;
+    if (cal.viewerIsOwner) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("upgraded");
+    url.searchParams.delete("session_id");
+    url.searchParams.delete("adopt");
+    window.history.replaceState(null, "", url.toString());
+    let cancelled = false;
+    (async () => {
+      for (let i = 0; i < 4; i++) {
+        if (cancelled) return;
+        const ok = await runAdopt();
+        if (ok || cancelled) return;
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadState, cal]);
 
@@ -236,8 +278,12 @@ export default function PublicCalendarPage() {
     await runAdopt();
   }
 
-  async function runAdopt() {
-    if (!cal) return;
+  // Returns true when the adopt fully completed (or is about to route
+  // away). Returns false when it landed on a recoverable state (paywall
+  // opened, retry needed after Stripe webhook), so the Stripe-return
+  // effect can decide whether to keep retrying.
+  async function runAdopt(): Promise<boolean> {
+    if (!cal) return false;
     setAdopting(true);
     setAdoptError(null);
     try {
@@ -264,22 +310,20 @@ export default function PublicCalendarPage() {
       // popup keyed to that public surface.
       if (result.shareId) {
         router.push(`/org/${result.shareId}?welcome=1`);
-        return;
+        return true;
       }
-      // Recovery paths. Previously we dropped the manager on
-      // /cal/<owned-slug>?welcome=1, which flashed an "It's yours"
-      // popup over an intermediate URL that wasn't the public
-      // calendar they expected. Route to their dashboard with an
-      // explicit toast instead so they know WHY it didn't land.
+      // Starter-tier hit their calendar limit. Show the upgrade paywall
+      // in-place instead of bouncing to the dashboard with a toast —
+      // keeps the visitor on the calendar they just made, and the Stripe
+      // return trip re-runs adopt so the Groups row lands automatically.
       if (result.subCalSkipReason === "calendar_limit_reached" && result.parentOrgId) {
-        router.push(
-          `/dashboard/${result.parentOrgId}?tab=calendars&adoptSkip=limit`,
-        );
-        return;
+        setPaywall({ parentOrgId: result.parentOrgId });
+        setAdopting(false);
+        return false;
       }
       if (result.subCalSkipReason === "no_primary_org") {
         router.push(`/dashboard?adoptSkip=needs_org`);
-        return;
+        return true;
       }
       // Belt-and-suspenders: any other reason (older server without
       // the skip-reason flag, or a truly unexpected null-shareId) —
@@ -287,12 +331,48 @@ export default function PublicCalendarPage() {
       // welcome=1 so they at least see the owned calendar without the
       // misleading "It's yours" modal on an intermediary URL.
       router.push(`/cal/${result.ownedSlug}`);
+      return true;
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Something went wrong. Try again.";
       trackCalendarEvent("adopt_failed", { slug: cal.slug, message: msg });
       setAdoptError(msg);
       setAdopting(false);
+      return false;
+    }
+  }
+
+  // Kick off Stripe Checkout for the selected paid tier. Success URL
+  // returns to /cal/<slug>?adopt=1 so the adopt effect re-fires and the
+  // Groups row lands after the webhook has flipped the tier. If the tier
+  // is starter/free (or the paywall got dismissed without a real choice),
+  // just close — no cloud call needed.
+  async function handleUpgrade(
+    tier: string,
+    billingPeriod: "monthly" | "yearly",
+  ) {
+    if (!paywall || tier === "starter") {
+      setPaywall(null);
+      return;
+    }
+    setUpgrading(true);
+    setAdoptError(null);
+    try {
+      const result = (await Parse.Cloud.run("createOrgSubscriptionCheckout", {
+        calendarId: paywall.parentOrgId,
+        tier,
+        billingPeriod,
+        returnUrl: `${window.location.origin}/cal/${slug}?adopt=1`,
+      })) as { url?: string };
+      if (result?.url) {
+        window.location.href = result.url;
+      } else {
+        throw new Error("Checkout could not be created.");
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upgrade failed.";
+      setAdoptError(msg);
+      setUpgrading(false);
     }
   }
 
@@ -429,6 +509,17 @@ export default function PublicCalendarPage() {
 
       {showWelcome && cal && (
         <WelcomePopup cal={cal} onClose={() => setShowWelcome(false)} />
+      )}
+
+      {paywall && (
+        <SubscriptionModal
+          currentTier="starter"
+          onSelect={handleUpgrade}
+          onClose={() => {
+            if (!upgrading) setPaywall(null);
+          }}
+          loading={upgrading}
+        />
       )}
     </Shell>
   );
