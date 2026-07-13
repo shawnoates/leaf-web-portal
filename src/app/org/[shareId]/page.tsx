@@ -1680,7 +1680,14 @@ export default function OrgCalendarPage() {
         isHost: result.isHost || false,
         plans,
         planIdeas,
-        hidePlanIdeas: result.hidePlanIdeas || false,
+        // AI-adopted calendars already surface starter events as "Suggested"
+        // cards up top — the AI plan-idea carousel below reads as a second
+        // "here are some ideas" section and collides with them. Force the
+        // carousel off in that case regardless of the org's stored flag.
+        hidePlanIdeas:
+          (Array.isArray(result.aiSourceEvents) && result.aiSourceEvents.length > 0)
+            ? true
+            : (result.hidePlanIdeas || false),
         hideCustomPlans: result.hideCustomPlans || false,
         hideDeals: result.hideDeals || false,
         blacklistCategories: result.orgBlacklistCategories || [],
@@ -2768,7 +2775,9 @@ export default function OrgCalendarPage() {
                   Get Involved
                 </p>
                 <h2 className="text-4xl font-light tracking-tight italic">
-                  Host Something for the Community
+                  {org.aiSourceEvents && org.aiSourceEvents.length > 0
+                    ? "Have one we missed? Pitch it."
+                    : "Host Something for the Community"}
                 </h2>
               </div>
               {org.planIdeas.length > 0 && !org.hidePlanIdeas && (
