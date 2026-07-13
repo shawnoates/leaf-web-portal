@@ -530,8 +530,9 @@ export default function ConciergeThread({
                           )}
                           <div className="flex flex-1 flex-col p-3">
                             {opt.timelyOccasion && (
-                              <span className="self-start mb-1 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
-                                🔥 {opt.timelyOccasion}
+                              <span className="self-start max-w-full mb-1 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full whitespace-nowrap overflow-hidden">
+                                <span className="shrink-0">🔥</span>
+                                <span className="truncate">{opt.timelyOccasion}</span>
                               </span>
                             )}
                             <h5 className="text-sm font-medium text-zinc-900 truncate mb-1">{opt.title}</h5>
