@@ -456,6 +456,12 @@ export default function OrgDashboardPage() {
   const [newCalHideDeals, setNewCalHideDeals] = useState(false);
   const [newCalLng, setNewCalLng] = useState<number | null>(null);
   const [addingCalendar, setAddingCalendar] = useState(false);
+  // Defaults to ON — pipes the description as a prompt through
+  // generateAICalendar server-side after the Groups row lands, so the
+  // /org page renders "Suggested" starter cards from the first visit.
+  // Owner flips off for calendars that don't map to AI ideation (soccer
+  // team schedule, private book club with a fixed cadence, etc.).
+  const [newCalSuggestStarters, setNewCalSuggestStarters] = useState(true);
 
   // Regenerate (per calendar)
   const [regeneratingCalId, setRegeneratingCalId] = useState<string | null>(null);
@@ -984,6 +990,9 @@ export default function OrgDashboardPage() {
         params.lng = newCalLng;
       }
       if (newCalHideDeals) params.hideDeals = true;
+      // Only send suggestStarters when toggled off — server defaults to
+      // true, so the wire stays minimal on the happy path.
+      if (!newCalSuggestStarters) params.suggestStarters = false;
       await Parse.Cloud.run("createCalendarUnderOrg", params);
       setShowAddCalendar(false);
       setNewCalName("");
@@ -993,6 +1002,7 @@ export default function OrgDashboardPage() {
       setNewCalLat(null);
       setNewCalLng(null);
       setNewCalHideDeals(false);
+      setNewCalSuggestStarters(true);
       fetchDashboard();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to add calendar";
@@ -3458,8 +3468,15 @@ export default function OrgDashboardPage() {
                   onChange={(e) => setNewCalDesc(e.target.value)}
                   rows={2}
                   className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-y"
-                  placeholder="What is this calendar about?"
+                  placeholder={newCalSuggestStarters
+                    ? "Describe the vibe — e.g., date night ideas in Fort Greene"
+                    : "What is this calendar about?"}
                 />
+                {newCalSuggestStarters && (
+                  <p className="text-[11px] text-zinc-400 mt-1">
+                    We&rsquo;ll use this to suggest a few starter plans.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">
@@ -3482,6 +3499,19 @@ export default function OrgDashboardPage() {
                 <p className="text-[11px] text-zinc-400 mt-1">
                   More specific = more accurate nearby-deal matching.
                 </p>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <p className="text-xs font-medium text-zinc-700">Suggest starter plans</p>
+                  <p className="text-xs text-zinc-400">Seed the calendar with a few AI-picked plan ideas</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNewCalSuggestStarters(!newCalSuggestStarters)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${newCalSuggestStarters ? "bg-zinc-900" : "bg-zinc-200"}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${newCalSuggestStarters ? "left-5" : "left-0.5"}`} />
+                </button>
               </div>
               <div className="flex items-center justify-between py-2">
                 <div>
