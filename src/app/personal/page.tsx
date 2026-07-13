@@ -183,12 +183,12 @@ export default function PersonalPage() {
       {/* How It Works */}
       <section id="how-it-works" className="bg-zinc-50 py-32">
         <div className="max-w-6xl mx-auto px-6">
-          <div className="mb-20">
+          <div className="mb-20 text-center md:text-left">
             <p className="text-xs tracking-wider uppercase text-zinc-500 font-semibold mb-3">
               How It Works
             </p>
             <h2 className="text-4xl font-light tracking-tight italic">
-              From a vibe to "see you Saturday"
+              From a vibe to &ldquo;see you Saturday&rdquo;
             </h2>
           </div>
           <div className="grid md:grid-cols-3 gap-16">
