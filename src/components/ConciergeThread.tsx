@@ -466,6 +466,10 @@ export default function ConciergeThread({
                             <div className="min-w-0 flex-1">
                               <h5 className="text-sm font-medium text-zinc-900 truncate">{item.title}</h5>
                               <p className="text-xs text-zinc-500 leading-snug line-clamp-2">{item.whatItIs || item.description}</p>
+                              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-zinc-500">
+                                <span className="flex items-center gap-1"><MapPin className="w-3 h-3 shrink-0 text-zinc-400" /> {item.location || "On-premise"}</span>
+                                {item.residentCost && <span className="flex items-center gap-1"><Wallet className="w-3 h-3 shrink-0 text-zinc-400" /> {item.residentCost}</span>}
+                              </div>
                               {addingPackageId === item.packageId && (
                                 <span className="text-[11px] text-zinc-400 flex items-center gap-1 mt-1">
                                   <Loader2 className="w-3 h-3 animate-spin" /> Adding…
