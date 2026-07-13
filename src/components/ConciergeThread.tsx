@@ -458,7 +458,9 @@ export default function ConciergeThread({
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={item.image} alt={item.title} className="w-14 h-14 rounded-lg object-cover shrink-0" />
                             ) : (
-                              <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-zinc-100 to-zinc-200 shrink-0" />
+                              <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-emerald-50 to-zinc-100 shrink-0 flex items-center justify-center">
+                                <Sparkles className="w-4 h-4 text-emerald-300" />
+                              </div>
                             )}
                             <div className="min-w-0 flex-1">
                               <h5 className="text-sm font-medium text-zinc-900 truncate">{item.title}</h5>
@@ -496,7 +498,9 @@ export default function ConciergeThread({
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={opt.image} alt={opt.title} className="h-24 w-full object-cover" />
                           ) : (
-                            <div className="h-24 w-full bg-gradient-to-br from-zinc-100 to-zinc-200" />
+                            <div className="h-24 w-full bg-gradient-to-br from-emerald-50 to-zinc-100 flex items-center justify-center">
+                              <Sparkles className="w-6 h-6 text-emerald-300" />
+                            </div>
                           )}
                           <div className="flex flex-1 flex-col p-3">
                             <h5 className="text-sm font-medium text-zinc-900 truncate mb-1">{opt.title}</h5>

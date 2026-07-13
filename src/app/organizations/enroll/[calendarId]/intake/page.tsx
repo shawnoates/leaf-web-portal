@@ -59,7 +59,7 @@ export default function ConciergeIntakePage({
     about: {},
     spaces: {},
     vibe: {},
-    members: {},
+    members: { photoConsentDefault: true }, // photography opt-in auto-enabled
     wrap: {},
   });
   // Section completion is tracked server-side (saveConciergeIntakeSection); we
@@ -84,6 +84,11 @@ export default function ConciergeIntakePage({
         SECTIONS.forEach(({ id }) => {
           next[id] = { ...(r?.values?.[id] || {}) };
         });
+        // Photography consent is opt-in by default (auto-enabled) — only off if
+        // the owner explicitly saved it false.
+        if (next.members.photoConsentDefault === undefined) {
+          next.members.photoConsentDefault = true;
+        }
         setValues(next);
         setCompleted(new Set(r?.sectionsCompleted || []));
       })
