@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { ORG_TYPES } from "@/lib/orgTypes";
+import CityAutocomplete from "@/components/CityAutocomplete";
 
 /**
  * Concierge enrollment — Step 2 of 3: intake questions (before payment).
@@ -269,6 +270,27 @@ function SectionFields({ sectionId, values, onChange }: FieldsProps) {
     case "spaces":
       return (
         <div className="space-y-5">
+          <div>
+            <label className="text-sm font-medium text-zinc-900 block mb-1">Community address</label>
+            <p className="text-xs text-zinc-500 mb-2">
+              Where your community is — so we can source vendors and nearby venues. Prefilled from your calendar if we have it.
+            </p>
+            <CityAutocomplete
+              value={(values.eventAddress as string) || ""}
+              onChange={(v) => {
+                onChange("eventAddress", v);
+                onChange("lat", null);
+                onChange("lng", null);
+              }}
+              onSelect={(place) => {
+                onChange("eventAddress", place.description);
+                if (place.lat != null) onChange("lat", place.lat);
+                if (place.lng != null) onChange("lng", place.lng);
+              }}
+              placeholder="Building address, neighborhood, or city"
+              className="w-full border-b border-zinc-300 py-2 text-base focus:outline-none focus:border-zinc-900"
+            />
+          </div>
           <CardSelect
             label="Where should events be hosted?"
             value={values.venueMode as string}
