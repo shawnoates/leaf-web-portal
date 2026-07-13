@@ -4312,7 +4312,7 @@ export default function OrgCalendarPage() {
                     {interestCount > 0
                       ? ` and the ${interestCount} ${interestCount === 1 ? "person" : "people"} interested in this event`
                       : ""}
-                    {" "}will be notified when the plan is created.
+                    {" "}will be notified as soon as you confirm.
                   </>
                 ) : (
                   <>
