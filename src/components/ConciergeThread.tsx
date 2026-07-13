@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Parse from "@/lib/parse-client";
-import { Send, Loader2, Sparkles, Check, MessageCirclePlus, MapPin, Wallet } from "lucide-react";
+import { Send, Loader2, Sparkles, Check, MessageCirclePlus, MapPin, Wallet, Users } from "lucide-react";
 import type { ConciergeMenu } from "./ConciergeMenuCard";
 import ConciergeProposalCard, { type ConciergeProposal } from "./ConciergeProposalCard";
 
@@ -25,6 +25,7 @@ interface LibraryItem {
   title: string;
   description: string;
   whatItIs?: string | null;
+  capacityRange?: string | null;
   image: string | null;
   category: string | null;
   residentCost: string | null;
@@ -490,6 +491,7 @@ export default function ConciergeThread({
                               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-zinc-500">
                                 <span className="flex items-center gap-1"><MapPin className="w-3 h-3 shrink-0 text-zinc-400" /> {item.location || "On-premise"}</span>
                                 {item.residentCost && <span className="flex items-center gap-1"><Wallet className="w-3 h-3 shrink-0 text-zinc-400" /> {item.residentCost}</span>}
+                                {item.capacityRange && <span className="flex items-center gap-1"><Users className="w-3 h-3 shrink-0 text-zinc-400" /> {item.capacityRange} guests</span>}
                               </div>
                               {addingPackageId === item.packageId && (
                                 <span className="text-[11px] text-zinc-400 flex items-center gap-1 mt-1">
@@ -520,14 +522,21 @@ export default function ConciergeThread({
                           key={opt.objectId}
                           className="snap-start shrink-0 w-52 flex flex-col rounded-xl border border-zinc-200 bg-white overflow-hidden"
                         >
-                          {opt.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={opt.image} alt={opt.title} className="h-24 w-full object-cover" />
-                          ) : (
-                            <div className="h-24 w-full bg-gradient-to-br from-emerald-50 to-zinc-100 flex items-center justify-center">
-                              <Sparkles className="w-6 h-6 text-emerald-300" />
-                            </div>
-                          )}
+                          <div className="relative">
+                            {opt.image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={opt.image} alt={opt.title} className="h-24 w-full object-cover" />
+                            ) : (
+                              <div className="h-24 w-full bg-gradient-to-br from-emerald-50 to-zinc-100 flex items-center justify-center">
+                                <Sparkles className="w-6 h-6 text-emerald-300" />
+                              </div>
+                            )}
+                            {opt.costType === "included" && (
+                              <span className="absolute top-1.5 left-1.5 text-[9px] font-bold uppercase tracking-widest bg-emerald-600 text-white px-1.5 py-0.5 rounded-full shadow-sm">
+                                Free for all
+                              </span>
+                            )}
+                          </div>
                           <div className="flex flex-1 flex-col p-3">
                             {opt.timelyOccasion && (
                               <span className="self-start max-w-full mb-1 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full whitespace-nowrap overflow-hidden">
@@ -548,6 +557,12 @@ export default function ConciergeThread({
                                 <p className="flex items-center gap-1 text-[11px] text-zinc-500">
                                   <Wallet className="w-3 h-3 shrink-0 text-zinc-400" />
                                   <span className="truncate">{opt.residentCost}</span>
+                                </p>
+                              )}
+                              {opt.capacityRange && (
+                                <p className="flex items-center gap-1 text-[11px] text-zinc-500">
+                                  <Users className="w-3 h-3 shrink-0 text-zinc-400" />
+                                  <span className="truncate">{opt.capacityRange} guests</span>
                                 </p>
                               )}
                             </div>

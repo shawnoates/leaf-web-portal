@@ -20,6 +20,7 @@ export interface ConciergeMenuOption {
   location?: string | null;
   leadDays?: number;
   timelyOccasion?: string | null;
+  capacityRange?: string | null;
 }
 
 export interface ConciergeMenu {
