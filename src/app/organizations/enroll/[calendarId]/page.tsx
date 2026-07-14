@@ -99,7 +99,9 @@ export default function ConciergeEnrollPage({
             })),
           ];
           setServicedOptions(opts);
-          setServicedId(cal.id);
+          // Only preselect when there's a single calendar (nothing to choose).
+          // With multiple, the owner must actively pick one.
+          setServicedId(opts.length === 1 ? cal.id : "");
         }
         setLoading(false);
       } catch (err) {
@@ -115,6 +117,11 @@ export default function ConciergeEnrollPage({
   }, [calendarId, router]);
 
   const handleContinue = () => {
+    // Require an explicit pick when the owner has more than one calendar.
+    if (servicedOptions.length > 1 && !servicedId) {
+      setError("Pick which calendar Concierge should run.");
+      return;
+    }
     // Questions come before payment — go to intake; checkout happens at the end.
     // Carry the chosen serviced calendar through to the checkout call.
     setSubmitting(true);
@@ -275,8 +282,8 @@ export default function ConciergeEnrollPage({
 
         <button
           onClick={handleContinue}
-          disabled={submitting}
-          className="w-full bg-zinc-900 text-white font-semibold py-4 rounded-full hover:bg-zinc-800 transition-colors disabled:opacity-60 disabled:cursor-wait"
+          disabled={submitting || (servicedOptions.length > 1 && !servicedId)}
+          className="w-full bg-zinc-900 text-white font-semibold py-4 rounded-full hover:bg-zinc-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {submitting ? "Loading…" : "Continue →"}
         </button>
