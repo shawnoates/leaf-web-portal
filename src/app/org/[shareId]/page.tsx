@@ -484,6 +484,16 @@ function RsvpModal({
     isFollowingCalendar ? "done" : followRequestPendingProp ? "pending" : "idle"
   );
   const [followError, setFollowError] = useState("");
+  // Inline follow-on-RSVP toggle — only meaningful when the calendar
+  // isn't already followed and there's no pending request. Default true
+  // so a non-follower attendee joins the calendar in the same click,
+  // instead of having to spot the post-success upsell button below.
+  const canOfferInlineFollow =
+    Boolean(calendarId) &&
+    Boolean(calendarName) &&
+    !isFollowingCalendar &&
+    !followRequestPendingProp;
+  const [alsoFollow, setAlsoFollow] = useState(true);
 
   const handleFollowCalendar = async () => {
     if (!calendarId || !verify.isVerified) return;
@@ -542,6 +552,16 @@ function RsvpModal({
       }
       onRsvpSuccess?.(plan.id, result?.alreadyRsvpd === true, result?.pendingApproval);
       setFormStep("success");
+      // Fire the follow-along after the success state transitions so the
+      // inline followState UI ("Following…" → "Following {name}") reads
+      // naturally on the success screen. Only fires when the checkbox
+      // was left on AND we still qualify (canOfferInlineFollow guards
+      // against calling for an already-followed calendar). Fully
+      // fire-and-forget — handleFollowCalendar has its own error state
+      // and never throws.
+      if (alsoFollow && canOfferInlineFollow) {
+        void handleFollowCalendar();
+      }
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to RSVP. Please try again.");
       setFormStep("error");
@@ -587,6 +607,21 @@ function RsvpModal({
                     className="w-4 h-4 accent-zinc-900 rounded"
                   />
                   <span className="text-xs text-zinc-600">Share phone number with host</span>
+                </label>
+              )}
+              {verify.isVerified && canOfferInlineFollow && (
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={alsoFollow}
+                    onChange={(e) => setAlsoFollow(e.target.checked)}
+                    className="w-4 h-4 accent-zinc-900 rounded"
+                  />
+                  <span className="text-xs text-zinc-600">
+                    {isPrivateCalendar
+                      ? `Also request to follow ${calendarName || "this calendar"}`
+                      : `Also follow ${calendarName || "this calendar"} for new plans`}
+                  </span>
                 </label>
               )}
               {plan.requireApproval && (
