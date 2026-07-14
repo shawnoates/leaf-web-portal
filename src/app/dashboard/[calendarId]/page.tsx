@@ -688,6 +688,19 @@ export default function OrgDashboardPage() {
     router.replace(`/dashboard/${calendarId}?tab=calendars`);
   }, [dashboard, searchParams, router, calendarId]);
 
+  // Concierge emails (proposal ready / updated) deep-link with ?concierge=1 —
+  // land on the Calendars tab and pop the concierge chat drawer, then strip the
+  // param so a refresh doesn't re-open it.
+  const conciergeParamRef = useRef(false);
+  useEffect(() => {
+    if (!dashboard || conciergeParamRef.current) return;
+    if (searchParams.get("concierge") !== "1") return;
+    conciergeParamRef.current = true;
+    setActiveTab("calendars");
+    setShowConciergeChat(true);
+    router.replace(`/dashboard/${calendarId}?tab=calendars`);
+  }, [dashboard, searchParams, router, calendarId]);
+
   // After the Google Calendar web OAuth flow, the server bounces back
   // here with ?google_calendar=<connected|denied|...>. Show a toast, then
   // strip the param so a refresh doesn't re-fire it.
