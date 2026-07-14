@@ -305,6 +305,17 @@ export default function ConciergeThread({
           </div>
         ) : (
           messages.slice(0, revealCount).map((m) => {
+            // System divider — e.g. "Now running events for {calendar}" when the
+            // owner switches which calendar the concierge runs. Centered, no bubble.
+            if (m.kind === "calendar_switch") {
+              return (
+                <div key={m.objectId} className="flex items-center gap-3 py-1">
+                  <div className="flex-1 h-px bg-zinc-200" />
+                  <span className="text-[11px] text-zinc-400 text-center shrink-0">{m.body}</span>
+                  <div className="flex-1 h-px bg-zinc-200" />
+                </div>
+              );
+            }
             const mine = m.senderRole === "owner";
             const avatarUrl = mine ? myAvatar : persona.avatarUrl;
             return (
