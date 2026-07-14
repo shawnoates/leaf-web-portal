@@ -8,6 +8,7 @@ export interface ConciergeProposal {
   objectId: string;
   status: string;
   eventType: string | null;
+  venueMode: string | null;
   title: string | null;
   description: string | null;
   image: string | null;
@@ -84,11 +85,33 @@ export default function ConciergeProposalCard({
 
   const extend = () => run("extend", () => Parse.Cloud.run("ownerExtendReview", { proposalId: proposal.objectId, days: 2 }));
 
+  // Dates are stored at UTC midnight — format in UTC so the day never shifts.
   const fmtDate = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : null;
+    iso ? new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }) : null;
+  const fmtTime = (t: string | null) => {
+    if (!t) return null;
+    const m = /^(\d{1,2}):(\d{2})/.exec(t);
+    if (!m) return t;
+    let h = parseInt(m[1], 10);
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    return `${h}:${m[2]} ${ampm}`;
+  };
   const deadline = proposal.ownerReviewDeadline
-    ? new Date(proposal.ownerReviewDeadline).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+    ? new Date(proposal.ownerReviewDeadline).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })
     : null;
+
+  // Only assert a premise we can back up. Until a venue is confirmed, an
+  // off-site or unknown-mode event shows an honest TBD instead of "On-premise".
+  const locationLabel = proposal.venueName
+    ? proposal.venueName
+    : proposal.eventType === "off_premise" || proposal.eventType === "marketplace"
+      ? "Off-site — we'll confirm the venue"
+      : proposal.venueMode === "on_premise"
+        ? "On-premise"
+        : proposal.venueMode === "mixed"
+          ? "On-premise or nearby"
+          : "Venue TBD";
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden">
@@ -121,9 +144,9 @@ export default function ConciergeProposalCard({
             {proposal.description && <p className="text-xs text-zinc-500 leading-snug mt-0.5 line-clamp-2">{proposal.description}</p>}
             <div className="mt-2 space-y-0.5 text-[11px] text-zinc-500">
               {(fmtDate(proposal.date) || proposal.time) && (
-                <p className="flex items-center gap-1"><Calendar className="w-3 h-3 shrink-0 text-zinc-400" /> {[fmtDate(proposal.date), proposal.time].filter(Boolean).join(" · ")}</p>
+                <p className="flex items-center gap-1"><Calendar className="w-3 h-3 shrink-0 text-zinc-400" /> {[fmtDate(proposal.date), fmtTime(proposal.time)].filter(Boolean).join(" · ")}</p>
               )}
-              <p className="flex items-center gap-1"><MapPin className="w-3 h-3 shrink-0 text-zinc-400" /> {proposal.venueName || "On-premise"}</p>
+              <p className="flex items-center gap-1"><MapPin className="w-3 h-3 shrink-0 text-zinc-400" /> {locationLabel}</p>
               {proposal.residentCost && <p className="flex items-center gap-1"><Wallet className="w-3 h-3 shrink-0 text-zinc-400" /> {proposal.residentCost}</p>}
               {typeof proposal.capacity === "number" && <p className="flex items-center gap-1"><Users className="w-3 h-3 shrink-0 text-zinc-400" /> Up to {proposal.capacity}</p>}
             </div>
