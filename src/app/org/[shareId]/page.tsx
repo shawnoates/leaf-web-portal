@@ -1924,6 +1924,29 @@ export default function OrgCalendarPage() {
     // to wherever they came from (e.g. /m/{notificationId}).
     const rt = search.get("returnTo");
     if (rt && rt.startsWith("/")) setReturnTo(rt);
+
+    // Stripe redirected back from a "Let Leaf host it" checkout.
+    // ?leafHostAuthorized=1 → success toast. ?leafHostCancelled=1 →
+    // silent redirect back (no toast — the owner chose to abandon).
+    // Params are stripped after firing so a refresh doesn't re-trigger.
+    if (search.get("leafHostAuthorized") === "1") {
+      setToast(
+        "Card authorized. Your validated plans will be ready to review within 24 hours.",
+      );
+      setTimeout(() => setToast(null), 6000);
+    }
+    if (
+      search.get("leafHostAuthorized") === "1" ||
+      search.get("leafHostCancelled") === "1"
+    ) {
+      const clean = new URLSearchParams(window.location.search);
+      clean.delete("leafHostAuthorized");
+      clean.delete("leafHostCancelled");
+      clean.delete("session_id");
+      const qs = clean.toString();
+      const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+      window.history.replaceState(null, "", nextUrl);
+    }
   }, []);
   const [returnTo, setReturnTo] = useState<string | null>(null);
   const autoOpenedPlanRef = useRef<string | null>(null);

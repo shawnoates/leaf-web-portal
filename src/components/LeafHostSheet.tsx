@@ -22,7 +22,16 @@ interface Quote {
   maxGroupSize: number;
   turnaroundHours: number;
   hostablePlans: HostablePlan[];
-  inFlight: null;
+  // Non-null when a hosting run is already active for this calendar —
+  // Phase 3 uses this to render an "arranging" state instead of the
+  // fresh-authorization form.
+  inFlight: {
+    hostingId: string;
+    status: string;
+    paymentStatus: string;
+    planCount: number;
+    quotedTotal: number;
+  } | null;
 }
 
 interface Props {
@@ -128,16 +137,48 @@ export default function LeafHostSheet({ calendarId, onClose }: Props) {
     return selected.size * quote.perPlanRate;
   }, [quote, selected]);
 
-  const canConfirm = selected.size > 0 && capacity > 0 && loadState === "ready";
+  const [authorizing, setAuthorizing] = useState(false);
+  const [authorizeError, setAuthorizeError] = useState<string | null>(null);
 
-  const handleConfirm = () => {
-    // Phase 3 wires this to authorizeCalendarHosting which mints the
-    // Stripe PaymentIntent and CalendarHosting record. Phase 2 just
-    // confirms the sheet routes end-to-end.
-    console.log("[LeafHostSheet] confirm — selected", Array.from(selected), "capacity", capacity, "total", quoteTotal);
-    alert(
-      `Phase 2 — sheet routed correctly.\n\nSelected: ${selected.size} plan${selected.size === 1 ? "" : "s"}\nDefault capacity: ${capacity}\nTotal to authorize: $${quoteTotal}\n\nStripe authorize + CalendarHosting record land in Phase 3.`,
-    );
+  const canConfirm =
+    selected.size > 0 &&
+    capacity > 0 &&
+    loadState === "ready" &&
+    !authorizing &&
+    !quote?.inFlight;
+
+  // Fires the payment authorization flow. Server creates the Stripe
+  // Checkout Session in manual-capture mode, mints the CalendarHosting
+  // record in `pending` state, and returns the hosted checkout URL.
+  // Browser redirects there; the webhook flips the record to
+  // `arranging` before the user lands back at /org/[shareId].
+  //
+  // Error handling: on any failure the sheet stays open and surfaces
+  // the reason. The CalendarHosting row may already exist server-side
+  // (created before the Checkout Session call throws) but stays in
+  // `pending`; the duplicate-in-flight guard covers this on retry.
+  const handleConfirm = async () => {
+    if (!quote || selected.size === 0) return;
+    setAuthorizing(true);
+    setAuthorizeError(null);
+    try {
+      const result = (await Parse.Cloud.run("authorizeCalendarHosting", {
+        calendarId: quote.calendarId,
+        selectedPlanIds: Array.from(selected),
+        defaultCapacity: capacity,
+        returnUrl:
+          typeof window !== "undefined" ? window.location.href.split("?")[0] : undefined,
+      })) as { checkoutUrl?: string; hostingId?: string };
+      if (result?.checkoutUrl) {
+        window.location.href = result.checkoutUrl;
+        return;
+      }
+      throw new Error("Checkout session could not be created.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Something went wrong.";
+      setAuthorizeError(msg);
+      setAuthorizing(false);
+    }
   };
 
   return (
@@ -382,17 +423,42 @@ export default function LeafHostSheet({ calendarId, onClose }: Props) {
 
             {/* 9. Single confirm — sticky footer so the CTA is visible
                 even when the sheet body is scrolled. */}
-            <div className="border-t border-zinc-100 px-8 md:px-10 py-5 bg-white rounded-b-2xl">
-              <button
-                type="button"
-                onClick={handleConfirm}
-                disabled={!canConfirm}
-                className="w-full bg-zinc-900 text-white py-3.5 text-xs uppercase tracking-widest font-bold rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {selected.size === 0
-                  ? "Select at least one plan"
-                  : `Authorize $${quoteTotal} — Let ${quote.persona.name} host it`}
-              </button>
+            <div className="border-t border-zinc-100 px-8 md:px-10 py-5 bg-white rounded-b-2xl space-y-3">
+              {authorizeError && (
+                <div className="flex items-start gap-2 text-xs text-red-600">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <p>{authorizeError}</p>
+                </div>
+              )}
+              {quote.inFlight ? (
+                <div className="flex items-start gap-3 text-sm text-zinc-700 bg-zinc-50 border border-zinc-200 rounded-lg px-4 py-3">
+                  <Clock className="w-4 h-4 text-zinc-500 flex-shrink-0 mt-0.5" />
+                  <p>
+                    <span className="font-medium">
+                      {quote.persona.name} is already working on this calendar.
+                    </span>{" "}
+                    Once every plan is delivered, you&rsquo;ll be able to add more.
+                  </p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleConfirm}
+                  disabled={!canConfirm}
+                  className="w-full bg-zinc-900 text-white py-3.5 text-xs uppercase tracking-widest font-bold rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                >
+                  {authorizing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Redirecting to Stripe…
+                    </>
+                  ) : selected.size === 0 ? (
+                    "Select at least one plan"
+                  ) : (
+                    `Authorize $${quoteTotal} — Let ${quote.persona.name} host it`
+                  )}
+                </button>
+              )}
             </div>
           </>
         )}
