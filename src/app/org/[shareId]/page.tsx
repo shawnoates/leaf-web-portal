@@ -8,6 +8,7 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
+import LeafHostSheet from "@/components/LeafHostSheet";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import {
@@ -455,12 +456,13 @@ function buildIcsHref(opts: {
 // plan & host it") — the persona's face humanizes the promise but the
 // promise is from the brand, per spec.
 //
-// Phase 1 stub: onClick logs to console. Phase 2 replaces with the
-// pre-pay detail sheet.
+// Phase 2 hookup: onClick opens the pre-pay detail sheet.
 function LeafHostBand({
   persona,
+  onOpenSheet,
 }: {
   persona: { id: string; name: string; avatarUrl: string | null };
+  onOpenSheet: () => void;
 }) {
   const initials = persona.name
     .split(/\s+/)
@@ -472,14 +474,7 @@ function LeafHostBand({
   return (
     <button
       type="button"
-      onClick={() => {
-        // Phase 2 hookup: open the pre-pay sheet. Log for now so testers
-        // can confirm the band routes end-to-end.
-        console.log("[LeafHostBand] tapped — persona", persona.name);
-        alert(
-          "Let Leaf host it — sheet coming next. This confirms the band routes correctly.",
-        );
-      }}
+      onClick={onOpenSheet}
       className="w-full flex items-center gap-4 rounded-xl border border-zinc-200 bg-zinc-50/60 px-5 py-4 text-left hover:bg-zinc-50 transition-colors group"
     >
       {persona.avatarUrl ? (
@@ -1288,6 +1283,12 @@ export default function OrgCalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<Plan | null>(null);
   const [rsvpPlan, setRsvpPlan] = useState<Plan | null>(null);
   const [hostingIdea, setHostingIdea] = useState<PlanIdea | null>(null);
+  // "Let Leaf host it" pre-pay sheet — spec §4. Opens from the
+  // owner-only band; closes on X or backdrop click. Owner-only rendering
+  // enforced by the band itself (band gates on isOwner via the leafHost
+  // payload block), so this state only ever flips true in an authorized
+  // context.
+  const [showLeafHostSheet, setShowLeafHostSheet] = useState(false);
   const [hostSuccess, setHostSuccess] = useState<boolean | "pending">(false);
   const [hostSubmitting, setHostSubmitting] = useState(false);
   const [hostNote, setHostNote] = useState("");
@@ -2460,7 +2461,10 @@ export default function OrgCalendarPage() {
         org.leafHost.persona &&
         org.leafHost.state === "none" && (
           <div className="max-w-6xl mx-auto px-6 pt-6">
-            <LeafHostBand persona={org.leafHost.persona} />
+            <LeafHostBand
+              persona={org.leafHost.persona}
+              onOpenSheet={() => setShowLeafHostSheet(true)}
+            />
           </div>
         )}
 
@@ -4278,6 +4282,19 @@ export default function OrgCalendarPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* "Let Leaf host it" pre-pay detail sheet — spec §4.
+          Owner-gated: only renders when the band exposed the persona,
+          which required server-side isOwner=true on the initial payload.
+          Defense-in-depth: the getCalendarHostingQuote endpoint the
+          sheet fetches also enforces ownership, so an unauthorized
+          state flip still fails at the API layer. */}
+      {showLeafHostSheet && org.isOwner && org.leafHost?.eligible && (
+        <LeafHostSheet
+          calendarId={org.objectId}
+          onClose={() => setShowLeafHostSheet(false)}
+        />
       )}
 
       {/* Welcome / "Make it your own" invite — shown after first calendar creation */}
