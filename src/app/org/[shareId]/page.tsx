@@ -158,6 +158,20 @@ interface OrgData {
   // aggregates from AIEventInterest in getOrgCalendarPage so every
   // starter card can render "N interested" without a per-card query.
   aiSourceEventInterests?: Record<number, number>;
+  // Owner-only payload for the "Let Leaf host it" band (spec §2, §6a).
+  // Only present when the viewer is verified as the calendar owner
+  // server-side — non-owner payloads omit this entirely so the persona
+  // never leaks to a public / logged-out surface. `eligible` reflects
+  // the current Config.leafHostRenderPolicy gate (NYC allowlist by
+  // default, flip to open when fulfillment scales). `persona` may be
+  // null when the active pool was empty at generate time; band hides.
+  // `state` reflects the CalendarHosting lifecycle — Phase 1 always
+  // reports "none"; later phases return "arranging" or "leaf_hosted".
+  leafHost?: {
+    eligible: boolean;
+    persona: { id: string; name: string; avatarUrl: string | null } | null;
+    state: "none" | "arranging" | "leaf_hosted";
+  };
 }
 
 const AI_INTEREST_COOKIE_KEY = "leaf_interest_cookie";
@@ -432,6 +446,68 @@ function buildIcsHref(opts: {
 }
 
 // --- Components ---
+
+// "Let Leaf host it" band — spec §2. Owner-only; renders under the
+// UPCOMING PLANS header when the calendar is eligible and no hosting
+// is in flight yet. Secondary weight — bordered card, muted background,
+// small persona avatar, arrow — so it never out-shouts a follower
+// tapping HOST THIS on a plan card. Copy is Leaf-branded ("Let Leaf
+// plan & host it") — the persona's face humanizes the promise but the
+// promise is from the brand, per spec.
+//
+// Phase 1 stub: onClick logs to console. Phase 2 replaces with the
+// pre-pay detail sheet.
+function LeafHostBand({
+  persona,
+}: {
+  persona: { id: string; name: string; avatarUrl: string | null };
+}) {
+  const initials = persona.name
+    .split(/\s+/)
+    .map((p) => p[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        // Phase 2 hookup: open the pre-pay sheet. Log for now so testers
+        // can confirm the band routes end-to-end.
+        console.log("[LeafHostBand] tapped — persona", persona.name);
+        alert(
+          "Let Leaf host it — sheet coming next. This confirms the band routes correctly.",
+        );
+      }}
+      className="w-full flex items-center gap-4 rounded-xl border border-zinc-200 bg-zinc-50/60 px-5 py-4 text-left hover:bg-zinc-50 transition-colors group"
+    >
+      {persona.avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={persona.avatarUrl}
+          alt=""
+          aria-hidden="true"
+          className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-1 ring-zinc-200"
+        />
+      ) : (
+        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-zinc-200 text-zinc-600 text-xs font-semibold flex-shrink-0">
+          {initials}
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-zinc-900">
+          Need a host? Let Leaf plan &amp; host it for you.
+        </p>
+        <p className="text-xs text-zinc-500 mt-0.5">
+          We&rsquo;ll validate venues, secure the reservations, and run the
+          season on your behalf.
+        </p>
+      </div>
+      <ArrowRight className="w-4 h-4 text-zinc-400 group-hover:text-zinc-700 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+    </button>
+  );
+}
 
 function AvatarStack({ count }: { count: number }) {
   return (
@@ -1740,6 +1816,17 @@ export default function OrgCalendarPage() {
           typeof result.aiSourceEventInterests === "object"
             ? result.aiSourceEventInterests
             : {},
+        // Pass through the owner-only leafHost block if the server
+        // included it. Server strips this on non-owner payloads, so
+        // trusting whatever it sends is safe here (spec §6a enforces
+        // the leak guard server-side, never in the client).
+        leafHost:
+          result.leafHost &&
+          typeof result.leafHost === "object" &&
+          typeof (result.leafHost as { eligible?: unknown }).eligible ===
+            "boolean"
+            ? (result.leafHost as OrgData["leafHost"])
+            : undefined,
       });
 
       // Sync RSVP cookies with backend data (handles admin-removed RSVPs)
@@ -2361,6 +2448,21 @@ export default function OrgCalendarPage() {
           Upcoming Plans
         </p>
       </div>
+
+      {/* Owner-only "Let Leaf host it" band — spec §2 placement: under
+          UPCOMING PLANS header, above the first card. Persona avatar +
+          Leaf-branded copy. Secondary visual weight so it never
+          out-shouts a human volunteering via HOST THIS on a plan card.
+          Server-side leak guard: leafHost is undefined on non-owner
+          payloads, so the null check below is a belt on top of a
+          suspender — the enforcement is at the API layer, not here. */}
+      {org.leafHost?.eligible &&
+        org.leafHost.persona &&
+        org.leafHost.state === "none" && (
+          <div className="max-w-6xl mx-auto px-6 pt-6">
+            <LeafHostBand persona={org.leafHost.persona} />
+          </div>
+        )}
 
       {/* Plans Stream */}
       <main className="max-w-6xl mx-auto px-6 py-12">
