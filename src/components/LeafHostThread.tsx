@@ -63,6 +63,16 @@ export default function LeafHostThread({
   const [sending, setSending] = useState(false);
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
 
+  // Progressive-reveal state — new concierge messages animate in one
+  // at a time behind a typing indicator so it reads as the persona
+  // typing, not four messages popping into existence at once. Owner
+  // messages appear instantly (the owner just typed them). Once a
+  // message id has been revealed we track it in a ref so a refetch
+  // doesn't re-animate the same message.
+  const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
+  const [isPersonaTyping, setIsPersonaTyping] = useState(false);
+  const revealTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
   const load = useCallback(async () => {
     try {
       const result = (await Parse.Cloud.run("getLeafHostThread", {
@@ -80,13 +90,85 @@ export default function LeafHostThread({
     load();
   }, [load]);
 
-  // Auto-scroll to bottom whenever a new message lands. Not a
-  // pixel-perfect scroll-lock — just keeps the latest message visible.
+  // Whenever thread.messages changes, schedule reveals for any
+  // messages not yet in `revealedIds`. Concierge messages get a
+  // 900ms typing indicator before appearing; owner messages appear
+  // instantly. Longer bodies get a small extra delay so the pacing
+  // matches perceived typing speed.
+  useEffect(() => {
+    if (!thread) return;
+    // Clear any pending reveal timers from a prior effect run so we
+    // don't accumulate overlapping animations on refetch.
+    revealTimersRef.current.forEach((t) => clearTimeout(t));
+    revealTimersRef.current = [];
+
+    const unrevealed = thread.messages.filter((m) => !revealedIds.has(m.objectId));
+    if (unrevealed.length === 0) return;
+
+    // Owner messages: reveal immediately (they typed them).
+    const ownerUnrevealed = unrevealed
+      .filter((m) => m.senderRole === "owner")
+      .map((m) => m.objectId);
+    if (ownerUnrevealed.length > 0) {
+      setRevealedIds((prev) => {
+        const next = new Set(prev);
+        ownerUnrevealed.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+
+    // Concierge messages: reveal in order behind a typing indicator.
+    // Wall clock across the burst = sum of per-message durations.
+    const conciergeUnrevealed = unrevealed.filter((m) => m.senderRole === "concierge");
+    let elapsed = 0;
+    for (const m of conciergeUnrevealed) {
+      // Base typing time + a body-length nudge (max +600ms) so long
+      // messages feel like they took slightly longer to compose. Not
+      // pixel-perfect realism — just enough for the beat to breathe.
+      const typingMs = 900 + Math.min(600, Math.floor((m.body?.length || 0) / 4));
+      const showTypingAt = elapsed;
+      const revealAt = elapsed + typingMs;
+      const nextIsAlsoConcierge =
+        conciergeUnrevealed[conciergeUnrevealed.indexOf(m) + 1] !== undefined;
+
+      // Only flip the typing indicator on if this is the first pending
+      // message — for subsequent messages the indicator is already up.
+      if (showTypingAt === 0) {
+        revealTimersRef.current.push(
+          setTimeout(() => setIsPersonaTyping(true), 0),
+        );
+      }
+
+      const capturedId = m.objectId;
+      const capturedIsLast = !nextIsAlsoConcierge;
+      revealTimersRef.current.push(
+        setTimeout(() => {
+          setRevealedIds((prev) => {
+            const next = new Set(prev);
+            next.add(capturedId);
+            return next;
+          });
+          if (capturedIsLast) setIsPersonaTyping(false);
+        }, revealAt),
+      );
+      elapsed = revealAt;
+    }
+
+    return () => {
+      revealTimersRef.current.forEach((t) => clearTimeout(t));
+      revealTimersRef.current = [];
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thread?.messages]);
+
+  // Auto-scroll to bottom whenever a new message lands (or the
+  // typing indicator toggles). Not a pixel-perfect scroll-lock —
+  // just keeps the latest message visible as the burst plays.
   useEffect(() => {
     const el = messagesScrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [thread?.messages.length]);
+  }, [revealedIds.size, isPersonaTyping]);
 
   const handleSend = async () => {
     const body = draft.trim();
@@ -110,14 +192,17 @@ export default function LeafHostThread({
   };
 
   // Grouping consecutive messages by sender keeps the avatar column
-  // clean — persona face appears once per burst.
+  // clean — persona face appears once per burst. Only messages the
+  // reveal effect has released are shown; the rest are behind the
+  // typing indicator.
   const messageGroups = useMemo(() => {
     if (!thread) return [];
     const groups: {
       senderRole: "owner" | "concierge";
       messages: ThreadMessage[];
     }[] = [];
-    for (const m of thread.messages) {
+    const visible = thread.messages.filter((m) => revealedIds.has(m.objectId));
+    for (const m of visible) {
       const last = groups[groups.length - 1];
       if (last && last.senderRole === m.senderRole) {
         last.messages.push(m);
@@ -126,7 +211,7 @@ export default function LeafHostThread({
       }
     }
     return groups;
-  }, [thread]);
+  }, [thread, revealedIds]);
 
   return (
     <div
@@ -229,6 +314,39 @@ export default function LeafHostThread({
                   </div>
                 </div>
               ))}
+              {/* Typing indicator — animated three-dot bubble that
+                  precedes each unread concierge message. Sits below the
+                  last revealed group, with the persona avatar in the
+                  same column as their message bubbles. */}
+              {isPersonaTyping && (
+                <div className="flex gap-3">
+                  {thread.persona.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={thread.persona.avatarUrl}
+                      alt=""
+                      aria-hidden="true"
+                      className="w-8 h-8 rounded-full object-cover flex-shrink-0 ring-1 ring-zinc-200"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-zinc-200 flex-shrink-0" />
+                  )}
+                  <div className="rounded-2xl bg-zinc-100 px-4 py-3 inline-flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 typing-dot" style={{ animationDelay: "0ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 typing-dot" style={{ animationDelay: "150ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 typing-dot" style={{ animationDelay: "300ms" }} />
+                    <style jsx>{`
+                      .typing-dot {
+                        animation: typing-bounce 1.2s infinite ease-in-out;
+                      }
+                      @keyframes typing-bounce {
+                        0%, 60%, 100% { transform: translateY(0); opacity: 0.6; }
+                        30% { transform: translateY(-4px); opacity: 1; }
+                      }
+                    `}</style>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Reply input — visible even mid-authorization so the owner
