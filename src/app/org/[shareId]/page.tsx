@@ -8,7 +8,7 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
-import LeafHostSheet from "@/components/LeafHostSheet";
+import LeafHostThread from "@/components/LeafHostThread";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import {
@@ -4353,14 +4353,16 @@ export default function OrgCalendarPage() {
         </div>
       )}
 
-      {/* "Let Leaf host it" pre-pay detail sheet — spec §4.
-          Owner-gated: only renders when the band exposed the persona,
-          which required server-side isOwner=true on the initial payload.
-          Defense-in-depth: the getCalendarHostingQuote endpoint the
-          sheet fetches also enforces ownership, so an unauthorized
-          state flip still fails at the API layer. */}
+      {/* "Let Leaf host it" chat-drawer — Phase 5 replaces the static
+          sheet with a persona-voiced message thread. Same drawer
+          skeleton (right-side desktop, bottom mobile); body is a chat
+          with an inline pay card. Owner-gated: the band only exposes
+          the persona when server-side isOwner=true, and every endpoint
+          the drawer touches (getLeafHostThread, sendLeafHostMessage,
+          getCalendarHostingQuote, authorizeCalendarHosting) re-checks
+          ownership. */}
       {showLeafHostSheet && org.isOwner && org.leafHost?.eligible && (
-        <LeafHostSheet
+        <LeafHostThread
           calendarId={org.objectId}
           onClose={() => setShowLeafHostSheet(false)}
         />
