@@ -76,6 +76,18 @@ interface Plan {
   pollOptionCount?: number;
   pollVoteCount?: number;
   pollClosesAt?: string | null;
+  // "Let Leaf host it" card state (spec §8). Server derives:
+  //   * "leaf_arranging" — a live ConciergeProposal covers this plan;
+  //     owner-private (server strips for non-owner viewers).
+  //   * "leaf_hosted" — proposal has published; public "HOSTED BY LEAF ·
+  //     [persona]" badge everyone sees.
+  //   * absent / null — no leaf-host activity on this plan.
+  leafHostState?: "leaf_arranging" | "leaf_hosted" | null;
+  leafHostPersona?: {
+    id: string;
+    name: string | null;
+    avatarUrl: string | null;
+  } | null;
 }
 
 interface PlanIdea {
@@ -1761,6 +1773,8 @@ export default function OrgCalendarPage() {
         pollOptionCount: (p.pollOptionCount as number) || 0,
         pollVoteCount: (p.pollVoteCount as number) || 0,
         pollClosesAt: (p.pollClosesAt as string) || null,
+        leafHostState: (p.leafHostState as Plan["leafHostState"]) || null,
+        leafHostPersona: (p.leafHostPersona as Plan["leafHostPersona"]) || null,
       }));
 
       const planIdeas: PlanIdea[] = (result.planIdeas || []).map((idea: Record<string, unknown>) => ({
@@ -2813,10 +2827,42 @@ export default function OrgCalendarPage() {
                       {plan.title}
                     </h3>
                     <div className="pt-2">
-                      <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: org.brandColor || "#18181b" }} />
-                        Hosted by {plan.hostName}
-                      </p>
+                      {/* Card state — leaf-host outcomes take precedence
+                          because they carry the strongest signal (Leaf
+                          delivered, or is delivering). Server already
+                          stripped `leaf_arranging` from non-owner
+                          payloads so the arranging line is safe to
+                          render whenever it's present.
+                          * leaf_hosted   → public: HOSTED BY LEAF · Sara
+                          * leaf_arranging → owner-only: LEAF IS ARRANGING THIS
+                          * default        → Hosted by {plan.hostName} */}
+                      {plan.leafHostState === "leaf_hosted" ? (
+                        <div className="flex items-center gap-2">
+                          {plan.leafHostPersona?.avatarUrl && (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={plan.leafHostPersona.avatarUrl}
+                              alt=""
+                              aria-hidden="true"
+                              className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200 flex-shrink-0"
+                            />
+                          )}
+                          <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold">
+                            Hosted by Leaf
+                            {plan.leafHostPersona?.name ? ` · ${plan.leafHostPersona.name}` : ""}
+                          </p>
+                        </div>
+                      ) : plan.leafHostState === "leaf_arranging" ? (
+                        <p className="text-xs tracking-wider uppercase text-zinc-500 font-bold flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                          Leaf is arranging this
+                        </p>
+                      ) : (
+                        <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: org.brandColor || "#18181b" }} />
+                          Hosted by {plan.hostName}
+                        </p>
+                      )}
                     </div>
                   </div>
 
