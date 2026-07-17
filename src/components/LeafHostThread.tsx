@@ -440,6 +440,20 @@ function MessageBubble({
     );
   }
 
+  // Guarantee gets a distinct, calmer treatment — emerald tint reads
+  // as "reassurance", not "warning" (which is what amber does for the
+  // fee line). Same border-callout shape so the two disclosure
+  // messages feel like a matched pair.
+  if (message.kind === "leaf_host_guarantee") {
+    return (
+      <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 max-w-[85%]">
+        <p className="text-sm text-zinc-900 leading-relaxed whitespace-pre-wrap">
+          {message.body}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`rounded-2xl px-4 py-2.5 max-w-[85%] ${

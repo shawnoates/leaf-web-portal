@@ -41,9 +41,16 @@ interface Props {
   onCloseDrawer: () => void;
 }
 
+// Format the plan's when-line. Server sends `dateISO` (full ISO
+// timestamp) and sometimes a separate `time` string (from
+// EventDetail.time_event). Prefer the explicit `time` when present;
+// otherwise pull the time from the ISO. Rendering something for time
+// on every plan matters — an empty right side reads as "date only,
+// unclear when" and drops confidence.
 function formatPlanWhen(plan: HostablePlan): string {
   if (!plan.dateISO && !plan.time) return "Date TBD";
   let datePart: string | null = null;
+  let timePart: string | null = null;
   if (plan.dateISO) {
     try {
       const d = new Date(plan.dateISO);
@@ -52,11 +59,20 @@ function formatPlanWhen(plan: HostablePlan): string {
         month: "short",
         day: "numeric",
       });
+      // Only derive time from the ISO when the server didn't send one
+      // explicitly — the explicit `time` may be a curated string
+      // (\"7:00 PM\") we shouldn't overwrite.
+      if (!plan.time) {
+        timePart = d.toLocaleTimeString(undefined, {
+          hour: "numeric",
+          minute: "2-digit",
+        });
+      }
     } catch {
       datePart = null;
     }
   }
-  return [datePart, plan.time].filter(Boolean).join(" · ");
+  return [datePart, plan.time || timePart].filter(Boolean).join(" · ");
 }
 
 // Inline pay card that renders as a special message-kind in the
@@ -298,6 +314,20 @@ export default function LeafHostPayCard({
           <span className="text-2xl font-light text-zinc-900">
             ${quoteTotal}
           </span>
+        </div>
+
+        {/* Fee-vs-tab at point-of-decision. The persona already said
+            this upfront in the chat, but by the time the owner has
+            scrolled through plan selection + capacity they may have
+            lost that beat — repeating it here (compact, muted) keeps
+            the disclosure unmissable per spec §4 without duplicating
+            visual weight. */}
+        <div className="rounded-lg bg-amber-50/70 border border-amber-100 px-3 py-2">
+          <p className="text-[11px] text-zinc-700 leading-snug">
+            <span className="font-semibold">${quoteTotal || perPlanRate}</span>{" "}
+            covers planning, booking, and running your calendar. Drinks
+            and food are on your group, paid at the venue.
+          </p>
         </div>
 
         {authorizeError && (
