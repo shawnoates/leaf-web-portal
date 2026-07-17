@@ -181,9 +181,19 @@ export default function LeafHostSheet({ calendarId, onClose }: Props) {
     }
   };
 
+  // Layout: right-side drawer on desktop (md+), bottom sheet on mobile.
+  // Spec §4 calls for a drawer explicitly, and the taller layout gives
+  // the plan-selection + capacity + quote + guarantee stack room to
+  // breathe without out-shouting the primary /org content beneath.
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white w-full max-w-2xl rounded-t-2xl md:rounded-2xl relative my-0 md:my-8 flex flex-col max-h-[95vh]">
+    <div
+      className="fixed inset-0 z-50 flex md:justify-end items-end md:items-stretch bg-zinc-900/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white w-full md:w-[560px] md:max-w-[95vw] rounded-t-2xl md:rounded-none md:rounded-l-2xl md:shadow-2xl relative flex flex-col md:h-full max-h-[95vh] md:max-h-none"
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-900 z-10"
@@ -423,7 +433,7 @@ export default function LeafHostSheet({ calendarId, onClose }: Props) {
 
             {/* 9. Single confirm — sticky footer so the CTA is visible
                 even when the sheet body is scrolled. */}
-            <div className="border-t border-zinc-100 px-8 md:px-10 py-5 bg-white rounded-b-2xl space-y-3">
+            <div className="border-t border-zinc-100 px-8 md:px-10 py-5 bg-white rounded-b-2xl md:rounded-b-none space-y-3">
               {authorizeError && (
                 <div className="flex items-start gap-2 text-xs text-red-600">
                   <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
