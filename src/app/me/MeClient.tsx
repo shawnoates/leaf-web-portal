@@ -372,7 +372,6 @@ function Stop({
   onRsvp: (id: string, s: RsvpState) => void;
   onMessage: (id: string, m: PlanMessage) => void;
 }) {
-  const tile = tileFor(plan, index);
   const status = statusFor(plan);
   const going = plan.rsvpState === "going";
   const meta = [weekday(plan.date), timeLabel(plan), plan.venueName || plan.venueAddress].filter(Boolean).join(" · ");
@@ -382,7 +381,7 @@ function Stop({
       <div className="date"><div className="d">{dayNum(plan.date)}</div><div className="m">{monthAbbr(plan.date)}</div></div>
       <span className={`dot ${going ? "on" : ""}`} />
       <div className="stop-card">
-        <div className={`tile sm ${tile.tone}`}>{tile.word}</div>
+        <PlanTile plan={plan} index={index} sm />
         <div>
           <div className="cal">{plan.calendarName}</div>
           <h3>{plan.title}</h3>
@@ -662,6 +661,8 @@ const CSS = `
 .leafme .tile.sage{background:var(--sage);color:var(--sage-deep)}
 .leafme .tile.cream{background:var(--cream);color:var(--cream-deep)}
 .leafme .tile.sm{aspect-ratio:16/10;font-size:19px}
+.leafme .tile.photo{padding:0;overflow:hidden;background:#f2f2f0}
+.leafme .tile.photo img{width:100%;height:100%;object-fit:cover;display:block}
 .leafme .sect{padding:44px 0;border-bottom:1px solid var(--rule)}
 .leafme .sect-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:26px}
 .leafme .count{font-size:11px;color:var(--ink-3)}
