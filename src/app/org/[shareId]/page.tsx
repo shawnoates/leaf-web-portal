@@ -9,6 +9,7 @@ import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
 import LeafHostThread from "@/components/LeafHostThread";
+import LeafHostPlanThread from "@/components/LeafHostPlanThread";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import {
@@ -88,6 +89,12 @@ interface Plan {
     name: string | null;
     avatarUrl: string | null;
   } | null;
+  // Owner-only: does this plan have a leaf-host chat thread the owner
+  // can open? True when any leaf_host_request proposal targets it —
+  // spec split: concierge is for a calendar, leaf-hosted is by plan.
+  hasLeafHostChat?: boolean;
+  // Owner-only: unread concierge messages in the plan-scoped thread.
+  leafHostChatUnread?: number;
 }
 
 interface PlanIdea {
@@ -1301,6 +1308,10 @@ export default function OrgCalendarPage() {
   // payload block), so this state only ever flips true in an authorized
   // context.
   const [showLeafHostSheet, setShowLeafHostSheet] = useState(false);
+  // Per-plan leaf-host chat drawer. Non-null = planId of the open
+  // drawer. Owner-only render — the pill that sets this state only
+  // renders when server surfaced hasLeafHostChat=true.
+  const [leafHostChatPlanId, setLeafHostChatPlanId] = useState<string | null>(null);
   const [hostSuccess, setHostSuccess] = useState<boolean | "pending">(false);
   const [hostSubmitting, setHostSubmitting] = useState(false);
   const [hostNote, setHostNote] = useState("");
@@ -1775,6 +1786,9 @@ export default function OrgCalendarPage() {
         pollClosesAt: (p.pollClosesAt as string) || null,
         leafHostState: (p.leafHostState as Plan["leafHostState"]) || null,
         leafHostPersona: (p.leafHostPersona as Plan["leafHostPersona"]) || null,
+        hasLeafHostChat: Boolean(p.hasLeafHostChat),
+        leafHostChatUnread:
+          typeof p.leafHostChatUnread === "number" ? p.leafHostChatUnread : 0,
       }));
 
       const planIdeas: PlanIdea[] = (result.planIdeas || []).map((idea: Record<string, unknown>) => ({
@@ -2862,6 +2876,38 @@ export default function OrgCalendarPage() {
                           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: org.brandColor || "#18181b" }} />
                           Hosted by {plan.hostName}
                         </p>
+                      )}
+                      {/* Per-plan leaf-host chat pill — owner-only.
+                          Server strips these fields for non-owners so
+                          the button never surfaces publicly. Unread
+                          badge inside the pill; click opens a plan-
+                          scoped drawer (LeafHostPlanThread). */}
+                      {plan.hasLeafHostChat && plan.leafHostPersona && (
+                        <button
+                          type="button"
+                          onClick={() => setLeafHostChatPlanId(plan.id)}
+                          className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 transition-colors text-xs font-medium text-zinc-700"
+                        >
+                          {plan.leafHostPersona.avatarUrl ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={plan.leafHostPersona.avatarUrl}
+                              alt=""
+                              aria-hidden="true"
+                              className="w-4 h-4 rounded-full object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          )}
+                          Chat with {plan.leafHostPersona.name || "your concierge"}
+                          {(plan.leafHostChatUnread ?? 0) > 0 && (
+                            <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-4 text-center">
+                              {(plan.leafHostChatUnread ?? 0) > 9
+                                ? "9+"
+                                : plan.leafHostChatUnread}
+                            </span>
+                          )}
+                        </button>
                       )}
                     </div>
                   </div>
@@ -4365,6 +4411,16 @@ export default function OrgCalendarPage() {
         <LeafHostThread
           calendarId={org.objectId}
           onClose={() => setShowLeafHostSheet(false)}
+        />
+      )}
+
+      {/* Per-plan leaf-host chat drawer. Owner-only — pill that opens
+          this only renders when the server surfaced the chat metadata
+          on the plan, which itself is stripped for non-owners. */}
+      {leafHostChatPlanId && org.isOwner && (
+        <LeafHostPlanThread
+          planId={leafHostChatPlanId}
+          onClose={() => setLeafHostChatPlanId(null)}
         />
       )}
 
