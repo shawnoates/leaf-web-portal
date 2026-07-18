@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { APPLY_URL } from "./config";
+import { PARTNER_URL } from "./config";
 
 export function LeafMark({
   size = 18,
