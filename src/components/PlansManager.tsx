@@ -7,8 +7,9 @@ import Parse from "@/lib/parse-client";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
 import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailModal";
+import PlanChatDrawer from "@/components/PlanChatDrawer";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
-import { Calendar, Camera, Check, Lock, MapPin, Plus, RefreshCw, Repeat, Settings, Trash2, UserCheck, Users, X } from "lucide-react";
+import { Calendar, Camera, Check, Lock, MapPin, MessageCircle, Plus, RefreshCw, Repeat, Settings, Trash2, UserCheck, Users, X } from "lucide-react";
 
 // Renders a plan cover image with a Calendar-icon placeholder fallback when
 // the src is missing OR 404s (attendee-uploaded / expired signed URLs go
@@ -225,6 +226,11 @@ export default function PlansManager({
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<UpcomingPlan | null>(null);
+  // Per-plan chat drawer state. Non-null = eventGroupId of the plan
+  // whose chat should render as a slide-over. Set from the plan-card
+  // hover overlay's "Chat" button so the owner never leaves the
+  // dashboard to see the plan chat.
+  const [chatPlanId, setChatPlanId] = useState<string | null>(null);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   const [createPlanPrefill, setCreatePlanPrefill] = useState<CreatePlanPrefill | null>(null);
   const planCreatedRef = useRef(false);
@@ -705,7 +711,7 @@ export default function PlansManager({
                       }
                       setSelectedPlan(plan);
                     }}
-                    className={`border rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer ${isAI ? "border-emerald-200/70 bg-emerald-50/30" : "border-zinc-100"}`}
+                    className={`group relative border rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer ${isAI ? "border-emerald-200/70 bg-emerald-50/30" : "border-zinc-100"}`}
                   >
                     {isAI ? (
                       // Placeholder cover matches /org/<shareId>: gradient
@@ -766,6 +772,36 @@ export default function PlansManager({
                         {!isAI && <span className="shrink-0 ml-2">{plan.rsvpCount} RSVPs</span>}
                       </div>
                     </div>
+                    {/* Hover overlay — two-action panel over the cover
+                        image. Skipped for AI starters (the card click
+                        already routes to the create-plan flow, and
+                        there's no chat on an unhosted suggestion). */}
+                    {!isAI && (
+                      <div className="absolute inset-x-0 top-0 h-28 bg-zinc-900/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none group-hover:pointer-events-auto">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedPlan(plan);
+                          }}
+                          className="inline-flex items-center gap-1.5 bg-white text-zinc-900 text-[11px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-full hover:bg-zinc-50 transition-colors"
+                        >
+                          <Calendar className="w-3 h-3" />
+                          Details
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setChatPlanId(plan.objectId);
+                          }}
+                          className="inline-flex items-center gap-1.5 bg-white text-zinc-900 text-[11px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-full hover:bg-zinc-50 transition-colors"
+                        >
+                          <MessageCircle className="w-3 h-3" />
+                          Chat
+                        </button>
+                      </div>
+                    )}
                   </div>
                   );
                 })}
@@ -936,6 +972,16 @@ export default function PlansManager({
             </div>
           )}
         </section>
+
+      {/* Per-plan chat drawer — right-side slide-over. Opens from the
+          hover overlay's Chat button so the owner stays inside the
+          dashboard rather than navigating to /chat/[eventGroupId]. */}
+      {chatPlanId && (
+        <PlanChatDrawer
+          eventGroupId={chatPlanId}
+          onClose={() => setChatPlanId(null)}
+        />
+      )}
 
       {/* Plan Detail Modal */}
       {selectedPlan && (

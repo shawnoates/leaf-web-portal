@@ -9,6 +9,7 @@ import CityAutocomplete from "@/components/CityAutocomplete";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import ConciergeDashboardBanner from "@/components/ConciergeDashboardBanner";
 import ConciergeInbox from "@/components/ConciergeInbox";
+import PlanChatDrawer from "@/components/PlanChatDrawer";
 import { type ConciergeMenu } from "@/components/ConciergeMenuCard";
 import ConciergeThread from "@/components/ConciergeThread";
 import PlansManager from "@/components/PlansManager";
@@ -642,6 +643,10 @@ export default function OrgDashboardPage() {
   // Concierge chat slide-over — the serviced calendar looks like any other; the
   // concierge conversation opens as a drawer from its "Concierge" button.
   const [showConciergeChat, setShowConciergeChat] = useState(false);
+  // Per-plan chat drawer — Overview tab's Upcoming carousel hover
+  // button routes here. Keeps the owner on the dashboard instead of
+  // navigating to /chat/[eventGroupId].
+  const [chatPlanId, setChatPlanId] = useState<string | null>(null);
 
   // Auto-open the drawer when the global ConciergeInbox routes a
   // click here with ?conciergeChat=1. Strips the param after firing
@@ -1627,7 +1632,7 @@ export default function OrgDashboardPage() {
                     ? `${dashboard.rsvpsThisMonth}/${dashboard.rsvpLimit}`
                     : dashboard.totalRsvpCount,
                 },
-                { label: "Active Plans", value: dashboard.upcomingPlanCount },
+                { label: "Upcoming Plans", value: dashboard.upcomingPlanCount },
               ].map((stat) => (
                 <div key={stat.label} className="border border-zinc-200 rounded-xl p-4">
                   <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1">{stat.label}</p>
@@ -1720,14 +1725,17 @@ export default function OrgDashboardPage() {
                             <Calendar className="w-3.5 h-3.5" />
                             Details
                           </button>
-                          <Link
-                            href={`/chat/${plan.objectId}`}
-                            onClick={(e) => e.stopPropagation()}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setChatPlanId(plan.objectId);
+                            }}
                             className="inline-flex items-center gap-1.5 bg-white text-zinc-900 text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-zinc-50 transition-colors"
                           >
                             <MessageCircle className="w-3.5 h-3.5" />
                             Chat
-                          </Link>
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -1994,7 +2002,7 @@ export default function OrgDashboardPage() {
                         deltaPct: analytics.growth.rsvpDeltaPct,
                       },
                       {
-                        label: "Active Plans",
+                        label: "Upcoming Plans",
                         value: analytics.engagement.planCount,
                         delta: null,
                         deltaPct: null,
@@ -3722,6 +3730,17 @@ export default function OrgDashboardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Per-plan chat drawer — opened from the Upcoming Plans carousel
+          hover overlay. Right-side slide-over that hosts the same
+          ChatShell the /chat/[eventGroupId] route uses, so the owner
+          reads and replies without leaving the dashboard. */}
+      {chatPlanId && (
+        <PlanChatDrawer
+          eventGroupId={chatPlanId}
+          onClose={() => setChatPlanId(null)}
+        />
       )}
 
       {/* Active Plan Detail Modal — shared component, also used by /plans page */}
