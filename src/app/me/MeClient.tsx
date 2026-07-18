@@ -10,6 +10,7 @@ import {
   ArrowUpRight,
   CloudSun,
   Send,
+  Check,
 } from "lucide-react";
 import Parse from "@/lib/parse-client";
 
@@ -470,29 +471,27 @@ function RsvpToggle({
     }
   }
 
+  // Explicit attend button. A plan only appears here if you already follow/own
+  // its calendar, so the action is about attending the plan, not following.
   return (
     <button
       onClick={toggle}
       disabled={busy}
       aria-pressed={going}
-      className="flex items-center gap-2 shrink-0 disabled:opacity-50"
+      className={
+        "shrink-0 inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-bold px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 " +
+        (going
+          ? "border border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+          : "bg-zinc-900 text-white hover:bg-zinc-800")
+      }
     >
-      <span className="text-[11px] uppercase tracking-wider text-zinc-500">
-        {going ? "Going" : "RSVP"}
-      </span>
-      <span
-        className={
-          "relative w-10 h-5 rounded-full transition-colors " +
-          (going ? "bg-emerald-600" : "bg-zinc-200")
-        }
-      >
-        <span
-          className={
-            "absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform " +
-            (going ? "translate-x-5" : "")
-          }
-        />
-      </span>
+      {going ? (
+        <>
+          <Check className="w-3.5 h-3.5" /> Attending
+        </>
+      ) : (
+        "I’m attending"
+      )}
     </button>
   );
 }
