@@ -1,46 +1,15 @@
 import { CTA, Eyebrow, TrustStrip } from "./ui";
 import Reveal from "./Reveal";
 
-/**
- * No dedicated hero photo exists for /creators, so the art panel is a
- * CSS-composed mock that tells the product story: one typed sentence
- * becomes a plan, and the RSVPs say yes.
- */
 function HeroArt() {
   return (
     <div
       className="hero__art"
       role="img"
-      aria-label="A typed sentence in Leaf becoming a plan with RSVPs"
+      aria-label="Friends laughing over drinks at a bar"
     >
-      <div className="mock">
-        <div className="mock__type">
-          drinks on the rooftop Friday, 8pm
-          <span className="mock__caret"> ▍</span>
-        </div>
-        <div className="mock__spacer" />
-        <div className="mock__card">
-          <div className="mock__title">Rooftop drinks</div>
-          <div className="mock__meta">Friday · 8pm · bring someone new</div>
-          <div className="mock__rsvps">
-            <div className="mock__faces">
-              <span className="mock__face" style={{ background: "#2d6a4f" }}>
-                M
-              </span>
-              <span className="mock__face" style={{ background: "#40916c" }}>
-                J
-              </span>
-              <span className="mock__face" style={{ background: "#e8a33d" }}>
-                A
-              </span>
-              <span className="mock__face" style={{ background: "#1b4332" }}>
-                +5
-              </span>
-            </div>
-            <span className="mock__yes">8 going</span>
-          </div>
-        </div>
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/creators-hero.jpg" alt="" className="hero__photo" />
     </div>
   );
 }
