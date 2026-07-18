@@ -305,7 +305,7 @@ function DashboardView({
             <span className="greet-wx">🌤 <b>{data.greeting.weather.temp}°</b> {data.greeting.weather.text}</span>
           )}
           <div className="greet-line">
-            {greetingWord()}{data.person.firstName ? `, ${data.person.firstName}` : ""}
+            {greetingWord()}{data.person.firstName ? `, ${data.person.firstName.trim().split(/\s+/)[0]}` : ""}
           </div>
         </section>
 
@@ -723,7 +723,7 @@ const CSS = `
 .leafme .greet{padding-top:36px;padding-bottom:4px}
 .leafme .greet-wx{display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;font-size:13px;color:var(--ink-2)}
 .leafme .greet-wx b{color:var(--ink);font-weight:600}
-.leafme .greet-line{font-family:var(--serif);font-size:26px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
+.leafme .greet-line{font-family:var(--serif);font-size:32px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
 .leafme .hero{padding-top:56px;padding-bottom:44px;border-bottom:1px solid var(--rule)}
 .leafme .hero .eyebrow{margin-bottom:18px}
 .leafme .hero-grid{display:grid;grid-template-columns:1fr 300px;gap:44px;align-items:start}
@@ -831,7 +831,7 @@ const CSS = `
   .leafme .modal-img{border-radius:16px 16px 0 0}
   .leafme .hero-grid{grid-template-columns:1fr;gap:24px}
   .leafme .greet{padding-top:24px}
-  .leafme .greet-line{font-size:22px}
+  .leafme .greet-line{font-size:26px}
   .leafme .hero{padding-top:32px;padding-bottom:32px}
   .leafme .hero h1{font-size:30px}
   .leafme .hero-grid > .tile-link,.leafme .hero-grid > .tile-wrap{order:-1;margin-bottom:6px}
