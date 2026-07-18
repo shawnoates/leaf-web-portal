@@ -1634,11 +1634,25 @@ export default function OrgDashboardPage() {
                   </div>
                   <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-6 px-6 pb-2 no-scrollbar">
                     {upcoming.slice(0, 12).map((plan) => (
-                      <button
+                      // Card wrapper is now a div (was a button) so the
+                      // hover overlay can nest its own action buttons —
+                      // <button> inside <button> is invalid HTML and
+                      // gives keyboard-nav weirdness. Card body still
+                      // opens the detail modal on click via role=button;
+                      // touch users get the same behavior since the
+                      // hover overlay is hidden on non-hover devices.
+                      <div
                         key={plan.objectId}
-                        type="button"
+                        className="group relative text-left border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 snap-start basis-[220px] sm:basis-[240px] md:basis-[260px] cursor-pointer"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => setSelectedActivePlan(plan)}
-                        className="text-left border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 snap-start basis-[220px] sm:basis-[240px] md:basis-[260px]"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedActivePlan(plan);
+                          }
+                        }}
                       >
                         {plan.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -1667,7 +1681,34 @@ export default function OrgDashboardPage() {
                             </span>
                           </div>
                         </div>
-                      </button>
+
+                        {/* Hover overlay — two-action panel appears over
+                            the cover image on pointer-hover. Kept off
+                            touch entirely (opacity + pointer-events
+                            gate) so a tap doesn't get an accidental
+                            overlay before the detail-modal open fires. */}
+                        <div className="absolute inset-x-0 top-0 h-28 bg-zinc-900/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none group-hover:pointer-events-auto">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedActivePlan(plan);
+                            }}
+                            className="inline-flex items-center gap-1.5 bg-white text-zinc-900 text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-zinc-50 transition-colors"
+                          >
+                            <Calendar className="w-3.5 h-3.5" />
+                            Details
+                          </button>
+                          <Link
+                            href={`/chat/${plan.objectId}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1.5 bg-white text-zinc-900 text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-zinc-50 transition-colors"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            Chat
+                          </Link>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </section>
