@@ -2,39 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  MapPin,
-  Loader2,
-  X,
-  ShieldCheck,
-  ArrowUpRight,
-  CloudSun,
-  Send,
-  Check,
-} from "lucide-react";
 import Parse from "@/lib/parse-client";
 
 // ============================================================================
 // Attendee dashboard (/me). Read-mostly. Answers one question — "where am I
 // going next, and am I still going?" It is the live truth (re-fetchable), not
-// a frozen digest. Built to Leaf's existing visual vocabulary: uppercase
-// micro-labels, sage/cream tiles, black pill actions, hairline rules.
+// a frozen digest. Built to the leaf-attendee-dashboard mockup: Newsreader
+// serif headings, sage/cream tiles, ink rectangular buttons, hairline rules.
 // ============================================================================
 
-// ---- Types (mirror the getMeDashboard payload, spec §A8) -------------------
+// ---- Types (mirror the getMeDashboard payload) -----------------------------
 type HostState = "waiting_on_host" | "human_host" | "leaf_arranging" | "leaf_hosted";
 type RsvpState = "going" | "not_going" | "no_response";
 
-interface Persona {
-  id: string;
-  name: string;
-  avatarUrl: string | null;
-}
-interface Weather {
-  temp: string;
-  icon: string;
-  text: string;
-}
+interface Persona { id: string; name: string; avatarUrl: string | null }
+interface Weather { temp: string; icon: string; text: string }
 interface PlanMessage {
   id: string | null;
   authorName: string;
@@ -46,6 +28,8 @@ interface PlanMessage {
 interface Plan {
   id: string;
   title: string;
+  description: string | null;
+  category: string | null;
   date: string | null;
   time: string | null;
   venueName: string | null;
@@ -69,38 +53,83 @@ interface Dashboard {
 }
 
 type AuthState = "resolving" | "authed" | "needs-otp" | "error";
-
 const PROMPT_BASE = "https://joinleaf.com/personal";
 
-// ---- Date helpers ----------------------------------------------------------
-function relativeDay(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const now = new Date();
-  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
-  const diffDays = Math.round(
-    (startOfDay(d).getTime() - startOfDay(now).getTime()) / 86400000,
-  );
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Tomorrow";
-  if (diffDays > 1 && diffDays < 7) return d.toLocaleDateString("en-US", { weekday: "long" });
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+// ---- Date / string helpers -------------------------------------------------
+function parse(iso: string | null) { return iso ? new Date(iso) : null; }
+function weekday(iso: string | null) {
+  const d = parse(iso); if (!d) return "";
+  return d.toLocaleDateString("en-US", { weekday: "long" });
 }
-function dayNum(iso: string | null): string {
-  if (!iso) return "";
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-function timeLabel(plan: Plan): string {
+function timeLabel(plan: Plan) {
   if (plan.time) return plan.time;
-  if (!plan.date) return "";
-  return new Date(plan.date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const d = parse(plan.date); if (!d) return "";
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+function relPhrase(iso: string | null) {
+  const d = parse(iso); if (!d) return "";
+  const s = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const diff = Math.round((s(d).getTime() - s(new Date()).getTime()) / 86400000);
+  if (diff <= 0) return "today";
+  if (diff === 1) return "tomorrow";
+  if (diff < 7) return `in ${diff} days`;
+  if (diff < 14) return "next week";
+  return `in ${Math.round(diff / 7)} weeks`;
+}
+function heroWhen(plan: Plan) {
+  const wd = weekday(plan.date); const rel = relPhrase(plan.date); const t = timeLabel(plan);
+  return [wd, rel && `— ${rel}`, t && `, ${t}`].filter(Boolean).join(" ").replace(" ,", ",");
+}
+function dayNum(iso: string | null) { const d = parse(iso); return d ? String(d.getDate()) : ""; }
+function monthAbbr(iso: string | null) {
+  const d = parse(iso); return d ? d.toLocaleDateString("en-US", { month: "short" }) : "";
+}
+function ago(iso: string | null) {
+  const d = parse(iso); if (!d) return "";
+  const mins = Math.round((Date.now() - d.getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs === 1 ? "" : "s"} ago`;
+  const days = Math.round(hrs / 24);
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+function initial(name: string) { return (name || "?").trim().charAt(0).toUpperCase() || "?"; }
+
+// Tile — Leaf's signature artifact: a colored square with a serif word.
+function tileFor(plan: Plan, i: number): { tone: "sage" | "cream"; word: string } {
+  const tone: "sage" | "cream" = i % 2 === 0 ? "sage" : "cream";
+  const s = `${plan.category || ""} ${plan.title} ${plan.venueName || ""}`.toLowerCase();
+  let word = "plans";
+  if (/happy hour|beer|brew|pub|tavern|ale/.test(s)) word = "beer";
+  else if (/cocktail|lounge|speakeasy|wine|oyster|bar/.test(s)) word = "cocktails";
+  else if (/dinner|supper|kitchen|bistro|table|trattoria|osteria/.test(s)) word = "supper";
+  else if (/coffee|cafe|brunch|breakfast|espresso/.test(s)) word = "coffee";
+  else if (/sauna|steam|soak|spa|bath|pool/.test(s)) word = "soak";
+  else if (/show|music|concert|gig|dj|dance/.test(s)) word = "music";
+  else if (/park|walk|hike|garden|outdoor|picnic/.test(s)) word = "outside";
+  return { tone, word };
+}
+function statusFor(plan: Plan): { cls: string; text: string } | null {
+  if (plan.hostState === "leaf_hosted" && plan.hostPersona) {
+    return { cls: "host", text: `Hosted by Leaf · ${plan.hostPersona.name}` };
+  }
+  if (plan.hostState === "leaf_hosted") return { cls: "host", text: "Hosted by Leaf" };
+  if (plan.hostState === "waiting_on_host") return { cls: "wait", text: "Waiting on host" };
+  if (plan.rsvpState === "going") {
+    const others = Math.max(0, plan.attendeeCount - 1);
+    return { cls: "", text: others > 0 ? `You're going · ${others} others` : "You're going" };
+  }
+  return { cls: "", text: `${plan.attendeeCount} going` };
 }
 
 // ============================================================================
 export default function MeClient() {
   const [authState, setAuthState] = useState<AuthState>("resolving");
   const [data, setData] = useState<Dashboard | null>(null);
-  const [loadError, setLoadError] = useState<string>("");
+  const [loadError, setLoadError] = useState("");
   const fetchedRef = useRef(false);
 
   const fetchDashboard = useCallback(async () => {
@@ -112,8 +141,6 @@ export default function MeClient() {
     }
   }, []);
 
-  // Auth resolution order (spec §W2): token → become → strip token → else
-  // existing session → else OTP.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -122,21 +149,13 @@ export default function MeClient() {
         const uid = new URLSearchParams(window.location.search).get("u");
         if (token && uid) {
           try {
-            const result = (await Parse.Cloud.run("getDashboardSession", {
-              userId: uid,
-              token,
-            })) as { sessionToken?: string };
-            const st = result?.sessionToken;
-            if (st && st.startsWith("r:")) {
-              await Parse.User.become(st);
-            }
-          } catch {
-            // fall through to existing-session / OTP resolution
-          }
-          // Strip the token so a refresh / shared screenshot can't replay it.
+            const r = (await Parse.Cloud.run("getDashboardSession", { userId: uid, token })) as {
+              sessionToken?: string;
+            };
+            if (r?.sessionToken?.startsWith("r:")) await Parse.User.become(r.sessionToken);
+          } catch { /* fall through */ }
           window.history.replaceState(null, "", window.location.pathname);
         }
-
         const current = Parse.User.current();
         if (cancelled) return;
         if (current) {
@@ -150,563 +169,372 @@ export default function MeClient() {
         if (!cancelled) setAuthState("error");
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [fetchDashboard]);
 
-  const onRsvpChange = useCallback((planId: string, next: RsvpState) => {
+  const patchPlan = useCallback((planId: string, patch: (p: Plan) => Plan) => {
     setData((prev) => {
       if (!prev) return prev;
-      const apply = (p: Plan): Plan => (p.id === planId ? { ...p, rsvpState: next } : p);
-      return {
-        ...prev,
-        nextPlan: prev.nextPlan ? apply(prev.nextPlan) : null,
-        plans: prev.plans.map(apply),
-      };
+      const apply = (p: Plan) => (p.id === planId ? patch(p) : p);
+      return { ...prev, nextPlan: prev.nextPlan ? apply(prev.nextPlan) : null, plans: prev.plans.map(apply) };
     });
   }, []);
 
-  const onMessagePosted = useCallback((planId: string, msg: PlanMessage) => {
-    setData((prev) => {
-      if (!prev) return prev;
-      const apply = (p: Plan): Plan =>
-        p.id === planId ? { ...p, messages: [...p.messages, msg] } : p;
-      return {
-        ...prev,
-        nextPlan: prev.nextPlan ? apply(prev.nextPlan) : null,
-        plans: prev.plans.map(apply),
-      };
-    });
-  }, []);
+  const onRsvp = useCallback((planId: string, next: RsvpState) => {
+    patchPlan(planId, (p) => ({ ...p, rsvpState: next }));
+  }, [patchPlan]);
 
-  if (authState === "resolving") return <FullScreen><Spinner /></FullScreen>;
-  if (authState === "error")
-    return (
-      <FullScreen>
-        <p className="text-sm text-zinc-500">Something went wrong. Tap your link again.</p>
-      </FullScreen>
-    );
-  if (authState === "needs-otp")
-    return (
-      <OtpModal
-        onVerified={async () => {
-          fetchedRef.current = true;
-          await fetchDashboard();
-          setAuthState("authed");
-        }}
-      />
-    );
+  const onMessage = useCallback((planId: string, m: PlanMessage) => {
+    patchPlan(planId, (p) => ({ ...p, messages: [...p.messages, m] }));
+  }, [patchPlan]);
 
-  if (!data && !loadError) return <FullScreen><Spinner /></FullScreen>;
-  if (loadError)
-    return (
-      <FullScreen>
-        <p className="text-sm text-zinc-500">{loadError}</p>
-      </FullScreen>
-    );
-
-  const d = data!;
-  const hasPlans = d.plans.length > 0;
-  const showOwnerStrip = d.person.ownsCalendars && d.person.pendingReviewCount > 0;
+  let body: React.ReactNode = null;
+  if (authState === "resolving" || (!data && !loadError && authState === "authed")) {
+    body = <div className="lm-center"><Spinner /></div>;
+  } else if (authState === "error") {
+    body = <div className="lm-center"><p className="lm-muted">Something went wrong. Tap your link again.</p></div>;
+  } else if (authState === "needs-otp") {
+    body = <OtpModal onVerified={async () => { fetchedRef.current = true; await fetchDashboard(); setAuthState("authed"); }} />;
+  } else if (loadError) {
+    body = <div className="lm-center"><p className="lm-muted">{loadError}</p></div>;
+  } else if (data) {
+    body = <DashboardView data={data} onRsvp={onRsvp} onMessage={onMessage} />;
+  }
 
   return (
-    <div className="min-h-screen bg-white text-zinc-900">
-      <div className="max-w-2xl mx-auto px-5 py-10">
-        {/* Masthead */}
-        <div className="flex items-center justify-between mb-8">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/leaf-logo-black.png" alt="Leaf" className="h-7" />
-          <span className="text-[11px] uppercase tracking-[0.2em] text-zinc-400">
-            {d.person.firstName ? `${d.person.firstName}’s week` : "Your week"}
-          </span>
-        </div>
-
-        {/* 1. Hero — the next plan (or an honest empty state) */}
-        {d.nextPlan ? (
-          <Hero plan={d.nextPlan} onRsvpChange={onRsvpChange} onMessagePosted={onMessagePosted} />
-        ) : (
-          <EmptyState ask={d.ask} owner={d.person.ownsCalendars} />
-        )}
-
-        {/* 2. The spine — chronology as structure (only when >1 plan) */}
-        {d.plans.length > 1 && (
-          <Spine
-            plans={d.plans}
-            unreadMessageCount={d.unreadMessageCount}
-            onRsvpChange={onRsvpChange}
-            onMessagePosted={onMessagePosted}
-          />
-        )}
-
-        {/* 3. The ask OR the owner strip — never both, after the spine */}
-        {hasPlans &&
-          (showOwnerStrip ? (
-            <OwnerStrip count={d.person.pendingReviewCount} />
-          ) : (
-            d.ask && <TheAsk ask={d.ask} plans={d.plans} />
-          ))}
-
-        {/* 4. Footer — the SMS contract */}
-        <MeFooter userId={Parse.User.current()?.id ?? null} />
-      </div>
+    <div className="leafme">
+      <style>{CSS}</style>
+      {body}
     </div>
+  );
+}
+
+// ---- Dashboard view --------------------------------------------------------
+function DashboardView({
+  data, onRsvp, onMessage,
+}: {
+  data: Dashboard;
+  onRsvp: (id: string, s: RsvpState) => void;
+  onMessage: (id: string, m: PlanMessage) => void;
+}) {
+  const hero = data.nextPlan;
+  const spine = data.plans.slice(1); // hero is plans[0]
+  const calCount = new Set(data.plans.map((p) => p.calendarId).filter(Boolean)).size;
+
+  return (
+    <>
+      <header className="bar">
+        <div className="wrap bar-in">
+          <div className="brand">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/leaf-logo-black.png" alt="Leaf" className="leaflogo" />
+          </div>
+          <div className="who">
+            <span>{data.person.firstName || "You"}</span>
+            <div className="ava">{initial(data.person.firstName || "Y")}</div>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        {hero ? (
+          <Hero plan={hero} onRsvp={onRsvp} onMessage={onMessage} />
+        ) : (
+          <EmptyHero ask={data.ask} owner={data.person.ownsCalendars} />
+        )}
+
+        {spine.length > 0 && (
+          <section className="wrap sect">
+            <div className="sect-head">
+              <div className="eyebrow">Your plans</div>
+              <div className="count">
+                {data.plans.length} upcoming · {calCount} calendar{calCount === 1 ? "" : "s"}
+                {data.unreadMessageCount > 0 && (
+                  <> · <span className="new">{data.unreadMessageCount} new message{data.unreadMessageCount === 1 ? "" : "s"}</span></>
+                )}
+              </div>
+            </div>
+            <div className="spine">
+              {spine.map((plan, i) => (
+                <Stop key={plan.id} plan={plan} index={i + 1} onRsvp={onRsvp} onMessage={onMessage} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Ask XOR owner strip — never both */}
+        {data.person.ownsCalendars ? (
+          <OwnerStrip count={data.person.pendingReviewCount} />
+        ) : (
+          data.ask && <Ask ask={data.ask} />
+        )}
+
+        <footer className="wrap foot">
+          <p>
+            One text a week, Sunday morning, with everything on this page. No text for every
+            plan added to a calendar you follow.{" "}
+            <Link href="/unsubscribe">Change how often</Link> · <Link href="/unsubscribe">Stop texts</Link>
+          </p>
+        </footer>
+      </main>
+    </>
   );
 }
 
 // ---- Hero ------------------------------------------------------------------
 function Hero({
-  plan,
-  onRsvpChange,
-  onMessagePosted,
+  plan, onRsvp, onMessage,
 }: {
   plan: Plan;
-  onRsvpChange: (id: string, s: RsvpState) => void;
-  onMessagePosted: (id: string, m: PlanMessage) => void;
+  onRsvp: (id: string, s: RsvpState) => void;
+  onMessage: (id: string, m: PlanMessage) => void;
 }) {
+  const tile = tileFor(plan, 0);
+  const venue = [plan.venueName, plan.calendarName].filter(Boolean).join(" · ");
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-emerald-50/60 to-white p-6 mb-10">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs uppercase tracking-widest font-bold text-emerald-700">
-          {relativeDay(plan.date)}
-          {timeLabel(plan) ? ` · ${timeLabel(plan)}` : ""}
-        </span>
-        {plan.weather && <WeatherChip weather={plan.weather} />}
-      </div>
-      <h1 className="text-2xl font-light tracking-tight text-zinc-900 mb-1">{plan.title}</h1>
-      <VenueLine plan={plan} />
-      <div className="mt-3">
-        <HostStateBadge plan={plan} />
-      </div>
-      <div className="mt-5 flex items-center justify-between border-t border-zinc-100 pt-4">
-        <span className="text-xs text-zinc-500">
-          {plan.attendeeCount > 0
-            ? `${plan.attendeeCount} going`
-            : "Be the first to RSVP"}
-        </span>
-        <RsvpToggle plan={plan} onRsvpChange={onRsvpChange} />
-      </div>
-      {plan.hostState === "waiting_on_host" && <HostThis plan={plan} />}
-      <MessageThread plan={plan} onMessagePosted={onMessagePosted} />
-    </section>
-  );
-}
-
-// ---- Spine -----------------------------------------------------------------
-function Spine({
-  plans,
-  unreadMessageCount,
-  onRsvpChange,
-  onMessagePosted,
-}: {
-  plans: Plan[];
-  unreadMessageCount: number;
-  onRsvpChange: (id: string, s: RsvpState) => void;
-  onMessagePosted: (id: string, m: PlanMessage) => void;
-}) {
-  // Skip the hero plan (index 0) — it's rendered above.
-  const rest = plans.slice(1);
-  return (
-    <section className="mb-10">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-[11px] uppercase tracking-[0.2em] text-zinc-400">Coming up</h2>
-        {unreadMessageCount > 0 && (
-          <span className="text-[11px] uppercase tracking-[0.2em] text-emerald-700 font-bold">
-            {unreadMessageCount} new message{unreadMessageCount === 1 ? "" : "s"}
-          </span>
-        )}
-      </div>
-      <div>
-        {rest.map((plan, i) => (
-          <SpineStop
-            key={plan.id}
-            plan={plan}
-            last={i === rest.length - 1}
-            onRsvpChange={onRsvpChange}
-            onMessagePosted={onMessagePosted}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function SpineStop({
-  plan,
-  last,
-  onRsvpChange,
-  onMessagePosted,
-}: {
-  plan: Plan;
-  last: boolean;
-  onRsvpChange: (id: string, s: RsvpState) => void;
-  onMessagePosted: (id: string, m: PlanMessage) => void;
-}) {
-  const going = plan.rsvpState === "going";
-  return (
-    <div className="flex gap-4">
-      {/* Left rail: date + dot encoding RSVP state */}
-      <div className="flex flex-col items-center w-14 shrink-0">
-        <span className="text-[11px] uppercase tracking-wider text-zinc-400 text-center leading-tight pt-1">
-          {dayNum(plan.date)}
-        </span>
-        <span
-          className={
-            "mt-2 w-3 h-3 rounded-full " +
-            (going ? "bg-emerald-600" : "border-2 border-zinc-300 bg-white")
-          }
-          aria-label={going ? "Going" : "No response yet"}
-        />
-        {!last && <span className="flex-1 w-px bg-zinc-100 mt-1" />}
-      </div>
-      {/* Card */}
-      <div className={"flex-1 pb-8 " + (last ? "" : "")}>
-        <span className="text-xs uppercase tracking-widest font-bold text-emerald-700">
-          {relativeDay(plan.date)}
-          {timeLabel(plan) ? ` · ${timeLabel(plan)}` : ""}
-        </span>
-        <div className="flex items-start justify-between gap-3 mt-1">
-          <div className="min-w-0">
-            <h3 className="text-lg font-normal text-zinc-900">{plan.title}</h3>
-            <VenueLine plan={plan} />
-            <div className="mt-2">
-              <HostStateBadge plan={plan} />
-            </div>
-            <p className="mt-2 text-xs text-zinc-500">
-              {going
-                ? `You're going${plan.attendeeCount > 1 ? ` · ${plan.attendeeCount - 1} others` : ""}`
-                : `${plan.attendeeCount} going`}
-            </p>
+    <section className="wrap hero">
+      <div className="eyebrow">Next up</div>
+      <div className="hero-grid">
+        <div>
+          <div className="when">{heroWhen(plan)}</div>
+          <h1>{plan.title}</h1>
+          {(plan.venueAddress || venue) && (
+            <p className="addr">{plan.venueAddress ? `${plan.venueAddress}` : ""}{venue ? `${plan.venueAddress ? " · " : ""}${venue}` : ""}</p>
+          )}
+          {plan.description && <p className="blurb">{plan.description}</p>}
+          <div className="row">
+            <AttendButtons plan={plan} onRsvp={onRsvp} />
+            {plan.weather && (
+              <span className="wx">🌤 <b>{plan.weather.temp}°</b> {plan.weather.text}</span>
+            )}
           </div>
-          <RsvpToggle plan={plan} onRsvpChange={onRsvpChange} />
+          <p className="note">Weather shows only when it might change your mind — outdoor plans, inside the forecast window.</p>
+          <Thread plan={plan} onMessage={onMessage} hero />
         </div>
-        {plan.hostState === "waiting_on_host" && <HostThis plan={plan} />}
-        <MessageThread plan={plan} onMessagePosted={onMessagePosted} />
+        <div className={`tile ${tile.tone}`}>{tile.word}</div>
       </div>
-    </div>
+    </section>
   );
 }
 
-// ---- Shared plan pieces ----------------------------------------------------
-function VenueLine({ plan }: { plan: Plan }) {
-  if (!plan.venueName && !plan.venueAddress) {
-    return <p className="text-sm text-zinc-400 mt-0.5">Venue shared once you RSVP</p>;
-  }
+function EmptyHero({ ask, owner }: { ask: Dashboard["ask"]; owner: boolean }) {
   return (
-    <p className="text-sm text-zinc-600 mt-0.5 flex items-center gap-1.5">
-      <MapPin className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-      <span className="truncate">
-        {plan.venueName}
-        {plan.venueAddress ? ` · ${plan.venueAddress}` : ""}
-      </span>
-    </p>
+    <section className="wrap hero">
+      <div className="eyebrow">Nothing coming up</div>
+      <div className="hero-grid">
+        <div>
+          <h1 style={{ marginTop: 8 }}>No plans yet</h1>
+          <p className="blurb">Nothing on your calendars in the next while. We&rsquo;ll text you the moment there is.</p>
+          {owner ? (
+            <div className="row"><Link className="btn ghost" href="/dashboard">Manage your calendars ↗</Link></div>
+          ) : (
+            ask && <div style={{ marginTop: 8 }}><Ask ask={ask} bare /></div>
+          )}
+        </div>
+        <div className="tile sage">plans</div>
+      </div>
+    </section>
   );
 }
 
-function HostStateBadge({ plan }: { plan: Plan }) {
-  // Persona leak guard: name/avatar ONLY on leaf_hosted. Never trust
-  // hostPersona presence alone — gate on hostState here.
-  if (plan.hostState === "leaf_hosted" && plan.hostPersona) {
-    return (
-      <span className="inline-flex items-center gap-2 text-[11px] uppercase tracking-wider text-zinc-500">
-        {plan.hostPersona.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={plan.hostPersona.avatarUrl}
-            alt=""
-            className="w-4 h-4 rounded-full object-cover"
-          />
-        ) : (
-          <span className="w-4 h-4 rounded-full bg-emerald-100" />
-        )}
-        Hosted by Leaf · {plan.hostPersona.name}
-      </span>
-    );
-  }
-  if (plan.hostState === "leaf_hosted") {
-    return (
-      <span className="text-[11px] uppercase tracking-wider text-zinc-500">Hosted by Leaf</span>
-    );
-  }
-  if (plan.hostState === "waiting_on_host") {
-    return (
-      <span className="text-[11px] uppercase tracking-wider text-amber-600">Waiting on host</span>
-    );
-  }
-  return null; // human_host / leaf_arranging → no badge
+// ---- Spine stop ------------------------------------------------------------
+function Stop({
+  plan, index, onRsvp, onMessage,
+}: {
+  plan: Plan;
+  index: number;
+  onRsvp: (id: string, s: RsvpState) => void;
+  onMessage: (id: string, m: PlanMessage) => void;
+}) {
+  const tile = tileFor(plan, index);
+  const status = statusFor(plan);
+  const going = plan.rsvpState === "going";
+  const meta = [weekday(plan.date), timeLabel(plan), plan.venueName || plan.venueAddress].filter(Boolean).join(" · ");
+  const hostHref = plan.calendarShareId ? `/org/${plan.calendarShareId}?host=${encodeURIComponent(plan.id)}` : `/p/${plan.id}`;
+  return (
+    <article className="stop">
+      <div className="date"><div className="d">{dayNum(plan.date)}</div><div className="m">{monthAbbr(plan.date)}</div></div>
+      <span className={`dot ${going ? "on" : ""}`} />
+      <div className="stop-card">
+        <div className={`tile sm ${tile.tone}`}>{tile.word}</div>
+        <div>
+          <div className="cal">{plan.calendarName}</div>
+          <h3>{plan.title}</h3>
+          <p className="meta">{meta}</p>
+          {status && <span className={`status ${status.cls}`}>{status.text}</span>}
+          {plan.hostState === "waiting_on_host" && (
+            <div style={{ marginTop: 9 }}><Link className="btn ghost" href={hostHref}>Host this ↗</Link></div>
+          )}
+          {plan.rsvpState !== "going" && plan.hostState !== "waiting_on_host" && (
+            <div style={{ marginTop: 9 }}><AttendButtons plan={plan} onRsvp={onRsvp} compact /></div>
+          )}
+          <Thread plan={plan} onMessage={onMessage} />
+        </div>
+      </div>
+    </article>
+  );
 }
 
-function WeatherChip({ weather }: { weather: Weather }) {
+// ---- Attend buttons --------------------------------------------------------
+function AttendButtons({
+  plan, onRsvp, compact,
+}: {
+  plan: Plan;
+  onRsvp: (id: string, s: RsvpState) => void;
+  compact?: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const going = plan.rsvpState === "going";
+
+  async function set(next: RsvpState) {
+    if (busy || plan.rsvpState === next) return;
+    const prev = plan.rsvpState;
+    setBusy(true);
+    onRsvp(plan.id, next);
+    try {
+      await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: next });
+    } catch {
+      onRsvp(plan.id, prev);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-zinc-500 bg-white/70 border border-zinc-200 rounded-full px-2 py-0.5">
-      <CloudSun className="w-3.5 h-3.5 text-amber-500" />
-      {weather.temp ? `${weather.temp}°` : ""}
-      {weather.text ? ` ${weather.text}` : ""}
+    <span className="attend">
+      <button
+        className={`btn ${going ? "" : ""}`}
+        aria-pressed={going}
+        disabled={busy}
+        onClick={() => set("going")}
+      >
+        {going ? "✓ Going" : compact ? "I'm going" : "I'm going"}
+      </button>
+      <button
+        className="btn ghost"
+        aria-pressed={plan.rsvpState === "not_going"}
+        disabled={busy}
+        onClick={() => set("not_going")}
+      >
+        Can&rsquo;t make it
+      </button>
     </span>
   );
 }
 
-function RsvpToggle({
-  plan,
-  onRsvpChange,
+// ---- Thread (messages colocated with their plan) ---------------------------
+function Thread({
+  plan, onMessage, hero,
 }: {
   plan: Plan;
-  onRsvpChange: (id: string, s: RsvpState) => void;
+  onMessage: (id: string, m: PlanMessage) => void;
+  hero?: boolean;
 }) {
-  const [busy, setBusy] = useState(false);
-  const going = plan.rsvpState === "going";
-
-  async function toggle() {
-    if (busy) return;
-    const next: RsvpState = going ? "not_going" : "going";
-    const prev = plan.rsvpState;
-    setBusy(true);
-    onRsvpChange(plan.id, next); // optimistic
-    try {
-      await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: next });
-    } catch {
-      onRsvpChange(plan.id, prev); // rollback
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Explicit attend button. A plan only appears here if you already follow/own
-  // its calendar, so the action is about attending the plan, not following.
-  return (
-    <button
-      onClick={toggle}
-      disabled={busy}
-      aria-pressed={going}
-      className={
-        "shrink-0 inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-bold px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 " +
-        (going
-          ? "border border-emerald-600 text-emerald-700 hover:bg-emerald-50"
-          : "bg-zinc-900 text-white hover:bg-zinc-800")
-      }
-    >
-      {going ? (
-        <>
-          <Check className="w-3.5 h-3.5" /> Attending
-        </>
-      ) : (
-        "I’m attending"
-      )}
-    </button>
-  );
-}
-
-// Low rung of the ask — HOST THIS on waiting_on_host plans. Uses the same copy
-// and destination as the calendar page (the org page owns the host action).
-function HostThis({ plan }: { plan: Plan }) {
-  const href = plan.calendarShareId
-    ? `/org/${plan.calendarShareId}?host=${encodeURIComponent(plan.id)}`
-    : `/p/${plan.id}`;
-  return (
-    <Link
-      href={href}
-      className="mt-3 inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-bold text-zinc-900 hover:text-emerald-700"
-    >
-      Host this <ArrowUpRight className="w-3.5 h-3.5" />
-    </Link>
-  );
-}
-
-// ---- Messages, colocated under their plan -----------------------------------
-function MessageThread({
-  plan,
-  onMessagePosted,
-}: {
-  plan: Plan;
-  onMessagePosted: (id: string, m: PlanMessage) => void;
-}) {
+  const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
-  const hasMessages = plan.messages.length > 0;
+  const canReply = plan.rsvpState === "going";
+
+  if (plan.messages.length === 0 && !canReply) return null;
 
   async function send() {
-    const body = text.trim();
-    if (!body || busy) return;
+    const b = text.trim();
+    if (!b || busy) return;
     setBusy(true);
     try {
-      await Parse.Cloud.run("postPlanMessage", { eventGroupId: plan.id, body });
-      onMessagePosted(plan.id, {
-        id: null,
-        authorName: "You",
-        authorRole: "self",
-        body,
-        sentAt: new Date().toISOString(),
-        unread: false,
+      await Parse.Cloud.run("postPlanMessage", { eventGroupId: plan.id, body: b });
+      onMessage(plan.id, {
+        id: null, authorName: "You", authorRole: "self", body: b,
+        sentAt: new Date().toISOString(), unread: false,
       });
-      setText("");
-    } catch {
-      // keep the draft so the user can retry
-    } finally {
-      setBusy(false);
-    }
+      setText(""); setOpen(false);
+    } catch { /* keep draft */ } finally { setBusy(false); }
   }
 
-  // No messages and going/RSVP'd → still allow a reply affordance, but no
-  // empty-state chrome (spec §A9).
-  if (!hasMessages && plan.rsvpState !== "going") return null;
-
   return (
-    <div className="mt-4 border-t border-zinc-100 pt-3">
+    <div className={`thread ${hero ? "hero-thread" : ""}`}>
       {plan.messages.map((m, i) => (
-        <div key={m.id || i} className="flex items-start gap-2 mb-2">
-          <span
-            className={
-              "mt-1 w-1.5 h-1.5 rounded-full shrink-0 " +
-              (m.unread ? "bg-emerald-600" : "bg-transparent")
-            }
-          />
-          <p className="text-sm text-zinc-700 leading-snug">
-            <span className="font-medium text-zinc-900">{m.authorName}:</span> {m.body}
-          </p>
+        <div className="msg" key={m.id || i}>
+          <div className={`mava ${m.unread ? "unread" : ""}`}>{initial(m.authorName)}</div>
+          <div className="msg-b">
+            <div className="t">{m.authorName}{m.authorRole === "leaf" ? " · Leaf concierge" : plan.calendarName ? ` · ${plan.calendarName}` : ""}</div>
+            <p className="p">{m.body}</p>
+            {m.sentAt && <div className="ago">{ago(m.sentAt)}</div>}
+          </div>
         </div>
       ))}
-      {plan.rsvpState === "going" && (
-        <div className="flex items-center gap-2 mt-2">
+      {canReply && !open && (
+        <button className="reply" onClick={() => setOpen(true)}>Reply</button>
+      )}
+      {canReply && open && (
+        <div className="composer">
           <input
             value={text}
+            autoFocus
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
             placeholder="Reply to the plan…"
-            className="flex-1 px-3 py-1.5 text-sm border border-zinc-200 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-200"
           />
-          <button
-            onClick={send}
-            disabled={busy || !text.trim()}
-            className="p-2 rounded-full bg-zinc-900 text-white disabled:opacity-40"
-            aria-label="Send reply"
-          >
-            <Send className="w-3.5 h-3.5" />
-          </button>
+          <button className="btn" disabled={busy || !text.trim()} onClick={send}>Send</button>
         </div>
       )}
     </div>
   );
 }
 
-// ---- Empty state — no upcoming plans (never render a blank page) -----------
-function EmptyState({
-  ask,
-  owner,
+// ---- The ask ---------------------------------------------------------------
+function Ask({
+  ask, bare,
 }: {
-  ask: Dashboard["ask"];
-  owner: boolean;
+  ask: NonNullable<Dashboard["ask"]>;
+  bare?: boolean;
 }) {
-  // Non-owner with a real pattern/generic ask → lead with the ask (spec §A9).
-  if (ask) return <TheAsk ask={ask} plans={[]} lead />;
-  // Owner (ask suppressed) or no ask → an honest "nothing coming up" card.
+  const href = ask.promptPrefill ? `${PROMPT_BASE}?q=${encodeURIComponent(ask.promptPrefill)}` : PROMPT_BASE;
+  const inner = (
+    <div className="start">
+      <p className="lede">{ask.copy}</p>
+      <p className="sub">Real places, real dates, in seconds. Your friends RSVP by text.</p>
+      <a className="prompt" href={href}>
+        <span className="typed">{ask.promptPrefill ? `"${ask.promptPrefill}"` : "Start a calendar"}</span>
+        <span className="btn">Start this ↗</span>
+      </a>
+      <p className="handoff">Opens the prompt on joinleaf.com with this already typed in — still signed in as you, nothing to sign up for.</p>
+    </div>
+  );
+  if (bare) return inner;
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-emerald-50/60 to-white p-6 mb-10">
-      <span className="text-xs uppercase tracking-widest font-bold text-emerald-700">
-        Nothing coming up
-      </span>
-      <p className="mt-2 text-lg font-light text-zinc-900">
-        No plans on your calendars in the next 7 days. We&rsquo;ll text you when there are.
-      </p>
-      {owner && (
-        <Link
-          href="/dashboard"
-          className="mt-4 inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-bold text-zinc-900 hover:text-emerald-700"
-        >
-          Manage your calendars <ArrowUpRight className="w-4 h-4" />
-        </Link>
-      )}
+    <section className="wrap sect">
+      <div className="eyebrow" style={{ marginBottom: 18 }}>Start your own</div>
+      {inner}
     </section>
   );
 }
 
-// ---- The ask (converting attendees into owners) ----------------------------
-function TheAsk({
-  ask,
-  lead,
-}: {
-  ask: { kind: "pattern" | "generic"; copy: string; promptPrefill: string | null };
-  plans: Plan[];
-  lead?: boolean;
-}) {
-  const href = ask.promptPrefill
-    ? `${PROMPT_BASE}?q=${encodeURIComponent(ask.promptPrefill)}`
-    : PROMPT_BASE;
-  return (
-    <section
-      className={
-        "rounded-2xl border border-zinc-200 bg-gradient-to-br from-emerald-50/60 to-white p-6 " +
-        (lead ? "mt-2" : "mt-2")
-      }
-    >
-      <span className="text-xs uppercase tracking-widest font-bold text-emerald-700">
-        {lead ? "Nothing on the calendar yet" : "Start something"}
-      </span>
-      <p className="mt-2 text-lg font-light text-zinc-900">{ask.copy}</p>
-      {/* Rendered as a quoted phrase LINK, not an input — it navigates. */}
-      <Link
-        href={href}
-        className="mt-4 inline-flex items-center gap-1.5 text-sm text-zinc-900 hover:text-emerald-700"
-      >
-        {ask.promptPrefill ? (
-          <span className="italic">“{ask.promptPrefill}”</span>
-        ) : (
-          <span className="font-bold uppercase tracking-widest text-[11px]">Start a calendar</span>
-        )}
-        <ArrowUpRight className="w-4 h-4 shrink-0" />
-      </Link>
-    </section>
-  );
-}
-
-// ---- Owner strip (mutually exclusive with the ask) -------------------------
+// ---- Owner strip -----------------------------------------------------------
 function OwnerStrip({ count }: { count: number }) {
   return (
-    <Link
-      href="/dashboard"
-      className="flex items-center justify-between rounded-xl border border-zinc-200 px-5 py-4 hover:border-zinc-300 mt-2"
-    >
-      <span className="text-sm text-zinc-700">
-        {count} plan{count === 1 ? "" : "s"} need your review
-      </span>
-      <span className="inline-flex items-center gap-1 text-[11px] uppercase tracking-widest font-bold text-zinc-900">
-        Open manage <ArrowUpRight className="w-3.5 h-3.5" />
-      </span>
-    </Link>
-  );
-}
-
-// ---- Footer — the SMS contract ---------------------------------------------
-function MeFooter({ userId }: { userId: string | null }) {
-  const prefBase = userId ? `/unsubscribe?u=${encodeURIComponent(userId)}` : "/unsubscribe";
-  return (
-    <footer className="mt-12 pt-6 border-t border-zinc-100 text-center">
-      <p className="text-xs text-zinc-400 leading-relaxed">
-        We text you once a week — one link to this page — only when you have plans coming up.
-      </p>
-      <div className="mt-3 flex items-center justify-center gap-4 text-[11px] uppercase tracking-wider text-zinc-400">
-        <Link href={prefBase} className="hover:text-zinc-600">
-          Change frequency
-        </Link>
-        <span className="text-zinc-200">·</span>
-        <Link href={prefBase} className="hover:text-zinc-600">
-          Stop texts
-        </Link>
+    <section className="wrap sect">
+      <div className="eyebrow" style={{ marginBottom: 18 }}>You also run a calendar</div>
+      <div className="owner">
+        <p>
+          {count > 0 ? (
+            <><b>{count} plan{count === 1 ? "" : "s"} need your review</b></>
+          ) : (
+            <><b>Manage your calendars</b> — review plans, RSVPs, and hosting.</>
+          )}
+        </p>
+        <Link className="btn ghost" href="/dashboard">Open manage ↗</Link>
       </div>
-    </footer>
+    </section>
   );
 }
 
 // ---- Chrome ----------------------------------------------------------------
-function FullScreen({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen bg-white flex items-center justify-center px-6">{children}</div>
-  );
-}
 function Spinner() {
-  return <Loader2 className="w-6 h-6 text-zinc-300 animate-spin" />;
+  return <span className="lm-spin" aria-label="Loading" />;
 }
 
-// ---- OTP fallback (for arrivals without a token) ---------------------------
+// ---- OTP fallback ----------------------------------------------------------
 function OtpModal({ onVerified }: { onVerified: () => void | Promise<void> }) {
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [phone, setPhone] = useState("");
@@ -714,120 +542,171 @@ function OtpModal({ onVerified }: { onVerified: () => void | Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  function formatPhone(value: string) {
-    const digits = value.replace(/\D/g, "").slice(0, 10);
-    if (digits.length <= 3) return digits;
-    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  function fmt(v: string) {
+    const d = v.replace(/\D/g, "").slice(0, 10);
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+    return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
   }
-
   async function sendCode() {
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length < 10) {
-      setErr("Enter a valid 10-digit phone number.");
-      return;
-    }
-    setBusy(true);
-    setErr("");
-    try {
-      await Parse.Cloud.run("requestOTP", { phone: `+1${digits}` });
-      setStep("code");
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Couldn't send code.");
-    } finally {
-      setBusy(false);
-    }
+    const d = phone.replace(/\D/g, "");
+    if (d.length < 10) { setErr("Enter a valid 10-digit phone number."); return; }
+    setBusy(true); setErr("");
+    try { await Parse.Cloud.run("requestOTP", { phone: `+1${d}` }); setStep("code"); }
+    catch (e: unknown) { setErr(e instanceof Error ? e.message : "Couldn't send code."); }
+    finally { setBusy(false); }
   }
-
-  async function submitCode() {
-    const digits = phone.replace(/\D/g, "");
-    if (code.length < 4) {
-      setErr("Enter the full code.");
-      return;
-    }
-    setBusy(true);
-    setErr("");
+  async function submit() {
+    const d = phone.replace(/\D/g, "");
+    if (code.length < 4) { setErr("Enter the full code."); return; }
+    setBusy(true); setErr("");
     try {
-      const result = (await Parse.Cloud.run("verifyOTP", {
-        phone: `+1${digits}`,
-        code,
-      })) as { sessionToken?: string } | string;
-      const st = typeof result === "string" ? result : result?.sessionToken;
+      const r = (await Parse.Cloud.run("verifyOTP", { phone: `+1${d}`, code })) as { sessionToken?: string } | string;
+      const st = typeof r === "string" ? r : r?.sessionToken;
       if (!st || !st.startsWith("r:")) throw new Error("Verification failed. Try again.");
       await Parse.User.become(st);
       await onVerified();
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Verification failed.");
-    } finally {
-      setBusy(false);
-    }
+    } catch (e: unknown) { setErr(e instanceof Error ? e.message : "Verification failed."); }
+    finally { setBusy(false); }
   }
-
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4">
-      <div className="max-w-sm w-full">
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center">
-            <ShieldCheck className="w-5 h-5 text-emerald-700" />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-zinc-900">See your plans</h3>
-            <p className="text-xs text-zinc-500">
-              {step === "phone" ? "Enter your phone to continue." : `Sent to +1 ${phone}`}
-            </p>
-          </div>
-        </div>
-
+    <div className="otp">
+      <div className="otp-card">
+        <div className="eyebrow" style={{ marginBottom: 10 }}>Your plans · Leaf</div>
+        <p className="lede" style={{ fontFamily: "var(--serif)", fontSize: 22, marginBottom: 4 }}>See your week</p>
+        <p className="sub" style={{ color: "var(--ink-3)", fontSize: 13, marginBottom: 18 }}>
+          {step === "phone" ? "Enter the phone on your Leaf account." : `Code sent to +1 ${phone}`}
+        </p>
         {step === "phone" ? (
           <>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-sm text-zinc-400">+1</span>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(formatPhone(e.target.value))}
-                placeholder="(555) 123-4567"
-                className="flex-1 px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-200"
-                autoFocus
-              />
-            </div>
-            {err && <p className="text-xs text-red-500 mb-2">{err}</p>}
-            <button
-              onClick={sendCode}
-              disabled={busy}
-              className="w-full py-2.5 text-sm font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 disabled:opacity-50"
-            >
-              {busy ? "Sending…" : "Send code"}
-            </button>
+            <input className="otp-in" type="tel" value={phone} autoFocus placeholder="(555) 123-4567" onChange={(e) => setPhone(fmt(e.target.value))} />
+            {err && <p className="otp-err">{err}</p>}
+            <button className="btn" style={{ width: "100%", justifyContent: "center" }} disabled={busy} onClick={sendCode}>{busy ? "Sending…" : "Send code"}</button>
           </>
         ) : (
           <>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              placeholder="Code"
-              className="w-full px-3 py-2 mb-3 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-200"
-              autoFocus
-            />
-            {err && <p className="text-xs text-red-500 mb-2">{err}</p>}
-            <button
-              onClick={submitCode}
-              disabled={busy}
-              className="w-full py-2.5 text-sm font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 disabled:opacity-50"
-            >
-              {busy ? "Verifying…" : "See my plans"}
-            </button>
-            <button
-              onClick={() => setStep("phone")}
-              className="w-full mt-2 text-xs text-zinc-400 hover:text-zinc-600 flex items-center justify-center gap-1"
-            >
-              <X className="w-3 h-3" /> Use a different number
-            </button>
+            <input className="otp-in" inputMode="numeric" value={code} autoFocus placeholder="Code" onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} />
+            {err && <p className="otp-err">{err}</p>}
+            <button className="btn" style={{ width: "100%", justifyContent: "center" }} disabled={busy} onClick={submit}>{busy ? "Verifying…" : "See my plans"}</button>
+            <button className="reply" style={{ marginTop: 10 }} onClick={() => setStep("phone")}>Use a different number</button>
           </>
         )}
       </div>
     </div>
   );
 }
+
+// ---- Scoped CSS (ported from the leaf-attendee-dashboard mockup) ------------
+const CSS = `
+.leafme{
+  --ink:#111111; --ink-2:#5c5c5c; --ink-3:#9a9a9a; --rule:#e8e8e6; --paper:#ffffff;
+  --sage:#dce5dc; --sage-deep:#2f5d43; --cream:#f5e6c8; --cream-deep:#8a6a2f; --green:#16a34a;
+  --sans:var(--font-me-sans),-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --serif:var(--font-me-serif),Georgia,serif;
+  background:var(--paper); color:var(--ink); font-family:var(--sans);
+  -webkit-font-smoothing:antialiased; line-height:1.5; min-height:100vh;
+}
+.leafme *{box-sizing:border-box}
+.leafme .wrap{max-width:940px;margin:0 auto;padding:0 28px}
+.leafme .eyebrow{font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.leafme .bar{border-bottom:1px solid var(--rule)}
+.leafme .bar-in{display:flex;align-items:center;justify-content:space-between;height:64px}
+.leafme .leaflogo{height:24px;width:auto;display:block}
+.leafme .who{display:flex;align-items:center;gap:9px}
+.leafme .who span{font-size:12px;color:var(--ink-2)}
+.leafme .ava{width:28px;height:28px;border-radius:50%;background:#d8d4cc;display:grid;place-items:center;font-size:11px;font-weight:600;color:var(--ink-2)}
+.leafme .hero{padding:56px 0 44px;border-bottom:1px solid var(--rule)}
+.leafme .hero .eyebrow{margin-bottom:18px}
+.leafme .hero-grid{display:grid;grid-template-columns:1fr 300px;gap:44px;align-items:start}
+.leafme .when{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ink-2);margin-bottom:6px}
+.leafme .hero h1{font-family:var(--serif);font-size:40px;line-height:1.08;font-weight:500;letter-spacing:-.02em;margin-bottom:12px}
+.leafme .addr{font-size:13px;color:var(--ink-2);margin-bottom:4px}
+.leafme .blurb{font-size:13px;color:var(--ink-3);max-width:44ch;margin-bottom:22px}
+.leafme .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.leafme .attend{display:inline-flex;gap:10px}
+.leafme .btn{display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:#fff;border:0;cursor:pointer;font-family:var(--sans);font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;padding:11px 16px;border-radius:3px;text-decoration:none}
+.leafme .btn:hover{background:#000}
+.leafme .btn:disabled{opacity:.5;cursor:default}
+.leafme .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--rule)}
+.leafme .btn.ghost:hover{border-color:var(--ink-3);background:transparent}
+.leafme .btn:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.leafme .wx{display:inline-flex;align-items:center;gap:6px;background:#f6f6f4;border-radius:999px;padding:5px 11px;font-size:12px;color:var(--ink-2)}
+.leafme .wx b{font-weight:600;color:var(--ink)}
+.leafme .tile{aspect-ratio:4/3;border-radius:3px;display:grid;place-items:center;font-family:var(--serif);font-size:30px}
+.leafme .tile.sage{background:var(--sage);color:var(--sage-deep)}
+.leafme .tile.cream{background:var(--cream);color:var(--cream-deep)}
+.leafme .tile.sm{aspect-ratio:16/10;font-size:19px}
+.leafme .sect{padding:44px 0;border-bottom:1px solid var(--rule)}
+.leafme .sect-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:26px}
+.leafme .count{font-size:11px;color:var(--ink-3)}
+.leafme .count .new{color:var(--green)}
+.leafme .spine{position:relative;padding-left:96px}
+.leafme .spine::before{content:"";position:absolute;left:71px;top:8px;bottom:8px;width:1px;background:var(--rule)}
+.leafme .stop{position:relative;padding-bottom:30px}
+.leafme .stop:last-child{padding-bottom:0}
+.leafme .date{position:absolute;left:-96px;top:0;width:56px;text-align:right}
+.leafme .date .d{font-family:var(--serif);font-size:22px;line-height:1;color:var(--ink)}
+.leafme .date .m{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-top:4px}
+.leafme .dot{position:absolute;left:-30px;top:7px;width:7px;height:7px;border-radius:50%;background:var(--paper);border:1.5px solid var(--ink-3)}
+.leafme .dot.on{background:var(--green);border-color:var(--green)}
+.leafme .stop-card{display:grid;grid-template-columns:120px 1fr;gap:18px;align-items:start}
+.leafme .stop h3{font-family:var(--serif);font-size:17px;font-weight:500;letter-spacing:-.01em;margin-bottom:3px}
+.leafme .meta{font-size:12px;color:var(--ink-3);margin-bottom:9px}
+.leafme .cal{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:5px}
+.leafme .status{display:inline-flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.leafme .status::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--ink-3)}
+.leafme .status.host::before{background:var(--green)}
+.leafme .status.wait::before{background:#d9a441}
+.leafme .thread{margin-top:14px;padding-top:13px;border-top:1px solid var(--rule)}
+.leafme .thread.hero-thread{max-width:44ch}
+.leafme .msg{display:flex;gap:11px;padding:9px 0}
+.leafme .msg:first-child{padding-top:0}
+.leafme .mava{width:26px;height:26px;border-radius:50%;flex-shrink:0;background:var(--sage);display:grid;place-items:center;font-family:var(--serif);font-size:12px;color:var(--sage-deep);position:relative}
+.leafme .mava.unread::after{content:"";position:absolute;top:-1px;right:-1px;width:7px;height:7px;border-radius:50%;background:var(--green);border:1.5px solid var(--paper)}
+.leafme .msg-b .t{font-size:11px;font-weight:500;color:var(--ink-2);margin-bottom:3px}
+.leafme .msg-b .p{font-size:13px;color:var(--ink);line-height:1.45}
+.leafme .msg-b .ago{font-size:11px;color:var(--ink-3);margin-top:3px}
+.leafme .reply{background:none;border:0;padding:0;margin-top:7px;cursor:pointer;font-family:var(--sans);font-size:11px;color:var(--ink-2);border-bottom:1px solid var(--rule)}
+.leafme .reply:hover{color:var(--ink);border-color:var(--ink-3)}
+.leafme .composer{display:flex;gap:8px;margin-top:10px}
+.leafme .composer input{flex:1;border:1px solid var(--rule);border-radius:3px;padding:9px 12px;font-family:var(--sans);font-size:13px;color:var(--ink)}
+.leafme .composer input:focus{outline:2px solid var(--green);outline-offset:1px}
+.leafme .start{border:1px solid var(--rule);border-radius:3px;padding:26px 24px}
+.leafme .start .lede{font-family:var(--serif);font-size:20px;line-height:1.3;margin-bottom:5px}
+.leafme .start .sub{font-size:13px;color:var(--ink-3);margin-bottom:18px}
+.leafme .prompt{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--rule);border-radius:3px;padding:5px 5px 5px 15px;background:#fbfbfa;text-decoration:none}
+.leafme .prompt:hover{border-color:var(--ink-3)}
+.leafme .typed{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ink-2);padding:9px 0}
+.leafme .handoff{font-size:11px;color:var(--ink-3);margin-top:12px}
+.leafme .owner{display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid var(--rule);border-radius:3px;padding:16px 18px}
+.leafme .owner p{font-size:13px;color:var(--ink-2)}
+.leafme .owner p b{color:var(--ink);font-weight:500}
+.leafme .foot{padding:36px 0 56px}
+.leafme .foot p{font-size:12px;color:var(--ink-3);max-width:52ch}
+.leafme .foot a{color:var(--ink-2)}
+.leafme .note{font-family:var(--serif);font-style:italic;font-size:13px;color:var(--ink-3);margin-top:10px;margin-bottom:4px}
+.leafme .lm-center{min-height:100vh;display:grid;place-items:center;padding:0 28px}
+.leafme .lm-muted{font-size:13px;color:var(--ink-3)}
+.leafme .lm-spin{width:22px;height:22px;border-radius:50%;border:2px solid var(--rule);border-top-color:var(--ink-3);animation:lmspin .8s linear infinite;display:inline-block}
+@keyframes lmspin{to{transform:rotate(360deg)}}
+.leafme .otp{min-height:100vh;display:grid;place-items:center;padding:0 24px}
+.leafme .otp-card{width:100%;max-width:360px}
+.leafme .otp-in{width:100%;border:1px solid var(--rule);border-radius:3px;padding:10px 12px;font-family:var(--sans);font-size:14px;margin-bottom:12px}
+.leafme .otp-in:focus{outline:2px solid var(--green);outline-offset:1px}
+.leafme .otp-err{font-size:12px;color:#c0392b;margin-bottom:10px}
+@media(max-width:760px){
+  .leafme .wrap{padding:0 20px}
+  .leafme .hero-grid{grid-template-columns:1fr;gap:24px}
+  .leafme .hero{padding:36px 0 32px}
+  .leafme .hero h1{font-size:30px}
+  .leafme .hero-grid .tile{max-width:280px}
+  .leafme .spine{padding-left:0}
+  .leafme .spine::before{display:none}
+  .leafme .date{position:static;width:auto;text-align:left;display:flex;align-items:baseline;gap:7px;margin-bottom:8px}
+  .leafme .date .m{margin-top:0}
+  .leafme .dot{display:none}
+  .leafme .stop-card{grid-template-columns:88px 1fr;gap:14px}
+  .leafme .owner{flex-direction:column;align-items:flex-start}
+}
+@media(prefers-reduced-motion:reduce){.leafme *{transition:none!important;animation:none!important}}
+`;

@@ -1,15 +1,30 @@
 import type { Metadata } from "next";
+import { Inter, Newsreader } from "next/font/google";
 import MeClient from "./MeClient";
 
-// Attendee dashboard (/me). The live destination for the weekly SMS link.
-// Auth is resolved client-side from the tokenized magic link (or an existing
-// Parse session, or an OTP step) — see MeClient. No server prefetch: the
-// session lives only in the browser Parse SDK, so this stays a thin shell.
+// Leaf's dashboard vocabulary: Inter for body, Newsreader (serif) for the
+// headings/dates/tiles that carry the brand.
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-me-sans",
+});
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  weight: ["400"],
+  variable: "--font-me-serif",
+});
+
 export const metadata: Metadata = {
-  title: "Your week · Leaf",
+  title: "Your plans · Leaf",
   robots: { index: false, follow: false },
 };
 
 export default function MePage() {
-  return <MeClient />;
+  return (
+    <div className={`${inter.variable} ${newsreader.variable}`}>
+      <MeClient />
+    </div>
+  );
 }
