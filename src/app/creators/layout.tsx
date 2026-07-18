@@ -6,7 +6,7 @@ import "./styles.css";
 // Reuses the resident-managers gathering photo until a creators-specific
 // OG asset is added.
 const OG_IMAGE = "https://os.joinleaf.com/resident-managers-hero.png";
-const OG_ALT = "People gathered around a table at a real dinner party";
+const OG_ALT = "Friends gathered at a real night out";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://os.joinleaf.com"),

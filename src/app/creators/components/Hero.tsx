@@ -15,13 +15,13 @@ function HeroArt() {
     >
       <div className="mock">
         <div className="mock__type">
-          cozy dinner for 8, everyone brings a dish
+          drinks on the rooftop Friday, 8pm
           <span className="mock__caret"> ▍</span>
         </div>
         <div className="mock__spacer" />
         <div className="mock__card">
-          <div className="mock__title">Cozy dinner for 8</div>
-          <div className="mock__meta">Saturday · 7:30pm · everyone brings a dish</div>
+          <div className="mock__title">Rooftop drinks</div>
+          <div className="mock__meta">Friday · 8pm · bring someone new</div>
           <div className="mock__rsvps">
             <div className="mock__faces">
               <span className="mock__face" style={{ background: "#2d6a4f" }}>

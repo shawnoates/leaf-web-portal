@@ -5,7 +5,7 @@ const steps = [
   {
     n: "1",
     h: "Plan something real",
-    b: "Type one sentence into Leaf — “cozy dinner for 8, everyone brings a dish” — and it becomes a plan with an invite your people RSVP to.",
+    b: "Type one sentence into Leaf — “drinks on the rooftop Friday, 8pm” — and it becomes a plan with an invite your people RSVP to.",
   },
   {
     n: "2",
