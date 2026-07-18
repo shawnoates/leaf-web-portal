@@ -213,18 +213,19 @@ export default function MeClient() {
     <div className="min-h-screen bg-white text-zinc-900">
       <div className="max-w-2xl mx-auto px-5 py-10">
         {/* Masthead */}
-        <div className="flex items-baseline justify-between mb-8">
-          <span className="text-lg font-light tracking-tight">Leaf</span>
+        <div className="flex items-center justify-between mb-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/leaf-logo-black.png" alt="Leaf" className="h-7" />
           <span className="text-[11px] uppercase tracking-[0.2em] text-zinc-400">
             {d.person.firstName ? `${d.person.firstName}’s week` : "Your week"}
           </span>
         </div>
 
-        {/* 1. Hero — the next plan */}
+        {/* 1. Hero — the next plan (or an honest empty state) */}
         {d.nextPlan ? (
           <Hero plan={d.nextPlan} onRsvpChange={onRsvpChange} onMessagePosted={onMessagePosted} />
         ) : (
-          d.ask && <TheAsk ask={d.ask} plans={[]} lead />
+          <EmptyState ask={d.ask} owner={d.person.ownsCalendars} />
         )}
 
         {/* 2. The spine — chronology as structure (only when >1 plan) */}
@@ -585,6 +586,37 @@ function MessageThread({
         </div>
       )}
     </div>
+  );
+}
+
+// ---- Empty state — no upcoming plans (never render a blank page) -----------
+function EmptyState({
+  ask,
+  owner,
+}: {
+  ask: Dashboard["ask"];
+  owner: boolean;
+}) {
+  // Non-owner with a real pattern/generic ask → lead with the ask (spec §A9).
+  if (ask) return <TheAsk ask={ask} plans={[]} lead />;
+  // Owner (ask suppressed) or no ask → an honest "nothing coming up" card.
+  return (
+    <section className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-emerald-50/60 to-white p-6 mb-10">
+      <span className="text-xs uppercase tracking-widest font-bold text-emerald-700">
+        Nothing coming up
+      </span>
+      <p className="mt-2 text-lg font-light text-zinc-900">
+        No plans on your calendars in the next 7 days. We&rsquo;ll text you when there are.
+      </p>
+      {owner && (
+        <Link
+          href="/dashboard"
+          className="mt-4 inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-bold text-zinc-900 hover:text-emerald-700"
+        >
+          Manage your calendars <ArrowUpRight className="w-4 h-4" />
+        </Link>
+      )}
+    </section>
   );
 }
 
