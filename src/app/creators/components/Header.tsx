@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { CTA } from "./ui";
+import { SITE_URL } from "./config";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type WindowWithDataLayer = Window & { dataLayer?: any[] };
@@ -43,6 +44,9 @@ export default function Header() {
           <a className="link-ghost" href="#how">
             How it works
           </a>
+          <CTA href={SITE_URL} variant="ghost" track="try_it">
+            Try it out
+          </CTA>
           <CTA variant="primary">Partner with us</CTA>
         </div>
       </div>
