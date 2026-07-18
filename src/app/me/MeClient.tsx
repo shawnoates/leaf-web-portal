@@ -463,11 +463,20 @@ function Thread({
   hero?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
-  const canReply = plan.rsvpState === "going";
+  const canReply = plan.rsvpState === "going" || plan.viewerIsHost;
 
   if (plan.messages.length === 0 && !canReply) return null;
+
+  // Lead with what needs attention: show all UNREAD messages; if everything's
+  // read, fall back to just the latest one for context. Rest collapse behind
+  // an expander so the spine stays scannable.
+  const unread = plan.messages.filter((m) => m.unread);
+  const base = unread.length > 0 ? unread : plan.messages.slice(-1);
+  const shown = expanded ? plan.messages : base;
+  const hidden = expanded ? 0 : plan.messages.length - base.length;
 
   async function send() {
     const b = text.trim();
@@ -485,7 +494,12 @@ function Thread({
 
   return (
     <div className={`thread ${hero ? "hero-thread" : ""}`}>
-      {plan.messages.map((m, i) => (
+      {!expanded && hidden > 0 && (
+        <button className="reply earlier" onClick={() => setExpanded(true)}>
+          Show {hidden} earlier message{hidden === 1 ? "" : "s"}
+        </button>
+      )}
+      {shown.map((m, i) => (
         <div className="msg" key={m.id || i}>
           <div className={`mava ${m.unread ? "unread" : ""}`}>{initial(m.authorName)}</div>
           <div className="msg-b">
@@ -704,6 +718,7 @@ const CSS = `
 .leafme .msg-b .ago{font-size:11px;color:var(--ink-3);margin-top:3px}
 .leafme .reply{background:none;border:0;padding:0;margin-top:7px;cursor:pointer;font-family:var(--sans);font-size:11px;color:var(--ink-2);border-bottom:1px solid var(--rule)}
 .leafme .reply:hover{color:var(--ink);border-color:var(--ink-3)}
+.leafme .reply.earlier{margin-top:0;margin-bottom:12px;display:inline-block}
 .leafme .composer{display:flex;gap:8px;margin-top:10px}
 .leafme .composer input{flex:1;border:1px solid var(--rule);border-radius:3px;padding:9px 12px;font-family:var(--sans);font-size:13px;color:var(--ink)}
 .leafme .composer input:focus{outline:2px solid var(--green);outline-offset:1px}
