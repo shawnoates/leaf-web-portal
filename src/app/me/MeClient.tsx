@@ -649,7 +649,7 @@ const CSS = `
 .leafme .who{display:flex;align-items:center;gap:9px}
 .leafme .who span{font-size:12px;color:var(--ink-2)}
 .leafme .ava{width:28px;height:28px;border-radius:50%;background:#d8d4cc;display:grid;place-items:center;font-size:11px;font-weight:600;color:var(--ink-2)}
-.leafme .hero{padding:56px 0 44px;border-bottom:1px solid var(--rule)}
+.leafme .hero{padding-top:56px;padding-bottom:44px;border-bottom:1px solid var(--rule)}
 .leafme .hero .eyebrow{margin-bottom:18px}
 .leafme .hero-grid{display:grid;grid-template-columns:1fr 300px;gap:44px;align-items:start}
 .leafme .when{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ink-2);margin-bottom:6px}
@@ -672,7 +672,7 @@ const CSS = `
 .leafme .tile.sm{aspect-ratio:16/10;font-size:19px}
 .leafme .tile.photo{padding:0;overflow:hidden;background:#f2f2f0}
 .leafme .tile.photo img{width:100%;height:100%;object-fit:cover;display:block}
-.leafme .sect{padding:44px 0;border-bottom:1px solid var(--rule)}
+.leafme .sect{padding-top:44px;padding-bottom:44px;border-bottom:1px solid var(--rule)}
 .leafme .sect-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:26px}
 .leafme .count{font-size:11px;color:var(--ink-3)}
 .leafme .count .new{color:var(--green)}
@@ -717,7 +717,7 @@ const CSS = `
 .leafme .owner{display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid var(--rule);border-radius:3px;padding:16px 18px}
 .leafme .owner p{font-size:13px;color:var(--ink-2)}
 .leafme .owner p b{color:var(--ink);font-weight:500}
-.leafme .foot{padding:36px 0 56px}
+.leafme .foot{padding-top:36px;padding-bottom:56px}
 .leafme .foot p{font-size:12px;color:var(--ink-3);max-width:52ch}
 .leafme .foot a{color:var(--ink-2)}
 .leafme .note{font-family:var(--serif);font-style:italic;font-size:13px;color:var(--ink-3);margin-top:10px;margin-bottom:4px}
@@ -733,7 +733,7 @@ const CSS = `
 @media(max-width:760px){
   .leafme .wrap{padding:0 20px}
   .leafme .hero-grid{grid-template-columns:1fr;gap:24px}
-  .leafme .hero{padding:36px 0 32px}
+  .leafme .hero{padding-top:36px;padding-bottom:32px}
   .leafme .hero h1{font-size:30px}
   .leafme .hero-grid .tile{max-width:100%;order:-1;margin-bottom:6px}
   .leafme .sect-head{flex-direction:column;align-items:flex-start;gap:6px}
