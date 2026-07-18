@@ -2,8 +2,7 @@ import { Eyebrow } from "./ui";
 import Reveal from "./Reveal";
 
 const items = [
-  "You actually gather people — a dinner crew, a run club, a book club, a couples’ circle, a “we’re doing something Saturday” energy",
-  "Brooklyn / NYC based (for now)",
+  "You enjoy gathering people — a dinner crew, a run club, a book club, a couples’ circle, a “we’re doing something Saturday” energy",
   "1,000+ followers on TikTok or Instagram — engagement matters more than count",
   "Your content feels like real life, not ads",
 ];

@@ -136,12 +136,12 @@ function tileFor(plan: Plan, i: number): { tone: "sage" | "cream"; word: string 
 }
 // Plan visual: real photo when the plan has one, else the sage/cream tile.
 function PlanTile({
-  plan, index, sm, href, weather,
+  plan, index, sm, onOpen, weather,
 }: {
   plan: Plan;
   index: number;
   sm?: boolean;
-  href?: string;
+  onOpen?: () => void;
   weather?: Weather | null;
 }) {
   const tileEl = plan.image ? (
@@ -161,11 +161,11 @@ function PlanTile({
       )}
     </div>
   );
-  if (href) {
+  if (onOpen) {
     return (
-      <Link href={href} className="tile-link" aria-label={`Open ${plan.title}`}>
+      <button type="button" onClick={onOpen} className="tile-link" aria-label={`Open ${plan.title}`}>
         {content}
-      </Link>
+      </button>
     );
   }
   return content;
@@ -246,10 +246,6 @@ export default function MeClient() {
     patchPlan(planId, (p) => ({ ...p, rsvpState: next }));
   }, [patchPlan]);
 
-  const onMessage = useCallback((planId: string, m: PlanMessage) => {
-    patchPlan(planId, (p) => ({ ...p, messages: [...p.messages, m] }));
-  }, [patchPlan]);
-
   let body: React.ReactNode = null;
   if (authState === "resolving" || (!data && !loadError && authState === "authed")) {
     body = <div className="lm-center"><Spinner /></div>;
@@ -260,7 +256,7 @@ export default function MeClient() {
   } else if (loadError) {
     body = <div className="lm-center"><p className="lm-muted">{loadError}</p></div>;
   } else if (data) {
-    body = <DashboardView data={data} onRsvp={onRsvp} onMessage={onMessage} />;
+    body = <DashboardView data={data} onRsvp={onRsvp} />;
   }
 
   return (
@@ -273,15 +269,20 @@ export default function MeClient() {
 
 // ---- Dashboard view --------------------------------------------------------
 function DashboardView({
-  data, onRsvp, onMessage,
+  data, onRsvp,
 }: {
   data: Dashboard;
   onRsvp: (id: string, s: RsvpState) => void;
-  onMessage: (id: string, m: PlanMessage) => void;
 }) {
   const hero = data.nextPlan;
   const spine = data.plans.slice(1); // hero is plans[0]
   const calCount = new Set(data.plans.map((p) => p.calendarId).filter(Boolean)).size;
+  const [openPlanId, setOpenPlanId] = useState<string | null>(null);
+  // Read the live plan object so RSVP changes reflect inside the modal.
+  const openPlan =
+    (data.nextPlan && data.nextPlan.id === openPlanId ? data.nextPlan : null) ||
+    data.plans.find((p) => p.id === openPlanId) ||
+    null;
 
   return (
     <>
@@ -301,7 +302,7 @@ function DashboardView({
       <main>
         <section className="wrap greet">
           {data.greeting?.weather && (data.greeting.weather.temp || data.greeting.weather.text) && (
-            <span className="wx greet-wx">🌤 <b>{data.greeting.weather.temp}°</b> {data.greeting.weather.text}</span>
+            <span className="greet-wx">🌤 <b>{data.greeting.weather.temp}°</b> {data.greeting.weather.text}</span>
           )}
           <div className="greet-line">
             {greetingWord()}{data.person.firstName ? `, ${data.person.firstName}` : ""}
@@ -309,7 +310,7 @@ function DashboardView({
         </section>
 
         {hero ? (
-          <Hero plan={hero} onRsvp={onRsvp} onMessage={onMessage} />
+          <Hero plan={hero} onRsvp={onRsvp} onOpen={() => setOpenPlanId(hero.id)} />
         ) : (
           <EmptyHero ask={data.ask} owner={data.person.ownsCalendars} />
         )}
@@ -327,7 +328,7 @@ function DashboardView({
             </div>
             <div className="spine">
               {spine.map((plan, i) => (
-                <Stop key={plan.id} plan={plan} index={i + 1} onRsvp={onRsvp} onMessage={onMessage} />
+                <Stop key={plan.id} plan={plan} index={i + 1} onRsvp={onRsvp} onOpen={() => setOpenPlanId(plan.id)} />
               ))}
             </div>
           </section>
@@ -349,17 +350,21 @@ function DashboardView({
           </p>
         </footer>
       </main>
+
+      {openPlan && (
+        <PlanModal plan={openPlan} onClose={() => setOpenPlanId(null)} onRsvp={onRsvp} />
+      )}
     </>
   );
 }
 
 // ---- Hero ------------------------------------------------------------------
 function Hero({
-  plan, onRsvp, onMessage,
+  plan, onRsvp, onOpen,
 }: {
   plan: Plan;
   onRsvp: (id: string, s: RsvpState) => void;
-  onMessage: (id: string, m: PlanMessage) => void;
+  onOpen: () => void;
 }) {
   const addr = [plan.venueName, plan.venueAddress].filter(Boolean).join(" · ");
   return (
@@ -369,15 +374,15 @@ function Hero({
         <div>
           <div className="when">{heroWhen(plan)}</div>
           <div className="cal">{plan.calendarName}</div>
-          <h1><Link href={`/p/${plan.id}`} className="plan-link">{plan.title}</Link></h1>
+          <h1><button className="plan-link" onClick={onOpen}>{plan.title}</button></h1>
           {addr && <p className="addr">{addr}</p>}
           {plan.description && <p className="blurb">{plan.description}</p>}
           <div className="row">
             <AttendButtons plan={plan} onRsvp={onRsvp} />
           </div>
-          <Thread plan={plan} onMessage={onMessage} hero />
+          <Thread plan={plan} hero />
         </div>
-        <PlanTile plan={plan} index={0} href={`/p/${plan.id}`} weather={plan.weather} />
+        <PlanTile plan={plan} index={0} onOpen={onOpen} weather={plan.weather} />
       </div>
     </section>
   );
@@ -405,12 +410,12 @@ function EmptyHero({ ask, owner }: { ask: Dashboard["ask"]; owner: boolean }) {
 
 // ---- Spine stop ------------------------------------------------------------
 function Stop({
-  plan, index, onRsvp, onMessage,
+  plan, index, onRsvp, onOpen,
 }: {
   plan: Plan;
   index: number;
   onRsvp: (id: string, s: RsvpState) => void;
-  onMessage: (id: string, m: PlanMessage) => void;
+  onOpen: () => void;
 }) {
   const status = statusFor(plan);
   const going = plan.rsvpState === "going";
@@ -421,10 +426,10 @@ function Stop({
       <div className="date"><div className="d">{dayNum(plan.date)}</div><div className="m">{monthAbbr(plan.date)}</div></div>
       <span className={`dot ${going ? "on" : ""}`} />
       <div className="stop-card">
-        <PlanTile plan={plan} index={index} sm href={`/p/${plan.id}`} />
+        <PlanTile plan={plan} index={index} sm onOpen={onOpen} />
         <div>
           <div className="cal">{plan.calendarName}</div>
-          <h3><Link href={`/p/${plan.id}`} className="plan-link">{plan.title}</Link></h3>
+          <h3><button className="plan-link" onClick={onOpen}>{plan.title}</button></h3>
           <p className="meta">{meta}</p>
           {status && <span className={`status ${status.cls}`}>{status.text}</span>}
           {plan.hostState === "waiting_on_host" && (
@@ -433,7 +438,7 @@ function Stop({
           {!plan.viewerIsHost && plan.rsvpState !== "going" && plan.hostState !== "waiting_on_host" && (
             <div style={{ marginTop: 9 }}><AttendButtons plan={plan} onRsvp={onRsvp} /></div>
           )}
-          <Thread plan={plan} onMessage={onMessage} />
+          <Thread plan={plan} />
         </div>
       </div>
     </article>
@@ -491,20 +496,11 @@ function AttendButtons({
 }
 
 // ---- Thread (messages colocated with their plan) ---------------------------
-function Thread({
-  plan, onMessage, hero,
-}: {
-  plan: Plan;
-  onMessage: (id: string, m: PlanMessage) => void;
-  hero?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
+function Thread({ plan, hero }: { plan: Plan; hero?: boolean }) {
   const [expanded, setExpanded] = useState(false);
-  const [text, setText] = useState("");
-  const [busy, setBusy] = useState(false);
-  const canReply = plan.rsvpState === "going" || plan.viewerIsHost;
+  const canChat = plan.rsvpState === "going" || plan.viewerIsHost;
 
-  if (plan.messages.length === 0 && !canReply) return null;
+  if (plan.messages.length === 0 && !canChat) return null;
 
   // Lead with what needs attention: show all UNREAD messages; if everything's
   // read, fall back to just the latest one for context. Rest collapse behind
@@ -513,20 +509,6 @@ function Thread({
   const base = unread.length > 0 ? unread : plan.messages.slice(-1);
   const shown = expanded ? plan.messages : base;
   const hidden = expanded ? 0 : plan.messages.length - base.length;
-
-  async function send() {
-    const b = text.trim();
-    if (!b || busy) return;
-    setBusy(true);
-    try {
-      await Parse.Cloud.run("postPlanMessage", { eventGroupId: plan.id, body: b });
-      onMessage(plan.id, {
-        id: null, authorName: "You", authorRole: "self", body: b,
-        sentAt: new Date().toISOString(), unread: false,
-      });
-      setText(""); setOpen(false);
-    } catch { /* keep draft */ } finally { setBusy(false); }
-  }
 
   return (
     <div className={`thread ${hero ? "hero-thread" : ""}`}>
@@ -545,20 +527,8 @@ function Thread({
           </div>
         </div>
       ))}
-      {canReply && !open && (
-        <button className="reply" onClick={() => setOpen(true)}>Reply</button>
-      )}
-      {canReply && open && (
-        <div className="composer">
-          <input
-            value={text}
-            autoFocus
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && send()}
-            placeholder="Reply to the plan…"
-          />
-          <button className="btn" disabled={busy || !text.trim()} onClick={send}>Send</button>
-        </div>
+      {canChat && (
+        <Link href={`/chat/${plan.id}`} className="btn ghost chat-btn">Join Plan Chat ↗</Link>
       )}
     </div>
   );
@@ -608,6 +578,57 @@ function OwnerStrip({ count }: { count: number }) {
         <Link className="btn ghost" href="/dashboard">Manage ↗</Link>
       </div>
     </section>
+  );
+}
+
+// ---- Plan detail modal (opens over /me, no navigation) ---------------------
+function PlanModal({
+  plan, onClose, onRsvp,
+}: {
+  plan: Plan;
+  onClose: () => void;
+  onRsvp: (id: string, s: RsvpState) => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const status = statusFor(plan);
+  const canChat = plan.rsvpState === "going" || plan.viewerIsHost;
+  const addr = [plan.venueName, plan.venueAddress].filter(Boolean).join(" · ");
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-x" onClick={onClose} aria-label="Close">×</button>
+        {plan.image && (
+          <div className="modal-img">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={plan.image} alt="" />
+          </div>
+        )}
+        <div className="modal-body">
+          <div className="cal">{plan.calendarName}</div>
+          <h2 className="modal-title">{plan.title}</h2>
+          <div className="when">{heroWhen(plan)}</div>
+          {addr && <p className="addr" style={{ marginTop: 6 }}>{addr}</p>}
+          {plan.description && <p className="blurb" style={{ marginTop: 8 }}>{plan.description}</p>}
+          {status && (
+            <div style={{ marginTop: 8 }}><span className={`status ${status.cls}`}>{status.text}</span></div>
+          )}
+          <div className="row" style={{ marginTop: 18 }}>
+            <AttendButtons plan={plan} onRsvp={onRsvp} />
+          </div>
+          {canChat && (
+            <div style={{ marginTop: 12 }}>
+              <Link href={`/chat/${plan.id}`} className="btn ghost">Join Plan Chat ↗</Link>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -700,7 +721,8 @@ const CSS = `
 .leafme .who span{font-size:12px;color:var(--ink-2)}
 .leafme .ava{width:28px;height:28px;border-radius:50%;background:#d8d4cc;display:grid;place-items:center;font-size:11px;font-weight:600;color:var(--ink-2)}
 .leafme .greet{padding-top:36px;padding-bottom:4px}
-.leafme .greet-wx{display:inline-flex;margin-bottom:14px}
+.leafme .greet-wx{display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;font-size:13px;color:var(--ink-2)}
+.leafme .greet-wx b{color:var(--ink);font-weight:600}
 .leafme .greet-line{font-family:var(--serif);font-size:26px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
 .leafme .hero{padding-top:56px;padding-bottom:44px;border-bottom:1px solid var(--rule)}
 .leafme .hero .eyebrow{margin-bottom:18px}
@@ -726,9 +748,10 @@ const CSS = `
 .leafme .tile.photo{padding:0;overflow:hidden;background:#f2f2f0}
 .leafme .tile.photo img{width:100%;height:100%;object-fit:cover;display:block}
 .leafme .tile-wrap{position:relative;display:block}
-.leafme .tile-link{display:block;text-decoration:none}
-.leafme .plan-link{color:inherit;text-decoration:none}
+.leafme .tile-link{display:block;width:100%;padding:0;margin:0;border:0;background:none;cursor:pointer;text-decoration:none}
+.leafme .plan-link{display:inline;padding:0;margin:0;border:0;background:none;font:inherit;color:inherit;letter-spacing:inherit;cursor:pointer;text-align:left}
 .leafme .plan-link:hover{color:var(--ink-2)}
+.leafme .chat-btn{margin-top:12px}
 .leafme .wx-over{position:absolute;top:10px;right:10px;margin:0;z-index:2;background:rgba(255,255,255,.92);box-shadow:0 1px 3px rgba(0,0,0,.14)}
 .leafme .sect{padding-top:44px;padding-bottom:44px;border-bottom:1px solid var(--rule)}
 .leafme .sect.tail{border-bottom:none;padding-bottom:32px}
@@ -793,8 +816,19 @@ const CSS = `
 .leafme .otp-in{width:100%;border:1px solid var(--rule);border-radius:3px;padding:10px 12px;font-family:var(--sans);font-size:14px;margin-bottom:12px}
 .leafme .otp-in:focus{outline:2px solid var(--green);outline-offset:1px}
 .leafme .otp-err{font-size:12px;color:#c0392b;margin-bottom:10px}
+.leafme .modal-overlay{position:fixed;inset:0;z-index:60;background:rgba(17,17,17,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.leafme .modal-card{position:relative;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;background:var(--paper);border-radius:14px;animation:lmmodal .2s ease}
+@keyframes lmmodal{from{transform:translateY(16px);opacity:.5}to{transform:translateY(0);opacity:1}}
+.leafme .modal-x{position:absolute;top:12px;right:12px;z-index:2;width:32px;height:32px;border:0;border-radius:50%;background:rgba(255,255,255,.92);box-shadow:0 1px 4px rgba(0,0,0,.14);font-size:20px;line-height:1;cursor:pointer;color:var(--ink)}
+.leafme .modal-img{width:100%;aspect-ratio:16/9;overflow:hidden;background:#f2f2f0;border-radius:14px 14px 0 0}
+.leafme .modal-img img{width:100%;height:100%;object-fit:cover;display:block}
+.leafme .modal-body{padding:22px 22px 28px}
+.leafme .modal-title{font-family:var(--serif);font-size:26px;font-weight:500;letter-spacing:-.01em;margin:4px 0 8px}
 @media(max-width:760px){
   .leafme .wrap{padding:0 20px}
+  .leafme .modal-overlay{align-items:flex-end;padding:0}
+  .leafme .modal-card{max-width:none;border-radius:16px 16px 0 0;max-height:88vh}
+  .leafme .modal-img{border-radius:16px 16px 0 0}
   .leafme .hero-grid{grid-template-columns:1fr;gap:24px}
   .leafme .greet{padding-top:24px}
   .leafme .greet-line{font-size:22px}

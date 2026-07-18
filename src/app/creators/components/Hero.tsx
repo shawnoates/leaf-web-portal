@@ -52,8 +52,8 @@ export default function Hero() {
         <Reveal>
           <Eyebrow>For creators &amp; hosts</Eyebrow>
           <h1 className="h-xl">
-            Get paid to create content about nights that{" "}
-            <span className="underline-amber">actually happen.</span>
+            Get paid to document{" "}
+            <span className="underline-amber">a good night.</span>
           </h1>
           <p className="lead" style={{ marginTop: 22 }}>
             Leaf partners with hosts and creators who make real gatherings happen &mdash;
@@ -68,7 +68,7 @@ export default function Hero() {
               fontSize: "0.95rem",
             }}
           >
-            Brooklyn + NYC first. 1k followers is plenty.
+            1k followers is plenty.
           </p>
           <div className="cta-row cta-row--solo" style={{ marginTop: 28 }}>
             <CTA variant="primary" arrow>

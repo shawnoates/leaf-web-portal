@@ -12,11 +12,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://os.joinleaf.com"),
   title: "Leaf — Get paid to create content about nights that actually happen.",
   description:
-    "Leaf partners with Brooklyn + NYC hosts and creators who make real gatherings happen. Plan it through Leaf, film the night, post it in your voice — $50–150 per video, paid within 24 hours. 1k followers is plenty.",
+    "Leaf partners with hosts and creators who make real gatherings happen. Plan it through Leaf, film the night, post it in your voice — $50–150 per video, paid within 24 hours. 1k followers is plenty.",
   openGraph: {
     title: "Leaf — Get paid to document a good night.",
     description:
-      "Plan a real gathering through Leaf, film what happens, post it in your voice. $50–150 per video, paid within 24h. Brooklyn + NYC. Partner with us.",
+      "Plan a real gathering through Leaf, film what happens, post it in your voice. $50–150 per video, paid within 24h. Partner with us.",
     type: "website",
     url: "https://os.joinleaf.com/creators",
     siteName: "Leaf OS",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Leaf — Get paid to document a good night.",
     description:
-      "Plan a real gathering through Leaf, film what happens, post it in your voice. $50–150 per video, paid within 24h. Brooklyn + NYC.",
+      "Plan a real gathering through Leaf, film what happens, post it in your voice. $50–150 per video, paid within 24h.",
     images: [OG_IMAGE],
   },
 };

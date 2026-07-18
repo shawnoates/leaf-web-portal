@@ -70,7 +70,6 @@ export function CTA({
 export function TrustStrip() {
   return (
     <div className="trust">
-      <span>Brooklyn + NYC first</span>
       <span>1k followers is plenty</span>
       <span>Paid within 24h</span>
     </div>
