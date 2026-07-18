@@ -302,10 +302,11 @@ function DashboardView({
         )}
 
         <footer className="wrap foot">
-          <p>
-            One text a week, Sunday morning, with everything on this page. No text for every
-            plan added to a calendar you follow.{" "}
-            <Link href="/unsubscribe">Change how often</Link> · <Link href="/unsubscribe">Stop texts</Link>
+          <p>One text a week, Sunday morning — everything on this page in one link. Never a text for every plan on a calendar you follow.</p>
+          <p className="foot-links">
+            <Link href="/unsubscribe">Change how often</Link>
+            <span aria-hidden> · </span>
+            <Link href="/unsubscribe">Stop texts</Link>
           </p>
         </footer>
       </main>
@@ -732,9 +733,12 @@ const CSS = `
 .leafme .owner{display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid var(--rule);border-radius:3px;padding:16px 18px}
 .leafme .owner p{font-size:13px;color:var(--ink-2)}
 .leafme .owner p b{color:var(--ink);font-weight:500}
-.leafme .foot{padding-top:36px;padding-bottom:56px}
-.leafme .foot p{font-size:12px;color:var(--ink-3);max-width:52ch}
+.leafme .foot{padding-top:40px;padding-bottom:72px}
+.leafme .foot p{font-size:12px;color:var(--ink-3);max-width:52ch;line-height:1.6}
 .leafme .foot a{color:var(--ink-2)}
+.leafme .foot-links{margin-top:12px;font-size:11px;letter-spacing:.04em}
+.leafme .foot-links a{text-decoration:none}
+.leafme .foot-links a:hover{color:var(--ink)}
 .leafme .note{font-family:var(--serif);font-style:italic;font-size:13px;color:var(--ink-3);margin-top:10px;margin-bottom:4px}
 .leafme .lm-center{min-height:100vh;display:grid;place-items:center;padding:0 28px}
 .leafme .lm-muted{font-size:13px;color:var(--ink-3)}
@@ -758,7 +762,9 @@ const CSS = `
   .leafme .date .m{margin-top:0}
   .leafme .dot{display:none}
   .leafme .stop-card{grid-template-columns:88px 1fr;gap:14px}
-  .leafme .owner{flex-direction:column;align-items:flex-start}
+  .leafme .owner{flex-direction:column;align-items:stretch;gap:14px;padding:18px}
+  .leafme .owner .btn{width:100%;justify-content:center}
+  .leafme .foot{padding-bottom:96px}
 }
 @media(prefers-reduced-motion:reduce){.leafme *{transition:none!important;animation:none!important}}
 `;
