@@ -585,7 +585,7 @@ function Ask({
   );
   if (bare) return inner;
   return (
-    <section className="wrap sect">
+    <section className="wrap sect tail">
       <div className="eyebrow" style={{ marginBottom: 18 }}>Start your own</div>
       {inner}
     </section>
@@ -595,7 +595,7 @@ function Ask({
 // ---- Owner strip -----------------------------------------------------------
 function OwnerStrip({ count }: { count: number }) {
   return (
-    <section className="wrap sect">
+    <section className="wrap sect tail">
       <div className="eyebrow" style={{ marginBottom: 18 }}>You also run a calendar</div>
       <div className="owner">
         <p>
@@ -731,6 +731,7 @@ const CSS = `
 .leafme .plan-link:hover{color:var(--ink-2)}
 .leafme .wx-over{position:absolute;top:10px;right:10px;margin:0;z-index:2;background:rgba(255,255,255,.92);box-shadow:0 1px 3px rgba(0,0,0,.14)}
 .leafme .sect{padding-top:44px;padding-bottom:44px;border-bottom:1px solid var(--rule)}
+.leafme .sect.tail{border-bottom:none;padding-bottom:32px}
 .leafme .sect-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:26px}
 .leafme .count{font-size:11px;color:var(--ink-3)}
 .leafme .count .new{color:var(--green)}
@@ -776,7 +777,7 @@ const CSS = `
 .leafme .owner{display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid var(--rule);border-radius:3px;padding:16px 18px}
 .leafme .owner p{font-size:13px;color:var(--ink-2)}
 .leafme .owner p b{color:var(--ink);font-weight:500}
-.leafme .foot{padding-top:40px;padding-bottom:72px}
+.leafme .foot{border-top:1px solid var(--rule);margin-top:20px;padding-top:44px;padding-bottom:80px}
 .leafme .foot p{font-size:12px;color:var(--ink-3);max-width:52ch;line-height:1.6}
 .leafme .foot a{color:var(--ink-2)}
 .leafme .foot-links{margin-top:12px;font-size:11px;letter-spacing:.04em}
@@ -810,7 +811,9 @@ const CSS = `
   .leafme .stop-card{grid-template-columns:88px 1fr;gap:14px}
   .leafme .owner{flex-direction:column;align-items:stretch;gap:14px;padding:18px}
   .leafme .owner .btn{width:100%;justify-content:center}
-  .leafme .foot{padding-bottom:96px}
+  .leafme .sect{padding-top:32px;padding-bottom:32px}
+  .leafme .sect.tail{padding-top:32px;padding-bottom:28px}
+  .leafme .foot{margin-top:16px;padding-top:36px;padding-bottom:110px}
 }
 @media(prefers-reduced-motion:reduce){.leafme *{transition:none!important;animation:none!important}}
 `;
