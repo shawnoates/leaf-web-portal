@@ -589,7 +589,7 @@ function OwnerStrip({ count }: { count: number }) {
             <><b>Manage your calendars</b> — review plans, RSVPs, and hosting.</>
           )}
         </p>
-        <Link className="btn ghost" href="/dashboard">Open manage ↗</Link>
+        <Link className="btn ghost" href="/dashboard">Manage ↗</Link>
       </div>
     </section>
   );
