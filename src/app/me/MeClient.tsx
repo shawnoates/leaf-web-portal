@@ -394,8 +394,8 @@ function Stop({
           {plan.hostState === "waiting_on_host" && (
             <div style={{ marginTop: 9 }}><Link className="btn ghost" href={hostHref}>Host this ↗</Link></div>
           )}
-          {plan.rsvpState !== "going" && plan.hostState !== "waiting_on_host" && (
-            <div style={{ marginTop: 9 }}><AttendButtons plan={plan} onRsvp={onRsvp} compact /></div>
+          {!plan.viewerIsHost && plan.rsvpState !== "going" && plan.hostState !== "waiting_on_host" && (
+            <div style={{ marginTop: 9 }}><AttendButtons plan={plan} onRsvp={onRsvp} /></div>
           )}
           <Thread plan={plan} onMessage={onMessage} />
         </div>
@@ -657,7 +657,7 @@ const CSS = `
 .leafme .addr{font-size:13px;color:var(--ink-2);margin-bottom:4px}
 .leafme .blurb{font-size:13px;color:var(--ink-3);max-width:44ch;margin-bottom:22px}
 .leafme .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.leafme .attend{display:inline-flex;gap:10px}
+.leafme .attend{display:inline-flex;gap:10px;flex-wrap:wrap}
 .leafme .btn{display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:#fff;border:0;cursor:pointer;font-family:var(--sans);font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;padding:11px 16px;border-radius:3px;text-decoration:none}
 .leafme .btn:hover{background:#000}
 .leafme .btn:disabled{opacity:.5;cursor:default}
@@ -735,7 +735,8 @@ const CSS = `
   .leafme .hero-grid{grid-template-columns:1fr;gap:24px}
   .leafme .hero{padding:36px 0 32px}
   .leafme .hero h1{font-size:30px}
-  .leafme .hero-grid .tile{max-width:280px}
+  .leafme .hero-grid .tile{max-width:100%;order:-1;margin-bottom:6px}
+  .leafme .sect-head{flex-direction:column;align-items:flex-start;gap:6px}
   .leafme .spine{padding-left:0}
   .leafme .spine::before{display:none}
   .leafme .date{position:static;width:auto;text-align:left;display:flex;align-items:baseline;gap:7px;margin-bottom:8px}
