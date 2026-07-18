@@ -47,6 +47,12 @@ export default function ChatShell({
   hidePlanDetails?: boolean;
 }) {
   const router = useRouter();
+  // When opened from the attendee dashboard (/chat/{id}?from=me), Back returns
+  // to /me instead of the calendar. Read after mount to avoid SSR mismatch.
+  const [fromMe, setFromMe] = useState(false);
+  useEffect(() => {
+    setFromMe(new URLSearchParams(window.location.search).get("from") === "me");
+  }, []);
   const [authState, setAuthState] = useState<AuthState>("checking");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [planTitle, setPlanTitle] = useState<string | null>(null);
@@ -333,7 +339,7 @@ export default function ChatShell({
   }
 
   const handleBack = () => {
-    router.push(`/p/${eventGroupId}`);
+    router.push(fromMe ? "/me" : `/p/${eventGroupId}`);
   };
 
   const formattedDate = planDate
@@ -407,7 +413,7 @@ export default function ChatShell({
             onClick={handleBack}
             className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" /> Back to calendar
+            <ArrowLeft className="w-4 h-4" /> {fromMe ? "Back to your week" : "Back to calendar"}
           </button>
 
           <div>
