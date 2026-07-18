@@ -8,6 +8,7 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import ConciergeDashboardBanner from "@/components/ConciergeDashboardBanner";
+import ConciergeInbox from "@/components/ConciergeInbox";
 import { type ConciergeMenu } from "@/components/ConciergeMenuCard";
 import ConciergeThread from "@/components/ConciergeThread";
 import PlansManager from "@/components/PlansManager";
@@ -641,6 +642,22 @@ export default function OrgDashboardPage() {
   // Concierge chat slide-over — the serviced calendar looks like any other; the
   // concierge conversation opens as a drawer from its "Concierge" button.
   const [showConciergeChat, setShowConciergeChat] = useState(false);
+
+  // Auto-open the drawer when the global ConciergeInbox routes a
+  // click here with ?conciergeChat=1. Strips the param after firing
+  // so a refresh doesn't re-open, and so the URL stays clean when
+  // the owner closes the drawer.
+  const conciergeChatOpenedRef = useRef(false);
+  useEffect(() => {
+    if (conciergeChatOpenedRef.current) return;
+    if (searchParams.get("conciergeChat") !== "1") return;
+    conciergeChatOpenedRef.current = true;
+    setShowConciergeChat(true);
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("conciergeChat");
+    const qs = next.toString();
+    router.replace(`/dashboard/${calendarId}${qs ? `?${qs}` : ""}`);
+  }, [searchParams, router, calendarId]);
   const managePlansOpenedRef = useRef(false);
   useEffect(() => {
     if (!dashboard || managePlansOpenedRef.current) return;
@@ -1232,6 +1249,10 @@ export default function OrgDashboardPage() {
             <h1 className="text-xl font-medium tracking-tight truncate">{dashboard.name}</h1>
             <p className="text-xs text-zinc-400">{tierLabel} Plan</p>
           </div>
+          {/* Global concierge inbox — hides itself when the caller
+              owns no Concierge-tier calendars. Concierge-tier only per
+              scope note (leaf-host chats live per-plan on /org). */}
+          <ConciergeInbox />
           <button
             onClick={handleLogout}
             className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-zinc-400 hover:text-zinc-900 transition-colors shrink-0"
