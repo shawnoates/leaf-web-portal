@@ -33,7 +33,19 @@ function detectDevice(): DeviceType {
   return "desktop";
 }
 
-export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
+// hidePlanDetails hides the desktop plan sidebar (title, date, about,
+// attendees, Back-to-calendar link) so the shell can render as the
+// chat column alone. Used when ChatShell is embedded inside a drawer
+// or modal that already provides context (e.g., PlanChatDrawer on the
+// dashboard — the owner opened the drawer FROM a plan card and doesn't
+// need the sidebar repeating what they just clicked).
+export default function ChatShell({
+  eventGroupId,
+  hidePlanDetails = false,
+}: {
+  eventGroupId: string;
+  hidePlanDetails?: boolean;
+}) {
   const router = useRouter();
   const [authState, setAuthState] = useState<AuthState>("checking");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -363,7 +375,7 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
   return (
     <div className="h-dvh flex flex-col md:flex-row bg-zinc-50 overflow-hidden">
       {/* Mobile-only top header (no sidebar shown). On desktop the sidebar carries the same nav. */}
-      <header className="md:hidden bg-white border-b border-zinc-200 px-4 py-3 flex items-center gap-3 z-10 shrink-0">
+      <header className={`${hidePlanDetails ? "hidden" : "md:hidden"} bg-white border-b border-zinc-200 px-4 py-3 flex items-center gap-3 z-10 shrink-0`}>
         <button
           onClick={handleBack}
           aria-label="Back"
@@ -388,6 +400,7 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
       </header>
 
       {/* Desktop sidebar with plan details */}
+      {!hidePlanDetails && (
       <aside className="hidden md:flex md:flex-col md:w-80 lg:w-96 bg-white border-r border-zinc-200 overflow-y-auto shrink-0">
         <div className="p-6 space-y-6">
           <button
@@ -470,6 +483,7 @@ export default function ChatShell({ eventGroupId }: { eventGroupId: string }) {
           )}
         </div>
       </aside>
+      )}
 
       {/* QR modal — desktop only. Encodes the Universal Link to /c/{notificationId}
           so a scan from iPhone opens the plan chat in the app (or App Store). */}

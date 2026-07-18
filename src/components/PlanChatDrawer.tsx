@@ -34,7 +34,11 @@ export default function PlanChatDrawer({
           <X className="w-4 h-4" />
         </button>
         <div className="flex-1 min-h-0 overflow-hidden">
-          <ChatShell eventGroupId={eventGroupId} />
+          {/* hidePlanDetails hides ChatShell's built-in plan sidebar +
+              mobile top header. Owner opened this drawer from a plan
+              card that already told them what plan they're looking at,
+              and the drawer itself owns the close affordance. */}
+          <ChatShell eventGroupId={eventGroupId} hidePlanDetails />
         </div>
       </div>
     </div>
