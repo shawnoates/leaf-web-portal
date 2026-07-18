@@ -523,13 +523,41 @@ export default function ChatShell({
 
       {/* Chat column */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Desktop-only mini-header for the chat column */}
+        {/* Desktop-only mini-header for the chat column. When
+            hidePlanDetails is set, the sidebar is gone and this header
+            becomes the ONLY place the owner sees which plan they're
+            looking at — so promote plan title + date-line + attendee
+            count into it. Standalone /chat (hidePlanDetails=false)
+            keeps the terse "Chat · N messages" header because the
+            sidebar already carries the context. */}
         <header className="hidden md:flex bg-white border-b border-zinc-200 px-6 py-4 items-center gap-3 shrink-0">
           <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-medium text-zinc-900">Chat</h2>
-            <p className="text-xs text-zinc-500">
-              {messages.length} message{messages.length === 1 ? "" : "s"}
-            </p>
+            {hidePlanDetails ? (
+              <>
+                <h2 className="text-sm font-semibold text-zinc-900 truncate pr-8">
+                  {planTitle || "Plan chat"}
+                </h2>
+                <p className="text-xs text-zinc-500 truncate">
+                  {[
+                    formattedDate,
+                    formattedTime,
+                    attendeeCount != null
+                      ? `${attendeeCount} attendee${attendeeCount === 1 ? "" : "s"}`
+                      : null,
+                    `${messages.length} message${messages.length === 1 ? "" : "s"}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="text-sm font-medium text-zinc-900">Chat</h2>
+                <p className="text-xs text-zinc-500">
+                  {messages.length} message{messages.length === 1 ? "" : "s"}
+                </p>
+              </>
+            )}
           </div>
         </header>
 
