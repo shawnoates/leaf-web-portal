@@ -37,6 +37,7 @@ interface Plan {
   calendarId: string | null;
   calendarName: string;
   calendarShareId: string | null;
+  image: string | null;
   hostState: HostState;
   hostPersona: Persona | null;
   rsvpState: RsvpState;
@@ -61,10 +62,23 @@ function weekday(iso: string | null) {
   const d = parse(iso); if (!d) return "";
   return d.toLocaleDateString("en-US", { weekday: "long" });
 }
-function timeLabel(plan: Plan) {
-  if (plan.time) return plan.time;
-  const d = parse(plan.date); if (!d) return "";
+// Normalize any stored time ("19:00", "7:00 PM", "7 PM") to "H:MM AM/PM".
+function fmtTime(raw: string | null, dateIso: string | null) {
+  if (raw) {
+    const m24 = raw.trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (m24) {
+      let h = +m24[1]; const min = m24[2]; const ap = h >= 12 ? "PM" : "AM";
+      h = h % 12 || 12; return `${h}:${min} ${ap}`;
+    }
+    const m12 = raw.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
+    if (m12) return `${+m12[1]}:${m12[2] || "00"} ${m12[3].toUpperCase()}`;
+    return raw;
+  }
+  const d = parse(dateIso); if (!d) return "";
   return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+function timeLabel(plan: Plan) {
+  return fmtTime(plan.time, plan.date);
 }
 function relPhrase(iso: string | null) {
   const d = parse(iso); if (!d) return "";
@@ -112,6 +126,20 @@ function tileFor(plan: Plan, i: number): { tone: "sage" | "cream"; word: string 
   else if (/park|walk|hike|garden|outdoor|picnic/.test(s)) word = "outside";
   return { tone, word };
 }
+// Plan visual: real photo when the plan has one, else the sage/cream tile.
+function PlanTile({ plan, index, sm }: { plan: Plan; index: number; sm?: boolean }) {
+  if (plan.image) {
+    return (
+      <div className={`tile photo ${sm ? "sm" : ""}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={plan.image} alt="" />
+      </div>
+    );
+  }
+  const t = tileFor(plan, index);
+  return <div className={`tile ${t.tone} ${sm ? "sm" : ""}`}>{t.word}</div>;
+}
+
 function statusFor(plan: Plan): { cls: string; text: string } | null {
   if (plan.hostState === "leaf_hosted" && plan.hostPersona) {
     return { cls: "host", text: `Hosted by Leaf · ${plan.hostPersona.name}` };
@@ -289,18 +317,16 @@ function Hero({
   onRsvp: (id: string, s: RsvpState) => void;
   onMessage: (id: string, m: PlanMessage) => void;
 }) {
-  const tile = tileFor(plan, 0);
-  const venue = [plan.venueName, plan.calendarName].filter(Boolean).join(" · ");
+  const addr = [plan.venueName, plan.venueAddress].filter(Boolean).join(" · ");
   return (
     <section className="wrap hero">
       <div className="eyebrow">Next up</div>
       <div className="hero-grid">
         <div>
           <div className="when">{heroWhen(plan)}</div>
+          <div className="cal">{plan.calendarName}</div>
           <h1>{plan.title}</h1>
-          {(plan.venueAddress || venue) && (
-            <p className="addr">{plan.venueAddress ? `${plan.venueAddress}` : ""}{venue ? `${plan.venueAddress ? " · " : ""}${venue}` : ""}</p>
-          )}
+          {addr && <p className="addr">{addr}</p>}
           {plan.description && <p className="blurb">{plan.description}</p>}
           <div className="row">
             <AttendButtons plan={plan} onRsvp={onRsvp} />
@@ -311,7 +337,7 @@ function Hero({
           <p className="note">Weather shows only when it might change your mind — outdoor plans, inside the forecast window.</p>
           <Thread plan={plan} onMessage={onMessage} hero />
         </div>
-        <div className={`tile ${tile.tone}`}>{tile.word}</div>
+        <PlanTile plan={plan} index={0} />
       </div>
     </section>
   );
