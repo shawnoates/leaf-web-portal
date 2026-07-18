@@ -128,17 +128,40 @@ function tileFor(plan: Plan, i: number): { tone: "sage" | "cream"; word: string 
   return { tone, word };
 }
 // Plan visual: real photo when the plan has one, else the sage/cream tile.
-function PlanTile({ plan, index, sm }: { plan: Plan; index: number; sm?: boolean }) {
-  if (plan.image) {
+function PlanTile({
+  plan, index, sm, href, weather,
+}: {
+  plan: Plan;
+  index: number;
+  sm?: boolean;
+  href?: string;
+  weather?: Weather | null;
+}) {
+  const tileEl = plan.image ? (
+    <div className={`tile photo ${sm ? "sm" : ""}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={plan.image} alt="" />
+    </div>
+  ) : (() => {
+    const t = tileFor(plan, index);
+    return <div className={`tile ${t.tone} ${sm ? "sm" : ""}`}>{t.word}</div>;
+  })();
+  const content = (
+    <div className="tile-wrap">
+      {tileEl}
+      {weather && (weather.temp || weather.text) && (
+        <span className="wx wx-over">🌤 <b>{weather.temp}°</b> {weather.text}</span>
+      )}
+    </div>
+  );
+  if (href) {
     return (
-      <div className={`tile photo ${sm ? "sm" : ""}`}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={plan.image} alt="" />
-      </div>
+      <Link href={href} className="tile-link" aria-label={`Open ${plan.title}`}>
+        {content}
+      </Link>
     );
   }
-  const t = tileFor(plan, index);
-  return <div className={`tile ${t.tone} ${sm ? "sm" : ""}`}>{t.word}</div>;
+  return content;
 }
 
 function statusFor(plan: Plan): { cls: string; text: string } | null {
@@ -330,19 +353,15 @@ function Hero({
         <div>
           <div className="when">{heroWhen(plan)}</div>
           <div className="cal">{plan.calendarName}</div>
-          <h1>{plan.title}</h1>
+          <h1><Link href={`/p/${plan.id}`} className="plan-link">{plan.title}</Link></h1>
           {addr && <p className="addr">{addr}</p>}
           {plan.description && <p className="blurb">{plan.description}</p>}
           <div className="row">
             <AttendButtons plan={plan} onRsvp={onRsvp} />
-            {plan.weather && (
-              <span className="wx">🌤 <b>{plan.weather.temp}°</b> {plan.weather.text}</span>
-            )}
           </div>
-          <p className="note">Weather shows only when it might change your mind — outdoor plans, inside the forecast window.</p>
           <Thread plan={plan} onMessage={onMessage} hero />
         </div>
-        <PlanTile plan={plan} index={0} />
+        <PlanTile plan={plan} index={0} href={`/p/${plan.id}`} weather={plan.weather} />
       </div>
     </section>
   );
@@ -386,10 +405,10 @@ function Stop({
       <div className="date"><div className="d">{dayNum(plan.date)}</div><div className="m">{monthAbbr(plan.date)}</div></div>
       <span className={`dot ${going ? "on" : ""}`} />
       <div className="stop-card">
-        <PlanTile plan={plan} index={index} sm />
+        <PlanTile plan={plan} index={index} sm href={`/p/${plan.id}`} />
         <div>
           <div className="cal">{plan.calendarName}</div>
-          <h3>{plan.title}</h3>
+          <h3><Link href={`/p/${plan.id}`} className="plan-link">{plan.title}</Link></h3>
           <p className="meta">{meta}</p>
           {status && <span className={`status ${status.cls}`}>{status.text}</span>}
           {plan.hostState === "waiting_on_host" && (
@@ -687,6 +706,11 @@ const CSS = `
 .leafme .tile.sm{aspect-ratio:16/10;font-size:19px}
 .leafme .tile.photo{padding:0;overflow:hidden;background:#f2f2f0}
 .leafme .tile.photo img{width:100%;height:100%;object-fit:cover;display:block}
+.leafme .tile-wrap{position:relative;display:block}
+.leafme .tile-link{display:block;text-decoration:none}
+.leafme .plan-link{color:inherit;text-decoration:none}
+.leafme .plan-link:hover{color:var(--ink-2)}
+.leafme .wx-over{position:absolute;top:10px;right:10px;margin:0;z-index:2;background:rgba(255,255,255,.92);box-shadow:0 1px 3px rgba(0,0,0,.14)}
 .leafme .sect{padding-top:44px;padding-bottom:44px;border-bottom:1px solid var(--rule)}
 .leafme .sect-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:26px}
 .leafme .count{font-size:11px;color:var(--ink-3)}
@@ -754,7 +778,8 @@ const CSS = `
   .leafme .hero-grid{grid-template-columns:1fr;gap:24px}
   .leafme .hero{padding-top:36px;padding-bottom:32px}
   .leafme .hero h1{font-size:30px}
-  .leafme .hero-grid .tile{max-width:100%;order:-1;margin-bottom:6px}
+  .leafme .hero-grid > .tile-link,.leafme .hero-grid > .tile-wrap{order:-1;margin-bottom:6px}
+  .leafme .hero-grid .tile{max-width:100%}
   .leafme .sect-head{flex-direction:column;align-items:flex-start;gap:6px}
   .leafme .spine{padding-left:0}
   .leafme .spine::before{display:none}
