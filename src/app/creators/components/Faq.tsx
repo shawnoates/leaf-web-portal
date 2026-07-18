@@ -56,7 +56,7 @@ export default function Faq() {
         </div>
         <div className="inline-cta">
           <CTA variant="primary" arrow>
-            Apply to create
+            Partner with us
           </CTA>
         </div>
       </div>

@@ -48,6 +48,7 @@ interface Plan {
 }
 interface Dashboard {
   person: { firstName: string; ownsCalendars: boolean; pendingReviewCount: number };
+  greeting?: { weather: Weather | null };
   nextPlan: Plan | null;
   plans: Plan[];
   unreadMessageCount: number;
@@ -112,6 +113,12 @@ function ago(iso: string | null) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 function initial(name: string) { return (name || "?").trim().charAt(0).toUpperCase() || "?"; }
+function greetingWord() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
 
 // Tile — Leaf's signature artifact: a colored square with a serif word.
 function tileFor(plan: Plan, i: number): { tone: "sage" | "cream"; word: string } {
@@ -292,6 +299,15 @@ function DashboardView({
       </header>
 
       <main>
+        <section className="wrap greet">
+          {data.greeting?.weather && (data.greeting.weather.temp || data.greeting.weather.text) && (
+            <span className="wx greet-wx">🌤 <b>{data.greeting.weather.temp}°</b> {data.greeting.weather.text}</span>
+          )}
+          <div className="greet-line">
+            {greetingWord()}{data.person.firstName ? `, ${data.person.firstName}` : ""}
+          </div>
+        </section>
+
         {hero ? (
           <Hero plan={hero} onRsvp={onRsvp} onMessage={onMessage} />
         ) : (
@@ -683,6 +699,9 @@ const CSS = `
 .leafme .who{display:flex;align-items:center;gap:9px}
 .leafme .who span{font-size:12px;color:var(--ink-2)}
 .leafme .ava{width:28px;height:28px;border-radius:50%;background:#d8d4cc;display:grid;place-items:center;font-size:11px;font-weight:600;color:var(--ink-2)}
+.leafme .greet{padding-top:36px;padding-bottom:4px}
+.leafme .greet-wx{display:inline-flex;margin-bottom:14px}
+.leafme .greet-line{font-family:var(--serif);font-size:26px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
 .leafme .hero{padding-top:56px;padding-bottom:44px;border-bottom:1px solid var(--rule)}
 .leafme .hero .eyebrow{margin-bottom:18px}
 .leafme .hero-grid{display:grid;grid-template-columns:1fr 300px;gap:44px;align-items:start}
@@ -776,7 +795,9 @@ const CSS = `
 @media(max-width:760px){
   .leafme .wrap{padding:0 20px}
   .leafme .hero-grid{grid-template-columns:1fr;gap:24px}
-  .leafme .hero{padding-top:36px;padding-bottom:32px}
+  .leafme .greet{padding-top:24px}
+  .leafme .greet-line{font-size:22px}
+  .leafme .hero{padding-top:32px;padding-bottom:32px}
   .leafme .hero h1{font-size:30px}
   .leafme .hero-grid > .tile-link,.leafme .hero-grid > .tile-wrap{order:-1;margin-bottom:6px}
   .leafme .hero-grid .tile{max-width:100%}

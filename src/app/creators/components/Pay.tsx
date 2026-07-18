@@ -34,7 +34,7 @@ export default function Pay() {
 
         <Reveal className="inline-cta">
           <CTA variant="primary" arrow>
-            Apply to create
+            Partner with us
           </CTA>
         </Reveal>
       </div>

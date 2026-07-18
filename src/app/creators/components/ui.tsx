@@ -29,9 +29,9 @@ export function Plaque({ children }: { children: ReactNode }) {
 export type CTAVariant = "primary" | "ghost";
 
 /**
- * Primary CTAs point at APPLY_URL (external application form) and open in
- * a new tab. Pass an explicit `href` (e.g. "#how") for in-page anchor
- * links, which stay in-tab.
+ * Primary CTAs open a pre-addressed email to PARTNER_URL. Pass an
+ * explicit `href` (e.g. "#how") for in-page anchor links. Only http(s)
+ * external links open in a new tab — mailto and anchors stay in place.
  */
 export function CTA({
   href,
@@ -46,17 +46,16 @@ export function CTA({
   track?: string;
   children: ReactNode;
 }) {
-  const target = href ?? APPLY_URL;
-  const isExternal = /^https?:/.test(target);
-  const cta = track ?? (isExternal ? "apply" : "anchor");
+  const target = href ?? PARTNER_URL;
+  const isHttp = /^https?:/.test(target);
+  const isAnchor = target.startsWith("#");
+  const cta = track ?? (isAnchor ? "anchor" : "partner");
   return (
     <a
       className={`btn btn-${variant}`}
       href={target}
       data-cta={cta}
-      {...(isExternal
-        ? { target: "_blank", rel: "noopener noreferrer" }
-        : {})}
+      {...(isHttp ? { target: "_blank", rel: "noopener noreferrer" } : {})}
     >
       {children}
       {arrow && (

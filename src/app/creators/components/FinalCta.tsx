@@ -1,4 +1,5 @@
 import { CTA, TrustStrip } from "./ui";
+import { PARTNER_EMAIL, PARTNER_URL } from "./config";
 import Reveal from "./Reveal";
 
 export function FinalCta() {
@@ -15,9 +16,14 @@ export function FinalCta() {
           </p>
           <div className="cta-row cta-row--solo" style={{ justifyContent: "center", marginTop: 30 }}>
             <CTA variant="primary" arrow>
-              Apply to create
+              Partner with us
             </CTA>
           </div>
+          <p style={{ margin: "16px 0 0", fontSize: "0.95rem" }}>
+            <a href={PARTNER_URL} data-cta="partner" style={{ color: "var(--amber)", fontWeight: 600 }}>
+              {PARTNER_EMAIL}
+            </a>
+          </p>
           <div style={{ display: "flex", justifyContent: "center" }}>
             <TrustStrip />
           </div>
@@ -38,7 +44,9 @@ export function Footer() {
         </a>
         <nav className="footer__links">
           <a href="#how">How it works</a>
-          <a href="#top">Apply</a>
+          <a href={PARTNER_URL} data-cta="partner">
+            Partner with us
+          </a>
         </nav>
         <p className="footer__copy">
           Leaf OS builds the social side of better nights. &copy;{" "}

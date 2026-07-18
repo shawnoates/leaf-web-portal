@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Leaf — Get paid to document a good night.",
     description:
-      "Plan a real gathering through Leaf, film what happens, post it in your voice. $50–150 per video, paid within 24h. Brooklyn + NYC. Apply to create.",
+      "Plan a real gathering through Leaf, film what happens, post it in your voice. $50–150 per video, paid within 24h. Brooklyn + NYC. Partner with us.",
     type: "website",
     url: "https://os.joinleaf.com/creators",
     siteName: "Leaf OS",

@@ -43,7 +43,7 @@ export default function Header() {
           <a className="link-ghost" href="#how">
             How it works
           </a>
-          <CTA variant="primary">Apply to create</CTA>
+          <CTA variant="primary">Partner with us</CTA>
         </div>
       </div>
     </header>

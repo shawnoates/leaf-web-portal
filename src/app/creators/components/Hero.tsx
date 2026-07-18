@@ -72,7 +72,7 @@ export default function Hero() {
           </p>
           <div className="cta-row cta-row--solo" style={{ marginTop: 28 }}>
             <CTA variant="primary" arrow>
-              Apply to create
+              Partner with us
             </CTA>
           </div>
           <TrustStrip />
