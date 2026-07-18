@@ -22,9 +22,9 @@ export default function Register() {
             className="lead"
             style={{ margin: "26px auto 0", maxWidth: "48ch", textAlign: "center" }}
           >
-            More important than any exact words: the voice is yours. If the favorite thing
-            you&rsquo;ve ever posted is just your friends having a great time &mdash; this is
-            for you.
+            The script&rsquo;s a starting point &mdash; the delivery is all yours. If the
+            favorite thing you&rsquo;ve ever posted is just your friends having a great time
+            &mdash; this is for you.
           </p>
         </Reveal>
       </div>
