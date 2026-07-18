@@ -40,6 +40,7 @@ interface Plan {
   image: string | null;
   hostState: HostState;
   hostPersona: Persona | null;
+  viewerIsHost: boolean;
   rsvpState: RsvpState;
   attendeeCount: number;
   weather: Weather | null;
@@ -145,6 +146,9 @@ function statusFor(plan: Plan): { cls: string; text: string } | null {
     return { cls: "host", text: `Hosted by Leaf · ${plan.hostPersona.name}` };
   }
   if (plan.hostState === "leaf_hosted") return { cls: "host", text: "Hosted by Leaf" };
+  if (plan.viewerIsHost) {
+    return { cls: "host", text: plan.attendeeCount > 0 ? `You're hosting · ${plan.attendeeCount} going` : "You're hosting" };
+  }
   if (plan.hostState === "waiting_on_host") return { cls: "wait", text: "Waiting on host" };
   if (plan.rsvpState === "going") {
     const others = Math.max(0, plan.attendeeCount - 1);
@@ -402,11 +406,10 @@ function Stop({
 
 // ---- Attend buttons --------------------------------------------------------
 function AttendButtons({
-  plan, onRsvp, compact,
+  plan, onRsvp,
 }: {
   plan: Plan;
   onRsvp: (id: string, s: RsvpState) => void;
-  compact?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const going = plan.rsvpState === "going";
@@ -425,15 +428,19 @@ function AttendButtons({
     }
   }
 
+  // Hosts don't RSVP to their own plan — they host it.
+  if (plan.viewerIsHost) {
+    return (
+      <span className="attend">
+        <button className="btn" disabled aria-pressed>✓ Hosting</button>
+      </span>
+    );
+  }
+
   return (
     <span className="attend">
-      <button
-        className={`btn ${going ? "" : ""}`}
-        aria-pressed={going}
-        disabled={busy}
-        onClick={() => set("going")}
-      >
-        {going ? "✓ Going" : compact ? "I'm going" : "I'm going"}
+      <button className="btn" aria-pressed={going} disabled={busy} onClick={() => set("going")}>
+        {going ? "✓ Going" : "I'm going"}
       </button>
       <button
         className="btn ghost"
@@ -630,8 +637,10 @@ const CSS = `
   --serif:var(--font-me-serif),Georgia,serif;
   background:var(--paper); color:var(--ink); font-family:var(--sans);
   -webkit-font-smoothing:antialiased; line-height:1.5; min-height:100vh;
+  overflow-x:hidden;
 }
 .leafme *{box-sizing:border-box}
+.leafme h1,.leafme .stop h3,.leafme .addr,.leafme .blurb,.leafme .meta,.leafme .cal,.leafme .msg-b .p,.leafme .owner p,.leafme .foot p,.leafme .typed{overflow-wrap:anywhere}
 .leafme .wrap{max-width:940px;margin:0 auto;padding:0 28px}
 .leafme .eyebrow{font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
 .leafme .bar{border-bottom:1px solid var(--rule)}
