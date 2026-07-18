@@ -10,7 +10,7 @@ const steps = [
   {
     n: "2",
     h: "Film the night, not the app",
-    b: "Phone footage of your people showing up. Faces, the table, the toast. We send a one-page brief and 100 caption ideas; the voice is all yours.",
+    b: "Phone footage of your people showing up. Faces, the table, the toast. We send the script and the caption ideas — you just film it.",
   },
   {
     n: "3",

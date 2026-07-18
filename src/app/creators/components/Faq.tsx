@@ -10,7 +10,7 @@ const items = [
   },
   {
     q: "Do you write the script?",
-    a: "We send a short brief and a bank of overlay/caption ideas. You make it in your voice — that's the entire point.",
+    a: "Yes — we send the script and a bank of overlay/caption ideas, tuned to your night. You bring the people, the place, and film it.",
   },
   {
     q: "Who owns the video?",

@@ -528,7 +528,7 @@ function Thread({ plan, hero }: { plan: Plan; hero?: boolean }) {
         </div>
       ))}
       {canChat && (
-        <Link href={`/chat/${plan.id}`} className="btn ghost chat-btn">Join Plan Chat ↗</Link>
+        <Link href={`/chat/${plan.id}?from=me`} className="btn ghost chat-btn">Join Plan Chat ↗</Link>
       )}
     </div>
   );
@@ -623,7 +623,7 @@ function PlanModal({
           </div>
           {canChat && (
             <div style={{ marginTop: 12 }}>
-              <Link href={`/chat/${plan.id}`} className="btn ghost">Join Plan Chat ↗</Link>
+              <Link href={`/chat/${plan.id}?from=me`} className="btn ghost">Join Plan Chat ↗</Link>
             </div>
           )}
         </div>
