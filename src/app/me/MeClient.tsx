@@ -205,6 +205,7 @@ export default function MeClient() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [loadError, setLoadError] = useState("");
   const fetchedRef = useRef(false);
+  const trackedRef = useRef(false);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -221,6 +222,15 @@ export default function MeClient() {
       try {
         const token = new URLSearchParams(window.location.search).get("t");
         const uid = new URLSearchParams(window.location.search).get("u");
+        // Analytics: count the view. `fromLink` = arrived via the digest SMS
+        // link (has both u+t), which is the /me CTR numerator. Fire-and-forget.
+        if (!trackedRef.current) {
+          trackedRef.current = true;
+          Parse.Cloud.run("recordMeDashboardView", {
+            userId: uid || undefined,
+            fromLink: !!(token && uid),
+          }).catch(() => {});
+        }
         if (token && uid) {
           try {
             const r = (await Parse.Cloud.run("getDashboardSession", { userId: uid, token })) as {
