@@ -3,14 +3,12 @@ import type { ReactNode } from "react";
 import "./styles.css";
 
 // Absolute URL — iMessage / Slack / Twitter reject relative image paths.
-// Reuses the resident-managers gathering photo until a creators-specific
-// OG asset is added.
-const OG_IMAGE = "https://os.joinleaf.com/resident-managers-hero.png";
-const OG_ALT = "Friends gathered at a real night out";
+const OG_IMAGE = "https://os.joinleaf.com/creators-hero.jpg";
+const OG_ALT = "Friends laughing over drinks at a bar";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://os.joinleaf.com"),
-  title: "Leaf — Get paid to create content about nights that actually happen.",
+  title: "Leaf — Get paid to document a good night.",
   description:
     "Leaf partners with hosts and creators who make real gatherings happen. Plan it through Leaf, film the night, post it in your voice — $50–150 per video, paid within 24 hours. 1k followers is plenty.",
   openGraph: {
@@ -23,10 +21,10 @@ export const metadata: Metadata = {
     images: [
       {
         url: OG_IMAGE,
-        width: 1200,
-        height: 630,
+        width: 1400,
+        height: 2294,
         alt: OG_ALT,
-        type: "image/png",
+        type: "image/jpeg",
       },
     ],
   },

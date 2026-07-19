@@ -10,6 +10,13 @@ function HeroArt() {
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/creators-hero.jpg" alt="" className="hero__photo" />
+      <div className="hero__play" aria-hidden="true">
+        <span className="hero__play-btn">
+          <svg width="28" height="28" viewBox="0 0 24 24">
+            <path fill="#fff" d="M8 5v14l11-7z" />
+          </svg>
+        </span>
+      </div>
     </div>
   );
 }

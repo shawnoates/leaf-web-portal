@@ -392,3 +392,13 @@
 @media (max-width: 400px) { .creators-landing .cta-row--solo { grid-template-columns: 1fr; } }
 .creators-landing .cta-row--solo > .btn { width: auto; }
 @media (max-width: 400px) { .creators-landing .cta-row--solo > .btn { width: 100%; } }
+
+/* ---------- hero play-button overlay ---------- */
+.creators-landing .hero__play { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.creators-landing .hero__play-btn {
+  width: 78px; height: 78px; border-radius: 999px;
+  background: rgba(21,36,31,0.42); backdrop-filter: blur(3px);
+  border: 2px solid rgba(255,255,255,0.9);
+  display: grid; place-items: center; padding-left: 5px;
+  box-shadow: 0 12px 34px rgba(0,0,0,0.32);
+}
