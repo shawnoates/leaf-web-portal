@@ -46,9 +46,21 @@ interface Plan {
   weather: Weather | null;
   messages: PlanMessage[];
 }
+interface PlanPrompt {
+  ideaId: string;
+  title: string;
+  category: string | null;
+  image: string | null;
+  date: string | null;
+  calendarId: string | null;
+  calendarName: string;
+  calendarShareId: string | null;
+  addMode: "owner" | "propose";
+}
 interface Dashboard {
   person: { firstName: string; ownsCalendars: boolean; pendingReviewCount: number };
   greeting?: { weather: Weather | null };
+  planPrompts?: PlanPrompt[];
   nextPlan: Plan | null;
   plans: Plan[];
   unreadMessageCount: number;
@@ -334,6 +346,10 @@ function DashboardView({
           </section>
         )}
 
+        {data.planPrompts && data.planPrompts.length > 0 && (
+          <PlanPrompts prompts={data.planPrompts} />
+        )}
+
         {/* Ask XOR owner strip — never both */}
         {data.person.ownsCalendars ? (
           <OwnerStrip count={data.person.pendingReviewCount} />
@@ -531,6 +547,70 @@ function Thread({ plan, hero }: { plan: Plan; hero?: boolean }) {
         <Link href={`/chat/${plan.id}?from=me`} className="btn ghost chat-btn">Join Plan Chat ↗</Link>
       )}
     </div>
+  );
+}
+
+// ---- Add a plan — one-tap create from a calendar's current event prompts ----
+function PlanPrompts({ prompts }: { prompts: PlanPrompt[] }) {
+  type St = "idle" | "busy" | "created" | "proposed" | "error";
+  const [st, setSt] = useState<Record<string, St>>({});
+
+  async function create(p: PlanPrompt) {
+    const cur = st[p.ideaId];
+    if (cur === "busy" || cur === "created" || cur === "proposed") return;
+    setSt((s) => ({ ...s, [p.ideaId]: "busy" }));
+    try {
+      const r = (await Parse.Cloud.run("oneTapCreatePlanFromIdea", { calendarPlanId: p.ideaId })) as {
+        pendingApproval?: boolean;
+      };
+      setSt((s) => ({ ...s, [p.ideaId]: r?.pendingApproval ? "proposed" : "created" }));
+    } catch {
+      setSt((s) => ({ ...s, [p.ideaId]: "error" }));
+    }
+  }
+
+  function cta(p: PlanPrompt) {
+    switch (st[p.ideaId]) {
+      case "busy": return "Adding…";
+      case "created": return "✓ Added to calendar";
+      case "proposed": return "✓ Proposed to host";
+      case "error": return "Didn’t work — tap to retry";
+      default: return p.addMode === "owner" ? "Add to calendar ↗" : "Propose to host ↗";
+    }
+  }
+
+  return (
+    <section className="wrap sect">
+      <div className="eyebrow" style={{ marginBottom: 6 }}>Add a plan</div>
+      <p className="prompts-sub">Ideas for your calendars — one tap to create.</p>
+      <div className="prompts">
+        {prompts.map((p) => {
+          const done = st[p.ideaId] === "created" || st[p.ideaId] === "proposed";
+          return (
+            <button
+              key={p.ideaId}
+              className={`prompt-card ${done ? "done" : ""}`}
+              disabled={st[p.ideaId] === "busy" || done}
+              onClick={() => create(p)}
+            >
+              {p.image ? (
+                <div className="prompt-img">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.image} alt="" />
+                </div>
+              ) : (
+                <div className="prompt-img word">{(p.category || "plan").toLowerCase()}</div>
+              )}
+              <div className="prompt-b">
+                <div className="cal">{p.calendarName}</div>
+                <div className="prompt-title">{p.title}</div>
+                <span className="prompt-cta">{cta(p)}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -790,6 +870,17 @@ const CSS = `
 .leafme .composer{display:flex;gap:8px;margin-top:10px}
 .leafme .composer input{flex:1;border:1px solid var(--rule);border-radius:3px;padding:9px 12px;font-family:var(--sans);font-size:13px;color:var(--ink)}
 .leafme .composer input:focus{outline:2px solid var(--green);outline-offset:1px}
+.leafme .prompts-sub{font-size:13px;color:var(--ink-3);margin-bottom:18px}
+.leafme .prompts{display:flex;flex-direction:column;gap:10px}
+.leafme .prompt-card{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:none;border:1px solid var(--rule);border-radius:3px;padding:12px;cursor:pointer;transition:border-color .15s}
+.leafme .prompt-card:hover{border-color:var(--ink-3)}
+.leafme .prompt-card:disabled{cursor:default}
+.leafme .prompt-card.done{opacity:.65;border-color:var(--sage)}
+.leafme .prompt-img{width:76px;height:58px;flex-shrink:0;border-radius:3px;overflow:hidden;background:var(--sage);display:grid;place-items:center;font-family:var(--serif);font-size:14px;color:var(--sage-deep)}
+.leafme .prompt-img img{width:100%;height:100%;object-fit:cover;display:block}
+.leafme .prompt-b{min-width:0;flex:1}
+.leafme .prompt-title{font-family:var(--serif);font-size:17px;line-height:1.15;color:var(--ink);margin:3px 0 5px;overflow-wrap:anywhere}
+.leafme .prompt-cta{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--sage-deep);font-weight:500}
 .leafme .start{border:1px solid var(--rule);border-radius:3px;padding:26px 24px}
 .leafme .start .lede{font-family:var(--serif);font-size:20px;line-height:1.3;margin-bottom:5px}
 .leafme .start .sub{font-size:13px;color:var(--ink-3);margin-bottom:18px}
