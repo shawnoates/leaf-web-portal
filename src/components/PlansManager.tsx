@@ -222,6 +222,10 @@ export default function PlansManager({
   const router = useRouter();
 
   const [tier, setTier] = useState("starter");
+  // Only trust the tier once getOrgDashboard has actually resolved. Defaulting
+  // to "starter" made a failed/slow load look identical to a free plan and
+  // FALSE-locked paid features (e.g. Regenerate on a concierge org).
+  const [tierLoaded, setTierLoaded] = useState(false);
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -339,8 +343,11 @@ export default function PlansManager({
         setHidePlanIdeas(result.hidePlanIdeas || false);
       }
       setTier(result.tier);
-    } catch {
-      // Failed to load
+      setTierLoaded(true);
+    } catch (err) {
+      // Leave tierLoaded false so we don't false-lock paid features on a failed
+      // load; the server still tier-gates the actual regenerate.
+      console.warn("[PlansManager] getOrgDashboard failed:", err);
     }
   }
 
@@ -493,7 +500,7 @@ export default function PlansManager({
   }
 
   async function handleRegenerate() {
-    if (tier === "starter") {
+    if (tierLoaded && tier === "starter") {
       setShowUpgradeModal(true);
       return;
     }
@@ -869,7 +876,7 @@ export default function PlansManager({
                 disabled={regenerating}
                 className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors disabled:opacity-50"
               >
-                {tier === "starter" ? (
+                {tierLoaded && tier === "starter" ? (
                   <Lock className="w-3.5 h-3.5" />
                 ) : (
                   <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
