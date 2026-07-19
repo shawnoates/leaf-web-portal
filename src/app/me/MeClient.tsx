@@ -49,9 +49,13 @@ interface Plan {
 interface PlanPrompt {
   ideaId: string;
   title: string;
+  description: string | null;
   category: string | null;
   image: string | null;
   date: string | null;
+  time: string | null;
+  venueName: string | null;
+  venueAddress: string | null;
   calendarId: string | null;
   calendarName: string;
   calendarShareId: string | null;
@@ -561,47 +565,25 @@ function Thread({ plan, hero }: { plan: Plan; hero?: boolean }) {
 }
 
 // ---- Add a plan — one-tap create from a calendar's current event prompts ----
+type PromptOutcome = "created" | "proposed";
+
 function PlanPrompts({ prompts }: { prompts: PlanPrompt[] }) {
-  type St = "idle" | "busy" | "created" | "proposed" | "error";
-  const [st, setSt] = useState<Record<string, St>>({});
-
-  async function create(p: PlanPrompt) {
-    const cur = st[p.ideaId];
-    if (cur === "busy" || cur === "created" || cur === "proposed") return;
-    setSt((s) => ({ ...s, [p.ideaId]: "busy" }));
-    try {
-      const r = (await Parse.Cloud.run("oneTapCreatePlanFromIdea", { calendarPlanId: p.ideaId })) as {
-        pendingApproval?: boolean;
-      };
-      setSt((s) => ({ ...s, [p.ideaId]: r?.pendingApproval ? "proposed" : "created" }));
-    } catch {
-      setSt((s) => ({ ...s, [p.ideaId]: "error" }));
-    }
-  }
-
-  function cta(p: PlanPrompt) {
-    switch (st[p.ideaId]) {
-      case "busy": return "Adding…";
-      case "created": return "✓ Added to calendar";
-      case "proposed": return "✓ Proposed to host";
-      case "error": return "Didn’t work — tap to retry";
-      default: return p.addMode === "owner" ? "Add to calendar ↗" : "Propose to host ↗";
-    }
-  }
+  const [draft, setDraft] = useState<PlanPrompt | null>(null);
+  const [done, setDone] = useState<Record<string, PromptOutcome>>({});
 
   return (
     <section className="wrap sect">
       <div className="eyebrow" style={{ marginBottom: 6 }}>Add a plan</div>
-      <p className="prompts-sub">Ideas for your calendars — one tap to create.</p>
+      <p className="prompts-sub">Ideas for your calendars — tap to review, then create.</p>
       <div className="prompts">
         {prompts.map((p) => {
-          const done = st[p.ideaId] === "created" || st[p.ideaId] === "proposed";
+          const outcome = done[p.ideaId];
           return (
             <button
               key={p.ideaId}
-              className={`prompt-card ${done ? "done" : ""}`}
-              disabled={st[p.ideaId] === "busy" || done}
-              onClick={() => create(p)}
+              className={`prompt-card ${outcome ? "done" : ""}`}
+              disabled={!!outcome}
+              onClick={() => setDraft(p)}
             >
               {p.image ? (
                 <div className="prompt-img">
@@ -614,13 +596,96 @@ function PlanPrompts({ prompts }: { prompts: PlanPrompt[] }) {
               <div className="prompt-b">
                 <div className="cal">{p.calendarName}</div>
                 <div className="prompt-title">{p.title}</div>
-                <span className="prompt-cta">{cta(p)}</span>
+                <span className="prompt-cta">
+                  {outcome === "created" ? "✓ Added to calendar"
+                    : outcome === "proposed" ? "✓ Proposed to host"
+                    : p.addMode === "owner" ? "Preview & add ↗" : "Preview & propose ↗"}
+                </span>
               </div>
             </button>
           );
         })}
       </div>
+
+      {draft && (
+        <PromptDraftModal
+          prompt={draft}
+          onClose={() => setDraft(null)}
+          onDone={(id, outcome) => { setDone((d) => ({ ...d, [id]: outcome })); setDraft(null); }}
+        />
+      )}
     </section>
+  );
+}
+
+// Confirm-draft step: review the suggested plan (real title/date/venue/blurb)
+// before creating. Owner → creates; follower → proposes to the owner.
+function PromptDraftModal({
+  prompt, onClose, onDone,
+}: {
+  prompt: PlanPrompt;
+  onClose: () => void;
+  onDone: (ideaId: string, outcome: PromptOutcome) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const when = [weekday(prompt.date), fmtTime(prompt.time, prompt.date)].filter(Boolean).join(" · ")
+    || (prompt.date ? new Date(prompt.date).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }) : "Date to be set");
+  const venue = [prompt.venueName, prompt.venueAddress].filter(Boolean).join(" · ");
+  const owner = prompt.addMode === "owner";
+
+  async function submit() {
+    if (busy) return;
+    setBusy(true); setErr("");
+    try {
+      const r = (await Parse.Cloud.run("oneTapCreatePlanFromIdea", { calendarPlanId: prompt.ideaId })) as {
+        pendingApproval?: boolean;
+      };
+      onDone(prompt.ideaId, r?.pendingApproval ? "proposed" : "created");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Couldn't create the plan. Try again.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-x" onClick={onClose} aria-label="Close">×</button>
+        {prompt.image && (
+          <div className="modal-img">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={prompt.image} alt="" />
+          </div>
+        )}
+        <div className="modal-body">
+          <div className="cal">{prompt.calendarName}</div>
+          <h2 className="modal-title">{prompt.title}</h2>
+          <div className="when">{when}</div>
+          {venue && <p className="addr" style={{ marginTop: 6 }}>{venue}</p>}
+          {prompt.description && <p className="blurb" style={{ marginTop: 8 }}>{prompt.description}</p>}
+          {err && <p className="otp-err" style={{ marginTop: 12 }}>{err}</p>}
+          <div className="row" style={{ marginTop: 18 }}>
+            <button className="btn" disabled={busy} onClick={submit}>
+              {busy ? (owner ? "Adding…" : "Sending…") : (owner ? "Add to calendar" : "Propose to host")}
+            </button>
+            <button className="btn ghost" disabled={busy} onClick={onClose}>Cancel</button>
+          </div>
+          {!owner && (
+            <p className="prompts-sub" style={{ marginTop: 12, marginBottom: 0 }}>
+              You follow this calendar — this sends the plan to its owner to approve.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
