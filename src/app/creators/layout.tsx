@@ -3,7 +3,9 @@ import type { ReactNode } from "react";
 import "./styles.css";
 
 // Absolute URL — iMessage / Slack / Twitter reject relative image paths.
-const OG_IMAGE = "https://os.joinleaf.com/creators-hero.jpg";
+// Dedicated 1200x630 landscape crop (the tall creators-hero.jpg would be
+// center-cropped awkwardly in link-preview cards).
+const OG_IMAGE = "https://os.joinleaf.com/creators-og.jpg";
 const OG_ALT = "Friends laughing over drinks at a bar";
 
 export const metadata: Metadata = {
@@ -21,8 +23,8 @@ export const metadata: Metadata = {
     images: [
       {
         url: OG_IMAGE,
-        width: 1400,
-        height: 2294,
+        width: 1200,
+        height: 630,
         alt: OG_ALT,
         type: "image/jpeg",
       },
