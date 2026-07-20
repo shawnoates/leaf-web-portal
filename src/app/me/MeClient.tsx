@@ -473,10 +473,12 @@ function Stop({
       <div className="stop-card">
         <PlanTile plan={plan} index={index} sm onOpen={onOpen} />
         <div>
-          <div className="cal">{plan.calendarName}</div>
+          <div className="cal-row">
+            <div className="cal">{plan.calendarName}</div>
+            {status && <span className={`status ${status.cls}`}>{status.text}</span>}
+          </div>
           <h3><button className="plan-link" onClick={onOpen}>{plan.title}</button></h3>
           <p className="meta">{meta}</p>
-          {status && <div className="statusrow"><span className={`status ${status.cls}`}>{status.text}</span></div>}
           {plan.hostState === "waiting_on_host" && (
             <div style={{ marginTop: 9 }}><Link className="btn ghost" href={hostHref}>Host this ↗</Link></div>
           )}
@@ -921,8 +923,9 @@ const CSS = `
 .leafme .status::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--ink-3)}
 .leafme .status.host::before{background:var(--green)}
 .leafme .status.wait::before{background:#d9a441}
-.leafme .statusrow{margin-top:2px}
-@media(min-width:761px){.leafme .statusrow{text-align:right}}
+.leafme .cal-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.leafme .cal-row .cal{margin-bottom:0}
+.leafme .cal-row .status{flex-shrink:0}
 .leafme .thread{margin-top:14px;padding-top:13px;border-top:1px solid var(--rule)}
 .leafme .thread.hero-thread{max-width:44ch}
 .leafme .msg{display:flex;gap:11px;padding:9px 0}
@@ -944,20 +947,20 @@ const CSS = `
 .leafme .nhs .head h1{font-family:var(--serif);font-size:24px;font-weight:500;letter-spacing:-.01em;margin-top:6px}
 .leafme .nhs .head h1 .k{color:var(--danger)}
 .leafme .tierlab{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);margin:0 0 12px}
-.leafme .hcard{display:grid;grid-template-columns:50px 82px 1fr auto;gap:16px;align-items:center;padding:16px 0;border-bottom:1px solid var(--rule)}
-.leafme .hcard .date{text-align:left}
+.leafme .hcard{display:flex;align-items:center;gap:16px;padding:16px 0;border-bottom:1px solid var(--rule)}
+.leafme .hcard .date{width:46px;flex-shrink:0;text-align:left}
 .leafme .hcard .date .d{font-family:var(--serif);font-size:28px;line-height:.85;color:var(--ink)}
 .leafme .hcard .date .mo{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-top:5px}
-.leafme .hcard .thumb{width:82px;height:60px;border-radius:4px;object-fit:cover;display:block}
+.leafme .hcard .thumb{width:82px;height:60px;flex-shrink:0;border-radius:4px;object-fit:cover;display:block}
 .leafme .hcard .thumb.ph{background:var(--sage)}
-.leafme .hcard .hb{min-width:0}
-.leafme .hcard .hb h3{font-family:var(--serif);font-size:18px;font-weight:500;letter-spacing:-.01em;line-height:1.2;overflow-wrap:anywhere}
+.leafme .hcard .hb{flex:1;min-width:0}
+.leafme .hcard .hb h3{font-family:var(--serif);font-size:18px;font-weight:500;letter-spacing:-.01em;line-height:1.2}
 .leafme .hcard .hmeta{font-size:12.5px;color:var(--ink-3);margin-top:3px}
 .leafme .decay{display:inline-flex;align-items:center;gap:6px;margin-top:7px;font-size:12px;font-weight:500}
 .leafme .decay.soon{color:var(--danger)}
 .leafme .decay.warn{color:var(--amber)}
 .leafme .decay::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
-.leafme .hact{text-align:right}
+.leafme .hact{flex-shrink:0;text-align:right}
 .leafme .interested{font-size:11px;color:var(--ink-3);margin-bottom:6px}
 .leafme .host{background:var(--sage-deep);color:#fff;border:0;border-radius:6px;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:600;padding:11px 17px;white-space:nowrap}
 .leafme .host:hover{background:#264c37}
@@ -973,9 +976,9 @@ const CSS = `
 .leafme .crow .cbody .c b.soon{color:var(--danger)}
 .leafme .crow .cta{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--sage-deep);white-space:nowrap}
 @media(max-width:600px){
-  .leafme .hcard{grid-template-columns:44px 1fr;gap:12px;row-gap:9px}
+  .leafme .hcard{flex-wrap:wrap;gap:12px}
   .leafme .hcard .thumb{display:none}
-  .leafme .hcard .hact{grid-column:2;text-align:left}
+  .leafme .hcard .hact{flex-basis:100%;text-align:left;margin-top:2px}
   .leafme .crow .cta span{display:none}
 }
 .leafme .start{border:1px solid var(--rule);border-radius:3px;padding:26px 24px}
