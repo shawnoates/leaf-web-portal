@@ -68,6 +68,7 @@ interface HostCalRow {
   calendarId: string;
   calendarName: string;
   calendarShareId: string | null;
+  calendarPhoto: string | null;
   count: number;
   soonestDeadline: string;
   soonestIsUrgent: boolean;
@@ -660,7 +661,12 @@ function NeedsHostSection({ data }: { data: NeedsHost }) {
               className="crow"
               href={c.calendarShareId ? `/org/${c.calendarShareId}` : "#"}
             >
-              <span className="gmark" />
+              {c.calendarPhoto ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="gmark" src={c.calendarPhoto} alt="" />
+              ) : (
+                <span className="gmark" />
+              )}
               <div className="cbody">
                 <div className="n">{c.calendarName}</div>
                 <div className="c">
@@ -968,7 +974,7 @@ const CSS = `
 .leafme .tier2{margin-top:36px;padding-top:26px;border-top:1px solid var(--rule)}
 .leafme .crow{display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit;border:1px solid var(--rule);border-radius:8px;padding:15px 16px;margin-bottom:10px;background:#fff}
 .leafme .crow:hover{border-color:var(--ink-3);background:#faf9f6}
-.leafme .crow .gmark{width:34px;height:34px;border-radius:7px;background:linear-gradient(135deg,#7aa5c8,#2f5d43);flex-shrink:0}
+.leafme .crow .gmark{width:34px;height:34px;border-radius:7px;background:linear-gradient(135deg,#7aa5c8,#2f5d43);flex-shrink:0;object-fit:cover;display:block}
 .leafme .crow .cbody{flex:1;min-width:0}
 .leafme .crow .cbody .n{font-size:15px;font-weight:600;letter-spacing:-.01em}
 .leafme .crow .cbody .c{font-size:13px;color:var(--ink-3);margin-top:2px}
