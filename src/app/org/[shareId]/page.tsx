@@ -2977,7 +2977,7 @@ export default function OrgCalendarPage() {
                         backdropFilter: "blur(4px)",
                       }}
                     >
-                      Plan Idea
+                      Suggested
                     </span>
                   </div>
                   <div className="w-full md:w-2/5 space-y-6">
@@ -3110,6 +3110,57 @@ export default function OrgCalendarPage() {
                 </article>
               );
             })}
+            {/* Compact "Add a plan" row — inline sibling of the plan
+                ideas above using the same alternating layout, but a
+                shorter cover so it reads as an affordance, not
+                another suggestion. Owner-friendly copy vs. follower;
+                only renders when custom plans are enabled and the
+                calendar isn't RSVP-limited. */}
+            {!org.rsvpLimitReached && !org.hideCustomPlans && (
+              <article
+                className={`group flex flex-col md:flex-row gap-12 md:items-center ${org.planIdeas.length % 2 !== 0 ? "md:flex-row-reverse" : ""}`}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatingCustomPlan(true);
+                    setCustomTitle("");
+                    setCustomDescription("");
+                    setCustomCategory("");
+                    setCustomCapacity("");
+                    setHostNote("");
+                    setSelectedVenue(null);
+                    setCustomSubmitting(false);
+                    setCustomSuccess(false);
+                  }}
+                  className="w-full md:w-3/5 aspect-[16/5] md:aspect-[16/5] overflow-hidden shadow-sm relative rounded-none border-2 border-dashed border-emerald-300 bg-gradient-to-br from-emerald-50/80 to-white hover:from-emerald-50 transition-colors flex items-center justify-center"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                      <Plus className="w-5 h-5" />
+                    </div>
+                    <span className="text-xs font-bold uppercase tracking-widest text-emerald-700">
+                      {org.isOwner || org.isHost ? "Add a Plan" : "Suggest a Plan"}
+                    </span>
+                  </div>
+                </button>
+                <div className="w-full md:w-2/5 space-y-3">
+                  <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                    {org.isOwner || org.isHost ? "New plan" : "Your idea"}
+                  </p>
+                  <h3 className="text-2xl font-light tracking-tight">
+                    {org.isOwner || org.isHost
+                      ? "Have one in mind? Add it."
+                      : "Have one we missed? Pitch it."}
+                  </h3>
+                  <p className="text-zinc-500 leading-relaxed font-light text-sm">
+                    {org.isOwner || org.isHost
+                      ? "Pick a date, venue, and details — goes live on your calendar."
+                      : "Pitch a date, venue, and details — pending organizer approval."}
+                  </p>
+                </div>
+              </article>
+            )}
           </section>
         )}
 
@@ -3342,7 +3393,12 @@ export default function OrgCalendarPage() {
 
         {/* Plan Ideas Carousel */}
         {/* Get Involved section — shows if plan ideas OR custom proposals are enabled */}
-        {((org.planIdeas.length > 0 && !org.hidePlanIdeas) || (!org.rsvpLimitReached && !org.hideCustomPlans)) && (
+        {/* Get Involved section — fallback surface for the Custom Plan
+            card when NO plan ideas are present above. When plan ideas
+            exist, the inline flow already renders both the ideas AND
+            a compact Add-a-Plan row underneath them; showing this
+            duplicates the card. */}
+        {org.planIdeas.length === 0 && !org.rsvpLimitReached && !org.hideCustomPlans && (
           <section className={`${org.plans.length > 0 ? "mt-48" : "mt-8"} mb-24 space-y-12`}>
             <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
               <div className="space-y-2">
