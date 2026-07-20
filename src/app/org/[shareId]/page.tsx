@@ -3235,6 +3235,21 @@ export default function OrgCalendarPage() {
                 </article>
               );
             })}
+            {/* Show-more toggle — the rest of the spread-out ideas expand
+                in place so the default view stays scannable (confirmed
+                plans + a handful of suggestions) without hiding anything. */}
+            {hiddenIdeaCount > 0 && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setShowAllIdeas(true)}
+                  className="border border-zinc-200 px-6 py-3 text-xs uppercase tracking-widest font-medium text-zinc-600 hover:bg-zinc-50 transition-colors flex items-center gap-2"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Show {hiddenIdeaCount} more idea{hiddenIdeaCount === 1 ? "" : "s"}
+                </button>
+              </div>
+            )}
             {/* Compact "Add a plan" row — inline sibling of the plan
                 ideas above using the same alternating layout, but a
                 shorter cover so it reads as an affordance, not
@@ -3243,7 +3258,7 @@ export default function OrgCalendarPage() {
                 calendar isn't RSVP-limited. */}
             {!org.rsvpLimitReached && !org.hideCustomPlans && (
               <article
-                className={`group flex flex-col md:flex-row gap-12 md:items-center ${org.planIdeas.length % 2 !== 0 ? "md:flex-row-reverse" : ""}`}
+                className={`group flex flex-col md:flex-row gap-12 md:items-center ${visibleIdeas.length % 2 !== 0 ? "md:flex-row-reverse" : ""}`}
               >
                 <button
                   type="button"
@@ -3287,7 +3302,8 @@ export default function OrgCalendarPage() {
               </article>
             )}
           </section>
-        )}
+          );
+        })()}
 
         {org.plans.length > 0 && (
           <div className="space-y-32">
@@ -4172,7 +4188,15 @@ export default function OrgCalendarPage() {
                         required
                         min={new Date().toISOString().split("T")[0]}
                         max={org.tier === "starter" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] : undefined}
-                        defaultValue={hostingIdea.date ? new Date(hostingIdea.date).toISOString().split("T")[0] : ""}
+                        defaultValue={(() => {
+                          // Prefill the spread cadence date so the modal
+                          // matches the date shown on the idea's card;
+                          // fall back to the server date.
+                          const d =
+                            spreadIdeaDates.get(hostingIdea.id) ??
+                            (hostingIdea.date ? new Date(hostingIdea.date) : null);
+                          return d ? d.toISOString().split("T")[0] : "";
+                        })()}
                         className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
                       />
                     </div>
