@@ -467,6 +467,10 @@ function Stop({
   const going = plan.rsvpState === "going";
   const meta = [weekday(plan.date), timeLabel(plan), plan.venueName || plan.venueAddress].filter(Boolean).join(" · ");
   const hostHref = plan.calendarShareId ? `/org/${plan.calendarShareId}?host=${encodeURIComponent(plan.id)}` : `/p/${plan.id}`;
+  // Plans you're neither attending nor hosting (and not Leaf-hosted / waiting on
+  // a host) get a quick "I'm attending" CTA on the right instead of a count.
+  const canAttend = !plan.viewerIsHost && plan.rsvpState !== "going"
+    && plan.hostState !== "waiting_on_host" && plan.hostState !== "leaf_hosted";
   return (
     <article className="stop">
       <div className="date"><div className="d">{dayNum(plan.date)}</div><div className="m">{monthAbbr(plan.date)}</div></div>
@@ -476,20 +480,43 @@ function Stop({
         <div>
           <div className="cal-row">
             <div className="cal">{plan.calendarName}</div>
-            {status && <span className={`status ${status.cls}`}>{status.text}</span>}
+            {canAttend
+              ? <AttendCta plan={plan} onRsvp={onRsvp} />
+              : (status && <span className={`status ${status.cls}`}>{status.text}</span>)}
           </div>
           <h3><button className="plan-link" onClick={onOpen}>{plan.title}</button></h3>
           <p className="meta">{meta}</p>
           {plan.hostState === "waiting_on_host" && (
             <div style={{ marginTop: 9 }}><Link className="btn ghost" href={hostHref}>Host this ↗</Link></div>
           )}
-          {!plan.viewerIsHost && plan.rsvpState !== "going" && plan.hostState !== "waiting_on_host" && (
-            <div style={{ marginTop: 9 }}><AttendButtons plan={plan} onRsvp={onRsvp} /></div>
-          )}
           <Thread plan={plan} />
         </div>
       </div>
     </article>
+  );
+}
+
+// White-bg "I'm attending" quick CTA for the spine's not-attending plans.
+// One tap RSVPs going (optimistic); full controls live in the plan modal.
+function AttendCta({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: RsvpState) => void }) {
+  const [busy, setBusy] = useState(false);
+  async function go() {
+    if (busy) return;
+    setBusy(true);
+    const prev = plan.rsvpState;
+    onRsvp(plan.id, "going");
+    try {
+      await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: "going" });
+    } catch {
+      onRsvp(plan.id, prev);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <button className="attend-cta" disabled={busy} onClick={go}>
+      {busy ? "…" : "I'm attending"}
+    </button>
   );
 }
 
@@ -929,9 +956,12 @@ const CSS = `
 .leafme .status::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--ink-3)}
 .leafme .status.host::before{background:var(--green)}
 .leafme .status.wait::before{background:#d9a441}
-.leafme .cal-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.leafme .cal-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .leafme .cal-row .cal{margin-bottom:0}
 .leafme .cal-row .status{flex-shrink:0}
+.leafme .attend-cta{flex-shrink:0;background:#fff;border:1px solid var(--rule);border-radius:6px;color:var(--ink);font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:9px 16px;cursor:pointer;white-space:nowrap}
+.leafme .attend-cta:hover{border-color:var(--ink-3)}
+.leafme .attend-cta:disabled{opacity:.5;cursor:default}
 .leafme .thread{margin-top:14px;padding-top:13px;border-top:1px solid var(--rule)}
 .leafme .thread.hero-thread{max-width:44ch}
 .leafme .msg{display:flex;gap:11px;padding:9px 0}
