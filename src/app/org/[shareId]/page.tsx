@@ -2895,8 +2895,7 @@ export default function OrgCalendarPage() {
                                           : undefined
                                       }
                                     >
-                                      Host This{" "}
-                                      <ArrowUpRight className="w-4 h-4" />
+                                      Host This
                                     </button>
                                   );
                                 })()}
@@ -3100,7 +3099,7 @@ export default function OrgCalendarPage() {
                                   : undefined
                               }
                             >
-                              Host This <ArrowUpRight className="w-4 h-4" />
+                              Host This
                             </button>
                           );
                         })()}
