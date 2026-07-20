@@ -107,6 +107,16 @@ interface PlanIdea {
   icebreakerQuestion: string | null;
   suggestedCapacity: number | null;
   centroid: string | null;
+  // Public — anyone can express interest on a plan idea (same shape as
+  // AI-suggested events). Server aggregates via PlanIdeaInterest.
+  interestCount?: number;
+  // Venue anchor for the inline card. Optional; some ideas render
+  // with a location line, others don't.
+  location?: {
+    name: string;
+    address: string;
+  } | null;
+  ideaSeriesId?: string | null;
 }
 
 interface NearbyVenue {
@@ -236,6 +246,33 @@ function isAIEventLocallyInterested(shareId: string, eventIndex: number): boolea
     if (!raw) return false;
     const set: Record<string, boolean> = JSON.parse(raw);
     return !!set[`${shareId}::${eventIndex}`];
+  } catch {
+    return false;
+  }
+}
+
+// Sibling helpers for plan-idea interest (CalendarGeneratedPlan rows,
+// not aiSourceEvents). Same shape as the AI helpers; different storage
+// key so a shared browser doesn't cross-contaminate the two flows.
+const PLAN_IDEA_INTEREST_LOCAL_KEY = "leaf_plan_idea_interests";
+function markPlanIdeaLocallyInterested(ideaId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(PLAN_IDEA_INTEREST_LOCAL_KEY);
+    const set: Record<string, boolean> = raw ? JSON.parse(raw) : {};
+    set[ideaId] = true;
+    localStorage.setItem(PLAN_IDEA_INTEREST_LOCAL_KEY, JSON.stringify(set));
+  } catch {
+    /* quota / storage disabled */
+  }
+}
+function isPlanIdeaLocallyInterested(ideaId: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(PLAN_IDEA_INTEREST_LOCAL_KEY);
+    if (!raw) return false;
+    const set: Record<string, boolean> = JSON.parse(raw);
+    return !!set[ideaId];
   } catch {
     return false;
   }
@@ -1359,6 +1396,12 @@ export default function OrgCalendarPage() {
   const [aiInterestCounts, setAIInterestCounts] = useState<Record<number, number>>({});
   const [aiLocallyInterested, setAILocallyInterested] = useState<Set<number>>(new Set());
   const [aiInterestPending, setAIInterestPending] = useState<Set<number>>(new Set());
+  // Same three, keyed by CalendarGeneratedPlan.objectId (string) for
+  // plan ideas — merged inline with real plans + AI Suggested events
+  // in the Upcoming stream.
+  const [planIdeaInterestCounts, setPlanIdeaInterestCounts] = useState<Record<string, number>>({});
+  const [planIdeaLocallyInterested, setPlanIdeaLocallyInterested] = useState<Set<string>>(new Set());
+  const [planIdeaInterestPending, setPlanIdeaInterestPending] = useState<Set<string>>(new Set());
   const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   // Which AI event index (if any) the visitor tapped Host This on.
@@ -1458,6 +1501,74 @@ export default function OrgCalendarPage() {
     });
     if (seen.size > 0) setAILocallyInterested(seen);
   }, [org?.aiSourceEvents, shareId]);
+
+  // Plan-idea interest tap. Same optimistic pattern as
+  // handleAIEventInterest, keyed by CalendarGeneratedPlan.objectId
+  // instead of aiSourceEvents index.
+  const handlePlanIdeaInterest = useCallback(
+    async (ideaId: string) => {
+      if (planIdeaLocallyInterested.has(ideaId)) return;
+      if (planIdeaInterestPending.has(ideaId)) return;
+
+      const cookie = getOrCreateAIInterestCookie();
+      const priorCount =
+        planIdeaInterestCounts[ideaId] ??
+        (org?.planIdeas.find((i) => i.id === ideaId)?.interestCount ?? 0);
+
+      setPlanIdeaInterestPending((prev) => {
+        const next = new Set(prev);
+        next.add(ideaId);
+        return next;
+      });
+      setPlanIdeaLocallyInterested((prev) => {
+        const next = new Set(prev);
+        next.add(ideaId);
+        return next;
+      });
+      setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: priorCount + 1 }));
+      markPlanIdeaLocallyInterested(ideaId);
+
+      try {
+        const result = (await Parse.Cloud.run("expressInterestOnPlanIdea", {
+          ideaId,
+          cookie,
+        })) as { count?: number; alreadyInterested?: boolean };
+        if (typeof result?.count === "number") {
+          setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: result.count! }));
+        }
+      } catch (err) {
+        console.error("[org] expressInterestOnPlanIdea failed:", err);
+        setPlanIdeaLocallyInterested((prev) => {
+          const next = new Set(prev);
+          next.delete(ideaId);
+          return next;
+        });
+        setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: priorCount }));
+      } finally {
+        setPlanIdeaInterestPending((prev) => {
+          const next = new Set(prev);
+          next.delete(ideaId);
+          return next;
+        });
+      }
+    },
+    [
+      planIdeaInterestCounts,
+      planIdeaLocallyInterested,
+      planIdeaInterestPending,
+      org?.planIdeas,
+    ],
+  );
+
+  // Hydrate plan-idea "already interested" from localStorage.
+  useEffect(() => {
+    if (!org?.planIdeas || org.planIdeas.length === 0) return;
+    const seen = new Set<string>();
+    for (const idea of org.planIdeas) {
+      if (isPlanIdeaLocallyInterested(idea.id)) seen.add(idea.id);
+    }
+    if (seen.size > 0) setPlanIdeaLocallyInterested(seen);
+  }, [org?.planIdeas]);
 
   const handleSharePlan = useCallback(async (planId: string, planTitle: string) => {
     const url = `https://os.joinleaf.com/p/${planId}`;
@@ -1801,6 +1912,14 @@ export default function OrgCalendarPage() {
         icebreakerQuestion: idea.icebreakerQuestion as string || null,
         suggestedCapacity: idea.suggestedCapacity as number || null,
         centroid: idea.centroid as string || null,
+        interestCount: typeof idea.interestCount === "number" ? (idea.interestCount as number) : 0,
+        location: idea.location && typeof idea.location === "object"
+          ? {
+              name: ((idea.location as Record<string, unknown>).name as string) || "",
+              address: ((idea.location as Record<string, unknown>).address as string) || "",
+            }
+          : null,
+        ideaSeriesId: (idea.ideaSeriesId as string) || null,
       }));
 
       setOrg({
@@ -2794,6 +2913,206 @@ export default function OrgCalendarPage() {
           </>
         )}
 
+        {/* Plan Ideas — merged inline with the Upcoming stream so
+            visitors see them alongside real plans + AI Suggested
+            events instead of buried in a separate carousel below.
+            Same alternating-row layout, same I'm Interested / Host
+            This action pair. Only renders when the calendar has ideas
+            and the owner hasn't disabled them. */}
+        {!org.hidePlanIdeas && org.planIdeas.length > 0 && (
+          <section className="space-y-32 pt-8">
+            {org.planIdeas.map((idea, index) => {
+              const dateISO = idea.date;
+              let dateLabel: string | null = null;
+              if (dateISO) {
+                try {
+                  const d = new Date(dateISO);
+                  dateLabel = `${d
+                    .toLocaleDateString("en-US", {
+                      weekday: "long",
+                      month: "short",
+                      day: "numeric",
+                    })
+                    .toUpperCase()}`;
+                } catch { /* keep null */ }
+              }
+              const priorCount =
+                planIdeaInterestCounts[idea.id] ??
+                idea.interestCount ??
+                0;
+              const isInterested = planIdeaLocallyInterested.has(idea.id);
+              const isPending = planIdeaInterestPending.has(idea.id);
+              // Flip alternation continuous with real plans below —
+              // planIdeas rendered first means real plans start at the
+              // idea count's parity.
+              const flip = index % 2 !== 0;
+              return (
+                <article
+                  key={idea.id}
+                  className={`group flex flex-col md:flex-row gap-12 md:items-center ${flip ? "md:flex-row-reverse" : ""}`}
+                >
+                  <div
+                    className="w-full md:w-3/5 aspect-[16/10] overflow-hidden shadow-sm relative bg-zinc-100"
+                  >
+                    {idea.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={idea.image}
+                        alt={idea.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Sparkles className="w-12 h-12 text-zinc-300" />
+                      </div>
+                    )}
+                    <span
+                      className="absolute top-4 left-4 text-[10px] font-bold uppercase tracking-widest rounded-full px-3 py-1"
+                      style={{
+                        background: "rgba(255,255,255,0.9)",
+                        color: "#1B4332",
+                        backdropFilter: "blur(4px)",
+                      }}
+                    >
+                      Plan Idea
+                    </span>
+                  </div>
+                  <div className="w-full md:w-2/5 space-y-6">
+                    <div className="space-y-2">
+                      {dateLabel && (
+                        <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                          {dateLabel}
+                        </p>
+                      )}
+                      <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
+                        {idea.title}
+                      </h3>
+                      <div className="pt-2">
+                        <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
+                          <span
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: org.brandColor || "#1B4332" }}
+                          />
+                          Waiting on host
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {idea.description && (
+                        <p className="text-zinc-700 leading-relaxed font-light text-lg">
+                          {idea.description}
+                        </p>
+                      )}
+                      {idea.location?.name && (
+                        <p className="text-zinc-500 leading-relaxed font-light text-sm">
+                          {idea.location.name}
+                          {idea.location.address ? ` · ${idea.location.address}` : ""}
+                        </p>
+                      )}
+                    </div>
+                    <div className="pt-2 flex flex-col gap-6">
+                      {priorCount > 0 && (
+                        <div className="flex items-center gap-3">
+                          <span
+                            className="text-xs tracking-widest uppercase font-bold flex items-center gap-1.5"
+                            style={{ color: "#1B4332" }}
+                          >
+                            <Heart className="w-3 h-3" fill="currentColor" />
+                            {priorCount}{" "}
+                            {priorCount === 1 ? "person interested" : "people interested"}
+                          </span>
+                          {isInterested && (
+                            <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
+                              <Check className="w-3 h-3" /> You
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        <button
+                          onClick={() => handlePlanIdeaInterest(idea.id)}
+                          disabled={isInterested || isPending}
+                          className="border px-6 py-3 text-xs uppercase tracking-widest font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-default"
+                          style={{
+                            borderColor: isInterested ? "#1B4332" : "#E3E5DE",
+                            backgroundColor: isInterested ? "#E8EFE9" : "#ffffff",
+                            color: isInterested ? "#1B4332" : "#131714",
+                          }}
+                        >
+                          {isPending ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              Marking…
+                            </>
+                          ) : isInterested ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              You&apos;re interested
+                            </>
+                          ) : (
+                            <>
+                              <Heart className="w-3.5 h-3.5" />
+                              I&apos;m interested
+                            </>
+                          )}
+                        </button>
+                        {/* Host This — same permission matrix as
+                            AI-suggested events. Tapping opens the
+                            existing hostingIdea flow (create-plan
+                            modal prefilled from the idea). */}
+                        {(() => {
+                          const canHostAsHost = org.isOwner || org.isHost;
+                          const canHostAsFollower =
+                            !!org.allowFollowersToHost && !!org.isFollower;
+                          const shouldShow =
+                            canHostAsHost ||
+                            canHostAsFollower ||
+                            !!org.allowFollowersToHost;
+                          if (!shouldShow) return null;
+                          const active = canHostAsHost || canHostAsFollower;
+                          return (
+                            <button
+                              onClick={() => {
+                                if (!active || org.rsvpLimitReached) return;
+                                setHostingIdea(idea);
+                                setHostSubmitting(false);
+                                setHostSuccess(false);
+                                setHostNote("");
+                                setSelectedVenue(null);
+                              }}
+                              disabled={!active || org.rsvpLimitReached}
+                              title={
+                                active
+                                  ? undefined
+                                  : "Follow the calendar to host"
+                              }
+                              className={`px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 transition-opacity ${
+                                active && !org.rsvpLimitReached
+                                  ? "text-white hover:opacity-90"
+                                  : "text-zinc-400 border border-zinc-200 bg-white cursor-not-allowed"
+                              }`}
+                              style={
+                                active && !org.rsvpLimitReached
+                                  ? { backgroundColor: org.brandColor || "#18181b" }
+                                  : undefined
+                              }
+                            >
+                              Host This <ArrowUpRight className="w-4 h-4" />
+                            </button>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </section>
+        )}
+
         {org.plans.length > 0 && (
           <div className="space-y-32">
             {org.plans.map((plan, index) => (
@@ -3117,59 +3436,12 @@ export default function OrgCalendarPage() {
                   </div>
                 </div>
               )}
-              {/* Plan idea cards — only if plan ideas enabled. Filter out
-                  ideas with no image to avoid showing broken-image cards. */}
-              {!org.hidePlanIdeas && org.planIdeas.filter((idea) => idea.image).map((idea) => (
-                <div
-                  key={idea.id}
-                  className={`min-w-[280px] max-w-[300px] snap-start group ${org.rsvpLimitReached ? "cursor-default" : "cursor-pointer"}`}
-                  onClick={() => {
-                    if (org.rsvpLimitReached) return;
-                    setHostingIdea(idea);
-                    setHostSubmitting(false);
-                    setHostSuccess(false);
-                    setHostNote("");
-                    setSelectedVenue(null);
-                  }}
-                >
-                  <div className="aspect-[4/5] overflow-hidden bg-zinc-100 mb-4 relative">
-                    {idea.image ? (
-                      <img
-                        src={idea.image}
-                        className={`w-full h-full object-cover transition-transform duration-700 ${org.rsvpLimitReached ? "grayscale opacity-60" : "group-hover:scale-110"}`}
-                        alt={idea.title}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Sparkles className={`w-12 h-12 ${org.rsvpLimitReached ? "text-zinc-200" : "text-zinc-300"}`} />
-                      </div>
-                    )}
-                    <div className={`absolute inset-0 transition-all duration-300 flex items-center justify-center ${
-                      org.rsvpLimitReached
-                        ? "bg-black/10 opacity-100"
-                        : "bg-black/0 group-hover:bg-black/20 opacity-0 group-hover:opacity-100"
-                    }`}>
-                      {org.rsvpLimitReached ? (
-                        <span className="bg-white/90 px-6 py-3 text-xs tracking-wider uppercase font-bold shadow-xl flex items-center gap-2 text-zinc-400">
-                          <Lock className="w-3.5 h-3.5" /> Host This
-                        </span>
-                      ) : (
-                        <span className="bg-white px-6 py-3 text-xs tracking-wider uppercase font-bold shadow-xl">
-                          Host This
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <h4 className={`text-base font-medium tracking-tight ${org.rsvpLimitReached ? "text-zinc-400" : "group-hover:italic"}`}>
-                      {idea.title}
-                    </h4>
-                    <p className="text-sm text-zinc-500 font-light line-clamp-2 leading-relaxed">
-                      {idea.description}
-                    </p>
-                  </div>
-                </div>
-              ))}
+              {/* Plan idea cards — historically rendered here as a
+                  compact carousel. Now moved INLINE with the Upcoming
+                  stream above (same alternating-row treatment as AI
+                  Suggested + real plans, with I'm Interested + Host
+                  This actions). The Custom Plan card above is the
+                  only occupant of the Get Involved carousel now. */}
             </div>
           </section>
         )}
