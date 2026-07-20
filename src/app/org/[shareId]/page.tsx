@@ -2769,6 +2769,197 @@ export default function OrgCalendarPage() {
             </div>
           )}
 
+        {org.plans.length > 0 && (
+          <div className="space-y-32">
+            {org.plans.map((plan, index) => (
+              <article
+                key={plan.id}
+                className={`group flex flex-col md:flex-row gap-12 md:items-center ${
+                  index % 2 !== 0 ? "md:flex-row-reverse" : ""
+                }`}
+              >
+                <div
+                  className="w-full md:w-3/5 aspect-[16/10] overflow-hidden cursor-pointer bg-zinc-100 shadow-sm"
+                  onClick={() => setSelectedEvent(plan)}
+                >
+                  {plan.image ? (
+                    <img
+                      src={plan.image}
+                      alt={plan.title}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Calendar className="w-16 h-16 text-zinc-300" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="w-full md:w-2/5 space-y-6">
+                  <div className="space-y-2">
+                    <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                      {plan.isPoll ? (
+                        <>
+                          Date Poll &bull; {plan.pollOptionCount || 0} {plan.pollOptionCount === 1 ? "option" : "options"}
+                          {plan.pollClosesAt && (() => {
+                            const ms = new Date(plan.pollClosesAt).getTime() - Date.now();
+                            if (ms <= 0) return <> &bull; closed</>;
+                            const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
+                            return <> &bull; {days}d left</>;
+                          })()}
+                        </>
+                      ) : (
+                        <>{plan.date}{plan.time ? <> &bull; {plan.time}</> : ""}</>
+                      )}
+                    </p>
+                    <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
+                      {plan.title}
+                    </h3>
+                    <div className="pt-2">
+                      {/* Card state — leaf-host outcomes take precedence
+                          because they carry the strongest signal (Leaf
+                          delivered, or is delivering). Server already
+                          stripped `leaf_arranging` from non-owner
+                          payloads so the arranging line is safe to
+                          render whenever it's present.
+                          * leaf_hosted   → public: HOSTED BY LEAF · Sara
+                          * leaf_arranging → owner-only: LEAF IS ARRANGING THIS
+                          * default        → Hosted by {plan.hostName} */}
+                      {plan.leafHostState === "leaf_hosted" ? (
+                        <div className="flex items-center gap-2">
+                          {plan.leafHostPersona?.avatarUrl && (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={plan.leafHostPersona.avatarUrl}
+                              alt=""
+                              aria-hidden="true"
+                              className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200 flex-shrink-0"
+                            />
+                          )}
+                          <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold">
+                            Hosted by Leaf
+                            {plan.leafHostPersona?.name ? ` · ${plan.leafHostPersona.name}` : ""}
+                          </p>
+                        </div>
+                      ) : plan.leafHostState === "leaf_arranging" ? (
+                        <p className="text-xs tracking-wider uppercase text-zinc-500 font-bold flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                          Leaf is arranging this
+                        </p>
+                      ) : (
+                        <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: org.brandColor || "#18181b" }} />
+                          Hosted by {plan.hostName}
+                        </p>
+                      )}
+                      {/* Per-plan leaf-host chat pill — owner-only.
+                          Server strips these fields for non-owners so
+                          the button never surfaces publicly. Unread
+                          badge inside the pill; click opens a plan-
+                          scoped drawer (LeafHostPlanThread). */}
+                      {plan.hasLeafHostChat && plan.leafHostPersona && (
+                        <button
+                          type="button"
+                          onClick={() => setLeafHostChatPlanId(plan.id)}
+                          className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 transition-colors text-xs font-medium text-zinc-700"
+                        >
+                          {plan.leafHostPersona.avatarUrl ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={plan.leafHostPersona.avatarUrl}
+                              alt=""
+                              aria-hidden="true"
+                              className="w-4 h-4 rounded-full object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          )}
+                          Chat with {plan.leafHostPersona.name || "your concierge"}
+                          {(plan.leafHostChatUnread ?? 0) > 0 && (
+                            <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-4 text-center">
+                              {(plan.leafHostChatUnread ?? 0) > 9
+                                ? "9+"
+                                : plan.leafHostChatUnread}
+                            </span>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="text-zinc-500 leading-relaxed font-light text-lg line-clamp-3">
+                    {plan.description}
+                  </p>
+
+                  <div className="pt-2 flex flex-col gap-6">
+                    {plan.isPoll ? (
+                      <>
+                        <p className="text-xs tracking-widest uppercase font-bold text-zinc-500">
+                          {plan.pollVoteCount || 0} {plan.pollVoteCount === 1 ? "Vote" : "Votes"} so far
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          <button
+                            onClick={() => setSelectedEvent(plan)}
+                            className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+                            style={{ backgroundColor: org.brandColor || "#18181b" }}
+                          >
+                            Vote on a Date <ArrowUpRight className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleSharePlan(plan.id, plan.title)}
+                            className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
+                          >
+                            {copiedPlanId === plan.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                            <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-3">
+                          <AvatarStack count={plan.attendeeCount} />
+                          {hostedPlanIds.has(plan.id) ? (
+                            <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Hosting
+                            </span>
+                          ) : pendingRsvpIds.has(plan.id) ? (
+                            <span className="text-xs font-bold uppercase tracking-widest text-amber-500 flex items-center gap-1">
+                              <Clock className="w-3 h-3" /> Pending
+                            </span>
+                          ) : rsvpedPlanIds.has(plan.id) ? (
+                            <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Attending
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          {/* "View Details" for everyone — RSVP'd, hosting, pending, or new.
+                              The modal handles state-specific actions (Join Plan Chat for
+                              attendees, Message Attendees for hosts, Cancel RSVP, etc.). */}
+                          <button
+                            onClick={() => setSelectedEvent(plan)}
+                            className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+                            style={{ backgroundColor: org.brandColor || "#18181b" }}
+                          >
+                            View Details <ArrowUpRight className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleSharePlan(plan.id, plan.title)}
+                            className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
+                          >
+                            {copiedPlanId === plan.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                            <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+
         {/* AI-adopted starter events — always render when the calendar
             has aiSourceEvents so they appear ALONGSIDE real plans in the
             Upcoming Plans section, not just when the plans list is
@@ -3305,196 +3496,6 @@ export default function OrgCalendarPage() {
           );
         })()}
 
-        {org.plans.length > 0 && (
-          <div className="space-y-32">
-            {org.plans.map((plan, index) => (
-              <article
-                key={plan.id}
-                className={`group flex flex-col md:flex-row gap-12 md:items-center ${
-                  index % 2 !== 0 ? "md:flex-row-reverse" : ""
-                }`}
-              >
-                <div
-                  className="w-full md:w-3/5 aspect-[16/10] overflow-hidden cursor-pointer bg-zinc-100 shadow-sm"
-                  onClick={() => setSelectedEvent(plan)}
-                >
-                  {plan.image ? (
-                    <img
-                      src={plan.image}
-                      alt={plan.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Calendar className="w-16 h-16 text-zinc-300" />
-                    </div>
-                  )}
-                </div>
-
-                <div className="w-full md:w-2/5 space-y-6">
-                  <div className="space-y-2">
-                    <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
-                      {plan.isPoll ? (
-                        <>
-                          Date Poll &bull; {plan.pollOptionCount || 0} {plan.pollOptionCount === 1 ? "option" : "options"}
-                          {plan.pollClosesAt && (() => {
-                            const ms = new Date(plan.pollClosesAt).getTime() - Date.now();
-                            if (ms <= 0) return <> &bull; closed</>;
-                            const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
-                            return <> &bull; {days}d left</>;
-                          })()}
-                        </>
-                      ) : (
-                        <>{plan.date}{plan.time ? <> &bull; {plan.time}</> : ""}</>
-                      )}
-                    </p>
-                    <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
-                      {plan.title}
-                    </h3>
-                    <div className="pt-2">
-                      {/* Card state — leaf-host outcomes take precedence
-                          because they carry the strongest signal (Leaf
-                          delivered, or is delivering). Server already
-                          stripped `leaf_arranging` from non-owner
-                          payloads so the arranging line is safe to
-                          render whenever it's present.
-                          * leaf_hosted   → public: HOSTED BY LEAF · Sara
-                          * leaf_arranging → owner-only: LEAF IS ARRANGING THIS
-                          * default        → Hosted by {plan.hostName} */}
-                      {plan.leafHostState === "leaf_hosted" ? (
-                        <div className="flex items-center gap-2">
-                          {plan.leafHostPersona?.avatarUrl && (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img
-                              src={plan.leafHostPersona.avatarUrl}
-                              alt=""
-                              aria-hidden="true"
-                              className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200 flex-shrink-0"
-                            />
-                          )}
-                          <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold">
-                            Hosted by Leaf
-                            {plan.leafHostPersona?.name ? ` · ${plan.leafHostPersona.name}` : ""}
-                          </p>
-                        </div>
-                      ) : plan.leafHostState === "leaf_arranging" ? (
-                        <p className="text-xs tracking-wider uppercase text-zinc-500 font-bold flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                          Leaf is arranging this
-                        </p>
-                      ) : (
-                        <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: org.brandColor || "#18181b" }} />
-                          Hosted by {plan.hostName}
-                        </p>
-                      )}
-                      {/* Per-plan leaf-host chat pill — owner-only.
-                          Server strips these fields for non-owners so
-                          the button never surfaces publicly. Unread
-                          badge inside the pill; click opens a plan-
-                          scoped drawer (LeafHostPlanThread). */}
-                      {plan.hasLeafHostChat && plan.leafHostPersona && (
-                        <button
-                          type="button"
-                          onClick={() => setLeafHostChatPlanId(plan.id)}
-                          className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 transition-colors text-xs font-medium text-zinc-700"
-                        >
-                          {plan.leafHostPersona.avatarUrl ? (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img
-                              src={plan.leafHostPersona.avatarUrl}
-                              alt=""
-                              aria-hidden="true"
-                              className="w-4 h-4 rounded-full object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <MessageCircle className="w-3.5 h-3.5" />
-                          )}
-                          Chat with {plan.leafHostPersona.name || "your concierge"}
-                          {(plan.leafHostChatUnread ?? 0) > 0 && (
-                            <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-4 text-center">
-                              {(plan.leafHostChatUnread ?? 0) > 9
-                                ? "9+"
-                                : plan.leafHostChatUnread}
-                            </span>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <p className="text-zinc-500 leading-relaxed font-light text-lg line-clamp-3">
-                    {plan.description}
-                  </p>
-
-                  <div className="pt-2 flex flex-col gap-6">
-                    {plan.isPoll ? (
-                      <>
-                        <p className="text-xs tracking-widest uppercase font-bold text-zinc-500">
-                          {plan.pollVoteCount || 0} {plan.pollVoteCount === 1 ? "Vote" : "Votes"} so far
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-4">
-                          <button
-                            onClick={() => setSelectedEvent(plan)}
-                            className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
-                            style={{ backgroundColor: org.brandColor || "#18181b" }}
-                          >
-                            Vote on a Date <ArrowUpRight className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleSharePlan(plan.id, plan.title)}
-                            className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
-                          >
-                            {copiedPlanId === plan.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
-                            <span className="text-xs font-bold uppercase tracking-widest">Share</span>
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-3">
-                          <AvatarStack count={plan.attendeeCount} />
-                          {hostedPlanIds.has(plan.id) ? (
-                            <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
-                              <Check className="w-3 h-3" /> Hosting
-                            </span>
-                          ) : pendingRsvpIds.has(plan.id) ? (
-                            <span className="text-xs font-bold uppercase tracking-widest text-amber-500 flex items-center gap-1">
-                              <Clock className="w-3 h-3" /> Pending
-                            </span>
-                          ) : rsvpedPlanIds.has(plan.id) ? (
-                            <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
-                              <Check className="w-3 h-3" /> Attending
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-4">
-                          {/* "View Details" for everyone — RSVP'd, hosting, pending, or new.
-                              The modal handles state-specific actions (Join Plan Chat for
-                              attendees, Message Attendees for hosts, Cancel RSVP, etc.). */}
-                          <button
-                            onClick={() => setSelectedEvent(plan)}
-                            className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
-                            style={{ backgroundColor: org.brandColor || "#18181b" }}
-                          >
-                            View Details <ArrowUpRight className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleSharePlan(plan.id, plan.title)}
-                            className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
-                          >
-                            {copiedPlanId === plan.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
-                            <span className="text-xs font-bold uppercase tracking-widest">Share</span>
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
 
         {/* Nearby Deals — supporting benefit, sits between plans (the lead
             community-calendar pitch) and Get Involved (engagement levers).
