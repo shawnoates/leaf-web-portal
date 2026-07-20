@@ -872,7 +872,7 @@ const CSS = `
 .leafme .greet-line{font-family:var(--serif);font-size:32px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
 .leafme .hero{padding-top:56px;padding-bottom:44px;border-bottom:1px solid var(--rule)}
 .leafme .hero .eyebrow{margin-bottom:18px}
-.leafme .hero-grid{display:grid;grid-template-columns:1fr 300px;gap:44px;align-items:start}
+.leafme .hero-grid{display:grid;grid-template-columns:1fr 420px;gap:40px;align-items:start}
 .leafme .when{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ink-2);margin-bottom:6px}
 .leafme .hero h1{font-family:var(--serif);font-size:40px;line-height:1.08;font-weight:500;letter-spacing:-.02em;margin-bottom:12px}
 .leafme .addr{font-size:13px;color:var(--ink-2);margin-bottom:4px}
