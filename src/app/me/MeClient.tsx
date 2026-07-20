@@ -642,7 +642,7 @@ function NeedsHostSection({ data }: { data: NeedsHost }) {
                 {p.interestedCount > 0 && (
                   <div className="interested">{p.interestedCount} interested</div>
                 )}
-                <button className="host" disabled={busy[p.ideaId]} onClick={() => host(p)}>
+                <button className="hostbtn" disabled={busy[p.ideaId]} onClick={() => host(p)}>
                   {busy[p.ideaId] ? "Hosting…" : "Host this"}
                 </button>
               </div>
@@ -962,9 +962,9 @@ const CSS = `
 .leafme .decay::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .leafme .hact{flex-shrink:0;text-align:right}
 .leafme .interested{font-size:11px;color:var(--ink-3);margin-bottom:6px}
-.leafme .host{background:var(--sage-deep);color:#fff;border:0;border-radius:6px;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:600;padding:11px 17px;white-space:nowrap}
-.leafme .host:hover{background:#264c37}
-.leafme .host:disabled{opacity:.6;cursor:default}
+.leafme .hostbtn{background:var(--sage-deep);color:#fff;border:0;border-radius:6px;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:600;padding:11px 17px;white-space:nowrap}
+.leafme .hostbtn:hover{background:#264c37}
+.leafme .hostbtn:disabled{opacity:.6;cursor:default}
 .leafme .tier2{margin-top:36px;padding-top:26px;border-top:1px solid var(--rule)}
 .leafme .crow{display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit;border:1px solid var(--rule);border-radius:8px;padding:15px 16px;margin-bottom:10px;background:#fff}
 .leafme .crow:hover{border-color:var(--ink-3);background:#faf9f6}
