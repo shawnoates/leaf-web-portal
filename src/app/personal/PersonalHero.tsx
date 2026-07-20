@@ -243,15 +243,27 @@ export default function PersonalHero({ isLoggedIn }: { isLoggedIn: boolean }) {
               spellCheck={false}
               data-1p-ignore
               data-lpignore="true"
-              className="flex-1 border-0 outline-none bg-transparent py-2.5 text-base min-w-0"
+              className="flex-1 border-0 outline-none bg-transparent py-2.5 text-base min-w-0 hero-prompt-input"
               style={{ color: "#131714" }}
             />
+            {/* Suppress the browser's native type="search" X — we want
+                the input to stay clean while typing; the Generate
+                button on the right IS the primary affordance, an X
+                next to it competes with the CTA visually. */}
+            <style jsx>{`
+              .hero-prompt-input::-webkit-search-cancel-button,
+              .hero-prompt-input::-webkit-search-decoration {
+                -webkit-appearance: none;
+                appearance: none;
+                display: none;
+              }
+            `}</style>
             <button
               type="submit"
               disabled={!isTyping}
-              className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold whitespace-nowrap transition-colors disabled:opacity-70 disabled:cursor-default"
+              className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold whitespace-nowrap transition-colors disabled:cursor-default"
               style={{
-                background: "#1B4332",
+                background: isTyping ? "#131714" : "#d4d4d8",
                 color: "#ffffff",
               }}
             >
