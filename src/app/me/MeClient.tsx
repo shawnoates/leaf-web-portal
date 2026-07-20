@@ -919,7 +919,7 @@ const CSS = `
 .leafme .stop h3{font-family:var(--serif);font-size:17px;font-weight:500;letter-spacing:-.01em;margin-bottom:3px}
 .leafme .meta{font-size:12px;color:var(--ink-3);margin-bottom:9px}
 .leafme .cal{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:5px}
-.leafme .status{display:inline-flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.leafme .status{display:inline-flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);background:none;border:0;padding:0;border-radius:0;box-shadow:none}
 .leafme .status::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--ink-3)}
 .leafme .status.host::before{background:var(--green)}
 .leafme .status.wait::before{background:#d9a441}
