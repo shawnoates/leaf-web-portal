@@ -46,10 +46,9 @@ interface Plan {
   weather: Weather | null;
   messages: PlanMessage[];
 }
-interface PlanPrompt {
+interface HostPlan {
   ideaId: string;
   title: string;
-  description: string | null;
   category: string | null;
   image: string | null;
   date: string | null;
@@ -60,11 +59,27 @@ interface PlanPrompt {
   calendarName: string;
   calendarShareId: string | null;
   addMode: "owner" | "propose";
+  hostDeadline: string;
+  daysToDeadline: number;
+  decayLevel: "soon" | "warn";
+  interestedCount: number;
+}
+interface HostCalRow {
+  calendarId: string;
+  calendarName: string;
+  calendarShareId: string | null;
+  count: number;
+  soonestDeadline: string;
+  soonestIsUrgent: boolean;
+}
+interface NeedsHost {
+  tier1: HostPlan[];
+  tier2: HostCalRow[];
 }
 interface Dashboard {
   person: { firstName: string; ownsCalendars: boolean; pendingReviewCount: number };
   greeting?: { weather: Weather | null };
-  planPrompts?: PlanPrompt[];
+  needsHost?: NeedsHost;
   nextPlan: Plan | null;
   plans: Plan[];
   unreadMessageCount: number;
@@ -360,8 +375,8 @@ function DashboardView({
           </section>
         )}
 
-        {data.planPrompts && data.planPrompts.length > 0 && (
-          <PlanPrompts prompts={data.planPrompts} />
+        {data.needsHost && (data.needsHost.tier1.length > 0 || data.needsHost.tier2.length > 0) && (
+          <NeedsHostSection data={data.needsHost} />
         )}
 
         {/* Ask XOR owner strip — never both */}
@@ -564,128 +579,103 @@ function Thread({ plan, hero }: { plan: Plan; hero?: boolean }) {
   );
 }
 
-// ---- Add a plan — one-tap create from a calendar's current event prompts ----
-type PromptOutcome = "created" | "proposed";
-
-function PlanPrompts({ prompts }: { prompts: PlanPrompt[] }) {
-  const [draft, setDraft] = useState<PlanPrompt | null>(null);
-  const [done, setDone] = useState<Record<string, PromptOutcome>>({});
-
-  return (
-    <section className="wrap sect">
-      <div className="eyebrow" style={{ marginBottom: 6 }}>Add a plan</div>
-      <p className="prompts-sub">Ideas for your calendars — tap to review, then create.</p>
-      <div className="prompts">
-        {prompts.map((p) => {
-          const outcome = done[p.ideaId];
-          return (
-            <button
-              key={p.ideaId}
-              className={`prompt-card ${outcome ? "done" : ""}`}
-              disabled={!!outcome}
-              onClick={() => setDraft(p)}
-            >
-              {p.image ? (
-                <div className="prompt-img">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.image} alt="" />
-                </div>
-              ) : (
-                <div className="prompt-img word">{(p.category || "plan").toLowerCase()}</div>
-              )}
-              <div className="prompt-b">
-                <div className="cal">{p.calendarName}</div>
-                <div className="prompt-title">{p.title}</div>
-                <span className="prompt-cta">
-                  {outcome === "created" ? "✓ Added to calendar"
-                    : outcome === "proposed" ? "✓ Proposed to host"
-                    : p.addMode === "owner" ? "Preview & add ↗" : "Preview & propose ↗"}
-                </span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {draft && (
-        <PromptDraftModal
-          prompt={draft}
-          onClose={() => setDraft(null)}
-          onDone={(id, outcome) => { setDone((d) => ({ ...d, [id]: outcome })); setDraft(null); }}
-        />
-      )}
-    </section>
-  );
+// ---- Plans that need a host (leaf-needs-a-host-cta spec) --------------------
+function monthDay(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+function decayText(p: HostPlan): string {
+  const wd = weekday(p.hostDeadline);
+  if (p.decayLevel === "soon") {
+    if (p.daysToDeadline <= 0) return "Loses its slot today";
+    return `Loses its slot ${wd} — ${p.daysToDeadline} day${p.daysToDeadline === 1 ? "" : "s"} left`;
+  }
+  return `Needs a host by ${wd}`;
 }
 
-// Confirm-draft step: review the suggested plan (real title/date/venue/blurb)
-// before creating. Owner → creates; follower → proposes to the owner.
-function PromptDraftModal({
-  prompt, onClose, onDone,
-}: {
-  prompt: PlanPrompt;
-  onClose: () => void;
-  onDone: (ideaId: string, outcome: PromptOutcome) => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
+function NeedsHostSection({ data }: { data: NeedsHost }) {
+  // Local copy so a hosted card can leave the section immediately on success.
+  const [tier1, setTier1] = useState<HostPlan[]>(data.tier1);
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const tier2 = data.tier2;
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const when = [weekday(prompt.date), fmtTime(prompt.time, prompt.date)].filter(Boolean).join(" · ")
-    || (prompt.date ? new Date(prompt.date).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }) : "Date to be set");
-  const venue = [prompt.venueName, prompt.venueAddress].filter(Boolean).join(" · ");
-  const owner = prompt.addMode === "owner";
-
-  async function submit() {
-    if (busy) return;
-    setBusy(true); setErr("");
+  async function host(p: HostPlan) {
+    if (busy[p.ideaId]) return;
+    setBusy((b) => ({ ...b, [p.ideaId]: true }));
     try {
-      const r = (await Parse.Cloud.run("oneTapCreatePlanFromIdea", { calendarPlanId: prompt.ideaId })) as {
-        pendingApproval?: boolean;
-      };
-      onDone(prompt.ideaId, r?.pendingApproval ? "proposed" : "created");
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Couldn't create the plan. Try again.");
-      setBusy(false);
+      await Parse.Cloud.run("oneTapCreatePlanFromIdea", { calendarPlanId: p.ideaId });
+      setTier1((list) => list.filter((x) => x.ideaId !== p.ideaId)); // leaves the section
+    } catch {
+      setBusy((b) => ({ ...b, [p.ideaId]: false }));
     }
   }
 
+  if (tier1.length === 0 && tier2.length === 0) return null;
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-x" onClick={onClose} aria-label="Close">×</button>
-        {prompt.image && (
-          <div className="modal-img">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={prompt.image} alt="" />
-          </div>
-        )}
-        <div className="modal-body">
-          <div className="cal">{prompt.calendarName}</div>
-          <h2 className="modal-title">{prompt.title}</h2>
-          <div className="when">{when}</div>
-          {venue && <p className="addr" style={{ marginTop: 6 }}>{venue}</p>}
-          {prompt.description && <p className="blurb" style={{ marginTop: 8 }}>{prompt.description}</p>}
-          {err && <p className="otp-err" style={{ marginTop: 12 }}>{err}</p>}
-          <div className="row" style={{ marginTop: 18 }}>
-            <button className="btn" disabled={busy} onClick={submit}>
-              {busy ? (owner ? "Adding…" : "Sending…") : (owner ? "Add to calendar" : "Propose to host")}
-            </button>
-            <button className="btn ghost" disabled={busy} onClick={onClose}>Cancel</button>
-          </div>
-          {!owner && (
-            <p className="prompts-sub" style={{ marginTop: 12, marginBottom: 0 }}>
-              You follow this calendar — this sends the plan to its owner to approve.
-            </p>
-          )}
-        </div>
+    <section className="wrap nhs">
+      <div className="head">
+        <div className="eyebrow">On calendars you follow</div>
+        <h1>Plans that <span className="k">need a host</span>.</h1>
       </div>
-    </div>
+
+      {tier1.length > 0 && (
+        <>
+          <div className="tierlab">Claim these soon</div>
+          {tier1.map((p) => (
+            <div className="hcard" key={p.ideaId}>
+              <div className="date"><div className="d">{dayNum(p.date)}</div><div className="mo">{monthAbbr(p.date)}</div></div>
+              {p.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="thumb" src={p.image} alt="" />
+              ) : (
+                <div className="thumb ph" />
+              )}
+              <div className="hb">
+                <div className="cal">{p.calendarName}</div>
+                <h3>{p.title}</h3>
+                <div className="hmeta">{[weekday(p.date), fmtTime(p.time, p.date), p.venueName || p.venueAddress].filter(Boolean).join(" · ")}</div>
+                <div className={`decay ${p.decayLevel}`}>{decayText(p)}</div>
+              </div>
+              <div className="hact">
+                {p.interestedCount > 0 && (
+                  <div className="interested">{p.interestedCount} interested</div>
+                )}
+                <button className="host" disabled={busy[p.ideaId]} onClick={() => host(p)}>
+                  {busy[p.ideaId] ? "Hosting…" : "Host this"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+
+      {tier2.length > 0 && (
+        <div className="tier2">
+          <div className="tierlab">More on your calendars</div>
+          {tier2.map((c) => (
+            <Link
+              key={c.calendarId}
+              className="crow"
+              href={c.calendarShareId ? `/org/${c.calendarShareId}` : "#"}
+            >
+              <span className="gmark" />
+              <div className="cbody">
+                <div className="n">{c.calendarName}</div>
+                <div className="c">
+                  <b className={c.soonestIsUrgent ? "soon" : ""}>
+                    {c.count} plan{c.count === 1 ? "" : "s"} need a host
+                  </b>
+                  {c.soonestIsUrgent
+                    ? ` · one this ${weekday(c.soonestDeadline)}`
+                    : ` · soonest ${monthDay(c.soonestDeadline)}`}
+                </div>
+              </div>
+              <span className="cta">View calendar →</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -859,6 +849,7 @@ const CSS = `
 .leafme{
   --ink:#111111; --ink-2:#5c5c5c; --ink-3:#9a9a9a; --rule:#e8e8e6; --paper:#ffffff;
   --sage:#dce5dc; --sage-deep:#2f5d43; --cream:#f5e6c8; --cream-deep:#8a6a2f; --green:#16a34a;
+  --amber:#b06f22; --danger:#a8401f;
   --sans:var(--font-me-sans),-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   --serif:var(--font-me-serif),Georgia,serif;
   background:var(--paper); color:var(--ink); font-family:var(--sans);
@@ -945,17 +936,46 @@ const CSS = `
 .leafme .composer{display:flex;gap:8px;margin-top:10px}
 .leafme .composer input{flex:1;border:1px solid var(--rule);border-radius:3px;padding:9px 12px;font-family:var(--sans);font-size:13px;color:var(--ink)}
 .leafme .composer input:focus{outline:2px solid var(--green);outline-offset:1px}
-.leafme .prompts-sub{font-size:13px;color:var(--ink-3);margin-bottom:18px}
-.leafme .prompts{display:flex;flex-direction:column;gap:10px}
-.leafme .prompt-card{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:none;border:1px solid var(--rule);border-radius:3px;padding:12px;cursor:pointer;transition:border-color .15s}
-.leafme .prompt-card:hover{border-color:var(--ink-3)}
-.leafme .prompt-card:disabled{cursor:default}
-.leafme .prompt-card.done{opacity:.65;border-color:var(--sage)}
-.leafme .prompt-img{width:76px;height:58px;flex-shrink:0;border-radius:3px;overflow:hidden;background:var(--sage);display:grid;place-items:center;font-family:var(--serif);font-size:14px;color:var(--sage-deep)}
-.leafme .prompt-img img{width:100%;height:100%;object-fit:cover;display:block}
-.leafme .prompt-b{min-width:0;flex:1}
-.leafme .prompt-title{font-family:var(--serif);font-size:17px;line-height:1.15;color:var(--ink);margin:3px 0 5px;overflow-wrap:anywhere}
-.leafme .prompt-cta{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--sage-deep);font-weight:500}
+/* Plans that need a host (leaf-needs-a-host-cta) */
+.leafme .nhs{padding-top:8px;padding-bottom:8px}
+.leafme .nhs .head{padding-bottom:20px}
+.leafme .nhs .head h1{font-family:var(--serif);font-size:24px;font-weight:500;letter-spacing:-.01em;margin-top:6px}
+.leafme .nhs .head h1 .k{color:var(--danger)}
+.leafme .tierlab{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);margin:0 0 12px}
+.leafme .hcard{display:grid;grid-template-columns:50px 82px 1fr auto;gap:16px;align-items:center;padding:16px 0;border-bottom:1px solid var(--rule)}
+.leafme .hcard .date{text-align:left}
+.leafme .hcard .date .d{font-family:var(--serif);font-size:28px;line-height:.85;color:var(--ink)}
+.leafme .hcard .date .mo{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-top:5px}
+.leafme .hcard .thumb{width:82px;height:60px;border-radius:4px;object-fit:cover;display:block}
+.leafme .hcard .thumb.ph{background:var(--sage)}
+.leafme .hcard .hb{min-width:0}
+.leafme .hcard .hb h3{font-family:var(--serif);font-size:18px;font-weight:500;letter-spacing:-.01em;line-height:1.2;overflow-wrap:anywhere}
+.leafme .hcard .hmeta{font-size:12.5px;color:var(--ink-3);margin-top:3px}
+.leafme .decay{display:inline-flex;align-items:center;gap:6px;margin-top:7px;font-size:12px;font-weight:500}
+.leafme .decay.soon{color:var(--danger)}
+.leafme .decay.warn{color:var(--amber)}
+.leafme .decay::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.leafme .hact{text-align:right}
+.leafme .interested{font-size:11px;color:var(--ink-3);margin-bottom:6px}
+.leafme .host{background:var(--sage-deep);color:#fff;border:0;border-radius:6px;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:600;padding:11px 17px;white-space:nowrap}
+.leafme .host:hover{background:#264c37}
+.leafme .host:disabled{opacity:.6;cursor:default}
+.leafme .tier2{margin-top:36px;padding-top:26px;border-top:1px solid var(--rule)}
+.leafme .crow{display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit;border:1px solid var(--rule);border-radius:8px;padding:15px 16px;margin-bottom:10px;background:#fff}
+.leafme .crow:hover{border-color:var(--ink-3);background:#faf9f6}
+.leafme .crow .gmark{width:34px;height:34px;border-radius:7px;background:linear-gradient(135deg,#7aa5c8,#2f5d43);flex-shrink:0}
+.leafme .crow .cbody{flex:1;min-width:0}
+.leafme .crow .cbody .n{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.leafme .crow .cbody .c{font-size:13px;color:var(--ink-3);margin-top:2px}
+.leafme .crow .cbody .c b{color:var(--amber);font-weight:600}
+.leafme .crow .cbody .c b.soon{color:var(--danger)}
+.leafme .crow .cta{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--sage-deep);white-space:nowrap}
+@media(max-width:600px){
+  .leafme .hcard{grid-template-columns:44px 1fr;gap:12px;row-gap:9px}
+  .leafme .hcard .thumb{display:none}
+  .leafme .hcard .hact{grid-column:2;text-align:left}
+  .leafme .crow .cta span{display:none}
+}
 .leafme .start{border:1px solid var(--rule);border-radius:3px;padding:26px 24px}
 .leafme .start .lede{font-family:var(--serif);font-size:20px;line-height:1.3;margin-bottom:5px}
 .leafme .start .sub{font-size:13px;color:var(--ink-3);margin-bottom:18px}
