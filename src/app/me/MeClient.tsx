@@ -514,9 +514,12 @@ function AttendCta({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: RsvpS
     }
   }
   return (
-    <button className="attend-cta" disabled={busy} onClick={go}>
-      {busy ? "…" : "I'm attending"}
-    </button>
+    <div className="attend-cta-wrap">
+      <button className="attend-cta" disabled={busy} onClick={go}>
+        {busy ? "…" : "I'm attending"}
+      </button>
+      <div className="going-count">{plan.attendeeCount} going</div>
+    </div>
   );
 }
 
@@ -956,10 +959,12 @@ const CSS = `
 .leafme .status::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--ink-3)}
 .leafme .status.host::before{background:var(--green)}
 .leafme .status.wait::before{background:#d9a441}
-.leafme .cal-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.leafme .cal-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .leafme .cal-row .cal{margin-bottom:0}
 .leafme .cal-row .status{flex-shrink:0}
-.leafme .attend-cta{flex-shrink:0;background:#fff;border:1px solid var(--rule);border-radius:6px;color:var(--ink);font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:9px 16px;cursor:pointer;white-space:nowrap}
+.leafme .attend-cta-wrap{flex-shrink:0;text-align:right}
+.leafme .going-count{font-size:11px;color:var(--ink-3);margin-top:5px}
+.leafme .attend-cta{background:#fff;border:1px solid var(--rule);border-radius:6px;color:var(--ink);font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:9px 16px;cursor:pointer;white-space:nowrap}
 .leafme .attend-cta:hover{border-color:var(--ink-3)}
 .leafme .attend-cta:disabled{opacity:.5;cursor:default}
 .leafme .thread{margin-top:14px;padding-top:13px;border-top:1px solid var(--rule)}

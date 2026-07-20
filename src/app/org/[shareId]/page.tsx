@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import Link from "next/link";
@@ -360,6 +360,100 @@ function resolveAIEventDate(ev: {
   target.setDate(now.getDate() + daysUntil);
   target.setHours(hour, minute, 0, 0);
   return { date: target, isWeekly: true };
+}
+
+// Spread "needs a host" plan ideas across the community's real cadence.
+//
+// The server stamps every generated idea with a single fallback date (the
+// first Saturday past a 2-week floor), so a batch of ideas all lands on the
+// same day — the calendar reads as "ten things, one Sunday" instead of a
+// living month. This recomputes each idea's date on the client so they fan
+// out across the weekdays/times the community *actually* meets, inferred
+// from real upcoming plans.
+//
+// Cadence = the distinct (weekday, hour, minute) slots real plans use. With
+// no real plans to learn from we fall back to a weekly Saturday-2pm slot so
+// ideas still spread by week instead of stacking. Assignment is a stable
+// round-robin: ideas ordered by their original date walk forward through the
+// cadence slots week over week, skipping any day a real plan already owns so
+// a suggestion never shadows a confirmed event.
+const SPREAD_MIN_LEAD_MS = 14 * 24 * 60 * 60 * 1000; // match server's 2-week floor
+
+function deriveCadenceSlots(
+  planDates: Date[]
+): { dow: number; hour: number; minute: number }[] {
+  const seen = new Map<string, { dow: number; hour: number; minute: number }>();
+  for (const d of planDates) {
+    const slot = { dow: d.getDay(), hour: d.getHours(), minute: d.getMinutes() };
+    const key = `${slot.dow}-${slot.hour}-${slot.minute}`;
+    if (!seen.has(key)) seen.set(key, slot);
+  }
+  if (seen.size === 0) {
+    // No real plans yet — default to a single Saturday-afternoon slot so
+    // ideas still spread one-per-week rather than collapsing onto one day.
+    return [{ dow: 6, hour: 14, minute: 0 }];
+  }
+  // Order slots by weekday then time so the round-robin advances in a
+  // natural Mon→Sun reading order within each week.
+  return [...seen.values()].sort(
+    (a, b) => a.dow - b.dow || a.hour - b.hour || a.minute - b.minute
+  );
+}
+
+function computeSpreadIdeaDates(
+  planISODates: (string | null | undefined)[],
+  ideas: { id: string; date: string | null }[],
+  nowMs: number
+): Map<string, Date> {
+  const result = new Map<string, Date>();
+  if (ideas.length === 0) return result;
+
+  const planDates = planISODates
+    .map((s) => (s ? new Date(s) : null))
+    .filter((d): d is Date => d !== null && !Number.isNaN(d.getTime()));
+
+  const slots = deriveCadenceSlots(planDates);
+  // Days already taken by real plans — a suggestion should never share a day
+  // with a confirmed event.
+  const takenDays = new Set(
+    planDates.map((d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`)
+  );
+
+  const earliest = new Date(nowMs + SPREAD_MIN_LEAD_MS);
+  // Walk forward week by week, emitting each cadence slot's concrete date,
+  // collecting the first N unclaimed candidates (N = idea count).
+  const candidates: Date[] = [];
+  const startOfWeek = new Date(earliest);
+  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // back to Sunday
+  startOfWeek.setHours(0, 0, 0, 0);
+  const MAX_WEEKS = 52;
+  for (let week = 0; week < MAX_WEEKS && candidates.length < ideas.length; week++) {
+    for (const slot of slots) {
+      const d = new Date(startOfWeek);
+      d.setDate(startOfWeek.getDate() + week * 7 + slot.dow);
+      d.setHours(slot.hour, slot.minute, 0, 0);
+      if (d.getTime() < earliest.getTime()) continue;
+      const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      if (takenDays.has(dayKey)) continue;
+      takenDays.add(dayKey); // one suggestion per day
+      candidates.push(d);
+      if (candidates.length >= ideas.length) break;
+    }
+  }
+
+  // Stable idea order: original date (nulls last), then id — so the same
+  // idea keeps the same slot across re-renders.
+  const ordered = [...ideas].sort((a, b) => {
+    const at = a.date ? new Date(a.date).getTime() : Number.POSITIVE_INFINITY;
+    const bt = b.date ? new Date(b.date).getTime() : Number.POSITIVE_INFINITY;
+    if (at !== bt) return at - bt;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+
+  ordered.forEach((idea, i) => {
+    if (i < candidates.length) result.set(idea.id, candidates[i]);
+  });
+  return result;
 }
 
 // Maps human-readable blacklist labels (set in the org dashboard) to Google
@@ -1339,6 +1433,9 @@ export default function OrgCalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<Plan | null>(null);
   const [rsvpPlan, setRsvpPlan] = useState<Plan | null>(null);
   const [hostingIdea, setHostingIdea] = useState<PlanIdea | null>(null);
+  // "needs a host" ideas are capped in-line so they never bury confirmed
+  // plans; the rest expand behind a show-more toggle.
+  const [showAllIdeas, setShowAllIdeas] = useState(false);
   // "Let Leaf host it" pre-pay sheet — spec §4. Opens from the
   // owner-only band; closes on X or backdrop click. Owner-only rendering
   // enforced by the band itself (band gates on isOwner via the leafHost
@@ -2412,6 +2509,21 @@ export default function OrgCalendarPage() {
     }
   };
 
+  // Spread "needs a host" ideas across the community's real cadence so a
+  // server-stamped batch stops clustering on one day. Keyed by idea id;
+  // used for both the card date and the Host-This prefill so they agree.
+  // Recomputed hourly (nowBucket) so the 2-week floor rolls forward without
+  // thrashing on every render.
+  const nowBucket = Math.floor(Date.now() / (60 * 60 * 1000));
+  const spreadIdeaDates = useMemo(() => {
+    if (!org) return new Map<string, Date>();
+    return computeSpreadIdeaDates(
+      org.plans.map((p) => p.dateISO ?? null),
+      org.planIdeas.map((i) => ({ id: i.id, date: i.date })),
+      nowBucket * 60 * 60 * 1000
+    );
+  }, [org, nowBucket]);
+
   // Loading state
   if (loading) {
     return (
@@ -2918,22 +3030,36 @@ export default function OrgCalendarPage() {
             Same alternating-row layout, same I'm Interested / Host
             This action pair. Only renders when the calendar has ideas
             and the owner hasn't disabled them. */}
-        {!org.hidePlanIdeas && org.planIdeas.length > 0 && (
+        {!org.hidePlanIdeas && org.planIdeas.length > 0 && (() => {
+          // Order the "needs a host" ideas by their spread cadence date
+          // (falls back to the server date, then id-stable Infinity) so the
+          // in-line block reads chronologically instead of in emit order.
+          const IDEA_INLINE_CAP = 4;
+          const spreadOf = (i: PlanIdea) =>
+            spreadIdeaDates.get(i.id) ?? (i.date ? new Date(i.date) : null);
+          const orderedIdeas = [...org.planIdeas].sort((a, b) => {
+            const at = spreadOf(a)?.getTime() ?? Number.POSITIVE_INFINITY;
+            const bt = spreadOf(b)?.getTime() ?? Number.POSITIVE_INFINITY;
+            if (at !== bt) return at - bt;
+            return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+          });
+          const visibleIdeas = showAllIdeas
+            ? orderedIdeas
+            : orderedIdeas.slice(0, IDEA_INLINE_CAP);
+          const hiddenIdeaCount = orderedIdeas.length - visibleIdeas.length;
+          return (
           <section className="space-y-32 pt-8">
-            {org.planIdeas.map((idea, index) => {
-              const dateISO = idea.date;
+            {visibleIdeas.map((idea, index) => {
+              const spreadDate = spreadOf(idea);
               let dateLabel: string | null = null;
-              if (dateISO) {
-                try {
-                  const d = new Date(dateISO);
-                  dateLabel = `${d
-                    .toLocaleDateString("en-US", {
-                      weekday: "long",
-                      month: "short",
-                      day: "numeric",
-                    })
-                    .toUpperCase()}`;
-                } catch { /* keep null */ }
+              if (spreadDate) {
+                dateLabel = `${spreadDate
+                  .toLocaleDateString("en-US", {
+                    weekday: "long",
+                    month: "short",
+                    day: "numeric",
+                  })
+                  .toUpperCase()}`;
               }
               const priorCount =
                 planIdeaInterestCounts[idea.id] ??
