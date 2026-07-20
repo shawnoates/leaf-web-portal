@@ -476,7 +476,7 @@ function Stop({
           <div className="cal">{plan.calendarName}</div>
           <h3><button className="plan-link" onClick={onOpen}>{plan.title}</button></h3>
           <p className="meta">{meta}</p>
-          {status && <span className={`status ${status.cls}`}>{status.text}</span>}
+          {status && <div className="statusrow"><span className={`status ${status.cls}`}>{status.text}</span></div>}
           {plan.hostState === "waiting_on_host" && (
             <div style={{ marginTop: 9 }}><Link className="btn ghost" href={hostHref}>Host this ↗</Link></div>
           )}
@@ -921,6 +921,8 @@ const CSS = `
 .leafme .status::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--ink-3)}
 .leafme .status.host::before{background:var(--green)}
 .leafme .status.wait::before{background:#d9a441}
+.leafme .statusrow{margin-top:2px}
+@media(min-width:761px){.leafme .statusrow{text-align:right}}
 .leafme .thread{margin-top:14px;padding-top:13px;border-top:1px solid var(--rule)}
 .leafme .thread.hero-thread{max-width:44ch}
 .leafme .msg{display:flex;gap:11px;padding:9px 0}
