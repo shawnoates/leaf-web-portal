@@ -1009,6 +1009,10 @@ export default function PlansManager({
                     >
                       <div className="relative">
                         <PlanImage src={idea.image} alt={idea.title} className="w-full h-28" />
+                        <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-white/85 text-[#1B4332] backdrop-blur-sm">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#1B4332]" />
+                          Needs a host
+                        </span>
                         {idea.ideaSeriesId && (
                           <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-700 bg-white/85 backdrop-blur-sm">
                             <Repeat className="w-3 h-3" /> Recurring
