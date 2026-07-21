@@ -123,6 +123,18 @@ export default function PlanDetailModal({
   const [planRsvpsError, setPlanRsvpsError] = useState<string | null>(null);
   const [planRsvpsRefreshTick, setPlanRsvpsRefreshTick] = useState(0);
 
+  // Change-host picker (owner/co-host reassigns this plan's host to a
+  // follower/member, or themselves). Candidates load on open; the override
+  // reflects the new host name immediately without waiting for a parent refetch.
+  const [showChangeHost, setShowChangeHost] = useState(false);
+  const [hostCandidates, setHostCandidates] = useState<
+    { id: string; name: string; isCurrentHost: boolean; isSelf: boolean }[] | null
+  >(null);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [changingHostId, setChangingHostId] = useState<string | null>(null);
+  const [changeHostError, setChangeHostError] = useState<string | null>(null);
+  const [hostNameOverride, setHostNameOverride] = useState<string | null>(null);
+
   // Load attendees for non-poll plans. Re-fires when the parent triggers a
   // refresh (planRsvpsRefreshTick) so RSVPs that land after the modal
   // opened get picked up. Errors used to be swallowed silently, which
@@ -205,6 +217,44 @@ export default function PlanDetailModal({
       return;
     }
     onEdit(plan);
+  };
+
+  const openChangeHost = async () => {
+    setShowChangeHost(true);
+    setChangeHostError(null);
+    if (hostCandidates) return; // already loaded
+    setLoadingCandidates(true);
+    try {
+      const res = await Parse.Cloud.run("getPlanHostCandidates", { eventGroupId: plan.objectId });
+      setHostCandidates(res?.candidates || []);
+    } catch (err) {
+      setChangeHostError(err instanceof Error ? err.message : "Couldn't load people to assign");
+      setHostCandidates([]);
+    } finally {
+      setLoadingCandidates(false);
+    }
+  };
+
+  const handleChangeHost = async (candidate: { id: string; name: string }) => {
+    setChangingHostId(candidate.id);
+    setChangeHostError(null);
+    try {
+      const res = await Parse.Cloud.run("changePlanHost", {
+        eventGroupId: plan.objectId,
+        newHostUserId: candidate.id,
+      });
+      setHostNameOverride(res?.hostName || candidate.name);
+      // Reflect the new current-host flag in the loaded candidate list.
+      setHostCandidates((prev) =>
+        prev ? prev.map((c) => ({ ...c, isCurrentHost: c.id === candidate.id })) : prev
+      );
+      setShowChangeHost(false);
+      onChanged();
+    } catch (err) {
+      setChangeHostError(err instanceof Error ? err.message : "Couldn't change the host");
+    } finally {
+      setChangingHostId(null);
+    }
   };
 
   const handleCancel = async () => {
@@ -290,9 +340,78 @@ export default function PlanDetailModal({
             <h2 className="text-4xl md:text-5xl font-light tracking-tighter">
               {plan.title}
             </h2>
-            <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
-              Hosted by {plan.hostName}
-            </p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
+                Hosted by {hostNameOverride || plan.hostName}
+              </p>
+              {!plan.isPoll && (
+                <button
+                  onClick={openChangeHost}
+                  className="text-xs font-medium text-zinc-500 hover:text-zinc-900 underline underline-offset-2 transition-colors"
+                >
+                  Change host
+                </button>
+              )}
+            </div>
+
+            {/* Change-host picker — owner/co-host reassigns hosting to a
+                follower/member (or themselves). Inline so it stays in the
+                detail context. */}
+            {showChangeHost && (
+              <div className="border border-zinc-200 rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100">
+                  <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">
+                    Assign hosting to
+                  </p>
+                  <button
+                    onClick={() => setShowChangeHost(false)}
+                    className="p-1 rounded-full hover:bg-zinc-100 transition-colors"
+                  >
+                    <X className="w-4 h-4 text-zinc-400" />
+                  </button>
+                </div>
+                {changeHostError && (
+                  <p className="text-xs text-red-500 px-4 pt-3">{changeHostError}</p>
+                )}
+                <div className="max-h-64 overflow-y-auto p-1">
+                  {loadingCandidates ? (
+                    <div className="flex items-center justify-center py-6">
+                      <div className="w-5 h-5 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin" />
+                    </div>
+                  ) : hostCandidates && hostCandidates.length > 0 ? (
+                    hostCandidates.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => { if (!c.isCurrentHost) handleChangeHost(c); }}
+                        disabled={!!changingHostId || c.isCurrentHost}
+                        className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-50 transition-colors text-left disabled:cursor-default disabled:hover:bg-transparent"
+                      >
+                        <span className="flex items-center gap-2.5 min-w-0">
+                          <span className="w-7 h-7 rounded-full bg-zinc-100 flex items-center justify-center shrink-0">
+                            <Users className="w-3.5 h-3.5 text-zinc-400" />
+                          </span>
+                          <span className="text-sm font-medium text-zinc-900 truncate">
+                            {c.name}{c.isSelf ? " (you)" : ""}
+                          </span>
+                        </span>
+                        {c.isCurrentHost ? (
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 shrink-0">
+                            Current host
+                          </span>
+                        ) : changingHostId === c.id ? (
+                          <span className="w-4 h-4 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin shrink-0" />
+                        ) : null}
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-sm text-zinc-400 text-center py-6 px-4">
+                      No followers or members to assign yet.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-6 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">
               {plan.isPoll ? (
                 <>

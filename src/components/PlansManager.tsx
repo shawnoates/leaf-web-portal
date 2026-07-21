@@ -10,7 +10,7 @@ import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailMod
 import PlanChatDrawer from "@/components/PlanChatDrawer";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
-import { Calendar, Camera, Check, Lock, MapPin, MessageCircle, Pencil, Plus, RefreshCw, Repeat, Settings, Trash2, UserCheck, Users, X } from "lucide-react";
+import { Calendar, Camera, Check, Lock, MessageCircle, Pencil, Plus, RefreshCw, Repeat, Settings, Trash2, UserCheck, Users, X } from "lucide-react";
 
 // Renders a plan cover image with a Calendar-icon placeholder fallback when
 // the src is missing OR 404s (attendee-uploaded / expired signed URLs go
@@ -989,7 +989,10 @@ export default function PlansManager({
           ) : planIdeas.length === 0 ? (
             <p className="text-sm text-zinc-400 py-4">No suggested plans yet.</p>
           ) : (
-            <div className="space-y-3">
+            // Same card language as the Upcoming row (image-top, compact),
+            // just a touch narrower. Owner/co-host actions reveal on hover
+            // (always visible on touch, where there's no hover).
+            <div className="flex gap-3 overflow-x-auto pb-1">
               {[...planIdeas]
                 .sort((a, b) => {
                   const at = spreadDateOf(a)?.getTime() ?? Number.POSITIVE_INFINITY;
@@ -997,92 +1000,75 @@ export default function PlansManager({
                   if (at !== bt) return at - bt;
                   return a.objectId < b.objectId ? -1 : a.objectId > b.objectId ? 1 : 0;
                 })
-                .map((idea) => (
-                <div
-                  key={idea.objectId}
-                  className="group border border-zinc-200 rounded-xl p-4 flex items-center gap-4 hover:border-zinc-300 transition-colors"
-                >
-                  {idea.image && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={idea.image}
-                      alt=""
-                      className="w-12 h-12 rounded-lg object-cover shrink-0"
-                      onError={(e) => {
-                        // 404 on the idea cover — hide the slot rather than
-                        // leaving a broken-image placeholder.
-                        (e.currentTarget as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium text-sm truncate">{idea.title}</h3>
-                      {idea.ideaSeriesId && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-600 bg-zinc-100 shrink-0">
-                          <Repeat className="w-3 h-3" /> Recurring
+                .map((idea) => {
+                  const d = spreadDateOf(idea);
+                  return (
+                    <div
+                      key={idea.objectId}
+                      className="group relative border border-zinc-100 rounded-lg overflow-hidden shrink-0 w-48 hover:border-zinc-200 transition-colors"
+                    >
+                      <div className="relative">
+                        <PlanImage src={idea.image} alt={idea.title} className="w-full h-28" />
+                        <span className="absolute top-2 left-2 text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5 bg-white/85 text-[#1B4332] backdrop-blur-sm">
+                          Suggested
                         </span>
-                      )}
+                        {idea.ideaSeriesId && (
+                          <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-700 bg-white/85 backdrop-blur-sm">
+                            <Repeat className="w-3 h-3" /> Recurring
+                          </span>
+                        )}
+                      </div>
+                      <div className="p-3">
+                        <h4 className="font-medium text-sm mb-1 truncate">{idea.title}</h4>
+                        <p className="text-xs text-zinc-400 mb-1">
+                          {d ? `Preferred: ${d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}` : "Waiting on host"}
+                        </p>
+                        <div className="flex items-center justify-between gap-1 min-h-[1.75rem]">
+                          <span className="text-xs truncate">
+                            {idea.interestCount > 0 ? (
+                              <span className="text-emerald-600 font-medium">{idea.interestCount} interested</span>
+                            ) : (
+                              <span className="text-zinc-400">Waiting on host</span>
+                            )}
+                          </span>
+                          {/* Owner/co-host actions */}
+                          <div className="flex items-center gap-0.5 shrink-0 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
+                            <button
+                              onClick={() => openIdeaEditor(idea)}
+                              className="p-1.5 text-zinc-400 hover:text-zinc-900 transition-colors"
+                              title="Edit and publish"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => { setAssignError(null); setAssigningIdea(idea); }}
+                              className="p-1.5 text-zinc-400 hover:text-zinc-900 transition-colors"
+                              title="Assign a host"
+                            >
+                              <UserCheck className="w-3.5 h-3.5" />
+                            </button>
+                            {idea.ideaSeriesId && (
+                              <button
+                                onClick={() => handleEndSeries(idea.ideaSeriesId!)}
+                                className="p-1.5 text-zinc-400 hover:text-zinc-700 transition-colors"
+                                title="End recurring series"
+                              >
+                                <Repeat className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleRemoveIdea(idea.objectId)}
+                              className="p-1.5 text-zinc-400 hover:text-red-500 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    {idea.description && (
-                      <p className="text-xs text-zinc-500 line-clamp-1 mt-0.5">{idea.description}</p>
-                    )}
-                    <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-400">
-                      {(() => {
-                        const d = spreadDateOf(idea);
-                        return d ? (
-                          <span>Preferred: {d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
-                        ) : null;
-                      })()}
-                      {idea.location && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3" /> {idea.location.name}
-                        </span>
-                      )}
-                      {idea.interestCount > 0 && (
-                        <span className="text-emerald-600 font-medium">
-                          {idea.interestCount} interested
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {/* Owner/co-host hover actions (always visible on touch, where
-                      there's no hover): Edit → publish it yourself; Assign a
-                      Host → pick a member to run it; Delete → drop the idea. */}
-                  <div className="flex items-center gap-0.5 shrink-0 self-start transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
-                    <button
-                      onClick={() => openIdeaEditor(idea)}
-                      className="p-2.5 text-zinc-400 hover:text-zinc-900 transition-colors"
-                      title="Edit and publish"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => { setAssignError(null); setAssigningIdea(idea); }}
-                      className="p-2.5 text-zinc-400 hover:text-zinc-900 transition-colors"
-                      title="Assign a host"
-                    >
-                      <UserCheck className="w-4 h-4" />
-                    </button>
-                    {idea.ideaSeriesId && (
-                      <button
-                        onClick={() => handleEndSeries(idea.ideaSeriesId!)}
-                        className="p-2.5 text-zinc-400 hover:text-zinc-700 transition-colors"
-                        title="End recurring series"
-                      >
-                        <Repeat className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleRemoveIdea(idea.objectId)}
-                      className="p-2.5 text-zinc-400 hover:text-red-500 transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
             </div>
           )}
         </section>
