@@ -251,6 +251,36 @@ const PAID_TIERS = ["pro", "growth", "concierge"];
 
 type CalActivePlan = { objectId: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null };
 
+// Server (buildNeedsHost) card/row shapes for AI-suggested plans awaiting a host.
+type NeedsHostCard = {
+  ideaId: string;
+  title: string;
+  category: string | null;
+  image: string | null;
+  date: string;
+  time: string | null;
+  venueName: string | null;
+  venueAddress: string | null;
+  calendarId: string | null;
+  calendarName: string;
+  calendarShareId: string | null;
+  calendarPhoto: string | null;
+  addMode: "owner" | "propose";
+  hostDeadline: string;
+  daysToDeadline: number;
+  decayLevel: "soon" | "warn";
+  interestedCount: number;
+};
+type NeedsHostRow = {
+  calendarId: string | null;
+  calendarName: string;
+  calendarShareId: string | null;
+  calendarPhoto: string | null;
+  count: number;
+  soonestDeadline: string;
+  soonestIsUrgent: boolean;
+};
+
 // ── Analytics types ────────────────────────────────────────────────────
 
 interface AnalyticsSeriesPoint {
