@@ -46,7 +46,7 @@ const PRICING_TIERS: PricingTier[] = [
     highlight: false,
     features: [
       "1 calendar",
-      "5 AI plan ideas per week",
+      "5 AI-suggested plans per week",
       "Up to 50 RSVPs per month",
       "Phone-number RSVP with SMS confirmations",
       "Co-host with friends",
@@ -75,11 +75,11 @@ const PRICING_TIERS: PricingTier[] = [
     inheritsLabel: "Everything in Free, plus:",
     features: [
       "Unlimited calendars",
-      "15 AI plan ideas per week",
+      "15 AI-suggested plans per week",
       "Unlimited RSVPs",
       "Unlimited scheduling",
       "Custom branding (logo + brand color)",
-      "Custom plan idea preferences",
+      "Custom plan-suggestion controls",
       "Analytics dashboard",
     ],
     excluded: [],
@@ -113,7 +113,7 @@ const STEPS = [
 const FEATURES = [
   {
     icon: <Sparkles className="w-5 h-5" />,
-    title: "AI plan ideas, picked for you",
+    title: "AI-suggested plans, ready to host",
     description:
       "Stop spending Sundays scrolling for ideas. Leaf hands you a week of plans matched to your taste — coffee walks, dinners, run routes, trivia nights.",
   },
@@ -392,13 +392,13 @@ export default function PersonalPage() {
               </p>
             </div>
             <div>
-              <h3 className="text-sm font-bold mb-1">What are AI plan ideas?</h3>
+              <h3 className="text-sm font-bold mb-1">What are AI-suggested plans?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                Fresh plan ideas that keep your calendar alive between the ones
-                you host — real venues, smart timing, beautiful images. Your
-                crew can pick one up and host it themselves, so you're not the
-                only one carrying the group chat. Free gets 5 per week; Pro
-                gets 15.
+                Ready-to-host plans that keep your calendar alive between the
+                ones you host — real venues, smart timing, beautiful images.
+                Each one just needs a host: your crew can claim one and run it
+                themselves, so you're not the only one carrying the group chat.
+                Free gets 5 per week; Pro gets 15.
               </p>
             </div>
             <div>

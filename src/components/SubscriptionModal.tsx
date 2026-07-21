@@ -27,7 +27,7 @@ const TIERS: Tier[] = [
     description: "For getting your community off the ground",
     features: [
       "1 calendar",
-      "5 AI plan ideas per week",
+      "5 AI-suggested plans per week",
       "Up to 50 RSVPs",
       "Phone-number RSVP with SMS confirmations",
       "Member hosting",
@@ -49,11 +49,11 @@ const TIERS: Tier[] = [
     highlight: true,
     features: [
       "Unlimited calendars",
-      "15 AI plan ideas per week",
+      "15 AI-suggested plans per week",
       "Unlimited RSVPs",
       "Unlimited scheduling",
       "Custom branding (logo + brand color)",
-      "Custom plan idea preferences",
+      "Custom plan-suggestion controls",
       "Analytics dashboard",
       "Co-host management",
     ],

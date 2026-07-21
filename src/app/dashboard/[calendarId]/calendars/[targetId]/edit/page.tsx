@@ -712,8 +712,8 @@ export default function EditCalendarPage() {
         {/* ─── Advanced ──────────────────────────────────────────── */}
         <Section title="Advanced" defaultOpen={false}>
           <ToggleRow
-            title="Show plan ideas"
-            hint="Let members browse and host AI-generated plan ideas"
+            title="Show suggested plans"
+            hint="Let members browse and host AI-suggested plans"
             checked={!hidePlanIdeas}
             onChange={(v) => setHidePlanIdeas(!v)}
           />
@@ -722,12 +722,12 @@ export default function EditCalendarPage() {
               href={`/dashboard/${orgId}?tab=settings`}
               className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors underline block -mt-1 mb-1"
             >
-              Automated plan idea settings
+              Automated suggestion settings
             </Link>
           )}
           <ToggleRow
             title="Hide custom plan proposals"
-            hint="Prevent members from proposing their own plan ideas"
+            hint="Prevent members from proposing their own plans"
             checked={hideCustomPlans}
             onChange={setHideCustomPlans}
           />

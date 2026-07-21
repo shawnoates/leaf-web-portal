@@ -3484,8 +3484,7 @@ export default function OrgCalendarPage() {
                     onClick={() => setShowAllIdeas(true)}
                     className="border border-zinc-200 px-6 py-3 text-xs uppercase tracking-widest font-medium text-zinc-600 hover:bg-zinc-50 transition-colors flex items-center gap-2"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Show {hiddenSuggestedCount} more idea{hiddenSuggestedCount === 1 ? "" : "s"}
+                    Show {hiddenSuggestedCount} More
                   </button>
                 </div>
               )}

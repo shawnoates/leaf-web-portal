@@ -49,7 +49,7 @@ const PRICING_TIERS: PricingTier[] = [
     highlight: false,
     features: [
       "1 calendar",
-      "5 AI plan ideas per week",
+      "5 AI-suggested plans per week",
       "Up to 50 RSVPs per month",
       "Phone-number RSVP with SMS confirmations",
       "Member hosting",
@@ -78,11 +78,11 @@ const PRICING_TIERS: PricingTier[] = [
     inheritsLabel: "Everything in Free, plus:",
     features: [
       "Unlimited calendars",
-      "15 AI plan ideas per week",
+      "15 AI-suggested plans per week",
       "Unlimited RSVPs",
       "Unlimited scheduling",
       "Custom branding (logo + brand color)",
-      "Custom plan idea preferences",
+      "Custom plan-suggestion controls",
       "Analytics dashboard",
       "Co-host management",
     ],
@@ -124,23 +124,23 @@ const STEPS = [
   {
     number: "02",
     icon: <Zap className="w-6 h-6" />,
-    title: "AI creates personalized plan ideas",
+    title: "AI creates personalized suggested plans",
     description:
-      "Every week, Leaf generates curated event ideas with real venues, times, and images tailored to your community.",
+      "Every week, Leaf generates curated, ready-to-host plans with real venues, times, and images tailored to your community.",
   },
   {
     number: "03",
     icon: <Users className="w-6 h-6" />,
     title: "Members host, people RSVP",
     description:
-      "Organization members claim plan ideas and host them. Anyone can RSVP with just a phone number.",
+      "Organization members claim suggested plans and host them. Anyone can RSVP with just a phone number.",
   },
 ];
 
 const FEATURES = [
   {
     icon: <Sparkles className="w-5 h-5" />,
-    title: "AI-Powered Plan Ideas",
+    title: "AI-Suggested Plans",
     description:
       "Curated event suggestions based on your org's vibe, location, and preferences. Real venues, smart timing, beautiful images.",
   },
@@ -160,7 +160,7 @@ const FEATURES = [
     icon: <Users className="w-5 h-5" />,
     title: "Member Hosting",
     description:
-      "Organization members browse plan ideas and host events on behalf of your community. Distributed leadership.",
+      "Organization members browse suggested plans and host events on behalf of your community. Distributed leadership.",
   },
   {
     icon: <Shield className="w-5 h-5" />,
@@ -245,9 +245,9 @@ export default function OrganizationsPage() {
                 <span className="italic">by its members.</span>
               </h1>
               <p className="text-xl text-white/70 font-light leading-relaxed max-w-xl">
-                Leaf generates personalized event ideas for your organization.
-                Members host plans, people RSVP with just a phone number. No app
-                required.
+                Leaf generates personalized, ready-to-host plans for your
+                organization. Members host plans, people RSVP with just a phone
+                number. No app required.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Link
@@ -512,9 +512,9 @@ export default function OrganizationsPage() {
           </h2>
           <div className="space-y-8">
             <div>
-              <h3 className="text-sm font-bold mb-1">What are AI plan ideas?</h3>
+              <h3 className="text-sm font-bold mb-1">What are AI-suggested plans?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                Every week, Leaf automatically generates personalized event ideas for your calendar based on your location, vibe, and preferences. These include real venues, smart timing, and images — ready for you or your members to host. Free includes 5 ideas per week; Pro and Concierge get 15.
+                Every week, Leaf automatically generates personalized, ready-to-host plans for your calendar based on your location, vibe, and preferences. These include real venues, smart timing, and images — each just needs a host, so you or your members can claim one and run it. Free includes 5 per week; Pro and Concierge get 15.
               </p>
             </div>
             <div>
@@ -538,7 +538,7 @@ export default function OrganizationsPage() {
             <div>
               <h3 className="text-sm font-bold mb-1">What's the difference between member hosting and co-host management?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                Member hosting (included on every plan) lets anyone you've added as a member claim a plan idea and run that single event. Co-host management (Pro and Concierge) lets you invite trusted people who can manage every plan, approve RSVPs, and co-run the whole calendar.
+                Member hosting (included on every plan) lets anyone you've added as a member claim a suggested plan and run that single event. Co-host management (Pro and Concierge) lets you invite trusted people who can manage every plan, approve RSVPs, and co-run the whole calendar.
               </p>
             </div>
             <div>
@@ -584,8 +584,8 @@ export default function OrganizationsPage() {
             <span className="italic">together?</span>
           </h2>
           <p className="text-zinc-500 text-lg font-light mb-10 max-w-lg mx-auto">
-            Set up your organization calendar in minutes. Your first plan ideas
-            are generated instantly.
+            Set up your organization calendar in minutes. Your first suggested
+            plans are generated instantly.
           </p>
           <Link
             href={isLoggedIn ? "/dashboard" : "/organizations/setup"}

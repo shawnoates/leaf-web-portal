@@ -2765,8 +2765,8 @@ export default function OrgDashboardPage() {
               )}
               <section className={`border border-zinc-200 rounded-xl p-6 space-y-8 ${!isPaid ? "opacity-40 pointer-events-none" : ""}`}>
                 <div>
-                  <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Automated Plan Ideas</h2>
-                  <p className="text-xs text-zinc-500 mt-1">Control how Leaf generates plan ideas for your community.</p>
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Suggested Plans</h2>
+                  <p className="text-xs text-zinc-500 mt-1">Control how Leaf suggests ready-to-host plans for your community.</p>
                 </div>
 
                 {/* Preferred Days */}
@@ -2916,7 +2916,7 @@ export default function OrgDashboardPage() {
                 {/* Photo Style */}
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Photo Style</h3>
-                  <p className="text-xs text-zinc-500 mb-3">Control what kind of images AI selects for plan ideas.</p>
+                  <p className="text-xs text-zinc-500 mb-3">Control what kind of images AI selects for suggested plans.</p>
                   <div className="flex gap-2 flex-wrap">
                     {([
                       { id: "default", label: "Default" },
@@ -3586,7 +3586,7 @@ export default function OrgDashboardPage() {
               <div className="flex items-center justify-between py-2">
                 <div>
                   <p className="text-xs font-medium text-zinc-700">Suggest starter plans</p>
-                  <p className="text-xs text-zinc-400">Seed the calendar with a few AI-picked plan ideas</p>
+                  <p className="text-xs text-zinc-400">Seed the calendar with a few AI-suggested plans your members can host</p>
                 </div>
                 <button
                   type="button"
