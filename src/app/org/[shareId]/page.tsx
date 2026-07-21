@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import Link from "next/link";
@@ -1436,6 +1436,10 @@ export default function OrgCalendarPage() {
   // "needs a host" ideas are capped in-line so they never bury confirmed
   // plans; the rest expand behind a show-more toggle.
   const [showAllIdeas, setShowAllIdeas] = useState(false);
+  // Free-text venue search when hosting a suggested plan — lets the hoster
+  // pick a venue the AI didn't surface. A non-owner's choice still routes
+  // through owner/co-host approval (server holds it pending).
+  const [venueSearchQuery, setVenueSearchQuery] = useState("");
   // "Let Leaf host it" pre-pay sheet — spec §4. Opens from the
   // owner-only band; closes on X or backdrop click. Owner-only rendering
   // enforced by the band itself (band gates on isOwner via the leafHost
@@ -2221,8 +2225,11 @@ export default function OrgCalendarPage() {
     if (!hostingIdea && !creatingCustomPlan) return;
 
     const searchCity = hostingIdea?.centroid || org.orgCity || "";
+    // When hosting a suggested plan, a typed venue query overrides the idea's
+    // category so the hoster can search for any specific venue by name.
+    const typedVenueQuery = hostingIdea ? venueSearchQuery.trim() : "";
     const searchCategory = hostingIdea
-      ? hostingIdea.category
+      ? (typedVenueQuery || hostingIdea.category)
       : (customCategory.trim() || "");
 
     // Don't search until the user has typed something (custom plan) or a category exists (plan idea)
@@ -2236,8 +2243,10 @@ export default function OrgCalendarPage() {
     setSelectedVenue(null);
     setVenuesLoading(true);
 
-    // Debounce custom plan searches so we don't fire on every keystroke
-    const debounceMs = hostingIdea ? 0 : 400;
+    // Debounce keystroke-driven searches (custom plans, and typed venue
+    // queries on suggested plans); the idea's default category search is
+    // instant.
+    const debounceMs = hostingIdea && !typedVenueQuery ? 0 : 400;
     const timer = setTimeout(() => {
 
     // Load Google Maps if not already loaded, then search
@@ -2328,14 +2337,17 @@ export default function OrgCalendarPage() {
 
     }, debounceMs); // end setTimeout
     return () => clearTimeout(timer);
-  }, [hostingIdea, creatingCustomPlan, customCategory, org]);
+  }, [hostingIdea, creatingCustomPlan, customCategory, venueSearchQuery, org]);
 
   // Sync the proposer-side "require approval" toggles to the calendar default
   // whenever a proposal form opens. Owners/hosts editing on the dashboard get
   // their own toggle in CreatePlanModal; this only applies to follower
   // proposals from this page.
   useEffect(() => {
-    if (hostingIdea) setHostRequireApproval(org?.requireApprovalDefault === true);
+    if (hostingIdea) {
+      setHostRequireApproval(org?.requireApprovalDefault === true);
+      setVenueSearchQuery(""); // clear the venue search each time the modal opens
+    }
   }, [hostingIdea, org?.requireApprovalDefault]);
   useEffect(() => {
     if (creatingCustomPlan) setCustomRequireApproval(org?.requireApprovalDefault === true);
@@ -2769,9 +2781,27 @@ export default function OrgCalendarPage() {
             </div>
           )}
 
-        {org.plans.length > 0 && (
-          <div className="space-y-32">
-            {org.plans.map((plan, index) => (
+        {(() => {
+          // Unified upcoming stream — confirmed plans + "needs a host"
+          // suggestions interleaved by DATE into one alternating-row list, so
+          // the calendar reads chronologically instead of "all confirmed,
+          // then all suggested." Confirmed plans always render; suggestions
+          // (AI source events OR plan ideas — mutually exclusive) are capped
+          // in-line with a show-more toggle so they never bury real plans.
+          const IDEA_INLINE_CAP = 4;
+          const spreadOf = (i: PlanIdea) =>
+            spreadIdeaDates.get(i.id) ?? (i.date ? new Date(i.date) : null);
+
+          type StreamEntry = {
+            key: string;
+            date: number;
+            render: (index: number) => React.ReactNode;
+          };
+          const streamItems: StreamEntry[] = [];
+          let hiddenSuggestedCount = 0;
+
+          // --- Confirmed plans (always shown) ---
+          const renderConfirmedPlanCard = (plan: Plan, index: number) => (
               <article
                 key={plan.id}
                 className={`group flex flex-col md:flex-row gap-12 md:items-center ${
@@ -2956,42 +2986,27 @@ export default function OrgCalendarPage() {
                   </div>
                 </div>
               </article>
-            ))}
-          </div>
-        )}
+          );
+          org.plans.forEach((plan) => {
+            streamItems.push({
+              key: `plan-${plan.id}`,
+              date: plan.dateISO
+                ? new Date(plan.dateISO).getTime()
+                : Number.POSITIVE_INFINITY,
+              render: (index) => renderConfirmedPlanCard(plan, index),
+            });
+          });
 
-        {/* AI-adopted starter events — always render when the calendar
-            has aiSourceEvents so they appear ALONGSIDE real plans in the
-            Upcoming Plans section, not just when the plans list is
-            empty. Same visual language as real plans (alternating
-            image/text rows, serif title, kicker, CTAs). Weekly-vibe
-            events re-resolve dates every render; fixed-date events
-            drop from the list once past. Public — every visitor can
-            mark "I'm interested"; only the owner sees "Host This". */}
-        {org.aiSourceEvents && org.aiSourceEvents.length > 0 && (
-          <>
-            {(() => {
-              const rendered = org.aiSourceEvents
-                .map((ev, originalIndex) => ({
-                  ev,
-                  originalIndex,
-                  resolved: resolveAIEventDate(ev),
-                }))
-                .filter((r) => r.resolved.date !== null)
-                // Client-side chronological safety net — the server sorts
-                // on generate, but adopted calendars persisted before that
-                // sort landed still show in emit order. Cost is a stable
-                // n·log(n) once per render, worth the guaranteed ordering.
-                .sort((a, b) => {
-                  const at = (a.resolved.date as Date).getTime();
-                  const bt = (b.resolved.date as Date).getTime();
-                  return at - bt;
-                });
-              if (rendered.length === 0) return null;
-              return (
-                <section className="pt-8">
-                  <div className="space-y-32">
-                    {rendered.map(({ ev, originalIndex, resolved }, index) => {
+          // --- Suggested: AI-adopted source events ---
+          const renderAiEventCard = (
+            entry: {
+              ev: NonNullable<OrgData["aiSourceEvents"]>[number];
+              originalIndex: number;
+              resolved: { date: Date | null; isWeekly: boolean };
+            },
+            index: number
+          ) => {
+            const { ev, originalIndex, resolved } = entry;
                       const validDate = resolved.date as Date;
                       const interestCount =
                         aiInterestCounts[originalIndex] ??
@@ -3207,40 +3222,39 @@ export default function OrgCalendarPage() {
                           </div>
                         </article>
                       );
-                    })}
-                  </div>
-                </section>
-              );
-            })()}
-          </>
-        )}
+          };
+          if (org.aiSourceEvents && org.aiSourceEvents.length > 0) {
+              const rendered = org.aiSourceEvents
+                .map((ev, originalIndex) => ({
+                  ev,
+                  originalIndex,
+                  resolved: resolveAIEventDate(ev),
+                }))
+                .filter((r) => r.resolved.date !== null)
+                // Client-side chronological safety net — the server sorts
+                // on generate, but adopted calendars persisted before that
+                // sort landed still show in emit order. Cost is a stable
+                // n·log(n) once per render, worth the guaranteed ordering.
+                .sort((a, b) => {
+                  const at = (a.resolved.date as Date).getTime();
+                  const bt = (b.resolved.date as Date).getTime();
+                  return at - bt;
+                });
+            const visibleAi = showAllIdeas
+              ? rendered
+              : rendered.slice(0, IDEA_INLINE_CAP);
+            hiddenSuggestedCount = rendered.length - visibleAi.length;
+            visibleAi.forEach((entry) => {
+              streamItems.push({
+                key: `ai-${entry.originalIndex}`,
+                date: (entry.resolved.date as Date).getTime(),
+                render: (index) => renderAiEventCard(entry, index),
+              });
+            });
+          }
 
-        {/* Plan Ideas — merged inline with the Upcoming stream so
-            visitors see them alongside real plans + AI Suggested
-            events instead of buried in a separate carousel below.
-            Same alternating-row layout, same I'm Interested / Host
-            This action pair. Only renders when the calendar has ideas
-            and the owner hasn't disabled them. */}
-        {!org.hidePlanIdeas && org.planIdeas.length > 0 && (() => {
-          // Order the "needs a host" ideas by their spread cadence date
-          // (falls back to the server date, then id-stable Infinity) so the
-          // in-line block reads chronologically instead of in emit order.
-          const IDEA_INLINE_CAP = 4;
-          const spreadOf = (i: PlanIdea) =>
-            spreadIdeaDates.get(i.id) ?? (i.date ? new Date(i.date) : null);
-          const orderedIdeas = [...org.planIdeas].sort((a, b) => {
-            const at = spreadOf(a)?.getTime() ?? Number.POSITIVE_INFINITY;
-            const bt = spreadOf(b)?.getTime() ?? Number.POSITIVE_INFINITY;
-            if (at !== bt) return at - bt;
-            return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-          });
-          const visibleIdeas = showAllIdeas
-            ? orderedIdeas
-            : orderedIdeas.slice(0, IDEA_INLINE_CAP);
-          const hiddenIdeaCount = orderedIdeas.length - visibleIdeas.length;
-          return (
-          <section className="space-y-32 pt-8">
-            {visibleIdeas.map((idea, index) => {
+          // --- Suggested: plan ideas ---
+          const renderPlanIdeaCard = (idea: PlanIdea, index: number) => {
               const spreadDate = spreadOf(idea);
               let dateLabel: string | null = null;
               if (spreadDate) {
@@ -3425,31 +3439,60 @@ export default function OrgCalendarPage() {
                   </div>
                 </article>
               );
-            })}
-            {/* Show-more toggle — the rest of the spread-out ideas expand
-                in place so the default view stays scannable (confirmed
-                plans + a handful of suggestions) without hiding anything. */}
-            {hiddenIdeaCount > 0 && (
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => setShowAllIdeas(true)}
-                  className="border border-zinc-200 px-6 py-3 text-xs uppercase tracking-widest font-medium text-zinc-600 hover:bg-zinc-50 transition-colors flex items-center gap-2"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Show {hiddenIdeaCount} more idea{hiddenIdeaCount === 1 ? "" : "s"}
-                </button>
-              </div>
-            )}
-            {/* Compact "Add a plan" row — inline sibling of the plan
-                ideas above using the same alternating layout, but a
-                shorter cover so it reads as an affordance, not
-                another suggestion. Owner-friendly copy vs. follower;
-                only renders when custom plans are enabled and the
-                calendar isn't RSVP-limited. */}
-            {!org.rsvpLimitReached && !org.hideCustomPlans && (
+          };
+          if (!org.hidePlanIdeas && org.planIdeas.length > 0) {
+          const orderedIdeas = [...org.planIdeas].sort((a, b) => {
+            const at = spreadOf(a)?.getTime() ?? Number.POSITIVE_INFINITY;
+            const bt = spreadOf(b)?.getTime() ?? Number.POSITIVE_INFINITY;
+            if (at !== bt) return at - bt;
+            return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+          });
+          const visibleIdeas = showAllIdeas
+            ? orderedIdeas
+            : orderedIdeas.slice(0, IDEA_INLINE_CAP);
+          const hiddenIdeaCount = orderedIdeas.length - visibleIdeas.length;
+            hiddenSuggestedCount = hiddenIdeaCount;
+            visibleIdeas.forEach((idea) => {
+              const d = spreadOf(idea);
+              streamItems.push({
+                key: `idea-${idea.id}`,
+                date: d ? d.getTime() : Number.POSITIVE_INFINITY,
+                render: (index) => renderPlanIdeaCard(idea, index),
+              });
+            });
+          }
+
+          // Interleave by date; stable by key on ties.
+          streamItems.sort(
+            (a, b) =>
+              a.date - b.date || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)
+          );
+
+          return (
+            <>
+              {streamItems.length > 0 && (
+                <div className="space-y-32">
+                  {streamItems.map((it, i) => (
+                    <Fragment key={it.key}>{it.render(i)}</Fragment>
+                  ))}
+                </div>
+              )}
+              {hiddenSuggestedCount > 0 && (
+                <div className="flex justify-center pt-16">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllIdeas(true)}
+                    className="border border-zinc-200 px-6 py-3 text-xs uppercase tracking-widest font-medium text-zinc-600 hover:bg-zinc-50 transition-colors flex items-center gap-2"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Show {hiddenSuggestedCount} more idea{hiddenSuggestedCount === 1 ? "" : "s"}
+                  </button>
+                </div>
+              )}
+              {!org.rsvpLimitReached && !org.hideCustomPlans && (
+                <div className="pt-32">
               <article
-                className={`group flex flex-col md:flex-row gap-12 md:items-center ${visibleIdeas.length % 2 !== 0 ? "md:flex-row-reverse" : ""}`}
+                className={`group flex flex-col md:flex-row gap-12 md:items-center ${streamItems.length % 2 !== 0 ? "md:flex-row-reverse" : ""}`}
               >
                 <button
                   type="button"
@@ -3491,8 +3534,9 @@ export default function OrgCalendarPage() {
                   </p>
                 </div>
               </article>
-            )}
-          </section>
+                </div>
+              )}
+            </>
           );
         })()}
 
@@ -4095,6 +4139,24 @@ export default function OrgCalendarPage() {
                     <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
                       Choose a Venue
                     </h4>
+                    {/* Free-text venue search — type a specific place to
+                        override the AI's suggested category results. */}
+                    <div className="relative">
+                      <MapPin className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={venueSearchQuery}
+                        onChange={(e) => setVenueSearchQuery(e.target.value)}
+                        placeholder="Search for a different venue…"
+                        className="w-full border border-zinc-200 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-zinc-900 transition-colors"
+                      />
+                    </div>
+                    {!(org.isOwner || org.isHost) && (
+                      <p className="text-[11px] text-zinc-400">
+                        Picking your own venue? Your request goes to the
+                        organizer for approval before it&apos;s published.
+                      </p>
+                    )}
                     {venuesLoading ? (
                       <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
                         {[0, 1, 2, 3, 4].map((i) => (
