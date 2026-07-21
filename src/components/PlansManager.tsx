@@ -387,13 +387,18 @@ export default function PlansManager({
       let shareId = dash.shareId;
       const cal = dash.calendars?.find((c: { objectId: string }) => c.objectId === calendarId);
       if (cal?.shareId) shareId = cal.shareId;
-      // Members eligible to be assigned as a suggestion's host — need a bound
-      // user (objectId); unbound invites can't host yet, so drop them.
-      setMembers(
-        ((dash.members || []) as { objectId: string | null; name: string }[])
-          .filter((m) => !!m.objectId)
-          .map((m) => ({ id: m.objectId as string, name: m.name || "Member" }))
-      );
+      // People eligible to be assigned as a suggestion's host: the calendar's
+      // members AND followers. Both need a bound user (objectId) — unbound
+      // invites / phone-only followers can't host yet, so drop them. Deduped
+      // by user id (someone can be both a member and a follower).
+      const candidateMap = new Map<string, string>();
+      for (const m of (dash.members || []) as { objectId: string | null; name: string }[]) {
+        if (m.objectId && !candidateMap.has(m.objectId)) candidateMap.set(m.objectId, m.name || "Member");
+      }
+      for (const f of (dash.followers || []) as { objectId: string | null; name: string }[]) {
+        if (f.objectId && !candidateMap.has(f.objectId)) candidateMap.set(f.objectId, f.name || "Follower");
+      }
+      setMembers([...candidateMap.entries()].map(([id, name]) => ({ id, name })));
       const activePlans = (cal?.activePlans || []) as {
         objectId: string;
         title: string;
@@ -953,7 +958,7 @@ export default function PlansManager({
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-              Suggested Plans ({planIdeas.length})
+              Suggested Plans{hidePlanIdeas ? "" : ` (${planIdeas.length})`}
             </h2>
             {!hidePlanIdeas && (
               <button
@@ -973,7 +978,7 @@ export default function PlansManager({
 
           {hidePlanIdeas ? (
             <div className="border border-zinc-200 rounded-xl p-6 text-center space-y-3">
-              <p className="text-sm text-zinc-500">Plan ideas are turned off for this calendar.</p>
+              <p className="text-sm text-zinc-500">Suggested plans are turned off for this calendar.</p>
               <Link
                 href={`/dashboard/${orgId}?tab=calendars&editCal=${calendarId}`}
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 transition-colors"
@@ -1163,8 +1168,8 @@ export default function PlansManager({
             <div className="flex items-start justify-between p-5 border-b border-zinc-100">
               <div className="min-w-0">
                 <h3 className="text-lg font-medium text-zinc-900 truncate">Assign a host</h3>
-                <p className="text-xs text-zinc-400 mt-0.5 truncate">
-                  {assigningIdea.title} — publishes live, hosted by the member you pick.
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Publishes <span className="font-medium text-zinc-600">{assigningIdea.title}</span> live, hosted by the member or follower you pick.
                 </p>
               </div>
               <button
@@ -1180,7 +1185,7 @@ export default function PlansManager({
             <div className="overflow-y-auto p-2">
               {members.length === 0 ? (
                 <p className="text-sm text-zinc-400 text-center py-8 px-4">
-                  No members yet. Add members to your calendar to assign them as hosts.
+                  No members or followers yet. Once people join your calendar you can assign them as hosts.
                 </p>
               ) : (
                 members.map((m) => (
