@@ -921,7 +921,7 @@ export default function PlansManager({
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-              Active Plan Ideas ({planIdeas.length})
+              Suggested Plans ({planIdeas.length})
             </h2>
             {!hidePlanIdeas && (
               <button
@@ -934,7 +934,7 @@ export default function PlansManager({
                 ) : (
                   <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
                 )}
-                {regenerating ? "Generating..." : "Regenerate Ideas"}
+                {regenerating ? "Generating..." : "Regenerate"}
               </button>
             )}
           </div>
@@ -955,26 +955,13 @@ export default function PlansManager({
               <div className="w-5 h-5 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin" />
             </div>
           ) : planIdeas.length === 0 ? (
-            <p className="text-sm text-zinc-400 py-4">No active plan ideas.</p>
+            <p className="text-sm text-zinc-400 py-4">No suggested plans yet.</p>
           ) : (
             <div className="space-y-3">
               {planIdeas.map((idea) => (
                 <div
                   key={idea.objectId}
-                  className="border border-zinc-200 rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:border-zinc-400 transition-colors"
-                  onClick={() => {
-                    setCreatePlanPrefill({
-                      title: idea.title,
-                      description: idea.description,
-                      date: idea.date ? new Date(idea.date).toISOString().split("T")[0] : "",
-                      time: "",
-                      capacity: "",
-                      venue: idea.location || null,
-                      imageUrl: idea.image || undefined,
-                    });
-                    setEditingPlanId(null);
-                    setShowCreateModal(true);
-                  }}
+                  className="group border border-zinc-200 rounded-xl p-4 flex items-center gap-4 hover:border-zinc-300 transition-colors"
                 >
                   {idea.image && (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -1012,21 +999,41 @@ export default function PlansManager({
                       )}
                     </div>
                   </div>
-                  {idea.ideaSeriesId && (
+                  {/* Owner/co-host hover actions (always visible on touch, where
+                      there's no hover): Edit → publish it yourself; Assign a
+                      Host → pick a member to run it; Delete → drop the idea. */}
+                  <div className="flex items-center gap-0.5 shrink-0 self-start transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleEndSeries(idea.ideaSeriesId!); }}
-                      className="p-3 text-zinc-300 hover:text-zinc-700 transition-colors shrink-0 self-start"
-                      title="End recurring series"
+                      onClick={() => openIdeaEditor(idea)}
+                      className="p-2.5 text-zinc-400 hover:text-zinc-900 transition-colors"
+                      title="Edit and publish"
                     >
-                      <Repeat className="w-4 h-4" />
+                      <Pencil className="w-4 h-4" />
                     </button>
-                  )}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleRemoveIdea(idea.objectId); }}
-                    className="p-3 text-zinc-300 hover:text-red-500 transition-colors shrink-0 self-start"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                    <button
+                      onClick={() => { setAssignError(null); setAssigningIdea(idea); }}
+                      className="p-2.5 text-zinc-400 hover:text-zinc-900 transition-colors"
+                      title="Assign a host"
+                    >
+                      <UserCheck className="w-4 h-4" />
+                    </button>
+                    {idea.ideaSeriesId && (
+                      <button
+                        onClick={() => handleEndSeries(idea.ideaSeriesId!)}
+                        className="p-2.5 text-zinc-400 hover:text-zinc-700 transition-colors"
+                        title="End recurring series"
+                      >
+                        <Repeat className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleRemoveIdea(idea.objectId)}
+                      className="p-2.5 text-zinc-400 hover:text-red-500 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1106,6 +1113,66 @@ export default function PlansManager({
           onClose={() => setShowUpgradeModal(false)}
           loading={subscriptionLoading}
         />
+      )}
+
+      {/* Assign-a-Host picker — publishes the suggestion live, hosted by the
+          chosen member (server assigns them, no self-host approval needed). */}
+      {assigningIdea && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4"
+          onClick={() => { if (!assignBusyUserId) setAssigningIdea(null); }}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full max-h-[85vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between p-5 border-b border-zinc-100">
+              <div className="min-w-0">
+                <h3 className="text-lg font-medium text-zinc-900 truncate">Assign a host</h3>
+                <p className="text-xs text-zinc-400 mt-0.5 truncate">
+                  {assigningIdea.title} — publishes live, hosted by the member you pick.
+                </p>
+              </div>
+              <button
+                onClick={() => { if (!assignBusyUserId) setAssigningIdea(null); }}
+                className="p-1.5 rounded-full hover:bg-zinc-100 transition-colors shrink-0"
+              >
+                <X className="w-5 h-5 text-zinc-500" />
+              </button>
+            </div>
+            {assignError && (
+              <p className="text-xs text-red-500 px-5 pt-3">{assignError}</p>
+            )}
+            <div className="overflow-y-auto p-2">
+              {members.length === 0 ? (
+                <p className="text-sm text-zinc-400 text-center py-8 px-4">
+                  No members yet. Add members to your calendar to assign them as hosts.
+                </p>
+              ) : (
+                members.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => handleAssignHost(assigningIdea, m.id)}
+                    disabled={!!assignBusyUserId}
+                    className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-lg hover:bg-zinc-50 transition-colors text-left disabled:opacity-50"
+                  >
+                    <span className="flex items-center gap-3 min-w-0">
+                      <span className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center shrink-0">
+                        <Users className="w-4 h-4 text-zinc-400" />
+                      </span>
+                      <span className="text-sm font-medium text-zinc-900 truncate">{m.name}</span>
+                    </span>
+                    {assignBusyUserId === m.id ? (
+                      <span className="w-4 h-4 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin shrink-0" />
+                    ) : (
+                      <UserCheck className="w-4 h-4 text-zinc-300 shrink-0" />
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Past Plan Photos Modal */}
