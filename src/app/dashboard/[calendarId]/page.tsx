@@ -207,12 +207,6 @@ interface OrgDashboard {
     eventGroupId: string | null;
     eventTitle: string;
   }[];
-  // AI-suggested plans on this org's calendars that still need a host.
-  // tier1 = urgent cards (deadline soon), tier2 = per-calendar overflow rows.
-  needsHost?: {
-    tier1: NeedsHostCard[];
-    tier2: NeedsHostRow[];
-  };
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -250,36 +244,6 @@ const TABS = [
 const PAID_TIERS = ["pro", "growth", "concierge"];
 
 type CalActivePlan = { objectId: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null };
-
-// Server (buildNeedsHost) card/row shapes for AI-suggested plans awaiting a host.
-type NeedsHostCard = {
-  ideaId: string;
-  title: string;
-  category: string | null;
-  image: string | null;
-  date: string;
-  time: string | null;
-  venueName: string | null;
-  venueAddress: string | null;
-  calendarId: string | null;
-  calendarName: string;
-  calendarShareId: string | null;
-  calendarPhoto: string | null;
-  addMode: "owner" | "propose";
-  hostDeadline: string;
-  daysToDeadline: number;
-  decayLevel: "soon" | "warn";
-  interestedCount: number;
-};
-type NeedsHostRow = {
-  calendarId: string | null;
-  calendarName: string;
-  calendarShareId: string | null;
-  calendarPhoto: string | null;
-  count: number;
-  soonestDeadline: string;
-  soonestIsUrgent: boolean;
-};
 
 // ── Analytics types ────────────────────────────────────────────────────
 
@@ -1776,102 +1740,6 @@ export default function OrgDashboardPage() {
                       </div>
                     ))}
                   </div>
-                </section>
-              );
-            })()}
-
-            {/* Needs a host — AI-suggested plans that still need someone to
-                run them. Kept a DISTINCT section from Upcoming Plans (not
-                interleaved) so confirmed events stay unambiguous while the
-                owner still sees the actionable ask. Cards deep-link to the
-                calendar page where the Host-This flow lives. */}
-            {(() => {
-              const nh = dashboard.needsHost;
-              const tier1 = nh?.tier1 ?? [];
-              const tier2 = nh?.tier2 ?? [];
-              if (tier1.length === 0 && tier2.length === 0) return null;
-              const fmtDate = (iso: string) =>
-                new Date(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-              const deadlineLabel = (d: number) =>
-                d <= 0 ? "Host by today" : d === 1 ? "Host by tomorrow" : `Host within ${d}d`;
-              return (
-                <section>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5" /> Needs a Host
-                    </h3>
-                  </div>
-                  <p className="text-xs text-zinc-400 mb-3 -mt-1">
-                    AI-suggested plans ready to go — they just need someone to host.
-                  </p>
-                  {tier1.length > 0 && (
-                    <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-6 px-6 pb-2 no-scrollbar">
-                      {tier1.map((card) => (
-                        <Link
-                          key={card.ideaId}
-                          href={card.calendarShareId ? `/org/${card.calendarShareId}` : "#"}
-                          className="group relative border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 snap-start basis-[220px] sm:basis-[240px] md:basis-[260px]"
-                        >
-                          {card.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={card.image} alt={card.title} className="w-full h-28 object-cover" />
-                          ) : (
-                            <div className="w-full h-28 bg-zinc-100 flex items-center justify-center">
-                              <Sparkles className="w-6 h-6 text-zinc-300" />
-                            </div>
-                          )}
-                          <span
-                            className={`absolute top-2 left-2 text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${
-                              card.decayLevel === "soon"
-                                ? "bg-red-500 text-white"
-                                : "bg-amber-400 text-amber-950"
-                            }`}
-                          >
-                            <Clock className="w-2.5 h-2.5 inline mr-0.5 -mt-0.5" />
-                            {deadlineLabel(card.daysToDeadline)}
-                          </span>
-                          <div className="p-3">
-                            <h4 className="font-medium text-sm truncate">{card.title}</h4>
-                            <p className="text-xs text-zinc-400 mb-1">
-                              {fmtDate(card.date)}{card.time ? ` · ${card.time}` : ""}
-                            </p>
-                            <div className="flex items-center justify-between text-xs text-zinc-400">
-                              <span className="truncate">{card.venueName || card.calendarName}</span>
-                              {card.interestedCount > 0 && (
-                                <span className="shrink-0 ml-2 flex items-center gap-0.5">
-                                  <Heart className="w-3 h-3" /> {card.interestedCount}
-                                </span>
-                              )}
-                            </div>
-                            <span className="mt-2 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-zinc-900 group-hover:gap-1.5 transition-all">
-                              {card.addMode === "owner" ? "Host this" : "Review & host"}
-                              <ChevronRight className="w-3.5 h-3.5" />
-                            </span>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                  {tier2.length > 0 && (
-                    <div className="mt-3 space-y-1.5">
-                      {tier2.map((row) => (
-                        <Link
-                          key={row.calendarId ?? row.calendarName}
-                          href={row.calendarShareId ? `/org/${row.calendarShareId}` : "#"}
-                          className="flex items-center justify-between py-2 px-3 rounded-lg border border-zinc-100 hover:border-zinc-200 hover:bg-zinc-50 transition-colors group"
-                        >
-                          <span className="text-xs text-zinc-600 flex items-center gap-2">
-                            {row.soonestIsUrgent && <Clock className="w-3.5 h-3.5 text-red-500 shrink-0" />}
-                            <span className="font-medium text-zinc-900">
-                              {row.count} plan{row.count === 1 ? "" : "s"}
-                            </span>
-                            need{row.count === 1 ? "s" : ""} a host on {row.calendarName}
-                          </span>
-                          <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-zinc-500 shrink-0" />
-                        </Link>
-                      ))}
-                    </div>
-                  )}
                 </section>
               );
             })()}
