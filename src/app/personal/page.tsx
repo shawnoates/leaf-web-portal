@@ -397,7 +397,7 @@ export default function PersonalPage() {
                 Ready-to-host plans that keep your calendar alive between the
                 ones you host — real venues, smart timing, beautiful images.
                 Each one just needs a host: your crew can claim one and run it
-                themselves, so you're not the only one carrying the group chat.
+                themselves, so you&rsquo;re not the only one carrying the group chat.
                 Free gets 5 per week; Pro gets 15.
               </p>
             </div>
