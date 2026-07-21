@@ -1009,62 +1009,59 @@ export default function PlansManager({
                     >
                       <div className="relative">
                         <PlanImage src={idea.image} alt={idea.title} className="w-full h-28" />
-                        <span className="absolute top-2 left-2 text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5 bg-white/85 text-[#1B4332] backdrop-blur-sm">
-                          Suggested
-                        </span>
                         {idea.ideaSeriesId && (
                           <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-700 bg-white/85 backdrop-blur-sm">
                             <Repeat className="w-3 h-3" /> Recurring
                           </span>
                         )}
+                        {/* Owner/co-host actions overlay the cover (matches the
+                            Upcoming cards) so the footer text stays full-width
+                            and "Waiting on host" isn't truncated. */}
+                        <div className="absolute inset-0 bg-zinc-900/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none group-hover:pointer-events-auto">
+                          <button
+                            onClick={() => openIdeaEditor(idea)}
+                            className="p-2 bg-white rounded-full text-zinc-900 hover:bg-zinc-50 transition-colors"
+                            title="Edit and publish"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => { setAssignError(null); setAssigningIdea(idea); }}
+                            className="p-2 bg-white rounded-full text-zinc-900 hover:bg-zinc-50 transition-colors"
+                            title="Assign a host"
+                          >
+                            <UserCheck className="w-4 h-4" />
+                          </button>
+                          {idea.ideaSeriesId && (
+                            <button
+                              onClick={() => handleEndSeries(idea.ideaSeriesId!)}
+                              className="p-2 bg-white rounded-full text-zinc-700 hover:bg-zinc-50 transition-colors"
+                              title="End recurring series"
+                            >
+                              <Repeat className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleRemoveIdea(idea.objectId)}
+                            className="p-2 bg-white rounded-full text-red-500 hover:bg-zinc-50 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                       <div className="p-3">
                         <h4 className="font-medium text-sm mb-1 truncate">{idea.title}</h4>
                         <p className="text-xs text-zinc-400 mb-1">
-                          {d ? `Preferred: ${d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}` : "Waiting on host"}
+                          {d ? d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "Waiting on host"}
                         </p>
-                        <div className="flex items-center justify-between gap-1 min-h-[1.75rem]">
-                          <span className="text-xs truncate">
-                            {idea.interestCount > 0 ? (
-                              <span className="text-emerald-600 font-medium">{idea.interestCount} interested</span>
-                            ) : (
-                              <span className="text-zinc-400">Waiting on host</span>
-                            )}
-                          </span>
-                          {/* Owner/co-host actions */}
-                          <div className="flex items-center gap-0.5 shrink-0 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
-                            <button
-                              onClick={() => openIdeaEditor(idea)}
-                              className="p-1.5 text-zinc-400 hover:text-zinc-900 transition-colors"
-                              title="Edit and publish"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => { setAssignError(null); setAssigningIdea(idea); }}
-                              className="p-1.5 text-zinc-400 hover:text-zinc-900 transition-colors"
-                              title="Assign a host"
-                            >
-                              <UserCheck className="w-3.5 h-3.5" />
-                            </button>
-                            {idea.ideaSeriesId && (
-                              <button
-                                onClick={() => handleEndSeries(idea.ideaSeriesId!)}
-                                className="p-1.5 text-zinc-400 hover:text-zinc-700 transition-colors"
-                                title="End recurring series"
-                              >
-                                <Repeat className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleRemoveIdea(idea.objectId)}
-                              className="p-1.5 text-zinc-400 hover:text-red-500 transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
+                        <p className="text-xs">
+                          {idea.interestCount > 0 ? (
+                            <span className="text-emerald-600 font-medium">{idea.interestCount} interested</span>
+                          ) : (
+                            <span className="text-zinc-400">Waiting on host</span>
+                          )}
+                        </p>
                       </div>
                     </div>
                   );

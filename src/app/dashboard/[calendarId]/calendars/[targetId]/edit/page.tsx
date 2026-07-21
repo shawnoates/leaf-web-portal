@@ -79,7 +79,7 @@ export default function EditCalendarPage() {
 
   const [hideVenue, setHideVenue] = useState(true);
   const [requireApprovalDefault, setRequireApprovalDefault] = useState(false);
-  const [allowFollowersToHost, setAllowFollowersToHost] = useState(false);
+  const [allowFollowersToHost, setAllowFollowersToHost] = useState(true);
   const [isPrivate, setIsPrivate] = useState(false);
   const [hidePlanIdeas, setHidePlanIdeas] = useState(false);
   const [hideCustomPlans, setHideCustomPlans] = useState(false);
@@ -159,7 +159,7 @@ export default function EditCalendarPage() {
     setRemoveImage(false);
     setHideVenue(cal.hideVenueUntilRsvp !== false);
     setRequireApprovalDefault(cal.requireApprovalDefault === true);
-    setAllowFollowersToHost(cal.allowFollowersToHost === true);
+    setAllowFollowersToHost(cal.allowFollowersToHost !== false);
     setIsPrivate(cal.isPrivate || false);
     setHidePlanIdeas(cal.hidePlanIdeas || false);
     setHideCustomPlans(cal.hideCustomPlans || false);
@@ -554,12 +554,12 @@ export default function EditCalendarPage() {
         {/* ─── Local business events ──────────────────────────────── */}
         {canManageMerchant && (
           <Section title="Local business events">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center justify-between py-2 gap-4">
               <div>
-                <h3 className="text-sm font-semibold text-zinc-900">
+                <p className="text-xs font-medium text-zinc-700">
                   Allow local business events
-                </h3>
-                <p className="text-xs text-zinc-500 mt-1 max-w-md">
+                </p>
+                <p className="text-xs text-zinc-400 max-w-md">
                   Let nearby businesses pay to host events on this calendar —
                   tastings, classes, happy hours. Followers RSVP; you never get
                   charged. We suppress SMS for these, so they only reach the
@@ -574,12 +574,12 @@ export default function EditCalendarPage() {
               />
             </div>
             {!merchantOptOut && (
-              <div className="mt-4 pt-4 border-t border-zinc-100 flex items-start justify-between gap-4">
+              <div className="flex items-center justify-between py-2 gap-4">
                 <div>
-                  <h4 className="text-sm font-medium text-zinc-800">
+                  <p className="text-xs font-medium text-zinc-700">
                     Review each event first
-                  </h4>
-                  <p className="text-xs text-zinc-500 mt-1 max-w-md">
+                  </p>
+                  <p className="text-xs text-zinc-400 max-w-md">
                     When on, a business event won&apos;t go live on this
                     calendar until you approve it. When off, approved events
                     publish automatically.
@@ -874,15 +874,15 @@ function ToggleRow({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between py-2">
-      <div>
+    <div className="flex items-center justify-between gap-4 py-2">
+      <div className="min-w-0 flex-1">
         <p className="text-xs font-medium text-zinc-700">{title}</p>
         <p className="text-xs text-zinc-400">{hint}</p>
       </div>
       <button
         type="button"
         onClick={() => onChange(!checked)}
-        className={`relative w-10 h-5 rounded-full transition-colors ${checked ? "bg-zinc-900" : "bg-zinc-200"}`}
+        className={`shrink-0 relative w-10 h-5 rounded-full transition-colors ${checked ? "bg-zinc-900" : "bg-zinc-200"}`}
         aria-label={title}
         role="switch"
         aria-checked={checked}

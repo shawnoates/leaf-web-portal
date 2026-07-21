@@ -1964,7 +1964,7 @@ export default function OrgCalendarPage() {
         isFollower: result.isFollower || false,
         followRequestPending: result.followRequestPending || false,
         requireApprovalDefault: result.requireApprovalDefault === true,
-        allowFollowersToHost: result.allowFollowersToHost === true,
+        allowFollowersToHost: result.allowFollowersToHost !== false,
         aiSourceEvents: Array.isArray(result.aiSourceEvents)
           ? result.aiSourceEvents
           : null,
