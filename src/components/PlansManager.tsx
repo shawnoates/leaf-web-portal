@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
@@ -9,6 +9,7 @@ import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlan
 import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailModal";
 import PlanChatDrawer from "@/components/PlanChatDrawer";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
+import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
 import { Calendar, Camera, Check, Lock, MapPin, MessageCircle, Pencil, Plus, RefreshCw, Repeat, Settings, Trash2, UserCheck, Users, X } from "lucide-react";
 
 // Renders a plan cover image with a Calendar-icon placeholder fallback when
@@ -119,6 +120,7 @@ interface PlanIdea {
   image: string | null;
   location: { name: string; address: string } | null;
   ideaSeriesId: string | null;
+  interestCount: number;
 }
 
 interface PastPlan {
@@ -267,6 +269,25 @@ export default function PlansManager({
   const [assigningIdea, setAssigningIdea] = useState<PlanIdea | null>(null);
   const [assignBusyUserId, setAssignBusyUserId] = useState<string | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
+
+  // Spread the suggestions' "Preferred" dates across the calendar's real
+  // cadence (same helper the public /org page uses) so a server-clustered
+  // batch fans out instead of all showing one day. Display-only + drives the
+  // Edit/Assign prefill so the shown date and the published date agree.
+  // Cadence is inferred from real plans only (AI starters excluded). Bucketed
+  // hourly so the 2-week floor rolls forward without thrashing each render.
+  const nowBucket = Math.floor(Date.now() / (60 * 60 * 1000));
+  const spreadIdeaDates = useMemo(
+    () =>
+      computeSpreadIdeaDates(
+        upcomingPlans.filter((p) => !p.isAIStarter).map((p) => p.expiryDate),
+        planIdeas.map((i) => ({ id: i.objectId, date: i.date })),
+        nowBucket * 60 * 60 * 1000
+      ),
+    [upcomingPlans, planIdeas, nowBucket]
+  );
+  const spreadDateOf = (idea: PlanIdea): Date | null =>
+    spreadIdeaDates.get(idea.objectId) ?? (idea.date ? new Date(idea.date) : null);
 
   // Upgrade gate
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -460,7 +481,7 @@ export default function PlansManager({
         (a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime(),
       );
       setUpcomingPlans(merged);
-      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null }) => ({
+      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null; interestCount?: number }) => ({
         objectId: idea.objectId,
         title: idea.title,
         description: idea.description,
@@ -468,6 +489,7 @@ export default function PlansManager({
         image: idea.image || null,
         location: idea.location,
         ideaSeriesId: idea.ideaSeriesId || null,
+        interestCount: typeof idea.interestCount === "number" ? idea.interestCount : 0,
       }));
       const seen = new Set<string>();
       setPlanIdeas(allIdeas.filter((idea: PlanIdea) => {
@@ -592,7 +614,15 @@ export default function PlansManager({
   }
 
   async function handleRemoveIdea(ideaId: string) {
-    if (!confirm("Remove this plan idea?")) return;
+    // Warn the owner/co-host when followers have already marked interest —
+    // deleting drops a suggestion people are waiting on, so make it deliberate.
+    const idea = planIdeas.find((p) => p.objectId === ideaId);
+    const interested = idea?.interestCount ?? 0;
+    const message =
+      interested > 0
+        ? `${interested} follower${interested === 1 ? "" : "s"} ${interested === 1 ? "is" : "are"} interested in this suggested plan. Delete it anyway?`
+        : "Remove this suggested plan?";
+    if (!confirm(message)) return;
     try {
       await Parse.Cloud.run("removePlanIdea", { ideaId, calendarId });
       setPlanIdeas((prev) => prev.filter((p) => p.objectId !== ideaId));
@@ -604,10 +634,11 @@ export default function PlansManager({
   // Open the suggestion in the create modal, prefilled — the owner/co-host
   // can tweak details and publish it themselves ("Edit").
   function openIdeaEditor(idea: PlanIdea) {
+    const spread = spreadDateOf(idea);
     setCreatePlanPrefill({
       title: idea.title,
       description: idea.description,
-      date: idea.date ? new Date(idea.date).toISOString().split("T")[0] : "",
+      date: spread ? spread.toISOString().split("T")[0] : "",
       time: "",
       capacity: "",
       venue: idea.location || null,
@@ -624,10 +655,11 @@ export default function PlansManager({
     setAssignBusyUserId(hostUserId);
     setAssignError(null);
     try {
+      const spread = spreadDateOf(idea);
       await Parse.Cloud.run("assignPlanIdeaHost", {
         calendarPlanId: idea.objectId,
         hostUserId,
-        date: idea.date || undefined,
+        date: spread ? spread.toISOString() : idea.date || undefined,
       });
       setPlanIdeas((prev) => prev.filter((p) => p.objectId !== idea.objectId));
       setAssigningIdea(null);
@@ -958,7 +990,14 @@ export default function PlansManager({
             <p className="text-sm text-zinc-400 py-4">No suggested plans yet.</p>
           ) : (
             <div className="space-y-3">
-              {planIdeas.map((idea) => (
+              {[...planIdeas]
+                .sort((a, b) => {
+                  const at = spreadDateOf(a)?.getTime() ?? Number.POSITIVE_INFINITY;
+                  const bt = spreadDateOf(b)?.getTime() ?? Number.POSITIVE_INFINITY;
+                  if (at !== bt) return at - bt;
+                  return a.objectId < b.objectId ? -1 : a.objectId > b.objectId ? 1 : 0;
+                })
+                .map((idea) => (
                 <div
                   key={idea.objectId}
                   className="group border border-zinc-200 rounded-xl p-4 flex items-center gap-4 hover:border-zinc-300 transition-colors"
@@ -989,12 +1028,20 @@ export default function PlansManager({
                       <p className="text-xs text-zinc-500 line-clamp-1 mt-0.5">{idea.description}</p>
                     )}
                     <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-400">
-                      {idea.date && (
-                        <span>Preferred: {new Date(idea.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
-                      )}
+                      {(() => {
+                        const d = spreadDateOf(idea);
+                        return d ? (
+                          <span>Preferred: {d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
+                        ) : null;
+                      })()}
                       {idea.location && (
                         <span className="flex items-center gap-1">
                           <MapPin className="w-3 h-3" /> {idea.location.name}
+                        </span>
+                      )}
+                      {idea.interestCount > 0 && (
+                        <span className="text-emerald-600 font-medium">
+                          {idea.interestCount} interested
                         </span>
                       )}
                     </div>
