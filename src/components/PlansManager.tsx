@@ -9,7 +9,7 @@ import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlan
 import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailModal";
 import PlanChatDrawer from "@/components/PlanChatDrawer";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
-import { Calendar, Camera, Check, Lock, MapPin, MessageCircle, Plus, RefreshCw, Repeat, Settings, Trash2, UserCheck, Users, X } from "lucide-react";
+import { Calendar, Camera, Check, Lock, MapPin, MessageCircle, Pencil, Plus, RefreshCw, Repeat, Settings, Trash2, UserCheck, Users, X } from "lucide-react";
 
 // Renders a plan cover image with a Calendar-icon placeholder fallback when
 // the src is missing OR 404s (attendee-uploaded / expired signed URLs go
@@ -260,6 +260,14 @@ export default function PlansManager({
   const [regenerating, setRegenerating] = useState(false);
   const [hidePlanIdeas, setHidePlanIdeas] = useState(false);
 
+  // Assign-a-host: members eligible to be assigned as a suggestion's host,
+  // plus the idea currently being assigned (null = picker closed) and the
+  // user id mid-assignment (for the row spinner).
+  const [members, setMembers] = useState<{ id: string; name: string }[]>([]);
+  const [assigningIdea, setAssigningIdea] = useState<PlanIdea | null>(null);
+  const [assignBusyUserId, setAssignBusyUserId] = useState<string | null>(null);
+  const [assignError, setAssignError] = useState<string | null>(null);
+
   // Upgrade gate
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
@@ -358,6 +366,13 @@ export default function PlansManager({
       let shareId = dash.shareId;
       const cal = dash.calendars?.find((c: { objectId: string }) => c.objectId === calendarId);
       if (cal?.shareId) shareId = cal.shareId;
+      // Members eligible to be assigned as a suggestion's host — need a bound
+      // user (objectId); unbound invites can't host yet, so drop them.
+      setMembers(
+        ((dash.members || []) as { objectId: string | null; name: string }[])
+          .filter((m) => !!m.objectId)
+          .map((m) => ({ id: m.objectId as string, name: m.name || "Member" }))
+      );
       const activePlans = (cal?.activePlans || []) as {
         objectId: string;
         title: string;
@@ -583,6 +598,44 @@ export default function PlansManager({
       setPlanIdeas((prev) => prev.filter((p) => p.objectId !== ideaId));
     } catch (err) {
       console.error("Failed to remove idea:", err);
+    }
+  }
+
+  // Open the suggestion in the create modal, prefilled — the owner/co-host
+  // can tweak details and publish it themselves ("Edit").
+  function openIdeaEditor(idea: PlanIdea) {
+    setCreatePlanPrefill({
+      title: idea.title,
+      description: idea.description,
+      date: idea.date ? new Date(idea.date).toISOString().split("T")[0] : "",
+      time: "",
+      capacity: "",
+      venue: idea.location || null,
+      imageUrl: idea.image || undefined,
+    });
+    setEditingPlanId(null);
+    setShowCreateModal(true);
+  }
+
+  // Assign a member as the host of a suggestion — publishes it live hosted by
+  // them (server: assignPlanIdeaHost). Owner/co-host only; the Calendars tab
+  // is already gated to those roles.
+  async function handleAssignHost(idea: PlanIdea, hostUserId: string) {
+    setAssignBusyUserId(hostUserId);
+    setAssignError(null);
+    try {
+      await Parse.Cloud.run("assignPlanIdeaHost", {
+        calendarPlanId: idea.objectId,
+        hostUserId,
+        date: idea.date || undefined,
+      });
+      setPlanIdeas((prev) => prev.filter((p) => p.objectId !== idea.objectId));
+      setAssigningIdea(null);
+    } catch (err) {
+      console.error("Failed to assign host:", err);
+      setAssignError(err instanceof Error ? err.message : "Failed to assign host");
+    } finally {
+      setAssignBusyUserId(null);
     }
   }
 

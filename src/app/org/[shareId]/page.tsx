@@ -3577,13 +3577,12 @@ export default function OrgCalendarPage() {
         )}
 
         {/* Plan Ideas Carousel */}
-        {/* Get Involved section — shows if plan ideas OR custom proposals are enabled */}
         {/* Get Involved section — fallback surface for the Custom Plan
-            card when NO plan ideas are present above. When plan ideas
-            exist, the inline flow already renders both the ideas AND
-            a compact Add-a-Plan row underneath them; showing this
-            duplicates the card. */}
-        {org.planIdeas.length === 0 && !org.rsvpLimitReached && !org.hideCustomPlans && (
+            card when NOTHING appeared in the stream above. The inline
+            Add-a-Plan row renders whenever plans / AI Suggested plans
+            / plan ideas exist, so this fallback is only for calendars
+            with a truly empty stream — otherwise it duplicates. */}
+        {org.planIdeas.length === 0 && (!org.aiSourceEvents || org.aiSourceEvents.length === 0) && org.plans.length === 0 && !org.rsvpLimitReached && !org.hideCustomPlans && (
           <section className={`${org.plans.length > 0 ? "mt-48" : "mt-8"} mb-24 space-y-12`}>
             <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
               <div className="space-y-2">
