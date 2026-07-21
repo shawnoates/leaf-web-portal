@@ -207,6 +207,12 @@ interface OrgDashboard {
     eventGroupId: string | null;
     eventTitle: string;
   }[];
+  // AI-suggested plans on this org's calendars that still need a host.
+  // tier1 = urgent cards (deadline soon), tier2 = per-calendar overflow rows.
+  needsHost?: {
+    tier1: NeedsHostCard[];
+    tier2: NeedsHostRow[];
+  };
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
