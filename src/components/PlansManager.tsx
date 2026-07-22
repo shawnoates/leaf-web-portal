@@ -10,7 +10,7 @@ import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailMod
 import PlanChatDrawer from "@/components/PlanChatDrawer";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
-import { Calendar, Camera, Check, Lock, MessageCircle, Pencil, Plus, RefreshCw, Repeat, Settings, Trash2, UserCheck, Users, X } from "lucide-react";
+import { Calendar, Camera, Check, Link2, Lock, MessageCircle, Pencil, Plus, RefreshCw, Repeat, Settings, Trash2, UserCheck, Users, X } from "lucide-react";
 
 // Renders a plan cover image with a Calendar-icon placeholder fallback when
 // the src is missing OR 404s (attendee-uploaded / expired signed URLs go
@@ -237,6 +237,9 @@ export default function PlansManager({
   // hover overlay's "Chat" button so the owner never leaves the
   // dashboard to see the plan chat.
   const [chatPlanId, setChatPlanId] = useState<string | null>(null);
+  // Tracks which plan's direct link was just copied, so the card can flash a
+  // "Copied" confirmation. Cleared after a short delay.
+  const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   const [createPlanPrefill, setCreatePlanPrefill] = useState<CreatePlanPrefill | null>(null);
   const planCreatedRef = useRef(false);
@@ -524,6 +527,21 @@ export default function PlansManager({
       setPastPlans([]);
     } finally {
       setLoadingPast(false);
+    }
+  }
+
+  // Copy the plan's public direct link (/p/<eventGroupId>) to the clipboard so
+  // the owner can share a single event without routing people through the whole
+  // calendar page. Same canonical URL the SMS/share flows use.
+  async function copyPlanLink(objectId: string) {
+    try {
+      const url = `${window.location.origin}/p/${objectId}`;
+      await navigator.clipboard.writeText(url);
+      setCopiedPlanId(objectId);
+      setTimeout(() => setCopiedPlanId((cur) => (cur === objectId ? null : cur)), 2000);
+    } catch {
+      // Clipboard blocked (permissions / insecure context) — silently no-op;
+      // the owner can still open the plan and share from there.
     }
   }
 
@@ -858,6 +876,34 @@ export default function PlansManager({
                       })()
                     ) : (
                       <PlanImage src={plan.image} alt={plan.title} className="w-full h-28" />
+                    )}
+                    {/* Copy direct link — pinned top-right over the cover so the
+                        owner can grab a shareable /p/<id> URL without opening
+                        the plan or the public calendar. Sits above the hover
+                        overlay (z-20) and mirrors its hover-reveal + pointer
+                        gating so it never intercepts clicks while hidden. AI
+                        starters have no hosted EventGroup to link to yet. */}
+                    {!isAI && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyPlanLink(plan.objectId);
+                        }}
+                        title="Copy direct link to this plan"
+                        aria-label="Copy direct link to this plan"
+                        className="absolute top-2 right-2 z-20 inline-flex items-center gap-1 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-zinc-900 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white pointer-events-none group-hover:pointer-events-auto"
+                      >
+                        {copiedPlanId === plan.objectId ? (
+                          <>
+                            <Check className="w-3 h-3" /> Copied
+                          </>
+                        ) : (
+                          <>
+                            <Link2 className="w-3 h-3" /> Link
+                          </>
+                        )}
+                      </button>
                     )}
                     <div className="p-3">
                       <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>

@@ -11,6 +11,7 @@ import {
   Clock,
   Copy,
   EyeOff,
+  Link2,
   MessageCircle,
   Pencil,
   Plus,
@@ -109,6 +110,10 @@ export default function PlanDetailModal({
   onConnectApp,
   onPendingRsvpResolved,
 }: Props) {
+  // Flashes "Copied" on the Copy Link action after the direct /p/<id> URL is
+  // written to the clipboard.
+  const [linkCopied, setLinkCopied] = useState(false);
+
   const [pollDetail, setPollDetail] = useState<{
     options: PollOptionDetail[];
     totalVotes: number;
@@ -195,6 +200,19 @@ export default function PlanDetailModal({
       .catch(() => setPollDetail(null))
       .finally(() => setPollDetailLoading(false));
   }, [plan.objectId, plan.isPoll]);
+
+  // Copy the plan's public direct link (/p/<eventGroupId>) — same canonical
+  // share URL the card and SMS flows use — so the owner can hand someone a
+  // single event without sending them to the whole calendar page.
+  const copyPlanLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/p/${plan.objectId}`);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      // Clipboard blocked (permissions / insecure context) — silently no-op.
+    }
+  };
 
   const handleDuplicate = () => {
     if (!leafAppConnected && onConnectApp) {
@@ -777,6 +795,23 @@ export default function PlanDetailModal({
                   Plan Chat
                 </Link>
               )}
+              <button
+                onClick={copyPlanLink}
+                title="Copy direct link to this plan"
+                className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+              >
+                {linkCopied ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="w-4 h-4" />
+                    Copy Link
+                  </>
+                )}
+              </button>
               <button
                 onClick={handleDuplicate}
                 className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
