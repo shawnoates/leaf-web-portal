@@ -877,34 +877,6 @@ export default function PlansManager({
                     ) : (
                       <PlanImage src={plan.image} alt={plan.title} className="w-full h-28" />
                     )}
-                    {/* Copy direct link — pinned top-right over the cover so the
-                        owner can grab a shareable /p/<id> URL without opening
-                        the plan or the public calendar. Sits above the hover
-                        overlay (z-20) and mirrors its hover-reveal + pointer
-                        gating so it never intercepts clicks while hidden. AI
-                        starters have no hosted EventGroup to link to yet. */}
-                    {!isAI && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyPlanLink(plan.objectId);
-                        }}
-                        title="Copy direct link to this plan"
-                        aria-label="Copy direct link to this plan"
-                        className="absolute top-2 right-2 z-20 inline-flex items-center gap-1 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-zinc-900 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white pointer-events-none group-hover:pointer-events-auto"
-                      >
-                        {copiedPlanId === plan.objectId ? (
-                          <>
-                            <Check className="w-3 h-3" /> Copied
-                          </>
-                        ) : (
-                          <>
-                            <Link2 className="w-3 h-3" /> Link
-                          </>
-                        )}
-                      </button>
-                    )}
                     <div className="p-3">
                       <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
                       <p className="text-xs text-zinc-400 mb-1">
@@ -912,7 +884,31 @@ export default function PlansManager({
                       </p>
                       <div className="flex items-center justify-between text-xs text-zinc-400">
                         <span className="truncate">{isAI ? "Waiting on host" : plan.host?.name || "You"}</span>
-                        {!isAI && <span className="shrink-0 ml-2">{plan.rsvpCount} RSVPs</span>}
+                        {!isAI && (
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
+                            <span>{plan.rsvpCount} RSVPs</span>
+                            {/* Quiet copy-link icon — grabs the shareable /p/<id>
+                                URL without opening the plan or the public
+                                calendar. Kept out of the hover overlay so the
+                                cover stays a clean Details/Chat affordance. */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyPlanLink(plan.objectId);
+                              }}
+                              title="Copy direct link to this plan"
+                              aria-label="Copy direct link to this plan"
+                              className="p-1 -m-1 rounded text-zinc-300 hover:text-zinc-700 transition-colors"
+                            >
+                              {copiedPlanId === plan.objectId ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              ) : (
+                                <Link2 className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                     {/* Hover overlay — two-action panel over the cover
