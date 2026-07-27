@@ -125,6 +125,9 @@ interface PlanIdea {
     address: string;
   } | null;
   ideaSeriesId?: string | null;
+  // Owner-authored suggestion — the spread preserves its intentional date
+  // rather than fanning it across the calendar's cadence.
+  isManual?: boolean;
 }
 
 interface NearbyVenue {
