@@ -911,7 +911,9 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           : "Edit Plan"
         : isPoll
           ? "New Date Poll"
-          : "New Plan";
+          : mode === "idea"
+            ? "New Suggestion"
+            : "New Plan";
 
   return (
     <div className="fixed inset-0 z-50">
@@ -1053,7 +1055,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
               >
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span className="text-xs font-medium">Idea</span>
+                  <span className="text-xs font-medium">Suggestion</span>
                 </div>
                 <p className="text-xs text-zinc-500 leading-tight">Members can host</p>
               </button>
@@ -1604,7 +1606,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   <Repeat className="w-3.5 h-3.5 text-zinc-700 mt-0.5" />
                   <div>
                     <p className="text-xs font-medium text-zinc-700">Repeats</p>
-                    <p className="text-xs text-zinc-400">{mode === "idea" ? "Automatically offer the same idea each cycle" : "Automatically create the same plan each cycle"}</p>
+                    <p className="text-xs text-zinc-400">{mode === "idea" ? "Automatically offer the same suggestion each cycle" : "Automatically create the same plan each cycle"}</p>
                   </div>
                 </div>
                 <button
@@ -1744,7 +1746,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                       ? "Create Date Poll"
                       : isHosted
                         ? (recurring ? "Start Recurring Plan" : "Create plan")
-                        : (recurring ? "Start Recurring Idea" : "Create plan idea")}
+                        : (recurring ? "Start Recurring Suggestion" : "Create plan suggestion")}
           </button>
         </div>
       </div>

@@ -108,8 +108,14 @@ export default function VirtualHostSheet({
           >
             <X className="w-4 h-4" />
           </button>
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest bg-white/20 rounded-full px-2.5 py-1 mb-3">
-            <Sparkles className="w-3.5 h-3.5" /> AI-assisted host
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest bg-white/20 rounded-full pl-1 pr-2.5 py-1 mb-3">
+            {persona?.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={persona.avatarUrl} alt="" aria-hidden="true" className="w-4 h-4 rounded-full object-cover" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5 ml-0.5" />
+            )}
+            AI-assisted host
           </div>
           <h3 className="text-xl font-semibold leading-tight">Add a virtual host</h3>
           {persona && (
