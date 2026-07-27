@@ -107,7 +107,10 @@ export default function HostIdeaModal({
   // free-text venue query changes. Mirrors the public /org host modal: a typed
   // query overrides the idea's AI category so any specific venue is findable.
   useEffect(() => {
-    const searchCity = idea.centroid || orgCity || "";
+    // Prefer the calendar's precise address (concierge intake) so results are
+    // centered on the actual location, not a whole city; fall back to the
+    // idea's centroid, then the org city.
+    const searchCenter = orgAddress || idea.centroid || orgCity || "";
     const typedVenueQuery = venueSearchQuery.trim();
     const searchCategory = typedVenueQuery || idea.category || "";
 
@@ -146,42 +149,65 @@ export default function HostIdeaModal({
             }
           }
 
-          let searchRequest: google.maps.places.TextSearchRequest = { query: searchCategory };
+          const service = new window.google.maps.places.PlacesService(document.createElement("div"));
+          const toVenue = (place: google.maps.places.PlaceResult): NearbyVenue => ({
+            placeId: place.place_id || "",
+            name: place.name || "",
+            // nearbySearch returns `vicinity`; textSearch returns `formatted_address`.
+            address: place.formatted_address || place.vicinity || "",
+            rating: place.rating || null,
+            photoUrl: place.photos?.[0]?.getUrl({ maxWidth: 400 }) || null,
+            flagged: isVenueBlacklisted(place.name || "", place.types || [], blacklistCategories, excludeKeywords),
+          });
+          const publish = (results: google.maps.places.PlaceResult[] | null) => {
+            setNearbyVenues((results || []).slice(0, 8).map(toVenue));
+            setVenuesLoading(false);
+          };
+          // Prominence-ranked fallback within a bounded area (used when we have
+          // no geocoded center, or the distance search comes back empty).
+          const textFallback = (center?: google.maps.LatLng) => {
+            const req: google.maps.places.TextSearchRequest = center
+              ? { query: searchCategory, location: center, radius: 25000 }
+              : { query: `${searchCategory}${searchCenter ? ` in ${searchCenter}` : ""}` };
+            service.textSearch(req, (results, status) => {
+              publish(status === window.google.maps.places.PlacesServiceStatus.OK ? results : []);
+            });
+          };
 
-          if (searchCity) {
+          // Geocode the calendar's location → distance-ranked nearby search so
+          // the CLOSEST matching venues come first (textSearch ranks by
+          // prominence, which surfaced far-but-famous venues before).
+          let center: google.maps.LatLng | null = null;
+          if (searchCenter) {
             try {
               const geocoder = new window.google.maps.Geocoder();
               const geoResult = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
-                geocoder.geocode({ address: searchCity }, (results, status) => {
-                  if (status === window.google.maps.GeocoderStatus.OK && results?.length) {
-                    resolve(results);
-                  } else {
-                    reject(new Error("Geocode failed"));
-                  }
+                geocoder.geocode({ address: searchCenter }, (results, status) => {
+                  if (status === window.google.maps.GeocoderStatus.OK && results?.length) resolve(results);
+                  else reject(new Error("Geocode failed"));
                 });
               });
-              const loc = geoResult[0].geometry.location;
-              searchRequest = { ...searchRequest, location: loc, radius: 25000 };
+              center = geoResult[0].geometry.location;
             } catch {
-              searchRequest.query = `${searchCategory} in ${searchCity}`;
+              center = null;
             }
           }
 
-          const service = new window.google.maps.places.PlacesService(document.createElement("div"));
-          service.textSearch(searchRequest, (results, status) => {
-            if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
-              const venues: NearbyVenue[] = results.slice(0, 8).map((place) => ({
-                placeId: place.place_id || "",
-                name: place.name || "",
-                address: place.formatted_address || "",
-                rating: place.rating || null,
-                photoUrl: place.photos?.[0]?.getUrl({ maxWidth: 400 }) || null,
-                flagged: isVenueBlacklisted(place.name || "", place.types || [], blacklistCategories, excludeKeywords),
-              }));
-              setNearbyVenues(venues);
-            }
-            setVenuesLoading(false);
-          });
+          if (center) {
+            service.nearbySearch(
+              { location: center, rankBy: window.google.maps.places.RankBy.DISTANCE, keyword: searchCategory },
+              (results, status) => {
+                if (status === window.google.maps.places.PlacesServiceStatus.OK && results?.length) {
+                  publish(results);
+                } else {
+                  // No distance-ranked hits — fall back to prominence near the center.
+                  textFallback(center || undefined);
+                }
+              },
+            );
+          } else {
+            textFallback();
+          }
         } catch {
           setVenuesLoading(false);
         }
@@ -191,7 +217,7 @@ export default function HostIdeaModal({
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idea.objectId, idea.category, idea.centroid, venueSearchQuery, orgCity]);
+  }, [idea.objectId, idea.category, idea.centroid, venueSearchQuery, orgCity, orgAddress]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
