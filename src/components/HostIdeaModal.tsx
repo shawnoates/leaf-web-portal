@@ -521,7 +521,7 @@ export default function HostIdeaModal({
                       onClick={onDelete}
                       className="inline-flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-600 transition-colors py-1"
                     >
-                      <Trash2 className="w-3.5 h-3.5" /> Delete this plan idea
+                      <Trash2 className="w-3.5 h-3.5" /> Delete this plan suggestion
                     </button>
                   </div>
                 )}
