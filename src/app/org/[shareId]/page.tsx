@@ -128,6 +128,9 @@ interface PlanIdea {
   // Owner-authored suggestion — the spread preserves its intentional date
   // rather than fanning it across the calendar's cadence.
   isManual?: boolean;
+  // Owner explicitly pinned the date in the editor — also preserved.
+  datePinned?: boolean;
+  preferredTime?: string | null;
 }
 
 interface NearbyVenue {
@@ -1899,6 +1902,8 @@ export default function OrgCalendarPage() {
           : null,
         ideaSeriesId: (idea.ideaSeriesId as string) || null,
         isManual: idea.isManual === true,
+        datePinned: idea.datePinned === true,
+        preferredTime: (idea.preferredTime as string) ?? null,
       }));
 
       setOrg({
@@ -2409,7 +2414,7 @@ export default function OrgCalendarPage() {
     if (!org) return new Map<string, Date>();
     return computeSpreadIdeaDates(
       org.plans.map((p) => p.dateISO ?? null),
-      org.planIdeas.map((i) => ({ id: i.id, date: i.date, isManual: i.isManual })),
+      org.planIdeas.map((i) => ({ id: i.id, date: i.date, isManual: i.isManual, datePinned: i.datePinned })),
       nowBucket * 60 * 60 * 1000
     );
   }, [org, nowBucket]);
