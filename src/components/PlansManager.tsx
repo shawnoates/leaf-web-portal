@@ -132,6 +132,10 @@ interface PlanIdea {
   // Owner-authored (manual/recurring) — its date is intentional, so the spread
   // preserves it instead of fanning it across the cadence.
   isManual?: boolean;
+  // Owner explicitly set the date in the editor — also excluded from the spread.
+  datePinned?: boolean;
+  // Optional owner-chosen start time ("HH:mm").
+  preferredTime?: string | null;
 }
 
 interface PastPlan {
@@ -295,6 +299,7 @@ export default function PlansManager({
   // Org context threaded into the host modal so its venue search / approval
   // defaults match the public page. Populated by fetchPlanIdeas.
   const [orgCity, setOrgCity] = useState<string | null>(null);
+  const [orgAddress, setOrgAddress] = useState<string | null>(null);
   const [orgBlacklist, setOrgBlacklist] = useState<string[]>([]);
   const [orgExcludeKeywords, setOrgExcludeKeywords] = useState<string[]>([]);
   const [orgBrandColor, setOrgBrandColor] = useState<string | null>(null);
@@ -303,10 +308,11 @@ export default function PlansManager({
   // Edit-the-suggestion modal (server: updatePlanIdea). Distinct from hosting —
   // this refines the suggestion in place; it never creates a live plan.
   const [editingIdea, setEditingIdea] = useState<PlanIdea | null>(null);
-  const [ideaEditForm, setIdeaEditForm] = useState<{ title: string; description: string; date: string; image: string | null }>({
+  const [ideaEditForm, setIdeaEditForm] = useState<{ title: string; description: string; date: string; time: string; image: string | null }>({
     title: "",
     description: "",
     date: "",
+    time: "",
     image: null,
   });
   const [ideaEditBusy, setIdeaEditBusy] = useState(false);
@@ -323,7 +329,7 @@ export default function PlansManager({
     () =>
       computeSpreadIdeaDates(
         upcomingPlans.filter((p) => !p.isAIStarter).map((p) => p.expiryDate),
-        planIdeas.map((i) => ({ id: i.objectId, date: i.date, isManual: i.isManual })),
+        planIdeas.map((i) => ({ id: i.objectId, date: i.date, isManual: i.isManual, datePinned: i.datePinned })),
         nowBucket * 60 * 60 * 1000
       ),
     [upcomingPlans, planIdeas, nowBucket]
@@ -530,11 +536,12 @@ export default function PlansManager({
       setUpcomingPlans(merged);
       // Capture org context for the host modal's venue search + approval default.
       setOrgCity(page.orgCity ?? null);
+      setOrgAddress(page.orgAddress ?? null);
       setOrgBlacklist(Array.isArray(page.orgBlacklistCategories) ? page.orgBlacklistCategories : []);
       setOrgExcludeKeywords(Array.isArray(page.orgExcludeKeywords) ? page.orgExcludeKeywords : []);
       setOrgBrandColor(page.orgBrandColor ?? null);
       setRequireApprovalDefault(page.requireApprovalDefault === true);
-      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null; interestCount?: number; category?: string | null; centroid?: string | null; suggestedCapacity?: number | null; isManual?: boolean }) => ({
+      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null; interestCount?: number; category?: string | null; centroid?: string | null; suggestedCapacity?: number | null; isManual?: boolean; datePinned?: boolean; preferredTime?: string | null }) => ({
         objectId: idea.objectId,
         title: idea.title,
         description: idea.description,
@@ -547,6 +554,8 @@ export default function PlansManager({
         centroid: idea.centroid ?? null,
         suggestedCapacity: idea.suggestedCapacity ?? null,
         isManual: idea.isManual === true,
+        datePinned: idea.datePinned === true,
+        preferredTime: idea.preferredTime ?? null,
       }));
       // Dedupe by objectId (not title) — two distinct suggestions can share a
       // title (e.g. an owner manually adds one matching an AI suggestion), and
@@ -627,7 +636,7 @@ export default function PlansManager({
         try {
           const dash = await Parse.Cloud.run("getOrgDashboard", { calendarId });
           const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId: dash.shareId });
-          const rawIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null; interestCount?: number; category?: string | null; centroid?: string | null; suggestedCapacity?: number | null; isManual?: boolean }) => ({
+          const rawIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null; interestCount?: number; category?: string | null; centroid?: string | null; suggestedCapacity?: number | null; isManual?: boolean; datePinned?: boolean; preferredTime?: string | null }) => ({
             objectId: idea.objectId,
             title: idea.title,
             description: idea.description,
@@ -728,6 +737,7 @@ export default function PlansManager({
       title: idea.title,
       description: idea.description,
       date: spread ? spread.toISOString().split("T")[0] : "",
+      time: idea.preferredTime ?? "",
       image: idea.image,
     });
     setIdeaEditError(null);
@@ -750,20 +760,30 @@ export default function PlansManager({
         description: ideaEditForm.description.trim(),
         // Anchor the preferred date at local noon so it never day-shifts.
         date: ideaEditForm.date ? new Date(`${ideaEditForm.date}T12:00:00`).toISOString() : undefined,
+        // Optional start time; empty string clears any prior value server-side.
+        time: ideaEditForm.time,
       });
-      const updated = res?.idea as { title: string; description: string; image: string | null; date: string | null } | undefined;
+      const updated = res?.idea as { title: string; description: string; image: string | null; date: string | null; datePinned?: boolean; preferredTime?: string | null } | undefined;
       if (updated) {
+        // Merge server truth (incl. datePinned) so the card immediately shows
+        // the edited date instead of the auto-spread one.
+        const patch = {
+          title: updated.title,
+          description: updated.description,
+          image: updated.image,
+          date: updated.date ?? null,
+          datePinned: updated.datePinned === true,
+          preferredTime: updated.preferredTime ?? null,
+        };
         setPlanIdeas((prev) =>
           prev.map((p) =>
-            p.objectId === editingIdea.objectId
-              ? { ...p, title: updated.title, description: updated.description, image: updated.image, date: updated.date ?? p.date }
-              : p,
+            p.objectId === editingIdea.objectId ? { ...p, ...patch, date: patch.date ?? p.date } : p,
           ),
         );
         // Keep the detail modal in sync if it's open on the same idea.
         setDetailIdea((cur) =>
           cur && cur.objectId === editingIdea.objectId
-            ? { ...cur, title: updated.title, description: updated.description, image: updated.image, date: updated.date ?? cur.date }
+            ? { ...cur, ...patch, date: patch.date ?? cur.date }
             : cur,
         );
       }
@@ -1235,6 +1255,7 @@ export default function PlansManager({
           idea={detailIdea}
           prefillDate={spreadDateOf(detailIdea)}
           orgCity={orgCity}
+          orgAddress={orgAddress}
           tier={tier}
           brandColor={orgBrandColor}
           requireApprovalDefault={requireApprovalDefault}
@@ -1298,15 +1319,26 @@ export default function PlansManager({
                   className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-900 transition-colors resize-none"
                 />
               </div>
-              <div>
-                <label className="block text-[11px] font-medium text-zinc-500 mb-1">Preferred date</label>
-                <input
-                  type="date"
-                  value={ideaEditForm.date}
-                  min={new Date().toISOString().split("T")[0]}
-                  onChange={(e) => setIdeaEditForm((f) => ({ ...f, date: e.target.value }))}
-                  className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-900 transition-colors"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-zinc-500 mb-1">Preferred date</label>
+                  <input
+                    type="date"
+                    value={ideaEditForm.date}
+                    min={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => setIdeaEditForm((f) => ({ ...f, date: e.target.value }))}
+                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-900 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-zinc-500 mb-1">Start time <span className="text-zinc-300">(optional)</span></label>
+                  <input
+                    type="time"
+                    value={ideaEditForm.time}
+                    onChange={(e) => setIdeaEditForm((f) => ({ ...f, time: e.target.value }))}
+                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-900 transition-colors"
+                  />
+                </div>
               </div>
               {ideaEditError && <p className="text-xs text-red-500">{ideaEditError}</p>}
               <div className="flex gap-2 pt-1">

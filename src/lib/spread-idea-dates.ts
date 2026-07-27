@@ -43,7 +43,7 @@ const dayKeyOf = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}
 
 export function computeSpreadIdeaDates(
   planISODates: (string | null | undefined)[],
-  ideas: { id: string; date: string | null; isManual?: boolean }[],
+  ideas: { id: string; date: string | null; isManual?: boolean; datePinned?: boolean }[],
   nowMs: number
 ): Map<string, Date> {
   const result = new Map<string, Date>();
@@ -58,13 +58,14 @@ export function computeSpreadIdeaDates(
   // with a confirmed event.
   const takenDays = new Set(planDates.map(dayKeyOf));
 
-  // Preserve intentional dates: owner-authored suggestions (manual one-offs and
-  // recurring series instances) keep the date the owner chose — spreading only
-  // exists to fan out AI-generated ideas that all share one fallback date. Their
-  // day is reserved so a fanned AI idea won't land on top of them.
+  // Preserve intentional dates: owner-authored suggestions (manual one-offs,
+  // recurring series instances) AND any idea whose date the owner explicitly
+  // pinned via the editor keep the chosen date — spreading only exists to fan
+  // out AI-generated ideas that all share one fallback date. Their day is
+  // reserved so a fanned AI idea won't land on top of them.
   const toFan: { id: string; date: string | null }[] = [];
   for (const idea of ideas) {
-    if (idea.isManual && idea.date) {
+    if ((idea.isManual || idea.datePinned) && idea.date) {
       const d = new Date(idea.date);
       if (!Number.isNaN(d.getTime())) {
         result.set(idea.id, d);

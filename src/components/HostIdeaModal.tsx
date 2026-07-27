@@ -27,6 +27,8 @@ export interface HostIdeaModalIdea {
   suggestedCapacity?: number | null;
   location?: { name: string; address: string } | null;
   ideaSeriesId?: string | null;
+  // Optional owner-chosen start time ("HH:mm") — prefills the time picker.
+  preferredTime?: string | null;
 }
 
 interface NearbyVenue {
