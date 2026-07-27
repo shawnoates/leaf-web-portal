@@ -10,7 +10,7 @@ import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
 import LeafHostThread from "@/components/LeafHostThread";
 import LeafHostPlanThread from "@/components/LeafHostPlanThread";
-import VirtualHostSheet from "@/components/VirtualHostSheet";
+import VirtualHostSheet, { DEFAULT_HOST_AVATAR } from "@/components/VirtualHostSheet";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
@@ -2778,9 +2778,10 @@ export default function OrgCalendarPage() {
                         <button
                           type="button"
                           onClick={() => setVirtualHostPlan({ id: plan.id, calendarId: org.objectId })}
-                          className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 hover:border-teal-400 transition-colors text-xs font-medium text-teal-700"
+                          className="mt-2 inline-flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 hover:border-teal-400 transition-colors text-xs font-medium text-teal-700"
                         >
-                          <Sparkles className="w-3.5 h-3.5" /> Add virtual host
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={DEFAULT_HOST_AVATAR} alt="" aria-hidden="true" className="w-4 h-4 rounded-full object-cover" /> Add virtual host
                         </button>
                       )}
                       {/* Per-plan leaf-host chat pill — owner-only.

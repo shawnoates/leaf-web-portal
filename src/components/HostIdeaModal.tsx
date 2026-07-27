@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { isVenueBlacklisted } from "@/lib/venue-blacklist";
+import { DEFAULT_HOST_AVATAR } from "@/components/VirtualHostSheet";
 import {
   AlertTriangle,
   Calendar,
@@ -305,9 +306,10 @@ export default function HostIdeaModal({
                     <button
                       type="button"
                       onClick={onAddVirtualHost}
-                      className="inline-flex items-center gap-1.5 border border-teal-200 bg-teal-50 rounded-lg px-3 py-1.5 text-xs font-medium text-teal-700 hover:border-teal-400 transition-colors"
+                      className="inline-flex items-center gap-1.5 border border-teal-200 bg-teal-50 rounded-lg pl-1.5 pr-3 py-1.5 text-xs font-medium text-teal-700 hover:border-teal-400 transition-colors"
                     >
-                      <Sparkles className="w-3.5 h-3.5" /> Add virtual host
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={DEFAULT_HOST_AVATAR} alt="" aria-hidden="true" className="w-4 h-4 rounded-full object-cover" /> Add virtual host
                     </button>
                   )}
                   {onEndSeries && idea.ideaSeriesId && (

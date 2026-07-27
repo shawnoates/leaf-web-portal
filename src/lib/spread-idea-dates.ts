@@ -39,9 +39,11 @@ function deriveCadenceSlots(
   );
 }
 
+const dayKeyOf = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
 export function computeSpreadIdeaDates(
   planISODates: (string | null | undefined)[],
-  ideas: { id: string; date: string | null }[],
+  ideas: { id: string; date: string | null; isManual?: boolean }[],
   nowMs: number
 ): Map<string, Date> {
   const result = new Map<string, Date>();
@@ -54,9 +56,25 @@ export function computeSpreadIdeaDates(
   const slots = deriveCadenceSlots(planDates);
   // Days already taken by real plans — a suggestion should never share a day
   // with a confirmed event.
-  const takenDays = new Set(
-    planDates.map((d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`)
-  );
+  const takenDays = new Set(planDates.map(dayKeyOf));
+
+  // Preserve intentional dates: owner-authored suggestions (manual one-offs and
+  // recurring series instances) keep the date the owner chose — spreading only
+  // exists to fan out AI-generated ideas that all share one fallback date. Their
+  // day is reserved so a fanned AI idea won't land on top of them.
+  const toFan: { id: string; date: string | null }[] = [];
+  for (const idea of ideas) {
+    if (idea.isManual && idea.date) {
+      const d = new Date(idea.date);
+      if (!Number.isNaN(d.getTime())) {
+        result.set(idea.id, d);
+        takenDays.add(dayKeyOf(d));
+        continue;
+      }
+    }
+    toFan.push(idea);
+  }
+  if (toFan.length === 0) return result;
 
   const earliest = new Date(nowMs + SPREAD_MIN_LEAD_MS);
   // Walk forward week by week, emitting each cadence slot's concrete date,
@@ -66,23 +84,23 @@ export function computeSpreadIdeaDates(
   startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // back to Sunday
   startOfWeek.setHours(0, 0, 0, 0);
   const MAX_WEEKS = 52;
-  for (let week = 0; week < MAX_WEEKS && candidates.length < ideas.length; week++) {
+  for (let week = 0; week < MAX_WEEKS && candidates.length < toFan.length; week++) {
     for (const slot of slots) {
       const d = new Date(startOfWeek);
       d.setDate(startOfWeek.getDate() + week * 7 + slot.dow);
       d.setHours(slot.hour, slot.minute, 0, 0);
       if (d.getTime() < earliest.getTime()) continue;
-      const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const dayKey = dayKeyOf(d);
       if (takenDays.has(dayKey)) continue;
       takenDays.add(dayKey); // one suggestion per day
       candidates.push(d);
-      if (candidates.length >= ideas.length) break;
+      if (candidates.length >= toFan.length) break;
     }
   }
 
   // Stable idea order: original date (nulls last), then id — so the same
   // idea keeps the same slot across re-renders.
-  const ordered = [...ideas].sort((a, b) => {
+  const ordered = [...toFan].sort((a, b) => {
     const at = a.date ? new Date(a.date).getTime() : Number.POSITIVE_INFINITY;
     const bt = b.date ? new Date(b.date).getTime() : Number.POSITIVE_INFINITY;
     if (at !== bt) return at - bt;

@@ -129,6 +129,9 @@ interface PlanIdea {
   category?: string | null;
   centroid?: string | null;
   suggestedCapacity?: number | null;
+  // Owner-authored (manual/recurring) — its date is intentional, so the spread
+  // preserves it instead of fanning it across the cadence.
+  isManual?: boolean;
 }
 
 interface PastPlan {
@@ -320,7 +323,7 @@ export default function PlansManager({
     () =>
       computeSpreadIdeaDates(
         upcomingPlans.filter((p) => !p.isAIStarter).map((p) => p.expiryDate),
-        planIdeas.map((i) => ({ id: i.objectId, date: i.date })),
+        planIdeas.map((i) => ({ id: i.objectId, date: i.date, isManual: i.isManual })),
         nowBucket * 60 * 60 * 1000
       ),
     [upcomingPlans, planIdeas, nowBucket]
@@ -531,7 +534,7 @@ export default function PlansManager({
       setOrgExcludeKeywords(Array.isArray(page.orgExcludeKeywords) ? page.orgExcludeKeywords : []);
       setOrgBrandColor(page.orgBrandColor ?? null);
       setRequireApprovalDefault(page.requireApprovalDefault === true);
-      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null; interestCount?: number; category?: string | null; centroid?: string | null; suggestedCapacity?: number | null }) => ({
+      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null; interestCount?: number; category?: string | null; centroid?: string | null; suggestedCapacity?: number | null; isManual?: boolean }) => ({
         objectId: idea.objectId,
         title: idea.title,
         description: idea.description,
@@ -543,6 +546,7 @@ export default function PlansManager({
         category: idea.category ?? null,
         centroid: idea.centroid ?? null,
         suggestedCapacity: idea.suggestedCapacity ?? null,
+        isManual: idea.isManual === true,
       }));
       // Dedupe by objectId (not title) — two distinct suggestions can share a
       // title (e.g. an owner manually adds one matching an AI suggestion), and
@@ -623,7 +627,7 @@ export default function PlansManager({
         try {
           const dash = await Parse.Cloud.run("getOrgDashboard", { calendarId });
           const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId: dash.shareId });
-          const rawIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null; interestCount?: number; category?: string | null; centroid?: string | null; suggestedCapacity?: number | null }) => ({
+          const rawIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null; interestCount?: number; category?: string | null; centroid?: string | null; suggestedCapacity?: number | null; isManual?: boolean }) => ({
             objectId: idea.objectId,
             title: idea.title,
             description: idea.description,
@@ -635,6 +639,7 @@ export default function PlansManager({
             category: idea.category ?? null,
             centroid: idea.centroid ?? null,
             suggestedCapacity: idea.suggestedCapacity ?? null,
+            isManual: idea.isManual === true,
           }));
           const seenIds = new Set<string>();
           const ideas = rawIdeas.filter((idea: PlanIdea) => {
