@@ -103,7 +103,9 @@ export default function HostIdeaModal({
   const dateRef = useRef<HTMLInputElement>(null);
   const timeRef = useRef<HTMLInputElement>(null);
 
-  const hasActions = !!(onEditSuggestion || onAssignHost || onAddVirtualHost || onDelete || onEndSeries);
+  // Delete lives on its own at the bottom of the panel (below Host plan), so
+  // the top action row only carries the non-destructive owner tools.
+  const hasTopActions = !!(onEditSuggestion || onAssignHost || onAddVirtualHost || onEndSeries);
 
   // Fetch nearby venues via Google Places whenever the modal opens or the
   // free-text venue query changes. Mirrors the public /org host modal: a typed
@@ -313,8 +315,9 @@ export default function HostIdeaModal({
                 <h3 className="text-2xl md:text-3xl font-light">{idea.title}</h3>
               </div>
 
-              {/* Owner tools — edit the suggestion / assign / delete. */}
-              {hasActions && (
+              {/* Owner tools — edit the suggestion / assign. Delete is moved
+                  to its own row at the bottom of the panel. */}
+              {hasTopActions && (
                 <div className="flex flex-wrap items-center gap-2">
                   {onEditSuggestion && (
                     <button
@@ -350,15 +353,6 @@ export default function HostIdeaModal({
                       className="inline-flex items-center gap-1.5 border border-zinc-200 rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-700 hover:border-zinc-400 transition-colors"
                     >
                       <Repeat className="w-3.5 h-3.5" /> End series
-                    </button>
-                  )}
-                  {onDelete && (
-                    <button
-                      type="button"
-                      onClick={onDelete}
-                      className="inline-flex items-center gap-1.5 border border-zinc-200 rounded-lg px-3 py-1.5 text-xs font-medium text-red-500 hover:border-red-300 transition-colors ml-auto"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Delete
                     </button>
                   )}
                 </div>
@@ -517,6 +511,20 @@ export default function HostIdeaModal({
                     {submitting ? "Publishing…" : "Host plan"}
                   </button>
                 </div>
+
+                {/* Destructive action, separated at the very bottom so it's
+                    well clear of Host plan. */}
+                {onDelete && (
+                  <div className="pt-4 mt-2 border-t border-zinc-100 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={onDelete}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-600 transition-colors py-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete this plan idea
+                    </button>
+                  </div>
+                )}
               </form>
             </>
           )}
