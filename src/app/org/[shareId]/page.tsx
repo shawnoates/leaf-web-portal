@@ -2409,7 +2409,7 @@ export default function OrgCalendarPage() {
     if (!org) return new Map<string, Date>();
     return computeSpreadIdeaDates(
       org.plans.map((p) => p.dateISO ?? null),
-      org.planIdeas.map((i) => ({ id: i.id, date: i.date })),
+      org.planIdeas.map((i) => ({ id: i.id, date: i.date, isManual: i.isManual })),
       nowBucket * 60 * 60 * 1000
     );
   }, [org, nowBucket]);

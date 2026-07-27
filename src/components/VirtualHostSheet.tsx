@@ -78,6 +78,8 @@ export default function VirtualHostSheet({
         planIdeaId,
         eventGroupId,
         capacity,
+        // Attach the exact persona the sheet showed the owner.
+        personaId: info.persona?.id,
         returnUrl: returnTo || (typeof window !== "undefined" ? window.location.href : undefined),
       });
       if (res.attached) {
