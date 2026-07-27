@@ -195,7 +195,14 @@ export default function VenueSearch({
       <div className="relative">
         <input
           ref={inputRef}
-          type="text"
+          type="search"
+          name="venue-search"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          data-lpignore="true"
+          data-1p-ignore
           value={value}
           onChange={(e) => {
             onChange(e.target.value);

@@ -368,7 +368,14 @@ export default function HostIdeaModal({
                 <div className="relative">
                   <MapPin className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
-                    type="text"
+                    type="search"
+                    name="venue-search"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    data-lpignore="true"
+                    data-1p-ignore
                     value={venueSearchQuery}
                     onChange={(e) => setVenueSearchQuery(e.target.value)}
                     placeholder="Search for a different venue…"
