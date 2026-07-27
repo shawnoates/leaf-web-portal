@@ -2796,16 +2796,17 @@ export default function OrgCalendarPage() {
                           Hosted by {plan.hostName}
                         </p>
                       )}
-                      {/* Owner-only: attach a virtual host to a host-less plan.
-                          Server sets virtualHostAddable only for the owner on
-                          plans with no host and no RSVPs yet. */}
+                      {/* Owner-only: let Leaf host this host-less plan (virtual
+                          host). Server sets virtualHostAddable only for the owner
+                          on plans with no host and no RSVPs yet. Same label/style
+                          as the suggested-card CTA for one consistent action. */}
                       {plan.virtualHostAddable && (
                         <button
                           type="button"
                           onClick={() => setVirtualHostPlan({ calendarId: org.objectId, eventGroupId: plan.id })}
-                          className="mt-2 inline-flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 hover:border-teal-400 transition-colors text-xs font-medium text-teal-700"
+                          className="mt-2 w-fit px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center gap-2 border border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 transition-colors"
                         >
-                          <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Add virtual host
+                          <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Let Leaf host it
                         </button>
                       )}
                       {/* Per-plan leaf-host chat pill — owner-only.
@@ -3143,21 +3144,23 @@ export default function OrgCalendarPage() {
                                     </button>
                                   );
                                 })()}
+                                {/* Owner-only: let Leaf host it (virtual host).
+                                    Sits inline beside Host This — Host This runs
+                                    it yourself; this hands it to an AI-assisted
+                                    Leaf host. Server re-checks owner + venue/date
+                                    eligibility; the client gate is convenience. */}
+                                {org.isOwner && ev.placeId && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setVirtualHostPlan({ calendarId: org.objectId, aiEventIndex: originalIndex })}
+                                    className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 border border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 transition-colors"
+                                  >
+                                    <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Let Leaf host it
+                                  </button>
+                                )}
                               </div>
-                              {/* Owner-only: hand this suggestion to a virtual
-                                  host. Attaching publishes it into a live plan
-                                  and fronts it with an AI-assisted persona — so
-                                  the owner never has to recruit or self-run it.
-                                  Server re-checks owner + venue/date eligibility;
-                                  the client gate is convenience only. */}
                               {org.isOwner && ev.placeId && (
-                                <button
-                                  type="button"
-                                  onClick={() => setVirtualHostPlan({ calendarId: org.objectId, aiEventIndex: originalIndex })}
-                                  className="self-start inline-flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 hover:border-teal-400 transition-colors text-xs font-medium text-teal-700"
-                                >
-                                  <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Add virtual host
-                                </button>
+                                <p className="text-xs text-zinc-400 italic">Run it yourself, or let Leaf plan &amp; run it for you.</p>
                               )}
                             </div>
                           </div>
@@ -3379,19 +3382,22 @@ export default function OrgCalendarPage() {
                             </button>
                           );
                         })()}
+                        {/* Owner-only: let Leaf host it (virtual host). Sits
+                            inline beside Host This — Host This runs it yourself;
+                            this hands it to an AI-assisted Leaf host. Server
+                            re-checks owner + idea eligibility. */}
+                        {org.isOwner && (
+                          <button
+                            type="button"
+                            onClick={() => setVirtualHostPlan({ calendarId: org.objectId, planIdeaId: idea.id })}
+                            className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 border border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 transition-colors"
+                          >
+                            <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Let Leaf host it
+                          </button>
+                        )}
                       </div>
-                      {/* Owner-only: hand this suggestion to a virtual host.
-                          Attaching publishes the idea into a live plan and
-                          fronts it with an AI-assisted persona. Server
-                          re-checks owner + idea eligibility. */}
                       {org.isOwner && (
-                        <button
-                          type="button"
-                          onClick={() => setVirtualHostPlan({ calendarId: org.objectId, planIdeaId: idea.id })}
-                          className="self-start inline-flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 hover:border-teal-400 transition-colors text-xs font-medium text-teal-700"
-                        >
-                          <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Add virtual host
-                        </button>
+                        <p className="text-xs text-zinc-400 italic">Run it yourself, or let Leaf plan &amp; run it for you.</p>
                       )}
                     </div>
                   </div>
