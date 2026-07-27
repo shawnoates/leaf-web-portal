@@ -52,3 +52,27 @@ export function formatTimeInputInTimezone(
     hour12: false,
   }).format(d);
 }
+
+/**
+ * Format a venue-anchored wall-clock time string for display in 12-hour form,
+ * e.g. "18:00" → "6:00 PM". `time_event` is stored as a 24-hour "HH:mm" string,
+ * so surfaces that render it verbatim show military time — pass it through here.
+ *
+ * Accepts either "HH:mm" (24h) or "h:mm AM/PM" (already 12h, normalized).
+ * Returns "" for null/blank and echoes back anything it can't parse.
+ */
+export function formatWallClockTime12h(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  const m24 = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+  if (m24) {
+    let h = Number(m24[1]);
+    const min = m24[2];
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    return `${h}:${min} ${ap}`;
+  }
+  const m12 = trimmed.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
+  if (m12) return `${Number(m12[1])}:${m12[2] || "00"} ${m12[3].toUpperCase()}`;
+  return trimmed;
+}

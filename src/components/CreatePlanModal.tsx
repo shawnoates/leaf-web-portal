@@ -5,6 +5,7 @@ import Parse from "@/lib/parse-client";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { getDefaultCoverForSeed } from "@/lib/default-covers";
 import VenueSearch from "@/components/VenueSearch";
+import { detectCity } from "@/lib/detectCity";
 import {
   ArrowRight,
   Calendar,
@@ -427,10 +428,17 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     setPromptError(null);
     setPromptLoading(true);
     try {
+      // Anchor grounded venue/showtime search to a real place. detectCity is
+      // the same timezone-derived signal the server already uses to bias
+      // Places grounding elsewhere; skip the "your area" fallback (fallback
+      // === true) and let the server fall back to the tz region instead.
+      const detected = detectCity();
+      const locationHint = detected.fallback ? undefined : detected.city;
       const draft = await Parse.Cloud.run("draftPlanFromPrompt", {
         prompt: trimmed,
         todayISO: new Date().toISOString().slice(0, 10),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        locationHint,
       });
       const nextAI = new Set(aiFilled);
       const apply = (field: PlanDraftField, setter: () => void, value: unknown) => {

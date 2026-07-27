@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { renderLinkedText } from "@/lib/linkify";
+import { formatWallClockTime12h } from "@/lib/date-utils";
 import {
   Calendar,
   Check,
@@ -456,7 +457,7 @@ export default function PlanDetailModal({
                     <span className="flex items-center gap-2">
                       <Clock className="w-4 h-4" />
                       {new Date(plan.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-                      {plan.time && ` at ${plan.time}`}
+                      {plan.time && ` at ${formatWallClockTime12h(plan.time)}`}
                     </span>
                   )}
                   <span className="flex items-center gap-2">
@@ -516,13 +517,7 @@ export default function PlanDetailModal({
                             day: "numeric",
                           });
                         })();
-                        const timeLabel = opt.time ? (() => {
-                          const [hh, mm] = opt.time!.split(":");
-                          let h = parseInt(hh, 10);
-                          const ampm = h >= 12 ? "PM" : "AM";
-                          if (h === 0) h = 12; else if (h > 12) h -= 12;
-                          return `${h}:${mm} ${ampm}`;
-                        })() : null;
+                        const timeLabel = opt.time ? formatWallClockTime12h(opt.time) : null;
                         return (
                           <div key={`${opt.date}|${opt.time || ""}`} className="relative border border-zinc-200 rounded-lg overflow-hidden">
                             <div className="absolute inset-y-0 left-0 bg-zinc-100" style={{ width: `${pct}%` }} />
