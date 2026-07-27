@@ -649,6 +649,7 @@ export default function PlansManager({
             centroid: idea.centroid ?? null,
             suggestedCapacity: idea.suggestedCapacity ?? null,
             isManual: idea.isManual === true,
+            datePinned: idea.datePinned === true,
           }));
           const seenIds = new Set<string>();
           const ideas = rawIdeas.filter((idea: PlanIdea) => {
