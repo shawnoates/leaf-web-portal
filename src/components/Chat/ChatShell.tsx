@@ -42,9 +42,17 @@ function detectDevice(): DeviceType {
 export default function ChatShell({
   eventGroupId,
   hidePlanDetails = false,
+  fitParent = false,
 }: {
   eventGroupId: string;
   hidePlanDetails?: boolean;
+  // Standalone /chat pages have no height-defining parent, so the shell
+  // sizes itself to the viewport (h-dvh). When embedded in a container that
+  // already sets a height (PlanChatDrawer's bottom-sheet / slide-over), pass
+  // fitParent so the shell fills THAT box instead — otherwise h-dvh makes the
+  // shell taller than the drawer and its overflow-hidden clips the composer
+  // off the bottom.
+  fitParent?: boolean;
 }) {
   const router = useRouter();
   // When opened from the attendee dashboard (/chat/{id}?from=me), Back returns
@@ -379,7 +387,7 @@ export default function ChatShell({
   };
 
   return (
-    <div className="h-dvh flex flex-col md:flex-row bg-zinc-50 overflow-hidden">
+    <div className={`${fitParent ? "h-full" : "h-dvh"} flex flex-col md:flex-row bg-zinc-50 overflow-hidden`}>
       {/* Mobile-only top header (no sidebar shown). On desktop the sidebar carries the same nav. */}
       <header className={`${hidePlanDetails ? "hidden" : "md:hidden"} bg-white border-b border-zinc-200 px-4 py-3 flex items-center gap-3 z-10 shrink-0`}>
         <button

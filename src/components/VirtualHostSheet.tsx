@@ -4,6 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { Check, Clock, Loader2, Minus, Plus, Sparkles, X } from "lucide-react";
 
+// A representative host face for the "Add virtual host" CTA, shown before a
+// specific persona is picked (that happens server-side on attach). One of the
+// real ConciergePersona avatars so the button reads as "a person will host."
+export const DEFAULT_HOST_AVATAR =
+  "https://leaf-storage.s3.us-west-2.amazonaws.com/Gemini_Generated_Image_xzs4nwxzs4nwxzs4.png";
+
 // "What's included" info + capacity + pay sheet for attaching a Virtual Host
 // (VIRTUAL_HOST_SPEC §6.2). One of planIdeaId / eventGroupId identifies the
 // target. Concierge-tier calendars attach free; everyone else pays a flat $25

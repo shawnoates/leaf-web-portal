@@ -38,7 +38,7 @@ export default function PlanChatDrawer({
               mobile top header. Owner opened this drawer from a plan
               card that already told them what plan they're looking at,
               and the drawer itself owns the close affordance. */}
-          <ChatShell eventGroupId={eventGroupId} hidePlanDetails />
+          <ChatShell eventGroupId={eventGroupId} hidePlanDetails fitParent />
         </div>
       </div>
     </div>
