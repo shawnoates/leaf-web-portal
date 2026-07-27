@@ -8,7 +8,6 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
-import LeafHostThread from "@/components/LeafHostThread";
 import LeafHostPlanThread from "@/components/LeafHostPlanThread";
 import VirtualHostSheet, { DEFAULT_HOST_AVATAR, HostAvatar } from "@/components/VirtualHostSheet";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
@@ -476,62 +475,6 @@ function buildIcsHref(opts: {
 }
 
 // --- Components ---
-
-// "Let Leaf host it" band — spec §2. Owner-only; renders under the
-// UPCOMING PLANS header when the calendar is eligible and no hosting
-// is in flight yet. Secondary weight — bordered card, muted background,
-// small persona avatar, arrow — so it never out-shouts a follower
-// tapping HOST THIS on a plan card. Copy is Leaf-branded ("Let Leaf
-// plan & host it") — the persona's face humanizes the promise but the
-// promise is from the brand, per spec.
-//
-// Phase 2 hookup: onClick opens the pre-pay detail sheet.
-function LeafHostBand({
-  persona,
-  onOpenSheet,
-}: {
-  persona: { id: string; name: string; avatarUrl: string | null };
-  onOpenSheet: () => void;
-}) {
-  const initials = persona.name
-    .split(/\s+/)
-    .map((p) => p[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
-  return (
-    <button
-      type="button"
-      onClick={onOpenSheet}
-      className="w-full flex items-center gap-4 rounded-xl border border-zinc-200 bg-zinc-50/60 px-5 py-4 text-left hover:bg-zinc-50 transition-colors group"
-    >
-      {persona.avatarUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={persona.avatarUrl}
-          alt=""
-          aria-hidden="true"
-          className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-1 ring-zinc-200"
-        />
-      ) : (
-        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-zinc-200 text-zinc-600 text-xs font-semibold flex-shrink-0">
-          {initials}
-        </div>
-      )}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-zinc-900">
-          Need a host? Let Leaf plan &amp; host it for you.
-        </p>
-        <p className="text-xs text-zinc-500 mt-0.5">
-          We&rsquo;ll validate venues, secure the reservations, and run the
-          season on your behalf.
-        </p>
-      </div>
-      <ArrowRight className="w-4 h-4 text-zinc-400 group-hover:text-zinc-700 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
-    </button>
-  );
-}
 
 function AvatarStack({ count }: { count: number }) {
   return (
@@ -1319,12 +1262,6 @@ export default function OrgCalendarPage() {
   // pick a venue the AI didn't surface. A non-owner's choice still routes
   // through owner/co-host approval (server holds it pending).
   const [venueSearchQuery, setVenueSearchQuery] = useState("");
-  // "Let Leaf host it" pre-pay sheet — spec §4. Opens from the
-  // owner-only band; closes on X or backdrop click. Owner-only rendering
-  // enforced by the band itself (band gates on isOwner via the leafHost
-  // payload block), so this state only ever flips true in an authorized
-  // context.
-  const [showLeafHostSheet, setShowLeafHostSheet] = useState(false);
   // Per-plan leaf-host chat drawer. Non-null = planId of the open
   // drawer. Owner-only render — the pill that sets this state only
   // renders when server surfaced hasLeafHostChat=true.
@@ -2642,24 +2579,6 @@ export default function OrgCalendarPage() {
           Upcoming Plans
         </p>
       </div>
-
-      {/* Owner-only "Let Leaf host it" band — spec §2 placement: under
-          UPCOMING PLANS header, above the first card. Persona avatar +
-          Leaf-branded copy. Secondary visual weight so it never
-          out-shouts a human volunteering via HOST THIS on a plan card.
-          Server-side leak guard: leafHost is undefined on non-owner
-          payloads, so the null check below is a belt on top of a
-          suspender — the enforcement is at the API layer, not here. */}
-      {org.leafHost?.eligible &&
-        org.leafHost.persona &&
-        org.leafHost.state === "none" && (
-          <div className="max-w-6xl mx-auto px-6 pt-6">
-            <LeafHostBand
-              persona={org.leafHost.persona}
-              onOpenSheet={() => setShowLeafHostSheet(true)}
-            />
-          </div>
-        )}
 
       {/* Plans Stream */}
       <main className="max-w-6xl mx-auto px-6 py-12">
@@ -4906,21 +4825,6 @@ export default function OrgCalendarPage() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* "Let Leaf host it" chat-drawer — Phase 5 replaces the static
-          sheet with a persona-voiced message thread. Same drawer
-          skeleton (right-side desktop, bottom mobile); body is a chat
-          with an inline pay card. Owner-gated: the band only exposes
-          the persona when server-side isOwner=true, and every endpoint
-          the drawer touches (getLeafHostThread, sendLeafHostMessage,
-          getCalendarHostingQuote, authorizeCalendarHosting) re-checks
-          ownership. */}
-      {showLeafHostSheet && org.isOwner && org.leafHost?.eligible && (
-        <LeafHostThread
-          calendarId={org.objectId}
-          onClose={() => setShowLeafHostSheet(false)}
-        />
       )}
 
       {/* Per-plan leaf-host chat drawer. Owner-only — pill that opens
