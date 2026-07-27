@@ -7,10 +7,12 @@ import Parse from "@/lib/parse-client";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
 import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailModal";
+import HostIdeaModal from "@/components/HostIdeaModal";
 import PlanChatDrawer from "@/components/PlanChatDrawer";
+import VirtualHostSheet from "@/components/VirtualHostSheet";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
-import { Calendar, Camera, Check, Link2, Lock, MapPin, MessageCircle, Pencil, Plus, RefreshCw, Repeat, Settings, Trash2, UserCheck, Users, X } from "lucide-react";
+import { Calendar, Camera, Check, Link2, Lock, MessageCircle, Plus, RefreshCw, Repeat, Settings, UserCheck, Users, X } from "lucide-react";
 
 // Renders a plan cover image with a Calendar-icon placeholder fallback when
 // the src is missing OR 404s (attendee-uploaded / expired signed URLs go
@@ -121,6 +123,12 @@ interface PlanIdea {
   location: { name: string; address: string } | null;
   ideaSeriesId: string | null;
   interestCount: number;
+  // Venue-search inputs for the host modal (same fields the public /org page
+  // uses): AI category + city centroid drive the Google Places search, and
+  // suggestedCapacity seeds the published plan's capacity.
+  category?: string | null;
+  centroid?: string | null;
+  suggestedCapacity?: number | null;
 }
 
 interface PastPlan {
@@ -273,14 +281,21 @@ export default function PlansManager({
   const [assignBusyUserId, setAssignBusyUserId] = useState<string | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
 
-  // Suggestion detail + self-host modal (tap a suggestion card). The owner/
-  // co-host picks a date/time here and publishes it live hosted by themselves
-  // (server: hostPlanIdea, owner/co-host branch → goes live immediately).
+  // Virtual host — the idea currently being handed to a paid AI-assisted host
+  // (null = sheet closed). See VirtualHostSheet.
+  const [virtualHostIdea, setVirtualHostIdea] = useState<PlanIdea | null>(null);
+
+  // Host-a-suggestion modal (tap a suggestion card) — the same modal the public
+  // /org page uses, with Google Places venue selection. Owner/co-host publishes
+  // it live via hostPlanIdea's owner branch.
   const [detailIdea, setDetailIdea] = useState<PlanIdea | null>(null);
-  const [hostDate, setHostDate] = useState("");
-  const [hostTime, setHostTime] = useState("18:00");
-  const [hostIdeaBusy, setHostIdeaBusy] = useState(false);
-  const [hostIdeaError, setHostIdeaError] = useState<string | null>(null);
+  // Org context threaded into the host modal so its venue search / approval
+  // defaults match the public page. Populated by fetchPlanIdeas.
+  const [orgCity, setOrgCity] = useState<string | null>(null);
+  const [orgBlacklist, setOrgBlacklist] = useState<string[]>([]);
+  const [orgExcludeKeywords, setOrgExcludeKeywords] = useState<string[]>([]);
+  const [orgBrandColor, setOrgBrandColor] = useState<string | null>(null);
+  const [requireApprovalDefault, setRequireApprovalDefault] = useState(false);
 
   // Edit-the-suggestion modal (server: updatePlanIdea). Distinct from hosting —
   // this refines the suggestion in place; it never creates a live plan.
@@ -510,7 +525,13 @@ export default function PlansManager({
         (a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime(),
       );
       setUpcomingPlans(merged);
-      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null; interestCount?: number }) => ({
+      // Capture org context for the host modal's venue search + approval default.
+      setOrgCity(page.orgCity ?? null);
+      setOrgBlacklist(Array.isArray(page.orgBlacklistCategories) ? page.orgBlacklistCategories : []);
+      setOrgExcludeKeywords(Array.isArray(page.orgExcludeKeywords) ? page.orgExcludeKeywords : []);
+      setOrgBrandColor(page.orgBrandColor ?? null);
+      setRequireApprovalDefault(page.requireApprovalDefault === true);
+      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null; interestCount?: number; category?: string | null; centroid?: string | null; suggestedCapacity?: number | null }) => ({
         objectId: idea.objectId,
         title: idea.title,
         description: idea.description,
@@ -519,6 +540,9 @@ export default function PlansManager({
         location: idea.location,
         ideaSeriesId: idea.ideaSeriesId || null,
         interestCount: typeof idea.interestCount === "number" ? idea.interestCount : 0,
+        category: idea.category ?? null,
+        centroid: idea.centroid ?? null,
+        suggestedCapacity: idea.suggestedCapacity ?? null,
       }));
       const seen = new Set<string>();
       setPlanIdeas(allIdeas.filter((idea: PlanIdea) => {
@@ -595,7 +619,7 @@ export default function PlansManager({
         try {
           const dash = await Parse.Cloud.run("getOrgDashboard", { calendarId });
           const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId: dash.shareId });
-          const rawIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null }) => ({
+          const rawIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null; interestCount?: number; category?: string | null; centroid?: string | null; suggestedCapacity?: number | null }) => ({
             objectId: idea.objectId,
             title: idea.title,
             description: idea.description,
@@ -603,6 +627,10 @@ export default function PlansManager({
             image: idea.image || null,
             location: idea.location,
             ideaSeriesId: idea.ideaSeriesId || null,
+            interestCount: typeof idea.interestCount === "number" ? idea.interestCount : 0,
+            category: idea.category ?? null,
+            centroid: idea.centroid ?? null,
+            suggestedCapacity: idea.suggestedCapacity ?? null,
           }));
           const seenTitles = new Set<string>();
           const ideas = rawIdeas.filter((idea: PlanIdea) => {
@@ -677,13 +705,9 @@ export default function PlansManager({
     }
   }
 
-  // Open a suggestion's detail + self-host modal. Prefill the date/time pickers
-  // with the card's spread cadence date so the modal and card agree.
+  // Tap a suggestion card → open the full host modal (venue search + date/time),
+  // identical to the public /org page. Owner tools branch off from inside it.
   function openIdeaDetail(idea: PlanIdea) {
-    const spread = spreadDateOf(idea);
-    setHostDate(spread ? spread.toISOString().split("T")[0] : "");
-    setHostTime("18:00");
-    setHostIdeaError(null);
     setDetailIdea(idea);
   }
 
@@ -699,42 +723,6 @@ export default function PlansManager({
     });
     setIdeaEditError(null);
     setEditingIdea(idea);
-  }
-
-  // Publish the suggestion live, hosted by the current owner/co-host. Reuses
-  // hostPlanIdea's owner/co-host branch, which goes live immediately (no
-  // pending-approval friction). Consumes the suggestion on success.
-  async function handleHostIdeaMyself(idea: PlanIdea) {
-    if (!hostDate) {
-      setHostIdeaError("Pick a date for the plan.");
-      return;
-    }
-    setHostIdeaBusy(true);
-    setHostIdeaError(null);
-    try {
-      // Build a submitter-local ISO datetime with an explicit offset so the
-      // server anchors the wall-clock in the caller's zone (same shape the
-      // public /org host form sends).
-      const offset = new Date().getTimezoneOffset();
-      const sign = offset <= 0 ? "+" : "-";
-      const absH = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
-      const absM = String(Math.abs(offset) % 60).padStart(2, "0");
-      const dateTime = `${hostDate}T${hostTime || "18:00"}${sign}${absH}:${absM}`;
-      await Parse.Cloud.run("hostPlanIdea", {
-        calendarPlanId: idea.objectId,
-        date: dateTime,
-        capacity: 20,
-      });
-      setPlanIdeas((prev) => prev.filter((p) => p.objectId !== idea.objectId));
-      setDetailIdea(null);
-      // Refresh so the new live plan shows in Upcoming and the idea list is current.
-      fetchPlanIdeas();
-    } catch (err) {
-      console.error("Failed to host suggestion:", err);
-      setHostIdeaError(err instanceof Error ? err.message : "Failed to host this plan.");
-    } finally {
-      setHostIdeaBusy(false);
-    }
   }
 
   // Save edits to the suggestion in place (server: updatePlanIdea).
@@ -1211,125 +1199,51 @@ export default function PlansManager({
         />
       )}
 
-      {/* Suggestion detail + self-host modal — opens when a suggestion card is
-          tapped. Owner/co-host picks a date/time and publishes it live hosted
-          by themselves; edit/assign/delete branch off from here. */}
+      {/* Virtual host info/pay sheet — attaches a paid AI-assisted host to the
+          idea (publishes it), or redirects to Stripe Checkout when not on the
+          Concierge tier. */}
+      {virtualHostIdea && (
+        <VirtualHostSheet
+          calendarId={calendarId}
+          planIdeaId={virtualHostIdea.objectId}
+          returnTo={typeof window !== "undefined" ? window.location.href : undefined}
+          onClose={() => setVirtualHostIdea(null)}
+          onAttached={() => {
+            // Free (Concierge) attach: idea is now hosted → drop it from the
+            // rail. The paid path redirects to Stripe and never reaches here.
+            setPlanIdeas((prev) => prev.filter((p) => p.objectId !== virtualHostIdea.objectId));
+            setVirtualHostIdea(null);
+          }}
+        />
+      )}
+
+      {/* Host-a-suggestion modal — the same modal the public /org page uses
+          (Google Places venue search + date/time/note), opened when a suggestion
+          card is tapped. Owner tools (edit the suggestion, assign, virtual host,
+          delete) branch off from inside it. */}
       {detailIdea && (
-        <div
-          className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4"
-          onClick={() => { if (!hostIdeaBusy) setDetailIdea(null); }}
-        >
-          <div
-            className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="relative shrink-0">
-              <PlanImage src={detailIdea.image} alt={detailIdea.title} className="w-full h-40" />
-              <span className="absolute top-3 left-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-white/85 text-[#1B4332] backdrop-blur-sm">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#1B4332]" />
-                Needs a host
-              </span>
-              <button
-                onClick={() => { if (!hostIdeaBusy) setDetailIdea(null); }}
-                className="absolute top-3 right-3 p-1.5 rounded-full bg-white/85 text-zinc-700 hover:bg-white backdrop-blur-sm transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-5 overflow-y-auto space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold">{detailIdea.title}</h3>
-                {detailIdea.description && (
-                  <p className="text-sm text-zinc-500 mt-1 whitespace-pre-wrap">{detailIdea.description}</p>
-                )}
-              </div>
-              {detailIdea.location?.name && (
-                <p className="text-sm text-zinc-600 flex items-start gap-1.5">
-                  <MapPin className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
-                  <span>
-                    {detailIdea.location.name}
-                    {detailIdea.location.address ? ` · ${detailIdea.location.address}` : ""}
-                  </span>
-                </p>
-              )}
-
-              {/* Host it yourself */}
-              <div className="border-t border-zinc-100 pt-4 space-y-3">
-                <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">Host this plan yourself</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-medium text-zinc-500 mb-1">Date</label>
-                    <input
-                      type="date"
-                      value={hostDate}
-                      min={new Date().toISOString().split("T")[0]}
-                      onChange={(e) => setHostDate(e.target.value)}
-                      className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-900 transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-medium text-zinc-500 mb-1">Start time</label>
-                    <input
-                      type="time"
-                      value={hostTime}
-                      onChange={(e) => setHostTime(e.target.value)}
-                      className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-900 transition-colors"
-                    />
-                  </div>
-                </div>
-                <p className="text-[11px] text-zinc-400">
-                  Publishes live immediately with you as the host
-                  {detailIdea.location?.name ? ` at ${detailIdea.location.name}` : ""}. You can edit details afterward.
-                </p>
-                {hostIdeaError && <p className="text-xs text-red-500">{hostIdeaError}</p>}
-                <button
-                  onClick={() => handleHostIdeaMyself(detailIdea)}
-                  disabled={hostIdeaBusy}
-                  className="w-full bg-zinc-900 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {hostIdeaBusy ? (
-                    <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <UserCheck className="w-4 h-4" />
-                  )}
-                  {hostIdeaBusy ? "Publishing…" : "Host this plan"}
-                </button>
-              </div>
-
-              {/* Secondary actions */}
-              <div className="border-t border-zinc-100 pt-4 flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => { const idea = detailIdea; setDetailIdea(null); openIdeaEditor(idea); }}
-                  className="inline-flex items-center gap-1.5 border border-zinc-200 rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-700 hover:border-zinc-400 transition-colors"
-                >
-                  <Pencil className="w-3.5 h-3.5" /> Edit suggestion
-                </button>
-                <button
-                  onClick={() => { const idea = detailIdea; setDetailIdea(null); setAssignError(null); setAssigningIdea(idea); }}
-                  className="inline-flex items-center gap-1.5 border border-zinc-200 rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-700 hover:border-zinc-400 transition-colors"
-                >
-                  <UserCheck className="w-3.5 h-3.5" /> Assign a host
-                </button>
-                {detailIdea.ideaSeriesId && (
-                  <button
-                    onClick={() => handleEndSeries(detailIdea.ideaSeriesId!)}
-                    className="inline-flex items-center gap-1.5 border border-zinc-200 rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-700 hover:border-zinc-400 transition-colors"
-                  >
-                    <Repeat className="w-3.5 h-3.5" /> End series
-                  </button>
-                )}
-                <button
-                  onClick={() => handleRemoveIdea(detailIdea.objectId)}
-                  className="inline-flex items-center gap-1.5 border border-zinc-200 rounded-lg px-3 py-1.5 text-xs font-medium text-red-500 hover:border-red-300 transition-colors ml-auto"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <HostIdeaModal
+          idea={detailIdea}
+          prefillDate={spreadDateOf(detailIdea)}
+          orgCity={orgCity}
+          tier={tier}
+          brandColor={orgBrandColor}
+          requireApprovalDefault={requireApprovalDefault}
+          blacklistCategories={orgBlacklist}
+          excludeKeywords={orgExcludeKeywords}
+          onClose={() => setDetailIdea(null)}
+          onHosted={() => {
+            // Idea is now a live plan — drop it from the rail and refresh so it
+            // appears under Upcoming.
+            setPlanIdeas((prev) => prev.filter((p) => p.objectId !== detailIdea.objectId));
+            fetchPlanIdeas();
+          }}
+          onEditSuggestion={() => { const idea = detailIdea; setDetailIdea(null); openIdeaEditor(idea); }}
+          onAssignHost={() => { const idea = detailIdea; setDetailIdea(null); setAssignError(null); setAssigningIdea(idea); }}
+          onAddVirtualHost={() => { const idea = detailIdea; setDetailIdea(null); setVirtualHostIdea(idea); }}
+          onEndSeries={() => handleEndSeries(detailIdea.ideaSeriesId!)}
+          onDelete={() => handleRemoveIdea(detailIdea.objectId)}
+        />
       )}
 
       {/* Edit-the-suggestion modal — refines the CalendarGeneratedPlan idea in

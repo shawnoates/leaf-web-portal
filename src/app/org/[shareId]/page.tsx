@@ -10,9 +10,11 @@ import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
 import LeafHostThread from "@/components/LeafHostThread";
 import LeafHostPlanThread from "@/components/LeafHostPlanThread";
+import VirtualHostSheet from "@/components/VirtualHostSheet";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
+import { isVenueBlacklisted } from "@/lib/venue-blacklist";
 import {
   Plus,
   Users,
@@ -96,6 +98,11 @@ interface Plan {
   hasLeafHostChat?: boolean;
   // Owner-only: unread concierge messages in the plan-scoped thread.
   leafHostChatUnread?: number;
+  // Virtual host (VIRTUAL_HOST_SPEC) — persona-fronted paid host on this plan.
+  virtualHost?: boolean;
+  virtualHostPersona?: { id: string; name: string | null; avatarUrl: string | null } | null;
+  // Owner-only: can the owner attach a virtual host to this (host-less) plan?
+  virtualHostAddable?: boolean;
 }
 
 interface PlanIdea {
@@ -365,26 +372,6 @@ function resolveAIEventDate(ev: {
 
 
 // Maps human-readable blacklist labels (set in the org dashboard) to Google
-// Places `types` strings and lowercase name keywords used to filter venue
-// search results. Categories without reliable Places types fall back to
-// keyword matching against the venue name.
-const BLACKLIST_TYPE_MAP: Record<string, { types: string[]; keywords: string[] }> = {
-  "Bars": { types: ["bar"], keywords: ["bar", "pub", "tavern", "brewery", "brewpub"] },
-  "Nightclubs": { types: ["night_club"], keywords: ["nightclub", "night club", "lounge", "club"] },
-  "Casinos": { types: ["casino"], keywords: ["casino"] },
-  "Adult venues": { types: [], keywords: ["adult", "strip", "gentlemen", "xxx"] },
-  "Smoking lounges": { types: [], keywords: ["hookah", "cigar", "smoke shop", "vape", "smoking"] },
-  "Religious venues": {
-    types: ["church", "synagogue", "mosque", "hindu_temple", "place_of_worship"],
-    keywords: ["church", "synagogue", "mosque", "temple", "chapel", "cathedral"],
-  },
-  "Late-night venues": { types: [], keywords: ["late night", "after hours"] },
-  "Fast food": {
-    types: ["meal_takeaway"],
-    keywords: ["mcdonald", "burger king", "wendy", "taco bell", "kfc", "subway", "chipotle", "popeyes", "arby", "sonic", "hardee", "carl's jr", "jack in the box", "white castle", "dairy queen", "fast food"],
-  },
-};
-
 // Loose substring match — `orgType` values aren't enum-locked, and many
 // legacy calendars were created before the picker existed (so `orgType` is
 // null). Also scan the calendar name + description for common apartment
@@ -403,32 +390,6 @@ function isApartmentOrgType(
   return /apartment|residential|\bcondo\b|\bbuilding\b|\blofts?\b|\btowers?\b|\bresidences?\b|\bresidents?\b|\btenants?\b|\bhoa\b|\bhangouts?\b/i.test(
     blob
   );
-}
-
-function isVenueBlacklisted(
-  name: string,
-  types: string[],
-  blacklistCategories: string[],
-  excludeKeywords?: string[]
-): boolean {
-  const lowerName = name.toLowerCase();
-  // Check preset category blacklist
-  if (blacklistCategories && blacklistCategories.length > 0) {
-    const typeSet = new Set(types);
-    for (const category of blacklistCategories) {
-      const entry = BLACKLIST_TYPE_MAP[category];
-      if (!entry) continue;
-      if (entry.types.some((t) => typeSet.has(t))) return true;
-      if (entry.keywords.some((k) => lowerName.includes(k))) return true;
-    }
-  }
-  // Check custom excluded keywords
-  if (excludeKeywords && excludeKeywords.length > 0) {
-    for (const kw of excludeKeywords) {
-      if (lowerName.includes(kw.toLowerCase())) return true;
-    }
-  }
-  return false;
 }
 
 // --- Helpers ---
@@ -1358,6 +1319,8 @@ export default function OrgCalendarPage() {
   // drawer. Owner-only render — the pill that sets this state only
   // renders when server surfaced hasLeafHostChat=true.
   const [leafHostChatPlanId, setLeafHostChatPlanId] = useState<string | null>(null);
+  // Owner-only: the (host-less) plan the owner is attaching a virtual host to.
+  const [virtualHostPlan, setVirtualHostPlan] = useState<{ id: string; calendarId: string } | null>(null);
   const [hostSuccess, setHostSuccess] = useState<boolean | "pending">(false);
   const [hostSubmitting, setHostSubmitting] = useState(false);
   const [hostNote, setHostNote] = useState("");
@@ -1906,6 +1869,9 @@ export default function OrgCalendarPage() {
         pollClosesAt: (p.pollClosesAt as string) || null,
         leafHostState: (p.leafHostState as Plan["leafHostState"]) || null,
         leafHostPersona: (p.leafHostPersona as Plan["leafHostPersona"]) || null,
+        virtualHost: (p.virtualHost as boolean) || false,
+        virtualHostPersona: (p.virtualHostPersona as Plan["virtualHostPersona"]) || null,
+        virtualHostAddable: (p.virtualHostAddable as boolean) || false,
         hasLeafHostChat: Boolean(p.hasLeafHostChat),
         leafHostChatUnread:
           typeof p.leafHostChatUnread === "number" ? p.leafHostChatUnread : 0,
@@ -2763,7 +2729,22 @@ export default function OrgCalendarPage() {
                           * leaf_hosted   → public: HOSTED BY LEAF · Sara
                           * leaf_arranging → owner-only: LEAF IS ARRANGING THIS
                           * default        → Hosted by {plan.hostName} */}
-                      {plan.leafHostState === "leaf_hosted" ? (
+                      {plan.virtualHost ? (
+                        <div className="flex items-center gap-2">
+                          {plan.virtualHostPersona?.avatarUrl && (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={plan.virtualHostPersona.avatarUrl}
+                              alt=""
+                              aria-hidden="true"
+                              className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200 flex-shrink-0"
+                            />
+                          )}
+                          <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold">
+                            Hosted by {plan.virtualHostPersona?.name || "your host"}
+                          </p>
+                        </div>
+                      ) : plan.leafHostState === "leaf_hosted" ? (
                         <div className="flex items-center gap-2">
                           {plan.leafHostPersona?.avatarUrl && (
                             /* eslint-disable-next-line @next/next/no-img-element */
@@ -2789,6 +2770,18 @@ export default function OrgCalendarPage() {
                           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: org.brandColor || "#18181b" }} />
                           Hosted by {plan.hostName}
                         </p>
+                      )}
+                      {/* Owner-only: attach a virtual host to a host-less plan.
+                          Server sets virtualHostAddable only for the owner on
+                          plans with no host and no RSVPs yet. */}
+                      {plan.virtualHostAddable && (
+                        <button
+                          type="button"
+                          onClick={() => setVirtualHostPlan({ id: plan.id, calendarId: org.objectId })}
+                          className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 hover:border-teal-400 transition-colors text-xs font-medium text-teal-700"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" /> Add virtual host
+                        </button>
                       )}
                       {/* Per-plan leaf-host chat pill — owner-only.
                           Server strips these fields for non-owners so
@@ -4867,6 +4860,16 @@ export default function OrgCalendarPage() {
         <LeafHostPlanThread
           planId={leafHostChatPlanId}
           onClose={() => setLeafHostChatPlanId(null)}
+        />
+      )}
+
+      {virtualHostPlan && org.isOwner && (
+        <VirtualHostSheet
+          calendarId={virtualHostPlan.calendarId}
+          eventGroupId={virtualHostPlan.id}
+          returnTo={typeof window !== "undefined" ? window.location.href : undefined}
+          onClose={() => setVirtualHostPlan(null)}
+          onAttached={() => { setVirtualHostPlan(null); fetchOrg(); }}
         />
       )}
 
