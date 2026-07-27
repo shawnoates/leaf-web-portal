@@ -455,7 +455,7 @@ export default function HostIdeaModal({
                       ref={timeRef}
                       type="time"
                       required
-                      defaultValue="18:00"
+                      defaultValue={idea.preferredTime || "18:00"}
                       className="w-full border-b border-zinc-300 py-2.5 text-lg font-light focus:outline-none focus:border-zinc-900 transition-colors"
                     />
                   </div>
