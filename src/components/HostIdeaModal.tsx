@@ -56,6 +56,7 @@ export default function HostIdeaModal({
   idea,
   prefillDate = null,
   orgCity = null,
+  orgAddress = null,
   tier = "starter",
   brandColor = null,
   requireApprovalDefault = false,
@@ -72,6 +73,7 @@ export default function HostIdeaModal({
   idea: HostIdeaModalIdea;
   prefillDate?: Date | null;
   orgCity?: string | null;
+  orgAddress?: string | null;
   tier?: string;
   brandColor?: string | null;
   requireApprovalDefault?: boolean;
