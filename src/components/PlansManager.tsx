@@ -544,10 +544,14 @@ export default function PlansManager({
         centroid: idea.centroid ?? null,
         suggestedCapacity: idea.suggestedCapacity ?? null,
       }));
+      // Dedupe by objectId (not title) — two distinct suggestions can share a
+      // title (e.g. an owner manually adds one matching an AI suggestion), and
+      // keying on title silently hid the newer row from this rail while the
+      // public /org page (which doesn't dedupe) still showed it.
       const seen = new Set<string>();
       setPlanIdeas(allIdeas.filter((idea: PlanIdea) => {
-        if (seen.has(idea.title)) return false;
-        seen.add(idea.title);
+        if (seen.has(idea.objectId)) return false;
+        seen.add(idea.objectId);
         return true;
       }));
     } catch {
@@ -632,10 +636,10 @@ export default function PlansManager({
             centroid: idea.centroid ?? null,
             suggestedCapacity: idea.suggestedCapacity ?? null,
           }));
-          const seenTitles = new Set<string>();
+          const seenIds = new Set<string>();
           const ideas = rawIdeas.filter((idea: PlanIdea) => {
-            if (seenTitles.has(idea.title)) return false;
-            seenTitles.add(idea.title);
+            if (seenIds.has(idea.objectId)) return false;
+            seenIds.add(idea.objectId);
             return true;
           });
           if (ideas.length > startCount) {
