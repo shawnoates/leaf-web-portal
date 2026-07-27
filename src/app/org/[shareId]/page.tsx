@@ -3178,24 +3178,51 @@ export default function OrgCalendarPage() {
                     </span>
                   </div>
                   <div className="w-full md:w-2/5 space-y-6">
-                    <div className="space-y-2">
-                      {dateLabel && (
-                        <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
-                          {dateLabel}
-                        </p>
-                      )}
-                      <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
-                        {idea.title}
-                      </h3>
-                      <div className="pt-2">
-                        <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
-                          <span
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: org.brandColor || "#1B4332" }}
-                          />
-                          Waiting on host
-                        </p>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-2 min-w-0">
+                        {dateLabel && (
+                          <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                            {dateLabel}
+                          </p>
+                        )}
+                        <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
+                          {idea.title}
+                        </h3>
+                        <div className="pt-2">
+                          <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
+                            <span
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: org.brandColor || "#1B4332" }}
+                            />
+                            Waiting on host
+                          </p>
+                        </div>
                       </div>
+                      {/* Interest heart — top-right of the title (replaces the
+                          old inline "I'm interested" button). Public; cookie-
+                          deduped server-side, optimistic here. Badge shows the
+                          running interest count. */}
+                      <button
+                        type="button"
+                        onClick={() => handlePlanIdeaInterest(idea.id)}
+                        disabled={isInterested || isPending}
+                        aria-label={isInterested ? "You're interested" : "I'm interested"}
+                        className={`relative shrink-0 w-12 h-12 rounded-full border flex items-center justify-center transition-colors disabled:cursor-default ${isInterested ? "bg-emerald-50 border-emerald-300" : "border-zinc-200 hover:border-zinc-300"}`}
+                      >
+                        {isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+                        ) : (
+                          <Heart
+                            className={`w-5 h-5 ${isInterested ? "text-emerald-700" : "text-zinc-400"}`}
+                            fill={isInterested ? "currentColor" : "none"}
+                          />
+                        )}
+                        {priorCount > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-emerald-700 text-white text-[11px] font-bold flex items-center justify-center">
+                            {priorCount}
+                          </span>
+                        )}
+                      </button>
                     </div>
                     <div className="space-y-2">
                       {idea.description && (
@@ -3211,51 +3238,7 @@ export default function OrgCalendarPage() {
                       )}
                     </div>
                     <div className="pt-2 flex flex-col gap-6">
-                      {priorCount > 0 && (
-                        <div className="flex items-center gap-3">
-                          <span
-                            className="text-xs tracking-widest uppercase font-bold flex items-center gap-1.5"
-                            style={{ color: "#1B4332" }}
-                          >
-                            <Heart className="w-3 h-3" fill="currentColor" />
-                            {priorCount}{" "}
-                            {priorCount === 1 ? "person interested" : "people interested"}
-                          </span>
-                          {isInterested && (
-                            <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
-                              <Check className="w-3 h-3" /> You
-                            </span>
-                          )}
-                        </div>
-                      )}
                       <div className="flex flex-col sm:flex-row gap-4">
-                        <button
-                          onClick={() => handlePlanIdeaInterest(idea.id)}
-                          disabled={isInterested || isPending}
-                          className="border px-6 py-3 text-xs uppercase tracking-widest font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-default"
-                          style={{
-                            borderColor: isInterested ? "#1B4332" : "#E3E5DE",
-                            backgroundColor: isInterested ? "#E8EFE9" : "#ffffff",
-                            color: isInterested ? "#1B4332" : "#131714",
-                          }}
-                        >
-                          {isPending ? (
-                            <>
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              Marking…
-                            </>
-                          ) : isInterested ? (
-                            <>
-                              <Check className="w-3.5 h-3.5" />
-                              You&apos;re interested
-                            </>
-                          ) : (
-                            <>
-                              <Heart className="w-3.5 h-3.5" />
-                              I&apos;m interested
-                            </>
-                          )}
-                        </button>
                         {/* Host This — same permission matrix as
                             AI-suggested events. Tapping opens the
                             existing hostingIdea flow (create-plan
