@@ -202,6 +202,10 @@ interface OrgData {
   // aggregates from AIEventInterest in getOrgCalendarPage so every
   // starter card can render "N interested" without a per-card query.
   aiSourceEventInterests?: Record<number, number>;
+  // Indices of aiSourceEvents already materialized into a live plan (hosted
+  // or virtual-hosted). Skipped when rendering starter cards so a hosted
+  // suggestion doesn't show twice. Positional — see server comment.
+  hostedAiEventIndexes?: number[];
   // Owner-only payload for the "Let Leaf host it" band (spec §2, §6a).
   // Only present when the viewer is verified as the calendar owner
   // server-side — non-owner payloads omit this entirely so the persona
@@ -1325,8 +1329,12 @@ export default function OrgCalendarPage() {
   // drawer. Owner-only render — the pill that sets this state only
   // renders when server surfaced hasLeafHostChat=true.
   const [leafHostChatPlanId, setLeafHostChatPlanId] = useState<string | null>(null);
-  // Owner-only: the (host-less) plan the owner is attaching a virtual host to.
-  const [virtualHostPlan, setVirtualHostPlan] = useState<{ id: string; calendarId: string } | null>(null);
+  // Owner-only: the target the owner is attaching a virtual host to — either a
+  // published host-less plan (eventGroupId) or an AI starter suggestion
+  // (aiEventIndex, materialized into a plan on attach).
+  const [virtualHostPlan, setVirtualHostPlan] = useState<
+    { calendarId: string; eventGroupId?: string; aiEventIndex?: number } | null
+  >(null);
   // Real, current persona avatar for the "Add virtual host" button (server-
   // provided; seed URLs go stale).
   const [virtualHostAvatar, setVirtualHostAvatar] = useState<string | null>(null);
@@ -1953,6 +1961,9 @@ export default function OrgCalendarPage() {
           typeof result.aiSourceEventInterests === "object"
             ? result.aiSourceEventInterests
             : {},
+        hostedAiEventIndexes: Array.isArray(result.hostedAiEventIndexes)
+          ? (result.hostedAiEventIndexes as number[])
+          : [],
         // Pass through the owner-only leafHost block if the server
         // included it. Server strips this on non-owner payloads, so
         // trusting whatever it sends is safe here (spec §6a enforces
@@ -2791,7 +2802,7 @@ export default function OrgCalendarPage() {
                       {plan.virtualHostAddable && (
                         <button
                           type="button"
-                          onClick={() => setVirtualHostPlan({ id: plan.id, calendarId: org.objectId })}
+                          onClick={() => setVirtualHostPlan({ calendarId: org.objectId, eventGroupId: plan.id })}
                           className="mt-2 inline-flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 hover:border-teal-400 transition-colors text-xs font-medium text-teal-700"
                         >
                           <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Add virtual host
@@ -3133,19 +3144,38 @@ export default function OrgCalendarPage() {
                                   );
                                 })()}
                               </div>
+                              {/* Owner-only: hand this suggestion to a virtual
+                                  host. Attaching publishes it into a live plan
+                                  and fronts it with an AI-assisted persona — so
+                                  the owner never has to recruit or self-run it.
+                                  Server re-checks owner + venue/date eligibility;
+                                  the client gate is convenience only. */}
+                              {org.isOwner && ev.placeId && (
+                                <button
+                                  type="button"
+                                  onClick={() => setVirtualHostPlan({ calendarId: org.objectId, aiEventIndex: originalIndex })}
+                                  className="self-start inline-flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 hover:border-teal-400 transition-colors text-xs font-medium text-teal-700"
+                                >
+                                  <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Add virtual host
+                                </button>
+                              )}
                             </div>
                           </div>
                         </article>
                       );
           };
           if (org.aiSourceEvents && org.aiSourceEvents.length > 0) {
+              // Suggestions already materialized into a live plan (hosted or
+              // virtual-hosted) are dropped here so they don't render twice —
+              // once as a starter card and once as the real plan above.
+              const hostedIdx = new Set(org.hostedAiEventIndexes || []);
               const rendered = org.aiSourceEvents
                 .map((ev, originalIndex) => ({
                   ev,
                   originalIndex,
                   resolved: resolveAIEventDate(ev),
                 }))
-                .filter((r) => r.resolved.date !== null)
+                .filter((r) => r.resolved.date !== null && !hostedIdx.has(r.originalIndex))
                 // Client-side chronological safety net — the server sorts
                 // on generate, but adopted calendars persisted before that
                 // sort landed still show in emit order. Cost is a stable
@@ -4887,7 +4917,8 @@ export default function OrgCalendarPage() {
       {virtualHostPlan && org.isOwner && (
         <VirtualHostSheet
           calendarId={virtualHostPlan.calendarId}
-          eventGroupId={virtualHostPlan.id}
+          eventGroupId={virtualHostPlan.eventGroupId}
+          aiEventIndex={virtualHostPlan.aiEventIndex}
           returnTo={typeof window !== "undefined" ? window.location.href : undefined}
           onClose={() => setVirtualHostPlan(null)}
           onAttached={() => { setVirtualHostPlan(null); fetchOrg(); }}

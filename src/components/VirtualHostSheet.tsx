@@ -55,6 +55,7 @@ export default function VirtualHostSheet({
   calendarId,
   planIdeaId,
   eventGroupId,
+  aiEventIndex,
   returnTo,
   onClose,
   onAttached,
@@ -62,6 +63,9 @@ export default function VirtualHostSheet({
   calendarId: string;
   planIdeaId?: string;
   eventGroupId?: string;
+  // Index into the calendar's AI starter suggestions (Groups.aiSourceEvents).
+  // When set, attach publishes that suggestion into a live plan, then hosts it.
+  aiEventIndex?: number;
   returnTo?: string;
   onClose: () => void;
   onAttached: () => void;
@@ -80,6 +84,7 @@ export default function VirtualHostSheet({
         calendarId,
         planIdeaId,
         eventGroupId,
+        aiEventIndex,
       });
       setInfo(r);
       setCapacity(Math.min(r.capacityDefault || r.maxCapacity, r.maxCapacity));
@@ -88,7 +93,7 @@ export default function VirtualHostSheet({
     } finally {
       setLoading(false);
     }
-  }, [calendarId, planIdeaId, eventGroupId]);
+  }, [calendarId, planIdeaId, eventGroupId, aiEventIndex]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -101,6 +106,7 @@ export default function VirtualHostSheet({
         calendarId,
         planIdeaId,
         eventGroupId,
+        aiEventIndex,
         capacity,
         // Attach the exact persona the sheet showed the owner.
         personaId: info.persona?.id,
@@ -232,7 +238,7 @@ export default function VirtualHostSheet({
               )}
             </button>
             {!info.included && (
-              <p className="text-[11px] text-zinc-400 text-center mt-2">One-time charge. You'll set up payment securely with Stripe.</p>
+              <p className="text-[11px] text-zinc-400 text-center mt-2">One-time charge. You&apos;ll set up payment securely with Stripe.</p>
             )}
           </div>
         )}
