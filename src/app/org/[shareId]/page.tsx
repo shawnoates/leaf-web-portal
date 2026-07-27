@@ -1333,7 +1333,7 @@ export default function OrgCalendarPage() {
   // published host-less plan (eventGroupId) or an AI starter suggestion
   // (aiEventIndex, materialized into a plan on attach).
   const [virtualHostPlan, setVirtualHostPlan] = useState<
-    { calendarId: string; eventGroupId?: string; aiEventIndex?: number } | null
+    { calendarId: string; eventGroupId?: string; planIdeaId?: string; aiEventIndex?: number } | null
   >(null);
   // Real, current persona avatar for the "Add virtual host" button (server-
   // provided; seed URLs go stale).
@@ -3380,6 +3380,19 @@ export default function OrgCalendarPage() {
                           );
                         })()}
                       </div>
+                      {/* Owner-only: hand this suggestion to a virtual host.
+                          Attaching publishes the idea into a live plan and
+                          fronts it with an AI-assisted persona. Server
+                          re-checks owner + idea eligibility. */}
+                      {org.isOwner && (
+                        <button
+                          type="button"
+                          onClick={() => setVirtualHostPlan({ calendarId: org.objectId, planIdeaId: idea.id })}
+                          className="self-start inline-flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 hover:border-teal-400 transition-colors text-xs font-medium text-teal-700"
+                        >
+                          <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Add virtual host
+                        </button>
+                      )}
                     </div>
                   </div>
                 </article>
@@ -4918,6 +4931,7 @@ export default function OrgCalendarPage() {
         <VirtualHostSheet
           calendarId={virtualHostPlan.calendarId}
           eventGroupId={virtualHostPlan.eventGroupId}
+          planIdeaId={virtualHostPlan.planIdeaId}
           aiEventIndex={virtualHostPlan.aiEventIndex}
           returnTo={typeof window !== "undefined" ? window.location.href : undefined}
           onClose={() => setVirtualHostPlan(null)}
