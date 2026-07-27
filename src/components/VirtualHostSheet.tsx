@@ -5,10 +5,34 @@ import Parse from "@/lib/parse-client";
 import { Check, Clock, Loader2, Minus, Plus, Sparkles, X } from "lucide-react";
 
 // A representative host face for the "Add virtual host" CTA, shown before a
-// specific persona is picked (that happens server-side on attach). One of the
-// real ConciergePersona avatars so the button reads as "a person will host."
+// specific persona is picked (that happens server-side on attach). The neutral
+// persona (Jules) so it reads well for any audience.
 export const DEFAULT_HOST_AVATAR =
-  "https://leaf-storage.s3.us-west-2.amazonaws.com/Gemini_Generated_Image_xzs4nwxzs4nwxzs4.png";
+  "https://leaf-storage.s3.us-west-2.amazonaws.com/concierge-personas/jules.png";
+
+// Round host avatar that falls back to a sparkle glyph if the image is missing
+// or 404s (persona avatar URLs can go stale) — so the UI never shows a broken
+// image icon. `className` sets the size (e.g. "w-4 h-4").
+export function HostAvatar({ src, className }: { src?: string | null; className: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return (
+      <span className={`${className} inline-flex items-center justify-center`}>
+        <Sparkles className="w-3.5 h-3.5" />
+      </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      aria-hidden="true"
+      onError={() => setFailed(true)}
+      className={`${className} rounded-full object-cover`}
+    />
+  );
+}
 
 // "What's included" info + capacity + pay sheet for attaching a Virtual Host
 // (VIRTUAL_HOST_SPEC §6.2). One of planIdeaId / eventGroupId identifies the
@@ -117,12 +141,7 @@ export default function VirtualHostSheet({
             <X className="w-4 h-4" />
           </button>
           <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest bg-white/20 rounded-full pl-1 pr-2.5 py-1 mb-3">
-            {persona?.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={persona.avatarUrl} alt="" aria-hidden="true" className="w-4 h-4 rounded-full object-cover" />
-            ) : (
-              <Sparkles className="w-3.5 h-3.5 ml-0.5" />
-            )}
+            <HostAvatar src={persona?.avatarUrl} className="w-4 h-4" />
             AI-assisted host
           </div>
           <h3 className="text-xl font-semibold leading-tight">Add a virtual host</h3>
