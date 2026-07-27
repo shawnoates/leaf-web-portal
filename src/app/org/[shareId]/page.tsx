@@ -1898,6 +1898,7 @@ export default function OrgCalendarPage() {
             }
           : null,
         ideaSeriesId: (idea.ideaSeriesId as string) || null,
+        isManual: idea.isManual === true,
       }));
 
       setOrg({
