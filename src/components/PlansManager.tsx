@@ -300,6 +300,9 @@ export default function PlansManager({
   // defaults match the public page. Populated by fetchPlanIdeas.
   const [orgCity, setOrgCity] = useState<string | null>(null);
   const [orgAddress, setOrgAddress] = useState<string | null>(null);
+  // Real (current, gender-matched) persona avatar for the "Add virtual host"
+  // button, from the server — seed URLs go stale so we don't hardcode.
+  const [virtualHostAvatar, setVirtualHostAvatar] = useState<string | null>(null);
   const [orgBlacklist, setOrgBlacklist] = useState<string[]>([]);
   const [orgExcludeKeywords, setOrgExcludeKeywords] = useState<string[]>([]);
   const [orgBrandColor, setOrgBrandColor] = useState<string | null>(null);
@@ -537,6 +540,7 @@ export default function PlansManager({
       // Capture org context for the host modal's venue search + approval default.
       setOrgCity(page.orgCity ?? null);
       setOrgAddress(page.orgAddress ?? null);
+      setVirtualHostAvatar(page.virtualHostPreview?.avatarUrl ?? null);
       setOrgBlacklist(Array.isArray(page.orgBlacklistCategories) ? page.orgBlacklistCategories : []);
       setOrgExcludeKeywords(Array.isArray(page.orgExcludeKeywords) ? page.orgExcludeKeywords : []);
       setOrgBrandColor(page.orgBrandColor ?? null);
@@ -1257,6 +1261,7 @@ export default function PlansManager({
           prefillDate={spreadDateOf(detailIdea)}
           orgCity={orgCity}
           orgAddress={orgAddress}
+          virtualHostAvatar={virtualHostAvatar}
           tier={tier}
           brandColor={orgBrandColor}
           requireApprovalDefault={requireApprovalDefault}

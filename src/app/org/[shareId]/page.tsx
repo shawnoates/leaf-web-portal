@@ -1327,6 +1327,9 @@ export default function OrgCalendarPage() {
   const [leafHostChatPlanId, setLeafHostChatPlanId] = useState<string | null>(null);
   // Owner-only: the (host-less) plan the owner is attaching a virtual host to.
   const [virtualHostPlan, setVirtualHostPlan] = useState<{ id: string; calendarId: string } | null>(null);
+  // Real, current persona avatar for the "Add virtual host" button (server-
+  // provided; seed URLs go stale).
+  const [virtualHostAvatar, setVirtualHostAvatar] = useState<string | null>(null);
   const [hostSuccess, setHostSuccess] = useState<boolean | "pending">(false);
   const [hostSubmitting, setHostSubmitting] = useState(false);
   const [hostNote, setHostNote] = useState("");
@@ -1905,6 +1908,8 @@ export default function OrgCalendarPage() {
         datePinned: idea.datePinned === true,
         preferredTime: (idea.preferredTime as string) ?? null,
       }));
+
+      setVirtualHostAvatar((result.virtualHostPreview as { avatarUrl?: string | null } | null)?.avatarUrl ?? null);
 
       setOrg({
         objectId: result.objectId,
@@ -2789,7 +2794,7 @@ export default function OrgCalendarPage() {
                           onClick={() => setVirtualHostPlan({ id: plan.id, calendarId: org.objectId })}
                           className="mt-2 inline-flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 hover:border-teal-400 transition-colors text-xs font-medium text-teal-700"
                         >
-                          <HostAvatar src={DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Add virtual host
+                          <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Add virtual host
                         </button>
                       )}
                       {/* Per-plan leaf-host chat pill — owner-only.

@@ -57,6 +57,7 @@ export default function HostIdeaModal({
   prefillDate = null,
   orgCity = null,
   orgAddress = null,
+  virtualHostAvatar = null,
   tier = "starter",
   brandColor = null,
   requireApprovalDefault = false,
@@ -74,6 +75,7 @@ export default function HostIdeaModal({
   prefillDate?: Date | null;
   orgCity?: string | null;
   orgAddress?: string | null;
+  virtualHostAvatar?: string | null;
   tier?: string;
   brandColor?: string | null;
   requireApprovalDefault?: boolean;
@@ -338,7 +340,7 @@ export default function HostIdeaModal({
                       onClick={onAddVirtualHost}
                       className="inline-flex items-center gap-1.5 border border-teal-200 bg-teal-50 rounded-lg pl-1.5 pr-3 py-1.5 text-xs font-medium text-teal-700 hover:border-teal-400 transition-colors"
                     >
-                      <HostAvatar src={DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Add virtual host
+                      <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Add virtual host
                     </button>
                   )}
                   {onEndSeries && idea.ideaSeriesId && (
