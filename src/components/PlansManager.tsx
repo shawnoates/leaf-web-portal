@@ -809,13 +809,33 @@ export default function PlansManager({
     setAssignError(null);
     try {
       const spread = spreadDateOf(idea);
+      // The idea's date is anchored at local NOON (see updatePlanIdea), so
+      // sending it raw published the plan at 12pm and dropped the owner's
+      // preferred start time entirely. Fold in `preferredTime` (default 6pm)
+      // and stamp an explicit tz offset — the exact shape HostIdeaModal sends —
+      // so the server anchors the wall-clock in the caller's zone.
+      let date: string | undefined;
+      if (spread) {
+        const dateVal = `${spread.getFullYear()}-${String(spread.getMonth() + 1).padStart(2, "0")}-${String(spread.getDate()).padStart(2, "0")}`;
+        const timeVal = idea.preferredTime || "18:00";
+        const offset = new Date().getTimezoneOffset();
+        const sign = offset <= 0 ? "+" : "-";
+        const absH = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
+        const absM = String(Math.abs(offset) % 60).padStart(2, "0");
+        date = `${dateVal}T${timeVal}${sign}${absH}:${absM}`;
+      } else {
+        date = idea.date || undefined;
+      }
       await Parse.Cloud.run("assignPlanIdeaHost", {
         calendarPlanId: idea.objectId,
         hostUserId,
-        date: spread ? spread.toISOString() : idea.date || undefined,
+        date,
       });
+      // Drop the idea from the rail immediately, then refetch so the new live
+      // plan folds into Upcoming without a hard refresh (matches onHosted).
       setPlanIdeas((prev) => prev.filter((p) => p.objectId !== idea.objectId));
       setAssigningIdea(null);
+      await fetchPlanIdeas();
     } catch (err) {
       console.error("Failed to assign host:", err);
       setAssignError(err instanceof Error ? err.message : "Failed to assign host");
