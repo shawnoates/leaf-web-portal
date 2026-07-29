@@ -3564,9 +3564,51 @@ export default function OrgCalendarPage() {
                 <h2 className="text-4xl md:text-5xl font-light tracking-tighter">
                   {selectedEvent.title}
                 </h2>
-                <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
-                  Hosted by {selectedEvent.hostName}
-                </p>
+                {/* Host line mirrors the card's precedence (see ~2689): a
+                    virtual host or Leaf-host persona overrides the raw
+                    hostName. Without this the modal showed the underlying
+                    EventGroup owner (e.g. "Shawn Oates") for a plan the card
+                    correctly attributes to its virtual host ("Marcus"). */}
+                {selectedEvent.virtualHost ? (
+                  <div className="flex items-center gap-2">
+                    {selectedEvent.virtualHostPersona?.avatarUrl && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={selectedEvent.virtualHostPersona.avatarUrl}
+                        alt=""
+                        aria-hidden="true"
+                        className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200 flex-shrink-0"
+                      />
+                    )}
+                    <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
+                      Hosted by {selectedEvent.virtualHostPersona?.name || "your host"}
+                    </p>
+                  </div>
+                ) : selectedEvent.leafHostState === "leaf_hosted" ? (
+                  <div className="flex items-center gap-2">
+                    {selectedEvent.leafHostPersona?.avatarUrl && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={selectedEvent.leafHostPersona.avatarUrl}
+                        alt=""
+                        aria-hidden="true"
+                        className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200 flex-shrink-0"
+                      />
+                    )}
+                    <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
+                      Hosted by Leaf{selectedEvent.leafHostPersona?.name ? ` · ${selectedEvent.leafHostPersona.name}` : ""}
+                    </p>
+                  </div>
+                ) : selectedEvent.leafHostState === "leaf_arranging" ? (
+                  <p className="text-sm font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    Leaf is arranging this
+                  </p>
+                ) : (
+                  <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
+                    Hosted by {selectedEvent.hostName}
+                  </p>
+                )}
                 <div className="flex gap-6 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">
                   {selectedEvent.isPoll ? (
                     <>
