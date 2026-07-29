@@ -2044,6 +2044,19 @@ export default function OrgCalendarPage() {
     }
   }, [org, planQueryId]);
 
+  // Keep the open detail modal in sync with the live plans list. `selectedEvent`
+  // is a frozen snapshot taken when the card was clicked, so any later
+  // fetchOrg() (RSVP, host reassignment, virtual host, etc.) refreshes the card
+  // grid but leaves the modal showing stale data — most visibly the host name
+  // (card shows the new host while the modal still reads the old one). Re-derive
+  // the snapshot from org.plans by id whenever the list changes. If the plan is
+  // gone (cancelled), leave the snapshot as-is; explicit close paths null it.
+  useEffect(() => {
+    if (!selectedEvent || !org) return;
+    const fresh = org.plans.find((p) => p.id === selectedEvent.id);
+    if (fresh && fresh !== selectedEvent) setSelectedEvent(fresh);
+  }, [org, selectedEvent]);
+
   // Auto-load the host notification id when a host opens their own plan
   // (powers the "Message Attendees" button → /h/{id}).
   useEffect(() => {
