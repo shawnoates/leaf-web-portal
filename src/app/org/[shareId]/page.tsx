@@ -2057,10 +2057,19 @@ export default function OrgCalendarPage() {
     if (fresh && fresh !== selectedEvent) setSelectedEvent(fresh);
   }, [org, selectedEvent]);
 
+  // Whether the VIEWER should see the owner/host treatment (hosting badge,
+  // Message Attendees, add-to-calendar as host). A virtual host or Leaf host is
+  // the public face of the plan even though the owner technically owns the
+  // EventGroup — on this public page such a plan should read like any other
+  // visitor's plan ("Hosted by Marcus"), not "You're Hosting". The owner still
+  // manages it from the dashboard. Excludes those personas from the host view.
+  const viewerHostsPlan = (plan: Plan) =>
+    hostedPlanIds.has(plan.id) && !plan.virtualHost && plan.leafHostState !== "leaf_hosted";
+
   // Auto-load the host notification id when a host opens their own plan
   // (powers the "Message Attendees" button → /h/{id}).
   useEffect(() => {
-    if (selectedEvent && hostedPlanIds.has(selectedEvent.id)) {
+    if (selectedEvent && viewerHostsPlan(selectedEvent)) {
       loadHostNotificationId(selectedEvent.id);
     } else {
       setHostNotificationId(null);
@@ -2807,7 +2816,7 @@ export default function OrgCalendarPage() {
                       <>
                         <div className="flex items-center gap-3">
                           <AvatarStack count={plan.attendeeCount} />
-                          {hostedPlanIds.has(plan.id) ? (
+                          {viewerHostsPlan(plan) ? (
                             <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
                               <Check className="w-3 h-3" /> Hosting
                             </span>
@@ -3763,7 +3772,7 @@ export default function OrgCalendarPage() {
                       <span className="text-xs font-bold uppercase tracking-widest">Share</span>
                     </button>
                   </div>
-                ) : hostedPlanIds.has(selectedEvent.id) ? (
+                ) : viewerHostsPlan(selectedEvent) ? (
                   <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-center gap-2 py-2">
                       <Check className="w-4 h-4 text-emerald-600" />
@@ -3852,7 +3861,7 @@ export default function OrgCalendarPage() {
                     private addresses don't leak into calendar entries. */}
                 {!selectedEvent.isPoll
                   && selectedEvent.dateISO
-                  && (rsvpedPlanIds.has(selectedEvent.id) || hostedPlanIds.has(selectedEvent.id))
+                  && (rsvpedPlanIds.has(selectedEvent.id) || viewerHostsPlan(selectedEvent))
                   && (() => {
                   const venueGated = !!(selectedEvent.location?.isPrivate
                     || (selectedEvent.requireApproval && !rsvpedPlanIds.has(selectedEvent.id)));
