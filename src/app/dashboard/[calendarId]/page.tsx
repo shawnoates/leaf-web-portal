@@ -243,7 +243,7 @@ const TABS = [
 // `growth` is the retired Social tier treated as Pro.
 const PAID_TIERS = ["pro", "growth", "concierge"];
 
-type CalActivePlan = { objectId: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null };
+type CalActivePlan = { objectId: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; virtualHost?: boolean; virtualHostPersona?: { name: string; avatarUrl: string | null } | null; leafHostState?: "leaf_hosted" | "leaf_arranging" | null; leafHostPersona?: { name: string; avatarUrl: string | null } | null; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null };
 
 // ── Analytics types ────────────────────────────────────────────────────
 
@@ -1701,7 +1701,17 @@ export default function OrgDashboardPage() {
                             {new Date(plan.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                           </p>
                           <div className="flex items-center justify-between text-xs text-zinc-400">
-                            <span className="truncate">{plan.hostName}</span>
+                            <span className="truncate">
+                              {plan.virtualHost ? (
+                                <>Hosted by {plan.virtualHostPersona?.name || "your host"}</>
+                              ) : plan.leafHostState === "leaf_hosted" ? (
+                                <>Hosted by Leaf{plan.leafHostPersona?.name ? ` · ${plan.leafHostPersona.name}` : ""}</>
+                              ) : plan.leafHostState === "leaf_arranging" ? (
+                                <>Leaf is arranging this</>
+                              ) : (
+                                <>Hosted by {plan.hostName}</>
+                              )}
+                            </span>
                             <span className="shrink-0 ml-2">
                               {plan.isPoll ? `${plan.pollVoteCount ?? 0} votes` : `${plan.rsvpCount} RSVPs`}
                             </span>
