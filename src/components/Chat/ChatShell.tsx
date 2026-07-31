@@ -76,6 +76,7 @@ export default function ChatShell({
   const [users, setUsers] = useState<Map<string, UserLite>>(new Map());
   const [composeText, setComposeText] = useState("");
   const [sending, setSending] = useState(false);
+  const [virtualHostPersonaName, setVirtualHostPersonaName] = useState<string | null>(null);
 
   useEffect(() => {
     setDevice(detectDevice());
@@ -115,6 +116,7 @@ export default function ChatShell({
           attendeeCount?: number | null;
           notificationId?: string | null;
           users?: Record<string, { name: string; profilePictureUrl?: string | null }>;
+          virtualHostPersona?: { id: string; name: string; avatarUrl?: string | null } | null;
         };
 
         await signInToChat(tokenResult.firebaseToken);
@@ -161,6 +163,7 @@ export default function ChatShell({
         if (tokenResult.planLocationName) setPlanLocationName(tokenResult.planLocationName);
         if (typeof tokenResult.attendeeCount === "number") setAttendeeCount(tokenResult.attendeeCount);
         if (tokenResult.notificationId) setNotificationId(tokenResult.notificationId);
+        if (tokenResult.virtualHostPersona?.name) setVirtualHostPersonaName(tokenResult.virtualHostPersona.name);
 
         const messagesRef = ref(db, `groups/${eventGroupId}/messages`);
         const recentMessages = query(
@@ -599,6 +602,7 @@ export default function ChatShell({
                   user={users.get(msg.from)}
                   isFromCurrentUser={msg.from === currentUserIdRef.current}
                   hideAvatar={Boolean(sameUser)}
+                  virtualHostPersonaName={virtualHostPersonaName}
                 />
               );
             })

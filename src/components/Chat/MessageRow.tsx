@@ -10,6 +10,7 @@ interface Props {
   user?: UserLite;
   isFromCurrentUser: boolean;
   hideAvatar: boolean;
+  virtualHostPersonaName?: string | null;
 }
 
 export default function MessageRow({
@@ -17,6 +18,7 @@ export default function MessageRow({
   user,
   isFromCurrentUser,
   hideAvatar,
+  virtualHostPersonaName,
 }: Props) {
   const type = message.type;
 
@@ -45,6 +47,7 @@ export default function MessageRow({
       user={user}
       isFromCurrentUser={isFromCurrentUser}
       hideAvatar={hideAvatar}
+      virtualHostPersonaName={virtualHostPersonaName}
     />
   );
 }
@@ -56,14 +59,16 @@ function TextBubbleRow({
   user,
   isFromCurrentUser,
   hideAvatar,
+  virtualHostPersonaName,
 }: {
   message: FirMessage;
   user?: UserLite;
   isFromCurrentUser: boolean;
   hideAvatar: boolean;
+  virtualHostPersonaName?: string | null;
 }) {
   const isLeafAI = message.from === "leaf_ai";
-  const senderName = isLeafAI ? "Leaf" : user?.name || "";
+  const senderName = isLeafAI ? (virtualHostPersonaName || "Leaf") : user?.name || "";
   const text = (message.text || "").trim();
 
   const avatar = isLeafAI ? (
