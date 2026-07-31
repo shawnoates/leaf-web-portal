@@ -4,14 +4,15 @@ import Joyride, { CallBackProps, STATUS, Step } from "react-joyride";
 
 interface DashboardTourProps {
   run: boolean;
+  /** Controlled step index — the parent owns advancement so it can switch tabs
+   *  in the same render pass, guaranteeing the target is mounted. */
+  stepIndex: number;
   calendarId: string;
   steps: Step[];
-  onFinish: () => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onStepChange?: (data: any) => void;
+  onCallback: (data: CallBackProps) => void;
 }
 
-export function DashboardTour({ run, calendarId, steps, onFinish, onStepChange }: DashboardTourProps) {
+export function DashboardTour({ run, stepIndex, calendarId, steps, onCallback }: DashboardTourProps) {
   const handleCallback = (data: CallBackProps) => {
     if (data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED) {
       try {
@@ -19,17 +20,14 @@ export function DashboardTour({ run, calendarId, steps, onFinish, onStepChange }
       } catch {
         // quota or disabled localStorage
       }
-      onFinish();
     }
-    // Call the step change handler for tab navigation
-    if (onStepChange) {
-      onStepChange(data);
-    }
+    onCallback(data);
   };
 
   return (
     <Joyride
       run={run}
+      stepIndex={stepIndex}
       steps={steps}
       continuous
       showSkipButton

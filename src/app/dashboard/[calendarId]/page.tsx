@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Step } from "react-joyride";
+import { Step, ACTIONS, EVENTS, STATUS, CallBackProps } from "react-joyride";
 import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
@@ -614,61 +614,6 @@ export default function OrgDashboardPage() {
     const seen = localStorage.getItem(`dashboard_tour_seen_${calendarId}`);
     if (!seen) setRunTour(true);
   }, [dashboard?.isOwner, calendarId, showSubscription, showCreatePlanModal, showPhoneModal]);
-
-  // Navigate to appropriate tab when tour step changes
-  useEffect(() => {
-    if (!dashboard || !runTour) return;
-    // Build tour steps to get current step's target
-    const steps: Step[] = [
-      {
-        target: "[data-tour='tour-tabs']",
-        content: "This is your control center — switch between Overview, Calendars, Followers, and more.",
-        placement: "bottom",
-      },
-    ];
-    if (dashboard.tier === "concierge") {
-      steps.push({
-        target: "[data-tour='tour-concierge']",
-        content: "Chat with your concierge here for help with plans and members.",
-        placement: "bottom",
-      });
-    }
-    steps.push(
-      {
-        target: "[data-tour='tour-plans']",
-        content: "Your upcoming plans live here — tap one to see details.",
-        placement: "top",
-      },
-      {
-        target: "[data-tour='tour-add-calendar']",
-        content: "Add another calendar to this org anytime.",
-        placement: "right",
-      },
-      {
-        target: "[data-tour='tour-members']",
-        content: "Manage who's on your team and their roles.",
-        placement: "top",
-      }
-    );
-    if (dashboard.isOwner) {
-      steps.push({
-        target: "[data-tour='tour-settings']",
-        content: "Update your org's branding and preferences in Settings.",
-        placement: "bottom",
-      });
-    }
-
-    const targetSelector = steps[tourStepIndex]?.target;
-    const targetStr = typeof targetSelector === 'string' ? targetSelector : '';
-
-    if (targetStr.includes('tour-plans') || targetStr.includes('tour-add-calendar')) {
-      setActiveTab("calendars");
-    } else if (targetStr.includes('tour-members')) {
-      setActiveTab("members");
-    } else if (targetStr.includes('tour-settings')) {
-      setActiveTab("settings");
-    }
-  }, [tourStepIndex, runTour, dashboard?.tier, dashboard?.isOwner]);
 
   // Legacy compat: ?editCal=<id> used to open a modal on this page. The
   // edit surface is now its own route — redirect once dashboard is loaded
@@ -1352,10 +1297,45 @@ export default function OrgDashboardPage() {
     });
   }
 
-  // Track tour step changes (actual tab navigation happens in useEffect above)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleTourCallback = (data: any) => {
-    setTourStepIndex(data?.stepIndex || 0);
+  // Which tab does a given tour step live on? Used to switch tabs in the SAME
+  // batched update that advances the controlled stepIndex, so the target is
+  // always mounted by the time Joyride positions the tooltip.
+  const tabForTourTarget = (target: Step["target"] | undefined): string | null => {
+    const t = typeof target === "string" ? target : "";
+    if (t.includes("tour-plans") || t.includes("tour-add-calendar")) return "calendars";
+    if (t.includes("tour-members")) return "members";
+    if (t.includes("tour-settings")) return "settings";
+    if (t.includes("tour-tabs") || t.includes("tour-concierge")) return "overview";
+    return null;
+  };
+
+  // Controlled advancement. Joyride never advances on its own (stepIndex is a
+  // prop), so we own Next/Back here — switching the tab and moving the index
+  // together avoids the "target not mounted" skip-to-end bug.
+  const handleTourCallback = (data: CallBackProps) => {
+    const { action, index, status, type } = data;
+
+    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+      setRunTour(false);
+      setTourStepIndex(0);
+      return;
+    }
+
+    if (action === ACTIONS.CLOSE) {
+      setRunTour(false);
+      setTourStepIndex(0);
+      return;
+    }
+
+    // Advance only on an explicit Next/Back (STEP_AFTER). We deliberately do
+    // NOT react to TARGET_NOT_FOUND — auto-advancing on a missing target is
+    // exactly what made the tour skip straight to the last step.
+    if (type === EVENTS.STEP_AFTER) {
+      const nextIndex = index + (action === ACTIONS.PREV ? -1 : 1);
+      const tab = tabForTourTarget(tourSteps[nextIndex]?.target);
+      if (tab) setActiveTab(tab);
+      setTourStepIndex(nextIndex);
+    }
   };
 
   // ── Render ──
@@ -4017,10 +3997,10 @@ export default function OrgDashboardPage() {
       {/* Dashboard Tour */}
       <DashboardTour
         run={runTour}
+        stepIndex={tourStepIndex}
         calendarId={calendarId}
         steps={tourSteps}
-        onFinish={() => setRunTour(false)}
-        onStepChange={handleTourCallback}
+        onCallback={handleTourCallback}
       />
     </div>
   );
