@@ -2,7 +2,10 @@
    Only color tokens + typography — Fumadocs' own preset.css handles all
    component layout/structure. Scoped to /help via the layout CSS bundle. */
 
-#nd-root {
+/* Colors target :root (not #nd-root) so Fumadocs' portaled dialogs — search,
+   popovers — which mount on document.body outside #nd-root, still inherit the
+   brand palette. Safe because this stylesheet only loads on /help routes. */
+:root {
   /* Leaf's minimalist zinc/white palette */
   --color-fd-background: hsl(0, 0%, 100%);
   --color-fd-foreground: hsl(24, 9.8%, 10%);
@@ -20,12 +23,12 @@
   --color-fd-accent: hsl(0, 0%, 94%);
   --color-fd-accent-foreground: hsl(24, 9.8%, 10%);
   --color-fd-ring: hsl(24, 9.8%, 30%);
+}
 
+#nd-root {
   font-family: var(--font-geist-sans);
 }
 
-.dark #nd-root,
-#nd-root.dark,
 .dark {
   --color-fd-background: hsl(0, 0%, 8%);
   --color-fd-foreground: hsl(0, 0%, 96%);
