@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import InboxThreadList, { type InboxThread } from "@/components/Inbox/InboxThreadList";
@@ -24,7 +24,6 @@ interface InboxPayload {
 //
 // Mobile collapses to one column — the list, or the thread with a back arrow.
 export default function InboxClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [payload, setPayload] = useState<InboxPayload | null>(null);
   const [loading, setLoading] = useState(true);
