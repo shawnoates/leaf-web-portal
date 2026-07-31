@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Step } from "react-joyride";
 import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
@@ -18,6 +19,7 @@ import MarketplaceTab, { type MarketplaceEvent, type OrgSettings } from "@/compo
 import CreatePlanModal, { type CreatePlanPrefill, NEW_PLAN_DRAFT_SESSION_KEY } from "@/components/CreatePlanModal";
 import PlanDetailModal from "@/components/PlanDetailModal";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
+import { DashboardTour } from "@/components/DashboardTour";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import {
@@ -600,6 +602,15 @@ export default function OrgDashboardPage() {
     if (user) fetchDashboard();
   }, [user, fetchDashboard]);
 
+  // Trigger tour on first visit for owners
+  useEffect(() => {
+    if (!dashboard?.isOwner || !calendarId) return;
+    // Don't show tour if any modals are open
+    if (showSubscription || showCreatePlanModal || showPhoneModal) return;
+    const seen = localStorage.getItem(`dashboard_tour_seen_${calendarId}`);
+    if (!seen) setRunTour(true);
+  }, [dashboard?.isOwner, calendarId, showSubscription, showCreatePlanModal, showPhoneModal]);
+
   // Legacy compat: ?editCal=<id> used to open a modal on this page. The
   // edit surface is now its own route — redirect once dashboard is loaded
   // enough to know the calendar exists and is accessible.
@@ -905,6 +916,8 @@ export default function OrgDashboardPage() {
   // Selected calendar in the Calendars tab's master/detail layout.
   const [calendarsSelectedId, setCalendarsSelectedId] = useState<string | null>(null);
 
+  // Dashboard tour (first visit walkthrough)
+  const [runTour, setRunTour] = useState(false);
 
   // Analytics fetcher — Pro tier only
   const fetchAnalytics = useCallback(
@@ -1240,6 +1253,49 @@ export default function OrgDashboardPage() {
   const isPaid = PAID_TIERS.includes(dashboard.tier);
   const tierLabel = dashboard.tier === "concierge" ? "Concierge" : isPaid ? "Pro" : "Free";
 
+  // Build tour steps conditionally based on visible tabs
+  const tourSteps: Step[] = [
+    {
+      target: "[data-tour='tour-tabs']",
+      content: "This is your control center — switch between Overview, Calendars, Followers, and more.",
+      placement: "bottom",
+    },
+  ];
+
+  if (dashboard.tier === "concierge") {
+    tourSteps.push({
+      target: "[data-tour='tour-concierge']",
+      content: "Chat with your concierge here for help with plans and members.",
+      placement: "bottom",
+    });
+  }
+
+  tourSteps.push(
+    {
+      target: "[data-tour='tour-plans']",
+      content: "Your upcoming plans live here — tap one to see details.",
+      placement: "top",
+    },
+    {
+      target: "[data-tour='tour-add-calendar']",
+      content: "Add another calendar to this org anytime.",
+      placement: "right",
+    },
+    {
+      target: "[data-tour='tour-members']",
+      content: "Manage who's on your team and their roles.",
+      placement: "top",
+    }
+  );
+
+  if (dashboard.isOwner) {
+    tourSteps.push({
+      target: "[data-tour='tour-settings']",
+      content: "Update your org's branding and preferences in Settings.",
+      placement: "bottom",
+    });
+  }
+
   // ── Render ──
 
   return (
@@ -1270,7 +1326,7 @@ export default function OrgDashboardPage() {
 
         {/* Tabs */}
         <div className="max-w-5xl mx-auto px-6">
-          <nav className="flex gap-1 -mb-px overflow-x-auto no-scrollbar">
+          <nav className="flex gap-1 -mb-px overflow-x-auto no-scrollbar" data-tour="tour-tabs">
             {TABS.map((tab) => {
               if (tab.ownerOnly && !dashboard.isOwner) return null;
               const Icon = tab.icon;
@@ -1293,6 +1349,7 @@ export default function OrgDashboardPage() {
                       ? "border-zinc-900 text-zinc-900"
                       : "border-transparent text-zinc-400 hover:text-zinc-600"
                   }`}
+                  data-tour={tab.id === "settings" ? "tour-settings" : undefined}
                 >
                   <Icon className="w-3.5 h-3.5" />
                   {tab.label}
@@ -1374,6 +1431,7 @@ export default function OrgDashboardPage() {
               <button
                 onClick={() => setShowConciergeChat(true)}
                 className="w-full text-left relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 px-5 py-4 flex items-center gap-4 hover:bg-zinc-900 transition-colors"
+                data-tour="tour-concierge"
               >
                 <div aria-hidden className="pointer-events-none absolute inset-0">
                   <div className="absolute -top-16 -right-12 h-40 w-40 rounded-full bg-emerald-500/20 blur-3xl" />
@@ -2436,6 +2494,7 @@ export default function OrgDashboardPage() {
                         <button
                           onClick={() => setShowAddCalendar(true)}
                           className="w-full flex items-center justify-center gap-2 border border-dashed border-zinc-300 text-zinc-500 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest hover:border-zinc-400 hover:text-zinc-900 transition-colors"
+                          data-tour="tour-add-calendar"
                         >
                           <Plus className="w-3.5 h-3.5" /> Create Calendar
                         </button>
@@ -2571,7 +2630,7 @@ export default function OrgDashboardPage() {
                         </div>
                       </div>
                     )}
-                    <div className="pt-2">
+                    <div className="pt-2" data-tour="tour-plans">
                       <PlansManager
                         calendarId={cal.objectId}
                         orgId={calendarId}
@@ -3175,7 +3234,7 @@ export default function OrgDashboardPage() {
               {dashboard.members.length === 0 ? (
                 <p className="text-sm text-zinc-400">No users yet.</p>
               ) : (
-                <div className="border border-zinc-200 rounded-xl overflow-hidden">
+                <div className="border border-zinc-200 rounded-xl overflow-hidden" data-tour="tour-members">
                   <table className="w-full text-sm">
                     <thead className="bg-zinc-50 text-xs uppercase tracking-widest text-zinc-400">
                       <tr>
@@ -3892,6 +3951,14 @@ export default function OrgDashboardPage() {
           {toast}
         </div>
       )}
+
+      {/* Dashboard Tour */}
+      <DashboardTour
+        run={runTour}
+        calendarId={calendarId}
+        steps={tourSteps}
+        onFinish={() => setRunTour(false)}
+      />
     </div>
   );
 }
