@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import PersonalHero from "./PersonalHero";
+import PhotoGrid from "./PhotoGrid";
 import {
   Sparkles,
   Calendar,
@@ -161,6 +162,9 @@ export default function PersonalPage() {
   return (
     <div className="min-h-screen">
       <PersonalHero isLoggedIn={isLoggedIn} />
+
+      {/* Photo row */}
+      <PhotoGrid />
 
       {/* Who it's for */}
       <section className="py-24">
