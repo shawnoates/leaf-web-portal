@@ -28,7 +28,7 @@ export async function generateMetadata(
   props: HelpPageProps
 ): Promise<Metadata> {
   const { slug } = await props.params;
-  const page = await getHelpPage(slug);
+  const page = getHelpPage(slug);
 
   if (!page) {
     return {};
@@ -42,7 +42,7 @@ export async function generateMetadata(
 
 export default async function HelpPage(props: HelpPageProps) {
   const { slug } = await props.params;
-  const page = await getHelpPage(slug);
+  const page = getHelpPage(slug);
 
   if (!page) {
     notFound();
