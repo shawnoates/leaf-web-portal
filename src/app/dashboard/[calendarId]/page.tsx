@@ -9,7 +9,7 @@ import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import ConciergeDashboardBanner from "@/components/ConciergeDashboardBanner";
-import ConciergeInbox from "@/components/ConciergeInbox";
+import OwnerInbox from "@/components/OwnerInbox";
 import PlanChatDrawer from "@/components/PlanChatDrawer";
 import { type ConciergeMenu } from "@/components/ConciergeMenuCard";
 import ConciergeThread from "@/components/ConciergeThread";
@@ -1359,7 +1359,7 @@ export default function OrgDashboardPage() {
           {/* Global concierge inbox — hides itself when the caller
               owns no Concierge-tier calendars. Concierge-tier only per
               scope note (leaf-host chats live per-plan on /org). */}
-          <ConciergeInbox />
+          <OwnerInbox currentCalendarId={calendarId} />
           <Link
             href="/help"
             target="_blank"
