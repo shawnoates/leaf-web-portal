@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Loader2, Send } from "lucide-react";
 import Parse from "@/lib/parse-client";
+import PlanContextPanel, { type PlanContext } from "./PlanContextPanel";
 
 interface ThreadMessage {
   objectId: string;
@@ -23,6 +24,7 @@ interface ThreadPayload {
   planTitle: string | null;
   personaName: string | null;
   personaAvatarUrl: string | null;
+  plan: PlanContext | null;
   messages: ThreadMessage[];
 }
 
@@ -117,7 +119,8 @@ export default function InboxThreadView({
   const counterpart = thread?.personaName || "Leaf Concierge";
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-white">
+    <div className="flex h-full min-h-0">
+      <div className="flex flex-col flex-1 min-w-0 min-h-0 bg-white">
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-zinc-100 shrink-0">
         {onBack && (
@@ -219,6 +222,11 @@ export default function InboxThreadView({
           </button>
         </div>
       </div>
+      </div>
+
+      {/* Right rail: the plan under discussion. Plan threads only — a
+          calendar-level concierge thread has no single plan to describe. */}
+      {thread?.plan && <PlanContextPanel plan={thread.plan} />}
     </div>
   );
 }

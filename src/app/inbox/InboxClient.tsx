@@ -55,6 +55,29 @@ export default function InboxClient() {
     return () => clearInterval(t);
   }, [load]);
 
+  // Zero the badge the moment a thread is opened rather than waiting for the
+  // next 30s poll — a count that lingers after you've read the thread reads as
+  // broken. Concierge threads need the explicit mark because ConciergeThread
+  // only touches the legacy read booleans, not InboxThreadRead.
+  const selectThread = useCallback((t: InboxThread) => {
+    setSelected(t);
+    setPayload((prev) => {
+      if (!prev) return prev;
+      const hit = prev.threads.find((x) => x.threadKey === t.threadKey);
+      if (!hit || hit.unreadCount === 0) return prev;
+      return {
+        totalUnread: Math.max(0, prev.totalUnread - hit.unreadCount),
+        threads: prev.threads.map((x) =>
+          x.threadKey === t.threadKey ? { ...x, unreadCount: 0 } : x,
+        ),
+      };
+    });
+    Parse.Cloud.run("markInboxThreadRead", {
+      calendarId: t.calendarId,
+      planId: t.planId || undefined,
+    }).catch(() => undefined);
+  }, []);
+
   // Deep link: /inbox?calendarId=…&planId=… selects that thread once the list
   // has loaded. This is what the "Reply in your inbox" email button targets.
   const wantCalendarId = searchParams.get("calendarId");
@@ -64,8 +87,8 @@ export default function InboxClient() {
     const match = payload.threads.find(
       (t) => t.calendarId === wantCalendarId && (t.planId || null) === (wantPlanId || null),
     );
-    if (match) setSelected(match);
-  }, [payload, selected, wantCalendarId, wantPlanId]);
+    if (match) selectThread(match);
+  }, [payload, selected, wantCalendarId, wantPlanId, selectThread]);
 
   const threads = payload?.threads ?? [];
   const totalUnread = payload?.totalUnread ?? 0;
@@ -114,7 +137,7 @@ export default function InboxClient() {
             <InboxThreadList
               threads={threads}
               selectedKey={selected?.threadKey ?? null}
-              onSelect={setSelected}
+              onSelect={selectThread}
             />
           )}
         </aside>
@@ -132,7 +155,11 @@ export default function InboxClient() {
               </p>
             </div>
           ) : selected.threadKind === "concierge" && !selected.planId ? (
-            <div className="flex-1 min-h-0 bg-white">
+            /* ConciergeThread is `w-full h-full flex flex-col` with its
+               composer as the last child — it needs a padded, definite-height
+               box or the composer sits flush against the viewport edge and
+               clips. */
+            <div className="flex-1 min-h-0 bg-white px-4 md:px-6 py-4 flex flex-col">
               <ConciergeThread calendarId={selected.calendarId} />
             </div>
           ) : (

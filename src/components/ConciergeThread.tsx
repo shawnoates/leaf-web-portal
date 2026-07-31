@@ -5,6 +5,7 @@ import Parse from "@/lib/parse-client";
 import { Send, Loader2, Sparkles, Check, MessageCirclePlus, MapPin, Wallet, Users } from "lucide-react";
 import type { ConciergeMenu } from "./ConciergeMenuCard";
 import ConciergeProposalCard, { type ConciergeProposal } from "./ConciergeProposalCard";
+import LeafHostPayCard from "./LeafHostPayCard";
 
 interface ConciergeMessage {
   objectId: string;
@@ -316,6 +317,69 @@ export default function ConciergeThread({
                 </div>
               );
             }
+            // Leaf-host disclosure + pay messages carry their own rendering.
+            // These used to live only in LeafHostThread, which is mounted
+            // nowhere — so once leaf-host calendar threads started surfacing
+            // here, `leaf_host_pay_card` rendered its JSON payload as a plain
+            // text bubble. The card's parameters ARE that payload.
+            if (m.kind === "leaf_host_pay_card") {
+              let cfg: {
+                perPlanRate?: number;
+                maxGroupSize?: number;
+                turnaroundHours?: number;
+              } = {};
+              try {
+                cfg = JSON.parse(m.body) || {};
+              } catch {
+                // Malformed payload — fall through to a bubble rather than
+                // crashing the whole thread.
+              }
+              if (typeof cfg.perPlanRate === "number") {
+                return (
+                  <div key={m.objectId} className="flex items-start gap-2">
+                    <div className="w-8 shrink-0" />
+                    <div className="max-w-[85%] min-w-0">
+                      <LeafHostPayCard
+                        calendarId={calendarId}
+                        perPlanRate={cfg.perPlanRate}
+                        maxGroupSize={cfg.maxGroupSize ?? 8}
+                        turnaroundHours={cfg.turnaroundHours ?? 24}
+                        personaName={persona.name}
+                        inFlight={null}
+                        onAuthorized={load}
+                        onCloseDrawer={() => undefined}
+                      />
+                    </div>
+                  </div>
+                );
+              }
+            }
+
+            // Fee gets amber (a caveat to read), the guarantee emerald
+            // (reassurance) — a matched pair of callouts, not two warnings.
+            if (
+              m.kind === "leaf_host_fee_disclaimer" ||
+              m.kind === "leaf_host_guarantee"
+            ) {
+              const warm = m.kind === "leaf_host_fee_disclaimer";
+              return (
+                <div key={m.objectId} className="flex items-start gap-2">
+                  <div className="w-8 shrink-0" />
+                  <div
+                    className={`rounded-xl px-4 py-3 max-w-[85%] border ${
+                      warm
+                        ? "bg-amber-50 border-amber-200"
+                        : "bg-emerald-50 border-emerald-200"
+                    }`}
+                  >
+                    <p className="text-sm text-zinc-900 leading-relaxed whitespace-pre-wrap">
+                      {m.body}
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+
             const mine = m.senderRole === "owner";
             const avatarUrl = mine ? myAvatar : persona.avatarUrl;
             return (
