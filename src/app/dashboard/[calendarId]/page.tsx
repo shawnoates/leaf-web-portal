@@ -612,8 +612,14 @@ export default function OrgDashboardPage() {
     // Don't show tour if any modals are open
     if (showSubscription || showCreatePlanModal || showPhoneModal) return;
     const seen = localStorage.getItem(`dashboard_tour_seen_${calendarId}`);
-    if (!seen) setRunTour(true);
-  }, [dashboard?.isOwner, calendarId, showSubscription, showCreatePlanModal, showPhoneModal]);
+    if (!seen) {
+      // Start on the tab the first step lives on: concierge orgs open on the
+      // Overview concierge card, everyone else on the Calendars plans list.
+      setActiveTab(dashboard.tier === "concierge" ? "overview" : "calendars");
+      setTourStepIndex(0);
+      setRunTour(true);
+    }
+  }, [dashboard?.isOwner, dashboard?.tier, calendarId, showSubscription, showCreatePlanModal, showPhoneModal]);
 
   // Legacy compat: ?editCal=<id> used to open a modal on this page. The
   // edit surface is now its own route — redirect once dashboard is loaded
@@ -1254,20 +1260,16 @@ export default function OrgDashboardPage() {
   const isPaid = PAID_TIERS.includes(dashboard.tier);
   const tierLabel = dashboard.tier === "concierge" ? "Concierge" : isPaid ? "Pro" : "Free";
 
-  // Build tour steps for DashboardTour component
-  const tourSteps: Step[] = [
-    {
-      target: "[data-tour='tour-tabs']",
-      content: "This is your control center — switch between Overview, Calendars, Followers, and more.",
-      placement: "bottom",
-    },
-  ];
+  // Build tour steps for DashboardTour component. `disableBeacon` on the first
+  // step opens the tooltip immediately instead of showing a clickable dot.
+  const tourSteps: Step[] = [];
 
   if (dashboard.tier === "concierge") {
     tourSteps.push({
       target: "[data-tour='tour-concierge']",
       content: "Chat with your concierge here for help with plans and members.",
       placement: "bottom",
+      disableBeacon: true,
     });
   }
 
@@ -1276,6 +1278,7 @@ export default function OrgDashboardPage() {
       target: "[data-tour='tour-plans']",
       content: "Your upcoming plans live here — tap one to see details.",
       placement: "top",
+      disableBeacon: true,
     },
     {
       target: "[data-tour='tour-add-calendar']",
