@@ -7,9 +7,11 @@ interface DashboardTourProps {
   calendarId: string;
   steps: Step[];
   onFinish: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onStepChange?: (data: any) => void;
 }
 
-export function DashboardTour({ run, calendarId, steps, onFinish }: DashboardTourProps) {
+export function DashboardTour({ run, calendarId, steps, onFinish, onStepChange }: DashboardTourProps) {
   const handleCallback = (data: CallBackProps) => {
     if (data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED) {
       try {
@@ -18,6 +20,10 @@ export function DashboardTour({ run, calendarId, steps, onFinish }: DashboardTou
         // quota or disabled localStorage
       }
       onFinish();
+    }
+    // Call the step change handler for tab navigation
+    if (onStepChange) {
+      onStepChange(data);
     }
   };
 

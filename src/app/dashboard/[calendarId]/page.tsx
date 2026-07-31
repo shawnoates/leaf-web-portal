@@ -1296,6 +1296,22 @@ export default function OrgDashboardPage() {
     });
   }
 
+  // Navigate to appropriate tab when tour step changes
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleTourCallback = (data: any) => {
+    const stepIndex = data?.stepIndex || 0;
+    const targetSelector = tourSteps[stepIndex]?.target;
+    const targetStr = typeof targetSelector === 'string' ? targetSelector : '';
+
+    if (targetStr.includes('tour-plans') || targetStr.includes('tour-add-calendar')) {
+      setActiveTab("calendars");
+    } else if (targetStr.includes('tour-members')) {
+      setActiveTab("members");
+    } else if (targetStr.includes('tour-settings')) {
+      setActiveTab("settings");
+    }
+  };
+
   // ── Render ──
 
   return (
@@ -3958,6 +3974,7 @@ export default function OrgDashboardPage() {
         calendarId={calendarId}
         steps={tourSteps}
         onFinish={() => setRunTour(false)}
+        onStepChange={handleTourCallback}
       />
     </div>
   );
