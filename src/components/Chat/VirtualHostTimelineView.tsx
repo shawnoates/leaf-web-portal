@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Loader2, Sparkles } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { useState } from "react";
 
 interface TimelineEntry {
@@ -15,10 +15,12 @@ export default function VirtualHostTimelineView({
   entries,
   loading,
   personaName,
+  personaAvatarUrl,
 }: {
   entries: TimelineEntry[] | null;
   loading: boolean;
   personaName?: string | null;
+  personaAvatarUrl?: string | null;
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -33,7 +35,18 @@ export default function VirtualHostTimelineView({
         onClick={() => setIsOpen(!isOpen)}
         className="w-full px-4 py-3 flex items-center gap-2 hover:bg-teal-100/50 transition-colors"
       >
-        <Sparkles className="w-4 h-4 text-teal-600 shrink-0" />
+        {personaAvatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={personaAvatarUrl}
+            alt={personaName || "Virtual host"}
+            className="w-6 h-6 rounded-full object-cover shrink-0"
+          />
+        ) : (
+          <div className="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 text-[11px] font-bold shrink-0">
+            {(personaName || "L").charAt(0).toUpperCase()}
+          </div>
+        )}
         <span className="text-sm font-medium text-teal-900 flex-1 text-left">
           {personaName ? `${personaName} arranging this plan` : "Servicing timeline"}
         </span>

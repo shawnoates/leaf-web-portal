@@ -11,6 +11,7 @@ interface Props {
   isFromCurrentUser: boolean;
   hideAvatar: boolean;
   virtualHostPersonaName?: string | null;
+  virtualHostPersonaAvatarUrl?: string | null;
 }
 
 export default function MessageRow({
@@ -19,6 +20,7 @@ export default function MessageRow({
   isFromCurrentUser,
   hideAvatar,
   virtualHostPersonaName,
+  virtualHostPersonaAvatarUrl,
 }: Props) {
   const type = message.type;
 
@@ -48,6 +50,7 @@ export default function MessageRow({
       isFromCurrentUser={isFromCurrentUser}
       hideAvatar={hideAvatar}
       virtualHostPersonaName={virtualHostPersonaName}
+      virtualHostPersonaAvatarUrl={virtualHostPersonaAvatarUrl}
     />
   );
 }
@@ -60,21 +63,35 @@ function TextBubbleRow({
   isFromCurrentUser,
   hideAvatar,
   virtualHostPersonaName,
+  virtualHostPersonaAvatarUrl,
 }: {
   message: FirMessage;
   user?: UserLite;
   isFromCurrentUser: boolean;
   hideAvatar: boolean;
   virtualHostPersonaName?: string | null;
+  virtualHostPersonaAvatarUrl?: string | null;
 }) {
   const isLeafAI = message.from === "leaf_ai";
   const senderName = isLeafAI ? (virtualHostPersonaName || "Leaf") : user?.name || "";
   const text = (message.text || "").trim();
 
+  // Virtual-hosted plans speak as a named persona (Marcus, Jules…), so the
+  // AI bubble wears that persona's face. Falls back to the persona initial,
+  // and to Leaf's "L" only when no persona is attached.
   const avatar = isLeafAI ? (
-    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold shrink-0">
-      L
-    </div>
+    virtualHostPersonaAvatarUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={virtualHostPersonaAvatarUrl}
+        alt={senderName}
+        className="w-8 h-8 rounded-full object-cover shrink-0"
+      />
+    ) : (
+      <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold shrink-0">
+        {senderName.charAt(0).toUpperCase() || "L"}
+      </div>
+    )
   ) : user?.profilePictureUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img

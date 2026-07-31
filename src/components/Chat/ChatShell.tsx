@@ -78,6 +78,7 @@ export default function ChatShell({
   const [composeText, setComposeText] = useState("");
   const [sending, setSending] = useState(false);
   const [virtualHostPersonaName, setVirtualHostPersonaName] = useState<string | null>(null);
+  const [virtualHostPersonaAvatarUrl, setVirtualHostPersonaAvatarUrl] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<Array<{ id: string; stepType: string; label: string; notes: string; createdAtLocal: string }> | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
 
@@ -167,6 +168,8 @@ export default function ChatShell({
         if (typeof tokenResult.attendeeCount === "number") setAttendeeCount(tokenResult.attendeeCount);
         if (tokenResult.notificationId) setNotificationId(tokenResult.notificationId);
         if (tokenResult.virtualHostPersona?.name) setVirtualHostPersonaName(tokenResult.virtualHostPersona.name);
+        if (tokenResult.virtualHostPersona?.avatarUrl)
+          setVirtualHostPersonaAvatarUrl(tokenResult.virtualHostPersona.avatarUrl);
 
         // Fetch timeline if this is a virtual-hosted plan (owner/co-host only)
         setTimelineLoading(true);
@@ -599,6 +602,7 @@ export default function ChatShell({
             entries={timeline}
             loading={timelineLoading}
             personaName={virtualHostPersonaName}
+            personaAvatarUrl={virtualHostPersonaAvatarUrl}
           />
         )}
 
@@ -627,6 +631,7 @@ export default function ChatShell({
                   isFromCurrentUser={msg.from === currentUserIdRef.current}
                   hideAvatar={Boolean(sameUser)}
                   virtualHostPersonaName={virtualHostPersonaName}
+                  virtualHostPersonaAvatarUrl={virtualHostPersonaAvatarUrl}
                 />
               );
             })
