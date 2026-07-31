@@ -319,6 +319,10 @@ export default function OrgDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(initialTab);
 
+  // Dashboard tour (first visit walkthrough)
+  const [runTour, setRunTour] = useState(false);
+  const [tourStepIndex, setTourStepIndex] = useState(0);
+
   // Edit states
   const [editName, setEditName] = useState(false);
   const [nameValue, setNameValue] = useState("");
@@ -970,10 +974,6 @@ export default function OrgDashboardPage() {
 
   // Selected calendar in the Calendars tab's master/detail layout.
   const [calendarsSelectedId, setCalendarsSelectedId] = useState<string | null>(null);
-
-  // Dashboard tour (first visit walkthrough)
-  const [runTour, setRunTour] = useState(false);
-  const [tourStepIndex, setTourStepIndex] = useState(0);
 
   // Analytics fetcher — Pro tier only
   const fetchAnalytics = useCallback(
