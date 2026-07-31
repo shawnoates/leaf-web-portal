@@ -7,7 +7,13 @@ import "@/app/help/help.css";
 
 export default function HelpLayout({ children }: { children: ReactNode }) {
   return (
-    <RootProvider>
+    <RootProvider
+      search={{
+        options: {
+          api: "/api/help-search",
+        },
+      }}
+    >
       <DocsLayout tree={helpSource.pageTree} nav={{ title: "Help Center" }}>
         {children}
       </DocsLayout>

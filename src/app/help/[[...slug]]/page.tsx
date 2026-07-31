@@ -1,5 +1,5 @@
 import { helpSource } from "@/lib/help-source";
-import { helpMdxComponents } from "@/components/help-mdx";
+import { getHelpMdxComponents } from "@/components/help-mdx";
 import { notFound } from "next/navigation";
 import { DocsPage, DocsBody, DocsTitle, DocsDescription } from "fumadocs-ui/page";
 import type { Metadata } from "next";
@@ -43,7 +43,7 @@ export default async function HelpPage(props: HelpPageProps) {
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
-        <MDXBody components={helpMdxComponents} />
+        <MDXBody components={getHelpMdxComponents()} />
       </DocsBody>
     </DocsPage>
   );
