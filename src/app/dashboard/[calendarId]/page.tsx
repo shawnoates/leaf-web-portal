@@ -1356,9 +1356,8 @@ export default function OrgDashboardPage() {
             <h1 className="text-xl font-medium tracking-tight truncate">{dashboard.name}</h1>
             <p className="text-xs text-zinc-400">{tierLabel} Plan</p>
           </div>
-          {/* Global concierge inbox — hides itself when the caller
-              owns no Concierge-tier calendars. Concierge-tier only per
-              scope note (leaf-host chats live per-plan on /org). */}
+          {/* Persistent inbox — every owner and co-host, every tier.
+              Links to /inbox; hovering peeks at recent threads. */}
           <OwnerInbox />
           <Link
             href="/help"
