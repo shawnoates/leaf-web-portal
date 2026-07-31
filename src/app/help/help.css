@@ -1,8 +1,9 @@
-/* Leaf Brand Theme for Help Center */
-/* Fumadocs CSS variable overrides, scoped to /help only */
+/* Leaf brand overrides for the Help Center.
+   Only color tokens + typography — Fumadocs' own preset.css handles all
+   component layout/structure. Scoped to /help via the layout CSS bundle. */
 
 #nd-root {
-  /* Colors — matching Leaf's minimalist zinc/white palette */
+  /* Leaf's minimalist zinc/white palette */
   --color-fd-background: hsl(0, 0%, 100%);
   --color-fd-foreground: hsl(24, 9.8%, 10%);
   --color-fd-muted: hsl(0, 0%, 96.1%);
@@ -16,176 +17,38 @@
   --color-fd-primary-foreground: hsl(0, 0%, 100%);
   --color-fd-secondary: hsl(0, 0%, 96%);
   --color-fd-secondary-foreground: hsl(24, 9.8%, 10%);
-  --color-fd-accent: hsl(0, 0%, 90%);
+  --color-fd-accent: hsl(0, 0%, 94%);
   --color-fd-accent-foreground: hsl(24, 9.8%, 10%);
   --color-fd-ring: hsl(24, 9.8%, 30%);
 
-  /* Typography — Inter font via Tailwind variable */
   font-family: var(--font-geist-sans);
-  font-size: 16px;
-  line-height: 1.6;
-
-  /* Spacing and sizing */
-  --fd-docs-height: 100vh;
-  --fd-docs-row-1: 64px;
-  --fd-docs-row-3: 48px;
 }
 
-/* Reduce excessive whitespace and tighten spacing */
-#nd-root .space-y-4 {
-  --space-y: 0.75rem;
-}
-
-#nd-root .gap-2 {
-  --gap: 0.375rem;
-}
-
-#nd-root .gap-3 {
-  --gap: 0.625rem;
-}
-
-/* Improve button/link spacing */
-#nd-root button,
-#nd-root [role="button"],
-#nd-root a {
-  padding: 0.5rem 0.75rem;
-}
-
-/* Sidebar and navigation improvements */
-#nd-sidebar {
-  --fd-sidebar-width: 240px;
-}
-
-#nd-sidebar a,
-#nd-sidebar button {
-  gap: 0.375rem;
-  padding: 0.375rem 0.5rem;
-}
-
-/* Reduce gap between sidebar sections */
-#nd-sidebar > * > * {
-  gap: 0.5rem;
-}
-
-/* Content area improvements */
-#nd-page {
-  padding: 1.5rem 2rem;
-  max-width: 900px;
-}
-
-/* Header spacing */
-#nd-root header {
-  padding: 0.75rem 1rem;
-  gap: 0.5rem;
-}
-
-/* Prose styling within content area */
-#nd-root .prose {
-  color: var(--color-fd-foreground);
-}
-
-#nd-root .prose h1,
-#nd-root .prose h2,
-#nd-root .prose h3,
-#nd-root .prose h4,
-#nd-root .prose h5,
-#nd-root .prose h6 {
-  font-weight: 300;
-  letter-spacing: -0.02em;
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
-}
-
-#nd-root .prose h1 {
-  font-size: 2.5rem;
-  line-height: 1.2;
-}
-
-#nd-root .prose h2 {
-  font-size: 1.875rem;
-  line-height: 1.3;
-}
-
-#nd-root .prose h3 {
-  font-size: 1.5rem;
-  line-height: 1.4;
-}
-
-#nd-root .prose p {
-  margin: 1em 0;
-  color: hsl(0, 0%, 40%);
-}
-
-#nd-root .prose a {
-  color: var(--color-fd-primary);
-  text-decoration: underline;
-  text-decoration-color: hsl(0, 0%, 85%);
-  transition: color 0.2s;
-}
-
-#nd-root .prose a:hover {
-  color: hsl(0, 0%, 25%);
-  text-decoration-color: hsl(0, 0%, 70%);
-}
-
-#nd-root .prose code {
-  background-color: hsl(0, 0%, 95%);
-  color: hsl(0, 0%, 25%);
-  padding: 0.125em 0.375em;
-  border-radius: 3px;
-  font-size: 0.9em;
-  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-}
-
-#nd-root .prose pre {
-  background-color: hsl(0, 0%, 12%);
-  color: hsl(0, 0%, 92%);
-  padding: 1em;
-  border-radius: 4px;
-  overflow-x: auto;
-  margin: 1.5em 0;
-}
-
-#nd-root .prose li {
-  margin: 0.5em 0;
-}
-
-#nd-root .prose ul,
-#nd-root .prose ol {
-  margin: 1em 0 1em 1.5em;
-}
-
-/* Dark mode — minimal contrast increase */
-#nd-root .dark {
-  --color-fd-background: hsl(0, 0%, 9%);
+.dark #nd-root,
+#nd-root.dark,
+.dark {
+  --color-fd-background: hsl(0, 0%, 8%);
   --color-fd-foreground: hsl(0, 0%, 96%);
-  --color-fd-muted: hsl(0, 0%, 18%);
-  --color-fd-muted-foreground: hsl(0, 0%, 70%);
-  --color-fd-popover: hsl(0, 0%, 12%);
+  --color-fd-muted: hsl(0, 0%, 14%);
+  --color-fd-muted-foreground: hsl(0, 0%, 65%);
+  --color-fd-popover: hsl(0, 0%, 11%);
   --color-fd-popover-foreground: hsl(0, 0%, 92%);
-  --color-fd-card: hsl(0, 0%, 14%);
+  --color-fd-card: hsl(0, 0%, 12%);
   --color-fd-card-foreground: hsl(0, 0%, 96%);
-  --color-fd-border: hsl(0, 0%, 25%);
+  --color-fd-border: hsl(0, 0%, 22%);
   --color-fd-primary: hsl(0, 0%, 96%);
   --color-fd-primary-foreground: hsl(0, 0%, 9%);
-  --color-fd-secondary: hsl(0, 0%, 18%);
+  --color-fd-secondary: hsl(0, 0%, 16%);
   --color-fd-secondary-foreground: hsl(0, 0%, 92%);
-  --color-fd-accent: hsl(0, 0%, 22%);
-  --color-fd-accent-foreground: hsl(0, 0%, 90%);
+  --color-fd-accent: hsl(0, 0%, 20%);
+  --color-fd-accent-foreground: hsl(0, 0%, 92%);
   --color-fd-ring: hsl(0, 0%, 60%);
 }
 
-#nd-root .dark .prose p {
-  color: hsl(0, 0%, 70%);
-}
-
-#nd-root .dark .prose code {
-  background-color: hsl(0, 0%, 18%);
-  color: hsl(0, 0%, 85%);
-}
-
-/* Remove rounded corners — match Leaf's sharp-edged aesthetic */
-#nd-root button,
-#nd-root [class*="rounded"] {
-  border-radius: 4px;
+/* Lightweight headings to match Leaf's marketing typography */
+#nd-root .prose h1,
+#nd-root .prose h2,
+#nd-root .prose h3 {
+  font-weight: 300;
+  letter-spacing: -0.02em;
 }

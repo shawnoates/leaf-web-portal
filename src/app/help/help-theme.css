@@ -1,0 +1,19 @@
+/* Tailwind entry for the Help Center.
+   Fumadocs' preset.css uses Tailwind v4 directives (@apply/@variant/@theme/
+   @plugin) and MUST be compiled inside a Tailwind context — hence the
+   `@import "tailwindcss"` here. `@source` makes Tailwind scan Fumadocs'
+   compiled components (in node_modules, otherwise ignored) so the utility
+   classes those components rely on actually get generated.
+
+   This file is imported only by src/app/help/layout.tsx, so Next.js scopes
+   the resulting CSS bundle to /help routes — it never loads on /dashboard,
+   /about, or anywhere else. */
+
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+
+@source "../../../node_modules/fumadocs-ui/dist/**/*.js";
+
+/* Leaf brand overrides last so they win over the preset defaults. */
+@import "./help.css";
