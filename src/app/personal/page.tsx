@@ -492,6 +492,9 @@ export default function PersonalPage() {
                 <Link href="/organizations" className="hover:text-zinc-900">
                   For organizations
                 </Link>
+                <Link href="/help" className="hover:text-zinc-900">
+                  Help
+                </Link>
                 <a href="#pricing" className="hover:text-zinc-900">
                   Pricing
                 </a>

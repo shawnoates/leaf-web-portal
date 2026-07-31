@@ -261,6 +261,9 @@ export default function AboutPage() {
                 <Link href="/organizations" className="hover:text-zinc-900">
                   Organizations
                 </Link>
+                <Link href="/help" className="hover:text-zinc-900">
+                  Help
+                </Link>
               </div>
             </div>
             <div className="space-y-4">
