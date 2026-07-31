@@ -2,31 +2,41 @@
 
 Images for the fanned photo row under the `/personal` hero
 (`src/app/personal/PhotoGrid.tsx`). Filenames are referenced literally by that
-component — add a file here with the exact name, or edit the `PHOTOS` array.
+component — to swap one, drop a replacement in with the same name, or edit the
+`PHOTOS` array.
 
 | File | Scene |
 | --- | --- |
-| `group-dinner-1.jpg` | Friends laughing around a crowded dinner table |
-| `coffee-walk-1.jpg` | A small group walking together with coffees in hand |
-| `game-night-1.jpg` | Friends crowded around a table mid-game night |
-| `park-hangout-1.jpg` | A group sprawled on a blanket in the park |
-| `rooftop-1.jpg` | Friends gathered on a rooftop at sunset |
-| `run-club-1.jpg` | A run club after a morning route |
-| `potluck-1.jpg` | Friends passing dishes around a potluck spread |
-| `birthday-1.jpg` | A group crowding in around a birthday cake |
+| `kitchen-dinner.jpg` | Friends cooking and pouring wine in a kitchen at night |
+| `backyard-lunch.jpg` | A long backyard lunch, one friend pouring drinks |
+| `trail-hike.jpg` | Hikers pulling each other up a wooded trail |
+| `restaurant-dinner.jpg` | A packed restaurant table mid-laugh |
+| `pickup-soccer.jpg` | Pickup soccer on a lot at sunset |
+| `bar-night.jpg` | A group crowded into a bar booth |
+| `bike-ride.jpg` | Three friends riding along a river path |
+| `skatepark.jpg` | Friends cheering on a skater |
 
 ## Prep
 
-- **Portrait, ~9:16.** Cards render at 128×224 (mobile) up to 160×288 (xl), so
-  ~360×640 covers @2x. Anything larger is wasted bytes.
+Current set: **480×640 (3:4), JPEG q80, 68–119 KB each** (~750 KB total).
+
+- **Portrait 3:4.** The cards render 128px wide (mobile) up to 160px (xl) at
+  `aspect-[3/4]`, so 480px covers @3x. Larger is wasted bytes.
 - **Compress manually.** No build-time image pipeline exists in this repo (no
-  `next/image`, no sharp step). Target **80–150 KB** per file, not raw
-  generation-resolution PNGs.
+  `next/image`, no sharp step). Target **80–150 KB** per file. `sips` is enough:
+
+  ```sh
+  sips -s format jpeg -s formatOptions 80 --resampleWidth 480 in.png --out tmp.jpg
+  sips -c 640 480 tmp.jpg --out out.jpg   # center-crop to 3:4
+  ```
+
 - **Check every image at full size before shipping** — warped hands/faces,
   nonsense background text, or a glossy stock-photo look defeats the whole
   point of this section.
 - Keep the people plausibly diverse in age and background; the positioning is
   "your friend group", not one demographic.
+- Order in `PHOTOS` alternates day/night and indoor/outdoor on purpose — keep
+  that rhythm when swapping images in.
 
-Until a file lands here the component drops that card from the row (see its
-`onError` handler), so partial sets are safe to ship.
+If a file goes missing the component drops that card from the row (see its
+`onError` handler), so a partial set never renders a broken tile.
