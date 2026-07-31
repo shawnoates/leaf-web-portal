@@ -1043,7 +1043,7 @@ export default function PlansManager({
                       <div className="flex items-center justify-between text-xs text-zinc-400">
                         {/* Byline. A virtual host reads as a person here by
                             design (the persona fronts the plan publicly), so
-                            the only manager-side tell is a small hollow ring
+                            the only manager-side tell is a small filled dot
                             in a fixed spot ahead of the name — same position
                             on every card, survives name truncation, and costs
                             no width against the RSVP count. */}
@@ -1052,7 +1052,7 @@ export default function PlansManager({
                             <span
                               title="Virtual host — this is a persona, not a member"
                               aria-label="Virtual host"
-                              className="shrink-0 w-2 h-2 rounded-full border border-zinc-300"
+                              className="shrink-0 w-1.5 h-1.5 rounded-full bg-emerald-500"
                             />
                           )}
                           <span className="truncate">{isAI ? "Waiting on host" : plan.host?.name || "You"}</span>
