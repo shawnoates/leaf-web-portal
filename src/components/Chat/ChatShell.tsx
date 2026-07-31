@@ -623,6 +623,7 @@ export default function ChatShell({
               placeholder="Message"
               className="flex-1 border border-zinc-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-zinc-400"
               maxLength={2000}
+              autoComplete="off"
             />
             <button
               type="submit"
