@@ -17,6 +17,7 @@ import {
 import { Loader2, Send, ArrowLeft, Calendar, MapPin, Users, X, Smartphone } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import MessageRow from "./MessageRow";
+import VirtualHostTimelineView from "./VirtualHostTimelineView";
 import type { FirMessage, UserLite } from "./types";
 
 type AuthState = "checking" | "ready" | "denied" | "error";
@@ -77,6 +78,8 @@ export default function ChatShell({
   const [composeText, setComposeText] = useState("");
   const [sending, setSending] = useState(false);
   const [virtualHostPersonaName, setVirtualHostPersonaName] = useState<string | null>(null);
+  const [timeline, setTimeline] = useState<Array<{ id: string; stepType: string; label: string; notes: string; createdAtLocal: string }> | null>(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
 
   useEffect(() => {
     setDevice(detectDevice());
@@ -164,6 +167,18 @@ export default function ChatShell({
         if (typeof tokenResult.attendeeCount === "number") setAttendeeCount(tokenResult.attendeeCount);
         if (tokenResult.notificationId) setNotificationId(tokenResult.notificationId);
         if (tokenResult.virtualHostPersona?.name) setVirtualHostPersonaName(tokenResult.virtualHostPersona.name);
+
+        // Fetch timeline if this is a virtual-hosted plan (owner/co-host only)
+        setTimelineLoading(true);
+        Parse.Cloud.run("getVirtualHostTimeline", { eventGroupId })
+          .then((r: any) => {
+            setTimeline(r.entries || []);
+          })
+          .catch(() => {
+            // Timeline not available (not a virtual-hosted plan or no access)
+            setTimeline(null);
+          })
+          .finally(() => setTimelineLoading(false));
 
         const messagesRef = ref(db, `groups/${eventGroupId}/messages`);
         const recentMessages = query(
@@ -577,6 +592,15 @@ export default function ChatShell({
             )}
           </div>
         </header>
+
+        {/* Virtual Host Timeline (owner-only) */}
+        {timeline && (
+          <VirtualHostTimelineView
+            entries={timeline}
+            loading={timelineLoading}
+            personaName={virtualHostPersonaName}
+          />
+        )}
 
         <div
           ref={messagesContainerRef}
