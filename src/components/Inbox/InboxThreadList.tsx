@@ -59,6 +59,9 @@ export default function InboxThreadList({
     <div>
       {threads.map((t) => {
         const selected = t.threadKey === selectedKey;
+        const heading = t.personaName || t.calendarName;
+        const context = t.planTitle || t.calendarName;
+        const subtitle = context === heading ? null : context;
         return (
           <button
             key={t.threadKey}
@@ -77,22 +80,28 @@ export default function InboxThreadList({
                 className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-zinc-200"
               />
             ) : (
-              <div className="w-9 h-9 rounded-full bg-zinc-200 flex-shrink-0" />
+              // Initial beats a blank disc when a thread has no persona
+              // assigned yet — it still reads as "someone".
+              <div className="w-9 h-9 rounded-full bg-zinc-200 flex-shrink-0 flex items-center justify-center text-zinc-500 text-xs font-bold">
+                {heading.charAt(0).toUpperCase()}
+              </div>
             )}
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-sm font-semibold text-zinc-900 truncate">
-                  {t.personaName || t.calendarName}
+                  {heading}
                 </p>
                 <span className="text-[11px] text-zinc-400 flex-shrink-0">
                   {formatRelative(t.lastMessageAt)}
                 </span>
               </div>
               {/* Plan name disambiguates — an owner can have several plan
-                  threads with the same host running at once. */}
-              <p className="text-[11px] text-zinc-400 truncate">
-                {t.planTitle || t.calendarName}
-              </p>
+                  threads with the same host running at once. Suppressed when
+                  it would just repeat the heading (calendar thread with no
+                  persona resolved). */}
+              {subtitle && (
+                <p className="text-[11px] text-zinc-400 truncate">{subtitle}</p>
+              )}
               <p
                 className={`text-xs mt-0.5 truncate ${
                   t.unreadCount > 0

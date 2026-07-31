@@ -141,7 +141,9 @@ export default function InboxThreadView({
             className="w-9 h-9 rounded-full object-cover ring-1 ring-zinc-200 shrink-0"
           />
         ) : (
-          <div className="w-9 h-9 rounded-full bg-zinc-200 shrink-0" />
+          <div className="w-9 h-9 rounded-full bg-zinc-200 shrink-0 flex items-center justify-center text-zinc-500 text-xs font-bold">
+            {counterpart.charAt(0).toUpperCase()}
+          </div>
         )}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-zinc-900 truncate">

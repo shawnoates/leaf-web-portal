@@ -136,7 +136,11 @@ export default function OwnerInbox() {
                         className="w-8 h-8 rounded-full object-cover flex-shrink-0 ring-1 ring-zinc-200"
                       />
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-zinc-200 flex-shrink-0" />
+                      <div className="w-8 h-8 rounded-full bg-zinc-200 flex-shrink-0 flex items-center justify-center text-zinc-500 text-[11px] font-bold">
+                        {(t.personaName || t.calendarName || "?")
+                          .charAt(0)
+                          .toUpperCase()}
+                      </div>
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline justify-between gap-2">
