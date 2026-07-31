@@ -611,6 +611,61 @@ export default function OrgDashboardPage() {
     if (!seen) setRunTour(true);
   }, [dashboard?.isOwner, calendarId, showSubscription, showCreatePlanModal, showPhoneModal]);
 
+  // Navigate to appropriate tab when tour step changes
+  useEffect(() => {
+    if (!dashboard || !runTour) return;
+    // Build tour steps to get current step's target
+    const steps: Step[] = [
+      {
+        target: "[data-tour='tour-tabs']",
+        content: "This is your control center — switch between Overview, Calendars, Followers, and more.",
+        placement: "bottom",
+      },
+    ];
+    if (dashboard.tier === "concierge") {
+      steps.push({
+        target: "[data-tour='tour-concierge']",
+        content: "Chat with your concierge here for help with plans and members.",
+        placement: "bottom",
+      });
+    }
+    steps.push(
+      {
+        target: "[data-tour='tour-plans']",
+        content: "Your upcoming plans live here — tap one to see details.",
+        placement: "top",
+      },
+      {
+        target: "[data-tour='tour-add-calendar']",
+        content: "Add another calendar to this org anytime.",
+        placement: "right",
+      },
+      {
+        target: "[data-tour='tour-members']",
+        content: "Manage who's on your team and their roles.",
+        placement: "top",
+      }
+    );
+    if (dashboard.isOwner) {
+      steps.push({
+        target: "[data-tour='tour-settings']",
+        content: "Update your org's branding and preferences in Settings.",
+        placement: "bottom",
+      });
+    }
+
+    const targetSelector = steps[tourStepIndex]?.target;
+    const targetStr = typeof targetSelector === 'string' ? targetSelector : '';
+
+    if (targetStr.includes('tour-plans') || targetStr.includes('tour-add-calendar')) {
+      setActiveTab("calendars");
+    } else if (targetStr.includes('tour-members')) {
+      setActiveTab("members");
+    } else if (targetStr.includes('tour-settings')) {
+      setActiveTab("settings");
+    }
+  }, [tourStepIndex, runTour, dashboard?.tier, dashboard?.isOwner]);
+
   // Legacy compat: ?editCal=<id> used to open a modal on this page. The
   // edit surface is now its own route — redirect once dashboard is loaded
   // enough to know the calendar exists and is accessible.
@@ -1254,7 +1309,7 @@ export default function OrgDashboardPage() {
   const isPaid = PAID_TIERS.includes(dashboard.tier);
   const tierLabel = dashboard.tier === "concierge" ? "Concierge" : isPaid ? "Pro" : "Free";
 
-  // Build tour steps conditionally based on visible tabs
+  // Build tour steps for DashboardTour component
   const tourSteps: Step[] = [
     {
       target: "[data-tour='tour-tabs']",
@@ -1296,21 +1351,6 @@ export default function OrgDashboardPage() {
       placement: "bottom",
     });
   }
-
-  // Navigate to appropriate tab when tour step changes (before joyride searches for element)
-  useEffect(() => {
-    if (!runTour) return;
-    const targetSelector = tourSteps[tourStepIndex]?.target;
-    const targetStr = typeof targetSelector === 'string' ? targetSelector : '';
-
-    if (targetStr.includes('tour-plans') || targetStr.includes('tour-add-calendar')) {
-      setActiveTab("calendars");
-    } else if (targetStr.includes('tour-members')) {
-      setActiveTab("members");
-    } else if (targetStr.includes('tour-settings')) {
-      setActiveTab("settings");
-    }
-  }, [tourStepIndex, runTour]);
 
   // Track tour step changes (actual tab navigation happens in useEffect above)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
