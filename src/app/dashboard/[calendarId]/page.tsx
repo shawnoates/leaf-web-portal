@@ -1310,7 +1310,7 @@ export default function OrgDashboardPage() {
     } else if (targetStr.includes('tour-settings')) {
       setActiveTab("settings");
     }
-  }, [tourStepIndex, runTour, tourSteps]);
+  }, [tourStepIndex, runTour]);
 
   // Track tour step changes (actual tab navigation happens in useEffect above)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
