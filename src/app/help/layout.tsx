@@ -16,7 +16,11 @@ export default function HelpLayout({ children }: { children: ReactNode }) {
         },
       }}
     >
-      <DocsLayout tree={helpSource.pageTree} nav={{ title: "Help Center" }}>
+      <DocsLayout
+        tree={helpSource.pageTree}
+        nav={{ title: "Help Center" }}
+        themeSwitch={{ enabled: false }}
+      >
         {children}
       </DocsLayout>
     </RootProvider>
