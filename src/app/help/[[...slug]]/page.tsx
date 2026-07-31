@@ -7,9 +7,11 @@ interface HelpPageProps {
   params: Promise<{ slug?: string[] }>;
 }
 
-async function getHelpPage(slug?: string[]) {
+function getHelpPage(slug?: string[]) {
   if (!slug || slug.length === 0) {
-    return helpSource.getPage(["index"]);
+    // For the root /help path, return the first page (index)
+    const pages = helpSource.getPages();
+    return pages[0] || null;
   }
   return helpSource.getPage(slug);
 }
