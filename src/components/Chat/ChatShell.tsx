@@ -79,7 +79,7 @@ export default function ChatShell({
   const [sending, setSending] = useState(false);
   const [virtualHostPersonaName, setVirtualHostPersonaName] = useState<string | null>(null);
   const [virtualHostPersonaAvatarUrl, setVirtualHostPersonaAvatarUrl] = useState<string | null>(null);
-  const [timeline, setTimeline] = useState<Array<{ id: string; stepType: string; label: string; notes: string; createdAtLocal: string }> | null>(null);
+  const [timeline, setTimeline] = useState<Array<{ id: string; stepType: string; label: string; notes: string; createdAt: string | null; createdAtLocal: string }> | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
 
   useEffect(() => {

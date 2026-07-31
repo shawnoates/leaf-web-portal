@@ -180,6 +180,10 @@ interface UpcomingPlan {
   time: string | null;
   rsvpCount: number;
   host: { name: string } | null;
+  /** True when `host.name` is a virtual-host persona rather than a real person.
+   *  Owner/co-host only (getOrgDashboard is management-scoped) — drives the
+   *  small ring next to the byline so the manager can tell the two apart. */
+  isVirtualHost?: boolean;
   location: { name: string; address: string } | null;
   /** Full itinerary (server `getOrgDashboard` calendar.activePlans[i].locations).
    *  Threaded into `PlanDetailData.locations` for the edit modal to hydrate its
@@ -459,6 +463,7 @@ export default function PlansManager({
         timezone: string | null;
         time: string | null;
         hostName: string;
+        isVirtualHost?: boolean;
         rsvpCount: number;
         location: { name: string; address: string; placeId?: string | null } | null;
         locations?: {
@@ -486,6 +491,7 @@ export default function PlansManager({
         time: p.time,
         rsvpCount: p.rsvpCount,
         host: p.hostName ? { name: p.hostName } : null,
+        isVirtualHost: p.isVirtualHost === true,
         location: p.location ? { name: p.location.name, address: p.location.address } : null,
         locations: p.locations,
         isPoll: p.isPoll,
@@ -1035,7 +1041,22 @@ export default function PlansManager({
                         {new Date(plan.expiryDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", ...(plan.timezone ? { timeZone: plan.timezone } : {}) })}
                       </p>
                       <div className="flex items-center justify-between text-xs text-zinc-400">
-                        <span className="truncate">{isAI ? "Waiting on host" : plan.host?.name || "You"}</span>
+                        {/* Byline. A virtual host reads as a person here by
+                            design (the persona fronts the plan publicly), so
+                            the only manager-side tell is a small hollow ring
+                            in a fixed spot ahead of the name — same position
+                            on every card, survives name truncation, and costs
+                            no width against the RSVP count. */}
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          {!isAI && plan.isVirtualHost && (
+                            <span
+                              title="Virtual host — this is a persona, not a member"
+                              aria-label="Virtual host"
+                              className="shrink-0 w-2 h-2 rounded-full border border-zinc-300"
+                            />
+                          )}
+                          <span className="truncate">{isAI ? "Waiting on host" : plan.host?.name || "You"}</span>
+                        </span>
                         {!isAI && (
                           <div className="flex items-center gap-2 shrink-0 ml-2">
                             <span>{plan.rsvpCount} RSVPs</span>

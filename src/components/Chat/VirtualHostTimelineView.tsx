@@ -8,7 +8,30 @@ interface TimelineEntry {
   stepType: string;
   label: string;
   notes: string;
+  createdAt: string | null;
   createdAtLocal: string;
+}
+
+// The header shows one line and wants "2h ago"; the expanded log wants the
+// exact wall-clock in the calendar's timezone (createdAtLocal, formatted
+// server-side). Relative time is computed client-side off the ISO createdAt so
+// it stays honest while a long-lived drawer sits open.
+function relativeTime(iso: string | null): string | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return null;
+  const secs = Math.round((Date.now() - then) / 1000);
+  if (secs < 0) return "just now";
+  if (secs < 60) return "just now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  return null;
 }
 
 export default function VirtualHostTimelineView({
@@ -27,6 +50,8 @@ export default function VirtualHostTimelineView({
   if (!entries || entries.length === 0) {
     return null;
   }
+
+  const latest = entries[0];
 
   return (
     <div className="border-t border-zinc-200 bg-gradient-to-b from-teal-50 to-transparent">
@@ -47,8 +72,17 @@ export default function VirtualHostTimelineView({
             {(personaName || "L").charAt(0).toUpperCase()}
           </div>
         )}
-        <span className="text-sm font-medium text-teal-900 flex-1 text-left">
-          {personaName ? `${personaName} arranging this plan` : "Servicing timeline"}
+        {/* Collapsed, this row is the whole story the owner gets — so lead
+            with where things actually stand, not a static "arranging" label.
+            Entries arrive newest-first from getVirtualHostTimeline. */}
+        <span className="flex-1 min-w-0 text-left">
+          <span className="block text-sm font-medium text-teal-900 truncate">
+            {latest.label}
+          </span>
+          <span className="block text-[11px] text-teal-600 truncate">
+            {personaName ? `${personaName} · ` : ""}
+            {relativeTime(latest.createdAt) || latest.createdAtLocal}
+          </span>
         </span>
         <ChevronDown
           className={`w-4 h-4 text-teal-600 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
