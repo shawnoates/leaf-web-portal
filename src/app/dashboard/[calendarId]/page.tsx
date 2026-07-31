@@ -1359,7 +1359,7 @@ export default function OrgDashboardPage() {
           {/* Global concierge inbox — hides itself when the caller
               owns no Concierge-tier calendars. Concierge-tier only per
               scope note (leaf-host chats live per-plan on /org). */}
-          <OwnerInbox currentCalendarId={calendarId} />
+          <OwnerInbox />
           <Link
             href="/help"
             target="_blank"
