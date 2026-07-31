@@ -31,6 +31,7 @@ import {
   Copy,
   Download,
   Heart,
+  HelpCircle,
   ImagePlus,
   Layers,
   Link2,
@@ -1359,6 +1360,15 @@ export default function OrgDashboardPage() {
               owns no Concierge-tier calendars. Concierge-tier only per
               scope note (leaf-host chats live per-plan on /org). */}
           <ConciergeInbox />
+          <Link
+            href="/help"
+            target="_blank"
+            className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-zinc-400 hover:text-zinc-900 transition-colors shrink-0"
+            title="Help Center"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Help</span>
+          </Link>
           <button
             onClick={handleLogout}
             className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-zinc-400 hover:text-zinc-900 transition-colors shrink-0"
@@ -1761,7 +1771,7 @@ export default function OrgDashboardPage() {
                       See all
                     </button>
                   </div>
-                  <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-6 px-6 pb-2 no-scrollbar">
+                  <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mr-6 pr-6 pb-2 no-scrollbar">
                     {upcoming.slice(0, 12).map((plan) => (
                       // Card wrapper is now a div (was a button) so the
                       // hover overlay can nest its own action buttons —
