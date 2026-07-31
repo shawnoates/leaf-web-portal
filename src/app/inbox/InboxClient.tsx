@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import InboxThreadList, { type InboxThread } from "@/components/Inbox/InboxThreadList";
 import InboxThreadView from "@/components/Inbox/InboxThreadView";
 import ConciergeThread from "@/components/ConciergeThread";
+import AppHeader from "@/components/AppHeader";
 
 interface InboxPayload {
   threads: InboxThread[];
@@ -105,22 +106,14 @@ export default function InboxClient() {
 
   return (
     <div className="h-dvh flex flex-col bg-zinc-50">
-      {/* Page header */}
-      <header className="bg-white border-b border-zinc-200 px-5 py-4 flex items-center gap-3 shrink-0">
-        <button
-          onClick={() => router.back()}
-          className="p-1.5 -ml-1.5 text-zinc-500 hover:text-zinc-900 rounded-full hover:bg-zinc-100"
-          aria-label="Go back"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-semibold text-zinc-900">Inbox</h1>
-          <p className="text-xs text-zinc-500">
-            {totalUnread > 0 ? `${totalUnread} unread` : "All caught up"}
-          </p>
-        </div>
-      </header>
+      {/* Same top bar as the dashboard, so the inbox reads as part of the app
+          rather than a place you navigated away to. */}
+      <AppHeader
+        title="Inbox"
+        subtitle={totalUnread > 0 ? `${totalUnread} unread` : "All caught up"}
+        showBack
+        showInbox={false}
+      />
 
       <div className="flex-1 min-h-0 flex">
         {/* Left: thread list. Hidden on mobile once a thread is open. */}
