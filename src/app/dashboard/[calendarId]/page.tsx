@@ -918,6 +918,7 @@ export default function OrgDashboardPage() {
 
   // Dashboard tour (first visit walkthrough)
   const [runTour, setRunTour] = useState(false);
+  const [tourStepIndex, setTourStepIndex] = useState(0);
 
   // Analytics fetcher — Pro tier only
   const fetchAnalytics = useCallback(
@@ -1296,11 +1297,10 @@ export default function OrgDashboardPage() {
     });
   }
 
-  // Navigate to appropriate tab when tour step changes
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleTourCallback = (data: any) => {
-    const stepIndex = data?.stepIndex || 0;
-    const targetSelector = tourSteps[stepIndex]?.target;
+  // Navigate to appropriate tab when tour step changes (before joyride searches for element)
+  useEffect(() => {
+    if (!runTour) return;
+    const targetSelector = tourSteps[tourStepIndex]?.target;
     const targetStr = typeof targetSelector === 'string' ? targetSelector : '';
 
     if (targetStr.includes('tour-plans') || targetStr.includes('tour-add-calendar')) {
@@ -1310,6 +1310,12 @@ export default function OrgDashboardPage() {
     } else if (targetStr.includes('tour-settings')) {
       setActiveTab("settings");
     }
+  }, [tourStepIndex, runTour, tourSteps]);
+
+  // Track tour step changes (actual tab navigation happens in useEffect above)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleTourCallback = (data: any) => {
+    setTourStepIndex(data?.stepIndex || 0);
   };
 
   // ── Render ──
