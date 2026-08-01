@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Inbox } from "lucide-react";
+import { Mail } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import {
   formatRelative,
@@ -86,13 +86,13 @@ export default function OwnerInbox() {
       <Link
         href="/inbox"
         aria-label={`Inbox${totalUnread > 0 ? ` (${totalUnread} unread)` : ""}`}
-        className="relative p-2 rounded-full hover:bg-zinc-100 transition-colors inline-flex"
+        className="relative inline-flex text-zinc-400 hover:text-zinc-900 transition-colors shrink-0"
         onFocus={openPeek}
         onBlur={closePeek}
       >
-        <Inbox className="w-5 h-5 text-zinc-600" />
+        <Mail className="w-3.5 h-3.5" />
         {totalUnread > 0 && (
-          <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-4 text-center">
+          <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-4 text-center">
             {totalUnread > 9 ? "9+" : totalUnread}
           </span>
         )}
