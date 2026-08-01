@@ -66,7 +66,7 @@ export default function PhotoGrid() {
     <section className="py-16 md:py-20">
       {/* justify-start until the row actually fits — a centered flex row
           that overflows makes its leading edge unreachable on scroll. */}
-      <div className="flex justify-start xl:justify-center -space-x-2 md:-space-x-3 overflow-x-auto no-scrollbar px-6">
+      <div className="flex justify-start 2xl:justify-center gap-2 md:gap-3 overflow-x-auto no-scrollbar px-6 py-4">
         {photos.map((photo, i) => (
           // eslint-disable-next-line @next/next/no-img-element
           <img
