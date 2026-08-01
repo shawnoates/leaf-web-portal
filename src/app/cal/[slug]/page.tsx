@@ -160,6 +160,12 @@ export default function PublicCalendarPage() {
   // primary Groups row), not the AICalendar row on this page.
   const [paywall, setPaywall] = useState<{ parentOrgId: string } | null>(null);
   const [upgrading, setUpgrading] = useState(false);
+  // Which template events the visitor wants to bring into their own copy —
+  // defaults to "all" the moment the calendar loads (see seeding effect
+  // below), and each checkbox in EventsList toggles membership by index.
+  const [selectedEventIndexes, setSelectedEventIndexes] = useState<Set<number>>(
+    new Set()
+  );
 
   const loadCalendar = useCallback(async () => {
     // Seed first — fast, always available.
@@ -199,6 +205,26 @@ export default function PublicCalendarPage() {
   useEffect(() => {
     loadCalendar();
   }, [loadCalendar]);
+
+  // Seed selection to "everything checked" once per distinct calendar load.
+  // Keyed on slug (not `cal` itself) so an owner's own edits re-fetching
+  // `cal` don't silently reset a visitor's unchecks mid-session. Must run
+  // before the auto-adopt effects below so a ?adopt=1/?upgraded=1 landing
+  // has a populated selection to work with.
+  useEffect(() => {
+    if (!cal) return;
+    setSelectedEventIndexes(new Set(cal.events.map((_, i) => i)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cal?.slug]);
+
+  const handleToggleEvent = useCallback((idx: number) => {
+    setSelectedEventIndexes((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (loadState !== "ready" || !cal) return;
@@ -289,6 +315,7 @@ export default function PublicCalendarPage() {
     try {
       const result = (await Parse.Cloud.run("adoptCalendar", {
         templateSlug: cal.slug,
+        selectedEventIndexes: Array.from(selectedEventIndexes),
         sourceSeed:
           cal.origin === "generated"
             ? {
@@ -460,13 +487,16 @@ export default function PublicCalendarPage() {
           cal={cal}
           isOwner={isOwner}
           onChanged={loadCalendar}
+          selectable={!isOwner}
+          selected={selectedEventIndexes}
+          onToggle={handleToggleEvent}
         />
 
         {!isOwner ? (
           <div className="flex flex-col gap-3">
             <button
               onClick={handleAdopt}
-              disabled={adopting}
+              disabled={adopting || selectedEventIndexes.size === 0}
               className="inline-flex items-center justify-center gap-2 rounded-full px-7 py-4 text-[14px] font-semibold self-start disabled:opacity-70"
               style={{ background: "#131714", color: "#ffffff" }}
             >
@@ -481,6 +511,11 @@ export default function PublicCalendarPage() {
                 </>
               )}
             </button>
+            {selectedEventIndexes.size === 0 && (
+              <p className="text-[13px]" style={{ color: "#6B7168" }}>
+                Select at least one event to make it yours.
+              </p>
+            )}
             {adoptError && (
               <p className="text-[13px]" style={{ color: "#B03030" }}>
                 {adoptError}
@@ -661,10 +696,16 @@ function EventsList({
   cal,
   isOwner,
   onChanged,
+  selectable,
+  selected,
+  onToggle,
 }: {
   cal: AICalendarPayload;
   isOwner: boolean;
   onChanged: () => void | Promise<void>;
+  selectable: boolean;
+  selected: Set<number>;
+  onToggle: (idx: number) => void;
 }) {
   const [editing, setEditing] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
@@ -820,6 +861,18 @@ function EventsList({
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
+                  </div>
+                )}
+                {selectable && (
+                  <div className="flex flex-col gap-1 shrink-0 items-end pt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(i)}
+                      onChange={() => onToggle(i)}
+                      aria-label={`Include ${ev.name}`}
+                      className="w-4 h-4 rounded"
+                      style={{ accentColor: "#1B4332" }}
+                    />
                   </div>
                 )}
               </>
