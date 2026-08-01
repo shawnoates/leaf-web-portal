@@ -163,11 +163,8 @@ export default function PersonalPage() {
     <div className="min-h-screen">
       <PersonalHero isLoggedIn={isLoggedIn} />
 
-      {/* Photo row */}
-      <PhotoGrid />
-
       {/* Who it's for */}
-      <section className="py-24">
+      <section className="pt-24">
         <div className="max-w-4xl mx-auto px-6 text-center space-y-8">
           <p className="text-xs tracking-wider uppercase text-zinc-500 font-semibold">
             Who it's for
@@ -183,6 +180,9 @@ export default function PersonalPage() {
           </p>
         </div>
       </section>
+
+      {/* Photo row */}
+      <PhotoGrid />
 
       {/* How It Works */}
       <section id="how-it-works" className="bg-zinc-50 py-32">

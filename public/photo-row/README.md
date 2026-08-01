@@ -1,6 +1,6 @@
 # photo-row
 
-Images for the fanned photo row under the `/personal` hero
+Images for the fanned photo row under the "Who it's for" section on `/personal`
 (`src/app/personal/PhotoGrid.tsx`). Filenames are referenced literally by that
 component — to swap one, drop a replacement in with the same name, or edit the
 `PHOTOS` array.

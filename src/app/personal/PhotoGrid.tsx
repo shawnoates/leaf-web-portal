@@ -3,8 +3,8 @@
 import { useState } from "react";
 
 // /personal photo row — a fanned deck of candid group photos sitting
-// directly under the hero, before "Who it's for". Pure atmosphere /
-// social proof: no captions, no lightbox, no autoplay, no carousel
+// under the "Who it's for" copy, before "How It Works". Pure atmosphere
+// / social proof: no captions, no lightbox, no autoplay, no carousel
 // library. Static row on desktop; native horizontal scroll on narrow
 // widths using the repo's `no-scrollbar` convention.
 //
@@ -64,26 +64,31 @@ export default function PhotoGrid() {
 
   return (
     <section className="py-16 md:py-20">
-      {/* justify-start until the row actually fits — a centered flex row
-          that overflows makes its leading edge unreachable on scroll. */}
-      <div className="flex justify-start 2xl:justify-center gap-2 md:gap-3 overflow-x-auto no-scrollbar px-6 py-4">
-        {photos.map((photo, i) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            key={photo.src}
-            src={photo.src}
-            alt={photo.alt}
-            width={480}
-            height={640}
-            loading={i < 2 ? "eager" : "lazy"}
-            onError={() =>
-              setBroken((prev) =>
-                prev.includes(photo.src) ? prev : [...prev, photo.src]
-              )
-            }
-            className={`shrink-0 w-32 md:w-36 xl:w-40 h-auto aspect-[3/4] object-cover rounded-xl shadow-lg bg-zinc-100 ${photo.rotate}`}
-          />
-        ))}
+      {/* `w-max mx-auto` on the row rather than justify-center on the
+          scroller: it centers at any width where the row fits, and when
+          it doesn't, mx-auto simply does nothing and the row scrolls
+          from its true left edge. justify-center would instead make the
+          overflowing leading edge unreachable. */}
+      <div className="overflow-x-auto no-scrollbar">
+        <div className="flex w-max mx-auto gap-2 2xl:gap-3 px-6 py-4">
+          {photos.map((photo, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={photo.src}
+              src={photo.src}
+              alt={photo.alt}
+              width={480}
+              height={640}
+              loading={i < 2 ? "eager" : "lazy"}
+              onError={() =>
+                setBroken((prev) =>
+                  prev.includes(photo.src) ? prev : [...prev, photo.src]
+                )
+              }
+              className={`shrink-0 w-32 md:w-36 2xl:w-40 h-auto aspect-[3/4] object-cover rounded-xl border-4 border-white shadow-lg bg-zinc-100 ${photo.rotate}`}
+            />
+          ))}
+        </div>
       </div>
     </section>
   );
