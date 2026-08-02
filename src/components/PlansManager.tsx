@@ -217,6 +217,119 @@ interface UpcomingPlan {
   aiTagVariant?: "default" | "amber";
 }
 
+// Suggested Plans card for a real, persisted PlanIdea — image-top cover,
+// "Needs a host" badge, recurring badge, interest count. Tapping opens the
+// detail + self-host modal (host/edit/assign/delete all live there).
+function IdeaCard({
+  idea,
+  date,
+  onClick,
+}: {
+  idea: PlanIdea;
+  date: Date | null;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative border border-zinc-100 rounded-lg overflow-hidden shrink-0 w-48 text-left hover:border-zinc-300 hover:shadow-sm transition-all"
+    >
+      <div className="relative">
+        <PlanImage src={idea.image} alt={idea.title} className="w-full h-28" />
+        <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-white/85 text-[#1B4332] backdrop-blur-sm">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#1B4332]" />
+          Needs a host
+        </span>
+        {idea.ideaSeriesId && (
+          <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-700 bg-white/85 backdrop-blur-sm">
+            <Repeat className="w-3 h-3" /> Recurring
+          </span>
+        )}
+      </div>
+      <div className="p-3">
+        <h4 className="font-medium text-sm mb-1 truncate">{idea.title}</h4>
+        <p className="text-xs text-zinc-400 mb-1">
+          {date ? date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "Waiting on host"}
+        </p>
+        <p className="text-xs">
+          {idea.interestCount > 0 ? (
+            <span className="text-emerald-600 font-medium">{idea.interestCount} interested</span>
+          ) : (
+            <span className="text-zinc-400">Waiting on host</span>
+          )}
+        </p>
+      </div>
+    </button>
+  );
+}
+
+// Suggested Plans card for an AI-starter event (adopted AICalendar snapshot,
+// no persisted PlanIdea object). Cover matches /org/<shareId>: gradient
+// ground + the tag rendered LARGE in serif, so the manager and the public
+// visitor see the same card. Tapping prefills the plain Create Plan modal
+// (no host/assign/virtual-host actions — those apply only to real PlanIdeas).
+function AIStarterCard({
+  plan,
+  onClick,
+}: {
+  plan: UpcomingPlan;
+  onClick: () => void;
+}) {
+  const isAmber = plan.aiTagVariant === "amber";
+  return (
+    <div
+      onClick={onClick}
+      className="group relative border rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-48 cursor-pointer border-emerald-200/70 bg-emerald-50/30"
+    >
+      <div
+        className="relative w-full h-28 flex items-center justify-center"
+        style={{
+          background: isAmber
+            ? "linear-gradient(135deg, #f5e6d0 0%, #e8d1a5 100%)"
+            : "linear-gradient(135deg, #e8efe9 0%, #cddcd0 100%)",
+        }}
+      >
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 25% 30%, rgba(0,0,0,0.15) 1px, transparent 2px)",
+            backgroundSize: "18px 18px",
+          }}
+        />
+        <span
+          className="relative text-2xl font-light tracking-tight text-center px-4 truncate max-w-full"
+          style={{
+            fontFamily: 'ui-serif, Georgia, "Times New Roman", serif',
+            color: isAmber ? "#8A5F1E" : "#1B4332",
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {(plan.aiTag || "Event").toLowerCase()}
+        </span>
+        <span
+          className="absolute top-2 left-2 text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5"
+          style={{
+            background: "rgba(255,255,255,0.85)",
+            color: isAmber ? "#8A5F1E" : "#1B4332",
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          Suggestion
+        </span>
+      </div>
+      <div className="p-3">
+        <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
+        <p className="text-xs text-zinc-400 mb-1">
+          {new Date(plan.expiryDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+        </p>
+        <p className="text-xs text-zinc-400">Waiting on host</p>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Full plan-management surface for a single calendar: upcoming/past plans
  * (with attendance + photos), AI plan ideas (regenerate/remove/end-series),
@@ -265,6 +378,9 @@ export default function PlansManager({
 
   // Upcoming plans (hosted)
   const [upcomingPlans, setUpcomingPlans] = useState<UpcomingPlan[]>([]);
+  // AI-starter events from the adopted AICalendar's snapshot — rendered
+  // in the Suggested Plans section, not merged into upcomingPlans.
+  const [aiStarterPlans, setAiStarterPlans] = useState<UpcomingPlan[]>([]);
 
   // Past plans (with photo counts) — lazy-loaded when the user opens the Past tab
   const [planTense, setPlanTense] = useState<"upcoming" | "past">("upcoming");
@@ -335,7 +451,7 @@ export default function PlansManager({
   const spreadIdeaDates = useMemo(
     () =>
       computeSpreadIdeaDates(
-        upcomingPlans.filter((p) => !p.isAIStarter).map((p) => p.expiryDate),
+        upcomingPlans.map((p) => p.expiryDate),
         planIdeas.map((i) => ({ id: i.objectId, date: i.date, isManual: i.isManual, datePinned: i.datePinned })),
         nowBucket * 60 * 60 * 1000
       ),
@@ -502,11 +618,10 @@ export default function PlansManager({
         requireApproval: p.requireApproval,
         planSeriesId: p.planSeriesId,
       }));
-      // Show real plans right away; AI events fold in on the next await.
       setUpcomingPlans(realPlans);
       const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId });
-      // Merge AI starter events (from the adopted AICalendar's snapshot) so
-      // the manager sees them alongside real plans. Never a host until they
+      // AI starter events (from the adopted AICalendar's snapshot) — shown
+      // in Suggested Plans, not merged here. Never a host until the manager
       // "Plan This" and a real EventGroup gets created. Skip past dates so
       // the section doesn't accrue stale entries — Shape B events with a
       // locked dateISO in the past drop out here.
@@ -539,10 +654,7 @@ export default function PlansManager({
           aiTag: ev.tag || "Event",
           aiTagVariant: ev.tagVariant === "amber" ? "amber" : "default",
         }));
-      const merged = [...realPlans, ...aiStarters].sort(
-        (a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime(),
-      );
-      setUpcomingPlans(merged);
+      setAiStarterPlans(aiStarters);
       // Capture org context for the host modal's venue search + approval default.
       setOrgCity(page.orgCity ?? null);
       setOrgAddress(page.orgAddress ?? null);
@@ -961,80 +1073,13 @@ export default function PlansManager({
           {planTense === "upcoming" ? (
             upcomingPlans.length > 0 ? (
               <div className="flex gap-3 overflow-x-auto pb-1">
-                {upcomingPlans.map((plan) => {
-                  const isAI = !!plan.isAIStarter;
-                  return (
+                {upcomingPlans.map((plan) => (
                   <div
                     key={plan.objectId}
-                    onClick={() => {
-                      if (isAI) {
-                        // AI starter → open the New Plan drawer prefilled
-                        // so the manager can convert it into a real plan.
-                        setCreatePlanPrefill({
-                          title: plan.title,
-                          description: plan.description || "",
-                          venue: plan.location
-                            ? { name: plan.location.name, address: plan.aiVenueLine || plan.location.address, placeId: null }
-                            : null,
-                          date: plan.expiryDate.slice(0, 10),
-                          time: plan.time || undefined,
-                        });
-                        setShowCreateModal(true);
-                        return;
-                      }
-                      setSelectedPlan(plan);
-                    }}
-                    className={`group relative border rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer ${isAI ? "border-emerald-200/70 bg-emerald-50/30" : "border-zinc-100"}`}
+                    onClick={() => setSelectedPlan(plan)}
+                    className="group relative border rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer border-zinc-100"
                   >
-                    {isAI ? (
-                      // Placeholder cover matches /org/<shareId>: gradient
-                      // ground + the tag rendered LARGE in serif, so the
-                      // manager and the public visitor see the SAME card.
-                      (() => {
-                        const isAmber = plan.aiTagVariant === "amber";
-                        return (
-                          <div
-                            className="relative w-full h-28 flex items-center justify-center"
-                            style={{
-                              background: isAmber
-                                ? "linear-gradient(135deg, #f5e6d0 0%, #e8d1a5 100%)"
-                                : "linear-gradient(135deg, #e8efe9 0%, #cddcd0 100%)",
-                            }}
-                          >
-                            <div
-                              className="absolute inset-0 opacity-[0.07]"
-                              style={{
-                                backgroundImage:
-                                  "radial-gradient(circle at 25% 30%, rgba(0,0,0,0.15) 1px, transparent 2px)",
-                                backgroundSize: "18px 18px",
-                              }}
-                            />
-                            <span
-                              className="relative text-2xl font-light tracking-tight text-center px-4 truncate max-w-full"
-                              style={{
-                                fontFamily: 'ui-serif, Georgia, "Times New Roman", serif',
-                                color: isAmber ? "#8A5F1E" : "#1B4332",
-                                letterSpacing: "-0.01em",
-                              }}
-                            >
-                              {(plan.aiTag || "Event").toLowerCase()}
-                            </span>
-                            <span
-                              className="absolute top-2 left-2 text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5"
-                              style={{
-                                background: "rgba(255,255,255,0.85)",
-                                color: isAmber ? "#8A5F1E" : "#1B4332",
-                                backdropFilter: "blur(4px)",
-                              }}
-                            >
-                              Suggestion
-                            </span>
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      <PlanImage src={plan.image} alt={plan.title} className="w-full h-28" />
-                    )}
+                    <PlanImage src={plan.image} alt={plan.title} className="w-full h-28" />
                     <div className="p-3">
                       <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
                       <p className="text-xs text-zinc-400 mb-1">
@@ -1048,75 +1093,67 @@ export default function PlansManager({
                             on every card, survives name truncation, and costs
                             no width against the RSVP count. */}
                         <span className="flex items-center gap-1.5 min-w-0">
-                          {!isAI && plan.isVirtualHost && (
+                          {plan.isVirtualHost && (
                             <span
                               title="Virtual host — this is a persona, not a member"
                               aria-label="Virtual host"
                               className="shrink-0 w-1.5 h-1.5 rounded-full bg-emerald-500"
                             />
                           )}
-                          <span className="truncate">{isAI ? "Waiting on host" : plan.host?.name || "You"}</span>
+                          <span className="truncate">{plan.host?.name || "You"}</span>
                         </span>
-                        {!isAI && (
-                          <div className="flex items-center gap-2 shrink-0 ml-2">
-                            <span>{plan.rsvpCount} RSVPs</span>
-                            {/* Quiet copy-link icon — grabs the shareable /p/<id>
-                                URL without opening the plan or the public
-                                calendar. Kept out of the hover overlay so the
-                                cover stays a clean Details/Chat affordance. */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyPlanLink(plan.objectId);
-                              }}
-                              title="Copy direct link to this plan"
-                              aria-label="Copy direct link to this plan"
-                              className="p-1 -m-1 rounded text-zinc-300 hover:text-zinc-700 transition-colors"
-                            >
-                              {copiedPlanId === plan.objectId ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                              ) : (
-                                <Link2 className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          <span>{plan.rsvpCount} RSVPs</span>
+                          {/* Quiet copy-link icon — grabs the shareable /p/<id>
+                              URL without opening the plan or the public
+                              calendar. Kept out of the hover overlay so the
+                              cover stays a clean Details/Chat affordance. */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyPlanLink(plan.objectId);
+                            }}
+                            title="Copy direct link to this plan"
+                            aria-label="Copy direct link to this plan"
+                            className="p-1 -m-1 rounded text-zinc-300 hover:text-zinc-700 transition-colors"
+                          >
+                            {copiedPlanId === plan.objectId ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <Link2 className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    {/* Hover overlay — two-action panel over the cover
-                        image. Skipped for AI starters (the card click
-                        already routes to the create-plan flow, and
-                        there's no chat on an unhosted suggestion). */}
-                    {!isAI && (
-                      <div className="absolute inset-x-0 top-0 h-28 bg-zinc-900/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none group-hover:pointer-events-auto">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedPlan(plan);
-                          }}
-                          className="inline-flex items-center gap-1.5 bg-white text-zinc-900 text-[11px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-full hover:bg-zinc-50 transition-colors"
-                        >
-                          <Calendar className="w-3 h-3" />
-                          Details
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setChatPlanId(plan.objectId);
-                          }}
-                          className="inline-flex items-center gap-1.5 bg-white text-zinc-900 text-[11px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-full hover:bg-zinc-50 transition-colors"
-                        >
-                          <MessageCircle className="w-3 h-3" />
-                          Chat
-                        </button>
-                      </div>
-                    )}
+                    {/* Hover overlay — two-action panel over the cover image. */}
+                    <div className="absolute inset-x-0 top-0 h-28 bg-zinc-900/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none group-hover:pointer-events-auto">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedPlan(plan);
+                        }}
+                        className="inline-flex items-center gap-1.5 bg-white text-zinc-900 text-[11px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-full hover:bg-zinc-50 transition-colors"
+                      >
+                        <Calendar className="w-3 h-3" />
+                        Details
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setChatPlanId(plan.objectId);
+                        }}
+                        className="inline-flex items-center gap-1.5 bg-white text-zinc-900 text-[11px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-full hover:bg-zinc-50 transition-colors"
+                      >
+                        <MessageCircle className="w-3 h-3" />
+                        Chat
+                      </button>
+                    </div>
                   </div>
-                  );
-                })}
+                ))}
               </div>
             ) : (
               <p className="text-sm text-zinc-400">No upcoming plans yet.</p>
@@ -1173,7 +1210,7 @@ export default function PlansManager({
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-              Suggested Plans{hidePlanIdeas ? "" : ` (${planIdeas.length})`}
+              Suggested Plans{hidePlanIdeas ? "" : ` (${planIdeas.length + aiStarterPlans.length})`}
             </h2>
             {!hidePlanIdeas && (
               <button
@@ -1206,60 +1243,61 @@ export default function PlansManager({
             <div className="flex items-center justify-center py-10">
               <div className="w-5 h-5 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin" />
             </div>
-          ) : planIdeas.length === 0 ? (
+          ) : planIdeas.length === 0 && aiStarterPlans.length === 0 ? (
             <p className="text-sm text-zinc-400 py-4">No suggested plans yet.</p>
           ) : (
             // Same card language as the Upcoming row (image-top, compact),
             // just a touch narrower. Owner/co-host actions reveal on hover
-            // (always visible on touch, where there's no hover).
+            // (always visible on touch, where there's no hover). Interleaves
+            // real PlanIdeas with AI-starter events (from an adopted
+            // AICalendar) in one date-sorted row — each keeps its own card
+            // and click behavior since they're backed by different models.
             <div className="flex gap-3 overflow-x-auto pb-1">
-              {[...planIdeas]
-                .sort((a, b) => {
-                  const at = spreadDateOf(a)?.getTime() ?? Number.POSITIVE_INFINITY;
-                  const bt = spreadDateOf(b)?.getTime() ?? Number.POSITIVE_INFINITY;
-                  if (at !== bt) return at - bt;
-                  return a.objectId < b.objectId ? -1 : a.objectId > b.objectId ? 1 : 0;
-                })
-                .map((idea) => {
-                  const d = spreadDateOf(idea);
-                  return (
+              {[
+                ...planIdeas.map((idea) => ({
+                  kind: "idea" as const,
+                  idea,
+                  sortTime: spreadDateOf(idea)?.getTime() ?? Number.POSITIVE_INFINITY,
+                })),
+                ...aiStarterPlans.map((plan) => ({
+                  kind: "aiStarter" as const,
+                  plan,
+                  sortTime: new Date(plan.expiryDate).getTime(),
+                })),
+              ]
+                .sort((a, b) => a.sortTime - b.sortTime)
+                .map((item) =>
+                  item.kind === "idea" ? (
                     // Tapping the card opens the detail + self-host modal
                     // (openIdeaDetail); the owner/co-host actions — host, edit
                     // the suggestion, assign, delete — all live in that modal.
-                    <button
-                      key={idea.objectId}
-                      type="button"
-                      onClick={() => openIdeaDetail(idea)}
-                      className="group relative border border-zinc-100 rounded-lg overflow-hidden shrink-0 w-48 text-left hover:border-zinc-300 hover:shadow-sm transition-all"
-                    >
-                      <div className="relative">
-                        <PlanImage src={idea.image} alt={idea.title} className="w-full h-28" />
-                        <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-white/85 text-[#1B4332] backdrop-blur-sm">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#1B4332]" />
-                          Needs a host
-                        </span>
-                        {idea.ideaSeriesId && (
-                          <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-700 bg-white/85 backdrop-blur-sm">
-                            <Repeat className="w-3 h-3" /> Recurring
-                          </span>
-                        )}
-                      </div>
-                      <div className="p-3">
-                        <h4 className="font-medium text-sm mb-1 truncate">{idea.title}</h4>
-                        <p className="text-xs text-zinc-400 mb-1">
-                          {d ? d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "Waiting on host"}
-                        </p>
-                        <p className="text-xs">
-                          {idea.interestCount > 0 ? (
-                            <span className="text-emerald-600 font-medium">{idea.interestCount} interested</span>
-                          ) : (
-                            <span className="text-zinc-400">Waiting on host</span>
-                          )}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
+                    <IdeaCard
+                      key={`idea-${item.idea.objectId}`}
+                      idea={item.idea}
+                      date={spreadDateOf(item.idea)}
+                      onClick={() => openIdeaDetail(item.idea)}
+                    />
+                  ) : (
+                    // AI starter → open the New Plan drawer prefilled so the
+                    // manager can convert it into a real plan.
+                    <AIStarterCard
+                      key={`ai-${item.plan.objectId}`}
+                      plan={item.plan}
+                      onClick={() => {
+                        setCreatePlanPrefill({
+                          title: item.plan.title,
+                          description: item.plan.description || "",
+                          venue: item.plan.location
+                            ? { name: item.plan.location.name, address: item.plan.aiVenueLine || item.plan.location.address, placeId: null }
+                            : null,
+                          date: item.plan.expiryDate.slice(0, 10),
+                          time: item.plan.time || undefined,
+                        });
+                        setShowCreateModal(true);
+                      }}
+                    />
+                  )
+                )}
             </div>
           )}
         </section>
