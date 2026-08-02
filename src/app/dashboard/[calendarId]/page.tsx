@@ -2573,7 +2573,15 @@ export default function OrgDashboardPage() {
                         )}
                         <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <h3 className={`font-medium ${inactive ? "text-zinc-400" : ""}`}>{cal.name}</h3>
+                          <a
+                            href={`/org/${cal.shareId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className={`font-medium hover:underline ${inactive ? "text-zinc-400" : ""}`}
+                          >
+                            {cal.name}
+                          </a>
                           {!inactive && (
                             <>
                               <button
