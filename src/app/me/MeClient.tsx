@@ -703,7 +703,7 @@ function NeedsHostSection({ data }: { data: NeedsHost }) {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img className="gmark" src={c.calendarPhoto} alt="" />
               ) : (
-                <span className="gmark" />
+                <span className="gmark ph">{initial(c.calendarName)}</span>
               )}
               <div className="cbody">
                 <div className="n">{c.calendarName}</div>
@@ -1017,7 +1017,8 @@ const CSS = `
 .leafme .tier2{margin-top:36px;padding-top:26px;border-top:1px solid var(--rule)}
 .leafme .crow{display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit;border:1px solid var(--rule);border-radius:8px;padding:15px 16px;margin-bottom:10px;background:#fff}
 .leafme .crow:hover{border-color:var(--ink-3);background:#faf9f6}
-.leafme .crow .gmark{width:34px;height:34px;border-radius:7px;background:linear-gradient(135deg,#7aa5c8,#2f5d43);flex-shrink:0;object-fit:cover;display:block}
+.leafme .crow .gmark{width:34px;height:34px;border-radius:7px;flex-shrink:0;object-fit:cover;display:block}
+.leafme .crow .gmark.ph{background:#d8d4cc;display:grid;place-items:center;font-family:var(--serif);font-size:14px;font-weight:600;color:var(--ink-2)}
 .leafme .crow .cbody{flex:1;min-width:0}
 .leafme .crow .cbody .n{font-size:15px;font-weight:600;letter-spacing:-.01em}
 .leafme .crow .cbody .c{font-size:13px;color:var(--ink-3);margin-top:2px}
@@ -1027,7 +1028,7 @@ const CSS = `
 @media(max-width:600px){
   .leafme .hcard{flex-wrap:wrap;gap:12px}
   .leafme .hcard .thumb{display:none}
-  .leafme .hcard .hact{flex-basis:100%;text-align:left;margin-top:2px}
+  .leafme .hcard .hact{flex-basis:100%;text-align:right;margin-top:2px}
   .leafme .crow .cta span{display:none}
 }
 .leafme .start{border:1px solid var(--rule);border-radius:3px;padding:26px 24px}
