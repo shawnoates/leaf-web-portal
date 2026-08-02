@@ -415,6 +415,13 @@ function GenerationSurface({ prompt }: { prompt: string }) {
   const [generated, setGenerated] = useState<GeneratedCalendar | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const [reason, setReason] = useState<string | null>(null);
+  // Which events the visitor wants to bring into their own copy — defaults
+  // to "all" the moment generation succeeds. Carried to /cal/<slug> via the
+  // `sel` query param so the same selection survives the "Make it yours"
+  // hop instead of re-adopting everything.
+  const [selectedEventIndexes, setSelectedEventIndexes] = useState<Set<number>>(
+    new Set()
+  );
   // Detect city for the error-copy examples so a Chicago visitor with
   // an unmeaningful prompt sees "date night in Wicker Park", not
   // "Fort Greene".
@@ -430,6 +437,15 @@ function GenerationSurface({ prompt }: { prompt: string }) {
     setCity(detectCity());
   }, []);
   const exampleNeighborhood = city.neighborhoods[0];
+
+  const handleToggleEvent = (idx: number) => {
+    setSelectedEventIndexes((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -449,6 +465,7 @@ function GenerationSurface({ prompt }: { prompt: string }) {
         if (cancelled) return;
         if (result.ok && result.calendar) {
           setGenerated(result.calendar);
+          setSelectedEventIndexes(new Set(result.calendar.events.map((_, i) => i)));
           setFromCache(!!result.fromCache);
           setPhase("success");
         } else {
@@ -593,26 +610,55 @@ function GenerationSurface({ prompt }: { prompt: string }) {
                     {ev.venueLine}
                   </span>
                 </div>
+                <div className="flex flex-col gap-1 shrink-0 items-end pt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={selectedEventIndexes.has(i)}
+                    onChange={() => handleToggleEvent(i)}
+                    aria-label={`Include ${ev.name}`}
+                    className="w-4 h-4 rounded"
+                    style={{ accentColor: "#1B4332" }}
+                  />
+                </div>
               </li>
             ))}
           </ul>
 
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Link
-              href={`/cal/${generated.slug}?adopt=1`}
-              className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[13px] font-semibold"
-              style={{ background: "#131714", color: "#fff" }}
-            >
-              Make it yours
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-            <Link
-              href={`/cal/${generated.slug}`}
-              className="inline-flex items-center gap-2 text-[13px] font-semibold"
-              style={{ color: "#6B7168" }}
-            >
-              Or open the full page
-            </Link>
+          <div className="flex flex-col gap-3 pt-2">
+            <div className="flex flex-wrap items-center gap-3">
+              {selectedEventIndexes.size > 0 ? (
+                <Link
+                  href={`/cal/${generated.slug}?adopt=1&sel=${Array.from(selectedEventIndexes)
+                    .sort((a, b) => a - b)
+                    .join(",")}`}
+                  className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[13px] font-semibold"
+                  style={{ background: "#131714", color: "#fff" }}
+                >
+                  Make it yours
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[13px] font-semibold opacity-50 cursor-not-allowed"
+                  style={{ background: "#131714", color: "#fff" }}
+                >
+                  Make it yours
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </span>
+              )}
+              <Link
+                href={`/cal/${generated.slug}`}
+                className="inline-flex items-center gap-2 text-[13px] font-semibold"
+                style={{ color: "#6B7168" }}
+              >
+                Or open the full page
+              </Link>
+            </div>
+            {selectedEventIndexes.size === 0 && (
+              <p className="text-[13px]" style={{ color: "#6B7168" }}>
+                Select at least one event to make it yours.
+              </p>
+            )}
           </div>
         </div>
       )}

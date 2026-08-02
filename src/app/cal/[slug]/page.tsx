@@ -206,13 +206,30 @@ export default function PublicCalendarPage() {
     loadCalendar();
   }, [loadCalendar]);
 
-  // Seed selection to "everything checked" once per distinct calendar load.
+  // Seed selection once per distinct calendar load. Defaults to "everything
+  // checked", unless the visitor already made a selection on /calendars'
+  // generation preview and carried it here via ?sel=0,2,3 (indices into
+  // this same events array — the generation preview renders the exact
+  // array that becomes this calendar's `events`, so they line up 1:1).
   // Keyed on slug (not `cal` itself) so an owner's own edits re-fetching
   // `cal` don't silently reset a visitor's unchecks mid-session. Must run
   // before the auto-adopt effects below so a ?adopt=1/?upgraded=1 landing
   // has a populated selection to work with.
   useEffect(() => {
     if (!cal) return;
+    const selParam = searchParams.get("sel");
+    if (selParam) {
+      const fromParam = new Set(
+        selParam
+          .split(",")
+          .map((s) => parseInt(s, 10))
+          .filter((i) => Number.isInteger(i) && i >= 0 && i < cal.events.length)
+      );
+      if (fromParam.size > 0) {
+        setSelectedEventIndexes(fromParam);
+        return;
+      }
+    }
     setSelectedEventIndexes(new Set(cal.events.map((_, i) => i)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cal?.slug]);
