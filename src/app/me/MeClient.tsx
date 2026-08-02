@@ -586,7 +586,9 @@ function Thread({ plan, hero }: { plan: Plan; hero?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const canChat = plan.rsvpState === "going" || plan.viewerIsHost;
 
-  if (plan.messages.length === 0 && !canChat) return null;
+  // Message previews (and the join link) are only for people who can actually
+  // open the chat — not going/not hosting shouldn't see chat content.
+  if (!canChat) return null;
 
   // Lead with what needs attention: show all UNREAD messages; if everything's
   // read, fall back to just the latest one for context. Rest collapse behind
