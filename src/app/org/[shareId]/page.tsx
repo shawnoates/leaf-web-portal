@@ -1796,8 +1796,12 @@ export default function OrgCalendarPage() {
         hostId: (p.host as Record<string, string>)?.objectId || null,
         hostName: (p.host as Record<string, string>)?.name || "Community Member",
         hostAvatar: (p.host as Record<string, string>)?.profilePictureUrl || null,
-        // rsvpCount tracks RSVPs only; the host is always attending so add 1
-        attendeeCount: ((p.rsvpCount as number) || 0) + 1,
+        // rsvpCount tracks RSVPs only; a real host is always attending so add 1 —
+        // but a virtual/AI host (or one Leaf hasn't confirmed yet) isn't a real
+        // attendee, so don't pad the count for those.
+        attendeeCount:
+          ((p.rsvpCount as number) || 0) +
+          (p.virtualHost || p.leafHostState === "leaf_arranging" ? 0 : 1),
         location: p.location ? {
           name: (p.location as Record<string, unknown>).name as string | null,
           address: (p.location as Record<string, unknown>).address as string | null,
