@@ -12,7 +12,7 @@ import Parse from "@/lib/parse-client";
 // ============================================================================
 
 // ---- Types (mirror the getMeDashboard payload) -----------------------------
-type HostState = "waiting_on_host" | "human_host" | "leaf_arranging" | "leaf_hosted";
+type HostState = "waiting_on_host" | "human_host" | "leaf_arranging" | "leaf_hosted" | "virtual_host";
 type RsvpState = "going" | "not_going" | "no_response";
 
 interface Persona { id: string; name: string; avatarUrl: string | null }
@@ -208,6 +208,14 @@ function statusFor(plan: Plan): { cls: string; text: string } | null {
     return { cls: "host", text: `Hosted by Leaf · ${plan.hostPersona.name}` };
   }
   if (plan.hostState === "leaf_hosted") return { cls: "host", text: "Hosted by Leaf" };
+  // A virtual/Leaf host is the public face of the plan even though the owner
+  // technically owns the EventGroup — read like "Hosted by {persona}", not
+  // "You're hosting" (mirrors org/[shareId]'s viewerHostsPlan exclusion).
+  if (plan.hostState === "virtual_host") {
+    return plan.hostPersona
+      ? { cls: "host", text: `Hosted by ${plan.hostPersona.name}` }
+      : { cls: "host", text: "Hosted by Leaf" };
+  }
   if (plan.viewerIsHost) {
     return { cls: "host", text: plan.attendeeCount > 0 ? `You're hosting · ${plan.attendeeCount} going` : "You're hosting" };
   }

@@ -86,16 +86,19 @@ export default function OwnerInbox() {
       <Link
         href="/inbox"
         aria-label={`Inbox${totalUnread > 0 ? ` (${totalUnread} unread)` : ""}`}
-        className="relative inline-flex text-zinc-400 hover:text-zinc-900 transition-colors shrink-0"
+        className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-zinc-400 hover:text-zinc-900 transition-colors shrink-0"
         onFocus={openPeek}
         onBlur={closePeek}
       >
-        <Mail className="w-4 h-4" />
-        {totalUnread > 0 && (
-          <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-4 text-center">
-            {totalUnread > 9 ? "9+" : totalUnread}
-          </span>
-        )}
+        <span className="relative inline-flex">
+          <Mail className="w-4 h-4" />
+          {totalUnread > 0 && (
+            <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-4 text-center">
+              {totalUnread > 9 ? "9+" : totalUnread}
+            </span>
+          )}
+        </span>
+        <span className="hidden sm:inline">Inbox</span>
       </Link>
 
       {/* Peek panel. Hidden from touch devices, where there is no hover and
