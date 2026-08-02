@@ -26,7 +26,6 @@ interface GeneratedCalendar {
 interface GenerateResponse {
   ok: boolean;
   reason?: string;
-  fromCache?: boolean;
   calendar: GeneratedCalendar | null;
 }
 
@@ -413,7 +412,6 @@ function GenerationSurface({ prompt }: { prompt: string }) {
     "working"
   );
   const [generated, setGenerated] = useState<GeneratedCalendar | null>(null);
-  const [fromCache, setFromCache] = useState(false);
   const [reason, setReason] = useState<string | null>(null);
   // Which events the visitor wants to bring into their own copy — defaults
   // to "all" the moment generation succeeds. Carried to /cal/<slug> via the
@@ -466,7 +464,6 @@ function GenerationSurface({ prompt }: { prompt: string }) {
         if (result.ok && result.calendar) {
           setGenerated(result.calendar);
           setSelectedEventIndexes(new Set(result.calendar.events.map((_, i) => i)));
-          setFromCache(!!result.fromCache);
           setPhase("success");
         } else {
           setReason(result.reason || "generation_failed");
@@ -524,14 +521,6 @@ function GenerationSurface({ prompt }: { prompt: string }) {
           className="bg-white rounded-2xl border p-6 md:p-8 flex flex-col gap-5"
           style={{ borderColor: "#E3E5DE" }}
         >
-          {fromCache && (
-            <span
-              className="text-[11px] font-semibold uppercase tracking-[0.16em] self-start rounded px-2 py-0.5"
-              style={{ background: "#E8EFE9", color: "#1B4332" }}
-            >
-              From cache
-            </span>
-          )}
           <div className="flex items-baseline justify-between gap-3">
             <div className="flex flex-col gap-1 min-w-0">
               <span

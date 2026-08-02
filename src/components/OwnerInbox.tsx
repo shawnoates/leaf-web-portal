@@ -90,7 +90,7 @@ export default function OwnerInbox() {
         onFocus={openPeek}
         onBlur={closePeek}
       >
-        <Mail className="w-3.5 h-3.5" />
+        <Mail className="w-4 h-4" />
         {totalUnread > 0 && (
           <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-4 text-center">
             {totalUnread > 9 ? "9+" : totalUnread}
