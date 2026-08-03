@@ -115,8 +115,8 @@ function TextBubbleRow({
         className={`max-w-[75%] flex flex-col ${isFromCurrentUser && !isLeafAI ? "items-end" : "items-start"}`}
       >
         {!hideAvatar && senderName && (
-          <span className="text-[11px] text-zinc-400 mb-0.5 px-1 inline-flex items-center gap-1.5">
-            {senderName}
+          <span className="text-[11px] mb-0.5 px-1 inline-flex items-center gap-1.5">
+            <span className={isLeafAI ? "text-zinc-900" : "text-zinc-400"}>{senderName}</span>
             {isLeafAI && virtualHostPersonaName && (
               <VirtualHostBadge persona={{ name: virtualHostPersonaName }} />
             )}

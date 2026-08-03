@@ -613,7 +613,7 @@ function Thread({ plan, hero }: { plan: Plan; hero?: boolean }) {
           <div className={`mava ${m.unread ? "unread" : ""}`}>{initial(m.authorName)}</div>
           <div className="msg-b">
             <div className="t">
-              {m.authorName}
+              <span style={{ color: m.authorRole === "virtual_host" ? "var(--ink)" : "inherit" }}>{m.authorName}</span>
               {m.authorRole === "virtual_host"
                 ? " · Virtual host"
                 : m.authorRole === "leaf"
