@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { Heart } from "lucide-react";
 import Parse from "@/lib/parse-client";
 
 // ============================================================================
@@ -644,11 +645,65 @@ function decayText(p: HostPlan): string {
   return `Needs a host by ${wd}`;
 }
 
+// Same cookie/localStorage pattern org/[shareId] uses for expressInterestOnPlanIdea
+// (same cookie key, so a browser's interest is deduped server-side across both
+// surfaces) — kept as a light local copy rather than a shared import to avoid
+// touching that page's code for this one card.
+const INTEREST_COOKIE_KEY = "leaf_interest_cookie";
+const PLAN_IDEA_INTEREST_LOCAL_KEY = "leaf_plan_idea_interests";
+
+function getOrCreateInterestCookie(): string {
+  if (typeof document === "undefined") return "";
+  const match = document.cookie.match(new RegExp(`${INTEREST_COOKIE_KEY}=([^;]+)`));
+  if (match) return match[1];
+  const random = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  document.cookie = `${INTEREST_COOKIE_KEY}=${random}; path=/; max-age=${365 * 24 * 3600}; samesite=lax`;
+  return random;
+}
+function isPlanIdeaLocallyInterested(ideaId: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(PLAN_IDEA_INTEREST_LOCAL_KEY);
+    if (!raw) return false;
+    const set: Record<string, boolean> = JSON.parse(raw);
+    return !!set[ideaId];
+  } catch {
+    return false;
+  }
+}
+function markPlanIdeaLocallyInterested(ideaId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(PLAN_IDEA_INTEREST_LOCAL_KEY);
+    const set: Record<string, boolean> = raw ? JSON.parse(raw) : {};
+    set[ideaId] = true;
+    localStorage.setItem(PLAN_IDEA_INTEREST_LOCAL_KEY, JSON.stringify(set));
+  } catch {
+    /* quota / storage disabled */
+  }
+}
+
 function NeedsHostSection({ data }: { data: NeedsHost }) {
   // Local copy so a hosted card can leave the section immediately on success.
   const [tier1, setTier1] = useState<HostPlan[]>(data.tier1);
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const tier2 = data.tier2;
+
+  const [interested, setInterested] = useState<Set<string>>(new Set());
+  const [interestPending, setInterestPending] = useState<Set<string>>(new Set());
+  const [interestCounts, setInterestCounts] = useState<Record<string, number>>({});
+
+  // Hydrate "already interested" from localStorage (same key expressInterestOnPlanIdea's
+  // org/[shareId] caller uses), so the heart renders filled across reloads.
+  useEffect(() => {
+    const seen = new Set<string>();
+    for (const p of data.tier1) {
+      if (isPlanIdeaLocallyInterested(p.ideaId)) seen.add(p.ideaId);
+    }
+    if (seen.size > 0) setInterested(seen);
+  }, [data.tier1]);
 
   async function host(p: HostPlan) {
     if (busy[p.ideaId]) return;
@@ -658,6 +713,40 @@ function NeedsHostSection({ data }: { data: NeedsHost }) {
       setTier1((list) => list.filter((x) => x.ideaId !== p.ideaId)); // leaves the section
     } catch {
       setBusy((b) => ({ ...b, [p.ideaId]: false }));
+    }
+  }
+
+  async function markInterested(p: HostPlan) {
+    if (interested.has(p.ideaId) || interestPending.has(p.ideaId)) return;
+    const priorCount = interestCounts[p.ideaId] ?? p.interestedCount;
+
+    setInterestPending((s) => new Set(s).add(p.ideaId));
+    setInterested((s) => new Set(s).add(p.ideaId));
+    setInterestCounts((c) => ({ ...c, [p.ideaId]: priorCount + 1 }));
+    markPlanIdeaLocallyInterested(p.ideaId);
+
+    try {
+      const cookie = getOrCreateInterestCookie();
+      const result = (await Parse.Cloud.run("expressInterestOnPlanIdea", {
+        ideaId: p.ideaId,
+        cookie,
+      })) as { count?: number };
+      if (typeof result?.count === "number") {
+        setInterestCounts((c) => ({ ...c, [p.ideaId]: result.count! }));
+      }
+    } catch {
+      setInterested((s) => {
+        const next = new Set(s);
+        next.delete(p.ideaId);
+        return next;
+      });
+      setInterestCounts((c) => ({ ...c, [p.ideaId]: priorCount }));
+    } finally {
+      setInterestPending((s) => {
+        const next = new Set(s);
+        next.delete(p.ideaId);
+        return next;
+      });
     }
   }
 
@@ -684,13 +773,24 @@ function NeedsHostSection({ data }: { data: NeedsHost }) {
               )}
               <div className="hb">
                 <div className="cal">{p.calendarName}</div>
-                <h3>{p.title}</h3>
+                <h3>
+                  {p.title}
+                  <button
+                    type="button"
+                    className={`heart-btn ${interested.has(p.ideaId) ? "on" : ""}`}
+                    aria-label={interested.has(p.ideaId) ? "You're interested" : "I'm interested"}
+                    disabled={interested.has(p.ideaId) || interestPending.has(p.ideaId)}
+                    onClick={() => markInterested(p)}
+                  >
+                    <Heart className="w-4 h-4" fill={interested.has(p.ideaId) ? "currentColor" : "none"} />
+                  </button>
+                </h3>
                 <div className="hmeta">{[weekday(p.date), fmtTime(p.time, p.date), p.venueName || p.venueAddress].filter(Boolean).join(" · ")}</div>
                 <div className={`decay ${p.decayLevel}`}>{decayText(p)}</div>
               </div>
               <div className="hact">
-                {p.interestedCount > 0 && (
-                  <div className="interested">{p.interestedCount} interested</div>
+                {(interestCounts[p.ideaId] ?? p.interestedCount) > 0 && (
+                  <div className="interested">{interestCounts[p.ideaId] ?? p.interestedCount} interested</div>
                 )}
                 <button className="hostbtn" disabled={busy[p.ideaId]} onClick={() => host(p)}>
                   {busy[p.ideaId] ? "Hosting…" : "Host this"}
@@ -1014,7 +1114,11 @@ const CSS = `
 .leafme .hcard .thumb{width:82px;height:60px;flex-shrink:0;border-radius:4px;object-fit:cover;display:block}
 .leafme .hcard .thumb.ph{background:var(--sage)}
 .leafme .hcard .hb{flex:1;min-width:0}
-.leafme .hcard .hb h3{font-family:var(--serif);font-size:18px;font-weight:500;letter-spacing:-.01em;line-height:1.2}
+.leafme .hcard .hb h3{font-family:var(--serif);font-size:18px;font-weight:500;letter-spacing:-.01em;line-height:1.2;display:flex;align-items:center;gap:8px}
+.leafme .heart-btn{background:none;border:0;padding:0;cursor:pointer;display:inline-flex;color:var(--ink-3);flex-shrink:0}
+.leafme .heart-btn:hover{color:var(--ink-2)}
+.leafme .heart-btn.on{color:var(--sage-deep)}
+.leafme .heart-btn:disabled{cursor:default}
 .leafme .hcard .hmeta{font-size:12.5px;color:var(--ink-3);margin-top:3px}
 .leafme .decay{display:inline-flex;align-items:center;gap:6px;margin-top:7px;font-size:12px;font-weight:500}
 .leafme .decay.soon{color:var(--danger)}
