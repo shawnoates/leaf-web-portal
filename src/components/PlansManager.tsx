@@ -1095,8 +1095,8 @@ export default function PlansManager({
                         <span className="flex items-center gap-1.5 min-w-0">
                           {plan.isVirtualHost && (
                             <span
-                              title="Virtual host — this is a persona, not a member"
-                              aria-label="Virtual host"
+                              title="AI-assisted host — this is a persona, not a member"
+                              aria-label="AI-assisted host"
                               className="shrink-0 w-1.5 h-1.5 rounded-full bg-emerald-500"
                             />
                           )}
@@ -1470,7 +1470,9 @@ export default function PlansManager({
             hideVenueUntilRsvp: selectedPlan.hideVenueUntilRsvp,
             requireApproval: selectedPlan.requireApproval,
             planSeriesId: selectedPlan.planSeriesId,
+            isVirtualHost: selectedPlan.isVirtualHost,
           }}
+          calendarId={calendarId}
           onClose={() => setSelectedPlan(null)}
           onChanged={() => { fetchPlanIdeas(); }}
           onDuplicate={handleDuplicatePlan}

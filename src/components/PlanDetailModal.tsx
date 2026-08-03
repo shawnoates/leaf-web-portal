@@ -5,6 +5,7 @@ import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { renderLinkedText } from "@/lib/linkify";
 import { formatWallClockTime12h } from "@/lib/date-utils";
+import VirtualHostSheet from "@/components/VirtualHostSheet";
 import {
   Calendar,
   Check,
@@ -17,6 +18,7 @@ import {
   Pencil,
   Plus,
   Repeat,
+  Sparkles,
   Trash2,
   Users,
   Vote,
@@ -57,6 +59,9 @@ export type PlanDetailData = {
    *  modal exposes a "Cancel future occurrences" action that stops further
    *  materialization without touching already-created instances. */
   planSeriesId?: string | null;
+  /** Already has an AI-assisted (virtual) host attached — hides the
+   *  "Add AI-assisted host" CTA next to Change host. */
+  isVirtualHost?: boolean;
 };
 
 type PollOptionDetail = { date: string; time: string | null; count: number };
@@ -78,6 +83,8 @@ type Rsvp = {
 
 type Props = {
   plan: PlanDetailData;
+  /** Calendar this plan belongs to — required to open the AI-assisted host purchase sheet. */
+  calendarId: string;
   onClose: () => void;
   /** Called after any change that should refresh parent data (cancel, approve, decline, remove, pick-poll-winner). */
   onChanged: () => void;
@@ -102,6 +109,7 @@ type Props = {
 
 export default function PlanDetailModal({
   plan,
+  calendarId,
   onClose,
   onChanged,
   onDuplicate,
@@ -140,6 +148,12 @@ export default function PlanDetailModal({
   const [changingHostId, setChangingHostId] = useState<string | null>(null);
   const [changeHostError, setChangeHostError] = useState<string | null>(null);
   const [hostNameOverride, setHostNameOverride] = useState<string | null>(null);
+
+  // AI-assisted host purchase sheet, opened from the Change host popup —
+  // attaches (and pays for, unless Concierge-tier) an AI-assisted host that
+  // replaces whoever is currently hosting this plan, live RSVPs included.
+  const [showVirtualHostSheet, setShowVirtualHostSheet] = useState(false);
+  const [isVirtualHostOverride, setIsVirtualHostOverride] = useState(false);
 
   // Load attendees for non-poll plans. Re-fires when the parent triggers a
   // refresh (planRsvpsRefreshTick) so RSVPs that land after the modal
@@ -428,7 +442,33 @@ export default function PlanDetailModal({
                     </p>
                   )}
                 </div>
+                {!plan.isVirtualHost && !isVirtualHostOverride && (
+                  <div className="border-t border-zinc-100 p-1">
+                    <button
+                      onClick={() => setShowVirtualHostSheet(true)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-zinc-50 transition-colors text-left text-sm font-medium text-teal-700"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                      Purchase an AI-assisted host
+                    </button>
+                  </div>
+                )}
               </div>
+            )}
+
+            {showVirtualHostSheet && (
+              <VirtualHostSheet
+                calendarId={calendarId}
+                eventGroupId={plan.objectId}
+                onClose={() => setShowVirtualHostSheet(false)}
+                onAttached={(personaName) => {
+                  setShowVirtualHostSheet(false);
+                  setShowChangeHost(false);
+                  setIsVirtualHostOverride(true);
+                  if (personaName) setHostNameOverride(personaName);
+                  onChanged();
+                }}
+              />
             )}
 
             <div className="flex gap-6 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">

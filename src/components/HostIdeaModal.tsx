@@ -46,9 +46,12 @@ interface NearbyVenue {
  * note, require-approval), extracted so the owner dashboard opens an identical
  * modal when a suggested-plan card is tapped.
  *
- * This variant is owner/co-host only (the dashboard's Calendars tab is already
- * gated to those roles), so it always publishes live via hostPlanIdea's
- * owner/co-host branch — no phone verification or pending-approval friction.
+ * Owner/co-host callers (the dashboard's Calendars tab is already gated to
+ * those roles) publish live via hostPlanIdea's owner/co-host branch — no
+ * phone verification or pending-approval friction. Callers where the viewer
+ * might NOT be owner/co-host (e.g. /me's "on calendars you follow" section)
+ * should pass `hostName`/`hostPhone`; hostPlanIdea uses them for its
+ * pending-host-request branch and ignores them otherwise.
  * Owner tools (edit the suggestion, assign a host, delete) are surfaced as an
  * optional actions row when the matching callbacks are provided.
  */
@@ -63,6 +66,8 @@ export default function HostIdeaModal({
   requireApprovalDefault = false,
   blacklistCategories = [],
   excludeKeywords = [],
+  hostName = null,
+  hostPhone = null,
   onClose,
   onHosted,
   onEditSuggestion,
@@ -81,6 +86,11 @@ export default function HostIdeaModal({
   requireApprovalDefault?: boolean;
   blacklistCategories?: string[];
   excludeKeywords?: string[];
+  // Non-owner/co-host callers (e.g. a follower proposing to host someone
+  // else's calendar) need these — hostPlanIdea requires them for its
+  // pending-request branch and ignores them on the owner/co-host branch.
+  hostName?: string | null;
+  hostPhone?: string | null;
   onClose: () => void;
   onHosted: (result: { pendingApproval?: boolean; eventGroupId?: string } | undefined) => void;
   onEditSuggestion?: () => void;
@@ -249,6 +259,8 @@ export default function HostIdeaModal({
         capacity: idea.suggestedCapacity || 20,
         hostNote: hostNote.trim() || undefined,
         requireApproval: hostRequireApproval,
+        hostName: hostName || undefined,
+        hostPhone: hostPhone || undefined,
         venue: selectedVenue
           ? {
               placeId: selectedVenue.placeId,
@@ -343,7 +355,7 @@ export default function HostIdeaModal({
                       onClick={onAddVirtualHost}
                       className="inline-flex items-center gap-1.5 border border-teal-200 bg-teal-50 rounded-lg pl-1.5 pr-3 py-1.5 text-xs font-medium text-teal-700 hover:border-teal-400 transition-colors"
                     >
-                      <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Add virtual host
+                      <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Add AI-assisted host
                     </button>
                   )}
                   {onEndSeries && idea.ideaSeriesId && (

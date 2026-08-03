@@ -64,7 +64,7 @@ export default function VirtualHostTimelineView({
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={personaAvatarUrl}
-            alt={personaName || "Virtual host"}
+            alt={personaName || "AI-assisted host"}
             className="w-6 h-6 rounded-full object-cover shrink-0"
           />
         ) : (

@@ -246,7 +246,7 @@ const TABS = [
 // `growth` is the retired Social tier treated as Pro.
 const PAID_TIERS = ["pro", "growth", "concierge"];
 
-type CalActivePlan = { objectId: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; virtualHost?: boolean; virtualHostPersona?: { name: string; avatarUrl: string | null } | null; leafHostState?: "leaf_hosted" | "leaf_arranging" | null; leafHostPersona?: { name: string; avatarUrl: string | null } | null; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null };
+type CalActivePlan = { objectId: string; calendarId?: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; virtualHost?: boolean; virtualHostPersona?: { name: string; avatarUrl: string | null } | null; leafHostState?: "leaf_hosted" | "leaf_arranging" | null; leafHostPersona?: { name: string; avatarUrl: string | null } | null; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null };
 
 // ── Analytics types ────────────────────────────────────────────────────
 
@@ -478,6 +478,7 @@ export default function OrgDashboardPage() {
   // Plan detail modal
   const [selectedActivePlan, setSelectedActivePlan] = useState<{
     objectId: string;
+    calendarId?: string;
     title: string;
     description: string;
     image: string | null;
@@ -485,6 +486,7 @@ export default function OrgDashboardPage() {
     timezone: string | null;
     time: string | null;
     hostName: string;
+    virtualHost?: boolean;
     rsvpCount: number;
     location: { name: string; address: string; placeId?: string | null } | null;
     isPoll?: boolean;
@@ -3895,7 +3897,9 @@ export default function OrgDashboardPage() {
             hideVenueUntilRsvp: selectedActivePlan.hideVenueUntilRsvp,
             requireApproval: selectedActivePlan.requireApproval,
             planSeriesId: selectedActivePlan.planSeriesId,
+            isVirtualHost: selectedActivePlan.virtualHost,
           }}
+          calendarId={selectedActivePlan.calendarId || calendarId}
           onClose={() => setSelectedActivePlan(null)}
           onChanged={fetchDashboard}
           leafAppConnected={leafAppConnected}

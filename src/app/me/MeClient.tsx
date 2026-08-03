@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Heart } from "lucide-react";
 import Parse from "@/lib/parse-client";
+import HostIdeaModal from "@/components/HostIdeaModal";
 
 // ============================================================================
 // Attendee dashboard (/me). Read-mostly. Answers one question — "where am I
@@ -615,7 +616,7 @@ function Thread({ plan, hero }: { plan: Plan; hero?: boolean }) {
             <div className="t">
               <span style={{ color: m.authorRole === "virtual_host" ? "var(--ink)" : "inherit" }}>{m.authorName}</span>
               {m.authorRole === "virtual_host"
-                ? " · Virtual host"
+                ? " · AI-assisted host"
                 : m.authorRole === "leaf"
                   ? " · Leaf concierge"
                   : plan.calendarName ? ` · ${plan.calendarName}` : ""}
@@ -688,7 +689,7 @@ function markPlanIdeaLocallyInterested(ideaId: string) {
 function NeedsHostSection({ data }: { data: NeedsHost }) {
   // Local copy so a hosted card can leave the section immediately on success.
   const [tier1, setTier1] = useState<HostPlan[]>(data.tier1);
-  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [hostingIdea, setHostingIdea] = useState<HostPlan | null>(null);
   const tier2 = data.tier2;
 
   const [interested, setInterested] = useState<Set<string>>(new Set());
@@ -704,17 +705,6 @@ function NeedsHostSection({ data }: { data: NeedsHost }) {
     }
     if (seen.size > 0) setInterested(seen);
   }, [data.tier1]);
-
-  async function host(p: HostPlan) {
-    if (busy[p.ideaId]) return;
-    setBusy((b) => ({ ...b, [p.ideaId]: true }));
-    try {
-      await Parse.Cloud.run("oneTapCreatePlanFromIdea", { calendarPlanId: p.ideaId });
-      setTier1((list) => list.filter((x) => x.ideaId !== p.ideaId)); // leaves the section
-    } catch {
-      setBusy((b) => ({ ...b, [p.ideaId]: false }));
-    }
-  }
 
   async function markInterested(p: HostPlan) {
     if (interested.has(p.ideaId) || interestPending.has(p.ideaId)) return;
@@ -792,13 +782,35 @@ function NeedsHostSection({ data }: { data: NeedsHost }) {
                 {(interestCounts[p.ideaId] ?? p.interestedCount) > 0 && (
                   <div className="interested">{interestCounts[p.ideaId] ?? p.interestedCount} interested</div>
                 )}
-                <button className="hostbtn" disabled={busy[p.ideaId]} onClick={() => host(p)}>
-                  {busy[p.ideaId] ? "Hosting…" : "Host this"}
+                <button className="hostbtn" onClick={() => setHostingIdea(p)}>
+                  Host this
                 </button>
               </div>
             </div>
           ))}
         </>
+      )}
+
+      {hostingIdea && (
+        <HostIdeaModal
+          idea={{
+            objectId: hostingIdea.ideaId,
+            title: hostingIdea.title,
+            image: hostingIdea.image,
+            category: hostingIdea.category,
+            centroid: hostingIdea.venueAddress,
+            location: hostingIdea.venueName && hostingIdea.venueAddress
+              ? { name: hostingIdea.venueName, address: hostingIdea.venueAddress }
+              : null,
+            preferredTime: hostingIdea.time,
+          }}
+          hostName={Parse.User.current()?.get("full_name") || null}
+          hostPhone={Parse.User.current()?.get("phone") || null}
+          onClose={() => setHostingIdea(null)}
+          onHosted={() => {
+            setTier1((list) => list.filter((x) => x.ideaId !== hostingIdea.ideaId));
+          }}
+        />
       )}
 
       {tier2.length > 0 && (

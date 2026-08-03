@@ -45,6 +45,10 @@ interface VhInfo {
   included: boolean;
   maxCapacity: number;
   capacityDefault: number | null;
+  // Set only for an in-flight plan (eventGroupId) that already has a human
+  // host and/or RSVPs — attaching here replaces the current host.
+  currentHostName: string | null;
+  currentAttendeeCount: number;
   replyLabel: string;
   eligible: boolean;
   reason: string | null;
@@ -68,7 +72,7 @@ export default function VirtualHostSheet({
   aiEventIndex?: number;
   returnTo?: string;
   onClose: () => void;
-  onAttached: () => void;
+  onAttached: (personaName?: string) => void;
 }) {
   const [info, setInfo] = useState<VhInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,7 +93,7 @@ export default function VirtualHostSheet({
       setInfo(r);
       setCapacity(Math.min(r.capacityDefault || r.maxCapacity, r.maxCapacity));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't load virtual host details.");
+      setError(e instanceof Error ? e.message : "Couldn't load AI-assisted host details.");
     } finally {
       setLoading(false);
     }
@@ -113,7 +117,7 @@ export default function VirtualHostSheet({
         returnUrl: returnTo || (typeof window !== "undefined" ? window.location.href : undefined),
       });
       if (res.attached) {
-        onAttached();
+        onAttached(info.persona?.name);
       } else if (res.checkoutUrl) {
         window.location.href = res.checkoutUrl; // Stripe Checkout
       } else {
@@ -121,7 +125,7 @@ export default function VirtualHostSheet({
         setSubmitting(false);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't attach the virtual host.");
+      setError(e instanceof Error ? e.message : "Couldn't attach the AI-assisted host.");
       setSubmitting(false);
     }
   }
@@ -150,7 +154,7 @@ export default function VirtualHostSheet({
             <HostAvatar src={persona?.avatarUrl} className="w-4 h-4" />
             AI-assisted host
           </div>
-          <h3 className="text-xl font-semibold leading-tight">Add a virtual host</h3>
+          <h3 className="text-xl font-semibold leading-tight">Add an AI-assisted host</h3>
           {persona && (
             <div className="flex items-center gap-2 mt-3">
               {persona.avatarUrl ? (
@@ -188,15 +192,24 @@ export default function VirtualHostSheet({
                 ))}
               </ul>
 
-              {/* Capacity — owner sets/confirms at order (max 8). */}
+              {(info.currentHostName || info.currentAttendeeCount > 0) && (
+                <p className="text-sm text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2">
+                  {info.currentHostName ? `This replaces ${info.currentHostName} as the host. ` : "This replaces the current host. "}
+                  {info.currentAttendeeCount > 0 && `${info.currentAttendeeCount} guest${info.currentAttendeeCount === 1 ? "" : "s"} already RSVP'd — they'll keep their spot.`}
+                </p>
+              )}
+
+              {/* Capacity — owner sets/confirms at order (max 8). Floor is the
+                  plan's current headcount so the group can't shrink below
+                  guests who already RSVP'd. */}
               <div className="border-t border-zinc-100 pt-4">
                 <label className="block text-xs font-bold uppercase tracking-widest text-zinc-400 mb-2">Group size</label>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => setCapacity((c) => Math.max(1, c - 1))}
+                    onClick={() => setCapacity((c) => Math.max(info.currentAttendeeCount || 1, c - 1))}
                     className="w-9 h-9 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-600 hover:border-zinc-400 disabled:opacity-40"
-                    disabled={capacity <= 1}
+                    disabled={capacity <= (info.currentAttendeeCount || 1)}
                   >
                     <Minus className="w-4 h-4" />
                   </button>
