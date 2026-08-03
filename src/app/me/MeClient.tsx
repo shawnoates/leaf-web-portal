@@ -398,7 +398,7 @@ function DashboardView({
         )}
 
         <footer className="wrap foot">
-          <p>One text a week, Sunday morning — everything on this page in one link. Never a text for every plan on a calendar you follow.</p>
+          <p>One text a week, Sunday morning — everything on this page in one link. Plus a heads-up if something lands on your calendars too late to make it. Never a text for every plan on a calendar you follow.</p>
           <p className="foot-links">
             <Link href="/unsubscribe">Change how often</Link>
             <span aria-hidden> · </span>
@@ -588,7 +588,10 @@ function AttendButtons({
 // ---- Thread (messages colocated with their plan) ---------------------------
 function Thread({ plan, hero }: { plan: Plan; hero?: boolean }) {
   const [expanded, setExpanded] = useState(false);
-  const canChat = plan.rsvpState === "going" || plan.viewerIsHost;
+  // A virtual host fronts the plan's chat — the real owner isn't the one
+  // hosting it there, so viewerIsHost alone shouldn't grant chat access;
+  // only an actual "going" RSVP should (mirrors AttendButtons).
+  const canChat = plan.rsvpState === "going" || (plan.viewerIsHost && plan.hostState !== "virtual_host");
 
   // Message previews (and the join link) are only for people who can actually
   // open the chat — not going/not hosting shouldn't see chat content.
@@ -911,7 +914,10 @@ function PlanModal({
   }, [onClose]);
 
   const status = statusFor(plan);
-  const canChat = plan.rsvpState === "going" || plan.viewerIsHost;
+  // A virtual host fronts the plan's chat — the real owner isn't the one
+  // hosting it there, so viewerIsHost alone shouldn't grant chat access;
+  // only an actual "going" RSVP should (mirrors AttendButtons).
+  const canChat = plan.rsvpState === "going" || (plan.viewerIsHost && plan.hostState !== "virtual_host");
   const addr = [plan.venueName, plan.venueAddress].filter(Boolean).join(" · ");
 
   return (
