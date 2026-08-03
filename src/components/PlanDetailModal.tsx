@@ -5,7 +5,7 @@ import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { renderLinkedText } from "@/lib/linkify";
 import { formatWallClockTime12h } from "@/lib/date-utils";
-import VirtualHostSheet from "@/components/VirtualHostSheet";
+import VirtualHostSheet, { DEFAULT_HOST_AVATAR, HostAvatar } from "@/components/VirtualHostSheet";
 import {
   Calendar,
   Check,
@@ -18,7 +18,6 @@ import {
   Pencil,
   Plus,
   Repeat,
-  Sparkles,
   Trash2,
   Users,
   Vote,
@@ -350,12 +349,25 @@ export default function PlanDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm">
       <div className="bg-white w-full max-w-5xl max-h-[90vh] md:h-[85vh] md:max-h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl rounded-t-3xl md:rounded-none relative">
-        <button
-          onClick={onClose}
-          className="absolute top-6 right-6 z-50 p-2 rounded-full bg-white/20 text-white md:text-zinc-900 md:bg-transparent"
-        >
-          <Plus className="w-8 h-8 rotate-45" />
-        </button>
+        <div className="absolute top-6 right-6 z-50 flex items-center gap-2">
+          <button
+            onClick={copyPlanLink}
+            title="Copy direct link to this plan"
+            className="p-2 rounded-full bg-white/20 text-white md:text-zinc-900 md:bg-transparent"
+          >
+            {linkCopied ? (
+              <Check className="w-5 h-5 text-emerald-400 md:text-emerald-600" />
+            ) : (
+              <Link2 className="w-5 h-5" />
+            )}
+          </button>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full bg-white/20 text-white md:text-zinc-900 md:bg-transparent"
+          >
+            <Plus className="w-8 h-8 rotate-45" />
+          </button>
+        </div>
 
         <div className="hidden md:block w-1/2 h-full bg-zinc-100">
           {plan.image ? (
@@ -448,8 +460,8 @@ export default function PlanDetailModal({
                       onClick={() => setShowVirtualHostSheet(true)}
                       className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-zinc-50 transition-colors text-left text-sm font-medium text-teal-700"
                     >
-                      <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                      Purchase an AI-assisted host
+                      <HostAvatar src={DEFAULT_HOST_AVATAR} className="w-4 h-4 shrink-0" />
+                      Hire an AI-assisted host
                     </button>
                   </div>
                 )}
@@ -830,23 +842,6 @@ export default function PlanDetailModal({
                   Plan Chat
                 </Link>
               )}
-              <button
-                onClick={copyPlanLink}
-                title="Copy direct link to this plan"
-                className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
-              >
-                {linkCopied ? (
-                  <>
-                    <Check className="w-4 h-4 text-emerald-600" />
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Link2 className="w-4 h-4" />
-                    Copy Link
-                  </>
-                )}
-              </button>
               <button
                 onClick={handleDuplicate}
                 className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"

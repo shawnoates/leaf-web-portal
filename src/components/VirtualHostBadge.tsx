@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Info } from "lucide-react";
 
 interface VirtualHostPersona {
@@ -15,9 +15,23 @@ interface VirtualHostPersona {
 export default function VirtualHostBadge({ persona }: { persona?: VirtualHostPersona | null }) {
   const [open, setOpen] = useState(false);
   const name = persona?.name || "Your host";
+  const rootRef = useRef<HTMLSpanElement>(null);
+
+  // Tap/click anywhere outside dismisses the tooltip, same as a native
+  // popover — otherwise it stays pinned open over whatever's underneath.
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [open]);
 
   return (
-    <span className="relative inline-flex items-center gap-1 text-zinc-400">
+    <span ref={rootRef} className="relative inline-flex items-center gap-1 text-zinc-400">
       <span className="text-[10px] font-normal normal-case tracking-normal">AI-Assisted</span>
       <button
         type="button"
