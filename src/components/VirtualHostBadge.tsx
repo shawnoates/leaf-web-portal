@@ -8,10 +8,9 @@ interface VirtualHostPersona {
 }
 
 // "Virtual" + info tooltip (click/tap-to-toggle, since a plain `title=`
-// attribute never fires on mobile) plus a grayscale "Beta" pill. Shared by
-// the org calendar page's plan card and modal (kept in sync deliberately —
-// see the "mirrors the card's precedence" comment in page.tsx) and by the
-// plan chat bubble.
+// attribute never fires on mobile). Shared by the org calendar page's plan
+// card and modal (kept in sync deliberately — see the "mirrors the card's
+// precedence" comment in page.tsx) and by the plan chat bubble.
 export default function VirtualHostBadge({ persona }: { persona?: VirtualHostPersona | null }) {
   const [open, setOpen] = useState(false);
   const name = persona?.name || "Your host";
@@ -32,9 +31,6 @@ export default function VirtualHostBadge({ persona }: { persona?: VirtualHostPer
         >
           <Info className="w-3 h-3" />
         </button>
-      </span>
-      <span className="bg-zinc-100 text-zinc-500 border border-zinc-200 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold">
-        Beta
       </span>
       {open && (
         <span

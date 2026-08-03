@@ -612,7 +612,14 @@ function Thread({ plan, hero }: { plan: Plan; hero?: boolean }) {
         <div className="msg" key={m.id || i}>
           <div className={`mava ${m.unread ? "unread" : ""}`}>{initial(m.authorName)}</div>
           <div className="msg-b">
-            <div className="t">{m.authorName}{m.authorRole === "leaf" ? " · Leaf concierge" : plan.calendarName ? ` · ${plan.calendarName}` : ""}</div>
+            <div className="t">
+              {m.authorName}
+              {m.authorRole === "virtual_host"
+                ? " · Virtual host"
+                : m.authorRole === "leaf"
+                  ? " · Leaf concierge"
+                  : plan.calendarName ? ` · ${plan.calendarName}` : ""}
+            </div>
             <p className="p">{m.body}</p>
             {m.sentAt && <div className="ago">{ago(m.sentAt)}</div>}
           </div>
