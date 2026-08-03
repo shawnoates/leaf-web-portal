@@ -804,6 +804,7 @@ function NeedsHostSection({ data }: { data: NeedsHost }) {
               : null,
             preferredTime: hostingIdea.time,
           }}
+          prefillDate={parse(hostingIdea.date)}
           hostName={Parse.User.current()?.get("full_name") || null}
           hostPhone={Parse.User.current()?.get("phone") || null}
           onClose={() => setHostingIdea(null)}
@@ -1141,7 +1142,7 @@ const CSS = `
 .leafme .hostbtn{background:var(--sage-deep);color:#fff;border:0;border-radius:6px;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:600;padding:11px 17px;white-space:nowrap}
 .leafme .hostbtn:hover{background:#264c37}
 .leafme .hostbtn:disabled{opacity:.6;cursor:default}
-.leafme .tier2{margin-top:36px;padding-top:26px;border-top:1px solid var(--rule)}
+.leafme .tier2{margin-top:36px;padding-top:26px}
 .leafme .crow{display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit;border:1px solid var(--rule);border-radius:8px;padding:15px 16px;margin-bottom:10px;background:#fff}
 .leafme .crow:hover{border-color:var(--ink-3);background:#faf9f6}
 .leafme .crow .gmark{width:34px;height:34px;border-radius:7px;flex-shrink:0;object-fit:cover;display:block}
