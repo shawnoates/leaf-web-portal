@@ -555,7 +555,10 @@ function AttendButtons({
     }
   }
 
-  // Hosts don't RSVP to their own plan — they host it.
+  // Hosts don't RSVP to their own plan — they host it. A virtual host fronts
+  // the plan instead, so the real owner gets no action button here (the
+  // "Hosted by {persona}" status badge already says who's hosting).
+  if (plan.viewerIsHost && plan.hostState === "virtual_host") return null;
   if (plan.viewerIsHost) {
     return (
       <span className="attend">

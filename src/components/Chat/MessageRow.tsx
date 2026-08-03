@@ -2,6 +2,7 @@
 
 import { MapPin, CheckCircle2, ExternalLink, Smartphone } from "lucide-react";
 import type { FirMessage, UserLite } from "./types";
+import VirtualHostBadge from "@/components/VirtualHostBadge";
 
 const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
 
@@ -114,8 +115,11 @@ function TextBubbleRow({
         className={`max-w-[75%] flex flex-col ${isFromCurrentUser && !isLeafAI ? "items-end" : "items-start"}`}
       >
         {!hideAvatar && senderName && (
-          <span className="text-[11px] text-zinc-400 mb-0.5 px-1">
+          <span className="text-[11px] text-zinc-400 mb-0.5 px-1 inline-flex items-center gap-1.5">
             {senderName}
+            {isLeafAI && virtualHostPersonaName && (
+              <VirtualHostBadge persona={{ name: virtualHostPersonaName }} />
+            )}
           </span>
         )}
         <div

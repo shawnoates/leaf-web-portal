@@ -10,6 +10,7 @@ import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
 import LeafHostPlanThread from "@/components/LeafHostPlanThread";
 import VirtualHostSheet, { DEFAULT_HOST_AVATAR, HostAvatar } from "@/components/VirtualHostSheet";
+import VirtualHostBadge from "@/components/VirtualHostBadge";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
@@ -2713,6 +2714,7 @@ export default function OrgCalendarPage() {
                           <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold">
                             Hosted by {plan.virtualHostPersona?.name || "your host"}
                           </p>
+                          <VirtualHostBadge persona={plan.virtualHostPersona} />
                         </div>
                       ) : plan.leafHostState === "leaf_hosted" ? (
                         <div className="flex items-center gap-2">
@@ -3596,6 +3598,7 @@ export default function OrgCalendarPage() {
                     <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
                       Hosted by {selectedEvent.virtualHostPersona?.name || "your host"}
                     </p>
+                    <VirtualHostBadge persona={selectedEvent.virtualHostPersona} />
                   </div>
                 ) : selectedEvent.leafHostState === "leaf_hosted" ? (
                   <div className="flex items-center gap-2">
