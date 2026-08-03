@@ -19,7 +19,7 @@ import { ORG_TYPES } from "@/lib/orgTypes";
 
 const GENERATION_MESSAGES = [
   "Finding venues near you...",
-  "Crafting plan ideas...",
+  "Crafting plan suggestions...",
   "Matching activities to your vibe...",
   "Picking the best times and places...",
   "Almost ready...",
@@ -451,7 +451,7 @@ function SetupPageInner() {
                 Your calendar is <span className="italic">live.</span>
               </h1>
               <p className="text-zinc-500 font-light text-lg">
-                AI is generating your first plan ideas. They&apos;ll appear on your calendar shortly.
+                AI is generating your first plan suggestions. They&apos;ll appear on your calendar shortly.
               </p>
             </div>
             <div className="bg-zinc-50 border border-zinc-100 rounded-2xl p-6 space-y-2">
@@ -496,8 +496,8 @@ function SetupPageInner() {
             <span className="italic">your calendar.</span>
           </h1>
           <p className="text-lg text-zinc-500 font-light leading-relaxed max-w-xl">
-            Tell us a bit about it. We&apos;ll generate your first week of plan
-            ideas in seconds.
+            Tell us a bit about it. We&apos;ll generate your first week of
+            plan suggestions in seconds.
           </p>
         </div>
 
@@ -557,7 +557,7 @@ function SetupPageInner() {
           {/* Type */}
           <Field
             label="What kind of calendar is it?"
-            hint="We use this to shape the plan ideas."
+            hint="We use this to shape the plan suggestions."
           >
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {ORG_TYPES.map((type) => (
@@ -664,7 +664,7 @@ function SetupPageInner() {
                 </h3>
                 <div className="space-y-3">
                   {[
-                    "AI-generated plan ideas",
+                    "AI-generated plan suggestions",
                     "Phone-number RSVPs",
                     "A shareable calendar link",
                   ].map((item) => (
