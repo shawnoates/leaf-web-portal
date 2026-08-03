@@ -246,7 +246,7 @@ const TABS = [
 // `growth` is the retired Social tier treated as Pro.
 const PAID_TIERS = ["pro", "growth", "concierge"];
 
-type CalActivePlan = { objectId: string; calendarId?: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; virtualHost?: boolean; virtualHostPersona?: { name: string; avatarUrl: string | null } | null; leafHostState?: "leaf_hosted" | "leaf_arranging" | null; leafHostPersona?: { name: string; avatarUrl: string | null } | null; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null };
+type CalActivePlan = { objectId: string; calendarId?: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; isVirtualHost?: boolean; leafHostState?: "leaf_hosted" | "leaf_arranging" | null; leafHostPersona?: { name: string; avatarUrl: string | null } | null; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null };
 
 // ── Analytics types ────────────────────────────────────────────────────
 
@@ -486,7 +486,7 @@ export default function OrgDashboardPage() {
     timezone: string | null;
     time: string | null;
     hostName: string;
-    virtualHost?: boolean;
+    isVirtualHost?: boolean;
     rsvpCount: number;
     location: { name: string; address: string; placeId?: string | null } | null;
     isPoll?: boolean;
@@ -1816,8 +1816,8 @@ export default function OrgDashboardPage() {
                           </p>
                           <div className="flex items-center justify-between text-xs text-zinc-400">
                             <span className="truncate">
-                              {plan.virtualHost ? (
-                                <>Hosted by {plan.virtualHostPersona?.name || "your host"}</>
+                              {plan.isVirtualHost ? (
+                                <>Hosted by {plan.hostName}</>
                               ) : plan.leafHostState === "leaf_hosted" ? (
                                 <>Hosted by Leaf{plan.leafHostPersona?.name ? ` · ${plan.leafHostPersona.name}` : ""}</>
                               ) : plan.leafHostState === "leaf_arranging" ? (
@@ -3897,7 +3897,7 @@ export default function OrgDashboardPage() {
             hideVenueUntilRsvp: selectedActivePlan.hideVenueUntilRsvp,
             requireApproval: selectedActivePlan.requireApproval,
             planSeriesId: selectedActivePlan.planSeriesId,
-            isVirtualHost: selectedActivePlan.virtualHost,
+            isVirtualHost: selectedActivePlan.isVirtualHost,
           }}
           calendarId={selectedActivePlan.calendarId || calendarId}
           onClose={() => setSelectedActivePlan(null)}

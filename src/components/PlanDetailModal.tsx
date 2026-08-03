@@ -13,6 +13,7 @@ import {
   Clock,
   Copy,
   EyeOff,
+  Info,
   Link2,
   MessageCircle,
   Pencil,
@@ -389,6 +390,15 @@ export default function PlanDetailModal({
               <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
                 Hosted by {hostNameOverride || plan.hostName}
               </p>
+              {(plan.isVirtualHost || isVirtualHostOverride) && (
+                <span
+                  title="This plan is hosted by an AI-assisted persona, not a human member."
+                  className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5"
+                >
+                  AI-assisted
+                  <Info className="w-3 h-3" />
+                </span>
+              )}
               {!plan.isPoll && (
                 <button
                   onClick={openChangeHost}
