@@ -111,6 +111,12 @@ export default function InboxClient() {
         title="Inbox"
         subtitle={totalUnread > 0 ? `${totalUnread} unread` : "All caught up"}
         showBack
+        /* Where "back" lands when the inbox was opened cold (email link, pasted
+           URL) and there's no history to pop: the dashboard for the calendar
+           whose thread is open, since the inbox itself spans calendars. */
+        backHref={
+          selected ? `/dashboard/${selected.calendarId}` : "/dashboard"
+        }
         showInbox={false}
       />
 

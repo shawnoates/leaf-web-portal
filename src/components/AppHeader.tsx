@@ -17,14 +17,32 @@ export default function AppHeader({
   title,
   subtitle,
   showBack = false,
+  backHref = "/dashboard",
   showInbox = true,
 }: {
   title: string;
   subtitle?: string;
   showBack?: boolean;
+  backHref?: string;
   showInbox?: boolean;
 }) {
   const router = useRouter();
+
+  // router.back() alone is a dead button whenever this page IS the history
+  // stack — opened from an email's "Reply in your inbox" link, a pasted URL, or
+  // a new tab. There's nothing behind it, so the browser no-ops and the arrow
+  // silently does nothing. Fall back to a real destination in that case.
+  //
+  // history.length === 1 is the only reliable "nothing behind me" signal
+  // available to a page: entry indices aren't exposed, and a same-origin
+  // referrer can also come from a link that opened a new tab.
+  function handleBack() {
+    if (typeof window !== "undefined" && window.history.length <= 1) {
+      router.push(backHref);
+      return;
+    }
+    router.back();
+  }
 
   async function handleLogout() {
     try {
@@ -45,7 +63,7 @@ export default function AppHeader({
       <div className="w-full px-5 md:px-6 py-5 flex items-center gap-4">
         {showBack && (
           <button
-            onClick={() => router.back()}
+            onClick={handleBack}
             className="p-1.5 -ml-1.5 text-zinc-400 hover:text-zinc-900 rounded-full hover:bg-zinc-100 shrink-0"
             aria-label="Go back"
           >
