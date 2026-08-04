@@ -1102,9 +1102,9 @@ const CSS = `
 .leafme .cal-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .leafme .cal-row .cal{margin-bottom:0}
 .leafme .cal-row .status{flex-shrink:0}
-.leafme .attend-cta-wrap{flex-shrink:0;text-align:right}
-.leafme .going-count{font-size:11px;color:var(--ink-3);margin-top:5px}
-.leafme .attend-cta{background:#fff;border:1px solid var(--rule);border-radius:6px;color:var(--ink);font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:9px 16px;cursor:pointer;white-space:nowrap}
+.leafme .attend-cta-wrap{flex-shrink:0;display:inline-flex;align-items:center;gap:8px}
+.leafme .going-count{font-size:11px;color:var(--ink-3);white-space:nowrap}
+.leafme .attend-cta{background:#fff;border:1px solid var(--rule);border-radius:6px;color:var(--ink);font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:6px 12px;cursor:pointer;white-space:nowrap}
 .leafme .attend-cta:hover{border-color:var(--ink-3)}
 .leafme .attend-cta:disabled{opacity:.5;cursor:default}
 .leafme .thread{margin-top:14px;padding-top:13px;border-top:1px solid var(--rule)}
