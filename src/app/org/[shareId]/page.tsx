@@ -118,11 +118,15 @@ interface PlanIdea {
   // Public — anyone can express interest on a plan idea (same shape as
   // AI-suggested events). Server aggregates via PlanIdeaInterest.
   interestCount?: number;
-  // Venue anchor for the inline card. Optional; some ideas render
-  // with a location line, others don't.
+  // Venue anchor for the inline card, and — when the owner picked one while
+  // creating the suggestion — the venue the host modal pre-selects. Optional;
+  // some ideas render with a location line, others don't.
   location?: {
     name: string;
     address: string;
+    placeId?: string | null;
+    photoUrl?: string | null;
+    rating?: number | null;
   } | null;
   ideaSeriesId?: string | null;
   // Owner-authored suggestion — the spread preserves its intentional date
@@ -154,6 +158,27 @@ interface NearbyVenue {
   rating: number | null;
   photoUrl: string | null;
   flagged?: boolean;
+}
+
+// Stand-in placeId for a suggestion venue saved without a Google place id
+// (owner-typed venues). Never sent to the server — a pick still on the
+// suggested venue submits no `venue`, so the server keeps the suggestion's own
+// location object and its resolved timezone.
+const SUGGESTED_VENUE_ID = "__suggested__";
+
+/**
+ * The venue already attached to a suggestion, as a carousel-shaped venue.
+ * Featured rows carry no `location`, so they keep the "pick a venue" flow.
+ */
+function suggestedVenueFor(idea: PlanIdea | null): NearbyVenue | null {
+  if (!idea?.location?.name) return null;
+  return {
+    placeId: idea.location.placeId || SUGGESTED_VENUE_ID,
+    name: idea.location.name,
+    address: idea.location.address || "",
+    rating: idea.location.rating ?? null,
+    photoUrl: idea.location.photoUrl ?? null,
+  };
 }
 
 interface OrgData {
@@ -2243,7 +2268,10 @@ export default function OrgCalendarPage() {
     }
 
     setNearbyVenues([]);
-    setSelectedVenue(null);
+    // Hosting a suggestion keeps its own venue selected through the default
+    // category sweep — only a typed search (the hoster shopping for somewhere
+    // else) clears the pick. Custom plans have nothing to preserve.
+    setSelectedVenue(typedVenueQuery ? null : suggestedVenueFor(hostingIdea));
     setVenuesLoading(true);
 
     // Debounce keystroke-driven searches (custom plans, and typed venue
@@ -2350,6 +2378,9 @@ export default function OrgCalendarPage() {
     if (hostingIdea) {
       setHostRequireApproval(org?.requireApprovalDefault === true);
       setVenueSearchQuery(""); // clear the venue search each time the modal opens
+      // Start on the suggestion's own venue. Also covers ideas with no search
+      // category, where the venue effect bails before it can select anything.
+      setSelectedVenue(suggestedVenueFor(hostingIdea));
     }
   }, [hostingIdea, org?.requireApprovalDefault]);
   useEffect(() => {
@@ -2476,7 +2507,10 @@ export default function OrgCalendarPage() {
         hostPhone: !isOwnerOrHost ? `+1${hostVerify.phone.replace(/\D/g, "")}` : undefined,
         hostEmail: !isOwnerOrHost && hostEmail.trim() ? hostEmail.trim() : undefined,
         requireApproval: hostRequireApproval,
-        venue: selectedVenue ? {
+        // Omitting `venue` tells the server to keep the suggestion's own
+        // location — right when the pick is still the suggested one, and it
+        // preserves that location's already-resolved timezone.
+        venue: selectedVenue && selectedVenue.placeId !== suggestedVenueFor(hostingIdea)?.placeId ? {
           placeId: selectedVenue.placeId,
           name: selectedVenue.name,
           address: selectedVenue.address,
@@ -4297,56 +4331,72 @@ export default function OrgCalendarPage() {
                         organizer for approval before it&apos;s published.
                       </p>
                     )}
-                    {venuesLoading ? (
-                      <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-                        {[0, 1, 2, 3, 4].map((i) => (
-                          <div key={i} className="min-w-[160px] h-[180px] bg-zinc-100 rounded-xl animate-pulse shrink-0" />
-                        ))}
-                      </div>
-                    ) : nearbyVenues.length > 0 ? (
-                      <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-                        {nearbyVenues.map((venue) => (
-                          <button
-                            key={venue.placeId}
-                            type="button"
-                            onClick={() => setSelectedVenue(selectedVenue?.placeId === venue.placeId ? null : venue)}
-                            className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left relative ${
-                              selectedVenue?.placeId === venue.placeId
-                                ? "border-zinc-900 shadow-lg"
-                                : venue.flagged
-                                  ? "border-amber-300 hover:border-amber-400"
-                                  : "border-zinc-200 hover:border-zinc-300"
-                            }`}
-                          >
-                            {venue.flagged && (
-                              <div className="absolute top-1.5 right-1.5 bg-amber-500 text-white rounded-full p-0.5 z-10">
-                                <AlertTriangle className="w-3 h-3" />
-                              </div>
-                            )}
-                            <div className="h-[100px] bg-zinc-100">
-                              {venue.photoUrl ? (
-                                <img src={venue.photoUrl} className="w-full h-full object-cover" alt={venue.name} />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <MapPin className="w-6 h-6 text-zinc-300" />
+                    {(() => {
+                      // The suggestion's own venue leads the row (pre-selected);
+                      // Places results follow, minus any duplicate of it.
+                      const ideaVenue = suggestedVenueFor(hostingIdea);
+                      const venues = ideaVenue
+                        ? [
+                            ideaVenue,
+                            ...nearbyVenues.filter(
+                              (v) =>
+                                v.placeId !== ideaVenue.placeId &&
+                                v.name.trim().toLowerCase() !== ideaVenue.name.trim().toLowerCase(),
+                            ),
+                          ]
+                        : nearbyVenues;
+                      if (venues.length === 0 && !venuesLoading) {
+                        return <p className="text-sm text-zinc-400 italic">No venues found nearby.</p>;
+                      }
+                      return (
+                        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                          {venues.map((venue) => (
+                            <button
+                              key={venue.placeId}
+                              type="button"
+                              onClick={() => setSelectedVenue(selectedVenue?.placeId === venue.placeId ? null : venue)}
+                              className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left relative ${
+                                selectedVenue?.placeId === venue.placeId
+                                  ? "border-zinc-900 shadow-lg"
+                                  : venue.flagged
+                                    ? "border-amber-300 hover:border-amber-400"
+                                    : "border-zinc-200 hover:border-zinc-300"
+                              }`}
+                            >
+                              {venue.flagged && (
+                                <div className="absolute top-1.5 right-1.5 bg-amber-500 text-white rounded-full p-0.5 z-10">
+                                  <AlertTriangle className="w-3 h-3" />
                                 </div>
                               )}
-                            </div>
-                            <div className="p-2.5">
-                              <p className="text-xs font-bold truncate">{venue.name}</p>
-                              <div className="flex items-center gap-1 mt-0.5">
-                                {venue.rating && (
-                                  <span className="text-xs text-zinc-500">{venue.rating.toFixed(1)} &#9733;</span>
+                              <div className="h-[100px] bg-zinc-100">
+                                {venue.photoUrl ? (
+                                  <img src={venue.photoUrl} className="w-full h-full object-cover" alt={venue.name} />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <MapPin className="w-6 h-6 text-zinc-300" />
+                                  </div>
                                 )}
                               </div>
-                              <p className="text-xs text-zinc-400 truncate mt-0.5">{venue.address}</p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-zinc-400 italic">No venues found nearby.</p>
-                    )}
+                              <div className="p-2.5">
+                                {ideaVenue && venue.placeId === ideaVenue.placeId && (
+                                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-0.5">Chosen venue</p>
+                                )}
+                                <p className="text-xs font-bold truncate">{venue.name}</p>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  {venue.rating && (
+                                    <span className="text-xs text-zinc-500">{venue.rating.toFixed(1)} &#9733;</span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-zinc-400 truncate mt-0.5">{venue.address}</p>
+                              </div>
+                            </button>
+                          ))}
+                          {venuesLoading && [0, 1, 2, 3, 4].map((i) => (
+                            <div key={`venue-skeleton-${i}`} className="min-w-[160px] h-[180px] bg-zinc-100 rounded-xl animate-pulse shrink-0" />
+                          ))}
+                        </div>
+                      );
+                    })()}
                     {selectedVenue && (
                       <div>
                         <p className="text-xs text-zinc-600 flex items-center gap-1">
