@@ -490,12 +490,7 @@ function Stop({
       <div className="stop-card">
         <PlanTile plan={plan} index={index} sm onOpen={onOpen} />
         <div>
-          <div className="cal-row">
-            <div className="cal">{plan.calendarName}</div>
-            {canAttend
-              ? <AttendCta plan={plan} onRsvp={onRsvp} />
-              : (status && <span className={`status ${status.cls}`}>{status.text}</span>)}
-          </div>
+          <div className="cal">{plan.calendarName}</div>
           <h3><button className="plan-link" onClick={onOpen}>{plan.title}</button></h3>
           <p className="meta">{meta}</p>
           {plan.hostState === "waiting_on_host" && (
@@ -503,6 +498,9 @@ function Stop({
           )}
           <Thread plan={plan} />
         </div>
+        {canAttend
+          ? <AttendCta plan={plan} onRsvp={onRsvp} />
+          : (status && <span className={`status ${status.cls}`}>{status.text}</span>)}
       </div>
     </article>
   );
@@ -1091,7 +1089,7 @@ const CSS = `
 .leafme .date .m{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-top:4px}
 .leafme .dot{position:absolute;left:-30px;top:7px;width:7px;height:7px;border-radius:50%;background:var(--paper);border:1.5px solid var(--ink-3)}
 .leafme .dot.on{background:var(--green);border-color:var(--green)}
-.leafme .stop-card{display:grid;grid-template-columns:120px 1fr;gap:18px;align-items:start}
+.leafme .stop-card{display:grid;grid-template-columns:120px 1fr auto;gap:18px;align-items:start}
 .leafme .stop h3{font-family:var(--serif);font-size:17px;font-weight:500;letter-spacing:-.01em;margin-bottom:3px}
 .leafme .meta{font-size:12px;color:var(--ink-3);margin-bottom:9px}
 .leafme .cal{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:5px}
@@ -1099,10 +1097,10 @@ const CSS = `
 .leafme .status::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--ink-3)}
 .leafme .status.host::before{background:var(--green)}
 .leafme .status.wait::before{background:#d9a441}
-.leafme .cal-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.leafme .cal-row .cal{margin-bottom:0}
-.leafme .cal-row .status{flex-shrink:0}
-.leafme .attend-cta-wrap{flex-shrink:0;text-align:right}
+/* Status/CTA is its own grid column (see .stop-card), top-aligned beside the
+   whole title+meta+thread block — so a taller CTA never pushes the title
+   down, same as the "Host this" cards' image | body | action layout. */
+.leafme .attend-cta-wrap{text-align:right}
 .leafme .going-count{font-size:11px;color:var(--ink-3);margin-bottom:6px;white-space:nowrap}
 .leafme .attend-cta{background:#18181b;border:0;border-radius:6px;color:#fff;font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:9px 16px;cursor:pointer;white-space:nowrap}
 .leafme .attend-cta:hover{opacity:.9}

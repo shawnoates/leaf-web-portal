@@ -217,6 +217,11 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [promptInput, setPromptInput] = useState("");
   const [promptLoading, setPromptLoading] = useState(false);
   const [promptError, setPromptError] = useState<string | null>(null);
+  // Recommendation pills under the prompt bar. Each `text` is a ready-to-send
+  // sentence for draftPlanFromPrompt — tapping one runs the same path as
+  // typing it. `reason` is the data justification, shown on hover.
+  const [promptPills, setPromptPills] = useState<{ text: string; reason: string | null }[]>([]);
+  const [pillsLoading, setPillsLoading] = useState(false);
   const [aiFilled, setAiFilled] = useState<Set<PlanDraftField>>(() => new Set());
   const [userTouched, setUserTouched] = useState<Set<PlanDraftField>>(() => new Set());
   // Bumped whenever the prompt sets a new venue phrase — used as a `key` on
@@ -252,6 +257,38 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       });
     return () => { cancelled = true; };
   }, [pollConvertMode, editMode, hostRequestMode]);
+
+  // Recommendation pills — grounded in this calendar's own history (best
+  // weekday by RSVP share, typical start time, over-performing category, top
+  // plans) and steered away from what's already on the books. Refetches when
+  // the manager switches calendars, since the whole point is that they're
+  // calendar-specific. Server caches per calendar, so this is cheap on reopen.
+  useEffect(() => {
+    if (!showPromptBar) return;
+    if (!selectedCalendarId) return;
+    let cancelled = false;
+    setPillsLoading(true);
+    setPromptPills([]);
+    const detected = detectCity();
+    Parse.Cloud.run("suggestPlanPrompts", {
+      calendarId: selectedCalendarId,
+      todayISO: new Date().toISOString().slice(0, 10),
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      locationHint: detected.fallback ? undefined : detected.city,
+    })
+      .then((result: { pills?: { text: string; reason: string | null }[] }) => {
+        if (cancelled) return;
+        setPromptPills(Array.isArray(result?.pills) ? result.pills : []);
+      })
+      .catch(() => {
+        // Non-fatal — the prompt bar still works, the row just stays empty.
+        if (!cancelled) setPromptPills([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPillsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [showPromptBar, selectedCalendarId]);
 
   async function handleConnectGoogleCalendar() {
     if (connectingGoogle) return;
@@ -422,8 +459,11 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     return unique;
   }
 
-  async function handlePromptSubmit() {
-    const trimmed = promptInput.trim();
+  // `overrideText` is how a recommendation pill fires immediately — setState
+  // is async, so reading promptInput back on the same tick would submit the
+  // previous value (or empty on the first tap).
+  async function handlePromptSubmit(overrideText?: string) {
+    const trimmed = (overrideText ?? promptInput).trim();
     if (!trimmed || promptLoading) return;
     setPromptError(null);
     setPromptLoading(true);
@@ -985,7 +1025,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                 />
                 <button
                   type="button"
-                  onClick={handlePromptSubmit}
+                  onClick={() => handlePromptSubmit()}
                   disabled={!promptInput.trim() || promptLoading || creating}
                   className="shrink-0 bg-emerald-600 text-white rounded-lg h-9 w-9 flex items-center justify-center hover:bg-emerald-700 transition-colors disabled:opacity-40"
                   aria-label="Draft plan from prompt"
@@ -1005,6 +1045,40 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   Drafted {aiFilled.size} field{aiFilled.size === 1 ? "" : "s"} — review before creating.
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Recommendation pills — each one is a ready-to-send sentence built
+              from THIS calendar's history (best weekday by RSVP share, typical
+              start time, over-performing category, top plans) and filtered
+              against what's already scheduled. Tapping sends it straight
+              through the drafter, same path as typing it. Hidden once a draft
+              has landed — the fields below are the subject at that point. */}
+          {showPromptBar && aiFilled.size === 0 && (pillsLoading || promptPills.length > 0) && (
+            <div className="-mt-2 flex flex-wrap gap-1.5">
+              {pillsLoading && [0, 1, 2, 3].map((i) => (
+                <div
+                  key={`pill-skel-${i}`}
+                  className="h-[26px] rounded-full bg-zinc-100 animate-pulse"
+                  style={{ width: `${[142, 116, 158, 128][i]}px` }}
+                />
+              ))}
+              {!pillsLoading && promptPills.map((pill) => (
+                <button
+                  key={pill.text}
+                  type="button"
+                  title={pill.reason || undefined}
+                  onClick={() => {
+                    setPromptInput(pill.text);
+                    setPromptError(null);
+                    handlePromptSubmit(pill.text);
+                  }}
+                  disabled={promptLoading || creating}
+                  className="rounded-full border border-emerald-200 bg-emerald-50/50 px-2.5 py-1 text-xs text-emerald-900 hover:bg-emerald-100 hover:border-emerald-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {pill.text}
+                </button>
+              ))}
             </div>
           )}
 

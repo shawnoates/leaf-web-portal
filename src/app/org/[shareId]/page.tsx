@@ -418,6 +418,31 @@ function isApartmentOrgType(
 
 // --- Helpers ---
 
+/**
+ * UTC-offset suffix ("-04:00") for a wall-clock instant in a given IANA zone.
+ *
+ * Lets the browser hand the server an unambiguous absolute time anchored to
+ * the VENUE's zone rather than its own. Mirrors the server's
+ * `wallClockToUtcInTimezone` so both sides resolve DST the same way — the repo
+ * has already been bitten by two implementations disagreeing by an hour.
+ */
+function zoneOffsetSuffix(dateStr: string, timeStr: string, timeZone: string): string {
+  try {
+    const tentative = new Date(`${dateStr}T${timeStr}:00Z`);
+    if (isNaN(tentative.getTime())) return "Z";
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      timeZoneName: "shortOffset",
+    }).formatToParts(tentative);
+    const value = parts.find((p) => p.type === "timeZoneName")?.value;
+    const m = value?.match(/GMT([+-])(\d{1,2})(?::?(\d{2}))?/);
+    if (!m) return "Z"; // GMT+0 renders bare "GMT"; UTC is the correct read
+    return `${m[1]}${m[2].padStart(2, "0")}:${m[3] || "00"}`;
+  } catch {
+    return "Z";
+  }
+}
+
 // Format in the venue's IANA zone when known — a Bangkok viewer reading a
 // NYC plan should see NYC's wall-clock, not their own. Falls through to
 // viewer-local when no tz is supplied (legacy plans, missing venue data).
@@ -3290,7 +3315,16 @@ export default function OrgCalendarPage() {
                       {/* Interest heart — top-right of the title (replaces the
                           old inline "I'm interested" button). Public; cookie-
                           deduped server-side, optimistic here. Badge shows the
-                          running interest count. */}
+                          running interest count.
+
+                          Hidden for Featured: this writes a PlanIdeaInterest
+                          pointing at a CalendarGeneratedPlan, and a featured
+                          suggestion has no such row. Featured interest is also
+                          authenticated-only by design — it feeds cohort
+                          matching, which needs a real user, not a cookie. So
+                          web offers Host This and the app offers Mark
+                          Interested, per the spec's split. */}
+                      {!idea.isFeatured && (
                       <button
                         type="button"
                         onClick={() => handlePlanIdeaInterest(idea.id)}
@@ -3312,6 +3346,7 @@ export default function OrgCalendarPage() {
                           </span>
                         )}
                       </button>
+                      )}
                     </div>
                     <div className="space-y-2">
                       {idea.description && (
@@ -4262,6 +4297,13 @@ export default function OrgCalendarPage() {
                         min={new Date().toISOString().split("T")[0]}
                         max={org.tier === "starter" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] : undefined}
                         defaultValue={(() => {
+                          // Featured: read the admin's wall-clock directly.
+                          // Deriving it from the UTC instant would land on the
+                          // wrong DAY for any evening event whose venue-local
+                          // date and UTC date differ (9 PM PT is next-day UTC).
+                          if (hostingIdea.isFeatured && hostingIdea.localWallClock) {
+                            return hostingIdea.localWallClock.slice(0, 10);
+                          }
                           // Prefill the spread cadence date so the modal
                           // matches the date shown on the idea's card;
                           // fall back to the server date.
@@ -4280,9 +4322,20 @@ export default function OrgCalendarPage() {
                       <input
                         type="time"
                         required
-                        defaultValue="18:00"
+                        defaultValue={
+                          hostingIdea.isFeatured && hostingIdea.localWallClock
+                            ? hostingIdea.localWallClock.slice(11, 16)
+                            : hostingIdea.preferredTime || "18:00"
+                        }
                         className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
                       />
+                      {hostingIdea.isFeatured && hostingIdea.venueTimeZone && (
+                        <p className="text-xs text-zinc-400 font-light">
+                          {hostingIdea.timeMode === "local_wall_clock"
+                            ? "Local time in your city."
+                            : `Times are ${hostingIdea.venueTimeZone.split("/").pop()?.replace(/_/g, " ")}.`}
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs tracking-wider uppercase font-bold">
