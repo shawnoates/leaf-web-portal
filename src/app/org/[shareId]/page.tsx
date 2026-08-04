@@ -2094,6 +2094,48 @@ export default function OrgCalendarPage() {
     }
   }, [org, planQueryId]);
 
+  // ── Return from the AI-assisted host purchase (?virtualHostAttached=1) ────
+  // Stripe sends the owner back to this page with the sheet (and any modal it
+  // was opened from) gone. Resolve the checkout session to the plan that got
+  // hosted, refresh, and hand the id to the ?plan= auto-open above so they land
+  // on the plan detail — where the host they just paid for actually shows.
+  // The attach itself lands on the Stripe webhook (and on the idea / AI-starter
+  // paths the plan is created there), so poll until it reports ready.
+  const virtualHostReturnRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || virtualHostReturnRef.current) return;
+    const search = new URLSearchParams(window.location.search);
+    if (search.get("virtualHostAttached") !== "1") return;
+    virtualHostReturnRef.current = true;
+    const sessionId = search.get("session_id");
+    search.delete("virtualHostAttached");
+    search.delete("session_id");
+    const qs = search.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+    if (!sessionId) return;
+    let cancelled = false;
+    (async () => {
+      for (let i = 0; i < 8 && !cancelled; i++) {
+        try {
+          const r: { ready: boolean; eventGroupId?: string } = await Parse.Cloud.run(
+            "getVirtualHostAttachStatus",
+            { sessionId },
+          );
+          if (r.ready && r.eventGroupId) {
+            if (cancelled) return;
+            await fetchOrg();
+            if (!cancelled) setPlanQueryId(r.eventGroupId);
+            return;
+          }
+        } catch {
+          return; // not our session / signed out — leave them on the page
+        }
+        await new Promise((res) => setTimeout(res, 1500));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [fetchOrg]);
+
   // Keep the open detail modal in sync with the live plans list. `selectedEvent`
   // is a frozen snapshot taken when the card was clicked, so any later
   // fetchOrg() (RSVP, host reassignment, virtual host, etc.) refreshes the card
