@@ -131,6 +131,20 @@ interface PlanIdea {
   // Owner explicitly pinned the date in the editor — also preserved.
   datePinned?: boolean;
   preferredTime?: string | null;
+  // --- Admin-curated "Featured" suggestion (FEATURED_SUGGESTION_SPEC) ------
+  // Displaces the weakest algorithmic idea rather than adding a slot, so the
+  // list length is unchanged. Renders pinned first with a badge.
+  isFeatured?: boolean;
+  // Pre-rendered in the VENUE's timezone, not the viewer's. A "7:30 PM ET"
+  // showtime must read the same for everyone; deriving it client-side from a
+  // UTC instant would silently re-anchor it to the browser's zone.
+  whenLabel?: string;
+  // "fixed_instant" = one shared moment. "local_wall_clock" = 7:30 in each
+  // city, no single instant — so there's deliberately no UTC date to format.
+  timeMode?: "fixed_instant" | "local_wall_clock";
+  venueTimeZone?: string | null;
+  localWallClock?: string | null;
+  venueName?: string | null;
 }
 
 interface NearbyVenue {
@@ -1857,6 +1871,12 @@ export default function OrgCalendarPage() {
         isManual: idea.isManual === true,
         datePinned: idea.datePinned === true,
         preferredTime: (idea.preferredTime as string) ?? null,
+        isFeatured: idea.isFeatured === true,
+        whenLabel: (idea.whenLabel as string) ?? undefined,
+        timeMode: (idea.timeMode as PlanIdea["timeMode"]) ?? undefined,
+        venueTimeZone: (idea.venueTimeZone as string) ?? null,
+        localWallClock: (idea.localWallClock as string) ?? null,
+        venueName: (idea.venueName as string) ?? null,
       }));
 
       setVirtualHostAvatar((result.virtualHostPreview as { avatarUrl?: string | null } | null)?.avatarUrl ?? null);
@@ -2640,6 +2660,10 @@ export default function OrgCalendarPage() {
           type StreamEntry = {
             key: string;
             date: number;
+            // Editorial pin. The stream is date-ordered, so a featured
+            // suggestion would otherwise sink to wherever its date falls —
+            // undoing the ordering it was given upstream.
+            pinned?: boolean;
             render: (index: number) => React.ReactNode;
           };
           const streamItems: StreamEntry[] = [];
@@ -3120,7 +3144,13 @@ export default function OrgCalendarPage() {
           const renderPlanIdeaCard = (idea: PlanIdea, index: number) => {
               const spreadDate = spreadOf(idea);
               let dateLabel: string | null = null;
-              if (spreadDate) {
+              if (idea.isFeatured && idea.whenLabel) {
+                // Server-rendered in the VENUE's zone. Reformatting it here
+                // from a UTC instant would re-anchor it to the browser's zone,
+                // which is exactly the bug the two-time-mode model exists to
+                // avoid — a 7:30 PM ET showtime is not 4:30 PM for anyone.
+                dateLabel = idea.whenLabel.toUpperCase();
+              } else if (spreadDate) {
                 dateLabel = `${spreadDate
                   .toLocaleDateString("en-US", {
                     weekday: "long",
@@ -3164,13 +3194,21 @@ export default function OrgCalendarPage() {
                     )}
                     <span
                       className="absolute top-4 left-4 text-[10px] font-bold uppercase tracking-widest rounded-full px-3 py-1"
-                      style={{
-                        background: "rgba(255,255,255,0.9)",
-                        color: "#1B4332",
-                        backdropFilter: "blur(4px)",
-                      }}
+                      style={
+                        idea.isFeatured
+                          ? {
+                              background: "rgba(27,67,50,0.92)",
+                              color: "#FFFFFF",
+                              backdropFilter: "blur(4px)",
+                            }
+                          : {
+                              background: "rgba(255,255,255,0.9)",
+                              color: "#1B4332",
+                              backdropFilter: "blur(4px)",
+                            }
+                      }
                     >
-                      Suggested
+                      {idea.isFeatured ? "★ Featured" : "Suggested"}
                     </span>
                   </div>
                   <div className="w-full md:w-2/5 space-y-6">
@@ -3304,6 +3342,10 @@ export default function OrgCalendarPage() {
           };
           if (!org.hidePlanIdeas && org.planIdeas.length > 0) {
           const orderedIdeas = [...org.planIdeas].sort((a, b) => {
+            // Featured is editorial and pins ahead of the date sort — it took a
+            // slot from an algorithmic idea, so burying it below them would
+            // spend the displacement for nothing.
+            if (!!a.isFeatured !== !!b.isFeatured) return a.isFeatured ? -1 : 1;
             const at = spreadOf(a)?.getTime() ?? Number.POSITIVE_INFINITY;
             const bt = spreadOf(b)?.getTime() ?? Number.POSITIVE_INFINITY;
             if (at !== bt) return at - bt;
@@ -3319,6 +3361,7 @@ export default function OrgCalendarPage() {
               streamItems.push({
                 key: `idea-${idea.id}`,
                 date: d ? d.getTime() : Number.POSITIVE_INFINITY,
+                pinned: idea.isFeatured === true,
                 render: (index) => renderPlanIdeaCard(idea, index),
               });
             });
@@ -3327,7 +3370,9 @@ export default function OrgCalendarPage() {
           // Interleave by date; stable by key on ties.
           streamItems.sort(
             (a, b) =>
-              a.date - b.date || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)
+              Number(!!b.pinned) - Number(!!a.pinned) ||
+              a.date - b.date ||
+              (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)
           );
 
           return (
