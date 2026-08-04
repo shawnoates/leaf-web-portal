@@ -1068,8 +1068,8 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             // actual form off-screen. One scrolling row keeps the drawer's
             // shape; snap points make the partially-visible next chip an
             // affordance rather than a cut-off accident.
-            <div className="-mt-2 -mx-6 px-6 overflow-x-auto snap-x snap-mandatory">
-              <div className="flex gap-1.5 w-max pb-1.5">
+            <div className="no-scrollbar -mt-2 -mx-6 px-6 overflow-x-auto snap-x snap-mandatory">
+              <div className="flex gap-1.5 w-max">
                 {pillsLoading && [0, 1, 2, 3].map((i) => (
                   <div
                     key={`pill-skel-${i}`}
