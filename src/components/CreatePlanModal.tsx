@@ -222,6 +222,11 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   // typing it. `reason` is the data justification, shown on hover.
   const [promptPills, setPromptPills] = useState<{ text: string; reason: string | null }[]>([]);
   const [pillsLoading, setPillsLoading] = useState(false);
+  // Where this CALENDAR is, resolved server-side (its own city, else its
+  // parent org's, else the browser's). Used as the drafter's location hint so
+  // "a nearby taproom" resolves near the community — not near a manager who
+  // happens to be working from another city today.
+  const [calendarArea, setCalendarArea] = useState<string | null>(null);
   const [aiFilled, setAiFilled] = useState<Set<PlanDraftField>>(() => new Set());
   const [userTouched, setUserTouched] = useState<Set<PlanDraftField>>(() => new Set());
   // Bumped whenever the prompt sets a new venue phrase — used as a `key` on
@@ -276,9 +281,10 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       locationHint: detected.fallback ? undefined : detected.city,
     })
-      .then((result: { pills?: { text: string; reason: string | null }[] }) => {
+      .then((result: { pills?: { text: string; reason: string | null }[]; area?: string | null }) => {
         if (cancelled) return;
         setPromptPills(Array.isArray(result?.pills) ? result.pills : []);
+        setCalendarArea(result?.area || null);
       })
       .catch(() => {
         // Non-fatal — the prompt bar still works, the row just stays empty.
@@ -468,12 +474,14 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     setPromptError(null);
     setPromptLoading(true);
     try {
-      // Anchor grounded venue/showtime search to a real place. detectCity is
-      // the same timezone-derived signal the server already uses to bias
-      // Places grounding elsewhere; skip the "your area" fallback (fallback
-      // === true) and let the server fall back to the tz region instead.
+      // Anchor grounded venue/showtime search to a real place. The calendar's
+      // own area wins when we have it — a chip that says "a nearby taproom"
+      // was written about the community's neighborhood, so it has to resolve
+      // there. detectCity is the fallback: same timezone-derived signal the
+      // server uses to bias Places grounding elsewhere, skipping its "your
+      // area" case (fallback === true) so the server can use the tz region.
       const detected = detectCity();
-      const locationHint = detected.fallback ? undefined : detected.city;
+      const locationHint = calendarArea || (detected.fallback ? undefined : detected.city);
       const draft = await Parse.Cloud.run("draftPlanFromPrompt", {
         prompt: trimmed,
         todayISO: new Date().toISOString().slice(0, 10),
