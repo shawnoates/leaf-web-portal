@@ -479,7 +479,9 @@ function Stop({
   const hostHref = plan.calendarShareId ? `/org/${plan.calendarShareId}?host=${encodeURIComponent(plan.id)}` : `/p/${plan.id}`;
   // Plans you're neither attending nor hosting (and not Leaf-hosted / waiting on
   // a host) get a quick "I'm attending" CTA on the right instead of a count.
-  const canAttend = !plan.viewerIsHost && plan.rsvpState !== "going"
+  // A virtual host fronts the hosting, so the real owner counts as "not
+  // hosting" here too and still gets the CTA (mirrors AttendButtons/canChat).
+  const canAttend = (!plan.viewerIsHost || plan.hostState === "virtual_host") && plan.rsvpState !== "going"
     && plan.hostState !== "waiting_on_host" && plan.hostState !== "leaf_hosted";
   return (
     <article className="stop">
