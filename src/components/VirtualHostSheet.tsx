@@ -72,7 +72,7 @@ export default function VirtualHostSheet({
   aiEventIndex?: number;
   returnTo?: string;
   onClose: () => void;
-  onAttached: (personaName?: string) => void;
+  onAttached: (personaName?: string, personaAvatarUrl?: string) => void;
 }) {
   const [info, setInfo] = useState<VhInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -117,7 +117,7 @@ export default function VirtualHostSheet({
         returnUrl: returnTo || (typeof window !== "undefined" ? window.location.href : undefined),
       });
       if (res.attached) {
-        onAttached(info.persona?.name);
+        onAttached(info.persona?.name, info.persona?.avatarUrl || undefined);
       } else if (res.checkoutUrl) {
         window.location.href = res.checkoutUrl; // Stripe Checkout
       } else {

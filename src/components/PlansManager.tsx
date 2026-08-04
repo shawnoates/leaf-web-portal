@@ -184,6 +184,9 @@ interface UpcomingPlan {
    *  Owner/co-host only (getOrgDashboard is management-scoped) — drives the
    *  small ring next to the byline so the manager can tell the two apart. */
   isVirtualHost?: boolean;
+  /** Persona avatar (server `activePlans[i].virtualHostAvatarUrl`) — shown next
+   *  to the byline in the detail modal, same as the public /org page. */
+  virtualHostAvatarUrl?: string | null;
   location: { name: string; address: string } | null;
   /** Full itinerary (server `getOrgDashboard` calendar.activePlans[i].locations).
    *  Threaded into `PlanDetailData.locations` for the edit modal to hydrate its
@@ -580,6 +583,7 @@ export default function PlansManager({
         time: string | null;
         hostName: string;
         isVirtualHost?: boolean;
+        virtualHostAvatarUrl?: string | null;
         rsvpCount: number;
         location: { name: string; address: string; placeId?: string | null } | null;
         locations?: {
@@ -608,6 +612,7 @@ export default function PlansManager({
         rsvpCount: p.rsvpCount,
         host: p.hostName ? { name: p.hostName } : null,
         isVirtualHost: p.isVirtualHost === true,
+        virtualHostAvatarUrl: p.virtualHostAvatarUrl ?? null,
         location: p.location ? { name: p.location.name, address: p.location.address } : null,
         locations: p.locations,
         isPoll: p.isPoll,
@@ -1471,6 +1476,7 @@ export default function PlansManager({
             requireApproval: selectedPlan.requireApproval,
             planSeriesId: selectedPlan.planSeriesId,
             isVirtualHost: selectedPlan.isVirtualHost,
+            virtualHostAvatarUrl: selectedPlan.virtualHostAvatarUrl,
           }}
           calendarId={calendarId}
           onClose={() => setSelectedPlan(null)}

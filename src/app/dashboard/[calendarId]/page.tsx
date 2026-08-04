@@ -246,7 +246,7 @@ const TABS = [
 // `growth` is the retired Social tier treated as Pro.
 const PAID_TIERS = ["pro", "growth", "concierge"];
 
-type CalActivePlan = { objectId: string; calendarId?: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; isVirtualHost?: boolean; leafHostState?: "leaf_hosted" | "leaf_arranging" | null; leafHostPersona?: { name: string; avatarUrl: string | null } | null; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null };
+type CalActivePlan = { objectId: string; calendarId?: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; isVirtualHost?: boolean; virtualHostAvatarUrl?: string | null; leafHostState?: "leaf_hosted" | "leaf_arranging" | null; leafHostPersona?: { name: string; avatarUrl: string | null } | null; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null };
 
 // ── Analytics types ────────────────────────────────────────────────────
 
@@ -487,6 +487,7 @@ export default function OrgDashboardPage() {
     time: string | null;
     hostName: string;
     isVirtualHost?: boolean;
+    virtualHostAvatarUrl?: string | null;
     rsvpCount: number;
     location: { name: string; address: string; placeId?: string | null } | null;
     isPoll?: boolean;
@@ -3898,6 +3899,7 @@ export default function OrgDashboardPage() {
             requireApproval: selectedActivePlan.requireApproval,
             planSeriesId: selectedActivePlan.planSeriesId,
             isVirtualHost: selectedActivePlan.isVirtualHost,
+            virtualHostAvatarUrl: selectedActivePlan.virtualHostAvatarUrl,
           }}
           calendarId={selectedActivePlan.calendarId || calendarId}
           onClose={() => setSelectedActivePlan(null)}

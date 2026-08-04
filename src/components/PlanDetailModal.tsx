@@ -6,6 +6,7 @@ import Parse from "@/lib/parse-client";
 import { renderLinkedText } from "@/lib/linkify";
 import { formatWallClockTime12h } from "@/lib/date-utils";
 import VirtualHostSheet, { DEFAULT_HOST_AVATAR, HostAvatar } from "@/components/VirtualHostSheet";
+import VirtualHostBadge from "@/components/VirtualHostBadge";
 import {
   Calendar,
   Check,
@@ -13,7 +14,6 @@ import {
   Clock,
   Copy,
   EyeOff,
-  Info,
   Link2,
   MessageCircle,
   Pencil,
@@ -62,6 +62,9 @@ export type PlanDetailData = {
   /** Already has an AI-assisted (virtual) host attached — hides the
    *  "Add AI-assisted host" CTA next to Change host. */
   isVirtualHost?: boolean;
+  /** Persona avatar for the byline, mirroring the public /org page. Only
+   *  meaningful when `isVirtualHost` — a real host has no avatar here. */
+  virtualHostAvatarUrl?: string | null;
 };
 
 type PollOptionDetail = { date: string; time: string | null; count: number };
@@ -154,6 +157,9 @@ export default function PlanDetailModal({
   // replaces whoever is currently hosting this plan, live RSVPs included.
   const [showVirtualHostSheet, setShowVirtualHostSheet] = useState(false);
   const [isVirtualHostOverride, setIsVirtualHostOverride] = useState(false);
+  const [virtualHostAvatarOverride, setVirtualHostAvatarOverride] = useState<string | null>(null);
+  // Attaching a persona mid-session flips this on without a parent refetch.
+  const isVirtualHost = plan.isVirtualHost === true || isVirtualHostOverride;
 
   // Load attendees for non-poll plans. Re-fires when the parent triggers a
   // refresh (planRsvpsRefreshTick) so RSVPs that land after the modal
@@ -387,17 +393,23 @@ export default function PlanDetailModal({
               {plan.title}
             </h2>
             <div className="flex items-center gap-3 flex-wrap">
+              {isVirtualHost && (
+                /* Persona avatar ahead of the byline, matching the public /org
+                   page's virtual-host header. HostAvatar (not a bare <img>) so
+                   a stale persona URL degrades to a sparkle, never a broken
+                   image. Sits inside the same gap-3 row, so no extra wrapper. */
+                <HostAvatar
+                  src={virtualHostAvatarOverride || plan.virtualHostAvatarUrl}
+                  className="w-5 h-5 rounded-full ring-1 ring-zinc-200 -mr-1 text-zinc-400"
+                />
+              )}
               <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
                 Hosted by {hostNameOverride || plan.hostName}
               </p>
-              {(plan.isVirtualHost || isVirtualHostOverride) && (
-                <span
-                  title="This plan is hosted by an AI-assisted persona, not a human member."
-                  className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5"
-                >
-                  AI-assisted
-                  <Info className="w-3 h-3" />
-                </span>
+              {isVirtualHost && (
+                /* Same plain-text badge the public org calendar page uses —
+                   kept as the shared component so the two stay identical. */
+                <VirtualHostBadge persona={{ name: hostNameOverride || plan.hostName }} />
               )}
               {!plan.isPoll && (
                 <button
@@ -483,11 +495,12 @@ export default function PlanDetailModal({
                 calendarId={calendarId}
                 eventGroupId={plan.objectId}
                 onClose={() => setShowVirtualHostSheet(false)}
-                onAttached={(personaName) => {
+                onAttached={(personaName, personaAvatarUrl) => {
                   setShowVirtualHostSheet(false);
                   setShowChangeHost(false);
                   setIsVirtualHostOverride(true);
                   if (personaName) setHostNameOverride(personaName);
+                  setVirtualHostAvatarOverride(personaAvatarUrl || DEFAULT_HOST_AVATAR);
                   onChanged();
                 }}
               />
