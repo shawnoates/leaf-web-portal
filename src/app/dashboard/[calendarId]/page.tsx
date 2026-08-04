@@ -658,6 +658,71 @@ export default function OrgDashboardPage() {
     }
   }, [dashboard, searchParams]);
 
+  // ── Return from the AI-assisted host purchase (?virtualHostAttached=1) ────
+  // Stripe's returnUrl is whatever page the owner started on, so they land back
+  // on the bare dashboard — the sheet (and whatever modal it opened from) is
+  // gone. Resolve the checkout session to the plan that was hosted and re-open
+  // its detail modal, which is where the newly attached host shows up.
+  //
+  // The attach lands on the Stripe *webhook*, which can trail the redirect by a
+  // beat, and on the idea / AI-suggestion paths the plan doesn't exist until it
+  // fires — hence the poll, and the dashboard refetch before opening.
+  const virtualHostReturnRef = useRef(false);
+  const [pendingVirtualHostPlanId, setPendingVirtualHostPlanId] = useState<string | null>(null);
+  useEffect(() => {
+    if (virtualHostReturnRef.current) return;
+    if (searchParams.get("virtualHostAttached") !== "1") return;
+    virtualHostReturnRef.current = true;
+    const sessionId = searchParams.get("session_id");
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("virtualHostAttached");
+    next.delete("session_id");
+    const qs = next.toString();
+    router.replace(`/dashboard/${calendarId}${qs ? `?${qs}` : ""}`);
+    if (!sessionId) return;
+    let cancelled = false;
+    (async () => {
+      for (let i = 0; i < 8 && !cancelled; i++) {
+        try {
+          const r: { ready: boolean; eventGroupId?: string } = await Parse.Cloud.run(
+            "getVirtualHostAttachStatus",
+            { sessionId },
+          );
+          if (r.ready && r.eventGroupId) {
+            if (cancelled) return;
+            // Refetch FIRST so the plan (which may have just been published out
+            // of an idea) is in state by the time the opener effect runs.
+            await fetchDashboard();
+            if (!cancelled) setPendingVirtualHostPlanId(r.eventGroupId);
+            return;
+          }
+        } catch {
+          return; // not our session / signed out — leave them on the dashboard
+        }
+        await new Promise((res) => setTimeout(res, 1500));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [searchParams, router, calendarId, fetchDashboard]);
+
+  // Second half of the above: open the modal once the (possibly just-created)
+  // plan actually appears in the refreshed dashboard.
+  useEffect(() => {
+    if (!pendingVirtualHostPlanId || !dashboard) return;
+    type ActivePlan = NonNullable<typeof selectedActivePlan>;
+    const match = dashboard.calendars
+      .flatMap((cal) => ((cal as Record<string, unknown>).activePlans as ActivePlan[]) || [])
+      .find((p) => p.objectId === pendingVirtualHostPlanId);
+    // One shot: the dashboard was refetched after the attach confirmed, so if
+    // the plan isn't here it isn't coming — don't leave a pending id armed to
+    // pop a modal open on some later refresh.
+    setPendingVirtualHostPlanId(null);
+    if (match) {
+      setSelectedActivePlan(match);
+      setActiveTab("calendars");
+    }
+  }, [dashboard, pendingVirtualHostPlanId]);
+
   // Manage-plans slide-over — opened from the Calendars tab; replaces the old
   // standalone /dashboard/[calendarId]/plans route. ?managePlans=<calId>
   // auto-opens it, carrying prefill/returnTo for the /m "Host Another"
