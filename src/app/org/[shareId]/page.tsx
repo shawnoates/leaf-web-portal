@@ -1456,6 +1456,59 @@ export default function OrgCalendarPage() {
     ]
   );
 
+  // Opens the dashboard's New Plan drawer prefilled from an AI suggestion.
+  // Two callers: the review modal's "Edit details first" (owner wants to
+  // change the venue/time before publishing), and the automatic fallback
+  // when the server can't resolve the suggestion's venue or date and a
+  // human has to pick one. The drawer's VenueSearch auto-resolves the
+  // venue name into a placeId; Create finalizes via createManualPlan.
+  const openAIEventInDashboard = useCallback(
+    (ev: NonNullable<OrgData["aiSourceEvents"]>[number]) => {
+      if (!org) return;
+      // Prefer the parent org's dashboard route so the manager lands on
+      // THEIR primary calendar view, then the ?managePlans=<calId> handoff
+      // pivots to the correct sub-calendar's PlansManager.
+      const dashboardTarget = org.parentOrgId || org.objectId;
+      const params = new URLSearchParams();
+      params.set("managePlans", org.objectId);
+      params.set("prefillTitle", ev.name);
+      if (ev.description) params.set("prefillDescription", ev.description);
+      // resolved.date is a validated Date for any suggestion that rendered;
+      // format as the drawer's input types expect.
+      const d = resolveAIEventDate(ev).date;
+      if (d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        params.set("prefillDate", `${y}-${m}-${day}`);
+        params.set("prefillTime", `${hh}:${mm}`);
+      }
+      // Pass placeId when the AI event carries one (Places grounding merged
+      // it in). Older events fall back to VenueSearch's autoResolveInitial
+      // via the name string.
+      params.set(
+        "prefillVenue",
+        JSON.stringify({
+          name: ev.name,
+          address: ev.address || ev.venueLine || "",
+          placeId: ev.placeId || null,
+        }),
+      );
+      // Send them back to /org after they cancel/publish so they don't lose
+      // their spot on the calendar.
+      if (typeof window !== "undefined") {
+        params.set(
+          "returnTo",
+          window.location.pathname + window.location.search,
+        );
+      }
+      router.push(`/dashboard/${dashboardTarget}?${params.toString()}`);
+    },
+    [org, router],
+  );
+
   // Hydrate "already interested" from localStorage on mount so the
   // button renders in its confirmed state across reloads without a
   // round-trip.
@@ -5218,150 +5271,268 @@ export default function OrgCalendarPage() {
         </div>
       )}
 
-      {/* Host This confirmation modal — fires when a visitor with host
-          permission taps Host This on a Suggestion card. Spells out that
-          followers and interested users will be notified so the visitor
-          knows the consequence before committing. */}
+      {/* Host This review modal — fires when a visitor with host permission
+          taps Host This on a Suggestion card. Shows the suggestion in full
+          (cover, date, venue, blurb, interest) rather than a bare yes/no, so
+          the visitor reviews the actual plan before committing, and spells
+          out that followers and interested users get notified on confirm.
+          Mirrors the Plan Detail Overlay's split layout so hosting a
+          suggestion and opening a live plan feel like the same surface. */}
       {hostThisEventIndex !== null && org && (() => {
         const ev = org.aiSourceEvents?.[hostThisEventIndex];
         if (!ev) return null;
+        const eventIndex = hostThisEventIndex;
+        const canHostAsHost = !!(org.isOwner || org.isHost);
         const interestCount =
-          aiInterestCounts[hostThisEventIndex] ??
-          org.aiSourceEventInterests?.[hostThisEventIndex] ??
+          aiInterestCounts[eventIndex] ??
+          org.aiSourceEventInterests?.[eventIndex] ??
           0;
+        const resolvedDate = resolveAIEventDate(ev).date;
+        const whenLabel = resolvedDate
+          ? `${resolvedDate
+              .toLocaleDateString("en-US", {
+                weekday: "long",
+                month: "short",
+                day: "numeric",
+              })
+              .toUpperCase()} · ${resolvedDate.toLocaleTimeString("en-US", {
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: true,
+            })}`
+          : ev.time || null;
+        const isAmber = ev.tagVariant === "amber";
+        const venueLine = ev.venueLine || ev.address || null;
+
+        const confirmHostThis = async () => {
+          setHostThisSubmitting(true);
+          try {
+            // Server owns venue resolution + role gating and auto-approves
+            // owner/co-host (it delegates to requestCustomPlanViaWeb, which
+            // creates the EventGroup directly for them and falls back to the
+            // owner's approval queue for followers).
+            const result = (await Parse.Cloud.run("proposeAIEventPlan", {
+              shareId,
+              eventIndex,
+            })) as { pendingApproval?: boolean; eventGroupId?: string };
+            setHostThisEventIndex(null);
+
+            if (result?.pendingApproval) {
+              setToast(
+                "Sent to the calendar host for approval — you’ll hear back when they decide.",
+              );
+              setTimeout(() => setToast(null), 5000);
+              await fetchOrg();
+              return;
+            }
+
+            setToast(`You’re hosting ${ev.name}. Followers have been notified.`);
+            setTimeout(() => setToast(null), 5000);
+            // Refresh so the suggestion card is replaced by the live plan,
+            // then hand the new plan's id to the ?plan= auto-open effect so
+            // the host lands on the full detail overlay with themselves
+            // attached — same handoff the virtual-host return path uses.
+            await fetchOrg();
+            if (result?.eventGroupId) {
+              setPlanQueryId(result.eventGroupId);
+            } else {
+              // No id came back — drop them on the dashboard's Calendars tab
+              // with this calendar's plan manager open rather than leaving
+              // them to hunt for what they just created.
+              router.push(
+                `/dashboard/${org.parentOrgId || org.objectId}?tab=calendars&managePlans=${org.objectId}`,
+              );
+            }
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "";
+            // Venue/date the server couldn't resolve (no placeId and Places
+            // came back empty, or the suggestion carries no usable date).
+            // An owner can fix that by hand, so send them to the prefilled
+            // editor instead of dead-ending on an error toast.
+            if (canHostAsHost && /places|manually|no date/i.test(msg)) {
+              setHostThisEventIndex(null);
+              setToast("Couldn’t verify that venue — pick the spot and publish.");
+              setTimeout(() => setToast(null), 6000);
+              openAIEventInDashboard(ev);
+              return;
+            }
+            setToast(msg || "Couldn’t send that. Try again in a moment.");
+            setTimeout(() => setToast(null), 4000);
+          } finally {
+            setHostThisSubmitting(false);
+          }
+        };
+
         return (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+            className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm"
             onClick={() => { if (!hostThisSubmitting) setHostThisEventIndex(null); }}
           >
             <div
-              className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl"
+              className="bg-white w-full max-w-4xl max-h-[90vh] md:max-h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl rounded-t-3xl md:rounded-none relative"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-xl font-medium text-zinc-900 mb-2">
-                {(org.isOwner || org.isHost) ? "Host this event?" : "Propose to host?"}
-              </h3>
-              <p className="text-sm text-zinc-600 leading-relaxed mb-4">
-                {(org.isOwner || org.isHost) ? (
-                  <>
-                    You&rsquo;ll be added as the host of{" "}
-                    <span className="font-medium text-zinc-900">{ev.name}</span>.
-                    {" "}Followers of this calendar
-                    {interestCount > 0
-                      ? ` and the ${interestCount} ${interestCount === 1 ? "person" : "people"} interested in this event`
-                      : ""}
-                    {" "}will be notified as soon as you confirm.
-                  </>
-                ) : (
-                  <>
-                    You&rsquo;re proposing to host{" "}
-                    <span className="font-medium text-zinc-900">{ev.name}</span>.
-                    {" "}The calendar host will review; if they approve, followers
-                    {interestCount > 0
-                      ? ` and the ${interestCount} ${interestCount === 1 ? "person" : "people"} interested in this event`
-                      : ""}
-                    {" "}will be notified.
-                  </>
-                )}
-              </p>
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setHostThisEventIndex(null)}
-                  disabled={hostThisSubmitting}
-                  className="px-4 py-2 text-sm font-medium text-zinc-600 rounded-lg hover:bg-zinc-100 disabled:opacity-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={async () => {
-                    setHostThisSubmitting(true);
-                    try {
-                      // Owner / co-host: route to their dashboard with a
-                      // full AI-event prefill. The New Plan drawer opens
-                      // pre-populated; the VenueSearch auto-resolves the
-                      // venue name into a placeId, and clicking Create
-                      // finalizes via the existing createManualPlan path.
-                      const canHostAsHost = org.isOwner || org.isHost;
-                      if (canHostAsHost) {
-                        // Prefer the parent org's dashboard route so the
-                        // manager lands on THEIR primary calendar view,
-                        // then the ?managePlans=<calId> handoff pivots
-                        // to the correct sub-calendar's PlansManager.
-                        const dashboardTarget =
-                          org.parentOrgId || org.objectId;
-                        const params = new URLSearchParams();
-                        params.set("managePlans", org.objectId);
-                        params.set("prefillTitle", ev.name);
-                        if (ev.description) params.set("prefillDescription", ev.description);
-                        // resolved.date is a validated Date at this point;
-                        // format as the drawer's input types expect.
-                        const d = resolveAIEventDate(ev).date;
-                        if (d) {
-                          const y = d.getFullYear();
-                          const m = String(d.getMonth() + 1).padStart(2, "0");
-                          const day = String(d.getDate()).padStart(2, "0");
-                          const hh = String(d.getHours()).padStart(2, "0");
-                          const mm = String(d.getMinutes()).padStart(2, "0");
-                          params.set("prefillDate", `${y}-${m}-${day}`);
-                          params.set("prefillTime", `${hh}:${mm}`);
-                        }
-                        // Pass placeId when the AI event carries one
-                        // (Places grounding merged it in). Older events
-                        // still fall back to VenueSearch's autoResolveInitial
-                        // via the name string.
-                        params.set(
-                          "prefillVenue",
-                          JSON.stringify({
-                            name: ev.name,
-                            address: ev.address || ev.venueLine || "",
-                            placeId: ev.placeId || null,
-                          }),
-                        );
-                        // Send them back to /org after they cancel/publish
-                        // so they don't lose their spot on the calendar.
-                        if (typeof window !== "undefined") {
-                          params.set(
-                            "returnTo",
-                            window.location.pathname + window.location.search,
-                          );
-                        }
-                        router.push(
-                          `/dashboard/${dashboardTarget}?${params.toString()}`,
-                        );
-                        return;
-                      }
-                      // Follower path — server picks the auto-approve vs
-                      // pending-approval branch based on the caller's role
-                      // (delegates to requestCustomPlanViaWeb). We just
-                      // fire and reflect the outcome.
-                      const result = (await Parse.Cloud.run(
-                        "proposeAIEventPlan",
-                        { shareId, eventIndex: hostThisEventIndex },
-                      )) as { pendingApproval?: boolean };
-                      const message = result?.pendingApproval
-                        ? "Sent to the calendar host for approval — you’ll hear back when they decide."
-                        : "Plan created — followers and interested users notified.";
-                      setToast(message);
-                      setTimeout(() => setToast(null), 4000);
-                      setHostThisEventIndex(null);
-                    } catch (err: unknown) {
-                      const msg = err instanceof Error ? err.message : "Couldn’t send that. Try again in a moment.";
-                      setToast(msg);
-                      setTimeout(() => setToast(null), 4000);
-                    } finally {
-                      setHostThisSubmitting(false);
-                    }
+              <button
+                onClick={() => { if (!hostThisSubmitting) setHostThisEventIndex(null); }}
+                disabled={hostThisSubmitting}
+                aria-label="Close"
+                className="absolute top-4 right-4 z-50 p-2 rounded-full bg-zinc-100 text-zinc-600 md:bg-transparent md:text-zinc-900 disabled:opacity-40"
+              >
+                <Plus className="w-8 h-8 rotate-45" />
+              </button>
+
+              {/* Cover — suggestions have no image, so reuse the card's
+                  gradient + serif tag treatment verbatim. */}
+              <div
+                className="hidden md:flex w-2/5 shrink-0 items-center justify-center relative"
+                style={{
+                  background: isAmber
+                    ? "linear-gradient(135deg, #f5e6d0 0%, #e8d1a5 100%)"
+                    : "linear-gradient(135deg, #e8efe9 0%, #cddcd0 100%)",
+                }}
+              >
+                <div
+                  className="absolute inset-0 opacity-[0.07]"
+                  style={{
+                    backgroundImage:
+                      "radial-gradient(circle at 25% 30%, rgba(0,0,0,0.15) 1px, transparent 2px)",
+                    backgroundSize: "18px 18px",
                   }}
-                  disabled={hostThisSubmitting}
-                  className="px-5 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
-                  style={{ backgroundColor: org.brandColor || "#18181b" }}
+                />
+                <span
+                  className="relative text-4xl lg:text-5xl font-light tracking-tight text-center px-6"
+                  style={{
+                    fontFamily: 'ui-serif, Georgia, "Times New Roman", serif',
+                    color: isAmber ? "#8A5F1E" : "#1B4332",
+                    letterSpacing: "-0.01em",
+                  }}
                 >
-                  {hostThisSubmitting
-                    ? "Working…"
-                    : (org.isOwner || org.isHost)
-                      ? "Host & notify"
-                      : "Send proposal"}
-                </button>
+                  {(ev.tag || "Event").toLowerCase()}
+                </span>
+                <span
+                  className="absolute top-4 left-4 text-[10px] font-bold uppercase tracking-widest rounded-full px-3 py-1"
+                  style={{
+                    background: "rgba(255,255,255,0.85)",
+                    color: isAmber ? "#8A5F1E" : "#1B4332",
+                    backdropFilter: "blur(4px)",
+                  }}
+                >
+                  Suggested
+                </span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 md:p-12 space-y-8">
+                <div className="space-y-3">
+                  {whenLabel && (
+                    <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                      {whenLabel}
+                    </p>
+                  )}
+                  <h2 className="text-3xl md:text-4xl font-light tracking-tighter pr-8">
+                    {ev.name}
+                  </h2>
+                  {venueLine && (
+                    <p className="text-sm text-zinc-500 font-light">{venueLine}</p>
+                  )}
+                </div>
+
+                {ev.description && (
+                  <p className="text-zinc-700 leading-relaxed font-light text-lg">
+                    {ev.description}
+                  </p>
+                )}
+
+                <div className="space-y-3 text-sm text-zinc-600">
+                  {whenLabel && (
+                    <p className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-zinc-400 shrink-0" />
+                      {whenLabel}
+                    </p>
+                  )}
+                  {venueLine && (
+                    <p className="flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
+                      <span>
+                        {venueLine}
+                        {ev.address && ev.address !== venueLine ? ` · ${ev.address}` : ""}
+                      </span>
+                    </p>
+                  )}
+                  {interestCount > 0 && (
+                    <p className="flex items-center gap-2">
+                      <Heart className="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" />
+                      {interestCount} {interestCount === 1 ? "person is" : "people are"} interested
+                    </p>
+                  )}
+                </div>
+
+                {/* Consequence copy — the thing the old confirm dialog
+                    existed to say, kept verbatim in intent. */}
+                <div className="border-t border-zinc-100 pt-6 space-y-2">
+                  <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                    {canHostAsHost ? "When you confirm" : "What happens next"}
+                  </p>
+                  <p className="text-sm text-zinc-600 leading-relaxed">
+                    {canHostAsHost ? (
+                      <>
+                        This becomes a real plan on{" "}
+                        <span className="font-medium text-zinc-900">{org.name}</span> with
+                        you as the host. Followers of this calendar
+                        {interestCount > 0
+                          ? ` and the ${interestCount} ${interestCount === 1 ? "person" : "people"} interested in it`
+                          : ""}
+                        {" "}will be notified, and you can manage RSVPs from your dashboard.
+                      </>
+                    ) : (
+                      <>
+                        You&rsquo;re proposing to host this. The calendar host reviews it; if
+                        they approve, followers
+                        {interestCount > 0
+                          ? ` and the ${interestCount} ${interestCount === 1 ? "person" : "people"} interested in it`
+                          : ""}
+                        {" "}will be notified.
+                      </>
+                    )}
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3 pt-2">
+                  <button
+                    onClick={confirmHostThis}
+                    disabled={hostThisSubmitting}
+                    className="w-full px-6 py-4 text-xs uppercase tracking-widest font-medium text-white flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity"
+                    style={{ backgroundColor: org.brandColor || "#18181b" }}
+                  >
+                    {hostThisSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" /> Publishing…
+                      </>
+                    ) : canHostAsHost ? (
+                      "Confirm — I'll host this"
+                    ) : (
+                      "Send proposal"
+                    )}
+                  </button>
+                  {canHostAsHost && (
+                    <button
+                      onClick={() => {
+                        setHostThisEventIndex(null);
+                        openAIEventInDashboard(ev);
+                      }}
+                      disabled={hostThisSubmitting}
+                      className="w-full px-6 py-3 text-xs uppercase tracking-widest font-medium border border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 disabled:opacity-50 transition-colors"
+                    >
+                      Edit details first
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setHostThisEventIndex(null)}
+                    disabled={hostThisSubmitting}
+                    className="w-full py-2 text-[11px] text-zinc-400 hover:text-zinc-600 disabled:opacity-50 transition-colors"
+                  >
+                    Not now
+                  </button>
+                </div>
               </div>
             </div>
           </div>

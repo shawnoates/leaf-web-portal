@@ -9,10 +9,11 @@ import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlan
 import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailModal";
 import HostIdeaModal from "@/components/HostIdeaModal";
 import PlanChatDrawer from "@/components/PlanChatDrawer";
-import VirtualHostSheet from "@/components/VirtualHostSheet";
+import VirtualHostSheet, { DEFAULT_HOST_AVATAR, HostAvatar } from "@/components/VirtualHostSheet";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
-import { Calendar, Camera, Check, Link2, Lock, MessageCircle, Plus, RefreshCw, Repeat, Settings, UserCheck, Users, X } from "lucide-react";
+import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
+import { Calendar, Camera, Check, ImagePlus, Link2, Lock, MessageCircle, Plus, RefreshCw, Repeat, Settings, Sparkles, UserCheck, Users, X } from "lucide-react";
 
 // Renders a plan cover image with a Calendar-icon placeholder fallback when
 // the src is missing OR 404s (attendee-uploaded / expired signed URLs go
@@ -120,7 +121,9 @@ interface PlanIdea {
   description: string;
   date: string;
   image: string | null;
-  location: { name: string; address: string } | null;
+  // Venue chosen when the suggestion was created — carries place id/photo so
+  // the host modal can pre-select it as a real card.
+  location: { name: string; address: string; placeId?: string | null; photoUrl?: string | null; rating?: number | null } | null;
   ideaSeriesId: string | null;
   interestCount: number;
   // Venue-search inputs for the host modal (same fields the public /org page
@@ -443,6 +446,13 @@ export default function PlansManager({
   });
   const [ideaEditBusy, setIdeaEditBusy] = useState(false);
   const [ideaEditError, setIdeaEditError] = useState<string | null>(null);
+  // Cover photo for the suggestion editor. `ideaImageBase64` is an upload (wins
+  // server-side), `ideaEditForm.image` is the URL currently in play — either the
+  // existing cover or a picked Unsplash shot.
+  const [ideaImagePreview, setIdeaImagePreview] = useState<string | null>(null);
+  const [ideaImageBase64, setIdeaImageBase64] = useState<string | null>(null);
+  const [ideaUnsplashPhotos, setIdeaUnsplashPhotos] = useState<{ id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]>([]);
+  const [ideaUnsplashLoading, setIdeaUnsplashLoading] = useState(false);
 
   // Spread the suggestions' "Preferred" dates across the calendar's real
   // cadence (same helper the public /org page uses) so a server-clustered
@@ -668,7 +678,7 @@ export default function PlansManager({
       setOrgExcludeKeywords(Array.isArray(page.orgExcludeKeywords) ? page.orgExcludeKeywords : []);
       setOrgBrandColor(page.orgBrandColor ?? null);
       setRequireApprovalDefault(page.requireApprovalDefault === true);
-      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null; interestCount?: number; category?: string | null; centroid?: string | null; suggestedCapacity?: number | null; isManual?: boolean; datePinned?: boolean; preferredTime?: string | null }) => ({
+      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string; placeId?: string | null; photoUrl?: string | null; rating?: number | null } | null; ideaSeriesId?: string | null; interestCount?: number; category?: string | null; centroid?: string | null; suggestedCapacity?: number | null; isManual?: boolean; datePinned?: boolean; preferredTime?: string | null }) => ({
         objectId: idea.objectId,
         title: idea.title,
         description: idea.description,
@@ -868,8 +878,40 @@ export default function PlansManager({
       time: idea.preferredTime ?? "",
       image: idea.image,
     });
+    setIdeaImagePreview(null);
+    setIdeaImageBase64(null);
     setIdeaEditError(null);
     setEditingIdea(idea);
+    // Alternative covers for this suggestion, keyed off its title — same
+    // Unsplash source the create-plan modal uses.
+    setIdeaUnsplashPhotos([]);
+    const query = idea.title.trim();
+    if (query.length >= 3) {
+      setIdeaUnsplashLoading(true);
+      Parse.Cloud.run("searchUnsplashPhotos", { query })
+        .then((results: { id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]) => setIdeaUnsplashPhotos(results || []))
+        .catch(() => setIdeaUnsplashPhotos([]))
+        .finally(() => setIdeaUnsplashLoading(false));
+    }
+  }
+
+  // Cover upload inside the suggestion editor (HEIC-safe, 5MB cap) — mirrors
+  // CreatePlanModal's handler.
+  async function handleIdeaImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setIdeaEditError("Image must be under 5MB.");
+      return;
+    }
+    try {
+      const { preview, base64 } = await processImageFile(file);
+      setIdeaImagePreview(preview);
+      setIdeaImageBase64(base64);
+      setIdeaEditError(null);
+    } catch {
+      setIdeaEditError("Could not process this image. Try a different file.");
+    }
   }
 
   // Save edits to the suggestion in place (server: updatePlanIdea).
@@ -890,6 +932,12 @@ export default function PlansManager({
         date: ideaEditForm.date ? new Date(`${ideaEditForm.date}T12:00:00`).toISOString() : undefined,
         // Optional start time; empty string clears any prior value server-side.
         time: ideaEditForm.time,
+        // Cover photo — an upload beats a picked URL (server applies the same
+        // precedence); both omitted leaves the existing cover untouched.
+        imageBase64: ideaImageBase64 || undefined,
+        imageUrl: !ideaImageBase64 && ideaEditForm.image !== editingIdea.image
+          ? ideaEditForm.image || undefined
+          : undefined,
       });
       const updated = res?.idea as { title: string; description: string; image: string | null; date: string | null; datePinned?: boolean; preferredTime?: string | null } | undefined;
       if (updated) {
@@ -1345,7 +1393,6 @@ export default function PlansManager({
           prefillDate={spreadDateOf(detailIdea)}
           orgCity={orgCity}
           orgAddress={orgAddress}
-          virtualHostAvatar={virtualHostAvatar}
           tier={tier}
           brandColor={orgBrandColor}
           requireApprovalDefault={requireApprovalDefault}
@@ -1360,7 +1407,6 @@ export default function PlansManager({
           }}
           onEditSuggestion={() => { const idea = detailIdea; setDetailIdea(null); openIdeaEditor(idea); }}
           onAssignHost={() => { const idea = detailIdea; setDetailIdea(null); setAssignError(null); setAssigningIdea(idea); }}
-          onAddVirtualHost={() => { const idea = detailIdea; setDetailIdea(null); setVirtualHostIdea(idea); }}
           onEndSeries={() => handleEndSeries(detailIdea.ideaSeriesId!)}
           onDelete={() => handleRemoveIdea(detailIdea.objectId)}
         />
@@ -1389,8 +1435,86 @@ export default function PlansManager({
                 </button>
               </div>
               <p className="text-xs text-zinc-400 -mt-2">
-                Refines the suggestion. It stays a &ldquo;Needs a host&rdquo; idea — no plan is published. The venue is chosen when someone hosts it.
+                Refines the suggestion. It stays a &ldquo;Needs a host&rdquo; idea — no plan is published. A venue you already picked carries over to whoever hosts it.
               </p>
+
+              {/* Cover photo — upload one or pick from the suggestions below.
+                  Whatever's showing here is what the suggestion card and the
+                  host modal display. */}
+              <div>
+                <label className="block text-[11px] font-medium text-zinc-500 mb-1">Photo</label>
+                {ideaImagePreview || ideaEditForm.image ? (
+                  <div className="relative w-full h-36 rounded-lg overflow-hidden group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={ideaImagePreview || ideaEditForm.image || ""} alt="Suggestion cover" className="w-full h-full object-cover" />
+                    <label className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center cursor-pointer">
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1.5 bg-white/95 text-zinc-900 rounded-full px-3 py-1.5 text-xs font-medium">
+                        <ImagePlus className="w-3.5 h-3.5" /> Change photo
+                      </span>
+                      <input type="file" accept={IMAGE_ACCEPT} onChange={handleIdeaImageSelect} className="hidden" />
+                    </label>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center w-full h-28 rounded-lg cursor-pointer border border-dashed border-zinc-300 hover:border-zinc-400 transition-colors">
+                    <ImagePlus className="w-6 h-6 text-zinc-400 mb-1.5" />
+                    <span className="text-xs text-zinc-500">Click to upload a photo</span>
+                    <input type="file" accept={IMAGE_ACCEPT} onChange={handleIdeaImageSelect} className="hidden" />
+                  </label>
+                )}
+
+                {(ideaUnsplashLoading || ideaUnsplashPhotos.length > 0) && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-[11px] font-medium text-zinc-500">Photo suggestions</p>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {ideaUnsplashLoading && [0, 1, 2, 3].map((i) => (
+                        <div key={`idea-photo-skel-${i}`} className="min-w-[104px] h-[70px] bg-zinc-100 rounded-lg animate-pulse shrink-0" />
+                      ))}
+                      {!ideaUnsplashLoading && ideaUnsplashPhotos.map((photo) => {
+                        const picked = !ideaImageBase64 && ideaEditForm.image === photo.url;
+                        return (
+                          <button
+                            key={photo.id}
+                            type="button"
+                            onClick={() => {
+                              setIdeaImagePreview(null);
+                              setIdeaImageBase64(null);
+                              setIdeaEditForm((f) => ({ ...f, image: photo.url }));
+                            }}
+                            className={`min-w-[104px] max-w-[104px] h-[70px] shrink-0 rounded-lg overflow-hidden border-2 transition-all relative ${
+                              picked ? "border-zinc-900 shadow-lg" : "border-zinc-200 hover:border-zinc-300"
+                            }`}
+                          >
+                            {picked && (
+                              <div className="absolute top-1 right-1 bg-zinc-900 text-white rounded-full p-0.5 z-10">
+                                <Check className="w-2.5 h-2.5" />
+                              </div>
+                            )}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={photo.thumbUrl} className="w-full h-full object-cover" alt={photo.alt} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {(() => {
+                      const selected = ideaUnsplashPhotos.find((p) => !ideaImageBase64 && p.url === ideaEditForm.image);
+                      if (!selected) return null;
+                      return (
+                        <p className="text-[11px] text-zinc-400">
+                          Photo by{" "}
+                          <a href={`${selected.photographerUrl}?utm_source=leaf&utm_medium=referral`} target="_blank" rel="noopener noreferrer" className="underline hover:text-zinc-600">
+                            {selected.photographerName}
+                          </a>
+                          {" / "}
+                          <a href="https://unsplash.com/?utm_source=leaf&utm_medium=referral" target="_blank" rel="noopener noreferrer" className="underline hover:text-zinc-600">
+                            Unsplash
+                          </a>
+                        </p>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-[11px] font-medium text-zinc-500 mb-1">Title</label>
                 <input
@@ -1550,6 +1674,23 @@ export default function PlansManager({
               <p className="text-xs text-red-500 px-5 pt-3">{assignError}</p>
             )}
             <div className="overflow-y-auto p-2">
+              {/* Leaf's AI-assisted host is one of the hosts you can hand the
+                  plan to, so it leads this list rather than sitting as a
+                  separate action on the host modal. */}
+              <button
+                onClick={() => { const idea = assigningIdea; setAssigningIdea(null); setVirtualHostIdea(idea); }}
+                disabled={!!assignBusyUserId}
+                className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-lg border border-teal-100 bg-teal-50/60 hover:bg-teal-50 transition-colors text-left disabled:opacity-50 mb-1"
+              >
+                <span className="flex items-center gap-3 min-w-0">
+                  <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-8 h-8 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-teal-800 truncate">AI-assisted host</span>
+                    <span className="block text-xs text-teal-700/70 truncate">Leaf hosts it for you — greets guests and runs the plan</span>
+                  </span>
+                </span>
+                <Sparkles className="w-4 h-4 text-teal-400 shrink-0" />
+              </button>
               {members.length === 0 ? (
                 <p className="text-sm text-zinc-400 text-center py-8 px-4">
                   No members or followers yet. Once people join your calendar you can assign them as hosts.

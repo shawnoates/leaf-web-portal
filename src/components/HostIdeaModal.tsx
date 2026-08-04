@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { isVenueBlacklisted } from "@/lib/venue-blacklist";
-import { DEFAULT_HOST_AVATAR, HostAvatar } from "@/components/VirtualHostSheet";
 import {
   AlertTriangle,
   Calendar,
@@ -25,7 +24,15 @@ export interface HostIdeaModalIdea {
   category?: string | null;
   centroid?: string | null;
   suggestedCapacity?: number | null;
-  location?: { name: string; address: string } | null;
+  // Venue the owner picked when the suggestion was created. Pre-selected below
+  // so hosting keeps it instead of silently swapping in a Places result.
+  location?: {
+    name: string;
+    address: string;
+    placeId?: string | null;
+    photoUrl?: string | null;
+    rating?: number | null;
+  } | null;
   ideaSeriesId?: string | null;
   // Optional owner-chosen start time ("HH:mm") — prefills the time picker.
   preferredTime?: string | null;
@@ -39,6 +46,12 @@ interface NearbyVenue {
   photoUrl: string | null;
   flagged?: boolean;
 }
+
+// Stand-in placeId for a suggestion venue that was saved without a Google
+// place id (owner-typed venues). Never sent to the server — a selection still
+// on the suggested venue submits no `venue` at all, so the server keeps the
+// suggestion's own location object (and its resolved timezone).
+const SUGGESTED_VENUE_ID = "__suggested__";
 
 /**
  * Host-a-suggestion modal — the SAME experience the public /org/[shareId] page
@@ -60,7 +73,6 @@ export default function HostIdeaModal({
   prefillDate = null,
   orgCity = null,
   orgAddress = null,
-  virtualHostAvatar = null,
   tier = "starter",
   brandColor = null,
   requireApprovalDefault = false,
@@ -72,7 +84,6 @@ export default function HostIdeaModal({
   onHosted,
   onEditSuggestion,
   onAssignHost,
-  onAddVirtualHost,
   onDelete,
   onEndSeries,
 }: {
@@ -80,7 +91,6 @@ export default function HostIdeaModal({
   prefillDate?: Date | null;
   orgCity?: string | null;
   orgAddress?: string | null;
-  virtualHostAvatar?: string | null;
   tier?: string;
   brandColor?: string | null;
   requireApprovalDefault?: boolean;
@@ -94,15 +104,30 @@ export default function HostIdeaModal({
   onClose: () => void;
   onHosted: (result: { pendingApproval?: boolean; eventGroupId?: string } | undefined) => void;
   onEditSuggestion?: () => void;
+  // Assign-a-host picker — also where the AI-assisted host lives (it's one of
+  // the hosts you can hand the plan to, not a parallel action).
   onAssignHost?: () => void;
-  onAddVirtualHost?: () => void;
   onDelete?: () => void;
   onEndSeries?: () => void;
 }) {
+  // The venue already on the suggestion (owner picked it at creation time).
+  // It leads the carousel and starts selected, so hosting keeps it unless the
+  // hoster deliberately picks something else.
+  const suggestedVenue = useMemo<NearbyVenue | null>(() => {
+    if (!idea.location?.name) return null;
+    return {
+      placeId: idea.location.placeId || SUGGESTED_VENUE_ID,
+      name: idea.location.name,
+      address: idea.location.address || "",
+      rating: idea.location.rating ?? null,
+      photoUrl: idea.location.photoUrl ?? null,
+    };
+  }, [idea.location]);
+
   const [venueSearchQuery, setVenueSearchQuery] = useState("");
   const [nearbyVenues, setNearbyVenues] = useState<NearbyVenue[]>([]);
   const [venuesLoading, setVenuesLoading] = useState(false);
-  const [selectedVenue, setSelectedVenue] = useState<NearbyVenue | null>(null);
+  const [selectedVenue, setSelectedVenue] = useState<NearbyVenue | null>(suggestedVenue);
   const [hostNote, setHostNote] = useState("");
   const [hostRequireApproval, setHostRequireApproval] = useState(requireApprovalDefault);
   const [submitting, setSubmitting] = useState(false);
@@ -115,7 +140,7 @@ export default function HostIdeaModal({
 
   // Delete lives on its own at the bottom of the panel (below Host plan), so
   // the top action row only carries the non-destructive owner tools.
-  const hasTopActions = !!(onEditSuggestion || onAssignHost || onAddVirtualHost || onEndSeries);
+  const hasTopActions = !!(onEditSuggestion || onAssignHost || onEndSeries);
 
   // Fetch nearby venues via Google Places whenever the modal opens or the
   // free-text venue query changes. Mirrors the public /org host modal: a typed
@@ -135,7 +160,10 @@ export default function HostIdeaModal({
     }
 
     setNearbyVenues([]);
-    setSelectedVenue(null);
+    // A typed search means the hoster is shopping for a different venue, so
+    // drop the current pick; the default category sweep must NOT clear the
+    // suggestion's own venue out from under them.
+    setSelectedVenue(typedVenueQuery ? null : suggestedVenue);
     setVenuesLoading(true);
 
     // The idea's default category search is instant; typed queries debounce.
@@ -261,7 +289,9 @@ export default function HostIdeaModal({
         requireApproval: hostRequireApproval,
         hostName: hostName || undefined,
         hostPhone: hostPhone || undefined,
-        venue: selectedVenue
+        // Sending no venue tells the server to keep the suggestion's own
+        // location — the right move when the pick is still the suggested one.
+        venue: selectedVenue && selectedVenue.placeId !== suggestedVenue?.placeId
           ? {
               placeId: selectedVenue.placeId,
               name: selectedVenue.name,
@@ -281,6 +311,19 @@ export default function HostIdeaModal({
       setSubmitting(false);
     }
   }
+
+  // The suggestion's own venue leads the carousel; Places results follow with
+  // any duplicate of it dropped (matched on place id, then on name).
+  const displayVenues = suggestedVenue
+    ? [
+        suggestedVenue,
+        ...nearbyVenues.filter(
+          (v) =>
+            v.placeId !== suggestedVenue.placeId &&
+            v.name.trim().toLowerCase() !== suggestedVenue.name.trim().toLowerCase(),
+        ),
+      ]
+    : nearbyVenues;
 
   const defaultDateStr = prefillDate ? prefillDate.toISOString().split("T")[0] : "";
   const todayStr = new Date().toISOString().split("T")[0];
@@ -349,15 +392,6 @@ export default function HostIdeaModal({
                       <UserCheck className="w-3.5 h-3.5" /> Assign a host
                     </button>
                   )}
-                  {onAddVirtualHost && (
-                    <button
-                      type="button"
-                      onClick={onAddVirtualHost}
-                      className="inline-flex items-center gap-1.5 border border-teal-200 bg-teal-50 rounded-lg pl-1.5 pr-3 py-1.5 text-xs font-medium text-teal-700 hover:border-teal-400 transition-colors"
-                    >
-                      <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Add AI-assisted host
-                    </button>
-                  )}
                   {onEndSeries && idea.ideaSeriesId && (
                     <button
                       type="button"
@@ -390,58 +424,57 @@ export default function HostIdeaModal({
                     className="w-full border border-zinc-200 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-zinc-900 transition-colors"
                   />
                 </div>
-                {venuesLoading ? (
+                {displayVenues.length > 0 || venuesLoading ? (
                   <div className="flex gap-3 overflow-x-auto pb-2">
-                    {[0, 1, 2, 3, 4].map((i) => (
-                      <div key={i} className="min-w-[160px] h-[180px] bg-zinc-100 rounded-xl animate-pulse shrink-0" />
-                    ))}
-                  </div>
-                ) : nearbyVenues.length > 0 ? (
-                  <div className="flex gap-3 overflow-x-auto pb-2">
-                    {nearbyVenues.map((venue) => (
-                      <button
-                        key={venue.placeId}
-                        type="button"
-                        onClick={() => setSelectedVenue(selectedVenue?.placeId === venue.placeId ? null : venue)}
-                        className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left relative ${
-                          selectedVenue?.placeId === venue.placeId
-                            ? "border-zinc-900 shadow-lg"
-                            : venue.flagged
-                              ? "border-amber-300 hover:border-amber-400"
-                              : "border-zinc-200 hover:border-zinc-300"
-                        }`}
-                      >
-                        {venue.flagged && (
-                          <div className="absolute top-1.5 right-1.5 bg-amber-500 text-white rounded-full p-0.5 z-10">
-                            <AlertTriangle className="w-3 h-3" />
-                          </div>
-                        )}
-                        <div className="h-[100px] bg-zinc-100">
-                          {venue.photoUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={venue.photoUrl} className="w-full h-full object-cover" alt={venue.name} />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <MapPin className="w-6 h-6 text-zinc-300" />
+                    {displayVenues.map((venue) => {
+                      const isSuggested = !!suggestedVenue && venue.placeId === suggestedVenue.placeId;
+                      return (
+                        <button
+                          key={venue.placeId}
+                          type="button"
+                          onClick={() => setSelectedVenue(selectedVenue?.placeId === venue.placeId ? null : venue)}
+                          className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left relative ${
+                            selectedVenue?.placeId === venue.placeId
+                              ? "border-zinc-900 shadow-lg"
+                              : venue.flagged
+                                ? "border-amber-300 hover:border-amber-400"
+                                : "border-zinc-200 hover:border-zinc-300"
+                          }`}
+                        >
+                          {venue.flagged && (
+                            <div className="absolute top-1.5 right-1.5 bg-amber-500 text-white rounded-full p-0.5 z-10">
+                              <AlertTriangle className="w-3 h-3" />
                             </div>
                           )}
-                        </div>
-                        <div className="p-2.5">
-                          <p className="text-xs font-bold truncate">{venue.name}</p>
-                          {venue.rating && (
-                            <span className="text-xs text-zinc-500">{venue.rating.toFixed(1)} &#9733;</span>
-                          )}
-                          <p className="text-xs text-zinc-400 truncate mt-0.5">{venue.address}</p>
-                        </div>
-                      </button>
+                          <div className="h-[100px] bg-zinc-100">
+                            {venue.photoUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={venue.photoUrl} className="w-full h-full object-cover" alt={venue.name} />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <MapPin className="w-6 h-6 text-zinc-300" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-2.5">
+                            {isSuggested && (
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-0.5">Chosen venue</p>
+                            )}
+                            <p className="text-xs font-bold truncate">{venue.name}</p>
+                            {venue.rating && (
+                              <span className="text-xs text-zinc-500">{venue.rating.toFixed(1)} &#9733;</span>
+                            )}
+                            <p className="text-xs text-zinc-400 truncate mt-0.5">{venue.address}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {venuesLoading && [0, 1, 2, 3, 4].map((i) => (
+                      <div key={`venue-skeleton-${i}`} className="min-w-[160px] h-[180px] bg-zinc-100 rounded-xl animate-pulse shrink-0" />
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-zinc-400 italic">
-                    {idea.location?.name
-                      ? `Using the suggested venue: ${idea.location.name}. Search above to pick another.`
-                      : "No venues found nearby — search above."}
-                  </p>
+                  <p className="text-sm text-zinc-400 italic">No venues found nearby — search above.</p>
                 )}
                 {selectedVenue && (
                   <p className="text-xs text-zinc-600 flex items-center gap-1">

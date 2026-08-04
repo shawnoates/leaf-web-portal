@@ -146,6 +146,38 @@ function toTimeInputValue(t?: string | null): string {
   return `${String(h).padStart(2, "0")}:${m}`;
 }
 
+// Short title for a recommendation chip. The server sends a `label`; this is
+// the client-side derivation for pills that predate it (cached responses, the
+// deterministic fallback set) so a chip is never rendered as a full sentence.
+// Strategy: drop the schedule tail ("next Thursday at 7pm") and then the venue
+// tail, which is what makes these run 60+ characters — the full sentence is
+// still one tap away, so losing detail here costs nothing.
+const PILL_LABEL_MAX = 28;
+function pillLabel(pill: { text: string; label?: string | null }): string {
+  const explicit = (pill.label || "").trim();
+  if (explicit) return explicit;
+  let core = pill.text.trim()
+    // qualified schedule tail — "... next Thursday at 7pm", "... this weekend"
+    .replace(/\s+\b(this|next|on|every)\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday|weekend|tonight|tomorrow|morning|afternoon|evening|night)\b.*$/i, "")
+    // bare weekday tail — "... Sunday at 10am". Deliberately NOT bare
+    // morning/night: "Taco night" and "Game night" ARE the activity.
+    .replace(/\s+\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday|tonight|tomorrow)\b.*$/i, "")
+    // "... at 7pm" when no weekday was named
+    .replace(/\s+at\s+\d.*$/i, "")
+    // named-venue tail — "at Melody Lanes", "in Bay Ridge", "on Third Avenue"
+    .replace(/\s+\b(at|in|on)\s+(the\s+|a\s+|an\s+)?[A-Z0-9].*$/, "")
+    // generic-venue tail — "at a neighborhood taqueria", "in the park"
+    .replace(/\s+\b(at|in)\s+(a|an|the)\s+\S.*$/i, "")
+    .replace(/[\s,–—-]+$/, "")
+    .replace(/\s+\b(at|in|on|with|for|and|then)$/i, "")
+    .trim();
+  if (!core) core = pill.text.trim();
+  if (core.length <= PILL_LABEL_MAX) return core;
+  const cut = core.slice(0, PILL_LABEL_MAX);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > 12 ? cut.slice(0, lastSpace) : cut).replace(/[\s,]+$/, "")}…`;
+}
+
 export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, requireApprovalDefault, editMode, eventGroupId, hostRequestMode, hostRequestId, pollConvertMode, pollEventGroupId, pollWinningDate, pollWinningTime, onClose, onCreated, onUpgrade, autoSyncOnMount }: CreatePlanModalProps) {
   const [selectedCalendarId, setSelectedCalendarId] = useState(calendarId);
   const [hideVenue, setHideVenue] = useState(prefill?.hideVenueUntilRsvp ?? hideVenueDefault ?? true);
@@ -218,10 +250,16 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [promptLoading, setPromptLoading] = useState(false);
   const [promptError, setPromptError] = useState<string | null>(null);
   // Recommendation pills under the prompt bar. Each `text` is a ready-to-send
-  // sentence for draftPlanFromPrompt — tapping one runs the same path as
-  // typing it. `reason` is the data justification, shown on hover.
-  const [promptPills, setPromptPills] = useState<{ text: string; reason: string | null }[]>([]);
+  // sentence for draftPlanFromPrompt. The chip itself shows only `label` (a
+  // short title) — the full sentence lands in the prompt input on first tap,
+  // so the manager reads and can edit it before it's drafted. `reason` is the
+  // data justification, shown on hover.
+  const [promptPills, setPromptPills] = useState<{ text: string; reason: string | null; label?: string | null }[]>([]);
   const [pillsLoading, setPillsLoading] = useState(false);
+  // Which chip is loaded into the prompt input. Tapping it a second time is
+  // what sends it — first tap is "show me", second is "go".
+  const [selectedPill, setSelectedPill] = useState<string | null>(null);
+  const promptInputRef = useRef<HTMLInputElement>(null);
   // Where this CALENDAR is, resolved server-side (its own city, else its
   // parent org's, else the browser's). Used as the drafter's location hint so
   // "a nearby taproom" resolves near the community — not near a manager who
@@ -274,6 +312,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     let cancelled = false;
     setPillsLoading(true);
     setPromptPills([]);
+    setSelectedPill(null);
     const detected = detectCity();
     Parse.Cloud.run("suggestPlanPrompts", {
       calendarId: selectedCalendarId,
@@ -1020,9 +1059,10 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
               <div className="flex items-center gap-2">
                 <input
                   id="new-plan-prompt"
+                  ref={promptInputRef}
                   type="text"
                   value={promptInput}
-                  onChange={(e) => { setPromptInput(e.target.value); setPromptError(null); }}
+                  onChange={(e) => { setPromptInput(e.target.value); setPromptError(null); setSelectedPill(null); }}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handlePromptSubmit(); } }}
                   placeholder="Paint & sip next Thursday at 7pm on the rooftop"
                   disabled={promptLoading || creating}
@@ -1048,6 +1088,11 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
               {promptError && (
                 <p className="text-xs text-red-600">{promptError}</p>
               )}
+              {/* Only shown while a chip's sentence is sitting unsent in the
+                  box — the chip row is a two-step now, and this is the step. */}
+              {selectedPill && !promptError && aiFilled.size === 0 && (
+                <p className="text-xs text-emerald-800/70">Edit it, or hit send to draft it.</p>
+              )}
               {aiFilled.size > 0 && !promptError && (
                 <p className="text-xs text-emerald-800/70">
                   Drafted {aiFilled.size} field{aiFilled.size === 1 ? "" : "s"} — review before creating.
@@ -1059,40 +1104,65 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           {/* Recommendation pills — each one is a ready-to-send sentence built
               from THIS calendar's history (best weekday by RSVP share, typical
               start time, over-performing category, top plans) and filtered
-              against what's already scheduled. Tapping sends it straight
-              through the drafter, same path as typing it. Hidden once a draft
+              against what's already scheduled. The chip shows only a short
+              title; the first tap loads the full sentence into the prompt bar
+              above (where it can be read and edited), the second sends it
+              through the drafter — same path as typing it. Hidden once a draft
               has landed — the fields below are the subject at that point. */}
           {showPromptBar && aiFilled.size === 0 && (pillsLoading || promptPills.length > 0) && (
-            // Horizontal carousel. These chips carry a venue and a time, so
-            // they're long — wrapping them stacked four rows deep pushed the
-            // actual form off-screen. One scrolling row keeps the drawer's
-            // shape; snap points make the partially-visible next chip an
-            // affordance rather than a cut-off accident.
+            // Horizontal carousel. Short titles usually fit the row now, but
+            // the scroller stays: a long-ish label or a narrow drawer would
+            // otherwise wrap the chips into stacked rows and push the actual
+            // form off-screen. Snap points make a partially-visible next chip
+            // an affordance rather than a cut-off accident.
             <div className="no-scrollbar -mt-2 -mx-6 px-6 overflow-x-auto snap-x snap-mandatory">
               <div className="flex gap-1.5 w-max">
                 {pillsLoading && [0, 1, 2, 3].map((i) => (
                   <div
                     key={`pill-skel-${i}`}
                     className="h-[26px] rounded-full bg-zinc-100 animate-pulse shrink-0"
-                    style={{ width: `${[212, 168, 236, 184][i]}px` }}
+                    style={{ width: `${[124, 96, 148, 108][i]}px` }}
                   />
                 ))}
-                {!pillsLoading && promptPills.map((pill) => (
-                  <button
-                    key={pill.text}
-                    type="button"
-                    title={pill.reason || undefined}
-                    onClick={() => {
-                      setPromptInput(pill.text);
-                      setPromptError(null);
-                      handlePromptSubmit(pill.text);
-                    }}
-                    disabled={promptLoading || creating}
-                    className="shrink-0 snap-start whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50/50 px-3 py-1 text-xs text-emerald-900 hover:bg-emerald-100 hover:border-emerald-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {pill.text}
-                  </button>
-                ))}
+                {!pillsLoading && promptPills.map((pill) => {
+                  const selected = selectedPill === pill.text;
+                  return (
+                    <button
+                      key={pill.text}
+                      type="button"
+                      // Native tooltip carries the whole sentence for anyone
+                      // hovering, plus the data justification behind it.
+                      title={pill.reason ? `${pill.text} — ${pill.reason}` : pill.text}
+                      aria-label={pill.text}
+                      onClick={() => {
+                        setPromptError(null);
+                        if (selected) {
+                          handlePromptSubmit(pill.text);
+                          setSelectedPill(null);
+                          return;
+                        }
+                        setPromptInput(pill.text);
+                        setSelectedPill(pill.text);
+                        // Caret to the end so an edit starts where the
+                        // sentence does, not by replacing it.
+                        requestAnimationFrame(() => {
+                          const el = promptInputRef.current;
+                          if (!el) return;
+                          el.focus();
+                          el.setSelectionRange(pill.text.length, pill.text.length);
+                        });
+                      }}
+                      disabled={promptLoading || creating}
+                      className={`shrink-0 snap-start whitespace-nowrap rounded-full border px-3 py-1 text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                        selected
+                          ? "border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-800"
+                          : "border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 hover:border-zinc-300"
+                      }`}
+                    >
+                      {pillLabel(pill)}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
