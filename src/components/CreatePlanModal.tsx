@@ -1063,30 +1063,37 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
               through the drafter, same path as typing it. Hidden once a draft
               has landed — the fields below are the subject at that point. */}
           {showPromptBar && aiFilled.size === 0 && (pillsLoading || promptPills.length > 0) && (
-            <div className="-mt-2 flex flex-wrap gap-1.5">
-              {pillsLoading && [0, 1, 2, 3].map((i) => (
-                <div
-                  key={`pill-skel-${i}`}
-                  className="h-[26px] rounded-full bg-zinc-100 animate-pulse"
-                  style={{ width: `${[142, 116, 158, 128][i]}px` }}
-                />
-              ))}
-              {!pillsLoading && promptPills.map((pill) => (
-                <button
-                  key={pill.text}
-                  type="button"
-                  title={pill.reason || undefined}
-                  onClick={() => {
-                    setPromptInput(pill.text);
-                    setPromptError(null);
-                    handlePromptSubmit(pill.text);
-                  }}
-                  disabled={promptLoading || creating}
-                  className="rounded-full border border-emerald-200 bg-emerald-50/50 px-2.5 py-1 text-xs text-emerald-900 hover:bg-emerald-100 hover:border-emerald-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {pill.text}
-                </button>
-              ))}
+            // Horizontal carousel. These chips carry a venue and a time, so
+            // they're long — wrapping them stacked four rows deep pushed the
+            // actual form off-screen. One scrolling row keeps the drawer's
+            // shape; snap points make the partially-visible next chip an
+            // affordance rather than a cut-off accident.
+            <div className="-mt-2 -mx-6 px-6 overflow-x-auto snap-x snap-mandatory">
+              <div className="flex gap-1.5 w-max pb-1.5">
+                {pillsLoading && [0, 1, 2, 3].map((i) => (
+                  <div
+                    key={`pill-skel-${i}`}
+                    className="h-[26px] rounded-full bg-zinc-100 animate-pulse shrink-0"
+                    style={{ width: `${[212, 168, 236, 184][i]}px` }}
+                  />
+                ))}
+                {!pillsLoading && promptPills.map((pill) => (
+                  <button
+                    key={pill.text}
+                    type="button"
+                    title={pill.reason || undefined}
+                    onClick={() => {
+                      setPromptInput(pill.text);
+                      setPromptError(null);
+                      handlePromptSubmit(pill.text);
+                    }}
+                    disabled={promptLoading || creating}
+                    className="shrink-0 snap-start whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50/50 px-3 py-1 text-xs text-emerald-900 hover:bg-emerald-100 hover:border-emerald-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {pill.text}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

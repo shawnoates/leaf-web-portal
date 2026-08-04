@@ -7,8 +7,11 @@ import { Check, Clock, Loader2, Minus, Plus, Sparkles, X } from "lucide-react";
 // A representative host face for the "Add virtual host" CTA, shown before a
 // specific persona is picked (that happens server-side on attach). The neutral
 // persona (Jules) so it reads well for any audience.
+// Bucket ROOT, not the `concierge-personas/` folder — that prefix 403s, and the
+// live ConciergePersona rows all store root-level URLs. A wrong path here is
+// invisible in review: HostAvatar just degrades to its sparkle fallback.
 export const DEFAULT_HOST_AVATAR =
-  "https://leaf-storage.s3.us-west-2.amazonaws.com/concierge-personas/jules.png";
+  "https://leaf-storage.s3.us-west-2.amazonaws.com/jules.png";
 
 // Round host avatar that falls back to a sparkle glyph if the image is missing
 // or 404s (persona avatar URLs can go stale) — so the UI never shows a broken
