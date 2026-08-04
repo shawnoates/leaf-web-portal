@@ -37,7 +37,12 @@ export default function AppHeader({
 
   return (
     <header className="border-b border-zinc-100 bg-white shrink-0">
-      <div className="max-w-5xl mx-auto px-6 py-5 flex items-center gap-4">
+      {/* Full-bleed, NOT max-w-5xl: the body below is a full-width multi-pane
+          layout, so a centred 1024px header row floats the back arrow and title
+          into the middle of the screen with nothing beneath them to line up
+          against. Left edge of the header now matches the left edge of the
+          thread list, right edge matches the plan sidebar. */}
+      <div className="w-full px-5 md:px-6 py-5 flex items-center gap-4">
         {showBack && (
           <button
             onClick={() => router.back()}
