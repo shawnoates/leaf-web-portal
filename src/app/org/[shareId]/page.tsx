@@ -2285,11 +2285,66 @@ export default function OrgCalendarPage() {
     const form = e.target as HTMLFormElement;
     const dateInput = form.querySelector('input[type="date"]') as HTMLInputElement;
     const timeInput = form.querySelector('input[type="time"]') as HTMLInputElement;
-    const offset = new Date().getTimezoneOffset();
-    const sign = offset <= 0 ? "+" : "-";
-    const absH = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
-    const absM = String(Math.abs(offset) % 60).padStart(2, "0");
-    const dateTime = `${dateInput.value}T${timeInput.value || "18:00"}${sign}${absH}:${absM}`;
+    const timeValue = timeInput.value || "18:00";
+
+    // A featured suggestion's time belongs to the VENUE's zone, not the
+    // browser's — a NYC showtime hosted by someone in LA is still 7:30 ET.
+    // Everything else keeps the existing browser-offset behavior.
+    let offsetSuffix: string;
+    if (hostingIdea.isFeatured && hostingIdea.venueTimeZone) {
+      offsetSuffix = zoneOffsetSuffix(dateInput.value, timeValue, hostingIdea.venueTimeZone);
+    } else {
+      const offset = new Date().getTimezoneOffset();
+      const sign = offset <= 0 ? "+" : "-";
+      const absH = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
+      const absM = String(Math.abs(offset) % 60).padStart(2, "0");
+      offsetSuffix = `${sign}${absH}:${absM}`;
+    }
+    const dateTime = `${dateInput.value}T${timeValue}${offsetSuffix}`;
+
+    // Featured suggestions have no CalendarGeneratedPlan row, so hostPlanIdea
+    // (which looks one up by id) would 404. Route them through the free-form
+    // custom-plan path instead — same resulting EventGroup, same approval flow.
+    if (hostingIdea.isFeatured) {
+      try {
+        const result = await Parse.Cloud.run("requestCustomPlanViaWeb", {
+          shareId,
+          title: hostingIdea.title,
+          description: hostingIdea.description || hostingIdea.title,
+          imageUrl: hostingIdea.image || undefined,
+          date: dateTime,
+          capacity: hostingIdea.suggestedCapacity || 20,
+          hostNote: hostNote.trim() || undefined,
+          name: !isOwnerOrHost ? hostVerify.name.trim() : undefined,
+          phoneNumber: !isOwnerOrHost ? `+1${hostVerify.phone.replace(/\D/g, "")}` : undefined,
+          email: !isOwnerOrHost && hostEmail.trim() ? hostEmail.trim() : undefined,
+          requireApproval: hostRequireApproval,
+          venue: selectedVenue
+            ? {
+                placeId: selectedVenue.placeId,
+                name: selectedVenue.name,
+                address: selectedVenue.address,
+                photoUrl: selectedVenue.photoUrl,
+                rating: selectedVenue.rating,
+              }
+            : undefined,
+        });
+        setHostSuccess(result?.pendingApproval ? "pending" : true);
+        setHostNote("");
+        setHostEmail("");
+        setSelectedVenue(null);
+        if (!isOwnerOrHost && !isFollowing && org) {
+          setIsFollowing(true);
+          setFollowerCount((c) => c + 1);
+          setToast(`You're now following ${org.name}`);
+        }
+      } catch (err) {
+        setToast((err as Error).message || "Could not create that plan.");
+      } finally {
+        setHostSubmitting(false);
+      }
+      return;
+    }
 
     try {
       const result = await Parse.Cloud.run("hostPlanIdea", {
