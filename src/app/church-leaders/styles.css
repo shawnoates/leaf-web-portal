@@ -12,6 +12,13 @@
 /* ---------- hero ---------- */
 .ch-landing .hero__visual { display: flex; justify-content: center; }
 
+/* The shared `.underline-amber` highlight sits at z-index:-1, which puts
+   it behind the section's own background and makes it invisible. Giving
+   the span its own stacking context keeps the ::after below the letters
+   but above the band. Scoped here rather than fixed in the shared sheet
+   so /resident-managers keeps rendering exactly as it does today. */
+.ch-landing .underline-amber { z-index: 0; }
+
 .ch-landing .cta-stack--start { align-items: flex-start; }
 
 .ch-landing .phone {
