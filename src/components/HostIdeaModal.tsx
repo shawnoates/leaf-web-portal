@@ -53,6 +53,29 @@ interface NearbyVenue {
 // suggestion's own location object (and its resolved timezone).
 const SUGGESTED_VENUE_ID = "__suggested__";
 
+/** Loads the Google Maps Places library on demand. Resolves false when there's no key. */
+async function ensureGooglePlaces(): Promise<boolean> {
+  if (window.google?.maps?.places) return true;
+  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!key) return false;
+  if (!document.querySelector('script[src*="maps.googleapis.com"]')) {
+    await new Promise<void>((resolve) => {
+      (window as unknown as Record<string, unknown>).__venueSearchCallback = () => resolve();
+      const script = document.createElement("script");
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&callback=__venueSearchCallback`;
+      script.async = true;
+      document.head.appendChild(script);
+    });
+  } else {
+    await new Promise<void>((resolve) => {
+      const check = setInterval(() => {
+        if (window.google?.maps?.places) { clearInterval(check); resolve(); }
+      }, 100);
+    });
+  }
+  return !!window.google?.maps?.places;
+}
+
 /**
  * Host-a-suggestion modal — the SAME experience the public /org/[shareId] page
  * uses (venue carousel + free-text venue search over Google Places, date/time,
@@ -113,6 +136,10 @@ export default function HostIdeaModal({
   // The venue already on the suggestion (owner picked it at creation time).
   // It leads the carousel and starts selected, so hosting keeps it unless the
   // hoster deliberately picks something else.
+  // Saved venues carry no photo (the venue autocomplete doesn't capture one),
+  // so we look one up from Places and fold it in below.
+  const [suggestedPhotoUrl, setSuggestedPhotoUrl] = useState<string | null>(null);
+
   const suggestedVenue = useMemo<NearbyVenue | null>(() => {
     if (!idea.location?.name) return null;
     return {
@@ -120,9 +147,9 @@ export default function HostIdeaModal({
       name: idea.location.name,
       address: idea.location.address || "",
       rating: idea.location.rating ?? null,
-      photoUrl: idea.location.photoUrl ?? null,
+      photoUrl: idea.location.photoUrl ?? suggestedPhotoUrl,
     };
-  }, [idea.location]);
+  }, [idea.location, suggestedPhotoUrl]);
 
   const [venueSearchQuery, setVenueSearchQuery] = useState("");
   const [nearbyVenues, setNearbyVenues] = useState<NearbyVenue[]>([]);
@@ -142,6 +169,37 @@ export default function HostIdeaModal({
   // the top action row only carries the non-destructive owner tools.
   const hasTopActions = !!(onEditSuggestion || onAssignHost || onEndSeries);
 
+  // Pull a cover photo for the suggestion's own venue — by place id when we
+  // have one, otherwise by name+address. Keyed on primitives so callers that
+  // rebuild `idea` each render don't re-fire this.
+  const ideaVenueName = idea.location?.name || "";
+  const ideaVenueAddress = idea.location?.address || "";
+  const ideaVenuePlaceId = idea.location?.placeId || "";
+  const ideaVenuePhoto = idea.location?.photoUrl || "";
+  useEffect(() => {
+    if (!ideaVenueName || ideaVenuePhoto) return;
+    let cancelled = false;
+    (async () => {
+      if (!(await ensureGooglePlaces()) || cancelled) return;
+      const service = new window.google.maps.places.PlacesService(document.createElement("div"));
+      const apply = (place: google.maps.places.PlaceResult | null) => {
+        const url = place?.photos?.[0]?.getUrl({ maxWidth: 400 }) || null;
+        if (url && !cancelled) setSuggestedPhotoUrl(url);
+      };
+      const ok = window.google.maps.places.PlacesServiceStatus.OK;
+      if (ideaVenuePlaceId) {
+        service.getDetails({ placeId: ideaVenuePlaceId, fields: ["photos"] }, (place, status) => {
+          if (status === ok) apply(place);
+        });
+      } else {
+        service.textSearch({ query: `${ideaVenueName} ${ideaVenueAddress}`.trim() }, (results, status) => {
+          if (status === ok && results?.length) apply(results[0]);
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [ideaVenueName, ideaVenueAddress, ideaVenuePlaceId, ideaVenuePhoto]);
+
   // Fetch nearby venues via Google Places whenever the modal opens or the
   // free-text venue query changes. Mirrors the public /org host modal: a typed
   // query overrides the idea's AI category so any specific venue is findable.
@@ -152,6 +210,16 @@ export default function HostIdeaModal({
     const searchCenter = orgAddress || idea.centroid || orgCity || "";
     const typedVenueQuery = venueSearchQuery.trim();
     const searchCategory = typedVenueQuery || idea.category || "";
+
+    // The suggestion already has a venue — that's the answer, so don't sweep
+    // Places for alternatives nobody asked for. Typing in the search box opts
+    // back into results.
+    if (suggestedVenue && !typedVenueQuery) {
+      setNearbyVenues([]);
+      setSelectedVenue(suggestedVenue);
+      setVenuesLoading(false);
+      return;
+    }
 
     if (!searchCategory) {
       setNearbyVenues([]);
