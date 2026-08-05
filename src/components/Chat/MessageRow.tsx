@@ -41,6 +41,13 @@ export default function MessageRow({
     );
   }
   if (type === "readyToSplit") return <ReadyToSplitRow />;
+  // Plan-change notices ("Shawn changed the date to …") are posted by the
+  // server with type "system" and carry nothing but text — iOS renders them
+  // inline as a system line, so the generic "open in the app" card here was
+  // hiding a message that's already fully readable on web.
+  if (type === "system" && message.text && message.text.trim()) {
+    return <SystemNoticeRow text={message.text} />;
+  }
   if (type && !["leafMessage"].includes(type)) {
     return <OpenInAppRow message={message} />;
   }
@@ -169,6 +176,18 @@ function ResponseRow({ text }: { text: string }) {
   return (
     <div className="flex justify-center py-1">
       <span className={`text-xs font-medium ${color}`}>{trimmed}</span>
+    </div>
+  );
+}
+
+// --- system: plan-change notices, centered and muted ---
+
+function SystemNoticeRow({ text }: { text: string }) {
+  return (
+    <div className="flex justify-center py-1.5">
+      <span className="max-w-[80%] text-center text-xs text-zinc-500 whitespace-pre-wrap break-words">
+        {text.trim()}
+      </span>
     </div>
   );
 }

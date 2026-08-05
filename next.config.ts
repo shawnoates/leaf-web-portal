@@ -27,6 +27,10 @@ const nextConfig: NextConfig = {
       // /terms or /privacy bookmark still lands on real content.
       { source: "/terms", destination: "/terms-conditions", permanent: true },
       { source: "/privacy", destination: "/privacy-policy", permanent: true },
+      // /churches is the plural people reach for; the landing itself
+      // lives at /church-leaders (parallel to /resident-managers, and
+      // kept distinct from /church, which is the example calendar).
+      { source: "/churches", destination: "/church-leaders", permanent: false },
       // joinleaf.com (apex + www) → os.joinleaf.com/personal.
       //
       // Scoped via `has: host` so os.joinleaf.com traffic never trips
