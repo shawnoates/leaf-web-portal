@@ -74,7 +74,9 @@ export async function generateMetadata({
       title,
       description,
       type: "website",
-      url: `https://os.joinleaf.com/org/${shareId}`,
+      // Must be the www host. The apex os.joinleaf.com 302s to www, and
+      // unfurlers that re-resolve og:url take a second hop for nothing.
+      url: `https://www.os.joinleaf.com/org/${shareId}`,
       images: ogImages,
       siteName: "Leaf",
     },

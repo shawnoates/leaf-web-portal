@@ -15,6 +15,7 @@ import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-use
 import { renderLinkedText } from "@/lib/linkify";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
 import { isVenueBlacklisted } from "@/lib/venue-blacklist";
+import { fetchVenuePhotoUrl } from "@/lib/google-places";
 import {
   Plus,
   Users,
@@ -1348,6 +1349,9 @@ export default function OrgCalendarPage() {
   const hostVerify = usePhoneVerify();
   const [nearbyVenues, setNearbyVenues] = useState<NearbyVenue[]>([]);
   const [venuesLoading, setVenuesLoading] = useState(false);
+  // Cover photo for the hosting suggestion's own venue — saved venues store no
+  // photo, so we look one up from Places when the host modal opens.
+  const [ideaVenuePhotoUrl, setIdeaVenuePhotoUrl] = useState<string | null>(null);
   const [selectedVenue, setSelectedVenue] = useState<NearbyVenue | null>(null);
   // Custom plan creation state
   const [creatingCustomPlan, setCreatingCustomPlan] = useState(false);
@@ -2267,11 +2271,21 @@ export default function OrgCalendarPage() {
       return;
     }
 
+    // A suggestion that already has a venue IS the answer — don't sweep Places
+    // for alternatives nobody asked for. Typing in the search box opts back in.
+    const ideaVenue = suggestedVenueFor(hostingIdea);
+    if (ideaVenue && !typedVenueQuery) {
+      setNearbyVenues([]);
+      setSelectedVenue(ideaVenue);
+      setVenuesLoading(false);
+      return;
+    }
+
     setNearbyVenues([]);
     // Hosting a suggestion keeps its own venue selected through the default
     // category sweep — only a typed search (the hoster shopping for somewhere
     // else) clears the pick. Custom plans have nothing to preserve.
-    setSelectedVenue(typedVenueQuery ? null : suggestedVenueFor(hostingIdea));
+    setSelectedVenue(typedVenueQuery ? null : ideaVenue);
     setVenuesLoading(true);
 
     // Debounce keystroke-driven searches (custom plans, and typed venue
@@ -2380,7 +2394,19 @@ export default function OrgCalendarPage() {
       setVenueSearchQuery(""); // clear the venue search each time the modal opens
       // Start on the suggestion's own venue. Also covers ideas with no search
       // category, where the venue effect bails before it can select anything.
-      setSelectedVenue(suggestedVenueFor(hostingIdea));
+      const ideaVenue = suggestedVenueFor(hostingIdea);
+      setSelectedVenue(ideaVenue);
+      // Saved venues carry no photo — fetch one so the card isn't a blank tile.
+      setIdeaVenuePhotoUrl(null);
+      if (ideaVenue && !ideaVenue.photoUrl) {
+        fetchVenuePhotoUrl({
+          name: ideaVenue.name,
+          address: ideaVenue.address,
+          placeId: ideaVenue.placeId === SUGGESTED_VENUE_ID ? null : ideaVenue.placeId,
+        })
+          .then((url) => { if (url) setIdeaVenuePhotoUrl(url); })
+          .catch(() => {});
+      }
     }
   }, [hostingIdea, org?.requireApprovalDefault]);
   useEffect(() => {
@@ -4274,7 +4300,7 @@ export default function OrgCalendarPage() {
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 md:p-16 space-y-8">
+            <div className="flex-1 overflow-y-auto no-scrollbar p-8 md:p-16 space-y-8">
               {hostSuccess ? (
                 <div className="py-20 text-center space-y-6">
                   <div className="w-20 h-20 border border-zinc-900 rounded-full flex items-center justify-center mx-auto">
@@ -4334,7 +4360,10 @@ export default function OrgCalendarPage() {
                     {(() => {
                       // The suggestion's own venue leads the row (pre-selected);
                       // Places results follow, minus any duplicate of it.
-                      const ideaVenue = suggestedVenueFor(hostingIdea);
+                      const base = suggestedVenueFor(hostingIdea);
+                      const ideaVenue = base
+                        ? { ...base, photoUrl: base.photoUrl || ideaVenuePhotoUrl }
+                        : null;
                       const venues = ideaVenue
                         ? [
                             ideaVenue,

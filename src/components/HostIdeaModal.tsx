@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { isVenueBlacklisted } from "@/lib/venue-blacklist";
+import { ensureGooglePlaces, fetchVenuePhotoUrl } from "@/lib/google-places";
 import {
   AlertTriangle,
   Calendar,
@@ -52,29 +53,6 @@ interface NearbyVenue {
 // on the suggested venue submits no `venue` at all, so the server keeps the
 // suggestion's own location object (and its resolved timezone).
 const SUGGESTED_VENUE_ID = "__suggested__";
-
-/** Loads the Google Maps Places library on demand. Resolves false when there's no key. */
-async function ensureGooglePlaces(): Promise<boolean> {
-  if (window.google?.maps?.places) return true;
-  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-  if (!key) return false;
-  if (!document.querySelector('script[src*="maps.googleapis.com"]')) {
-    await new Promise<void>((resolve) => {
-      (window as unknown as Record<string, unknown>).__venueSearchCallback = () => resolve();
-      const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&callback=__venueSearchCallback`;
-      script.async = true;
-      document.head.appendChild(script);
-    });
-  } else {
-    await new Promise<void>((resolve) => {
-      const check = setInterval(() => {
-        if (window.google?.maps?.places) { clearInterval(check); resolve(); }
-      }, 100);
-    });
-  }
-  return !!window.google?.maps?.places;
-}
 
 /**
  * Host-a-suggestion modal — the SAME experience the public /org/[shareId] page
@@ -179,24 +157,9 @@ export default function HostIdeaModal({
   useEffect(() => {
     if (!ideaVenueName || ideaVenuePhoto) return;
     let cancelled = false;
-    (async () => {
-      if (!(await ensureGooglePlaces()) || cancelled) return;
-      const service = new window.google.maps.places.PlacesService(document.createElement("div"));
-      const apply = (place: google.maps.places.PlaceResult | null) => {
-        const url = place?.photos?.[0]?.getUrl({ maxWidth: 400 }) || null;
-        if (url && !cancelled) setSuggestedPhotoUrl(url);
-      };
-      const ok = window.google.maps.places.PlacesServiceStatus.OK;
-      if (ideaVenuePlaceId) {
-        service.getDetails({ placeId: ideaVenuePlaceId, fields: ["photos"] }, (place, status) => {
-          if (status === ok) apply(place);
-        });
-      } else {
-        service.textSearch({ query: `${ideaVenueName} ${ideaVenueAddress}`.trim() }, (results, status) => {
-          if (status === ok && results?.length) apply(results[0]);
-        });
-      }
-    })();
+    fetchVenuePhotoUrl({ name: ideaVenueName, address: ideaVenueAddress, placeId: ideaVenuePlaceId })
+      .then((url) => { if (url && !cancelled) setSuggestedPhotoUrl(url); })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [ideaVenueName, ideaVenueAddress, ideaVenuePlaceId, ideaVenuePhoto]);
 
@@ -239,25 +202,7 @@ export default function HostIdeaModal({
     const timer = setTimeout(() => {
       const doSearch = async () => {
         try {
-          if (!window.google?.maps?.places) {
-            const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-            if (!key) { setVenuesLoading(false); return; }
-            if (!document.querySelector('script[src*="maps.googleapis.com"]')) {
-              await new Promise<void>((resolve) => {
-                (window as unknown as Record<string, unknown>).__venueSearchCallback = () => resolve();
-                const script = document.createElement("script");
-                script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&callback=__venueSearchCallback`;
-                script.async = true;
-                document.head.appendChild(script);
-              });
-            } else {
-              await new Promise<void>((resolve) => {
-                const check = setInterval(() => {
-                  if (window.google?.maps?.places) { clearInterval(check); resolve(); }
-                }, 100);
-              });
-            }
-          }
+          if (!(await ensureGooglePlaces())) { setVenuesLoading(false); return; }
 
           const service = new window.google.maps.places.PlacesService(document.createElement("div"));
           const toVenue = (place: google.maps.places.PlaceResult): NearbyVenue => ({
@@ -422,7 +367,7 @@ export default function HostIdeaModal({
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-12 space-y-7">
+        <div className="flex-1 overflow-y-auto no-scrollbar p-6 md:p-12 space-y-7">
           {success ? (
             <div className="py-20 text-center space-y-6">
               <div className="w-20 h-20 border border-zinc-900 rounded-full flex items-center justify-center mx-auto">
@@ -493,7 +438,7 @@ export default function HostIdeaModal({
                   />
                 </div>
                 {displayVenues.length > 0 || venuesLoading ? (
-                  <div className="flex gap-3 overflow-x-auto pb-2">
+                  <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
                     {displayVenues.map((venue) => {
                       const isSuggested = !!suggestedVenue && venue.placeId === suggestedVenue.placeId;
                       return (
