@@ -4327,36 +4327,46 @@ export default function OrgCalendarPage() {
                     </p>
                   </div>
 
-                  {/* Venue Carousel */}
+                  {/* Venue Carousel. With a venue already chosen, the card
+                      leads and search drops below it — swapping a settled
+                      venue is the secondary action. */}
+                  {(() => {
+                    const chosen = suggestedVenueFor(hostingIdea);
+                    // Free-text venue search — type a specific place to
+                    // override the AI's suggested category results.
+                    const venueSearchInput = (
+                      <>
+                        <div className="relative">
+                          <MapPin className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <input
+                            type="search"
+                            name="venue-search"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            spellCheck={false}
+                            data-lpignore="true"
+                            data-1p-ignore
+                            value={venueSearchQuery}
+                            onChange={(e) => setVenueSearchQuery(e.target.value)}
+                            placeholder={chosen ? "Choose a different venue…" : "Search for a venue…"}
+                            className="w-full border border-zinc-200 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-zinc-900 transition-colors"
+                          />
+                        </div>
+                        {!(org.isOwner || org.isHost) && (
+                          <p className="text-[11px] text-zinc-400">
+                            Picking your own venue? Your request goes to the
+                            organizer for approval before it&apos;s published.
+                          </p>
+                        )}
+                      </>
+                    );
+                    return (
                   <div className="space-y-3">
                     <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
-                      Choose a Venue
+                      {chosen ? "Venue" : "Choose a Venue"}
                     </h4>
-                    {/* Free-text venue search — type a specific place to
-                        override the AI's suggested category results. */}
-                    <div className="relative">
-                      <MapPin className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      <input
-                        type="search"
-                        name="venue-search"
-                        autoComplete="off"
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        spellCheck={false}
-                        data-lpignore="true"
-                        data-1p-ignore
-                        value={venueSearchQuery}
-                        onChange={(e) => setVenueSearchQuery(e.target.value)}
-                        placeholder="Search for a different venue…"
-                        className="w-full border border-zinc-200 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-zinc-900 transition-colors"
-                      />
-                    </div>
-                    {!(org.isOwner || org.isHost) && (
-                      <p className="text-[11px] text-zinc-400">
-                        Picking your own venue? Your request goes to the
-                        organizer for approval before it&apos;s published.
-                      </p>
-                    )}
+                    {!chosen && venueSearchInput}
                     {(() => {
                       // The suggestion's own venue leads the row (pre-selected);
                       // Places results follow, minus any duplicate of it.
@@ -4438,7 +4448,10 @@ export default function OrgCalendarPage() {
                         )}
                       </div>
                     )}
+                    {chosen && venueSearchInput}
                   </div>
+                    );
+                  })()}
 
                   <form onSubmit={handleHostSubmit} className="space-y-8">
                     {/* Name & Phone for non-owners */}
