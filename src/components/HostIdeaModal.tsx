@@ -338,6 +338,28 @@ export default function HostIdeaModal({
       ]
     : nearbyVenues;
 
+  // Rendered above the carousel when there's no venue yet, below it once one is
+  // chosen — hence a single element reused in both slots.
+  const venueSearchInput = (
+    <div className="relative">
+      <MapPin className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+      <input
+        type="search"
+        name="venue-search"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        data-lpignore="true"
+        data-1p-ignore
+        value={venueSearchQuery}
+        onChange={(e) => setVenueSearchQuery(e.target.value)}
+        placeholder={suggestedVenue ? "Choose a different venue…" : "Search for a venue…"}
+        className="w-full border border-zinc-200 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-zinc-900 transition-colors"
+      />
+    </div>
+  );
+
   const defaultDateStr = prefillDate ? prefillDate.toISOString().split("T")[0] : "";
   const todayStr = new Date().toISOString().split("T")[0];
   const maxDateStr = tier === "starter"
@@ -417,26 +439,14 @@ export default function HostIdeaModal({
                 </div>
               )}
 
-              {/* Venue carousel */}
+              {/* Venue carousel. With a venue already chosen, the card leads
+                  and search drops below it — swapping a settled venue is the
+                  secondary action, not the first thing you're asked to do. */}
               <div className="space-y-3">
-                <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">Choose a venue</h4>
-                <div className="relative">
-                  <MapPin className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type="search"
-                    name="venue-search"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    data-lpignore="true"
-                    data-1p-ignore
-                    value={venueSearchQuery}
-                    onChange={(e) => setVenueSearchQuery(e.target.value)}
-                    placeholder="Search for a different venue…"
-                    className="w-full border border-zinc-200 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-zinc-900 transition-colors"
-                  />
-                </div>
+                <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
+                  {suggestedVenue ? "Venue" : "Choose a venue"}
+                </h4>
+                {!suggestedVenue && venueSearchInput}
                 {displayVenues.length > 0 || venuesLoading ? (
                   <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
                     {displayVenues.map((venue) => {
@@ -494,6 +504,7 @@ export default function HostIdeaModal({
                     <MapPin className="w-3 h-3" /> {selectedVenue.name} &mdash; {selectedVenue.address}
                   </p>
                 )}
+                {suggestedVenue && venueSearchInput}
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
