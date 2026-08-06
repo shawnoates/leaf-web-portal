@@ -60,6 +60,3 @@ export const POSTS: Post[] = [
     kind: "group",
   },
 ];
-
-/** The three that carry the hero phone. Informality is the pitch. */
-export const HERO_POSTS: Post[] = [POSTS[0], POSTS[3], POSTS[2]];

@@ -44,8 +44,7 @@ export default function Difference() {
 
         <Reveal>
           <p className="under-line">
-            One is the church&rsquo;s program. The other is the church&rsquo;s life. Most
-            churches have only ever had a place to put the first one.
+            One is the church&rsquo;s program. The other is the church&rsquo;s life.
           </p>
         </Reveal>
       </div>
