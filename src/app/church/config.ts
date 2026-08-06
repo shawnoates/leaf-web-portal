@@ -41,7 +41,7 @@ export const config: LandingConfig = {
       description:
         "Walking the bridge before it gets hot. Meet at the coffee place on the corner, come if you want. Back by 10 or so.",
       image:
-        "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=800&q=80",
+        "https://images.unsplash.com/photo-1518391846015-55a9cc003b25?w=800&q=80",
       hostName: "Marcus",
       attendeeCount: 7,
       location: "Coffee shop at Grand & 5th",
@@ -54,7 +54,7 @@ export const config: LandingConfig = {
       description:
         "Park by the library, near the little playground. Bring whatever, no plan. Usually a few of us, sometimes ten.",
       image:
-        "https://images.unsplash.com/photo-1476703993599-0035a21b17a9?w=800&q=80",
+        "https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?w=800&q=80",
       hostName: "Priya",
       attendeeCount: 11,
       location: "Library Park",
@@ -67,7 +67,7 @@ export const config: LandingConfig = {
       description:
         "Need two more sets of hands and a truck if anyone has one. Should be done by early afternoon — pizza after.",
       image:
-        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80",
+        "https://images.unsplash.com/photo-1600518464441-9154a4dea21b?w=800&q=80",
       hostName: "Tomas",
       attendeeCount: 6,
       location: "Bergen St, apartment 3R",
@@ -80,7 +80,7 @@ export const config: LandingConfig = {
       description:
         "Worship and teaching, with coffee in the lobby afterward. Kids' programs for all ages.",
       image:
-        "https://images.unsplash.com/photo-1485808191679-5f86510681a2?w=800&q=80",
+        "https://images.unsplash.com/photo-1519491050282-cf00c82424b4?w=800&q=80",
       hostName: "Grace Fellowship",
       attendeeCount: 148,
       location: "Grace Fellowship",
@@ -145,7 +145,7 @@ export const config: LandingConfig = {
       description:
         "The block association's annual one. Street closed, music, food trucks. A bunch of us are going as a group.",
       image:
-        "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=800&q=80",
+        "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=800&q=80",
       hostName: "Carroll St Block Association",
       attendeeCount: 34,
       location: "Carroll St, between 6th & 7th",
@@ -158,7 +158,7 @@ export const config: LandingConfig = {
       description:
         "Middle and high school. Games, dinner, and a short teaching. Drop-off and pickup in the back lot.",
       image:
-        "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&q=80",
+        "https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=800&q=80",
       hostName: "Grace Fellowship",
       attendeeCount: 41,
       location: "Fellowship Hall",
@@ -184,7 +184,7 @@ export const config: LandingConfig = {
       description:
         "Bring a bike, a lamp, whatever's broken. I have tools and two people who actually know what they're doing.",
       image:
-        "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=800&q=80",
+        "https://images.unsplash.com/photo-1567361808960-dec9cb578182?w=800&q=80",
       hostName: "Eli",
       attendeeCount: 8,
       location: "Eli's garage, Sterling Pl",
@@ -225,7 +225,7 @@ export const config: LandingConfig = {
         "Somebody's always moving. Post the address and the time and see who's free.",
       category: "Helping out",
       image:
-        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80",
+        "https://images.unsplash.com/photo-1600518464441-9154a4dea21b?w=800&q=80",
     },
   ],
   dealsHeader: "Nearby, from the neighborhood",
@@ -276,7 +276,7 @@ export const config: LandingConfig = {
       dealType: "public",
       interestCount: 4,
       imageUrl:
-        "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=800&q=80",
+        "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?w=800&q=80",
     },
   ],
 };
