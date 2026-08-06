@@ -5,7 +5,7 @@
  * footer, steps, reveal) comes from ../resident-managers/styles.css and
  * is rooted at `.rm-landing`, which this route's wrapper also carries.
  * Everything below is scoped to `.ch-landing` and covers the pieces
- * this page adds: the member-post card, the hero phone, the two-column
+ * this page adds: the member-post card, the hero crop, the two-column
  * contrast, the single stat card, and the open FAQ.
  */
 
@@ -18,7 +18,11 @@
 .ch-landing .section-head { margin-bottom: clamp(22px, 2.8vw, 32px); }
 
 /* ---------- hero ---------- */
-.ch-landing .hero__visual { display: flex; justify-content: center; }
+/* Shorter copy than /resident-managers, so the shared 4/4.4 portrait
+   crop would tower over the text column. Squarer keeps the two sides
+   balanced. */
+.ch-landing .hero__visual { width: 100%; }
+.ch-landing .hero__art { aspect-ratio: 4 / 3.8; }
 
 /* The shared `.underline-amber` highlight sits at z-index:-1, which puts
    it behind the section's own background and makes it invisible. Giving
@@ -28,27 +32,6 @@
 .ch-landing .underline-amber { z-index: 0; }
 
 .ch-landing .cta-stack--start { align-items: flex-start; }
-
-.ch-landing .phone {
-  width: 100%; max-width: 330px;
-  padding: 12px; border-radius: 40px;
-  background: linear-gradient(165deg, #274c3e, #12211c);
-  box-shadow: 0 34px 70px rgba(27, 67, 50, 0.26);
-}
-.ch-landing .phone__screen {
-  background: var(--paper); border-radius: 30px;
-  padding: 20px 14px 22px;
-}
-.ch-landing .phone__bar {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
-  padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--line);
-}
-.ch-landing .phone__title { font-family: var(--display); font-size: 1.05rem; color: var(--forest); }
-.ch-landing .phone__sub {
-  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--muted);
-}
-.ch-landing .phone__feed { display: grid; gap: 10px; }
 
 /* ---------- member post card ---------- */
 .ch-landing .post {
@@ -66,12 +49,6 @@
 .ch-landing .post__who { font-size: 0.98rem; font-weight: 700; color: var(--ink); line-height: 1.25; }
 .ch-landing .post__when { margin-top: 1px; font-size: 0.8rem; color: var(--muted); }
 .ch-landing .post__body { margin-top: 13px; font-size: 1rem; line-height: 1.5; color: var(--ink); }
-
-.ch-landing .post--compact { padding: 14px; border-radius: 12px; }
-.ch-landing .post--compact .post__avatar { width: 30px; height: 30px; font-size: 0.8rem; }
-.ch-landing .post--compact .post__who { font-size: 0.88rem; }
-.ch-landing .post--compact .post__when { font-size: 0.72rem; }
-.ch-landing .post--compact .post__body { margin-top: 9px; font-size: 0.87rem; line-height: 1.45; }
 
 /* Feed: three across, then the last two share the row at half width so
    five cards read as a deliberate layout rather than an orphaned row. */

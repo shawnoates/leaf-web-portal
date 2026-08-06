@@ -1,22 +1,15 @@
 import type { Post } from "./samplePosts";
 
 /**
- * A single mock calendar post. Used at two sizes: full size in the
- * "What shows up" feed, and compact inside the hero phone.
+ * A single mock calendar post, used in the "What shows up" feed.
  *
  * The member's name sits on the card, not the church's — that's both a
  * design choice and the visual proof of the attribution promise made in
  * the "So anyone can post anything?" section.
  */
-export default function PostCard({
-  post,
-  compact = false,
-}: {
-  post: Post;
-  compact?: boolean;
-}) {
+export default function PostCard({ post }: { post: Post }) {
   return (
-    <article className={`post${compact ? " post--compact" : ""}`}>
+    <article className="post">
       <div className="post__head">
         <span
           className="post__avatar"
