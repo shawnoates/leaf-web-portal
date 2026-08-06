@@ -24,6 +24,11 @@
 .ch-landing .hero__visual { width: 100%; }
 .ch-landing .hero__art { aspect-ratio: 4 / 3.8; }
 
+/* The shared display size sets the headline in four ragged lines here,
+   with "make" orphaned ahead of the nowrap `.underline-amber` phrase.
+   Smaller type plus balanced wrapping keeps it to three even lines. */
+.ch-landing .h-xl { font-size: clamp(2.1rem, 4.4vw, 3.35rem); text-wrap: balance; }
+
 /* The shared `.underline-amber` highlight sits at z-index:-1, which puts
    it behind the section's own background and makes it invisible. Giving
    the span its own stacking context keeps the ::after below the letters
