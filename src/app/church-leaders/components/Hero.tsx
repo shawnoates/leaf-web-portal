@@ -10,20 +10,24 @@ import { CTA, Eyebrow, ExampleLink, TrustStrip } from "./ui";
  *
  * Per the brief: no worship service and no staff-planned event in this
  * image — that would show a pastor the calendar they already have.
- * Also keep it alcohol-free. The first pick here was a long table with
+ * Also keep it alcohol-free. An early pick here was a long table with
  * beer and wine on it, which is a bad look in front of this audience
  * for the same reason the brief wants alcohol-forward deals suppressed.
+ *
+ * And keep it candid. A posed group arm-in-arm over a scenic view reads
+ * as an inspirational poster, which undercuts a page whose whole claim
+ * is that it shows you ordinary life rather than staging it.
  */
 function HeroArt() {
   return (
     <div
       className="hero__art"
       role="img"
-      aria-label="A group of people standing arm in arm, looking out over a view together"
+      aria-label="A few people cooking and talking together in a home kitchen"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1000&q=80"
+        src="https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=1000&q=80"
         alt=""
         className="hero__photo"
       />
