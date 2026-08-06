@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Leaf OS — Community Calendars for Organizations",
+  title: "Leaf OS — Community Calendars",
   description:
     "AI-powered community calendars that help organizations plan meaningful gatherings. Members host, people RSVP.",
   icons: {
