@@ -148,6 +148,12 @@ export default function ConciergeDashboardBanner({ calendarId }: { calendarId: s
       ? d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
       : "";
 
+  // A cancel/resume date in the past means the state is stale — Stripe's
+  // terminal webhook hasn't landed yet (the reconcile cron picks these up
+  // hourly). Never print a past date as if it were upcoming; fall back to
+  // undated copy until the backend catches up.
+  const isFuture = (d?: Date) => !!d && d.getTime() > Date.now();
+
   return (
     <div className="bg-zinc-900 text-white border-b border-zinc-800">
       <div className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-4">
@@ -171,7 +177,9 @@ export default function ConciergeDashboardBanner({ calendarId }: { calendarId: s
           {state.kind === "cancelling" && (
             <>
               <strong className="font-semibold">
-                Concierge ends {formatDate(state.periodEnd)}.
+                {isFuture(state.periodEnd)
+                  ? `Concierge ends ${formatDate(state.periodEnd)}.`
+                  : "Concierge is ending."}
               </strong>{" "}
               <span className="text-zinc-300">Changed your mind?</span>
             </>
@@ -179,7 +187,11 @@ export default function ConciergeDashboardBanner({ calendarId }: { calendarId: s
           {state.kind === "paused_voluntary" && (
             <>
               <strong className="font-semibold">Concierge is paused.</strong>{" "}
-              <span className="text-zinc-300">Resumes {formatDate(state.resumeAt)}.</span>
+              <span className="text-zinc-300">
+                {isFuture(state.resumeAt)
+                  ? `Resumes ${formatDate(state.resumeAt)}.`
+                  : "Resuming shortly."}
+              </span>
             </>
           )}
           {state.kind === "paused_involuntary" && (
