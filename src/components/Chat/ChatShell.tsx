@@ -87,6 +87,30 @@ export default function ChatShell({
   }, []);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const currentUserIdRef = useRef<string | null>(null);
+  const composerRef = useRef<HTMLInputElement>(null);
+
+  // Tap-to-mention. The persona only answers when tagged by name, so leaving
+  // guests to type "@Marcus" by hand is the difference between a question that
+  // reaches a human and one that sits unread. Inserting the canonical spelling
+  // also keeps the text matching the server's detection.
+  const personaMentionPresent =
+    Boolean(virtualHostPersonaName) &&
+    new RegExp(`@${virtualHostPersonaName}\\b`, "i").test(composeText);
+
+  const insertPersonaMention = useCallback(() => {
+    if (!virtualHostPersonaName) return;
+    setComposeText((prev) => {
+      if (new RegExp(`@${virtualHostPersonaName}\\b`, "i").test(prev)) return prev;
+      return prev.trim() ? `@${virtualHostPersonaName} ${prev.trimStart()}` : `@${virtualHostPersonaName} `;
+    });
+    // Focus after the state flush so the caret lands at the end of the new text.
+    requestAnimationFrame(() => {
+      const el = composerRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
+  }, [virtualHostPersonaName]);
 
   // Tell the server the user has caught up. Failures are silent — stale read
   // state just means an extra digest email, not a user-visible error.
@@ -647,8 +671,33 @@ export default function ChatShell({
               Enter handling removes the form context entirely; the name/type
               and the password-manager opt-outs below stop the field from
               looking anonymous to the remaining heuristics. */}
+          {virtualHostPersonaName && !personaMentionPresent && (
+            <div className="flex items-center gap-2 pb-2">
+              <button
+                type="button"
+                onClick={insertPersonaMention}
+                className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 pl-1 pr-3 py-1 text-xs text-zinc-600 hover:bg-zinc-100 hover:border-zinc-300 transition-colors"
+                aria-label={`Ask ${virtualHostPersonaName}`}
+              >
+                {virtualHostPersonaAvatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={virtualHostPersonaAvatarUrl}
+                    alt=""
+                    className="w-5 h-5 rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="w-5 h-5 rounded-full bg-zinc-200 flex items-center justify-center text-[10px] font-medium text-zinc-600">
+                    {virtualHostPersonaName.charAt(0).toUpperCase()}
+                  </span>
+                )}
+                Ask @{virtualHostPersonaName}
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <input
+              ref={composerRef}
               value={composeText}
               onChange={(e) => setComposeText(e.target.value)}
               onKeyDown={(e) => {
