@@ -639,23 +639,38 @@ export default function ChatShell({
         </div>
 
         <div className="bg-white border-t border-zinc-200 px-4 md:px-6 py-3 shrink-0">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-            }}
-            className="flex items-center gap-2"
-          >
+          {/* Deliberately NOT a <form>. Chrome only offers credit-card autofill
+              inside a form context, and it ignores autocomplete="off" for
+              payment/address suggestions — so a lone unnamed field in a form
+              got heuristically classified as a card field and popped the
+              "Pay now / Pay later" sheet over the composer. A div + explicit
+              Enter handling removes the form context entirely; the name/type
+              and the password-manager opt-outs below stop the field from
+              looking anonymous to the remaining heuristics. */}
+          <div className="flex items-center gap-2">
             <input
               value={composeText}
               onChange={(e) => setComposeText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              type="text"
+              name="chat-message"
+              id="chat-message"
               placeholder="Message"
               className="flex-1 border border-zinc-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-zinc-400"
               maxLength={2000}
               autoComplete="off"
+              data-lpignore="true"
+              data-1p-ignore
+              data-form-type="other"
             />
             <button
-              type="submit"
+              type="button"
+              onClick={handleSend}
               disabled={!composeText.trim() || sending}
               className="bg-zinc-900 text-white p-2.5 rounded-lg disabled:opacity-40"
               aria-label="Send"
@@ -666,7 +681,7 @@ export default function ChatShell({
                 <Send className="w-4 h-4" />
               )}
             </button>
-          </form>
+          </div>
         </div>
       </div>
     </div>
