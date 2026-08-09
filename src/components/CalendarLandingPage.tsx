@@ -762,123 +762,13 @@ export default function CalendarLandingPage({
         )}
       </div>
 
-      {/* Plans Stream */}
+      {/* Unified stream — confirmed plans and suggestions interleaved by
+          date. Suggestions are no longer a separate carousel row. */}
       <main className="max-w-6xl mx-auto px-6 py-12">
         <div className="space-y-32">
-          {(() => {
-            // In preview mode the first plan in the stream becomes the
-            // "host-plan" anchor so the tour's step 2 has a target to
-            // scroll to and spotlight.
-            const firstHostIndex = merchantPreview ? 0 : -1;
-            return config.plans.map((plan, index) => {
-            const date = futureDate(plan.daysFromNow);
-            const isHostTarget = merchantPreview && index === firstHostIndex;
-            const isSpotlit = activeSection === "host" && isHostTarget;
-            const cardId = isHostTarget ? "host-plan" : undefined;
-            const card = (
-              <article
-                key={plan.id}
-                id={merchantPreview ? cardId : undefined}
-                style={merchantPreview ? spotlightStyle(isSpotlit) : undefined}
-                className={`group flex flex-col md:flex-row gap-12 md:items-center scroll-mt-32 ${
-                  isSpotlit ? "p-12 md:p-14 bg-white rounded-2xl" : ""
-                } ${
-                  index % 2 !== 0 ? "md:flex-row-reverse" : ""
-                }`}
-              >
-                <div
-                  className="w-full md:w-3/5 aspect-[16/10] overflow-hidden cursor-pointer bg-zinc-100 shadow-sm"
-                  onClick={() => setShowCTA(true)}
-                >
-                  <img
-                    src={plan.image}
-                    alt={plan.title}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                </div>
-
-                <div className="w-full md:w-2/5 space-y-6">
-                  <div className="space-y-2">
-                    <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
-                      {formatDate(date)} &bull; {plan.time}
-                    </p>
-                    <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
-                      {plan.title}
-                    </h3>
-                    <div className="pt-2 space-y-1.5">
-                      <p className="text-xs tracking-wider uppercase font-bold flex items-center gap-2">
-                        <span
-                          className="w-2 h-2 rounded-full"
-                          style={{
-                            backgroundColor: plan.hostUrl
-                              ? "#e8a33d"
-                              : config.brandColor,
-                          }}
-                        />
-                        <span
-                          style={{
-                            color: plan.hostUrl ? "#b9791f" : "#18181b",
-                          }}
-                        >
-                          Hosted by{" "}
-                          {plan.hostUrl ? (
-                            <a
-                              href={plan.hostUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="underline decoration-1 underline-offset-2 hover:decoration-2"
-                            >
-                              {plan.hostName}
-                            </a>
-                          ) : (
-                            plan.hostName
-                          )}
-                        </span>
-                      </p>
-                      {plan.sponsoredBy && (
-                        <p className="text-xs tracking-wider uppercase font-bold flex items-center gap-2 text-amber-700">
-                          <span className="w-2 h-2 rounded-full bg-amber-500" />
-                          Sponsored by {plan.sponsoredBy}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <p className="text-zinc-500 leading-relaxed font-light text-lg line-clamp-3">
-                    {plan.description}
-                  </p>
-
-                  <div className="pt-2 flex flex-col gap-6">
-                    <AvatarStack count={plan.attendeeCount} />
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      <button
-                        onClick={() => setShowCTA(true)}
-                        className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
-                        style={{ backgroundColor: config.brandColor }}
-                      >
-                        View Details <ArrowUpRight className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleShare(plan.id, plan.title)}
-                        className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
-                      >
-                        {copiedPlanId === plan.id ? (
-                          <Check className="w-5 h-5 text-green-600" />
-                        ) : (
-                          <Share2 className="w-5 h-5" />
-                        )}
-                        <span className="text-xs font-bold uppercase tracking-widest">
-                          Share
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            );
-            return card;
-            });
-          })()}
+          {streamItems.map((item, index) => (
+            <Fragment key={item.key}>{item.render(index)}</Fragment>
+          ))}
         </div>
 
         {/* Local Deals — supporting benefit between plans and the
