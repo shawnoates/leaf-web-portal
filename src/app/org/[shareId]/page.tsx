@@ -2001,6 +2001,16 @@ export default function OrgCalendarPage() {
 
       setVirtualHostAvatar((result.virtualHostPreview as { avatarUrl?: string | null } | null)?.avatarUrl ?? null);
 
+      // "Show suggested and featured plans" covers the AI starter cards too —
+      // they render as "Suggested" and are the ONLY suggestion surface on a
+      // freshly adopted AI calendar, so leaving them on made the toggle look
+      // like it did nothing. Dropping them here (rather than at each render
+      // site) also fixes the empty-state copy, which keys off this array.
+      const visibleAiSourceEvents =
+        result.hidePlanIdeas === true || !Array.isArray(result.aiSourceEvents)
+          ? null
+          : result.aiSourceEvents;
+
       setOrg({
         objectId: result.objectId,
         parentOrgId: result.parentOrgId || null,
@@ -2022,8 +2032,12 @@ export default function OrgCalendarPage() {
         // cards up top — the AI plan-idea carousel below reads as a second
         // "here are some ideas" section and collides with them. Force the
         // carousel off in that case regardless of the org's stored flag.
+        //
+        // The stored flag still wins: when the owner turns suggestions off,
+        // visibleAiSourceEvents is already null, so this collapses to the
+        // stored value and every suggestion surface goes dark together.
         hidePlanIdeas:
-          (Array.isArray(result.aiSourceEvents) && result.aiSourceEvents.length > 0)
+          (Array.isArray(visibleAiSourceEvents) && visibleAiSourceEvents.length > 0)
             ? true
             : (result.hidePlanIdeas || false),
         hideCustomPlans: result.hideCustomPlans || false,
@@ -2035,9 +2049,7 @@ export default function OrgCalendarPage() {
         followRequestPending: result.followRequestPending || false,
         requireApprovalDefault: result.requireApprovalDefault === true,
         allowFollowersToHost: result.allowFollowersToHost !== false,
-        aiSourceEvents: Array.isArray(result.aiSourceEvents)
-          ? result.aiSourceEvents
-          : null,
+        aiSourceEvents: visibleAiSourceEvents,
         aiSourceEventInterests:
           result.aiSourceEventInterests &&
           typeof result.aiSourceEventInterests === "object"

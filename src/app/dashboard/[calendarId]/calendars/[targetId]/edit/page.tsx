@@ -712,8 +712,8 @@ export default function EditCalendarPage() {
         {/* ─── Advanced ──────────────────────────────────────────── */}
         <Section title="Advanced" defaultOpen={false}>
           <ToggleRow
-            title="Show suggested plans"
-            hint="Let members browse and host AI-suggested plans"
+            title="Show suggested and featured plans"
+            hint="Let members browse and host AI-suggested and Leaf-featured plans"
             checked={!hidePlanIdeas}
             onChange={(v) => setHidePlanIdeas(!v)}
           />
