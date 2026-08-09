@@ -26,7 +26,7 @@ const config: LandingConfig = {
       description:
         "Grab a drink and watch the sun set over the Manhattan skyline from a Williamsburg rooftop. Craft cocktails, good music, and great company.",
       image:
-        "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=800&q=80",
+        "https://images.unsplash.com/photo-1556831732-7178ea98d74f?w=800&q=80",
       hostName: "Matt",
       attendeeCount: 12,
       location: "Williamsburg, Brooklyn",
@@ -39,7 +39,7 @@ const config: LandingConfig = {
       description:
         "Saturday morning pickup volleyball on the Great Lawn. All skill levels welcome — we'll split into teams. Bring water and sunscreen!",
       image:
-        "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=800&q=80",
+        "https://images.unsplash.com/photo-1659090491025-1e6202433871?w=800&q=80",
       hostName: "Maya",
       attendeeCount: 8,
       location: "Great Lawn, Central Park",
@@ -52,7 +52,7 @@ const config: LandingConfig = {
       description:
         "Walk across the Brooklyn Bridge at golden hour, then grab ice cream in DUMBO. Perfect for catching up with friends old and new.",
       image:
-        "https://images.unsplash.com/photo-1534430480872-3498386e7856?w=800&q=80",
+        "https://images.unsplash.com/photo-1477882244523-716124bf91a1?w=800&q=80",
       hostName: "Matt",
       attendeeCount: 15,
       location: "Brooklyn Bridge",
@@ -65,7 +65,7 @@ const config: LandingConfig = {
       description:
         "Live standup at one of NYC's most iconic comedy clubs. We've got a group reservation — expect surprise headliners and a lot of laughs.",
       image:
-        "https://images.unsplash.com/photo-1585699324551-f6c309eedeca?w=800&q=80",
+        "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=800&q=80",
       hostName: "Jake",
       attendeeCount: 6,
       location: "Comedy Cellar, Greenwich Village",
@@ -78,7 +78,7 @@ const config: LandingConfig = {
       description:
         "Full beach day at Rockaway Beach. Waves, boardwalk tacos, spikeball, and good vibes. We'll claim a spot early — look for the Leaf flag.",
       image:
-        "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80",
+        "https://images.unsplash.com/photo-1519338381761-c7523edc1f46?w=800&q=80",
       hostName: "Sarah",
       attendeeCount: 20,
       location: "Rockaway Beach, Queens",
@@ -91,7 +91,7 @@ const config: LandingConfig = {
       description:
         "Bring a blanket and join us for a classic film under the stars at Brooklyn Bridge Park. Popcorn and snacks provided.",
       image:
-        "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80",
+        "https://images.unsplash.com/photo-1658195952756-892740657893?w=800&q=80",
       hostName: "Matt",
       attendeeCount: 10,
       location: "Brooklyn Bridge Park",
@@ -105,7 +105,7 @@ const config: LandingConfig = {
         "Paddle along the Hudson River with skyline views. No experience needed — guided group session.",
       category: "Adventure",
       image:
-        "https://images.unsplash.com/photo-1472745942893-4b9f730c7668?w=800&q=80",
+        "https://images.unsplash.com/photo-1782864841071-4f98c7d0a5ce?w=800&q=80",
     },
     {
       id: "i2",
@@ -114,7 +114,7 @@ const config: LandingConfig = {
         "Sample the best street food vendors at Brooklyn's legendary outdoor food market.",
       category: "Food & Drink",
       image:
-        "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80",
+        "https://images.unsplash.com/photo-1662714212971-059415b0c4d1?w=800&q=80",
     },
     {
       id: "i3",
@@ -123,7 +123,7 @@ const config: LandingConfig = {
         "Catch a free live jazz set in one of NYC's parks. Bring a picnic blanket and enjoy the vibes.",
       category: "Music",
       image:
-        "https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=800&q=80",
+        "https://images.unsplash.com/photo-1561394742-4f9ab68d1a42?w=800&q=80",
     },
     {
       id: "i4",
@@ -132,7 +132,7 @@ const config: LandingConfig = {
         "Hands-on pottery class in a cozy Brooklyn studio. Make a mug, bowl, or whatever inspires you.",
       category: "Creative",
       image:
-        "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=800&q=80",
+        "https://images.unsplash.com/photo-1607556671927-78a6605e290b?w=800&q=80",
     },
   ],
 };

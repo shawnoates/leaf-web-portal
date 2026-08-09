@@ -35,7 +35,7 @@ export const config: LandingConfig = {
       description:
         "Two lanes reserved for residents. Beer, shoes, and bragging rights — bring your A-game (or just your friends).",
       image:
-        "https://images.unsplash.com/photo-1545056453-f0359c3df6db?w=800&q=80",
+        "https://images.unsplash.com/photo-1650915894778-fad96db48de4?w=800&q=80",
       hostName: "Devon",
       attendeeCount: 14,
       location: "Frames Bowling Lounge",
@@ -48,7 +48,7 @@ export const config: LandingConfig = {
       description:
         "Weekly resident pickleball at the public courts down the block. Paddles available to borrow — all skill levels welcome.",
       image:
-        "https://images.unsplash.com/photo-1618551763300-dc7eb8ce3560?w=800&q=80",
+        "https://images.unsplash.com/photo-1693142518277-3568e9ec3176?w=800&q=80",
       hostName: "Priya",
       attendeeCount: 9,
       location: "Lincoln Park Courts",
@@ -61,7 +61,7 @@ export const config: LandingConfig = {
       description:
         "Saturday morning runs at the park courts. Half-court, full-court, depends who shows. First-come, first-team.",
       image:
-        "https://images.unsplash.com/photo-1546519638-68e109498ffc?w=800&q=80",
+        "https://images.unsplash.com/photo-1636662978233-bbaf957292c9?w=800&q=80",
       hostName: "Marcus",
       attendeeCount: 11,
       location: "Lincoln Park Basketball Courts",
@@ -74,7 +74,7 @@ export const config: LandingConfig = {
       description:
         "$5 drafts, $7 wines, and half-off apps. We've got the back booth — come for a drink, stay for dinner.",
       image:
-        "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=800&q=80",
+        "https://images.unsplash.com/photo-1681641090195-5adb0c54eeb0?w=800&q=80",
       hostName: "Sara",
       attendeeCount: 18,
       location: "The Quarter, 2 blocks away",
@@ -87,7 +87,7 @@ export const config: LandingConfig = {
       description:
         "Family-style Italian at the corner spot. Group menu, shared plates, BYOB. Cap at 16 — reserve your seat early.",
       image:
-        "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80",
+        "https://images.unsplash.com/photo-1777333033410-4548702116af?w=800&q=80",
       hostName: "Devon",
       attendeeCount: 12,
       location: "Bocca Trattoria",
@@ -100,7 +100,7 @@ export const config: LandingConfig = {
       description:
         "Meet the neighbors on the roof deck. Drinks, light bites, and skyline views. Hosted by the residents' committee.",
       image:
-        "https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=800&q=80",
+        "https://images.unsplash.com/photo-1758272133392-b5bbce307e0b?w=800&q=80",
       hostName: "Priya",
       attendeeCount: 22,
       location: "Building Rooftop",
@@ -114,7 +114,7 @@ export const config: LandingConfig = {
         "Hit two or three local brunch spots in a morning. Bottomless mimosas optional, friendships guaranteed.",
       category: "Food & Drink",
       image:
-        "https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=800&q=80",
+        "https://images.unsplash.com/photo-1773091839506-26ecff84172c?w=800&q=80",
     },
     {
       id: "i2",
@@ -123,7 +123,7 @@ export const config: LandingConfig = {
         "Team up with your floor for trivia night at the neighborhood pub. Winner buys the next round.",
       category: "Social",
       image:
-        "https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=800&q=80",
+        "https://images.unsplash.com/photo-1671116810331-894618e447b8?w=800&q=80",
     },
     {
       id: "i3",
@@ -132,7 +132,7 @@ export const config: LandingConfig = {
         "Easy 3-mile loop along the river. Coffee at the corner café after. All paces welcome.",
       category: "Fitness",
       image:
-        "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=800&q=80",
+        "https://images.unsplash.com/photo-1739368732843-800f36a9b7d0?w=800&q=80",
     },
     {
       id: "i4",
@@ -141,7 +141,7 @@ export const config: LandingConfig = {
         "Popcorn, projector, and a residents' vote on what to watch. Comfy clothes encouraged.",
       category: "Chill",
       image:
-        "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80",
+        "https://images.unsplash.com/photo-1665827491450-c6f329f2285c?w=800&q=80",
     },
   ],
   dealsHeader: "Nearby deals for Lincoln Place",
@@ -156,7 +156,7 @@ export const config: LandingConfig = {
       dealType: "public",
       interestCount: 14,
       imageUrl:
-        "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80",
+        "https://images.unsplash.com/photo-1565895405227-31cffbe0cf86?w=800&q=80",
     },
     {
       id: "d2",
@@ -168,7 +168,7 @@ export const config: LandingConfig = {
       dealType: "public",
       interestCount: 9,
       imageUrl:
-        "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=800&q=80",
+        "https://images.unsplash.com/photo-1615332579037-3c44b3660b53?w=800&q=80",
     },
     {
       id: "d3",
@@ -180,7 +180,7 @@ export const config: LandingConfig = {
       dealType: "public",
       interestCount: 5,
       imageUrl:
-        "https://images.unsplash.com/photo-1545056453-f0359c3df6db?w=800&q=80",
+        "https://images.unsplash.com/photo-1542651314-8c3b3fb85762?w=800&q=80",
     },
     {
       id: "d4",
@@ -192,7 +192,7 @@ export const config: LandingConfig = {
       dealType: "public",
       interestCount: 22,
       imageUrl:
-        "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&q=80",
+        "https://images.unsplash.com/photo-1635902981695-4bb5b00f5713?w=800&q=80",
     },
     {
       id: "d5",
@@ -204,7 +204,7 @@ export const config: LandingConfig = {
       dealType: "public",
       interestCount: 7,
       imageUrl:
-        "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80",
+        "https://images.unsplash.com/photo-1761034114082-c2d63456a82a?w=800&q=80",
     },
     {
       id: "d6",
@@ -216,7 +216,7 @@ export const config: LandingConfig = {
       dealType: "public",
       interestCount: 3,
       imageUrl:
-        "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=800&q=80",
+        "https://images.unsplash.com/photo-1527908290749-8c9518e0db09?w=800&q=80",
     },
   ],
 };

@@ -1,14 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect, type CSSProperties } from "react";
+import { useState, useEffect, Fragment, type CSSProperties } from "react";
 import {
   Plus,
   Users,
   ArrowUpRight,
   Share2,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
   X,
   Heart,
   Check,
@@ -117,6 +115,24 @@ function formatDate(date: Date): string {
     weekday: "long",
     month: "short",
     day: "numeric",
+  });
+}
+
+/**
+ * Gives each suggestion a date so it can be interleaved with the
+ * confirmed plans instead of living in a carousel of its own. Each idea
+ * lands in the gap between two consecutive plans, so the merged stream
+ * alternates plan / suggestion / plan rather than clumping every
+ * suggestion at the end. Mirrors computeSpreadIdeaDates on the live
+ * /org/[shareId] page, minus the cadence math a mock doesn't need.
+ */
+function spreadIdeaDays(plans: Plan[], ideas: PlanIdea[]): number[] {
+  const days = [...plans.map((p) => p.daysFromNow)].sort((a, b) => a - b);
+  if (days.length === 0) return ideas.map((_, i) => (i + 1) * 7);
+  return ideas.map((_, i) => {
+    const start = days[Math.min(i, days.length - 1)];
+    const end = days[Math.min(i + 1, days.length - 1)];
+    return end > start ? Math.round((start + end) / 2) : start + 4 + i;
   });
 }
 
@@ -350,13 +366,17 @@ export default function CalendarLandingPage({
   const [showCTA, setShowCTA] = useState(false);
   const [showScrollPopup, setShowScrollPopup] = useState(false);
   const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
+  // Cosmetic on a mock: the heart on an inline suggestion toggles local
+  // state only. The real page posts a PlanIdeaInterest.
+  const [interestedIdeas, setInterestedIdeas] = useState<Set<string>>(
+    () => new Set(),
+  );
   // Auto-start the tour when merchantPreview is on so the merchant
   // lands directly on step 1 (Post a deal spotlit) instead of having
   // to click a "Take the tour" pill first.
   const [tourStep, setTourStep] = useState<number | null>(
     merchantPreview ? 0 : null,
   );
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Skip the "A calendar for your building" prospect popup when this
@@ -429,13 +449,6 @@ export default function CalendarLandingPage({
         }
       : { transition: "box-shadow 0.35s ease" };
 
-  const scroll = (dir: "left" | "right") => {
-    scrollRef.current?.scrollBy({
-      left: dir === "left" ? -320 : 320,
-      behavior: "smooth",
-    });
-  };
-
   const handleShare = async (planId: string, title: string) => {
     const url = window.location.href;
     if (navigator.share) {
@@ -453,9 +466,230 @@ export default function CalendarLandingPage({
 
   const navLabel = config.navLabel ?? "Calendar";
   const plansHeader = config.plansHeader ?? "Upcoming Plans";
-  const ideasHeader = config.ideasHeader ?? "Get Involved";
   const ideasTitle = config.ideasTitle ?? "Host Something for the Community";
   const ideasButtonLabel = config.ideasButtonLabel ?? "Host This";
+
+  // Suggestions live in the stream, not in a row of their own: each idea
+  // is dated into a gap between confirmed plans and rendered with the
+  // same full-width card as a plan, flagged "Suggested" and waiting on a
+  // host. Same treatment as the live /org/[shareId] page.
+  const ideaDays = spreadIdeaDays(config.plans, config.planIdeas);
+
+  const toggleInterest = (ideaId: string) =>
+    setInterestedIdeas((prev) => {
+      const next = new Set(prev);
+      if (next.has(ideaId)) next.delete(ideaId);
+      else next.add(ideaId);
+      return next;
+    });
+
+  const renderPlanCard = (plan: Plan, index: number, isHostTarget: boolean) => {
+    const date = futureDate(plan.daysFromNow);
+    const isSpotlit = activeSection === "host" && isHostTarget;
+    return (
+      <article
+        id={merchantPreview && isHostTarget ? "host-plan" : undefined}
+        style={merchantPreview ? spotlightStyle(isSpotlit) : undefined}
+        className={`group flex flex-col md:flex-row gap-12 md:items-center scroll-mt-32 ${
+          isSpotlit ? "p-12 md:p-14 bg-white rounded-2xl" : ""
+        } ${index % 2 !== 0 ? "md:flex-row-reverse" : ""}`}
+      >
+        <div
+          className="w-full md:w-3/5 aspect-[16/10] overflow-hidden cursor-pointer bg-zinc-100 shadow-sm"
+          onClick={() => setShowCTA(true)}
+        >
+          <img
+            src={plan.image}
+            alt={plan.title}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          />
+        </div>
+
+        <div className="w-full md:w-2/5 space-y-6">
+          <div className="space-y-2">
+            <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+              {formatDate(date)} &bull; {plan.time}
+            </p>
+            <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
+              {plan.title}
+            </h3>
+            <div className="pt-2 space-y-1.5">
+              <p className="text-xs tracking-wider uppercase font-bold flex items-center gap-2">
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{
+                    backgroundColor: plan.hostUrl ? "#e8a33d" : config.brandColor,
+                  }}
+                />
+                <span style={{ color: plan.hostUrl ? "#b9791f" : "#18181b" }}>
+                  Hosted by{" "}
+                  {plan.hostUrl ? (
+                    <a
+                      href={plan.hostUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline decoration-1 underline-offset-2 hover:decoration-2"
+                    >
+                      {plan.hostName}
+                    </a>
+                  ) : (
+                    plan.hostName
+                  )}
+                </span>
+              </p>
+              {plan.sponsoredBy && (
+                <p className="text-xs tracking-wider uppercase font-bold flex items-center gap-2 text-amber-700">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  Sponsored by {plan.sponsoredBy}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <p className="text-zinc-500 leading-relaxed font-light text-lg line-clamp-3">
+            {plan.description}
+          </p>
+
+          <div className="pt-2 flex flex-col gap-6">
+            <AvatarStack count={plan.attendeeCount} />
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button
+                onClick={() => setShowCTA(true)}
+                className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+                style={{ backgroundColor: config.brandColor }}
+              >
+                View Details <ArrowUpRight className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleShare(plan.id, plan.title)}
+                className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
+              >
+                {copiedPlanId === plan.id ? (
+                  <Check className="w-5 h-5 text-green-600" />
+                ) : (
+                  <Share2 className="w-5 h-5" />
+                )}
+                <span className="text-xs font-bold uppercase tracking-widest">
+                  Share
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </article>
+    );
+  };
+
+  const renderIdeaCard = (idea: PlanIdea, index: number, day: number) => {
+    const date = futureDate(day);
+    const interested = interestedIdeas.has(idea.id);
+    return (
+      <article
+        className={`group flex flex-col md:flex-row gap-12 md:items-center scroll-mt-32 ${
+          index % 2 !== 0 ? "md:flex-row-reverse" : ""
+        }`}
+      >
+        <div
+          className="w-full md:w-3/5 aspect-[16/10] overflow-hidden cursor-pointer bg-zinc-100 shadow-sm relative"
+          onClick={() => setShowCTA(true)}
+        >
+          <img
+            src={idea.image}
+            alt={idea.title}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          />
+          <span className="absolute top-4 left-4 text-[10px] font-bold uppercase tracking-widest rounded-full px-3 py-1 bg-white/90 text-zinc-900 backdrop-blur-sm">
+            Suggested
+          </span>
+        </div>
+
+        <div className="w-full md:w-2/5 space-y-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2 min-w-0">
+              <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                {formatDate(date)} &bull; {idea.category}
+              </p>
+              <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
+                {idea.title}
+              </h3>
+              <div className="pt-2">
+                <p className="text-xs tracking-wider uppercase font-bold flex items-center gap-2">
+                  <span
+                    className="w-2 h-2 rounded-full border-2 bg-white"
+                    style={{ borderColor: config.brandColor }}
+                  />
+                  Waiting on host
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => toggleInterest(idea.id)}
+              aria-label={interested ? "You're interested" : "I'm interested"}
+              className={`relative shrink-0 w-12 h-12 rounded-full border flex items-center justify-center transition-colors ${
+                interested
+                  ? "bg-emerald-50 border-emerald-300"
+                  : "border-zinc-200 hover:border-zinc-300"
+              }`}
+            >
+              <Heart
+                className={`w-5 h-5 ${interested ? "text-emerald-700" : "text-zinc-400"}`}
+                fill={interested ? "currentColor" : "none"}
+              />
+              {interested && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-emerald-700 text-white text-[11px] font-bold flex items-center justify-center">
+                  1
+                </span>
+              )}
+            </button>
+          </div>
+
+          <p className="text-zinc-500 leading-relaxed font-light text-lg line-clamp-3">
+            {idea.description}
+          </p>
+
+          <div className="pt-2 flex flex-col sm:flex-row gap-4">
+            <button
+              onClick={() => setShowCTA(true)}
+              className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+              style={{ backgroundColor: config.brandColor }}
+            >
+              {ideasButtonLabel} <ArrowUpRight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => handleShare(idea.id, idea.title)}
+              className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
+            >
+              {copiedPlanId === idea.id ? (
+                <Check className="w-5 h-5 text-green-600" />
+              ) : (
+                <Share2 className="w-5 h-5" />
+              )}
+              <span className="text-xs font-bold uppercase tracking-widest">
+                Share
+              </span>
+            </button>
+          </div>
+        </div>
+      </article>
+    );
+  };
+
+  // Merged, date-ordered stream. In preview mode the first plan stays the
+  // "host-plan" anchor so the merchant tour has something to spotlight.
+  const streamItems = [
+    ...config.plans.map((plan, planIndex) => ({
+      key: `plan-${plan.id}`,
+      day: plan.daysFromNow,
+      render: (index: number) =>
+        renderPlanCard(plan, index, merchantPreview && planIndex === 0),
+    })),
+    ...config.planIdeas.map((idea, ideaIndex) => ({
+      key: `idea-${idea.id}`,
+      day: ideaDays[ideaIndex],
+      render: (index: number) => renderIdeaCard(idea, index, ideaDays[ideaIndex]),
+    })),
+  ].sort((a, b) => a.day - b.day || (a.key < b.key ? -1 : 1));
 
   return (
     <div className="min-h-screen">
@@ -511,9 +745,9 @@ export default function CalendarLandingPage({
         </div>
       </nav>
 
-      {/* Stream Header — plans lead the page. Local deals (when present)
-          appear below as a supporting benefit. Matches the live render on
-          /org/[shareId]. */}
+      {/* Stream Header — plans lead the page, with suggestions mixed into
+          the same stream. Local deals (when present) appear below as a
+          supporting benefit. Matches the live render on /org/[shareId]. */}
       <div
         id={merchantPreview ? "upcoming-plans" : undefined}
         className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100 scroll-mt-32"
@@ -521,6 +755,11 @@ export default function CalendarLandingPage({
         <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
           {plansHeader}
         </p>
+        {config.planIdeas.length > 0 && (
+          <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
+            {config.planIdeas.length} waiting on a host
+          </p>
+        )}
       </div>
 
       {/* Plans Stream */}

@@ -28,7 +28,7 @@ const config: LandingConfig = {
       description:
         "Start your day with breath and movement. 60-minute flow class for all levels. Mats and props provided.",
       image:
-        "https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=800&q=80",
+        "https://images.unsplash.com/photo-1588286840104-8957b019727f?w=800&q=80",
       hostName: "Lila",
       attendeeCount: 18,
       location: "Studio A",
@@ -41,7 +41,7 @@ const config: LandingConfig = {
       description:
         "Crystal singing bowls, gongs, and chimes. A 75-minute journey of deep relaxation. Bring a blanket and water.",
       image:
-        "https://images.unsplash.com/photo-1593811167562-9cef47bfc4d7?w=800&q=80",
+        "https://images.unsplash.com/photo-1760691313751-98262affa4f9?w=800&q=80",
       hostName: "Kai",
       attendeeCount: 22,
       location: "Studio B",
@@ -54,7 +54,7 @@ const config: LandingConfig = {
       description:
         "Donation-based community class under the trees. Slow flow with a meditation finish. Bring your own mat.",
       image:
-        "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&q=80",
+        "https://images.unsplash.com/photo-1686749143613-0eeacff36894?w=800&q=80",
       hostName: "Lila",
       attendeeCount: 35,
       location: "Riverside Park, Cherry Walk",
@@ -67,7 +67,7 @@ const config: LandingConfig = {
       description:
         "Long, restorative holds paired with a guided tea meditation. Perfect for nervous system reset. Limited to 12.",
       image:
-        "https://images.unsplash.com/photo-1599447421416-3414500d18a5?w=800&q=80",
+        "https://images.unsplash.com/photo-1587834323138-befbf2c33797?w=800&q=80",
       hostName: "Sage",
       attendeeCount: 11,
       location: "Studio A",
@@ -80,7 +80,7 @@ const config: LandingConfig = {
       description:
         "Two-hour intro to yoga foundations. Breath, alignment, and basic poses. Perfect if you've never tried before.",
       image:
-        "https://images.unsplash.com/photo-1588286840104-8957b019727f?w=800&q=80",
+        "https://images.unsplash.com/photo-1540206063137-4a88ca974d1a?w=800&q=80",
       hostName: "Maren",
       attendeeCount: 9,
       location: "Studio B",
@@ -93,7 +93,7 @@ const config: LandingConfig = {
       description:
         "Candlelit restorative practice synced with the lunar cycle. Bolsters, blankets, and intention setting.",
       image:
-        "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&q=80",
+        "https://images.unsplash.com/photo-1667061481921-b31e615ae740?w=800&q=80",
       hostName: "Sage",
       attendeeCount: 16,
       location: "Studio A",
@@ -107,7 +107,7 @@ const config: LandingConfig = {
         "Bring a friend or partner. Two-person poses, trust exercises, lots of laughs.",
       category: "Workshop",
       image:
-        "https://images.unsplash.com/photo-1518644961665-ed172691aaa1?w=800&q=80",
+        "https://images.unsplash.com/photo-1758274538040-98eb11624eba?w=800&q=80",
     },
     {
       id: "i2",
@@ -116,7 +116,7 @@ const config: LandingConfig = {
         "Slow flow followed by a community potluck brunch. Members bring dishes to share.",
       category: "Social",
       image:
-        "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&q=80",
+        "https://images.unsplash.com/photo-1576867757603-05b134ebc379?w=800&q=80",
     },
     {
       id: "i3",
@@ -125,7 +125,7 @@ const config: LandingConfig = {
         "Four-week pranayama intensive. Learn techniques for energy, calm, and focus.",
       category: "Series",
       image:
-        "https://images.unsplash.com/photo-1474418397713-7ede21d49118?w=800&q=80",
+        "https://images.unsplash.com/photo-1600618528240-fb9fc964b853?w=800&q=80",
     },
     {
       id: "i4",
@@ -134,7 +134,7 @@ const config: LandingConfig = {
         "Curious about becoming a yoga teacher? Q&A with our 200hr lead instructors.",
       category: "Info",
       image:
-        "https://images.unsplash.com/photo-1591291621164-2c6367723315?w=800&q=80",
+        "https://images.unsplash.com/photo-1643682661119-28da0685be2c?w=800&q=80",
     },
   ],
 };

@@ -28,7 +28,7 @@ const config: LandingConfig = {
       description:
         "Games wrap at 8:30 — we take over Ladybird's back patio after. Pitchers on the league, jerseys stay on, season standings on the chalkboard. Recap the bad calls and even worse plays.",
       image:
-        "https://images.unsplash.com/photo-1541532713592-79a0317b6b77?w=800&q=80",
+        "https://images.unsplash.com/photo-1575037614876-c38a4d44f5b8?w=800&q=80",
       hostName: "Marcus",
       attendeeCount: 78,
       location: "Ladybird Grove & Mess Hall",
@@ -41,7 +41,7 @@ const config: LandingConfig = {
       description:
         "Easy 3 miles around Piedmont before opening day. Don't show up to the first game gassed after one inning. Coffee at Octane after — captains expected.",
       image:
-        "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=800&q=80",
+        "https://images.unsplash.com/photo-1786025000466-d8eb9a8649cd?w=800&q=80",
       hostName: "Dani",
       attendeeCount: 26,
       location: "Piedmont Park, 14th St Entrance",
@@ -54,7 +54,7 @@ const config: LandingConfig = {
       description:
         "Taking over the upstairs at Park Tavern. Beer towers, $5 wings, and the league banner on the wall. Free-agent signups happen at the bar — bring anyone thinking about joining a team.",
       image:
-        "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=800&q=80",
+        "https://images.unsplash.com/photo-1784095089441-0608aff9aa0c?w=800&q=80",
       hostName: "Ashley",
       attendeeCount: 92,
       location: "Park Tavern Upstairs",
@@ -67,7 +67,7 @@ const config: LandingConfig = {
       description:
         "All 12 captains, one big table. Spring schedule, rule changes, rookie draft order, bottomless mimosas. Show up or your team gets stuck with the 8 AM Sunday games.",
       image:
-        "https://images.unsplash.com/photo-1517649763962-0c623066013b?w=800&q=80",
+        "https://images.unsplash.com/photo-1688437310162-8eef29fa74b4?w=800&q=80",
       hostName: "Jordan",
       attendeeCount: 14,
       location: "Murphy's, Virginia-Highland",
@@ -80,7 +80,7 @@ const config: LandingConfig = {
       description:
         "No standings, no refs, no pressure. Mixed-team scrimmage to shake off the rust mid-season. Bring a friend who's been thinking about joining — we'll sub them in for an inning.",
       image:
-        "https://images.unsplash.com/photo-1486218119243-13883505764c?w=800&q=80",
+        "https://images.unsplash.com/photo-1543326727-cf6c39e8f84c?w=800&q=80",
       hostName: "Tasha",
       attendeeCount: 48,
       location: "Grant Park Field B",
@@ -93,7 +93,7 @@ const config: LandingConfig = {
       description:
         "Take over Ladybird for the awards ceremony. MVP votes counted live, trophy handoff, and the infamous Best Team Name award. Wear your jersey one last time.",
       image:
-        "https://images.unsplash.com/photo-1514820720301-4c4790309f46?w=800&q=80",
+        "https://images.unsplash.com/photo-1773949118355-8a0e8fd8053d?w=800&q=80",
       hostName: "Marcus",
       attendeeCount: 186,
       location: "Ladybird Grove & Mess Hall",
@@ -107,7 +107,7 @@ const config: LandingConfig = {
         "Lock in 3–4 bars to rotate post-game nights through the season. Discounted pitchers, league-night specials, jerseys on the wall.",
       category: "Social",
       image:
-        "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=800&q=80",
+        "https://images.unsplash.com/photo-1562049070-7e003d30a3d9?w=800&q=80",
     },
     {
       id: "i2",
@@ -116,7 +116,7 @@ const config: LandingConfig = {
         "Saturday morning fun run, entry fees to a local cause. Captains rally their teams. Hangover-free way to kick off title weekend.",
       category: "Community",
       image:
-        "https://images.unsplash.com/photo-1530143584546-02191bc84eb5?w=800&q=80",
+        "https://images.unsplash.com/photo-1613937574892-25f441264a09?w=800&q=80",
     },
     {
       id: "i3",
@@ -125,7 +125,7 @@ const config: LandingConfig = {
         "Open field, no refs, drills + casual scrimmage. Lets new players get a feel before committing — and gives current teams a midweek tune-up.",
       category: "Skills",
       image:
-        "https://images.unsplash.com/photo-1483721310020-03333e577078?w=800&q=80",
+        "https://images.unsplash.com/photo-1785003897037-d7f67231b232?w=800&q=80",
     },
     {
       id: "i4",
@@ -134,7 +134,7 @@ const config: LandingConfig = {
         "Parking-lot grill-out before first pitch. Captains bring teams, food, coolers. Sets the tone for the whole season.",
       category: "Pre-Game",
       image:
-        "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=800&q=80",
+        "https://images.unsplash.com/photo-1783119548884-62ac580ceba6?w=800&q=80",
     },
   ],
 };

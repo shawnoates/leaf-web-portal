@@ -28,7 +28,7 @@ const config: LandingConfig = {
       description:
         "Worship, teaching from Pastor Mark, and communion together. Coffee and fellowship in the lobby afterward. Kids' programs available for all ages.",
       image:
-        "https://images.unsplash.com/photo-1438232992991-995b7058bbb3?w=800&q=80",
+        "https://images.unsplash.com/photo-1522158637959-30385a09e0da?w=800&q=80",
       hostName: "Pastor Mark",
       attendeeCount: 240,
       location: "Main Sanctuary",
@@ -41,7 +41,7 @@ const config: LandingConfig = {
       description:
         "Week 4 of our 12-week study through the Gospel of John. Bring your Bible, a notebook, and an open heart. Childcare provided.",
       image:
-        "https://images.unsplash.com/photo-1606229365485-93a3b8ee0385?w=800&q=80",
+        "https://images.unsplash.com/photo-1611242254711-3f3e21033e4b?w=800&q=80",
       hostName: "Pastor Mark",
       attendeeCount: 32,
       location: "Fellowship Hall",
@@ -54,7 +54,7 @@ const config: LandingConfig = {
       description:
         "Pancakes, coffee, and a short devotional. A great way to start your Saturday with brothers in faith. All men welcome — bring a friend.",
       image:
-        "https://images.unsplash.com/photo-1517898717281-8e4385a41802?w=800&q=80",
+        "https://images.unsplash.com/photo-1701280316378-d12dc6d9306a?w=800&q=80",
       hostName: "David",
       attendeeCount: 18,
       location: "Fellowship Hall",
@@ -67,7 +67,7 @@ const config: LandingConfig = {
       description:
         "A safe space for women to gather, share, and grow together. This month we're discussing the book \"Adorned\" by Nancy Wolgemuth.",
       image:
-        "https://images.unsplash.com/photo-1518998053901-5348d3961a04?w=800&q=80",
+        "https://images.unsplash.com/photo-1590650046871-92c887180603?w=800&q=80",
       hostName: "Sarah",
       attendeeCount: 24,
       location: "Room 201",
@@ -80,7 +80,7 @@ const config: LandingConfig = {
       description:
         "Games, worship, teaching, and pizza. For students grades 6–12. Friends always welcome — bring someone new.",
       image:
-        "https://images.unsplash.com/photo-1529070538774-1843cb3265df?w=800&q=80",
+        "https://images.unsplash.com/photo-1569617084133-26942bb441f2?w=800&q=80",
       hostName: "Jordan",
       attendeeCount: 45,
       location: "Youth Center",
@@ -93,7 +93,7 @@ const config: LandingConfig = {
       description:
         "Serving our neighbors at the local food bank and community garden. Lunch provided. Family-friendly — bring the kids to serve alongside you.",
       image:
-        "https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?w=800&q=80",
+        "https://images.unsplash.com/photo-1758599669406-d5179ccefcb9?w=800&q=80",
       hostName: "Pastor Mark",
       attendeeCount: 60,
       location: "Riverside Food Bank",
@@ -107,7 +107,7 @@ const config: LandingConfig = {
         "A Saturday focused on strengthening marriages. Practical teaching, group discussion, and a date night to close.",
       category: "Workshop",
       image:
-        "https://images.unsplash.com/photo-1523580494863-6f3031224c94?w=800&q=80",
+        "https://images.unsplash.com/photo-1542338347-4fff3276af78?w=800&q=80",
     },
     {
       id: "i2",
@@ -116,7 +116,7 @@ const config: LandingConfig = {
         "An evening of corporate prayer and worship. Open mic for testimonies, extended worship sets, and time to seek God together.",
       category: "Worship",
       image:
-        "https://images.unsplash.com/photo-1485808191679-5f86510681a2?w=800&q=80",
+        "https://images.unsplash.com/photo-1570786032462-2efc3ca8fccd?w=800&q=80",
     },
     {
       id: "i3",
@@ -125,7 +125,7 @@ const config: LandingConfig = {
         "Pack and distribute meals at our partner food bank. Two-hour shift. Great for groups, families, or solo volunteers.",
       category: "Service",
       image:
-        "https://images.unsplash.com/photo-1492321936769-b49830bc1d1e?w=800&q=80",
+        "https://images.unsplash.com/photo-1593113616828-6f22bca04804?w=800&q=80",
     },
     {
       id: "i4",
@@ -134,7 +134,7 @@ const config: LandingConfig = {
         "Lunch with the pastors and ministry leaders. Hear our story, share yours, and find your place in the community.",
       category: "Welcome",
       image:
-        "https://images.unsplash.com/photo-1499209974431-9dddcece7f88?w=800&q=80",
+        "https://images.unsplash.com/photo-1721180672597-beddd124205a?w=800&q=80",
     },
   ],
 };

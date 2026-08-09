@@ -28,7 +28,7 @@ const config: LandingConfig = {
       description:
         "8-mile loop through Piedmont Park and the Beltline. Pace groups for 8:00, 9:00, and 10:00 minute miles. Coffee and bagels at the finish.",
       image:
-        "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=800&q=80",
+        "https://images.unsplash.com/photo-1645238426817-8c3e7d1396cf?w=800&q=80",
       hostName: "Jordan",
       attendeeCount: 34,
       location: "Piedmont Park, 14th St Entrance",
@@ -41,7 +41,7 @@ const config: LandingConfig = {
       description:
         "Speed work at Grady Stadium. 6x800m repeats with 400m recovery. Coach Dani will lead warmup and cooldown. All paces welcome.",
       image:
-        "https://images.unsplash.com/photo-1483721310020-03333e577078?w=800&q=80",
+        "https://images.unsplash.com/photo-1582893523490-dd68ebc7884e?w=800&q=80",
       hostName: "Dani",
       attendeeCount: 18,
       location: "Grady High School Track",
@@ -54,7 +54,7 @@ const config: LandingConfig = {
       description:
         "5-mile tempo run on the Eastside Trail. Steady effort, sustainable pace. Perfect for race prep. Hangout at Ponce City Market after.",
       image:
-        "https://images.unsplash.com/photo-1486218119243-13883505764c?w=800&q=80",
+        "https://images.unsplash.com/photo-1759084488037-c0457596ea60?w=800&q=80",
       hostName: "Marcus",
       attendeeCount: 22,
       location: "Eastside BeltLine Trail",
@@ -67,7 +67,7 @@ const config: LandingConfig = {
       description:
         "Casual 5K through Inman Park, then brunch at Café Bartolotti. The run is the warmup — the brunch is the event.",
       image:
-        "https://images.unsplash.com/photo-1517649763962-0c623066013b?w=800&q=80",
+        "https://images.unsplash.com/photo-1535567465397-7523840f2ae9?w=800&q=80",
       hostName: "Ashley",
       attendeeCount: 41,
       location: "Inman Park",
@@ -80,7 +80,7 @@ const config: LandingConfig = {
       description:
         "6-mile trail loop with serious elevation. Trail shoes recommended. We'll regroup at the summit for views and group photo.",
       image:
-        "https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&q=80",
+        "https://images.unsplash.com/photo-1623390003553-4fa3f9fceb89?w=800&q=80",
       hostName: "Tasha",
       attendeeCount: 15,
       location: "Stone Mountain Park",
@@ -93,7 +93,7 @@ const config: LandingConfig = {
       description:
         "The annual ATLRC Beer Mile. 4 beers, 4 laps, all the chaos. Spectators welcome. Costumes encouraged. Trophy for the winner.",
       image:
-        "https://images.unsplash.com/photo-1559526324-c1f275fbfa32?w=800&q=80",
+        "https://images.unsplash.com/photo-1758272133713-52c6bb9f74f0?w=800&q=80",
       hostName: "Marcus",
       attendeeCount: 28,
       location: "Westside Park",
@@ -107,7 +107,7 @@ const config: LandingConfig = {
         "Brutal but worth it. 8 repeats up the steepest street in ATL. Bring water and ego.",
       category: "Workout",
       image:
-        "https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=800&q=80",
+        "https://images.unsplash.com/photo-1602248349498-3cdaf3600cf8?w=800&q=80",
     },
     {
       id: "i2",
@@ -116,7 +116,7 @@ const config: LandingConfig = {
         "Easy 4 miles before the city wakes up. End at a local roaster for coffee and pastries.",
       category: "Recovery",
       image:
-        "https://images.unsplash.com/photo-1502230831726-fe5549140034?w=800&q=80",
+        "https://images.unsplash.com/photo-1594882645126-14020914d58d?w=800&q=80",
     },
     {
       id: "i3",
@@ -125,7 +125,7 @@ const config: LandingConfig = {
         "Cross-training at Bobby Dodd Stadium. Stairs, hill sprints, and core work. 45 minutes of pain.",
       category: "Workout",
       image:
-        "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=800&q=80",
+        "https://images.unsplash.com/photo-1776799734087-a39d3d62c1ba?w=800&q=80",
     },
     {
       id: "i4",
@@ -134,7 +134,7 @@ const config: LandingConfig = {
         "12-week half marathon plan. Group meets weekly. Coach-led, beginner friendly.",
       category: "Training",
       image:
-        "https://images.unsplash.com/photo-1530143584546-02191bc84eb5?w=800&q=80",
+        "https://images.unsplash.com/photo-1540539234-c14a20fb7c7b?w=800&q=80",
     },
   ],
 };
