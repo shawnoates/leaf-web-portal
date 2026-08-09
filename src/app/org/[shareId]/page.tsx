@@ -122,9 +122,17 @@ interface PlanIdea {
   // Venue anchor for the inline card, and — when the owner picked one while
   // creating the suggestion — the venue the host modal pre-selects. Optional;
   // some ideas render with a location line, others don't.
+  // `name`/`address`/`placeId`/`photoUrl` are null when the server gates the
+  // venue (getOrgCalendarPage's hideIdeaVenue — on for non-owner/co-host
+  // viewers whenever the calendar keeps hideVenueUntilRsvp). `neighborhood`
+  // always ships, and is what the card renders in that case. Don't reintroduce
+  // a client-side conditional here: gating happens server-side so the address
+  // never reaches the browser at all.
   location?: {
-    name: string;
-    address: string;
+    name: string | null;
+    address: string | null;
+    neighborhood?: string | null;
+    isPrivate?: boolean;
     placeId?: string | null;
     photoUrl?: string | null;
     rating?: number | null;
@@ -1972,6 +1980,11 @@ export default function OrgCalendarPage() {
           ? {
               name: ((idea.location as Record<string, unknown>).name as string) || "",
               address: ((idea.location as Record<string, unknown>).address as string) || "",
+              // Carried through so a gated card keeps its location line after a
+              // refetch — name/address arrive null in that case and this is the
+              // only thing left to render.
+              neighborhood: ((idea.location as Record<string, unknown>).neighborhood as string) || null,
+              isPrivate: (idea.location as Record<string, unknown>).isPrivate === true,
             }
           : null,
         ideaSeriesId: (idea.ideaSeriesId as string) || null,
@@ -3509,12 +3522,20 @@ export default function OrgCalendarPage() {
                           {idea.description}
                         </p>
                       )}
-                      {idea.location?.name && (
+                      {/* Venue when the viewer is entitled to it (owner /
+                          co-host), neighborhood otherwise. The server decides
+                          which by nulling name+address, so this is just a
+                          render of whatever survived. */}
+                      {idea.location?.name ? (
                         <p className="text-zinc-500 leading-relaxed font-light text-sm">
                           {idea.location.name}
                           {idea.location.address ? ` · ${idea.location.address}` : ""}
                         </p>
-                      )}
+                      ) : idea.location?.neighborhood ? (
+                        <p className="text-zinc-500 leading-relaxed font-light text-sm">
+                          {idea.location.neighborhood}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="pt-2 flex flex-col gap-6">
                       <div className="flex flex-col sm:flex-row gap-4">
