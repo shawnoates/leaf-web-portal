@@ -22,7 +22,6 @@ export const config: LandingConfig = {
   followerCount: 164,
   navLabel: "Church",
   plansHeader: "What's happening",
-  ideasHeader: "Ideas from the neighborhood",
   ctaTitle: "Start your church's free calendar",
   ctaSubtitle:
     "A community calendar your members fill in themselves — the hikes, the coffees, the meal trains. Your staff doesn't maintain it, and there's nothing to download.",
@@ -54,7 +53,7 @@ export const config: LandingConfig = {
       description:
         "Park by the library, near the little playground. Bring whatever, no plan. Usually a few of us, sometimes ten.",
       image:
-        "https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?w=800&q=80",
+        "https://images.unsplash.com/photo-1503668630001-50cf6f5d256f?w=800&q=80",
       hostName: "Priya",
       attendeeCount: 11,
       location: "Library Park",

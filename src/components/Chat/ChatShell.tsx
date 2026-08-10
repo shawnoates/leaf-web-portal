@@ -18,6 +18,7 @@ import { Loader2, Send, ArrowLeft, Calendar, MapPin, Users, X, Smartphone } from
 import { QRCodeSVG } from "qrcode.react";
 import MessageRow from "./MessageRow";
 import VirtualHostTimelineView from "./VirtualHostTimelineView";
+import type { UpcomingMilestone } from "./VirtualHostTimelineView";
 import type { FirMessage, UserLite } from "./types";
 
 type AuthState = "checking" | "ready" | "denied" | "error";
@@ -81,6 +82,7 @@ export default function ChatShell({
   const [virtualHostPersonaAvatarUrl, setVirtualHostPersonaAvatarUrl] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<Array<{ id: string; stepType: string; label: string; notes: string; createdAt: string | null; createdAtLocal: string }> | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
+  const [upcomingMilestone, setUpcomingMilestone] = useState<UpcomingMilestone | null>(null);
 
   useEffect(() => {
     setDevice(detectDevice());
@@ -200,10 +202,12 @@ export default function ChatShell({
         Parse.Cloud.run("getVirtualHostTimeline", { eventGroupId })
           .then((r: any) => {
             setTimeline(r.entries || []);
+            setUpcomingMilestone(r.upcomingMilestone || null);
           })
           .catch(() => {
             // Timeline not available (not a virtual-hosted plan or no access)
             setTimeline(null);
+            setUpcomingMilestone(null);
           })
           .finally(() => setTimelineLoading(false));
 
@@ -620,13 +624,16 @@ export default function ChatShell({
           </div>
         </header>
 
-        {/* Virtual Host Timeline (owner-only) */}
-        {timeline && (
+        {/* Virtual Host Timeline (owner-only). Renders on a pending milestone
+            alone — a plan waiting on an onsale has no completed steps yet, and
+            that silent stretch is exactly when the owner wants to see one. */}
+        {(timeline || upcomingMilestone) && (
           <VirtualHostTimelineView
             entries={timeline}
             loading={timelineLoading}
             personaName={virtualHostPersonaName}
             personaAvatarUrl={virtualHostPersonaAvatarUrl}
+            upcomingMilestone={upcomingMilestone}
           />
         )}
 

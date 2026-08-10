@@ -78,7 +78,6 @@ export interface LandingConfig {
   pastPlanCount?: number;
   navLabel?: string;
   plansHeader?: string;
-  ideasHeader?: string;
   ideasTitle?: string;
   ideasButtonLabel?: string;
   dealsHeader?: string;

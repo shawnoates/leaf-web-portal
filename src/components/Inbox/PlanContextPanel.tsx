@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, Clock, MapPin, MessageSquare, Users } from "lucide-react";
 import Parse from "@/lib/parse-client";
+import type { UpcomingMilestone } from "@/components/Chat/VirtualHostTimelineView";
 
 export interface PlanContext {
   planId: string;
@@ -76,17 +77,23 @@ function Row({
 // get squeezed on smaller screens.
 export default function PlanContextPanel({ plan }: { plan: PlanContext }) {
   const [timeline, setTimeline] = useState<TimelineEntry[] | null>(null);
+  // The venue milestone we're waiting on, when there is one. Completed steps
+  // are the only thing `timeline` carries, so a plan parked on a future onsale
+  // has an empty progress list — this is what fills that gap.
+  const [upcoming, setUpcoming] = useState<UpcomingMilestone | null>(null);
 
   useEffect(() => {
     let alive = true;
     Parse.Cloud.run("getVirtualHostTimeline", { eventGroupId: plan.planId })
-      .then((r: { entries?: TimelineEntry[] }) => {
-        if (alive) setTimeline(r?.entries || []);
+      .then((r: { entries?: TimelineEntry[]; upcomingMilestone?: UpcomingMilestone | null }) => {
+        if (!alive) return;
+        setTimeline(r?.entries || []);
+        setUpcoming(r?.upcomingMilestone || null);
       })
       .catch(() => {
         // Not virtual-hosted, or no access — the panel simply omits the
         // section rather than showing an error the owner can't act on.
-        if (alive) setTimeline(null);
+        if (alive) { setTimeline(null); setUpcoming(null); }
       });
     return () => {
       alive = false;
@@ -142,17 +149,37 @@ export default function PlanContextPanel({ plan }: { plan: PlanContext }) {
 
       {/* Servicing timeline — owner/co-host only, enforced server-side by
           getVirtualHostTimeline. */}
-      {timeline && timeline.length > 0 && (
+      {((timeline && timeline.length > 0) || upcoming) && (
         <div className="px-5 py-4 border-b border-zinc-100">
           <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-3">
             {plan.personaName ? `${plan.personaName}'s progress` : "Progress"}
           </p>
           <div className="space-y-3">
-            {timeline.map((e, i) => (
+            {/* Hollow dot — this step is ahead of us, not behind. */}
+            {upcoming && (
+              <div className="flex gap-2.5">
+                <div className="flex flex-col items-center shrink-0 pt-1">
+                  <div className="w-2 h-2 rounded-full border border-teal-500 bg-transparent" />
+                  {timeline && timeline.length > 0 && (
+                    <div className="w-px flex-1 min-h-[16px] bg-teal-100 mt-1" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0 pb-1">
+                  <p className="text-xs font-medium text-zinc-900">{upcoming.label}</p>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">{upcoming.opensAtLocal}</p>
+                  <p className="text-xs text-zinc-500 mt-1 italic">
+                    {upcoming.kind === "tickets"
+                      ? "We'll buy them as soon as they're released."
+                      : "We'll book as soon as the tables are released."}
+                  </p>
+                </div>
+              </div>
+            )}
+            {(timeline || []).map((e, i) => (
               <div key={e.id} className="flex gap-2.5">
                 <div className="flex flex-col items-center shrink-0 pt-1">
                   <div className="w-2 h-2 rounded-full bg-teal-600" />
-                  {i < timeline.length - 1 && (
+                  {i < (timeline?.length ?? 0) - 1 && (
                     <div className="w-px flex-1 min-h-[16px] bg-teal-100 mt-1" />
                   )}
                 </div>

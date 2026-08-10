@@ -12,7 +12,6 @@ const config: LandingConfig = {
   followerCount: 246,
   navLabel: "Calendar",
   plansHeader: "What's On at Landmark",
-  ideasHeader: "Book the Space",
   ideasTitle: "Host your night here",
   ctaTitle: "Turn Your Restaurant Into a Calendar",
   ctaSubtitle:
