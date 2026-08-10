@@ -808,103 +808,31 @@ export default function CalendarLandingPage({
           </section>
         )}
 
-        {/* Plan Ideas Carousel */}
-        {config.planIdeas.length > 0 && (
-        <section className="mt-48 mb-24 space-y-12">
-          <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
-            <div className="space-y-2">
-              <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
-                {ideasHeader}
-              </p>
-              <h2 className="text-4xl font-light tracking-tight italic">
-                {ideasTitle}
-              </h2>
-            </div>
-            <div className="flex gap-4">
-              <button
-                onClick={() => scroll("left")}
-                className="p-2 border border-zinc-200 rounded-full hover:bg-zinc-50 transition-all active:scale-90"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => scroll("right")}
-                className="p-2 border border-zinc-200 rounded-full hover:bg-zinc-50 transition-all active:scale-90"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
+      {/* Suggest a Plan — the one thing the old ideas carousel still
+          needs to say now that the suggestions themselves live inline in
+          the stream above. Full-width band, not a card in a row. */}
+      <section className="mt-32 mb-24">
+        <button
+          onClick={() => setShowCTA(true)}
+          className="w-full group flex flex-col sm:flex-row sm:items-center gap-6 text-left rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white px-8 py-8 transition-all hover:shadow-lg hover:border-emerald-300"
+        >
+          <div className="w-14 h-14 shrink-0 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+            <Plus className="w-7 h-7" />
           </div>
-
-          <div
-            ref={scrollRef}
-            className="flex gap-8 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-8"
-          >
-            {config.planIdeas.map((idea) => (
-              <div
-                key={idea.id}
-                className="min-w-[280px] max-w-[300px] snap-start group cursor-pointer"
-                onClick={() => setShowCTA(true)}
-              >
-                <div className="aspect-[4/5] overflow-hidden bg-zinc-100 mb-4 relative">
-                  <img
-                    src={idea.image}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    alt={idea.title}
-                  />
-                  <div className="absolute inset-0 transition-all duration-300 flex items-center justify-center bg-black/0 group-hover:bg-black/20 opacity-0 group-hover:opacity-100">
-                    <span className="bg-white px-6 py-3 text-xs tracking-wider uppercase font-bold shadow-xl">
-                      {ideasButtonLabel}
-                    </span>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <h4 className="text-base font-medium tracking-tight group-hover:italic">
-                    {idea.title}
-                  </h4>
-                  <p className="text-sm text-zinc-500 font-light line-clamp-2 leading-relaxed">
-                    {idea.description}
-                  </p>
-                </div>
-              </div>
-            ))}
-
-            {/* Suggest a Plan card */}
-            <div
-              className="min-w-[280px] max-w-[300px] snap-start group cursor-pointer"
-              onClick={() => setShowCTA(true)}
-            >
-              <div className="aspect-[4/5] overflow-hidden mb-4 relative rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white transition-all group-hover:shadow-lg group-hover:border-emerald-300">
-                <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center space-y-4">
-                  <div className="w-14 h-14 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
-                    <Plus className="w-7 h-7" />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs tracking-wider uppercase font-bold text-emerald-700">
-                      Your Idea
-                    </p>
-                    <h4 className="text-lg font-medium tracking-tight text-zinc-900">
-                      Suggest a Plan
-                    </h4>
-                    <p className="text-xs text-zinc-500 leading-relaxed font-light">
-                      Have something in mind? Share your idea and we&apos;ll
-                      review it.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <h4 className="text-base font-medium tracking-tight group-hover:italic">
-                  Custom Plan
-                </h4>
-                <p className="text-sm text-zinc-500 font-light line-clamp-2 leading-relaxed">
-                  Pitch a date, venue, and details — pending organizer approval.
-                </p>
-              </div>
-            </div>
+          <div className="space-y-1.5 flex-1">
+            <p className="text-xs tracking-wider uppercase font-bold text-emerald-700">
+              Your Idea
+            </p>
+            <h3 className="text-2xl font-light tracking-tight group-hover:italic">
+              {ideasTitle}
+            </h3>
+            <p className="text-sm text-zinc-500 leading-relaxed font-light">
+              Pitch a date, venue, and details — pending organizer approval.
+            </p>
           </div>
-        </section>
-        )}
+          <ArrowRight className="w-5 h-5 text-emerald-700 shrink-0 hidden sm:block" />
+        </button>
+      </section>
 
         {/* Bottom CTA */}
         <div className="text-center py-16 border-t border-zinc-100">
