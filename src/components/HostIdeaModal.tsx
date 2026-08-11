@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { isVenueBlacklisted } from "@/lib/venue-blacklist";
 import { ensureGooglePlaces, fetchVenuePhotoUrl } from "@/lib/google-places";
+import { zoneOffsetSuffix } from "@/lib/wall-clock";
 import {
   AlertTriangle,
   Calendar,
@@ -21,6 +22,7 @@ import {
 export interface HostIdeaModalIdea {
   objectId: string;
   title: string;
+  description?: string;
   image?: string | null;
   category?: string | null;
   centroid?: string | null;
@@ -37,6 +39,16 @@ export interface HostIdeaModalIdea {
   ideaSeriesId?: string | null;
   // Optional owner-chosen start time ("HH:mm") — prefills the time picker.
   preferredTime?: string | null;
+  // --- Admin-curated "Featured" suggestion (FEATURED_SUGGESTION_SPEC) ------
+  // Not a CalendarGeneratedPlan: it's a FeaturedSuggestion row the server
+  // merges into the calendar's idea list, so `objectId` is that row's id and
+  // hostPlanIdea would 404 on it. Hosting routes through the custom-plan path
+  // instead (needs `shareId`), and its date/time come from the admin's
+  // wall-clock rather than the suggestion-spread cadence.
+  isFeatured?: boolean;
+  localWallClock?: string | null;
+  venueTimeZone?: string | null;
+  timeMode?: "fixed_instant" | "local_wall_clock";
 }
 
 interface NearbyVenue {
@@ -72,6 +84,7 @@ const SUGGESTED_VENUE_ID = "__suggested__";
 export default function HostIdeaModal({
   idea,
   prefillDate = null,
+  shareId = null,
   orgCity = null,
   orgAddress = null,
   tier = "starter",
@@ -90,6 +103,9 @@ export default function HostIdeaModal({
 }: {
   idea: HostIdeaModalIdea;
   prefillDate?: Date | null;
+  // Required only for a featured suggestion, whose host path is
+  // requestCustomPlanViaWeb (keyed by shareId, not by a plan-idea id).
+  shareId?: string | null;
   orgCity?: string | null;
   orgAddress?: string | null;
   tier?: string;
@@ -281,17 +297,72 @@ export default function HostIdeaModal({
       setError("Pick a date for the plan.");
       return;
     }
+    const timeVal = timeRef.current?.value || "18:00";
+
+    // A featured suggestion's time belongs to the VENUE's zone, not the
+    // browser's — a NYC showtime hosted by someone in LA is still 7:30 ET.
+    // Everything else keeps the submitter-local offset.
+    let offsetSuffix: string;
+    if (idea.isFeatured && idea.venueTimeZone) {
+      offsetSuffix = zoneOffsetSuffix(dateVal, timeVal, idea.venueTimeZone);
+    } else {
+      const offset = new Date().getTimezoneOffset();
+      const sign = offset <= 0 ? "+" : "-";
+      const absH = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
+      const absM = String(Math.abs(offset) % 60).padStart(2, "0");
+      offsetSuffix = `${sign}${absH}:${absM}`;
+    }
+    const dateTime = `${dateVal}T${timeVal}${offsetSuffix}`;
+
+    // Featured suggestions have no CalendarGeneratedPlan row, so hostPlanIdea
+    // (which looks one up by id) would 404. Route them through the free-form
+    // custom-plan path instead — same resulting EventGroup, same approval flow.
+    // That path has no suggestion to inherit a location from, so it requires a
+    // venue outright; catch it here rather than as a server 400.
+    if (idea.isFeatured) {
+      if (!shareId) {
+        setError("This suggestion can't be hosted from here yet.");
+        return;
+      }
+      if (!selectedVenue) {
+        setError("Pick a venue for this plan.");
+        return;
+      }
+      setSubmitting(true);
+      setError(null);
+      try {
+        const result = await Parse.Cloud.run("requestCustomPlanViaWeb", {
+          shareId,
+          title: idea.title,
+          description: idea.description || idea.title,
+          imageUrl: idea.image || undefined,
+          date: dateTime,
+          capacity: idea.suggestedCapacity || 20,
+          hostNote: hostNote.trim() || undefined,
+          name: hostName || undefined,
+          phoneNumber: hostPhone || undefined,
+          requireApproval: hostRequireApproval,
+          venue: {
+            placeId: selectedVenue.placeId,
+            name: selectedVenue.name,
+            address: selectedVenue.address,
+            photoUrl: selectedVenue.photoUrl,
+            rating: selectedVenue.rating,
+          },
+        });
+        setSuccess(true);
+        onHosted(result as { pendingApproval?: boolean; eventGroupId?: string } | undefined);
+        setTimeout(() => onClose(), 1500);
+      } catch (err) {
+        console.error("Failed to host featured suggestion:", err);
+        setError(err instanceof Error ? err.message : "Failed to host this plan.");
+        setSubmitting(false);
+      }
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
-
-    // Submitter-local ISO datetime with an explicit offset so the server
-    // anchors the wall-clock in the caller's zone.
-    const timeVal = timeRef.current?.value || "18:00";
-    const offset = new Date().getTimezoneOffset();
-    const sign = offset <= 0 ? "+" : "-";
-    const absH = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
-    const absM = String(Math.abs(offset) % 60).padStart(2, "0");
-    const dateTime = `${dateVal}T${timeVal}${sign}${absH}:${absM}`;
 
     try {
       const result = await Parse.Cloud.run("hostPlanIdea", {

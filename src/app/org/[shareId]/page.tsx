@@ -14,6 +14,7 @@ import VirtualHostBadge from "@/components/VirtualHostBadge";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
+import { zoneOffsetSuffix, featuredWallClockDate } from "@/lib/wall-clock";
 import { isVenueBlacklisted } from "@/lib/venue-blacklist";
 import { fetchVenuePhotoUrl } from "@/lib/google-places";
 import {
@@ -451,31 +452,6 @@ function isApartmentOrgType(
 }
 
 // --- Helpers ---
-
-/**
- * UTC-offset suffix ("-04:00") for a wall-clock instant in a given IANA zone.
- *
- * Lets the browser hand the server an unambiguous absolute time anchored to
- * the VENUE's zone rather than its own. Mirrors the server's
- * `wallClockToUtcInTimezone` so both sides resolve DST the same way — the repo
- * has already been bitten by two implementations disagreeing by an hour.
- */
-function zoneOffsetSuffix(dateStr: string, timeStr: string, timeZone: string): string {
-  try {
-    const tentative = new Date(`${dateStr}T${timeStr}:00Z`);
-    if (isNaN(tentative.getTime())) return "Z";
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone,
-      timeZoneName: "shortOffset",
-    }).formatToParts(tentative);
-    const value = parts.find((p) => p.type === "timeZoneName")?.value;
-    const m = value?.match(/GMT([+-])(\d{1,2})(?::?(\d{2}))?/);
-    if (!m) return "Z"; // GMT+0 renders bare "GMT"; UTC is the correct read
-    return `${m[1]}${m[2].padStart(2, "0")}:${m[3] || "00"}`;
-  } catch {
-    return "Z";
-  }
-}
 
 // Format in the venue's IANA zone when known — a Bangkok viewer reading a
 // NYC plan should see NYC's wall-clock, not their own. Falls through to
@@ -1966,7 +1942,12 @@ export default function OrgCalendarPage() {
       }));
 
       const planIdeas: PlanIdea[] = (result.planIdeas || []).map((idea: Record<string, unknown>) => ({
-        id: idea.objectId as string,
+        // A featured suggestion is a FeaturedSuggestion row merged into this
+        // list by the server, and it ships `id` where a CalendarGeneratedPlan
+        // ships `objectId`. Without the fallback its id is `undefined`, which
+        // then keys the React list, the spread-date map and the interest-count
+        // map — so every id-less entry collides on one bucket.
+        id: (idea.objectId as string) ?? (idea.id as string),
         title: idea.title as string || "Plan Idea",
         description: idea.description as string || "",
         category: idea.category as string || "Activity",
@@ -2674,7 +2655,19 @@ export default function OrgCalendarPage() {
     if (!org) return new Map<string, Date>();
     return computeSpreadIdeaDates(
       org.plans.map((p) => p.dateISO ?? null),
-      org.planIdeas.map((i) => ({ id: i.id, date: i.date, isManual: i.isManual, datePinned: i.datePinned })),
+      // A featured suggestion's date is a real-world fact (a tournament's
+      // opening day, a film's release), so it enters the spread already pinned:
+      // it keeps its own day, reserves it against the fan-out, and — the part
+      // that was wrong — stops eating a cadence slot a real idea could use.
+      org.planIdeas.map((i) =>
+        i.isFeatured
+          ? {
+              id: i.id,
+              date: featuredWallClockDate(i)?.toISOString() ?? null,
+              datePinned: true,
+            }
+          : { id: i.id, date: i.date, isManual: i.isManual, datePinned: i.datePinned }
+      ),
       nowBucket * 60 * 60 * 1000
     );
   }, [org, nowBucket]);
@@ -3482,7 +3475,7 @@ export default function OrgCalendarPage() {
                         <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
                           {idea.title}
                         </h3>
-                        <div className="pt-2">
+                        <div className="pt-2 space-y-1.5">
                           <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
                             <span
                               className="w-2 h-2 rounded-full"
@@ -3490,6 +3483,18 @@ export default function OrgCalendarPage() {
                             />
                             Waiting on host
                           </p>
+                          {/* Featured has no interest BUTTON here (see below),
+                              but the count still means something: it's how many
+                              people already told us they want this. Read-only,
+                              and worded so it doesn't read as this calendar's
+                              followers — the counter lives on the admin's
+                              suggestion and is shared by every calendar it
+                              surfaces on. */}
+                          {idea.isFeatured && priorCount > 0 && (
+                            <p className="text-xs tracking-wider uppercase text-emerald-700 font-bold">
+                              {priorCount} {priorCount === 1 ? "person" : "people"} nearby interested
+                            </p>
+                          )}
                         </div>
                       </div>
                       {/* Interest heart — top-right of the title (replaces the
