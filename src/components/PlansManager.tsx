@@ -12,6 +12,7 @@ import PlanChatDrawer from "@/components/PlanChatDrawer";
 import VirtualHostSheet, { DEFAULT_HOST_AVATAR, HostAvatar } from "@/components/VirtualHostSheet";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
+import { featuredWallClockDate } from "@/lib/wall-clock";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { Calendar, Camera, Check, ImagePlus, Link2, Lock, MessageCircle, Plus, RefreshCw, Repeat, Settings, Sparkles, UserCheck, Users, X } from "lucide-react";
 
@@ -119,7 +120,9 @@ interface PlanIdea {
   objectId: string;
   title: string;
   description: string;
-  date: string;
+  // Nullable: a date-only featured suggestion has no UTC instant to send, and
+  // an AI idea can arrive before the generator stamps a fallback date.
+  date: string | null;
   image: string | null;
   // Venue chosen when the suggestion was created — carries place id/photo so
   // the host modal can pre-select it as a real card.
@@ -139,6 +142,81 @@ interface PlanIdea {
   datePinned?: boolean;
   // Optional owner-chosen start time ("HH:mm").
   preferredTime?: string | null;
+  // --- Admin-curated "Featured" suggestion (FEATURED_SUGGESTION_SPEC) ------
+  // A FeaturedSuggestion row the server merges into this calendar's idea list,
+  // NOT a CalendarGeneratedPlan. Its date is a real-world fact in the venue's
+  // zone (already formatted into `whenLabel`), so it never goes through the
+  // suggestion spread; and since there's no CalendarGeneratedPlan behind it,
+  // edit/assign/delete/end-series don't apply — see the detail modal below.
+  isFeatured?: boolean;
+  whenLabel?: string | null;
+  timeMode?: "fixed_instant" | "local_wall_clock";
+  venueTimeZone?: string | null;
+  localWallClock?: string | null;
+  venueName?: string | null;
+}
+
+// Raw `planIdeas` entry as getOrgCalendarPage ships it. Two shapes arrive on
+// this one array: a CalendarGeneratedPlan (keyed `objectId`) and an
+// admin-curated FeaturedSuggestion merged in by mergeFeaturedIntoIdeas (keyed
+// `id`, carrying the venue-zone time fields).
+interface RawPlanIdea {
+  objectId?: string;
+  id?: string;
+  title: string;
+  description: string;
+  date: string | null;
+  image: string | null;
+  location: { name: string; address: string; placeId?: string | null; photoUrl?: string | null; rating?: number | null } | null;
+  ideaSeriesId?: string | null;
+  interestCount?: number;
+  category?: string | null;
+  centroid?: string | null;
+  suggestedCapacity?: number | null;
+  isManual?: boolean;
+  datePinned?: boolean;
+  preferredTime?: string | null;
+  isFeatured?: boolean;
+  whenLabel?: string | null;
+  timeMode?: "fixed_instant" | "local_wall_clock";
+  venueTimeZone?: string | null;
+  localWallClock?: string | null;
+  venueName?: string | null;
+}
+
+/**
+ * One mapper for both readers of that array — the initial fetch and the
+ * post-Regenerate poll. They used to carry separate copies of this, and the
+ * copy in the poll silently dropped the featured fields, so a Regenerate
+ * reverted a correctly-rendered featured card to the broken one.
+ */
+function mapPlanIdea(idea: RawPlanIdea): PlanIdea {
+  return {
+    // Featured suggestions ship `id` where a CalendarGeneratedPlan ships
+    // `objectId`. Without the fallback every one of them lands here as
+    // `undefined`, which then keys the React list, the spread map, the dedupe,
+    // and every cloud call the detail modal makes.
+    objectId: (idea.objectId ?? idea.id) as string,
+    title: idea.title,
+    description: idea.description,
+    date: idea.date,
+    image: idea.image || null,
+    location: idea.location,
+    ideaSeriesId: idea.ideaSeriesId || null,
+    interestCount: typeof idea.interestCount === "number" ? idea.interestCount : 0,
+    category: idea.category ?? null,
+    centroid: idea.centroid ?? null,
+    suggestedCapacity: idea.suggestedCapacity ?? null,
+    isManual: idea.isManual === true,
+    datePinned: idea.datePinned === true,
+    preferredTime: idea.preferredTime ?? null,
+    isFeatured: idea.isFeatured === true,
+    whenLabel: idea.whenLabel ?? null,
+    timeMode: idea.timeMode,
+    venueTimeZone: idea.venueTimeZone ?? null,
+    localWallClock: idea.localWallClock ?? null,
+    venueName: idea.venueName ?? null,
+  };
 }
 
 interface PastPlan {
@@ -243,10 +321,18 @@ function IdeaCard({
     >
       <div className="relative">
         <PlanImage src={idea.image} alt={idea.title} className="w-full h-28" />
-        <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-white/85 text-[#1B4332] backdrop-blur-sm">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#1B4332]" />
-          Needs a host
-        </span>
+        {/* Same badge treatment as the public /org card, so the owner and the
+            visitor are looking at the same thing. */}
+        {idea.isFeatured ? (
+          <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-[#1B4332]/[0.92] text-white backdrop-blur-sm">
+            ★ Featured
+          </span>
+        ) : (
+          <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-white/85 text-[#1B4332] backdrop-blur-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#1B4332]" />
+            Needs a host
+          </span>
+        )}
         {idea.ideaSeriesId && (
           <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-700 bg-white/85 backdrop-blur-sm">
             <Repeat className="w-3 h-3" /> Recurring
@@ -255,12 +341,26 @@ function IdeaCard({
       </div>
       <div className="p-3">
         <h4 className="font-medium text-sm mb-1 truncate">{idea.title}</h4>
-        <p className="text-xs text-zinc-400 mb-1">
-          {date ? date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "Waiting on host"}
+        <p className="text-xs text-zinc-400 mb-1 truncate">
+          {/* Featured: the server already formatted this in the VENUE's zone
+              ("Starting Sun, Aug 30"). Reformatting a UTC instant here would
+              re-anchor it to the browser — and for a date-only suggestion there
+              is no instant to format at all. */}
+          {idea.isFeatured && idea.whenLabel
+            ? idea.whenLabel
+            : date
+              ? date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+              : "Waiting on host"}
         </p>
         <p className="text-xs">
           {idea.interestCount > 0 ? (
-            <span className="text-emerald-600 font-medium">{idea.interestCount} interested</span>
+            <span className="text-emerald-600 font-medium">
+              {/* A featured suggestion's counter lives on the admin's row and is
+                  shared by every calendar it surfaces on — these are people in
+                  the area, not this calendar's followers. Say so, or the owner
+                  reads it as their own membership. */}
+              {idea.interestCount} interested{idea.isFeatured ? " nearby" : ""}
+            </span>
           ) : (
             <span className="text-zinc-400">Waiting on host</span>
           )}
@@ -402,6 +502,9 @@ export default function PlansManager({
 
   // Plan ideas
   const [planIdeas, setPlanIdeas] = useState<PlanIdea[]>([]);
+  // This calendar's public shareId (child calendar's own when managing one).
+  // Only the featured-suggestion host path needs it.
+  const [calendarShareId, setCalendarShareId] = useState<string | null>(null);
   const [loadingIdeas, setLoadingIdeas] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [hidePlanIdeas, setHidePlanIdeas] = useState(false);
@@ -465,13 +568,23 @@ export default function PlansManager({
     () =>
       computeSpreadIdeaDates(
         upcomingPlans.map((p) => p.expiryDate),
-        planIdeas.map((i) => ({ id: i.objectId, date: i.date, isManual: i.isManual, datePinned: i.datePinned })),
+        // A featured suggestion's date is a real-world fact (a tournament's
+        // opening day), so it enters the spread already pinned: it keeps its own
+        // day and doesn't eat a cadence slot. Fanning it out is what put the US
+        // Open six weeks after the tournament started.
+        planIdeas.map((i) =>
+          i.isFeatured
+            ? { id: i.objectId, date: featuredWallClockDate(i)?.toISOString() ?? null, datePinned: true }
+            : { id: i.objectId, date: i.date, isManual: i.isManual, datePinned: i.datePinned }
+        ),
         nowBucket * 60 * 60 * 1000
       ),
     [upcomingPlans, planIdeas, nowBucket]
   );
   const spreadDateOf = (idea: PlanIdea): Date | null =>
-    spreadIdeaDates.get(idea.objectId) ?? (idea.date ? new Date(idea.date) : null);
+    idea.isFeatured
+      ? featuredWallClockDate(idea)
+      : spreadIdeaDates.get(idea.objectId) ?? (idea.date ? new Date(idea.date) : null);
 
   // Upgrade gate
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -571,6 +684,9 @@ export default function PlansManager({
       let shareId = dash.shareId;
       const cal = dash.calendars?.find((c: { objectId: string }) => c.objectId === calendarId);
       if (cal?.shareId) shareId = cal.shareId;
+      // Held in state for the host modal — a featured suggestion publishes
+      // through requestCustomPlanViaWeb, which is keyed by shareId.
+      setCalendarShareId(shareId ?? null);
       // People eligible to be assigned as a suggestion's host: the calendar's
       // members AND followers. Both need a bound user (objectId) — unbound
       // invites / phone-only followers can't host yet, so drop them. Deduped
@@ -678,22 +794,7 @@ export default function PlansManager({
       setOrgExcludeKeywords(Array.isArray(page.orgExcludeKeywords) ? page.orgExcludeKeywords : []);
       setOrgBrandColor(page.orgBrandColor ?? null);
       setRequireApprovalDefault(page.requireApprovalDefault === true);
-      const allIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string; placeId?: string | null; photoUrl?: string | null; rating?: number | null } | null; ideaSeriesId?: string | null; interestCount?: number; category?: string | null; centroid?: string | null; suggestedCapacity?: number | null; isManual?: boolean; datePinned?: boolean; preferredTime?: string | null }) => ({
-        objectId: idea.objectId,
-        title: idea.title,
-        description: idea.description,
-        date: idea.date,
-        image: idea.image || null,
-        location: idea.location,
-        ideaSeriesId: idea.ideaSeriesId || null,
-        interestCount: typeof idea.interestCount === "number" ? idea.interestCount : 0,
-        category: idea.category ?? null,
-        centroid: idea.centroid ?? null,
-        suggestedCapacity: idea.suggestedCapacity ?? null,
-        isManual: idea.isManual === true,
-        datePinned: idea.datePinned === true,
-        preferredTime: idea.preferredTime ?? null,
-      }));
+      const allIdeas = (page.planIdeas || []).map(mapPlanIdea);
       // Dedupe by objectId (not title) — two distinct suggestions can share a
       // title (e.g. an owner manually adds one matching an AI suggestion), and
       // keying on title silently hid the newer row from this rail while the
@@ -773,21 +874,7 @@ export default function PlansManager({
         try {
           const dash = await Parse.Cloud.run("getOrgDashboard", { calendarId });
           const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId: dash.shareId });
-          const rawIdeas = (page.planIdeas || []).map((idea: { objectId: string; title: string; description: string; date: string; image: string | null; location: { name: string; address: string } | null; ideaSeriesId?: string | null; interestCount?: number; category?: string | null; centroid?: string | null; suggestedCapacity?: number | null; isManual?: boolean; datePinned?: boolean; preferredTime?: string | null }) => ({
-            objectId: idea.objectId,
-            title: idea.title,
-            description: idea.description,
-            date: idea.date,
-            image: idea.image || null,
-            location: idea.location,
-            ideaSeriesId: idea.ideaSeriesId || null,
-            interestCount: typeof idea.interestCount === "number" ? idea.interestCount : 0,
-            category: idea.category ?? null,
-            centroid: idea.centroid ?? null,
-            suggestedCapacity: idea.suggestedCapacity ?? null,
-            isManual: idea.isManual === true,
-            datePinned: idea.datePinned === true,
-          }));
+          const rawIdeas = (page.planIdeas || []).map(mapPlanIdea);
           const seenIds = new Set<string>();
           const ideas = rawIdeas.filter((idea: PlanIdea) => {
             if (seenIds.has(idea.objectId)) return false;
@@ -1391,6 +1478,9 @@ export default function PlansManager({
         <HostIdeaModal
           idea={detailIdea}
           prefillDate={spreadDateOf(detailIdea)}
+          // Featured hosts through requestCustomPlanViaWeb, which is keyed by
+          // shareId — hostPlanIdea has no row to look up.
+          shareId={calendarShareId}
           orgCity={orgCity}
           orgAddress={orgAddress}
           tier={tier}
@@ -1405,10 +1495,18 @@ export default function PlansManager({
             setPlanIdeas((prev) => prev.filter((p) => p.objectId !== detailIdea.objectId));
             fetchPlanIdeas();
           }}
-          onEditSuggestion={() => { const idea = detailIdea; setDetailIdea(null); openIdeaEditor(idea); }}
-          onAssignHost={() => { const idea = detailIdea; setDetailIdea(null); setAssignError(null); setAssigningIdea(idea); }}
-          onEndSeries={() => handleEndSeries(detailIdea.ideaSeriesId!)}
-          onDelete={() => handleRemoveIdea(detailIdea.objectId)}
+          // Owner tools all operate on a CalendarGeneratedPlan row: edit
+          // (updatePlanIdea), assign (assignPlanIdeaHost), delete
+          // (removePlanIdea), end series. A featured suggestion has no such row
+          // — every one of these would call its cloud function against a
+          // FeaturedSuggestion id and fail. Omitting the callbacks is what hides
+          // the buttons (HostIdeaModal treats them as optional), so the card
+          // stays hostable and nothing else is offered. Removing a featured
+          // suggestion is an admin action in the admin portal, not an owner one.
+          onEditSuggestion={detailIdea.isFeatured ? undefined : () => { const idea = detailIdea; setDetailIdea(null); openIdeaEditor(idea); }}
+          onAssignHost={detailIdea.isFeatured ? undefined : () => { const idea = detailIdea; setDetailIdea(null); setAssignError(null); setAssigningIdea(idea); }}
+          onEndSeries={detailIdea.isFeatured ? undefined : () => handleEndSeries(detailIdea.ideaSeriesId!)}
+          onDelete={detailIdea.isFeatured ? undefined : () => handleRemoveIdea(detailIdea.objectId)}
         />
       )}
 

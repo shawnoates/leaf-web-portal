@@ -439,8 +439,10 @@ export default function HostIdeaModal({
     : prefillDate
       ? `${prefillDate.getFullYear()}-${String(prefillDate.getMonth() + 1).padStart(2, "0")}-${String(prefillDate.getDate()).padStart(2, "0")}`
       : "";
-  const defaultTimeStr = idea.isFeatured && idea.localWallClock?.length >= 16
-    ? idea.localWallClock.slice(11, 16)
+  // Date-only featured rows ("US Open, Aug 30" with no showtime) have nothing
+  // to slice, so they keep the generic 6pm default.
+  const defaultTimeStr = idea.isFeatured && (idea.localWallClock || "").length >= 16
+    ? (idea.localWallClock as string).slice(11, 16)
     : idea.preferredTime || "18:00";
   const todayStr = new Date().toISOString().split("T")[0];
   const maxDateStr = tier === "starter"
@@ -608,9 +610,16 @@ export default function HostIdeaModal({
                       ref={timeRef}
                       type="time"
                       required
-                      defaultValue={idea.preferredTime || "18:00"}
+                      defaultValue={defaultTimeStr}
                       className="w-full border-b border-zinc-300 py-2.5 text-lg font-light focus:outline-none focus:border-zinc-900 transition-colors"
                     />
+                    {idea.isFeatured && idea.venueTimeZone && (
+                      <p className="text-xs text-zinc-400 font-light">
+                        {idea.timeMode === "local_wall_clock"
+                          ? "Local time in your city."
+                          : `Times are ${idea.venueTimeZone.split("/").pop()?.replace(/_/g, " ")}.`}
+                      </p>
+                    )}
                   </div>
                 </div>
 
