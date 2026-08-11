@@ -431,7 +431,17 @@ export default function HostIdeaModal({
     </div>
   );
 
-  const defaultDateStr = prefillDate ? prefillDate.toISOString().split("T")[0] : "";
+  // Featured: read the admin's wall-clock directly. Deriving it from the UTC
+  // instant would land on the wrong DAY for any evening event whose venue-local
+  // date and UTC date differ (9 PM PT is next-day UTC).
+  const defaultDateStr = idea.isFeatured && idea.localWallClock
+    ? idea.localWallClock.slice(0, 10)
+    : prefillDate
+      ? `${prefillDate.getFullYear()}-${String(prefillDate.getMonth() + 1).padStart(2, "0")}-${String(prefillDate.getDate()).padStart(2, "0")}`
+      : "";
+  const defaultTimeStr = idea.isFeatured && idea.localWallClock?.length >= 16
+    ? idea.localWallClock.slice(11, 16)
+    : idea.preferredTime || "18:00";
   const todayStr = new Date().toISOString().split("T")[0];
   const maxDateStr = tier === "starter"
     ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
