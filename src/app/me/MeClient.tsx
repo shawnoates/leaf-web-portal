@@ -211,12 +211,15 @@ function statusFor(plan: Plan): { cls: string; text: string } | null {
   }
   if (plan.hostState === "leaf_hosted") return { cls: "host", text: "Hosted by Leaf" };
   // A virtual/Leaf host is the public face of the plan even though the owner
-  // technically owns the EventGroup — read like "Hosted by {persona}", not
+  // technically owns the EventGroup — read like "Organized by {persona}", not
   // "You're hosting" (mirrors org/[shareId]'s viewerHostsPlan exclusion).
+  // "Organized by", not "Hosted by": a virtual host arranges the plan but
+  // isn't in the room, so the hosting verb would promise a presence nobody
+  // delivers. Kept in sync with org/[shareId] and dashboard/[calendarId].
   if (plan.hostState === "virtual_host") {
     return plan.hostPersona
-      ? { cls: "host", text: `Hosted by ${plan.hostPersona.name}` }
-      : { cls: "host", text: "Hosted by Leaf" };
+      ? { cls: "host", text: `Organized by ${plan.hostPersona.name}` }
+      : { cls: "host", text: "Organized by Leaf" };
   }
   if (plan.viewerIsHost) {
     return { cls: "host", text: plan.attendeeCount > 0 ? `You're hosting · ${plan.attendeeCount} going` : "You're hosting" };

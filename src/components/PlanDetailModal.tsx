@@ -404,7 +404,11 @@ export default function PlanDetailModal({
                 />
               )}
               <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
-                Hosted by {hostNameOverride || plan.hostName}
+                {/* Virtual hosts arrange the plan but don't attend it, so they
+                    read as "Organized by" — same wording the public /org card
+                    and modal use. A real human host keeps "Hosted by". */}
+                {isVirtualHost ? "Organized by" : "Hosted by"}{" "}
+                {hostNameOverride || plan.hostName}
               </p>
               {isVirtualHost && (
                 /* Same plain-text badge the public org calendar page uses —

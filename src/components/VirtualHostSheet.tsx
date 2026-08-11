@@ -167,7 +167,7 @@ export default function VirtualHostSheet({
                 <div className="w-9 h-9 rounded-full bg-white/25 flex items-center justify-center text-sm font-semibold">{persona.name.charAt(0)}</div>
               )}
               <div className="text-sm">
-                <div className="font-medium">Hosted by {persona.name}</div>
+                <div className="font-medium">Organized by {persona.name}</div>
                 {info?.replyLabel && (
                   <div className="text-white/75 text-xs inline-flex items-center gap-1"><Clock className="w-3 h-3" /> {info.replyLabel}</div>
                 )}

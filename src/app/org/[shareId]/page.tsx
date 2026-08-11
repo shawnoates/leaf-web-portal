@@ -2260,7 +2260,7 @@ export default function OrgCalendarPage() {
   // Message Attendees, add-to-calendar as host). A virtual host or Leaf host is
   // the public face of the plan even though the owner technically owns the
   // EventGroup — on this public page such a plan should read like any other
-  // visitor's plan ("Hosted by Marcus"), not "You're Hosting". The owner still
+  // visitor's plan ("Organized by Marcus"), not "You're Hosting". The owner still
   // manages it from the dashboard. Excludes those personas from the host view.
   const viewerHostsPlan = (plan: Plan) =>
     hostedPlanIds.has(plan.id) && !plan.virtualHost && plan.leafHostState !== "leaf_hosted";
@@ -2996,7 +2996,7 @@ export default function OrgCalendarPage() {
                             />
                           )}
                           <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold">
-                            Hosted by {plan.virtualHostPersona?.name || "your host"}
+                            Organized by {plan.virtualHostPersona?.name || "your host"}
                           </p>
                           <VirtualHostBadge persona={plan.virtualHostPersona} />
                         </div>
@@ -3919,7 +3919,7 @@ export default function OrgCalendarPage() {
                       />
                     )}
                     <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
-                      Hosted by {selectedEvent.virtualHostPersona?.name || "your host"}
+                      Organized by {selectedEvent.virtualHostPersona?.name || "your host"}
                     </p>
                     <VirtualHostBadge persona={selectedEvent.virtualHostPersona} />
                   </div>

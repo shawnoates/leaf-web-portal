@@ -1883,7 +1883,7 @@ export default function OrgDashboardPage() {
                           <div className="flex items-center justify-between text-xs text-zinc-400">
                             <span className="truncate">
                               {plan.isVirtualHost ? (
-                                <>Hosted by {plan.hostName}</>
+                                <>Organized by {plan.hostName}</>
                               ) : plan.leafHostState === "leaf_hosted" ? (
                                 <>Hosted by Leaf{plan.leafHostPersona?.name ? ` · ${plan.leafHostPersona.name}` : ""}</>
                               ) : plan.leafHostState === "leaf_arranging" ? (
