@@ -278,6 +278,30 @@ const AI_INTEREST_LOCAL_KEY = "leaf_ai_event_interests";
 // year-long expiry, samesite=lax. Server-side dedupe keys on this so
 // a visitor can't inflate an event's interest count from a single
 // device.
+/**
+ * Whatever we already know about this visitor, for an interest tap.
+ *
+ * An interest tap must never prompt for anything — that's the whole point of
+ * the surface. But if this browser has already OTP-verified a phone (any web
+ * RSVP, poll vote or follow sets `leaf_verified_user`), sending it along lets
+ * the server resolve the tap to a real person, which is what makes "who's
+ * interested, and do they follow us?" answerable at all. No cookie, no
+ * identity, no prompt — the tap still counts, it just stays anonymous.
+ *
+ * Same precedence the page-load call uses: the follow phone in localStorage
+ * first, then the verified-user cookie.
+ */
+function interestIdentityParams(): { name?: string; phone?: string } {
+  if (typeof window === "undefined") return {};
+  const cached = getVerifiedUserCookie();
+  const storedPhone = localStorage.getItem("leaf_follower_phone");
+  const phone = (storedPhone || cached?.phone || "").replace(/\D/g, "");
+  return {
+    ...(phone.length >= 10 ? { phone } : {}),
+    ...(cached?.name ? { name: cached.name } : {}),
+  };
+}
+
 function getOrCreateAIInterestCookie(): string {
   if (typeof document === "undefined") return "";
   const match = document.cookie.match(
@@ -1433,6 +1457,7 @@ export default function OrgCalendarPage() {
           groupShareId: shareId,
           eventIndex,
           cookie,
+          ...interestIdentityParams(),
         })) as { count?: number; alreadyInterested?: boolean };
         if (typeof result?.count === "number") {
           setAIInterestCounts((prev) => ({
@@ -1564,6 +1589,7 @@ export default function OrgCalendarPage() {
         const result = (await Parse.Cloud.run("expressInterestOnPlanIdea", {
           ideaId,
           cookie,
+          ...interestIdentityParams(),
         })) as { count?: number; alreadyInterested?: boolean };
         if (typeof result?.count === "number") {
           setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: result.count! }));
