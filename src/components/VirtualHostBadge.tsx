@@ -7,11 +7,17 @@ interface VirtualHostPersona {
   name: string | null;
 }
 
-// Plain-text "AI-Assisted" + info tooltip (click/tap-to-toggle, since a plain
-// `title=` attribute never fires on mobile) — deliberately lighter/smaller
-// than the host name it sits next to, not a pill. Shared by the org calendar
+// Info tooltip (click/tap-to-toggle, since a plain `title=` attribute never
+// fires on mobile) sitting after the host name. Shared by the org calendar
 // page's plan card and modal (kept in sync deliberately — see the "mirrors
-// the card's precedence" comment in page.tsx) and by the plan chat bubble.
+// the card's precedence" comment in page.tsx), the plan detail modal, and the
+// plan chat bubble.
+//
+// The visible "AI-Assisted" label was dropped once every surface adopted
+// "Organized by {name}" — the two together read as redundant hedging on a card
+// that already says who arranged the plan. The tooltip is now the disclosure,
+// so the icon stays: it's the only remaining path to "who is Marcus, exactly?"
+// and deleting it would leave attendees no way to find out at all.
 export default function VirtualHostBadge({ persona }: { persona?: VirtualHostPersona | null }) {
   const [open, setOpen] = useState(false);
   const name = persona?.name || "Your host";
@@ -32,7 +38,6 @@ export default function VirtualHostBadge({ persona }: { persona?: VirtualHostPer
 
   return (
     <span ref={rootRef} className="relative inline-flex items-center gap-1 text-zinc-400">
-      <span className="text-[10px] font-normal normal-case tracking-normal">AI-Assisted</span>
       <button
         type="button"
         aria-label={`What's an AI-assisted host?`}
@@ -41,7 +46,10 @@ export default function VirtualHostBadge({ persona }: { persona?: VirtualHostPer
           e.stopPropagation();
           setOpen((o) => !o);
         }}
-        className="leading-none text-zinc-400 hover:text-zinc-600"
+        // Padding (negative-margined back out, so nothing shifts) gives the
+        // icon a real tap target. It used to sit beside a label; now it's the
+        // only thing here, and a bare 12px glyph isn't reliably tappable.
+        className="leading-none text-zinc-400 hover:text-zinc-600 p-1 -m-1"
       >
         <Info className="w-3 h-3" />
       </button>
