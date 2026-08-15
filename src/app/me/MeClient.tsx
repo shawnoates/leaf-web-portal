@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Heart } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import HostIdeaModal from "@/components/HostIdeaModal";
+import VirtualHostBadge from "@/components/VirtualHostBadge";
 
 // ============================================================================
 // Attendee dashboard (/me). Read-mostly. Answers one question — "where am I
@@ -621,11 +622,21 @@ function Thread({ plan, hero }: { plan: Plan; hero?: boolean }) {
           <div className="msg-b">
             <div className="t">
               <span style={{ color: m.authorRole === "virtual_host" ? "var(--ink)" : "inherit" }}>{m.authorName}</span>
-              {m.authorRole === "virtual_host"
-                ? " · AI-assisted host"
-                : m.authorRole === "leaf"
-                  ? " · Leaf concierge"
-                  : plan.calendarName ? ` · ${plan.calendarName}` : ""}
+              {m.authorRole === "virtual_host" ? (
+                // The same tooltip the web chat bubble carries, rather than a
+                // "· AI-assisted host" role label here and a bare icon there.
+                // One disclosure, one wording, both places it can be read.
+                <>
+                  {" "}
+                  <VirtualHostBadge persona={{ name: m.authorName }} />
+                </>
+              ) : m.authorRole === "leaf" ? (
+                " · Leaf concierge"
+              ) : plan.calendarName ? (
+                ` · ${plan.calendarName}`
+              ) : (
+                ""
+              )}
             </div>
             <p className="p">{m.body}</p>
             {m.sentAt && <div className="ago">{ago(m.sentAt)}</div>}
