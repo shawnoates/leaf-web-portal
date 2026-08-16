@@ -1098,9 +1098,9 @@ const CSS = `
 .leafme .spine::before{content:"";position:absolute;left:71px;top:8px;bottom:8px;width:1px;background:var(--rule)}
 .leafme .stop{position:relative;padding-bottom:30px}
 .leafme .stop:last-child{padding-bottom:0}
-.leafme .date{position:absolute;left:-96px;top:0;width:56px;text-align:right}
-.leafme .date .d{font-family:var(--serif);font-size:22px;line-height:1;color:var(--ink)}
-.leafme .date .m{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-top:4px}
+.leafme .stop .date{position:absolute;left:-96px;top:0;width:56px;text-align:right}
+.leafme .stop .date .d{font-family:var(--serif);font-size:22px;line-height:1;color:var(--ink)}
+.leafme .stop .date .m{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-top:4px}
 .leafme .dot{position:absolute;left:-30px;top:7px;width:7px;height:7px;border-radius:50%;background:var(--paper);border:1.5px solid var(--ink-3)}
 .leafme .dot.on{background:var(--green);border-color:var(--green)}
 .leafme .stop-card{display:grid;grid-template-columns:120px 1fr auto;gap:18px;align-items:start}
@@ -1228,10 +1228,16 @@ const CSS = `
   .leafme .sect-head{flex-direction:column;align-items:flex-start;gap:6px}
   .leafme .spine{padding-left:0}
   .leafme .spine::before{display:none}
-  .leafme .date{position:static;width:auto;text-align:left;display:flex;align-items:baseline;gap:7px;margin-bottom:8px}
-  .leafme .date .m{margin-top:0}
+  .leafme .stop .date{position:static;width:auto;text-align:left;display:flex;align-items:baseline;gap:7px;margin-bottom:8px}
+  .leafme .stop .date .m{margin-top:0}
   .leafme .dot{display:none}
   .leafme .stop-card{grid-template-columns:88px 1fr;gap:14px}
+  /* The desktop layout's third column (status pill / attend CTA) has no home
+     in the collapsed 2-col grid — without this it wraps into the narrow date
+     column. Park it under the text block instead, laid out as a row. */
+  .leafme .stop-card > .status,.leafme .stop-card > .attend-cta-wrap{grid-column:2;justify-self:start;text-align:left;margin-top:2px}
+  .leafme .attend-cta-wrap{display:flex;align-items:center;gap:12px}
+  .leafme .attend-cta-wrap .going-count{margin-bottom:0;order:2}
   .leafme .owner{flex-direction:column;align-items:stretch;gap:14px;padding:18px}
   .leafme .owner .btn{width:100%;justify-content:center}
   .leafme .sect{padding-top:32px;padding-bottom:32px}
