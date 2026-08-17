@@ -132,6 +132,42 @@ interface CreatePlanModalProps {
   autoSyncOnMount?: boolean;
 }
 
+// ── Timing hints (getPlanTimingHints) ─────────────────────────────────
+// "When should I schedule this?" guidance rendered under the Date/Time
+// fields. Calendar-specific when the calendar has enough history +
+// following; otherwise platform-wide ("global") stats.
+
+interface TimingHints {
+  source: "calendar" | "global";
+  sampleSize: number;
+  bestDay: { day: string; dayIndex: number; sharePct: number } | null;
+  bestTime: { bucket: string; sharePct: number; suggestedTime: string | null } | null;
+  leadTime: { bucket: string; label: string; avgRsvps: number; restAvgRsvps: number } | null;
+}
+
+// Per-calendar cache for the SPA session — reopening the drawer (or tabbing
+// between modes) shouldn't refetch. `null` caches a "nothing to show" result.
+const timingHintsCache = new Map<string, TimingHints | null>();
+
+// Fallback start time per time-of-day bucket when the server couldn't pick a
+// concrete winning hour.
+const BUCKET_DEFAULT_TIME: Record<string, string> = {
+  morning: "10:00",
+  afternoon: "14:00",
+  evening: "18:30",
+  night: "21:00",
+};
+
+// "18:00" → "6 PM", "18:30" → "6:30 PM" — for the apply-chip label.
+function displayHintTime(t: string): string {
+  const [hStr, mStr] = t.split(":");
+  let h = parseInt(hStr, 10);
+  const ampm = h >= 12 ? "PM" : "AM";
+  if (h === 0) h = 12;
+  if (h > 12) h -= 12;
+  return mStr === "00" ? `${h} ${ampm}` : `${h}:${mStr} ${ampm}`;
+}
+
 // Convert display time ("6:30 PM") to 24h format ("18:30") for <input type="time">
 function toTimeInputValue(t?: string | null): string {
   if (!t) return "";
@@ -301,6 +337,70 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       });
     return () => { cancelled = true; };
   }, [pollConvertMode, editMode, hostRequestMode]);
+
+  // Timing hints under Date/Time — calendar-specific "best times to host"
+  // stats with a platform-wide fallback. Keyed to the selected calendar so
+  // switching targets in the dropdown swaps the guidance too. Skipped in
+  // edit/host-request/poll-convert modes where the schedule is already set
+  // (or locked).
+  const [timingHints, setTimingHints] = useState<TimingHints | null>(null);
+  useEffect(() => {
+    if (pollConvertMode || editMode || hostRequestMode) {
+      setTimingHints(null);
+      return;
+    }
+    const calId = selectedCalendarId;
+    if (timingHintsCache.has(calId)) {
+      setTimingHints(timingHintsCache.get(calId) ?? null);
+      return;
+    }
+    let cancelled = false;
+    Parse.Cloud.run("getPlanTimingHints", { calendarId: calId })
+      .then((h: TimingHints) => {
+        // A response with no surfaced hint renders nothing — cache that too.
+        const useful = h && (h.bestDay || h.bestTime || h.leadTime) ? h : null;
+        timingHintsCache.set(calId, useful);
+        if (!cancelled) setTimingHints(useful);
+      })
+      .catch(() => {
+        // Non-fatal — the panel just doesn't render. Don't cache errors so a
+        // transient failure can recover on the next open.
+        if (!cancelled) setTimingHints(null);
+      });
+    return () => { cancelled = true; };
+  }, [selectedCalendarId, pollConvertMode, editMode, hostRequestMode]);
+
+  // Apply-chip target: next occurrence of the best day (1-7 days out, always
+  // within the starter tier's 2-week window) + the winning start time.
+  const timingHintTarget = (() => {
+    if (!timingHints || (!timingHints.bestDay && !timingHints.bestTime)) return null;
+    let dateISO: string | null = null;
+    let dateLabel: string | null = null;
+    if (timingHints.bestDay) {
+      const nowD = new Date();
+      const delta = ((timingHints.bestDay.dayIndex - nowD.getDay()) + 7) % 7 || 7;
+      const d = new Date(nowD.getTime() + delta * 24 * 60 * 60 * 1000);
+      dateISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      dateLabel = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    }
+    const timeHHMM = timingHints.bestTime
+      ? timingHints.bestTime.suggestedTime || BUCKET_DEFAULT_TIME[timingHints.bestTime.bucket] || null
+      : null;
+    if (!dateISO && !timeHHMM) return null;
+    return { dateISO, dateLabel, timeHHMM };
+  })();
+
+  function applyTimingHint() {
+    if (!timingHintTarget) return;
+    if (timingHintTarget.dateISO) {
+      setDate(timingHintTarget.dateISO);
+      markTouched("date");
+    }
+    if (timingHintTarget.timeHHMM) {
+      setTime(timingHintTarget.timeHHMM);
+      markTouched("time");
+    }
+  }
 
   // Recommendation pills — grounded in this calendar's own history (best
   // weekday by RSVP share, typical start time, over-performing category, top
