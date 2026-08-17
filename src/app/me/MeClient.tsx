@@ -6,6 +6,7 @@ import { Heart } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import HostIdeaModal from "@/components/HostIdeaModal";
 import VirtualHostBadge from "@/components/VirtualHostBadge";
+import { setVerifiedUserCookie } from "@/lib/verified-user";
 
 // ============================================================================
 // Attendee dashboard (/me). Read-mostly. Answers one question — "where am I
@@ -1011,6 +1012,21 @@ function OwnerStrip({ count }: { count: number }) {
 }
 
 // ---- Plan detail modal (opens over /me, no navigation) ---------------------
+// The /org calendar page identifies visitors by phone (leaf_follower_phone /
+// leaf_verified_user), not by Parse session — without this stamp a logged-in
+// /me user lands there as a stranger: RSVP state missing, gated venues
+// redacted, and re-RSVP'ing mints a duplicate identity.
+function bridgeIdentityToOrgPage() {
+  const u = Parse.User.current();
+  const digits = ((u?.get("phone") as string) || "").replace(/\D/g, "");
+  if (!digits) return;
+  const name = (u?.get("full_name") as string) || (u?.get("first_name") as string) || "";
+  try {
+    setVerifiedUserCookie(name, digits);
+    localStorage.setItem("leaf_follower_phone", digits);
+  } catch { /* storage unavailable — org page falls back to its OTP flow */ }
+}
+
 function PlanModal({
   plan, onClose, onRsvp,
 }: {
@@ -1056,6 +1072,17 @@ function PlanModal({
           {canChat && (
             <div style={{ marginTop: 12 }}>
               <Link href={`/chat/${plan.id}?from=me`} className="btn ghost">Join Plan Chat ↗</Link>
+            </div>
+          )}
+          {plan.calendarShareId && (
+            <div style={{ marginTop: 12 }}>
+              <Link
+                href={`/org/${plan.calendarShareId}?plan=${plan.id}`}
+                className="btn ghost"
+                onClick={bridgeIdentityToOrgPage}
+              >
+                View on calendar ↗
+              </Link>
             </div>
           )}
         </div>
