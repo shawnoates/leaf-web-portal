@@ -70,8 +70,10 @@ type AttendeeMemoryInfo = {
     acceptingResponses: boolean;
     existing: {
       objectId: string;
-      rating: number;
+      rating: number | null;
       comment: string | null;
+      hostRating: number | null;
+      hostComment: string | null;
       submittedAt: string;
       updatedAt: string;
     } | null;
@@ -79,6 +81,7 @@ type AttendeeMemoryInfo = {
     ratingMax: number;
     commentMaxLen: number;
   };
+  virtualHost?: { personaName: string; personaAvatarUrl: string | null } | null;
 };
 
 async function fetchInfo(
