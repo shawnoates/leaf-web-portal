@@ -17,7 +17,7 @@ import { setVerifiedUserCookie } from "@/lib/verified-user";
 
 // ---- Types (mirror the getMeDashboard payload) -----------------------------
 type HostState = "waiting_on_host" | "human_host" | "leaf_arranging" | "leaf_hosted" | "virtual_host";
-type RsvpState = "going" | "not_going" | "no_response" | "pending";
+type RsvpState = "going" | "not_going" | "no_response" | "pending" | "waitlisted";
 
 interface Persona { id: string; name: string; avatarUrl: string | null }
 interface Weather { temp: string; icon: string; text: string }
@@ -241,9 +241,10 @@ function statusFor(plan: Plan): { cls: string; text: string } | null {
   // "Organized by", not "Hosted by": a virtual host arranges the plan but
   // isn't in the room, so the hosting verb would promise a presence nobody
   // delivers. Kept in sync with org/[shareId] and dashboard/[calendarId].
-  // The viewer's own pending request outranks host-context pills — it's the
+  // The viewer's own queued state outranks host-context pills — it's the
   // state they act on ("did my request go through?").
   if (plan.rsvpState === "pending") return { cls: "wait", text: "Requested · waiting on host" };
+  if (plan.rsvpState === "waitlisted") return { cls: "wait", text: "On the waitlist" };
   if (plan.hostState === "virtual_host") {
     const by = plan.hostPersona ? `Organized by ${plan.hostPersona.name}` : "Organized by Leaf";
     return { cls: "host", text: plan.attendeeCount > 0 ? `${by} · ${plan.attendeeCount} going` : by };
@@ -612,7 +613,7 @@ function Stop({
   // A virtual host fronts the hosting, so the real owner counts as "not
   // hosting" here too and still gets the CTA (mirrors AttendButtons/canChat).
   const canAttend = (!plan.viewerIsHost || plan.hostState === "virtual_host") && plan.rsvpState !== "going"
-    && plan.rsvpState !== "pending"
+    && plan.rsvpState !== "pending" && plan.rsvpState !== "waitlisted"
     && plan.hostState !== "waiting_on_host" && plan.hostState !== "leaf_hosted";
   return (
     <article className="stop">
@@ -638,8 +639,8 @@ function Stop({
 }
 
 // White-bg quick CTA for the spine's not-attending plans. One tap RSVPs going
-// (optimistic); requireApproval plans queue a request instead ("pending").
-// Full controls live in the plan modal.
+// (optimistic); requireApproval plans queue a request ("pending") and full
+// plans join the waitlist ("waitlisted"). Full controls live in the plan modal.
 function AttendCta({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: RsvpState) => void }) {
   const [busy, setBusy] = useState(false);
   const full = planIsFull(plan);
@@ -649,7 +650,7 @@ function AttendCta({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: RsvpS
     const prev = plan.rsvpState;
     // Optimistically land on the state the server will return; reconcile if
     // it disagrees (e.g. a stale card missing the approval flag).
-    const target: RsvpState = plan.requireApproval ? "pending" : "going";
+    const target: RsvpState = full ? "waitlisted" : plan.requireApproval ? "pending" : "going";
     onRsvp(plan.id, target);
     try {
       const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: "going" });
@@ -665,13 +666,9 @@ function AttendCta({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: RsvpS
       <div className="going-count">
         {plan.attendeeCount} going{plan.capacity != null ? ` · ${plan.capacity} max` : ""}
       </div>
-      {full ? (
-        <span className="status wait">Full</span>
-      ) : (
-        <button className="attend-cta" disabled={busy} onClick={go}>
-          {busy ? "…" : plan.requireApproval ? "Request to Attend" : "Count me in"}
-        </button>
-      )}
+      <button className="attend-cta" disabled={busy} onClick={go}>
+        {busy ? "…" : full ? "Join Waitlist" : plan.requireApproval ? "Request to Attend" : "Count me in"}
+      </button>
     </div>
   );
 }
@@ -686,15 +683,19 @@ function AttendButtons({
   const [busy, setBusy] = useState(false);
   const going = plan.rsvpState === "going";
   const pending = plan.rsvpState === "pending";
-  const full = planIsFull(plan) && !going && !pending;
+  const waitlisted = plan.rsvpState === "waitlisted";
+  const full = planIsFull(plan) && !going && !pending && !waitlisted;
 
   async function set(next: RsvpState) {
     if (busy || plan.rsvpState === next) return;
     const prev = plan.rsvpState;
     setBusy(true);
-    // requireApproval plans land on "pending", not "going" — reconcile with
-    // whatever the server actually returns.
-    const target: RsvpState = next === "going" && plan.requireApproval ? "pending" : next;
+    // Full plans land on "waitlisted" and requireApproval plans on "pending",
+    // not "going" — reconcile with whatever the server actually returns.
+    const target: RsvpState = next !== "going" ? next
+      : full ? "waitlisted"
+      : plan.requireApproval ? "pending"
+      : "going";
     onRsvp(plan.id, target);
     try {
       const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: next });
@@ -719,10 +720,11 @@ function AttendButtons({
 
   return (
     <span className="attend">
-      <button className="btn" aria-pressed={going || pending} disabled={busy || pending || full} onClick={() => set("going")}>
+      <button className="btn" aria-pressed={going || pending || waitlisted} disabled={busy || pending || waitlisted} onClick={() => set("going")}>
         {going ? "✓ Going"
           : pending ? "✓ Requested"
-          : full ? "Full"
+          : waitlisted ? "✓ On waitlist"
+          : full ? "Join Waitlist"
           : plan.requireApproval ? "Request to Attend"
           : "Count me in"}
       </button>
@@ -732,7 +734,7 @@ function AttendButtons({
         disabled={busy}
         onClick={() => set("not_going")}
       >
-        {pending ? "Withdraw request" : <>Can&rsquo;t make it</>}
+        {pending ? "Withdraw request" : waitlisted ? "Leave waitlist" : <>Can&rsquo;t make it</>}
       </button>
     </span>
   );

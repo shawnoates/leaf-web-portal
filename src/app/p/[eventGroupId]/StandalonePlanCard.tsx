@@ -130,7 +130,7 @@ export default function StandalonePlanCard({
               {rsvpCount} going
               {capacity != null
                 ? isFull
-                  ? " · Full"
+                  ? " · Full — waitlist open"
                   : ` · ${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`
                 : null}
             </div>

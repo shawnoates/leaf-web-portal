@@ -54,9 +54,8 @@ type Props = {
   // via onLocationRevealed.
   location: { name: string | null; address: string | null; timezone: string | null } | null;
   requireApproval: boolean;
-  // Capacity reached — replaces the RSVP CTA with a non-interactive Full
-  // state (the server rejects over-capacity RSVPs too; this just saves the
-  // visitor the dead-end tap).
+  // Capacity reached — the CTA becomes "Join the Waitlist" and the server
+  // queues the RSVP as a waitlisted request instead of confirming it.
   isFull: boolean;
   // True when the visitor was bounced back from /open/p/<id>?rsvp=1
   // because iOS didn't intercept the Universal Link (no app installed).
@@ -111,7 +110,7 @@ export default function StandalonePlanRsvp({
   autoOpenRsvp,
   onLocationRevealed,
 }: Props) {
-  const [open, setOpen] = useState(autoOpenRsvp && !isFull);
+  const [open, setOpen] = useState(autoOpenRsvp);
 
   // Strip the rsvp=1 query the bouncer added so a refresh / share doesn't
   // re-pop the modal. The cookie/state hydration inside RsvpModal still
@@ -134,18 +133,12 @@ export default function StandalonePlanRsvp({
           with autoOpenRsvp=true so the verify-via-web modal opens
           automatically. Plain <a> (not next Link) so the browser does a
           full navigation that Safari can hand off to iOS's UL machinery. */}
-      {isFull ? (
-        <div className="block w-full text-center bg-zinc-100 text-zinc-400 rounded-full py-3 text-sm font-medium cursor-default">
-          This plan is full
-        </div>
-      ) : (
-        <a
-          href={`/open/p/${eventGroupId}?rsvp=1`}
-          className="block w-full text-center bg-zinc-900 text-white rounded-full py-3 text-sm font-medium hover:bg-zinc-800 transition"
-        >
-          {requireApproval ? "Request to Attend" : "Count me in"}
-        </a>
-      )}
+      <a
+        href={`/open/p/${eventGroupId}?rsvp=1`}
+        className="block w-full text-center bg-zinc-900 text-white rounded-full py-3 text-sm font-medium hover:bg-zinc-800 transition"
+      >
+        {isFull ? "Join the Waitlist" : requireApproval ? "Request to Attend" : "Count me in"}
+      </a>
       {open ? (
         <RsvpModal
           eventGroupId={eventGroupId}
@@ -154,6 +147,7 @@ export default function StandalonePlanRsvp({
           expiryDate={expiryDate}
           location={location}
           requireApproval={requireApproval}
+          isFull={isFull}
           onClose={() => setOpen(false)}
           onLocationRevealed={onLocationRevealed}
         />
@@ -169,6 +163,7 @@ function RsvpModal({
   expiryDate,
   location,
   requireApproval,
+  isFull,
   onClose,
   onLocationRevealed,
 }: {
@@ -178,6 +173,7 @@ function RsvpModal({
   expiryDate: string | null;
   location: { name: string | null; address: string | null; timezone: string | null } | null;
   requireApproval: boolean;
+  isFull: boolean;
   onClose: () => void;
   onLocationRevealed?: (loc: { name: string | null; address: string | null }) => void;
 }) {
@@ -204,6 +200,7 @@ function RsvpModal({
   const [rsvpNote, setRsvpNote] = useState("");
   const [sharePhone, setSharePhone] = useState(true);
   const [isPendingResult, setIsPendingResult] = useState(false);
+  const [isWaitlistResult, setIsWaitlistResult] = useState(false);
   const [isHostResult, setIsHostResult] = useState(false);
   const [notificationId, setNotificationId] = useState<string | null>(null);
 
@@ -264,6 +261,7 @@ function RsvpModal({
         | {
             eventNotificationId?: string;
             pendingApproval?: boolean;
+            waitlisted?: boolean;
             isHost?: boolean;
             locationName?: string | null;
             address?: string | null;
@@ -278,7 +276,8 @@ function RsvpModal({
       if (result?.eventNotificationId) {
         setNotificationId(result.eventNotificationId);
       }
-      if (result?.pendingApproval) setIsPendingResult(true);
+      if (result?.pendingApproval || result?.waitlisted) setIsPendingResult(true);
+      if (result?.waitlisted) setIsWaitlistResult(true);
       if (result?.isHost) setIsHostResult(true);
       // Server returns name + address on confirmed (Accepted/Owned) RSVPs;
       // pending requests come back with both null and stay redacted until
@@ -313,7 +312,7 @@ function RsvpModal({
           <div className="space-y-6">
             <div>
               <h3 className="text-2xl font-light tracking-tight">
-                {requireApproval ? "Request to Attend" : "RSVP for"} {planTitle}
+                {isFull ? "Join the waitlist for" : requireApproval ? "Request to Attend" : "RSVP for"} {planTitle}
               </h3>
             </div>
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -431,6 +430,8 @@ function RsvpModal({
               >
                 {formStep === "submitting" ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
+                ) : isFull ? (
+                  <>Join Waitlist <ArrowRight className="w-4 h-4" /></>
                 ) : requireApproval ? (
                   <>Submit Request <ArrowRight className="w-4 h-4" /></>
                 ) : (
@@ -462,18 +463,22 @@ function RsvpModal({
             </div>
             <div>
               <h4 className="text-2xl font-light mb-2">
-                {isPendingResult
-                  ? "Request Sent!"
-                  : isHostResult
-                    ? "You’re hosting this plan"
-                    : "You’re in!"}
+                {isWaitlistResult
+                  ? "You’re on the waitlist!"
+                  : isPendingResult
+                    ? "Request Sent!"
+                    : isHostResult
+                      ? "You’re hosting this plan"
+                      : "You’re in!"}
               </h4>
               <p className="text-sm text-zinc-500 max-w-xs mx-auto">
-                {isPendingResult
-                  ? "You’ll receive a text when your request is approved."
-                  : isHostResult
-                    ? "Open the Plan Chat in Leaf to coordinate with your attendees."
-                    : "Coordinate with the group. Join the Plan Chat."}
+                {isWaitlistResult
+                  ? "You’ll receive a text the moment a spot opens up."
+                  : isPendingResult
+                    ? "You’ll receive a text when your request is approved."
+                    : isHostResult
+                      ? "Open the Plan Chat in Leaf to coordinate with your attendees."
+                      : "Coordinate with the group. Join the Plan Chat."}
               </p>
             </div>
 

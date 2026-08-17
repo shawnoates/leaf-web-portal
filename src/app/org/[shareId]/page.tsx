@@ -596,6 +596,7 @@ function RsvpModal({
   const [notificationId, setNotificationId] = useState<string | null>(existingNotificationId || null);
   const [rsvpNote, setRsvpNote] = useState("");
   const [isPendingResult, setIsPendingResult] = useState(false);
+  const [isWaitlistResult, setIsWaitlistResult] = useState(false);
   const [sharePhone, setSharePhone] = useState(true);
   const [followState, setFollowState] = useState<"idle" | "following" | "done" | "pending">(
     isFollowingCalendar ? "done" : followRequestPendingProp ? "pending" : "idle"
@@ -643,7 +644,7 @@ function RsvpModal({
         eventGroupId: plan.id,
         rsvpNote: plan.requireApproval && rsvpNote.trim() ? rsvpNote.trim() : undefined,
         sharePhoneWithHost: sharePhone,
-      }) as { eventNotificationId?: string; alreadyRsvpd?: boolean; pendingApproval?: boolean } | null | undefined;
+      }) as { eventNotificationId?: string; alreadyRsvpd?: boolean; pendingApproval?: boolean; waitlisted?: boolean } | null | undefined;
       console.log("[RSVP] result:", result);
       setVerifiedUserCookie(verify.name, verify.phone);
       if (result?.eventNotificationId) {
@@ -664,10 +665,11 @@ function RsvpModal({
           console.warn("[RSVP] Could not mint chat session:", sessionErr);
         }
       }
-      if (result?.pendingApproval) {
+      if (result?.pendingApproval || result?.waitlisted) {
         setIsPendingResult(true);
       }
-      onRsvpSuccess?.(plan.id, result?.alreadyRsvpd === true, result?.pendingApproval);
+      if (result?.waitlisted) setIsWaitlistResult(true);
+      onRsvpSuccess?.(plan.id, result?.alreadyRsvpd === true, result?.pendingApproval || result?.waitlisted);
       setFormStep("success");
       // Fire the follow-along after the success state transitions so the
       // inline followState UI ("Following…" → "Following {name}") reads
@@ -787,11 +789,15 @@ function RsvpModal({
               {isPendingResult ? <Clock className="w-7 h-7 text-amber-500" /> : <CheckCircle2 className="w-7 h-7" />}
             </div>
             <div>
-              <h4 className="text-2xl font-light mb-2">{isPendingResult ? "Request Sent!" : "You\u0027re in!"}</h4>
+              <h4 className="text-2xl font-light mb-2">
+                {isWaitlistResult ? "You\u0027re on the waitlist!" : isPendingResult ? "Request Sent!" : "You\u0027re in!"}
+              </h4>
               <p className="text-sm text-zinc-500 max-w-xs mx-auto">
-                {isPendingResult
-                  ? "You\u0027ll receive a text when your request is approved."
-                  : "Coordinate with the group. Join the Plan Chat."}
+                {isWaitlistResult
+                  ? "You\u0027ll receive a text the moment a spot opens up."
+                  : isPendingResult
+                    ? "You\u0027ll receive a text when your request is approved."
+                    : "Coordinate with the group. Join the Plan Chat."}
               </p>
             </div>
 
