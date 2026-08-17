@@ -80,10 +80,24 @@ interface NeedsHost {
   tier1: HostPlan[];
   tier2: HostCalRow[];
 }
+// Spot interest probe (To Plan v2 §C4). Venue-framed by design: the payload
+// carries no owner identity and the card must never imply "someone you know".
+interface SpotProbe {
+  probeId: string;
+  venueSnapshot: {
+    name: string;
+    category: string | null;
+    neighborhood: string | null;
+    imageURL: string | null;
+  } | null;
+  window: { startIso: string; endIso: string; label: string } | null;
+  status: string; // pending | interested | passed | expired
+}
 interface Dashboard {
   person: { firstName: string; ownsCalendars: boolean; pendingReviewCount: number };
   greeting?: { weather: Weather | null };
   needsHost?: NeedsHost;
+  spotProbes?: SpotProbe[]; // may be absent while the server side ships
   nextPlan: Plan | null;
   plans: Plan[];
   unreadMessageCount: number;
@@ -388,6 +402,10 @@ function DashboardView({
               ))}
             </div>
           </section>
+        )}
+
+        {Array.isArray(data.spotProbes) && data.spotProbes.length > 0 && (
+          <AskAroundSection probes={data.spotProbes} />
         )}
 
         {data.needsHost && (data.needsHost.tier1.length > 0 || data.needsHost.tier2.length > 0) && (
@@ -866,6 +884,85 @@ function NeedsHostSection({ data }: { data: NeedsHost }) {
   );
 }
 
+// ---- Leaf asked around (spot interest probes — To Plan v2 §C4) --------------
+// GUARDRAIL (spec §7): venue-framed only. The card never names who queued the
+// spot, never says "someone you know", never hints at provenance at all — the
+// venue is the subject and the reader reacts to the place itself. Both answers
+// are one tap; "Not for me" carries no guilt copy. Responses are optimistic:
+// the card flips to a brief "Got it 🌱" then collapses, and once responded it
+// is never re-shown even if a refetch still returns the probe as pending.
+function AskAroundSection({ probes }: { probes: SpotProbe[] }) {
+  // responded → card shows the "Got it 🌱" state; collapsed → card is gone.
+  // Both are local-only so a mid-flight refetch can't resurrect a card.
+  const [responded, setResponded] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const timersRef = useRef<number[]>([]);
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => { timers.forEach((t) => window.clearTimeout(t)); };
+  }, []);
+
+  // Pending probes only — resolved/expired rows never render here.
+  const visible = probes.filter(
+    (p) => p && p.probeId && p.status === "pending" && !collapsed.has(p.probeId),
+  );
+  if (visible.length === 0) return null;
+
+  function respond(p: SpotProbe, response: "interested" | "passed") {
+    if (responded.has(p.probeId)) return;
+    setResponded((s) => new Set(s).add(p.probeId));
+    // Fire-and-forget: the answer is a soft signal, not an RSVP — never
+    // re-surface the card to retry (spec: no re-show once answered).
+    Parse.Cloud.run("respondToSpotProbe", { probeId: p.probeId, response }).catch(() => {});
+    timersRef.current.push(window.setTimeout(() => {
+      setCollapsed((s) => new Set(s).add(p.probeId));
+    }, 1400));
+  }
+
+  return (
+    <section className="wrap sect aas">
+      <div className="eyebrow" style={{ marginBottom: 18 }}>Worth checking out?</div>
+      {visible.map((p) => {
+        const v = p.venueSnapshot;
+        const catHood = [v?.category, v?.neighborhood].filter(Boolean).join(" · ");
+        const windowLine = p.window?.label
+          ? `${p.window.label} could work — would you go?`
+          : "Would you go sometime?";
+        if (responded.has(p.probeId)) {
+          return (
+            <div className="hcard" key={p.probeId}>
+              <div className="aas-thanks">Got it 🌱</div>
+            </div>
+          );
+        }
+        return (
+          <div className="hcard" key={p.probeId}>
+            {v?.imageURL ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="thumb" src={v.imageURL} alt="" />
+            ) : (
+              <div className="thumb ph" />
+            )}
+            <div className="hb">
+              <h3>{v?.name || "A spot nearby"}</h3>
+              {catHood && <div className="hmeta">{catHood}</div>}
+              <div className="note">{windowLine}</div>
+            </div>
+            <div className="hact aas-act">
+              <button className="hostbtn" onClick={() => respond(p, "interested")}>
+                I&rsquo;d go
+              </button>
+              <button className="aas-pass" onClick={() => respond(p, "passed")}>
+                Not for me
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 // ---- The ask ---------------------------------------------------------------
 function Ask({
   ask, bare,
@@ -1173,6 +1270,12 @@ const CSS = `
 .leafme .crow .cbody .c b{color:var(--amber);font-weight:600}
 .leafme .crow .cbody .c b.soon{color:var(--danger)}
 .leafme .crow .cta{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--sage-deep);white-space:nowrap}
+/* Leaf asked around (spot probes — To Plan v2 §C4) */
+.leafme .aas .note{margin-top:6px;margin-bottom:0}
+.leafme .aas-act{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+.leafme .aas-pass{background:transparent;color:var(--ink-2);border:1px solid var(--rule);border-radius:6px;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:600;padding:11px 17px;white-space:nowrap}
+.leafme .aas-pass:hover{border-color:var(--ink-3);color:var(--ink)}
+.leafme .aas-thanks{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--sage-deep);padding:6px 0}
 @media(max-width:600px){
   .leafme .hcard{flex-wrap:wrap;gap:12px}
   .leafme .hcard .thumb{display:none}
