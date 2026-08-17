@@ -1639,6 +1639,52 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                 />
               </div>
             </div>
+            {/* Timing hints — what actually draws RSVPs, from this calendar's
+                own history when it has enough, otherwise platform-wide. */}
+            {timingHints && (() => {
+              const parts: string[] = [];
+              if (timingHints.bestDay) {
+                parts.push(`${timingHints.bestDay.day}s draw ${timingHints.bestDay.sharePct}% of RSVPs`);
+              }
+              if (timingHints.bestTime) {
+                const b = timingHints.bestTime.bucket;
+                parts.push(`${b.charAt(0).toUpperCase() + b.slice(1)} starts work best`);
+              }
+              if (timingHints.leadTime) {
+                parts.push(
+                  `plans posted ${timingHints.leadTime.label} average ${timingHints.leadTime.avgRsvps} RSVPs vs ${timingHints.leadTime.restAvgRsvps}`
+                );
+              }
+              if (parts.length === 0) return null;
+              const chipLabel = timingHintTarget
+                ? [
+                    timingHintTarget.dateLabel,
+                    timingHintTarget.timeHHMM ? displayHintTime(timingHintTarget.timeHHMM) : null,
+                  ].filter(Boolean).join(" · ")
+                : null;
+              return (
+                <div className="border border-zinc-200 bg-zinc-50/60 rounded-lg px-3 py-2.5">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <TrendingUp className="w-3 h-3 text-emerald-600" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                      {timingHints.source === "calendar"
+                        ? "What works for your followers"
+                        : "What works across Leaf"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-600 leading-snug">{parts.join(" · ")}</p>
+                  {chipLabel && (
+                    <button
+                      type="button"
+                      onClick={applyTimingHint}
+                      className="mt-2 inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-700 hover:border-zinc-900 hover:text-zinc-900 transition-colors"
+                    >
+                      Use {chipLabel}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
             {/* Sync to Calendar — one button that's either the connect
                 CTA (when Google Cal isn't linked yet) or the actual sync
                 fetch (once it is). Same button, same slot, no separate
