@@ -47,6 +47,7 @@ import {
   LogOut,
   TrendingUp,
   Sparkles,
+  Lightbulb,
   Code,
   Megaphone,
   Ticket,
@@ -2142,7 +2143,7 @@ export default function OrgDashboardPage() {
                             className="border border-emerald-200 bg-emerald-50/40 rounded-lg px-3 py-2 flex items-center gap-3"
                           >
                             <div className="w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center flex-shrink-0">
-                              <Sparkles className="w-3 h-3" />
+                              <Lightbulb className="w-3 h-3" />
                             </div>
                             <p className="text-xs text-zinc-700 leading-snug flex-1">
                               {ins.message}
@@ -3614,7 +3615,7 @@ export default function OrgDashboardPage() {
               {showNoGrowthCallout && (
                 <div className="border border-emerald-200 bg-emerald-50/40 rounded-xl p-4 flex items-start gap-3 mb-4">
                   <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center flex-shrink-0">
-                    <Sparkles className="w-4 h-4" />
+                    <Lightbulb className="w-4 h-4" />
                   </div>
                   <p className="text-sm text-zinc-700 leading-relaxed pt-1">
                     No new followers in the last 30 days. Share your calendar link to drive new sign-ups.
