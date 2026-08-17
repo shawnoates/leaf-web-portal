@@ -1992,6 +1992,11 @@ export default function OrgCalendarPage() {
               // only thing left to render.
               neighborhood: ((idea.location as Record<string, unknown>).neighborhood as string) || null,
               isPrivate: (idea.location as Record<string, unknown>).isPrivate === true,
+              // Real Google placeId when the server has one (featured rows
+              // always ship it). Dropping it here made suggestedVenueFor fall
+              // back to the __suggested__ sentinel, which the featured submit
+              // path would then send to requestCustomPlanViaWeb as a placeId.
+              placeId: ((idea.location as Record<string, unknown>).placeId as string) || null,
             }
           : null,
         ideaSeriesId: (idea.ideaSeriesId as string) || null,
