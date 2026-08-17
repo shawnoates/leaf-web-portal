@@ -289,6 +289,8 @@ interface OrgAnalytics {
     weekdayDistribution: { day: string; value: number }[];
     timeOfDayDistribution: { bucket: string; value: number }[];
     topCategories: { category: string; plans: number; rsvps: number }[];
+    leadTimeDistribution?: { bucket: string; label: string; plans: number; rsvps: number; avgRsvps: number }[];
+    rsvpArrival?: { sampleSize: number; medianLeadDays: number; withinTwoDaysPct: number } | null;
   };
   insights: {
     type: string;
@@ -296,6 +298,7 @@ interface OrgAnalytics {
     actionLabel?: string;
     actionDayIndex?: number;
     actionTimeBucket?: string;
+    actionLeadBucket?: string;
   }[];
 }
 
@@ -2419,6 +2422,68 @@ export default function OrgDashboardPage() {
                     </div>
                   </section>
                 </div>
+
+                {/* Posting lead time — avg RSVPs per plan by how far ahead it
+                    was posted (completed plans only, computed server-side). */}
+                {(() => {
+                  const leadDist = analytics.whatsWorking.leadTimeDistribution || [];
+                  const totalLeadPlans = leadDist.reduce((a, b) => a + b.plans, 0);
+                  if (totalLeadPlans === 0) return null;
+                  const arrival = analytics.whatsWorking.rsvpArrival;
+                  return (
+                    <section className="border border-zinc-200 rounded-xl p-6">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1">
+                        RSVPs by posting lead time
+                      </h3>
+                      <p className="text-[11px] text-zinc-400 mb-4">
+                        Average RSVPs per completed plan, by how far ahead it was posted
+                      </p>
+                      <div className="h-48 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={leadDist}>
+                            <CartesianGrid stroke="#f4f4f5" vertical={false} />
+                            <XAxis
+                              dataKey="label"
+                              tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <YAxis
+                              tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                              tickLine={false}
+                              axisLine={false}
+                              width={30}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                border: "1px solid #e4e4e7",
+                                borderRadius: 8,
+                                fontSize: 12,
+                              }}
+                              formatter={(value, _name, entry) => {
+                                const row = entry?.payload as { plans?: number } | undefined;
+                                return [
+                                  `${value} avg RSVPs (${row?.plans ?? 0} plan${row?.plans === 1 ? "" : "s"})`,
+                                  null,
+                                ];
+                              }}
+                            />
+                            <Bar dataKey="avgRsvps" fill="#18181b" radius={[6, 6, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                      {arrival && (
+                        <p className="text-[11px] text-zinc-500 mt-3">
+                          Half of your RSVPs arrive within{" "}
+                          {arrival.medianLeadDays <= 1
+                            ? "a day"
+                            : `${Math.round(arrival.medianLeadDays)} days`}{" "}
+                          of the event · {arrival.withinTwoDaysPct}% come in the final 48 hours
+                        </p>
+                      )}
+                    </section>
+                  );
+                })()}
 
                 {/* Engagement summary */}
                 <section className="border border-zinc-200 rounded-xl p-6">
