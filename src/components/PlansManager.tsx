@@ -1212,7 +1212,7 @@ export default function PlansManager({
 
           {planTense === "upcoming" ? (
             upcomingPlans.length > 0 ? (
-              <div className="flex gap-3 overflow-x-auto pb-1">
+              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
                 {upcomingPlans.map((plan) => (
                   <div
                     key={plan.objectId}
@@ -1392,7 +1392,7 @@ export default function PlansManager({
             // real PlanIdeas with AI-starter events (from an adopted
             // AICalendar) in one date-sorted row — each keeps its own card
             // and click behavior since they're backed by different models.
-            <div className="flex gap-3 overflow-x-auto pb-1">
+            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
               {[
                 ...planIdeas.map((idea) => ({
                   kind: "idea" as const,
