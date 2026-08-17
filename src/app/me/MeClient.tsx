@@ -93,6 +93,13 @@ interface SpotProbe {
   } | null;
   window: { startIso: string; endIso: string; label: string } | null;
   status: string; // pending | interested | passed | expired
+  // Calendar-framed probes (v2): the followed calendar collecting interest on
+  // this venue. Null on legacy bookmark-sourced probes, which stay anonymous.
+  calendarId?: string | null;
+  calendarName?: string | null;
+  // Stamped after the one-tap popup has shown this probe — the popup never
+  // re-fires for a seen probe, answered or not.
+  seenAt?: string | null;
 }
 interface Dashboard {
   person: { firstName: string; ownsCalendars: boolean; pendingReviewCount: number };
@@ -349,6 +356,24 @@ function DashboardView({
   const spine = data.plans.slice(1); // hero is plans[0]
   const calCount = new Set(data.plans.map((p) => p.calendarId).filter(Boolean)).size;
   const [openPlanId, setOpenPlanId] = useState<string | null>(null);
+
+  // One-tap probe popup: fires once per unseen pending probe, newest first.
+  // Seen is stamped server-side the moment it shows — dismissing without
+  // answering still means it never pops again; the inline section remains.
+  const [popupProbe, setPopupProbe] = useState<SpotProbe | null>(null);
+  const [popupAnsweredId, setPopupAnsweredId] = useState<string | null>(null);
+  const popupFiredRef = useRef(false);
+  useEffect(() => {
+    if (popupFiredRef.current) return;
+    const candidate = (data.spotProbes || []).find(
+      (p) => p && p.probeId && p.status === "pending" && !p.seenAt,
+    );
+    if (!candidate) return;
+    popupFiredRef.current = true;
+    setPopupProbe(candidate);
+    Parse.Cloud.run("markSpotProbesSeen", { probeIds: [candidate.probeId] }).catch(() => {});
+  }, [data.spotProbes]);
+  const sectionProbes = (data.spotProbes || []).filter((p) => p.probeId !== popupAnsweredId);
   // Read the live plan object so RSVP changes reflect inside the modal.
   const openPlan =
     (data.nextPlan && data.nextPlan.id === openPlanId ? data.nextPlan : null) ||
@@ -405,8 +430,8 @@ function DashboardView({
           </section>
         )}
 
-        {Array.isArray(data.spotProbes) && data.spotProbes.length > 0 && (
-          <AskAroundSection probes={data.spotProbes} />
+        {sectionProbes.length > 0 && (
+          <AskAroundSection probes={sectionProbes} />
         )}
 
         {data.needsHost && (data.needsHost.tier1.length > 0 || data.needsHost.tier2.length > 0) && (
@@ -433,7 +458,80 @@ function DashboardView({
       {openPlan && (
         <PlanModal plan={openPlan} onClose={() => setOpenPlanId(null)} onRsvp={onRsvp} />
       )}
+
+      {popupProbe && (
+        <ProbePopup
+          probe={popupProbe}
+          onClose={() => setPopupProbe(null)}
+          onAnswered={(id) => setPopupAnsweredId(id)}
+        />
+      )}
     </>
+  );
+}
+
+// ---- One-tap probe popup ---------------------------------------------------
+// Same guardrails as AskAroundSection: one tap either way, no guilt copy, and
+// closing without answering is a first-class exit (the inline card stays).
+function ProbePopup({
+  probe, onClose, onAnswered,
+}: {
+  probe: SpotProbe;
+  onClose: () => void;
+  onAnswered: (probeId: string) => void;
+}) {
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const v = probe.venueSnapshot;
+  const catHood = [v?.category, v?.neighborhood].filter(Boolean).join(" · ");
+
+  function respond(response: "interested" | "passed") {
+    if (done) return;
+    setDone(true);
+    onAnswered(probe.probeId);
+    Parse.Cloud.run("respondToSpotProbe", {
+      probeId: probe.probeId, response, respondedVia: "me_popup",
+    }).catch(() => {});
+    window.setTimeout(onClose, 1100);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card probe-pop" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-x" onClick={onClose} aria-label="Close">×</button>
+        {v?.imageURL && (
+          <div className="modal-img">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={v.imageURL} alt="" />
+          </div>
+        )}
+        <div className="modal-body">
+          {done ? (
+            <div className="aas-thanks" style={{ padding: "24px 0" }}>Got it 🌱</div>
+          ) : (
+            <>
+              {probe.calendarName && <div className="cal">{probe.calendarName}</div>}
+              <h2 className="modal-title">{v?.name || "A spot nearby"}</h2>
+              {catHood && <div className="hmeta" style={{ marginTop: 4 }}>{catHood}</div>}
+              <p className="blurb" style={{ marginTop: 10 }}>
+                {probe.window?.label
+                  ? `${probe.window.label} could work — would you go?`
+                  : "Would you go sometime?"}
+              </p>
+              <div className="row" style={{ marginTop: 18 }}>
+                <button className="hostbtn" onClick={() => respond("interested")}>I&rsquo;d go</button>
+                <button className="aas-pass" onClick={() => respond("passed")}>Not for me</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -799,8 +897,15 @@ function NeedsHostSection({ data }: { data: NeedsHost }) {
               )}
               <div className="hb">
                 <div className="cal">{p.calendarName}</div>
-                <h3>
-                  {p.title}
+                <h3>{p.title}</h3>
+                <div className="hmeta">{[weekday(p.date), fmtTime(p.time, p.date), p.venueName || p.venueAddress].filter(Boolean).join(" · ")}</div>
+                <div className={`decay ${p.decayLevel}`}>{decayText(p)}</div>
+              </div>
+              <div className="hact">
+                {(interestCounts[p.ideaId] ?? p.interestedCount) > 0 && (
+                  <div className="interested">{interestCounts[p.ideaId] ?? p.interestedCount} interested</div>
+                )}
+                <div className="hact-row">
                   <button
                     type="button"
                     className={`heart-btn ${interested.has(p.ideaId) ? "on" : ""}`}
@@ -810,17 +915,10 @@ function NeedsHostSection({ data }: { data: NeedsHost }) {
                   >
                     <Heart className="w-4 h-4" fill={interested.has(p.ideaId) ? "currentColor" : "none"} />
                   </button>
-                </h3>
-                <div className="hmeta">{[weekday(p.date), fmtTime(p.time, p.date), p.venueName || p.venueAddress].filter(Boolean).join(" · ")}</div>
-                <div className={`decay ${p.decayLevel}`}>{decayText(p)}</div>
-              </div>
-              <div className="hact">
-                {(interestCounts[p.ideaId] ?? p.interestedCount) > 0 && (
-                  <div className="interested">{interestCounts[p.ideaId] ?? p.interestedCount} interested</div>
-                )}
-                <button className="hostbtn" onClick={() => setHostingIdea(p)}>
-                  Host this
-                </button>
+                  <button className="hostbtn" onClick={() => setHostingIdea(p)}>
+                    Host this
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -945,6 +1043,9 @@ function AskAroundSection({ probes }: { probes: SpotProbe[] }) {
               <div className="thumb ph" />
             )}
             <div className="hb">
+              {/* Calendar-framed probes name their calendar; legacy bookmark
+                  probes stay venue-only (provenance guardrail above). */}
+              {p.calendarName && <div className="aas-cal">{p.calendarName}</div>}
               <h3>{v?.name || "A spot nearby"}</h3>
               {catHood && <div className="hmeta">{catHood}</div>}
               <div className="note">{windowLine}</div>
@@ -1271,7 +1372,7 @@ const CSS = `
 .leafme .hcard .thumb{width:82px;height:60px;flex-shrink:0;border-radius:4px;object-fit:cover;display:block}
 .leafme .hcard .thumb.ph{background:var(--sage)}
 .leafme .hcard .hb{flex:1;min-width:0}
-.leafme .hcard .hb h3{font-family:var(--serif);font-size:18px;font-weight:500;letter-spacing:-.01em;line-height:1.2;display:flex;align-items:center;gap:8px}
+.leafme .hcard .hb h3{font-family:var(--serif);font-size:18px;font-weight:500;letter-spacing:-.01em;line-height:1.2}
 .leafme .heart-btn{background:none;border:0;padding:0;cursor:pointer;display:inline-flex;color:var(--ink-3);flex-shrink:0}
 .leafme .heart-btn:hover{color:var(--ink-2)}
 .leafme .heart-btn.on{color:var(--sage-deep)}
@@ -1282,6 +1383,8 @@ const CSS = `
 .leafme .decay.warn{color:var(--amber)}
 .leafme .decay::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .leafme .hact{flex-shrink:0;text-align:right}
+.leafme .hact-row{display:flex;justify-content:flex-end;align-items:stretch;gap:8px}
+.leafme .hact-row .heart-btn{align-items:center;justify-content:center;border:1px solid var(--rule);border-radius:6px;padding:0 12px}
 .leafme .interested{font-size:11px;color:var(--ink-3);margin-bottom:6px}
 .leafme .hostbtn{background:var(--sage-deep);color:#fff;border:0;border-radius:6px;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:600;padding:11px 17px;white-space:nowrap}
 .leafme .hostbtn:hover{background:#264c37}
@@ -1303,6 +1406,9 @@ const CSS = `
 .leafme .aas-pass{background:transparent;color:var(--ink-2);border:1px solid var(--rule);border-radius:6px;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:600;padding:11px 17px;white-space:nowrap}
 .leafme .aas-pass:hover{border-color:var(--ink-3);color:var(--ink)}
 .leafme .aas-thanks{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--sage-deep);padding:6px 0}
+.leafme .aas-cal{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
+.leafme .probe-pop{max-width:420px}
+.leafme .probe-pop .row{display:flex;gap:8px;align-items:center}
 @media(max-width:600px){
   .leafme .hcard{flex-wrap:wrap;gap:12px}
   .leafme .hcard .thumb{display:none}
