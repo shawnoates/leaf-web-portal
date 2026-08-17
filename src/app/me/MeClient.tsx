@@ -533,7 +533,7 @@ function ProbePopup({
                   : "Would you go sometime?"}
               </p>
               <div className="row" style={{ marginTop: 18 }}>
-                <button className="hostbtn" onClick={() => respond("interested")}>I&rsquo;d go</button>
+                <button className="hostbtn" onClick={() => respond("interested")}>Interested</button>
                 <button className="aas-pass" onClick={() => respond("passed")}>Not for me</button>
               </div>
             </>
@@ -1083,8 +1083,10 @@ function AskAroundSection({ probes }: { probes: SpotProbe[] }) {
               <div className="note">{windowLine}</div>
             </div>
             <div className="hact aas-act">
+              {/* "Interested", not "I'd go" — this is a soft signal, and the
+                  copy must not read as committing to a plan. */}
               <button className="hostbtn" onClick={() => respond(p, "interested")}>
-                I&rsquo;d go
+                Interested
               </button>
               <button className="aas-pass" onClick={() => respond(p, "passed")}>
                 Not for me
@@ -1439,6 +1441,7 @@ const CSS = `
 .leafme .aas-pass:hover{border-color:var(--ink-3);color:var(--ink)}
 .leafme .aas-thanks{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--sage-deep);padding:6px 0}
 .leafme .aas-cal{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
+.leafme .aas .hcard:last-child{border-bottom:0} /* .sect already rules the seam — avoid a double line */
 .leafme .probe-pop{max-width:420px}
 .leafme .probe-pop .row{display:flex;gap:8px;align-items:center}
 @media(max-width:600px){
