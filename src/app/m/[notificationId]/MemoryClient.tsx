@@ -88,8 +88,10 @@ type AttendeeMemoryInfo = {
     acceptingResponses: boolean;
     existing: {
       objectId: string;
-      rating: number;
+      rating: number | null;
       comment: string | null;
+      hostRating: number | null;
+      hostComment: string | null;
       submittedAt: string;
       updatedAt: string;
     } | null;
@@ -97,6 +99,9 @@ type AttendeeMemoryInfo = {
     ratingMax: number;
     commentMaxLen: number;
   };
+  // Present only on virtual-hosted plans — gates the private host-feedback
+  // section of the survey card.
+  virtualHost?: { personaName: string; personaAvatarUrl: string | null } | null;
 };
 
 function formatEventDate(iso: string | null): string {
@@ -134,6 +139,12 @@ export default function MemoryClient({
   );
   const [surveyComment, setSurveyComment] = useState<string>(
     initialInfo?.survey?.existing?.comment ?? ""
+  );
+  const [hostRating, setHostRating] = useState<number>(
+    initialInfo?.survey?.existing?.hostRating ?? 0
+  );
+  const [hostComment, setHostComment] = useState<string>(
+    initialInfo?.survey?.existing?.hostComment ?? ""
   );
   const [surveySubmitting, setSurveySubmitting] = useState(false);
   const [surveyError, setSurveyError] = useState<string | null>(null);
@@ -239,19 +250,26 @@ export default function MemoryClient({
   }
 
   async function submitSurvey() {
-    if (!info?.survey || surveyRating < 1) return;
+    // Either half is enough — an event rating, or private host feedback alone.
+    const hasEventRating = surveyRating >= 1;
+    const hasHostFeedback = hostRating >= 1 || hostComment.trim().length > 0;
+    if (!info?.survey || (!hasEventRating && !hasHostFeedback)) return;
     setSurveyError(null);
     setSurveySubmitting(true);
     setSurveyJustSaved(false);
     try {
       const result = (await Parse.Cloud.run("submitAttendeeSurvey", {
         notificationId,
-        rating: surveyRating,
-        comment: surveyComment.trim() || undefined,
+        rating: hasEventRating ? surveyRating : undefined,
+        comment: hasEventRating ? surveyComment.trim() || undefined : undefined,
+        hostRating: hostRating >= 1 ? hostRating : undefined,
+        hostComment: hostComment.trim() || undefined,
       })) as {
         objectId: string;
-        rating: number;
+        rating: number | null;
         comment: string | null;
+        hostRating: number | null;
+        hostComment: string | null;
         submittedAt: string;
         updatedAt: string;
       };
@@ -487,6 +505,67 @@ export default function MemoryClient({
             />
           </label>
 
+          {/* Private feedback about the AI-assisted host. Only rendered on
+              virtual-hosted plans; goes to the Leaf team, never to the plan
+              host, the calendar owner, or the group. */}
+          {info.virtualHost && (
+            <div className="border-t border-zinc-100 mt-5 pt-5">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-1">
+                How was {info.virtualHost.personaName}, your host?
+              </h3>
+              <p className="text-xs text-zinc-500 mb-3">
+                Private — this goes only to the Leaf team, not the group or the
+                calendar.
+              </p>
+              <div
+                className="flex items-center gap-1 mb-3"
+                role="radiogroup"
+                aria-label={`Rate ${info.virtualHost.personaName} from 1 to 5 stars`}
+              >
+                {Array.from({ length: info.survey.ratingMax }, (_, i) => i + 1).map(
+                  (n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      role="radio"
+                      aria-checked={hostRating === n}
+                      aria-label={`${n} star${n === 1 ? "" : "s"}`}
+                      onClick={() => {
+                        setHostRating(n);
+                        setSurveyJustSaved(false);
+                      }}
+                      disabled={surveySubmitting}
+                      className="p-1 disabled:opacity-50 transition-transform hover:scale-110"
+                    >
+                      <Star
+                        className={`w-6 h-6 ${
+                          hostRating >= n
+                            ? "fill-amber-400 text-amber-400"
+                            : "fill-zinc-100 text-zinc-300"
+                        }`}
+                      />
+                    </button>
+                  )
+                )}
+              </div>
+              <label className="block">
+                <span className="sr-only">Private feedback about your host</span>
+                <textarea
+                  value={hostComment}
+                  onChange={(e) => {
+                    setHostComment(e.target.value);
+                    setSurveyJustSaved(false);
+                  }}
+                  maxLength={info.survey.commentMaxLen}
+                  rows={2}
+                  disabled={surveySubmitting}
+                  placeholder={`How did ${info.virtualHost.personaName} do? (private, optional)`}
+                  className="w-full text-sm border border-zinc-200 rounded-lg p-3 focus:outline-none focus:border-zinc-400 resize-y disabled:opacity-50"
+                />
+              </label>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mt-3">
             <p className="text-[11px] text-zinc-400">
               Visible to the host as {info.attendee.name}.
@@ -494,7 +573,10 @@ export default function MemoryClient({
             <button
               type="button"
               onClick={submitSurvey}
-              disabled={surveySubmitting || surveyRating < 1}
+              disabled={
+                surveySubmitting ||
+                (surveyRating < 1 && hostRating < 1 && !hostComment.trim())
+              }
               className="inline-flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
             >
               {surveySubmitting ? (
