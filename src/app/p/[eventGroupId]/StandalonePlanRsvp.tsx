@@ -133,7 +133,7 @@ export default function StandalonePlanRsvp({
         href={`/open/p/${eventGroupId}?rsvp=1`}
         className="block w-full text-center bg-zinc-900 text-white rounded-full py-3 text-sm font-medium hover:bg-zinc-800 transition"
       >
-        {requireApproval ? "Request to Attend" : "I’m Attending"}
+        {requireApproval ? "Request to Attend" : "Count me in"}
       </a>
       {open ? (
         <RsvpModal

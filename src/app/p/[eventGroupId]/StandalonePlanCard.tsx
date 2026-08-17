@@ -27,7 +27,7 @@ type Props = {
   calendarProfilePhoto: string | null;
   // Only present when variant === "privateCalendar"
   shareId: string | null;
-  // Affects "I'm Attending" vs "Request to Attend" button copy
+  // Affects "Count me in" vs "Request to Attend" button copy
   requireApproval: boolean;
   // Set when /p/<id>?rsvp=1 — the visitor was bounced back from
   // /open/p/<id>?rsvp=1 after iOS failed to intercept (no app installed),

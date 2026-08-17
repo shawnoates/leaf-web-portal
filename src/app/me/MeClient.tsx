@@ -501,7 +501,7 @@ function Stop({
   const meta = [weekday(plan.date), timeLabel(plan), plan.venueName || plan.venueAddress].filter(Boolean).join(" · ");
   const hostHref = plan.calendarShareId ? `/org/${plan.calendarShareId}?host=${encodeURIComponent(plan.id)}` : `/p/${plan.id}`;
   // Plans you're neither attending nor hosting (and not Leaf-hosted / waiting on
-  // a host) get a quick "I'm attending" CTA on the right instead of a count.
+  // a host) get a quick "Count me in" CTA on the right instead of a count.
   // A virtual host fronts the hosting, so the real owner counts as "not
   // hosting" here too and still gets the CTA (mirrors AttendButtons/canChat).
   const canAttend = (!plan.viewerIsHost || plan.hostState === "virtual_host") && plan.rsvpState !== "going"
@@ -529,7 +529,7 @@ function Stop({
   );
 }
 
-// White-bg "I'm attending" quick CTA for the spine's not-attending plans.
+// White-bg "Count me in" quick CTA for the spine's not-attending plans.
 // One tap RSVPs going (optimistic); full controls live in the plan modal.
 function AttendCta({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: RsvpState) => void }) {
   const [busy, setBusy] = useState(false);
@@ -550,7 +550,7 @@ function AttendCta({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: RsvpS
     <div className="attend-cta-wrap">
       <div className="going-count">{plan.attendeeCount} going</div>
       <button className="attend-cta" disabled={busy} onClick={go}>
-        {busy ? "…" : "I'm attending"}
+        {busy ? "…" : "Count me in"}
       </button>
     </div>
   );
@@ -594,7 +594,7 @@ function AttendButtons({
   return (
     <span className="attend">
       <button className="btn" aria-pressed={going} disabled={busy} onClick={() => set("going")}>
-        {going ? "✓ Going" : "I'm going"}
+        {going ? "✓ Going" : "Count me in"}
       </button>
       <button
         className="btn ghost"
