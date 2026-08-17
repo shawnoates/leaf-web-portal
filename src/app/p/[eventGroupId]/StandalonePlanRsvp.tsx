@@ -54,6 +54,10 @@ type Props = {
   // via onLocationRevealed.
   location: { name: string | null; address: string | null; timezone: string | null } | null;
   requireApproval: boolean;
+  // Capacity reached — replaces the RSVP CTA with a non-interactive Full
+  // state (the server rejects over-capacity RSVPs too; this just saves the
+  // visitor the dead-end tap).
+  isFull: boolean;
   // True when the visitor was bounced back from /open/p/<id>?rsvp=1
   // because iOS didn't intercept the Universal Link (no app installed).
   // Opens the RSVP modal on mount so the tap that started the journey
@@ -103,10 +107,11 @@ export default function StandalonePlanRsvp({
   expiryDate,
   location,
   requireApproval,
+  isFull,
   autoOpenRsvp,
   onLocationRevealed,
 }: Props) {
-  const [open, setOpen] = useState(autoOpenRsvp);
+  const [open, setOpen] = useState(autoOpenRsvp && !isFull);
 
   // Strip the rsvp=1 query the bouncer added so a refresh / share doesn't
   // re-pop the modal. The cookie/state hydration inside RsvpModal still
@@ -129,12 +134,18 @@ export default function StandalonePlanRsvp({
           with autoOpenRsvp=true so the verify-via-web modal opens
           automatically. Plain <a> (not next Link) so the browser does a
           full navigation that Safari can hand off to iOS's UL machinery. */}
-      <a
-        href={`/open/p/${eventGroupId}?rsvp=1`}
-        className="block w-full text-center bg-zinc-900 text-white rounded-full py-3 text-sm font-medium hover:bg-zinc-800 transition"
-      >
-        {requireApproval ? "Request to Attend" : "Count me in"}
-      </a>
+      {isFull ? (
+        <div className="block w-full text-center bg-zinc-100 text-zinc-400 rounded-full py-3 text-sm font-medium cursor-default">
+          This plan is full
+        </div>
+      ) : (
+        <a
+          href={`/open/p/${eventGroupId}?rsvp=1`}
+          className="block w-full text-center bg-zinc-900 text-white rounded-full py-3 text-sm font-medium hover:bg-zinc-800 transition"
+        >
+          {requireApproval ? "Request to Attend" : "Count me in"}
+        </a>
+      )}
       {open ? (
         <RsvpModal
           eventGroupId={eventGroupId}

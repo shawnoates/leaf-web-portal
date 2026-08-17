@@ -29,6 +29,10 @@ type Props = {
   shareId: string | null;
   // Affects "Count me in" vs "Request to Attend" button copy
   requireApproval: boolean;
+  // Confirmed attendee count + optional group-size cap — renders the
+  // "N going · M spots left" line and the full-plan state.
+  rsvpCount: number;
+  capacity: number | null;
   // Set when /p/<id>?rsvp=1 — the visitor was bounced back from
   // /open/p/<id>?rsvp=1 after iOS failed to intercept (no app installed),
   // so the StandalonePlanRsvp child opens its RSVP modal on mount.
@@ -48,10 +52,14 @@ export default function StandalonePlanCard({
   calendarProfilePhoto,
   shareId,
   requireApproval,
+  rsvpCount,
+  capacity,
   autoOpenRsvp,
 }: Props) {
   const showWhen = variant !== "copy" && expiryDate !== null;
   const blurDetails = variant === "privateCalendar";
+  const isFull = capacity != null && rsvpCount >= capacity;
+  const spotsLeft = capacity != null ? Math.max(0, capacity - rsvpCount) : null;
 
   // Server returns null for non-attendees; revealed once the RSVP child
   // reports a successful Accepted RSVP and hands us the location pair.
@@ -117,6 +125,17 @@ export default function StandalonePlanCard({
             <div className="text-sm text-zinc-500">Hosted by {hostName}</div>
           ) : null}
 
+          {variant !== "copy" && (rsvpCount > 0 || capacity != null) ? (
+            <div className="text-sm text-zinc-500">
+              {rsvpCount} going
+              {capacity != null
+                ? isFull
+                  ? " · Full"
+                  : ` · ${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`
+                : null}
+            </div>
+          ) : null}
+
           {description ? (
             <p className="text-sm text-zinc-600 whitespace-pre-wrap">
               {description}
@@ -156,6 +175,7 @@ export default function StandalonePlanCard({
                     : null
                 }
                 requireApproval={requireApproval}
+                isFull={isFull}
                 autoOpenRsvp={autoOpenRsvp}
                 onLocationRevealed={(loc) => {
                   if (loc.name) setRevealedName(loc.name);

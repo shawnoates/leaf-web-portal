@@ -28,6 +28,8 @@ type PlanShareInfo = {
   viewerIsAttendee: boolean;
   calendarProfilePhoto: string | null;
   requireApproval: boolean;
+  rsvpCount: number;
+  capacity: number | null;
 };
 
 async function fetchPlanShareInfo(
@@ -245,6 +247,8 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
       calendarProfilePhoto={info.calendarProfilePhoto}
       shareId={info.shareId}
       requireApproval={info.requireApproval}
+      rsvpCount={info.rsvpCount ?? 0}
+      capacity={info.capacity ?? null}
       autoOpenRsvp={autoOpenRsvp}
     />
   );
