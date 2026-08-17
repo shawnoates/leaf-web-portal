@@ -370,15 +370,23 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     return () => { cancelled = true; };
   }, [selectedCalendarId, pollConvertMode, editMode, hostRequestMode]);
 
-  // Apply-chip target: next occurrence of the best day (1-7 days out, always
-  // within the starter tier's 2-week window) + the winning start time.
+  // Apply-chip target: the best day + the winning start time. Starts at the
+  // next occurrence of the best day, then — when the lead-time hint says
+  // longer runway earns more RSVPs — skips ahead in week steps until the
+  // suggested date carries at least that bucket's minimum lead (e.g. a
+  // "1–2 weeks ahead" winner never suggests this Saturday when that's only
+  // 5 days out). Capped at the starter tier's 2-week posting window.
   const timingHintTarget = (() => {
     if (!timingHints || (!timingHints.bestDay && !timingHints.bestTime)) return null;
     let dateISO: string | null = null;
     let dateLabel: string | null = null;
     if (timingHints.bestDay) {
       const nowD = new Date();
-      const delta = ((timingHints.bestDay.dayIndex - nowD.getDay()) + 7) % 7 || 7;
+      let delta = ((timingHints.bestDay.dayIndex - nowD.getDay()) + 7) % 7 || 7;
+      const LEAD_MIN_DAYS: Record<string, number> = { "0-2": 0, "3-6": 3, "7-13": 7, "14+": 14 };
+      const minLead = timingHints.leadTime ? LEAD_MIN_DAYS[timingHints.leadTime.bucket] ?? 0 : 0;
+      const maxLead = tier === "starter" ? 14 : Infinity;
+      while (delta < minLead && delta + 7 <= maxLead) delta += 7;
       const d = new Date(nowD.getTime() + delta * 24 * 60 * 60 * 1000);
       dateISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       dateLabel = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
