@@ -18,6 +18,7 @@ import {
   Plus,
   Repeat,
   Sparkles,
+  TrendingUp,
   Vote,
   X,
 } from "lucide-react";
