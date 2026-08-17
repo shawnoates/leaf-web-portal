@@ -1459,6 +1459,7 @@ const CSS = `
 .leafme .aas .hcard:last-child{border-bottom:0} /* .sect already rules the seam — avoid a double line */
 .leafme .probe-pop{max-width:420px}
 .leafme .probe-pop .row{display:flex;gap:8px;align-items:center}
+.leafme .probe-pop .hmeta{font-size:13px;color:var(--ink-3)}
 @media(max-width:600px){
   .leafme .hcard{flex-wrap:wrap;gap:12px}
   .leafme .hcard .thumb{display:none}
@@ -1504,6 +1505,15 @@ const CSS = `
   .leafme .modal-overlay{align-items:flex-end;padding:0}
   .leafme .modal-card{max-width:none;border-radius:16px 16px 0 0;max-height:88vh}
   .leafme .modal-img{border-radius:16px 16px 0 0}
+  /* Probe popup reads as a compact bottom sheet, not a takeover: shorter
+     photo, roomier corners, and thumb-sized full-width answers pinned above
+     the home-indicator safe area. */
+  .leafme .probe-pop{border-radius:20px 20px 0 0}
+  .leafme .probe-pop .modal-img{aspect-ratio:2/1;max-height:210px;border-radius:20px 20px 0 0}
+  .leafme .probe-pop .modal-body{padding:18px 20px calc(20px + env(safe-area-inset-bottom))}
+  .leafme .probe-pop .modal-title{font-size:24px}
+  .leafme .probe-pop .row{gap:10px}
+  .leafme .probe-pop .row .hostbtn,.leafme .probe-pop .row .aas-pass{flex:1;padding:14px 12px;font-size:15px;text-align:center}
   .leafme .hero-grid{grid-template-columns:1fr;gap:24px}
   .leafme .greet{padding-top:24px}
   .leafme .greet-line{font-size:26px}
