@@ -994,7 +994,11 @@ export default function OrgDashboardPage() {
   }, [dashboard, calendarId]);
 
   // Selected calendar in the Calendars tab's master/detail layout.
-  const [calendarsSelectedId, setCalendarsSelectedId] = useState<string | null>(null);
+  // Seeded from ?cal= so returns from the edit page (a fresh mount) land on
+  // the calendar that was being edited instead of falling back to primary.
+  const [calendarsSelectedId, setCalendarsSelectedId] = useState<string | null>(
+    () => searchParams.get("cal"),
+  );
 
   // Analytics fetcher — Pro tier only
   const fetchAnalytics = useCallback(
@@ -1118,7 +1122,10 @@ export default function OrgDashboardPage() {
       // Only send suggestStarters when toggled off — server defaults to
       // true, so the wire stays minimal on the happy path.
       if (!newCalSuggestStarters) params.suggestStarters = false;
-      await Parse.Cloud.run("createCalendarUnderOrg", params);
+      const created = (await Parse.Cloud.run("createCalendarUnderOrg", params)) as
+        | { calendarId?: string }
+        | undefined;
+      if (created?.calendarId) setCalendarsSelectedId(created.calendarId);
       setShowAddCalendar(false);
       setNewCalName("");
       setNewCalDesc("");
@@ -3786,7 +3793,7 @@ export default function OrgDashboardPage() {
               <div className="flex items-center justify-between py-2">
                 <div>
                   <p className="text-xs font-medium text-zinc-700">Suggest starter plans</p>
-                  <p className="text-xs text-zinc-400">Seed the calendar with a few AI-suggested plans your members can host</p>
+                  <p className="text-xs text-zinc-400">Seed the calendar with a few AI-suggested plans your members can host. Off hides suggested and featured plans on this calendar.</p>
                 </div>
                 <button
                   type="button"

@@ -314,7 +314,7 @@ export default function EditCalendarPage() {
       else if (removeImage) p.removeImage = true;
 
       await Parse.Cloud.run("updateCalendar", p);
-      router.push(`/dashboard/${orgId}?tab=calendars`);
+      router.push(`/dashboard/${orgId}?tab=calendars&cal=${targetId}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to update calendar.");
     } finally {
@@ -395,7 +395,7 @@ export default function EditCalendarPage() {
       <div className="max-w-3xl mx-auto px-6 py-8">
         <div className="mb-6">
           <Link
-            href={`/dashboard/${orgId}?tab=calendars`}
+            href={`/dashboard/${orgId}?tab=calendars&cal=${targetId}`}
             className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900"
           >
             <ArrowLeft className="w-3 h-3" /> Back to dashboard
