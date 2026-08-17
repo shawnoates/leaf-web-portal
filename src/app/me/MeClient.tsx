@@ -1460,6 +1460,7 @@ const CSS = `
 .leafme .probe-pop{max-width:420px}
 .leafme .probe-pop .row{display:flex;gap:8px;align-items:center}
 .leafme .probe-pop .hmeta{font-size:13px;color:var(--ink-3)}
+.leafme .probe-pop .blurb{margin-bottom:0;font-size:15px;color:var(--ink-2)} /* the ask is the point — body size, and .row's own margin rules the seam */
 @media(max-width:600px){
   .leafme .hcard{flex-wrap:wrap;gap:12px}
   .leafme .hcard .thumb{display:none}
