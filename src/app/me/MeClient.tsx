@@ -1493,7 +1493,7 @@ const CSS = `
 .leafme .otp-in{width:100%;border:1px solid var(--rule);border-radius:3px;padding:10px 12px;font-family:var(--sans);font-size:14px;margin-bottom:12px}
 .leafme .otp-in:focus{outline:2px solid var(--green);outline-offset:1px}
 .leafme .otp-err{font-size:12px;color:#c0392b;margin-bottom:10px}
-.leafme .modal-overlay{position:fixed;inset:0;z-index:60;background:rgba(17,17,17,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.leafme .modal-overlay{position:fixed;inset:0;z-index:60;background:rgba(17,17,17,.62);display:flex;align-items:center;justify-content:center;padding:16px}
 .leafme .modal-card{position:relative;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;background:var(--paper);border-radius:14px;animation:lmmodal .2s ease}
 @keyframes lmmodal{from{transform:translateY(16px);opacity:.5}to{transform:translateY(0);opacity:1}}
 .leafme .modal-x{position:absolute;top:12px;right:12px;z-index:2;width:32px;height:32px;border:0;border-radius:50%;background:rgba(255,255,255,.92);box-shadow:0 1px 4px rgba(0,0,0,.14);font-size:20px;line-height:1;cursor:pointer;color:var(--ink)}
@@ -1510,7 +1510,7 @@ const CSS = `
      photo, roomier corners, and thumb-sized full-width answers pinned above
      the home-indicator safe area. */
   .leafme .probe-pop{border-radius:20px 20px 0 0}
-  .leafme .probe-pop .modal-img{aspect-ratio:2/1;max-height:210px;border-radius:20px 20px 0 0}
+  .leafme .probe-pop .modal-img{aspect-ratio:5/2;max-height:160px;border-radius:20px 20px 0 0}
   .leafme .probe-pop .modal-body{padding:18px 20px calc(20px + env(safe-area-inset-bottom))}
   .leafme .probe-pop .modal-title{font-size:24px}
   .leafme .probe-pop .row{gap:10px}
