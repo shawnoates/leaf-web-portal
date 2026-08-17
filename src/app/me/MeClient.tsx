@@ -564,6 +564,19 @@ function Hero({
           <h1><button className="plan-link" onClick={onOpen}>{plan.title}</button></h1>
           {addr && <p className="addr">{addr}</p>}
           {plan.description && <p className="blurb">{plan.description}</p>}
+          {(plan.attendeeCount > 0 || plan.capacity != null) && (() => {
+            const spotsLeft = plan.capacity != null ? Math.max(0, plan.capacity - plan.attendeeCount) : null;
+            return (
+              <p className="meta">
+                {plan.attendeeCount} going
+                {plan.capacity != null
+                  ? planIsFull(plan)
+                    ? " · Full — waitlist open"
+                    : ` · ${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`
+                  : ""}
+              </p>
+            );
+          })()}
           <div className="row">
             <AttendButtons plan={plan} onRsvp={onRsvp} />
           </div>
