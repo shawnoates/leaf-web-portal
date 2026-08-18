@@ -31,6 +31,12 @@ const nextConfig: NextConfig = {
       // lives at /church-leaders (parallel to /resident-managers, and
       // kept distinct from /church, which is the example calendar).
       { source: "/churches", destination: "/church-leaders", permanent: false },
+      // /faqs is hardcoded as HelpURL / ContactUsURL in the iOS app
+      // (Constants.swift) and ships in every build already on a phone. It has
+      // no page — it used to be swallowed by the apex catch-all below and
+      // land on /personal. Now that the apex serves the real app, without
+      // this alias those two menu items 404.
+      { source: "/faqs", destination: "/help/faq", permanent: true },
       // joinleaf.com is the canonical product domain. It used to 308 every
       // path except the legal pages and /help over to
       // os.joinleaf.com/personal; that catch-all is gone, so the apex now
