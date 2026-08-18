@@ -1255,7 +1255,10 @@ export default function PlansManager({
       justification: `Repeating "${plan.title}" from ${new Date(plan.expiryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", ...(plan.timezone ? { timeZone: plan.timezone } : {}) })}. Pick a new date below.`,
     });
     setEditingPlanId(null);
+    // Close the recap if the repeat was launched from inside it.
     setPhotosModalPlan(null);
+    setModalPhotos(null);
+    setModalRsvps(null);
     setShowCreateModal(true);
   }
 
@@ -1952,12 +1955,23 @@ export default function PlansManager({
                   {photosModalPlan.photoCount} {photosModalPlan.photoCount === 1 ? "photo" : "photos"}
                 </p>
               </div>
-              <button
-                onClick={() => { setPhotosModalPlan(null); setModalPhotos(null); setModalRsvps(null); }}
-                className="text-zinc-400 hover:text-zinc-900 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-3 shrink-0 ml-3">
+                {/* Same Repeat action as the card — reviewing how a plan went
+                    is exactly when an owner decides to run it again. */}
+                <button
+                  type="button"
+                  onClick={() => handleRepeatPlan(photosModalPlan)}
+                  className="inline-flex items-center gap-1.5 border border-zinc-300 rounded-md px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-widest text-zinc-700 hover:border-zinc-900 hover:text-zinc-900 transition-colors whitespace-nowrap"
+                >
+                  <Repeat className="w-3 h-3" /> Repeat
+                </button>
+                <button
+                  onClick={() => { setPhotosModalPlan(null); setModalPhotos(null); setModalRsvps(null); }}
+                  className="text-zinc-400 hover:text-zinc-900 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
             <div className="overflow-y-auto p-5 space-y-6">
               <section>
