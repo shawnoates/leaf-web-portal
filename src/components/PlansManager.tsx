@@ -396,6 +396,19 @@ function AIStarterCard({
             : "linear-gradient(135deg, #e8efe9 0%, #cddcd0 100%)",
         }}
       >
+        {/* The generator's Unsplash photo when it resolved one; the
+            tag-on-gradient treatment is the fallback (and what every
+            suggestion generated before per-event images shows). */}
+        {plan.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={plan.image}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <>
         <div
           className="absolute inset-0 opacity-[0.07]"
           style={{
@@ -414,6 +427,8 @@ function AIStarterCard({
         >
           {(plan.aiTag || "Event").toLowerCase()}
         </span>
+          </>
+        )}
         <span
           className="absolute top-2 left-2 text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5"
           style={{
@@ -757,6 +772,8 @@ export default function PlansManager({
       // the section doesn't accrue stale entries — Shape B events with a
       // locked dateISO in the past drop out here.
       const aiEvents = (page.aiSourceEvents || []) as Array<{
+        // Activity headline (no venue/geography); null on pre-title rows.
+        title?: string | null;
         name: string;
         time: string;
         venueLine: string;
@@ -764,15 +781,16 @@ export default function PlansManager({
         tagVariant?: "default" | "amber";
         isoDatetime?: string | null;
         dateISO?: string | null;
+        imageUrl?: string | null;
       }>;
       const aiStarters: UpcomingPlan[] = aiEvents
         .map((ev, index) => ({ ev, index, resolved: resolveAIStarterDate(ev) }))
         .filter((r) => r.resolved !== null)
         .map(({ ev, index, resolved }) => ({
           objectId: `ai-${index}`,
-          title: ev.name,
+          title: ev.title || ev.name,
           description: "",
-          image: null,
+          image: ev.imageUrl || null,
           expiryDate: (resolved as Date).toISOString(),
           timezone: null,
           time: ev.time,
