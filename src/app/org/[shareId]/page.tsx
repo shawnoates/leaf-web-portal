@@ -225,9 +225,18 @@ interface OrgData {
   // plans. Empty/null when the calendar isn't AI-sourced.
   aiSourceEvents?:
     | {
+        // Short activity headline the generator writes ("Cold Plunge &
+        // Sauna") — deliberately carries no venue or neighborhood, so it's
+        // safe to show before RSVP on a hideVenueUntilRsvp calendar. Null
+        // on rows generated before the field existed; falls back to `name`.
+        title?: string | null;
         name: string;
         time: string;
         venueLine: string;
+        // Unsplash photo picked per event at generate time. Null on older
+        // rows and on any event whose lookup came back empty — the card
+        // falls back to the tag-on-gradient placeholder.
+        imageUrl?: string | null;
         // Vibe-setting 1-sentence blurb the LLM writes per event. Null
         // on older AICalendar rows generated before this field existed;
         // the card falls back to just showing venueLine.
@@ -3220,11 +3229,12 @@ export default function OrgCalendarPage() {
                             index % 2 !== 0 ? "md:flex-row-reverse" : ""
                           }`}
                         >
-                          {/* Placeholder cover — soft-green (or amber for
-                              the finale) gradient with the tag rendered
-                              LARGE in serif so the card reads as
-                              intentional visual work, not a missing
-                              image. */}
+                          {/* Cover — the generator's Unsplash photo when it
+                              resolved one, otherwise the soft-green (or
+                              amber for the finale) gradient with the tag
+                              rendered LARGE in serif so the card still
+                              reads as intentional visual work rather than
+                              a missing image. */}
                           <div
                             className="w-full md:w-3/5 aspect-[16/10] overflow-hidden shadow-sm relative flex items-center justify-center"
                             style={{
@@ -3233,6 +3243,16 @@ export default function OrgCalendarPage() {
                                 : "linear-gradient(135deg, #e8efe9 0%, #cddcd0 100%)",
                             }}
                           >
+                            {ev.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={ev.imageUrl}
+                                alt=""
+                                loading="lazy"
+                                className="absolute inset-0 w-full h-full object-cover"
+                              />
+                            ) : (
+                              <>
                             <div
                               className="absolute inset-0 opacity-[0.07]"
                               style={{
@@ -3252,6 +3272,8 @@ export default function OrgCalendarPage() {
                             >
                               {(ev.tag || "Event").toLowerCase()}
                             </span>
+                              </>
+                            )}
                             <span
                               className="absolute top-4 left-4 text-[10px] font-bold uppercase tracking-widest rounded-full px-3 py-1"
                               style={{
@@ -3271,7 +3293,7 @@ export default function OrgCalendarPage() {
                                   {kicker}
                                 </p>
                                 <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
-                                  {ev.name}
+                                  {ev.title || ev.name}
                                 </h3>
                                 <div className="pt-2">
                                   <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">

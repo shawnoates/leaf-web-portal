@@ -55,9 +55,15 @@ interface AICalendarPayload {
 }
 
 interface Event {
+  // Short activity headline ("Cold Plunge & Sauna") — no venue name, no
+  // neighborhood. Null on rows generated before the field existed, where
+  // the venue name is still the headline.
+  title?: string | null;
   name: string;
   time: string;
   venueLine: string;
+  // Per-event Unsplash photo picked at generate time; null on older rows.
+  imageUrl?: string | null;
   // One-sentence vibe blurb the LLM writes per event; null on older
   // AICalendar rows generated before this field existed.
   description?: string | null;
@@ -849,8 +855,13 @@ function EventsList({
                       fontWeight: 400,
                     }}
                   >
-                    {ev.name}
+                    {ev.title || ev.name}
                   </h3>
+                  {ev.title && ev.title !== ev.name && (
+                    <span className="text-[13px] font-medium" style={{ color: "#3D4A3F" }}>
+                      {ev.name}
+                    </span>
+                  )}
                   {ev.description && (
                     <span className="text-[14px] leading-relaxed" style={{ color: "#3D4A3F" }}>
                       {ev.description}
@@ -944,6 +955,7 @@ function EventEditor({
   onCancel: () => void;
   saving: boolean;
 }) {
+  const [title, setTitle] = useState(initial.title || "");
   const [name, setName] = useState(initial.name);
   const [time, setTime] = useState(initial.time);
   const [venueLine, setVenueLine] = useState(initial.venueLine);
@@ -962,6 +974,27 @@ function EventEditor({
           className="text-[10px] font-bold uppercase tracking-[0.16em]"
           style={{ color: "#6B7168" }}
         >
+          Event title
+        </span>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g. Natural Wine Dinner"
+          className="border-b bg-transparent outline-none py-1.5 text-[15px]"
+          style={{ color: "#131714", borderColor: "#E3E5DE" }}
+          autoFocus
+          maxLength={80}
+        />
+        <span className="text-[11px]" style={{ color: "#6B7168" }}>
+          Short and activity-shaped — the venue and neighborhood belong in the
+          fields below, not here.
+        </span>
+      </label>
+      <label className="flex flex-col gap-1">
+        <span
+          className="text-[10px] font-bold uppercase tracking-[0.16em]"
+          style={{ color: "#6B7168" }}
+        >
           Venue name
         </span>
         <input
@@ -970,7 +1003,6 @@ function EventEditor({
           placeholder="e.g. Bar Camillo"
           className="border-b bg-transparent outline-none py-1.5 text-[15px]"
           style={{ color: "#131714", borderColor: "#E3E5DE" }}
-          autoFocus
           maxLength={120}
         />
       </label>
@@ -1035,7 +1067,12 @@ function EventEditor({
       <div className="flex items-center gap-2 mt-1">
         <button
           onClick={() =>
+            // Spread `initial` first so the fields this form doesn't expose
+            // — description, imageUrl, placeId/address grounding, dateISO —
+            // survive an edit instead of being silently dropped.
             onSave({
+              ...initial,
+              title: title.trim() || null,
               name: name.trim() || "Untitled",
               time: time.trim(),
               venueLine: venueLine.trim(),
