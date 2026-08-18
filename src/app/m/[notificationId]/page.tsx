@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SITE_URL } from "@/lib/site";
 import Parse from "@/lib/parse";
 import MemoryClient from "./MemoryClient";
 
@@ -128,7 +129,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title,
       description,
       type: "website",
-      url: `https://os.joinleaf.com/m/${notificationId}`,
+      url: `${SITE_URL}/m/${notificationId}`,
       images: info.event.image ? [{ url: info.event.image }] : undefined,
       siteName: "Leaf",
     },

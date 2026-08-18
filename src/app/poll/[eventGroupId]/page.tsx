@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SITE_URL } from "@/lib/site";
 import Parse from "@/lib/parse";
 import PollVoteClient from "./PollVoteClient";
 
@@ -77,7 +78,7 @@ export async function generateMetadata({
       title,
       description,
       type: "article",
-      url: `https://os.joinleaf.com/poll/${eventGroupId}`,
+      url: `${SITE_URL}/poll/${eventGroupId}`,
       images: ogImages,
       siteName: "Leaf",
     },

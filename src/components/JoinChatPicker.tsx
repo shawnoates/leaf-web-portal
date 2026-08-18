@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
+import { SITE_URL } from "@/lib/site";
 import { Loader2, Smartphone, MessageCircle } from "lucide-react";
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
@@ -115,7 +116,7 @@ export default function JoinChatPicker({
     setButtonRendered(true);
   }, [scriptReady, buttonRendered, handleCredentialResponse]);
 
-  const appUrl = appLinkHref || `https://os.joinleaf.com/c/${eventNotificationId}`;
+  const appUrl = appLinkHref || `${SITE_URL}/c/${eventNotificationId}`;
   const accent = brandColor || "#18181b";
 
   return (

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SITE_URL } from "@/lib/site";
 import Parse from "@/lib/parse";
 
 type OrgShareInfo = {
@@ -74,9 +75,9 @@ export async function generateMetadata({
       title,
       description,
       type: "website",
-      // Must be the www host. The apex os.joinleaf.com 302s to www, and
+      // Must be the www host. The apex joinleaf.com 308s to www, and
       // unfurlers that re-resolve og:url take a second hop for nothing.
-      url: `https://www.os.joinleaf.com/org/${shareId}`,
+      url: `${SITE_URL}/org/${shareId}`,
       images: ogImages,
       siteName: "Leaf",
     },

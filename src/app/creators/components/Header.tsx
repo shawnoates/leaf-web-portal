@@ -8,7 +8,7 @@ import { SITE_URL } from "./config";
 type WindowWithDataLayer = Window & { dataLayer?: any[] };
 
 /**
- * Sticky landing-page header. Mirrors the os.joinleaf.com brand mark
+ * Sticky landing-page header. Mirrors the joinleaf.com brand mark
  * (leaf-logo-black.png + "OS" wordmark) so this marketing route reads
  * as part of the same site. A delegated click listener forwards
  * [data-cta] attributes to window.dataLayer for GTM analytics.

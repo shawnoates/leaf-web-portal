@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Parse from "@/lib/parse-client";
+import { SITE_URL } from "@/lib/site";
 import { Users, Calendar, ArrowUpRight, Loader2, Vote } from "lucide-react";
 
 // --- Types ---
@@ -272,7 +273,7 @@ function PoweredByLeaf() {
   return (
     <div className="text-center py-6 border-t border-zinc-100">
       <a
-        href="https://os.joinleaf.com"
+        href={SITE_URL}
         target="_blank"
         rel="noopener noreferrer"
         className="text-xs tracking-wider uppercase text-zinc-300 hover:text-zinc-400 transition-colors"

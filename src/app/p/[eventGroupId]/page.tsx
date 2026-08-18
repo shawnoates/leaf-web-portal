@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Parse from "@/lib/parse";
+import { APP_LINK_URL, SITE_URL } from "@/lib/site";
 import PlanShareRedirect from "./PlanShareRedirect";
 import StandalonePlanCard from "./StandalonePlanCard";
 
@@ -124,12 +125,16 @@ export async function generateMetadata({
   // which renders a Leaf-branded card. Without an explicit og:image,
   // iMessage falls through to apple-touch-icon at the wrong dimensions and
   // renders a giant empty grey preview bubble.
-  const ogImageUrl = info.image ?? "https://os.joinleaf.com/api/og/plan-fallback";
+  const ogImageUrl = info.image ?? `${SITE_URL}/api/og/plan-fallback`;
 
+  // APP_LINK_URL, not SITE_URL: this is the one route shipped iOS builds
+  // intercept as a Universal Link, and they only claim os.joinleaf.com. An
+  // unfurler that re-resolves og:url would otherwise hand recipients a host
+  // the installed app ignores.
   const canonicalUrl =
     mode === "copy"
-      ? `https://os.joinleaf.com/p/${eventGroupId}?copy=1`
-      : `https://os.joinleaf.com/p/${eventGroupId}`;
+      ? `${APP_LINK_URL}/p/${eventGroupId}?copy=1`
+      : `${APP_LINK_URL}/p/${eventGroupId}`;
 
   return {
     title: `${title} · Leaf`,

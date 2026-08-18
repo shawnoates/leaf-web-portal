@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     title: TITLE,
     description: DESCRIPTION,
     type: "website",
-    url: "https://os.joinleaf.com/apartment",
+    url: "/apartment",
     images: [{ url: OG_IMAGE }],
     siteName: "Leaf",
   },

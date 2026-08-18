@@ -1,9 +1,10 @@
 import { ImageResponse } from "next/og";
+import { SITE_HOST } from "@/lib/site";
 
 // 1200x630 branded card served as the site-wide default og:image.
 //
 // The root layout points every route that doesn't set its own
-// `openGraph` at this URL — the bare domain (os.joinleaf.com → /personal),
+// `openGraph` at this URL — the bare domain (joinleaf.com → /personal),
 // /about, /safety, /calendars, the legal pages, and anything added later.
 // Without it those links unfurl as a bare blue URL in iMessage and as a
 // title-only stub in Slack, because the root layout previously emitted no
@@ -58,7 +59,7 @@ export async function GET() {
             color: "#a7bfa9",
           }}
         >
-          os.joinleaf.com
+          {SITE_HOST}
         </div>
       </div>
     ),

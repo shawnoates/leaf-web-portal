@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
+import { SITE_URL } from "@/lib/site";
 import { getChatDatabase, signInToChat } from "@/lib/firebase-client";
 import {
   ref,
@@ -423,7 +424,7 @@ export default function ChatShell({
   // link entry route. Encodes the user's specific RSVP so the iOS app opens
   // the right plan chat. QR code on desktop renders this so a phone scan
   // routes through the app's own /c/ handling.
-  const appLinkUrl = notificationId ? `https://os.joinleaf.com/c/${notificationId}` : null;
+  const appLinkUrl = notificationId ? `${SITE_URL}/c/${notificationId}` : null;
   const iosDeepLink = notificationId ? `leaf://planChat?planId=${notificationId}` : null;
 
   const handleOpenInApp = () => {

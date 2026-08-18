@@ -31,28 +31,42 @@ const nextConfig: NextConfig = {
       // lives at /church-leaders (parallel to /resident-managers, and
       // kept distinct from /church, which is the example calendar).
       { source: "/churches", destination: "/church-leaders", permanent: false },
-      // joinleaf.com (apex + www) → os.joinleaf.com/personal.
+      // joinleaf.com is the canonical product domain. It used to 308 every
+      // path except the legal pages and /help over to
+      // os.joinleaf.com/personal; that catch-all is gone, so the apex now
+      // serves the whole app.
       //
-      // Scoped via `has: host` so os.joinleaf.com traffic never trips
-      // these — they only fire when the incoming Host header matches
-      // the marketing domain.
+      // os.joinleaf.com deliberately still serves every route too, rather
+      // than redirecting here. Installed iOS builds only claim
+      // `applinks:os.joinleaf.com` (see Leaflets.entitlements), so a blanket
+      // os → joinleaf redirect would push /p/* and /open/p/* off the host
+      // those builds intercept and break "open in app" for everyone who
+      // hasn't updated. Add that redirect once the release carrying
+      // `applinks:joinleaf.com` has broad adoption. Until then the two hosts
+      // are twins and canonical tags (src/lib/site.ts) settle which one wins.
       //
-      // Source uses a negative lookahead to skip /terms-conditions,
-      // /privacy-policy, and /help so those paths continue to serve
-      // their real pages on joinleaf.com. Next.js evaluates redirects
-      // BEFORE page routing, so without this exclusion the catch-all
-      // would eat those paths and bounce them to /personal. Anything
-      // else — including the bare root — 308s to /personal.
+      // Apex → www so one host is canonical, matching how os.joinleaf.com
+      // already 302s to www.os.joinleaf.com.
+      //
+      // The negative lookahead on `.well-known` is load-bearing: Next
+      // evaluates redirects BEFORE routing, and Apple does not follow
+      // redirects when fetching apple-app-site-association. Without the
+      // exclusion the apex would 308 that file to www and Universal Links
+      // registered against the bare apex would silently never associate.
+      //
+      // Split in two because `/:path(...)` won't match the bare root — the
+      // custom pattern still needs a segment to bind to — and the root is
+      // the one URL that absolutely has to redirect.
       {
-        source: "/((?!terms-conditions|privacy-policy|help).*)",
+        source: "/",
         has: [{ type: "host", value: "joinleaf.com" }],
-        destination: "https://www.os.joinleaf.com/personal",
+        destination: "https://www.joinleaf.com/",
         permanent: true,
       },
       {
-        source: "/((?!terms-conditions|privacy-policy|help).*)",
-        has: [{ type: "host", value: "www.joinleaf.com" }],
-        destination: "https://www.os.joinleaf.com/personal",
+        source: "/:path((?!\\.well-known).*)",
+        has: [{ type: "host", value: "joinleaf.com" }],
+        destination: "https://www.joinleaf.com/:path",
         permanent: true,
       },
     ];

@@ -1,15 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { SITE_URL } from "@/lib/site";
 import "./styles.css";
 
 // Absolute URL — iMessage / Slack / Twitter reject relative image paths.
 // Dedicated 1200x630 landscape crop (the tall creators-hero.jpg would be
 // center-cropped awkwardly in link-preview cards).
-const OG_IMAGE = "https://os.joinleaf.com/creators-og.jpg";
+const OG_IMAGE = `${SITE_URL}/creators-og.jpg`;
 const OG_ALT = "Friends laughing over drinks at a bar";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://os.joinleaf.com"),
+  metadataBase: new URL(SITE_URL),
   title: "Leaf — Get paid to document a good night.",
   description:
     "Leaf partners with hosts and creators who make real gatherings happen. Plan it through Leaf, film the night, post it in your voice — $50–150 per video, paid within 24 hours. 1k followers is plenty.",
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
     description:
       "Plan a real gathering through Leaf, film what happens, post it in your voice. $50–150 per video, paid within 24h. Partner with us.",
     type: "website",
-    url: "https://os.joinleaf.com/creators",
+    url: `${SITE_URL}/creators`,
     siteName: "Leaf OS",
     images: [
       {
@@ -47,7 +48,7 @@ export const viewport: Viewport = {
  * Route-scoped layout. The single wrapper div carries the
  * `.creators-landing` class so the imported styles.css (which prefixes
  * every selector with that class) applies only here — leaves the rest of
- * os.joinleaf.com on Tailwind without collisions.
+ * joinleaf.com on Tailwind without collisions.
  */
 export default function CreatorsLayout({
   children,

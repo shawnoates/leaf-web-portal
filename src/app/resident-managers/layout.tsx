@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { SITE_URL } from "@/lib/site";
 import "./styles.css";
 
 // Absolute URL — iMessage / Slack / Twitter reject relative image paths.
-const OG_IMAGE = "https://os.joinleaf.com/resident-managers-hero.png";
+const OG_IMAGE = `${SITE_URL}/resident-managers-hero.png`;
 const OG_ALT =
   "Neighbors gathering at a resident event on a rooftop at dusk";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://os.joinleaf.com"),
+  metadataBase: new URL(SITE_URL),
   title: "Leaf — Build community. Keep residents. Protect your NOI.",
   description:
     "Leaf OS runs the social side of your building for you — one done-for-you resident event a month — so neighbors connect, residents renew, and your NOI holds. Book a demo or start your calendar free.",
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
     description:
       "Done-for-you resident events that build community and drive renewals. Book a demo or start your building's calendar free.",
     type: "website",
-    url: "https://os.joinleaf.com/resident-managers",
+    url: `${SITE_URL}/resident-managers`,
     siteName: "Leaf OS",
     images: [
       {
@@ -45,7 +46,7 @@ export const viewport: Viewport = {
 /**
  * Route-scoped layout. The single wrapper div carries the `.rm-landing`
  * class so the imported styles.css (which prefixes every selector with
- * that class) applies only here — leaves the rest of os.joinleaf.com
+ * that class) applies only here — leaves the rest of joinleaf.com
  * on Tailwind without collisions.
  */
 export default function ResidentManagersLayout({

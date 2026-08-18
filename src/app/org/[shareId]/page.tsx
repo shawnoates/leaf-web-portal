@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
+import { APP_LINK_URL, SITE_URL } from "@/lib/site";
 import Link from "next/link";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import JoinChatPicker from "@/components/JoinChatPicker";
@@ -1670,7 +1671,9 @@ export default function OrgCalendarPage() {
   }, [org?.planIdeas]);
 
   const handleSharePlan = useCallback(async (planId: string, planTitle: string) => {
-    const url = `https://os.joinleaf.com/p/${planId}`;
+    // APP_LINK_URL: a shared plan link has to land on the host installed
+    // iOS builds intercept, or recipients get Safari instead of the app.
+    const url = `${APP_LINK_URL}/p/${planId}`;
     if (navigator.share) {
       try {
         await navigator.share({ title: planTitle, url });
@@ -5195,7 +5198,7 @@ export default function OrgCalendarPage() {
             </p>
           </div>
           <a
-            href="https://www.os.joinleaf.com/organizations/setup"
+            href={`${SITE_URL}/organizations/setup`}
             className="inline-flex items-center gap-2 bg-zinc-900 text-white px-6 py-3 text-xs uppercase tracking-wider font-bold hover:bg-zinc-800 transition-colors shrink-0"
           >
             Get Started — It&apos;s Free <ArrowRight className="w-3.5 h-3.5" />

@@ -1409,11 +1409,30 @@ export default function PlansManager({
                   }}
                   className="group text-left border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors flex cursor-pointer focus:outline-none focus-visible:border-zinc-400"
                 >
-                  <PlanImage
-                    src={plan.image}
-                    alt={plan.title}
-                    className="w-24 h-24 flex-shrink-0"
-                  />
+                  <div className="relative w-24 h-24 flex-shrink-0">
+                    <PlanImage
+                      src={plan.image}
+                      alt={plan.title}
+                      className="w-24 h-24"
+                    />
+                    {/* Repeat — re-host this plan on a new date. Icon-only on
+                        the cover so it never competes for width with the
+                        stats row (which is nowrap and clips on a narrow card).
+                        Always rendered, not hover-only, so it's reachable on
+                        touch. */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRepeatPlan(plan);
+                      }}
+                      title={`Repeat "${plan.title}" on a new date`}
+                      aria-label={`Repeat "${plan.title}" on a new date`}
+                      className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-white/85 text-zinc-600 backdrop-blur-sm hover:bg-white hover:text-zinc-900 transition-colors"
+                    >
+                      <Repeat className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   <div className="p-3 flex-1 min-w-0">
                     <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
                     <p className="text-xs text-zinc-400 mb-2">
@@ -1435,20 +1454,6 @@ export default function PlansManager({
                         <Camera className="w-3 h-3" />
                         {plan.photoCount} {plan.photoCount === 1 ? "photo" : "photos"}
                       </span>
-                      {/* Repeat — re-host this plan on a new date. Always
-                          present (not hover-only) so it's reachable on touch;
-                          it just gains contrast alongside the card's hover. */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRepeatPlan(plan);
-                        }}
-                        title={`Repeat "${plan.title}" on a new date`}
-                        className="ml-auto inline-flex items-center gap-1 rounded-md border border-zinc-200 px-2 py-1 text-[11px] font-semibold text-zinc-500 group-hover:border-zinc-300 group-hover:text-zinc-700 hover:!border-zinc-900 hover:!text-zinc-900 transition-colors whitespace-nowrap"
-                      >
-                        <Repeat className="w-3 h-3" /> Repeat
-                      </button>
                     </div>
                   </div>
                 </div>

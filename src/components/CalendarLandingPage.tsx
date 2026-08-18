@@ -15,8 +15,9 @@ import {
   Lock,
   Flag,
 } from "lucide-react";
+import { SITE_URL } from "@/lib/site";
 
-const SETUP_URL = "https://www.os.joinleaf.com/organizations/setup";
+const SETUP_URL = `${SITE_URL}/organizations/setup`;
 
 // --- Types ---
 
@@ -301,7 +302,7 @@ function CTAModal({
               {config.ctaButtonLabel}
             </a>
             <a
-              href="https://www.os.joinleaf.com"
+              href={SITE_URL}
               className="block w-full border border-zinc-200 py-3 text-xs uppercase tracking-wider font-bold text-center hover:bg-zinc-50 transition-colors rounded-lg"
             >
               Learn More

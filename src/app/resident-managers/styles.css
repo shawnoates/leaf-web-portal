@@ -1,6 +1,6 @@
 /*
  * /resident-managers landing — fully scoped under .rm-landing so the
- * marketing CSS doesn't collide with the rest of os.joinleaf.com (Tailwind
+ * marketing CSS doesn't collide with the rest of joinleaf.com (Tailwind
  * v4 globals.css). Every selector below is rooted at .rm-landing.
  */
 

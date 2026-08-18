@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Step, ACTIONS, EVENTS, STATUS, CallBackProps } from "react-joyride";
 import Parse from "@/lib/parse-client";
+import { SITE_HOST } from "@/lib/site";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import SubscriptionModal from "@/components/SubscriptionModal";
@@ -3710,7 +3711,7 @@ export default function OrgDashboardPage() {
                       <div key={cal.objectId} className="bg-zinc-50 rounded-lg p-4 flex items-center justify-between">
                         <div>
                           <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-0.5">{cal.name}</p>
-                          <p className="text-sm font-mono text-zinc-900">os.joinleaf.com/org/{cal.shareId}</p>
+                          <p className="text-sm font-mono text-zinc-900">{SITE_HOST}/org/{cal.shareId}</p>
                         </div>
                         <div className="flex gap-2">
                           <a
@@ -3722,7 +3723,7 @@ export default function OrgDashboardPage() {
                           </a>
                           <button
                             onClick={() => {
-                              navigator.clipboard.writeText(`os.joinleaf.com/org/${cal.shareId}`);
+                              navigator.clipboard.writeText(`${SITE_HOST}/org/${cal.shareId}`);
                               setToast("Link copied!");
                               setTimeout(() => setToast(null), 2000);
                             }}

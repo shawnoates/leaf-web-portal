@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import UserActivityBeacon from "@/components/UserActivityBeacon";
+import { SITE_URL } from "@/lib/site";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -11,10 +12,6 @@ const inter = Inter({
 const SITE_TITLE = "Leaf OS — Community Calendars";
 const SITE_DESCRIPTION =
   "AI-powered community calendars that help organizations plan meaningful gatherings. Members host, people RSVP.";
-
-// www, not the apex — os.joinleaf.com 302s to www, and unfurlers that
-// re-resolve og:url would take a second hop for nothing.
-const SITE_URL = "https://www.os.joinleaf.com";
 
 export const metadata: Metadata = {
   // Lets URL-based metadata fields below (and in any child route) use a

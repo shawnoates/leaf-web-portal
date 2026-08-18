@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
+import { SITE_HOST } from "@/lib/site";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import SettingsSwitch from "@/components/SettingsSwitch";
 import { IMAGE_ACCEPT, processImageFile } from "@/lib/image-utils";
@@ -493,7 +494,7 @@ export default function EditCalendarPage() {
           <Field label="URL slug">
             <div className="flex items-center gap-0">
               <span className="text-sm text-zinc-400 font-light whitespace-nowrap">
-                os.joinleaf.com/org/
+                {SITE_HOST}/org/
               </span>
               <input
                 value={slug}

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SITE_URL } from "@/lib/site";
 import Parse from "@/lib/parse";
 import { findSeed } from "@/lib/aiCalendarSeed";
 
@@ -82,7 +83,7 @@ export async function generateMetadata({
       title,
       description,
       type: "website",
-      url: `https://www.os.joinleaf.com/cal/${slug}`,
+      url: `${SITE_URL}/cal/${slug}`,
       images: [image],
       siteName: "Leaf",
     },

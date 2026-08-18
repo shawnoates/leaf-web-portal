@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 
-// Apple App Site Association — declares which os.joinleaf.com URL paths the
-// Leaf iOS app should intercept as Universal Links.
+// Apple App Site Association — declares which URL paths the Leaf iOS app
+// should intercept as Universal Links.
+//
+// Served from every host this app answers on. Today shipped builds only
+// declare `applinks:os.joinleaf.com`, so os.joinleaf.com is the host that
+// actually matters; joinleaf.com serves the same file so the entitlement can
+// add it without a second deploy. Apple fetches this over HTTPS with no
+// redirect following, which is why next.config.ts excludes `.well-known`
+// from the apex → www redirect.
 //
 // Universal Link paths. WARNING: each path here needs a matching native
 // handler in leaf-appcode/Leaflet/AppVM.swift handleURL — otherwise iOS

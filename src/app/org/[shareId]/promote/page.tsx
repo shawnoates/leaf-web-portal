@@ -6,6 +6,7 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Parse from "@/lib/parse-client";
+import { SITE_URL } from "@/lib/site";
 import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowLeft,
@@ -251,7 +252,7 @@ export default function PromotePage({
     );
   }
 
-  const calendarUrl = `https://www.os.joinleaf.com/org/${calendar.shareId}`;
+  const calendarUrl = `${SITE_URL}/org/${calendar.shareId}`;
 
   const handlePrint = () => window.print();
 

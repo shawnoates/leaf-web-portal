@@ -8,7 +8,7 @@ type WindowWithDataLayer = Window & { dataLayer?: any[] };
 
 /**
  * Sticky landing header — same shell as /resident-managers so this route
- * reads as part of os.joinleaf.com. The delegated click listener forwards
+ * reads as part of joinleaf.com. The delegated click listener forwards
  * [data-cta] attributes to window.dataLayer for GTM.
  */
 export default function Header() {

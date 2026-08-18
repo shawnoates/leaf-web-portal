@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Parse from "@/lib/parse-client";
+import { SITE_HOST } from "@/lib/site";
 import {
   ArrowRight,
   Check,
@@ -310,7 +311,7 @@ function SetupPageInner() {
   );
 
   const copyShareUrl = useCallback(() => {
-    navigator.clipboard.writeText(`os.joinleaf.com/org/${shareId}`);
+    navigator.clipboard.writeText(`${SITE_HOST}/org/${shareId}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [shareId]);
@@ -376,7 +377,7 @@ function SetupPageInner() {
                 </p>
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-base sm:text-lg font-mono text-zinc-800 truncate">
-                    os.joinleaf.com/org/{shareId}
+                    {SITE_HOST}/org/{shareId}
                   </p>
                   <button
                     onClick={copyShareUrl}
@@ -459,7 +460,7 @@ function SetupPageInner() {
                 Your calendar URL
               </p>
               <p className="text-lg font-mono">
-                os.joinleaf.com/org/{shareId}
+                {SITE_HOST}/org/{shareId}
               </p>
             </div>
             <div className="flex flex-col gap-3 items-center">

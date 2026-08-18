@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { SITE_URL } from "@/lib/site";
 // Shared landing design system. /church-leaders is a content variant of
 // /resident-managers, not a new design system, so it imports that
 // route's stylesheet rather than forking 300 lines of it. Every selector
@@ -10,14 +11,14 @@ import "../resident-managers/styles.css";
 import "./styles.css";
 
 // Absolute URL — iMessage / Slack / Twitter reject relative image paths.
-const OG_IMAGE = "https://os.joinleaf.com/church-leaders-hero.png";
+const OG_IMAGE = `${SITE_URL}/church-leaders-hero.png`;
 const OG_ALT =
   "A phone showing a church community calendar filled with member-posted gatherings";
 
 const TITLE = "Leaf — The best things at your church never make the calendar.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://os.joinleaf.com"),
+  metadataBase: new URL(SITE_URL),
   title: TITLE,
   description:
     "A free community calendar your members fill in themselves. The hikes, the coffees, the game nights — the life of your church that nobody scheduled. Your staff doesn't maintain it. Nothing to download.",
@@ -26,7 +27,7 @@ export const metadata: Metadata = {
     description:
       "A free calendar your members fill in, not your staff. Live in minutes.",
     type: "website",
-    url: "https://os.joinleaf.com/church-leaders",
+    url: `${SITE_URL}/church-leaders`,
     siteName: "Leaf OS",
     images: [
       {
