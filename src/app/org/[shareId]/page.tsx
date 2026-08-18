@@ -260,6 +260,12 @@ interface OrgData {
   // aggregates from AIEventInterest in getOrgCalendarPage so every
   // starter card can render "N interested" without a per-card query.
   aiSourceEventInterests?: Record<number, number>;
+  // IANA zone for the calendar's geography. AI source events carry no
+  // location object (unlike real plans, whose venue zone rides on
+  // `locations[].timezone`), so this is what their times must be formatted
+  // against. Null on calendars with no neighborhood — callers then fall back
+  // to viewer-local, which is the pre-existing behavior.
+  orgTimezone?: string | null;
   // Indices of aiSourceEvents already materialized into a live plan (hosted
   // or virtual-hosted). Skipped when rendering starter cards so a hosted
   // suggestion doesn't show twice. Positional — see server comment.
@@ -489,6 +495,26 @@ function isApartmentOrgType(
 // Format in the venue's IANA zone when known — a Bangkok viewer reading a
 // NYC plan should see NYC's wall-clock, not their own. Falls through to
 // viewer-local when no tz is supplied (legacy plans, missing venue data).
+/**
+ * AI source events store a FLOATING wall-clock, not an instant: the server
+ * builds isoDatetime as `${dateISO}T${hh}:${mm}:00Z` (ai-calendar-functions.js),
+ * stamping the venue's wall-clock with a Z it never earned. "Wed 8:30 AM"
+ * becomes 08:30Z.
+ *
+ * So these must be read back in UTC, which returns the exact wall-clock the
+ * generator wrote — 8:30 AM to every viewer, anywhere. Localizing them instead
+ * (the previous behavior) shifted the time by the VIEWER's offset: a Pacific
+ * reader saw a Brooklyn 8:30 AM event as 1:30 AM. Formatting in the venue's
+ * real zone is equally wrong here — that yields 4:30 AM — because the stored
+ * instant is not a true instant.
+ *
+ * Floating is the right model for these: a template generated for one prompt
+ * is cached and reused across cities, so "Wed 8:30 AM" has to mean 8:30 local
+ * wherever it lands. Real plans are different — they carry a genuine instant
+ * plus their venue's IANA zone, and go through formatDate/formatTime with it.
+ */
+const FLOATING_EVENT_TZ = "UTC";
+
 function formatDate(isoDate: string, timezone: string | null = null): string {
   const date = new Date(isoDate);
   const opts: Intl.DateTimeFormatOptions = {
@@ -3211,15 +3237,12 @@ export default function OrgCalendarPage() {
                         0;
                       const isInterested = aiLocallyInterested.has(originalIndex);
                       const isPending = aiInterestPending.has(originalIndex);
-                      const kicker = `${validDate
-                        .toLocaleDateString("en-US", {
-                          weekday: "long",
-                          month: "short",
-                          day: "numeric",
-                        })
-                        .toUpperCase()} · ${validDate.toLocaleTimeString(
-                        "en-US",
-                        { hour: "numeric", minute: "2-digit", hour12: true }
+                      const kicker = `${formatDate(
+                        validDate.toISOString(),
+                        FLOATING_EVENT_TZ
+                      ).toUpperCase()} · ${formatTime(
+                        validDate.toISOString(),
+                        FLOATING_EVENT_TZ
                       )}`;
                       const isAmber = ev.tagVariant === "amber";
                       return (
@@ -5478,17 +5501,13 @@ export default function OrgCalendarPage() {
           0;
         const resolvedDate = resolveAIEventDate(ev).date;
         const whenLabel = resolvedDate
-          ? `${resolvedDate
-              .toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "short",
-                day: "numeric",
-              })
-              .toUpperCase()} · ${resolvedDate.toLocaleTimeString("en-US", {
-              hour: "numeric",
-              minute: "2-digit",
-              hour12: true,
-            })}`
+          ? `${formatDate(
+              resolvedDate.toISOString(),
+              FLOATING_EVENT_TZ
+            ).toUpperCase()} · ${formatTime(
+              resolvedDate.toISOString(),
+              FLOATING_EVENT_TZ
+            )}`
           : ev.time || null;
         const isAmber = ev.tagVariant === "amber";
         const venueLine = ev.venueLine || ev.address || null;
