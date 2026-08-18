@@ -83,6 +83,11 @@ export interface CreatePlanPrefill {
   pollClosesAt?: string;
   /** Seed for the placeholder cover gradient — match the source card's color. */
   coverSeed?: string;
+  /** Event type (EventDetail.category) to scope the Date/Time insights to.
+   *  Set by the Repeat flow on the dashboard's Past tab so the panel under
+   *  the empty Date field reports how THIS kind of plan performs, plus how
+   *  often it runs — not the calendar's blended average. */
+  insightCategory?: string | null;
   /** Plan's current hideVenueUntilRsvp value (used when editing an existing plan). */
   hideVenueUntilRsvp?: boolean;
   /** Plan's current requireApproval value (used when editing an existing plan). */
@@ -138,15 +143,28 @@ interface CreatePlanModalProps {
 // following; otherwise platform-wide ("global") stats.
 
 interface TimingHints {
-  source: "calendar" | "global";
+  /** "category" = scoped to the event type we asked about (Repeat flow). */
+  source: "category" | "calendar" | "global";
+  /** The event type these stats describe — only set when source is "category". */
+  category?: string | null;
   sampleSize: number;
   bestDay: { day: string; dayIndex: number; sharePct: number } | null;
   bestTime: { bucket: string; sharePct: number; suggestedTime: string | null } | null;
   leadTime: { bucket: string; label: string; avgRsvps: number; restAvgRsvps: number } | null;
+  /** How often this event type actually runs + when the next one is due.
+   *  Only computed when a category was requested. */
+  cadence?: {
+    count: number;
+    medianGapDays: number;
+    lastDateISO: string;
+    suggestedDateISO: string;
+  } | null;
 }
 
 // Per-calendar cache for the SPA session — reopening the drawer (or tabbing
 // between modes) shouldn't refetch. `null` caches a "nothing to show" result.
+// Keyed by calendar AND requested category, since the same calendar answers
+// "when should I host this?" differently per event type.
 const timingHintsCache = new Map<string, TimingHints | null>();
 
 // Fallback start time per time-of-day bucket when the server couldn't pick a
@@ -350,16 +368,20 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       return;
     }
     const calId = selectedCalendarId;
-    if (timingHintsCache.has(calId)) {
-      setTimingHints(timingHintsCache.get(calId) ?? null);
+    const cat = (prefill?.insightCategory || "").trim();
+    const cacheKey = cat ? `${calId}::${cat.toLowerCase()}` : calId;
+    if (timingHintsCache.has(cacheKey)) {
+      setTimingHints(timingHintsCache.get(cacheKey) ?? null);
       return;
     }
     let cancelled = false;
-    Parse.Cloud.run("getPlanTimingHints", { calendarId: calId })
+    Parse.Cloud.run("getPlanTimingHints", { calendarId: calId, category: cat || undefined })
       .then((h: TimingHints) => {
         // A response with no surfaced hint renders nothing — cache that too.
-        const useful = h && (h.bestDay || h.bestTime || h.leadTime) ? h : null;
-        timingHintsCache.set(calId, useful);
+        // Cadence alone is worth the panel: "you run this every 2 weeks, the
+        // last one was Jul 16" is the answer to "what date?" on its own.
+        const useful = h && (h.bestDay || h.bestTime || h.leadTime || h.cadence) ? h : null;
+        timingHintsCache.set(cacheKey, useful);
         if (!cancelled) setTimingHints(useful);
       })
       .catch(() => {
@@ -368,7 +390,15 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
         if (!cancelled) setTimingHints(null);
       });
     return () => { cancelled = true; };
-  }, [selectedCalendarId, pollConvertMode, editMode, hostRequestMode]);
+  }, [selectedCalendarId, pollConvertMode, editMode, hostRequestMode, prefill?.insightCategory]);
+
+  // Latest date the tier can post to. Declared here (not with `today` further
+  // down) because the timing-hint target below runs during render and has to
+  // keep its suggestions inside the same window the Date field enforces.
+  const maxDateISO =
+    tier === "starter"
+      ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+      : undefined;
 
   // Apply-chip target: the best day + the winning start time. Starts at the
   // next occurrence of the best day, then — when the lead-time hint says
@@ -377,10 +407,24 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   // "1–2 weeks ahead" winner never suggests this Saturday when that's only
   // 5 days out). Capped at the starter tier's 2-week posting window.
   const timingHintTarget = (() => {
-    if (!timingHints || (!timingHints.bestDay && !timingHints.bestTime)) return null;
+    if (!timingHints || (!timingHints.bestDay && !timingHints.bestTime && !timingHints.cadence)) return null;
     let dateISO: string | null = null;
     let dateLabel: string | null = null;
-    if (timingHints.bestDay) {
+    // A repeating event type's own rhythm beats the aggregate best-day: if
+    // this thing runs every other Thursday, the next slot IS the answer.
+    // Skipped when the starter tier's posting window can't reach it.
+    const cadenceISO = timingHints.cadence?.suggestedDateISO || null;
+    const cadenceInWindow = !!cadenceISO && (!maxDateISO || cadenceISO <= maxDateISO);
+    if (cadenceISO && cadenceInWindow) {
+      dateISO = cadenceISO;
+      // Parsed as local noon so the label can't slip a day across timezones.
+      const d = new Date(`${cadenceISO}T12:00:00`);
+      dateLabel = Number.isNaN(d.getTime())
+        ? null
+        : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+      if (!dateLabel) dateISO = null;
+    }
+    if (!dateISO && timingHints.bestDay) {
       const nowD = new Date();
       let delta = ((timingHints.bestDay.dayIndex - nowD.getDay()) + 7) % 7 || 7;
       const LEAD_MIN_DAYS: Record<string, number> = { "0-2": 0, "3-6": 3, "7-13": 7, "14+": 14 };
@@ -1092,10 +1136,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   }
 
   const today = new Date().toISOString().split("T")[0];
-  const maxDate =
-    tier === "starter"
-      ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
-      : undefined;
+  const maxDate = maxDateISO;
 
   const headerTitle = pollConvertMode
     ? "Confirm & Convert Poll"
@@ -1663,7 +1704,28 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   `plans posted ${timingHints.leadTime.label} average ${timingHints.leadTime.avgRsvps} RSVPs vs ${timingHints.leadTime.restAvgRsvps}`
                 );
               }
-              if (parts.length === 0) return null;
+              // Cadence — the series' own rhythm, which is what a Repeat is
+              // really asking about. Rendered on its own line above the RSVP
+              // stats since it answers "what date?" directly.
+              const cadence = timingHints.cadence;
+              const cadenceLine = cadence
+                ? (() => {
+                    const last = new Date(`${cadence.lastDateISO}T12:00:00`);
+                    const lastLabel = Number.isNaN(last.getTime())
+                      ? null
+                      : last.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                    const every =
+                      cadence.medianGapDays === 7
+                        ? "weekly"
+                        : cadence.medianGapDays === 14
+                          ? "every 2 weeks"
+                          : cadence.medianGapDays % 7 === 0
+                            ? `about every ${cadence.medianGapDays / 7} weeks`
+                            : `about every ${cadence.medianGapDays} days`;
+                    return `Hosted ${cadence.count}× ${every}${lastLabel ? ` · last on ${lastLabel}` : ""}`;
+                  })()
+                : null;
+              if (parts.length === 0 && !cadenceLine) return null;
               const chipLabel = timingHintTarget
                 ? [
                     timingHintTarget.dateLabel,
@@ -1675,12 +1737,19 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   <div className="flex items-center gap-1.5 mb-1">
                     <TrendingUp className="w-3 h-3 text-emerald-600" />
                     <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-                      {timingHints.source === "calendar"
-                        ? "What works for your followers"
-                        : "What works across Leaf"}
+                      {timingHints.source === "category" && timingHints.category
+                        ? `What works for your ${timingHints.category} plans`
+                        : timingHints.source === "global"
+                          ? "What works across Leaf"
+                          : "What works for your followers"}
                     </span>
                   </div>
-                  <p className="text-xs text-zinc-600 leading-snug">{parts.join(" · ")}</p>
+                  {cadenceLine && (
+                    <p className="text-xs text-zinc-900 font-medium leading-snug mb-0.5">{cadenceLine}</p>
+                  )}
+                  {parts.length > 0 && (
+                    <p className="text-xs text-zinc-600 leading-snug">{parts.join(" · ")}</p>
+                  )}
                   {chipLabel && (
                     <button
                       type="button"

@@ -230,7 +230,22 @@ interface PastPlan {
   attendanceCount: number;
   photoCount: number;
   host: { name: string } | null;
-  location: { name: string; address: string } | null;
+  location: { name: string; address: string; placeId?: string | null } | null;
+  // ── Repeat inputs ────────────────────────────────────────────────────
+  // Everything needed to re-host this plan on a new date. `category` is also
+  // what scopes the create modal's date insights to this event type.
+  locations?: {
+    objectId?: string | null;
+    name: string | null;
+    address: string | null;
+    placeId?: string | null;
+    time?: string | null;
+  }[];
+  category?: string | null;
+  time?: string | null;
+  capacity?: number | null;
+  requireApproval?: boolean;
+  hideVenueUntilRsvp?: boolean;
 }
 
 interface EventPhoto {
@@ -1191,6 +1206,59 @@ export default function PlansManager({
     setShowCreateModal(true);
   }
 
+  /**
+   * Repeat a past plan — reopens the plan modal carrying everything the
+   * original had EXCEPT its date, which is deliberately left blank: the one
+   * decision a repeat actually requires is "when". The modal fills that gap
+   * with date insights scoped to this plan's event type (`insightCategory` →
+   * getPlanTimingHints), so the empty field comes with an answer rather than
+   * just a cursor.
+   *
+   * Creates a NEW plan (no `editingPlanId`) — the past plan, its RSVPs and
+   * its photos are history and stay untouched.
+   */
+  function handleRepeatPlan(plan: PastPlan) {
+    // Stop 0 is the primary Venue field; 1..N are the extra stops. Fall back
+    // to the singular `location` shortcut for plans saved before the past-plan
+    // payload carried the full itinerary.
+    const stops = plan.locations && plan.locations.length > 0
+      ? plan.locations
+      : plan.location
+        ? [{ objectId: null, name: plan.location.name, address: plan.location.address, placeId: plan.location.placeId ?? null, time: null }]
+        : [];
+    const primary = stops[0];
+    const extraStops = stops.slice(1).map((loc) => ({
+      // No objectId: a repeat writes new stops rather than re-pointing at the
+      // past plan's DBLocation rows, so editing the copy can't rewrite history.
+      objectId: null,
+      name: loc.name || "",
+      address: loc.address || "",
+      placeId: loc.placeId ?? null,
+      time: loc.time || null,
+    }));
+
+    setCreatePlanPrefill({
+      title: plan.title,
+      description: plan.description,
+      venue: primary
+        ? { name: primary.name || "", address: primary.address || "", placeId: primary.placeId ?? null }
+        : null,
+      // Intentionally omitted: `date`. Everything else carries over.
+      time: plan.time || "",
+      capacity: plan.capacity != null ? String(plan.capacity) : undefined,
+      imageUrl: plan.image,
+      hideVenueUntilRsvp: plan.hideVenueUntilRsvp,
+      requireApproval: plan.requireApproval,
+      additionalStops: extraStops.length > 0 ? extraStops : undefined,
+      coverSeed: plan.title,
+      insightCategory: plan.category || null,
+      justification: `Repeating "${plan.title}" from ${new Date(plan.expiryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", ...(plan.timezone ? { timeZone: plan.timezone } : {}) })}. Pick a new date below.`,
+    });
+    setEditingPlanId(null);
+    setPhotosModalPlan(null);
+    setShowCreateModal(true);
+  }
+
   return (
     <div className="space-y-10">
         {/* Plans (Upcoming / Past) */}
@@ -1323,10 +1391,20 @@ export default function PlansManager({
           ) : pastPlans && pastPlans.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {pastPlans.map((plan) => (
-                <button
+                // Div rather than a button: the card opens the recap, but it
+                // also holds its own Repeat action, and a button can't nest.
+                <div
                   key={plan.objectId}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => openPhotosModal(plan)}
-                  className="text-left border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors flex"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openPhotosModal(plan);
+                    }
+                  }}
+                  className="group text-left border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors flex cursor-pointer focus:outline-none focus-visible:border-zinc-400"
                 >
                   <PlanImage
                     src={plan.image}
@@ -1354,9 +1432,23 @@ export default function PlansManager({
                         <Camera className="w-3 h-3" />
                         {plan.photoCount} {plan.photoCount === 1 ? "photo" : "photos"}
                       </span>
+                      {/* Repeat — re-host this plan on a new date. Always
+                          present (not hover-only) so it's reachable on touch;
+                          it just gains contrast alongside the card's hover. */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRepeatPlan(plan);
+                        }}
+                        title={`Repeat "${plan.title}" on a new date`}
+                        className="ml-auto inline-flex items-center gap-1 rounded-md border border-zinc-200 px-2 py-1 text-[11px] font-semibold text-zinc-500 group-hover:border-zinc-300 group-hover:text-zinc-700 hover:!border-zinc-900 hover:!text-zinc-900 transition-colors whitespace-nowrap"
+                      >
+                        <Repeat className="w-3 h-3" /> Repeat
+                      </button>
                     </div>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           ) : (
