@@ -3,13 +3,16 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Step, ACTIONS, EVENTS, STATUS, CallBackProps } from "react-joyride";
+import dynamic from "next/dynamic";
+import type { Step, CallBackProps } from "react-joyride";
 import Parse from "@/lib/parse-client";
 import { SITE_HOST } from "@/lib/site";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import ConciergeDashboardBanner from "@/components/ConciergeDashboardBanner";
+import DashboardSkeleton from "@/components/DashboardSkeleton";
+import type { AnalyticsRange, OrgAnalytics } from "@/components/analytics/types";
 import OwnerInbox from "@/components/OwnerInbox";
 import PlanChatDrawer from "@/components/PlanChatDrawer";
 import { type ConciergeMenu } from "@/components/ConciergeMenuCard";
@@ -20,7 +23,27 @@ import MarketplaceTab, { type MarketplaceEvent, type OrgSettings } from "@/compo
 import CreatePlanModal, { type CreatePlanPrefill, NEW_PLAN_DRAFT_SESSION_KEY } from "@/components/CreatePlanModal";
 import PlanDetailModal from "@/components/PlanDetailModal";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
-import { DashboardTour } from "@/components/DashboardTour";
+// react-joyride is ~40KB and the tour runs once per calendar, ever — loading it
+// on every dashboard visit is pure first-paint tax. `ssr: false` because the
+// tour is a browser-only overlay with nothing meaningful to prerender.
+const DashboardTour = dynamic(
+  () => import("@/components/DashboardTour").then((m) => m.DashboardTour),
+  { ssr: false },
+);
+
+// recharts is the largest dependency on this route (~200KB gzipped) and only
+// the Analytics tab uses it — free-tier owners can't even open that tab. Keep
+// it out of the first-paint bundle. `ssr: false` because the charts measure
+// their container on mount and render nothing useful on the server anyway.
+const AnalyticsTab = dynamic(() => import("@/components/analytics/AnalyticsTab"), {
+  ssr: false,
+  loading: () => (
+    <div className="border border-zinc-200 rounded-xl p-12 flex items-center justify-center text-zinc-400 text-sm">
+      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+      Loading analytics…
+    </div>
+  ),
+});
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import {
@@ -59,18 +82,9 @@ import {
   MessageCircle,
 } from "lucide-react";
 
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-  Cell,
-} from "recharts";
+// NOTE: do not import recharts here. It is loaded only via the dynamic
+// <AnalyticsTab> below; a static import would pull it back into the
+// first-paint bundle for every dashboard visitor.
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -248,60 +262,24 @@ const TABS = [
 // `growth` is the retired Social tier treated as Pro.
 const PAID_TIERS = ["pro", "growth", "concierge"];
 
+// react-joyride exports ACTIONS/EVENTS/STATUS as runtime objects — importing
+// them would pull the whole library into the first-paint bundle and undo the
+// dynamic import of <DashboardTour>. These mirror the five we actually compare
+// against, and `satisfies` types each one against the library's own union, so
+// if an upstream rename drops a member this fails to compile instead of
+// silently never matching.
+const TOUR_STATUS_FINISHED = "finished" satisfies CallBackProps["status"];
+const TOUR_STATUS_SKIPPED = "skipped" satisfies CallBackProps["status"];
+const TOUR_ACTION_CLOSE = "close" satisfies CallBackProps["action"];
+const TOUR_ACTION_PREV = "prev" satisfies CallBackProps["action"];
+const TOUR_EVENT_STEP_AFTER = "step:after" satisfies CallBackProps["type"];
+
 type CalActivePlan = { objectId: string; calendarId?: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; isVirtualHost?: boolean; virtualHostAvatarUrl?: string | null; leafHostState?: "leaf_hosted" | "leaf_arranging" | null; leafHostPersona?: { name: string; avatarUrl: string | null } | null; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null };
 
-// ── Analytics types ────────────────────────────────────────────────────
+// Analytics payload types live in components/analytics/types.ts so this page
+// can hold OrgAnalytics state without importing from the lazily-loaded
+// analytics chunk.
 
-interface AnalyticsSeriesPoint {
-  date: string;
-  value: number;
-}
-
-interface OrgAnalytics {
-  range: string;
-  generatedAt: string;
-  growth: {
-    followerCount: number;
-    followersInRange: number;
-    followerDeltaPct: number;
-    memberCount: number;
-    membersInRange: number;
-    rsvpsInRange: number;
-    rsvpDeltaPct: number;
-    pageViewCount: number;
-    pageViewsInRange: number;
-    pageViewDeltaPct: number;
-    followerSeries: AnalyticsSeriesPoint[];
-    rsvpSeries: AnalyticsSeriesPoint[];
-    pageViewSeries: AnalyticsSeriesPoint[];
-  };
-  engagement: {
-    rsvpCount: number;
-    planCount: number;
-    rsvpRate: number;
-    attendanceCount: number;
-    attendanceRate: number;
-    repeatAttendeeCount: number;
-    uniqueRsvpUsersInRange: number;
-    repeatRate: number;
-    topPlans: { id: string; title: string; category: string; rsvpCount: number }[];
-  };
-  whatsWorking: {
-    weekdayDistribution: { day: string; value: number }[];
-    timeOfDayDistribution: { bucket: string; value: number }[];
-    topCategories: { category: string; plans: number; rsvps: number }[];
-    leadTimeDistribution?: { bucket: string; label: string; plans: number; rsvps: number; avgRsvps: number }[];
-    rsvpArrival?: { sampleSize: number; medianLeadDays: number; withinTwoDaysPct: number } | null;
-  };
-  insights: {
-    type: string;
-    message: string;
-    actionLabel?: string;
-    actionDayIndex?: number;
-    actionTimeBucket?: string;
-    actionLeadBucket?: string;
-  }[];
-}
 
 // ── Component ──────────────────────────────────────────────────────────
 
@@ -328,6 +306,13 @@ export default function OrgDashboardPage() {
   // Dashboard tour (first visit walkthrough)
   const [runTour, setRunTour] = useState(false);
   const [tourStepIndex, setTourStepIndex] = useState(0);
+  // Latches true the first time the tour starts and never resets, so the lazy
+  // react-joyride chunk is requested once and the component isn't torn down
+  // while it's finishing. See the render site at the bottom of this file.
+  const [tourMounted, setTourMounted] = useState(false);
+  useEffect(() => {
+    if (runTour) setTourMounted(true);
+  }, [runTour]);
 
   // Edit states
   const [editName, setEditName] = useState(false);
@@ -427,7 +412,7 @@ export default function OrgDashboardPage() {
   const [analytics, setAnalytics] = useState<OrgAnalytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
-  const [analyticsRange, setAnalyticsRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
+  const [analyticsRange, setAnalyticsRange] = useState<AnalyticsRange>("30d");
   const [analyticsCalFilter, setAnalyticsCalFilter] = useState<string>("all");
 
   // Dismissed insights — persisted per-calendar in localStorage. Key per
@@ -1017,7 +1002,7 @@ export default function OrgDashboardPage() {
   const isPaidTier = dashboard ? PAID_TIERS.includes(dashboard.tier) : false;
 
   const fetchAnalytics = useCallback(
-    async (range: "7d" | "30d" | "90d" | "all", calFilter?: string) => {
+    async (range: AnalyticsRange, calFilter?: string) => {
       if (!isPaidTier) return;
       setAnalyticsLoading(true);
       setAnalyticsError(null);
@@ -1310,12 +1295,12 @@ export default function OrgDashboardPage() {
 
   // ── Auth gate ──
 
+  // This is what the server renders — `authChecked` can only flip in an effect,
+  // so the SSR response for this route is always this branch. Painting the real
+  // chrome here means the hydration swap fills text into boxes that already
+  // exist instead of replacing a centered spinner with a full page.
   if (!authChecked) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (!user) {
@@ -1330,12 +1315,10 @@ export default function OrgDashboardPage() {
     );
   }
 
+  // Only reached on a cold load (no cached dashboard in localStorage) — the
+  // cache-hydrate effect clears `loading` synchronously when there is one.
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (error || !dashboard) {
@@ -1412,13 +1395,13 @@ export default function OrgDashboardPage() {
   const handleTourCallback = (data: CallBackProps) => {
     const { action, index, status, type } = data;
 
-    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+    if (status === TOUR_STATUS_FINISHED || status === TOUR_STATUS_SKIPPED) {
       setRunTour(false);
       setTourStepIndex(0);
       return;
     }
 
-    if (action === ACTIONS.CLOSE) {
+    if (action === TOUR_ACTION_CLOSE) {
       setRunTour(false);
       setTourStepIndex(0);
       return;
@@ -1427,8 +1410,8 @@ export default function OrgDashboardPage() {
     // Advance only on an explicit Next/Back (STEP_AFTER). We deliberately do
     // NOT react to TARGET_NOT_FOUND — auto-advancing on a missing target is
     // exactly what made the tour skip straight to the last step.
-    if (type === EVENTS.STEP_AFTER) {
-      const nextIndex = index + (action === ACTIONS.PREV ? -1 : 1);
+    if (type === TOUR_EVENT_STEP_AFTER) {
+      const nextIndex = index + (action === TOUR_ACTION_PREV ? -1 : 1);
       const tab = tabForTourTarget(tourSteps[nextIndex]?.target);
       if (tab) setActiveTab(tab);
       setTourStepIndex(nextIndex);
@@ -2091,542 +2074,24 @@ export default function OrgDashboardPage() {
         )}
 
         {/* ──────── ANALYTICS TAB ──────── */}
-        {activeTab === "analytics" && PAID_TIERS.includes(dashboard.tier) && (
-          <div className="space-y-8">
-            {/* Range selector + calendar filter */}
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-3">
-                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-                  Analytics
-                </h2>
-                {dashboard.calendars.length > 1 && (
-                  <select
-                    value={analyticsCalFilter}
-                    onChange={(e) => setAnalyticsCalFilter(e.target.value)}
-                    className="text-xs border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 focus:outline-none focus:border-zinc-400"
-                  >
-                    <option value="all">All Calendars</option>
-                    {dashboard.calendars.filter((c) => c.isActive).map((cal) => (
-                      <option key={cal.objectId} value={cal.objectId}>{cal.name}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
-              <div className="flex gap-1 border border-zinc-200 rounded-lg p-0.5">
-                {(["7d", "30d", "90d", "all"] as const).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => setAnalyticsRange(r)}
-                    className={`px-3 py-1.5 text-xs uppercase tracking-widest font-bold rounded-md transition-colors ${
-                      analyticsRange === r
-                        ? "bg-zinc-900 text-white"
-                        : "text-zinc-500 hover:text-zinc-900"
-                    }`}
-                  >
-                    {r === "all" ? "All time" : `Last ${r}`}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* First load only. Once `analytics` exists we keep the charts
-                mounted and dim them instead — swapping a full chart grid for a
-                one-line spinner collapses the page height and springs it back,
-                which reads as a flicker on every range change. */}
-            {analyticsLoading && !analytics && (
-              <div className="border border-zinc-200 rounded-xl p-12 flex items-center justify-center text-zinc-400 text-sm">
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                Loading analytics…
-              </div>
-            )}
-
-            {/* Shown whether or not charts are on screen: a failed background
-                revalidation still needs surfacing, but it shouldn't wipe out
-                the last-good data underneath it. */}
-            {analyticsError && (
-              <div className="border border-red-200 bg-red-50 rounded-xl p-6 text-sm text-red-700">
-                {analyticsError}
-              </div>
-            )}
-
-            {analytics && (
-              <div
-                className={`space-y-8 transition-opacity duration-200 ${
-                  analyticsLoading ? "opacity-50" : "opacity-100"
-                }`}
-                aria-busy={analyticsLoading}
-              >
-                {/* Insights / recommendations (no_growth lives on the Followers tab) */}
-                {(() => {
-                  // Build a stable dismiss key from insight content. If the
-                  // underlying insight changes (e.g., top category flips from
-                  // "dining" to "music"), the key changes and the new one
-                  // appears even if the prior was dismissed.
-                  const insightKey = (ins: { type: string; message: string }) =>
-                    `${ins.type}|${ins.message}`.slice(0, 200);
-
-                  const filtered = analytics.insights
-                    .filter((ins) => ins.type !== "no_growth")
-                    .filter((ins) => !dismissedInsights.has(insightKey(ins)));
-                  if (filtered.length === 0) return null;
-                  return (
-                    <section className="space-y-2">
-                      {filtered.map((ins) => {
-                        const key = insightKey(ins);
-                        return (
-                          <div
-                            key={key}
-                            className="border border-emerald-200 bg-emerald-50/40 rounded-lg px-3 py-2 flex items-center gap-3"
-                          >
-                            <div className="w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center flex-shrink-0">
-                              <Lightbulb className="w-3 h-3" />
-                            </div>
-                            <p className="text-xs text-zinc-700 leading-snug flex-1">
-                              {ins.message}
-                            </p>
-                            <button
-                              onClick={() => dismissInsight(key)}
-                              className="text-xs uppercase tracking-widest font-bold text-zinc-400 hover:text-zinc-700 transition-colors flex-shrink-0"
-                            >
-                              Dismiss
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </section>
-                  );
-                })()}
-
-                {/* Growth headline stats */}
-                <section>
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-3">
-                    Growth
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                    {[
-                      {
-                        label: "Page Views",
-                        value: analytics.growth.pageViewCount,
-                        delta: analytics.growth.pageViewsInRange,
-                        deltaPct: analytics.growth.pageViewDeltaPct,
-                      },
-                      {
-                        label: "Followers",
-                        value: analytics.growth.followerCount,
-                        delta: analytics.growth.followersInRange,
-                        deltaPct: analytics.growth.followerDeltaPct,
-                      },
-                      {
-                        label: "Members",
-                        value: analytics.growth.memberCount,
-                        delta: analytics.growth.membersInRange,
-                        deltaPct: null,
-                      },
-                      {
-                        label: "RSVPs",
-                        value: analytics.engagement.rsvpCount,
-                        delta: analytics.growth.rsvpsInRange,
-                        deltaPct: analytics.growth.rsvpDeltaPct,
-                      },
-                      {
-                        label: "Upcoming Plans",
-                        value: analytics.engagement.planCount,
-                        delta: null,
-                        deltaPct: null,
-                      },
-                    ].map((stat) => (
-                      <div
-                        key={stat.label}
-                        className="border border-zinc-200 rounded-xl p-4"
-                      >
-                        <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1">
-                          {stat.label}
-                        </p>
-                        <p className="text-2xl font-light">{stat.value}</p>
-                        {stat.delta != null && (
-                          <p
-                            className={`text-[11px] mt-1 ${
-                              stat.deltaPct == null
-                                ? "text-zinc-400"
-                                : stat.deltaPct >= 0
-                                ? "text-emerald-600"
-                                : "text-red-500"
-                            }`}
-                          >
-                            {stat.deltaPct == null
-                              ? `+${stat.delta} this period`
-                              : `${stat.deltaPct >= 0 ? "+" : ""}${stat.deltaPct}% vs prev`}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                {/* Followers over time */}
-                <section className="border border-zinc-200 rounded-xl p-6">
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
-                    Followers over time
-                  </h3>
-                  <div className="h-56 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={analytics.growth.followerSeries}>
-                        <CartesianGrid stroke="#f4f4f5" vertical={false} />
-                        <XAxis
-                          dataKey="date"
-                          tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                          tickLine={false}
-                          axisLine={false}
-                          tickFormatter={(d) =>
-                            new Date(d).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })
-                          }
-                          minTickGap={30}
-                        />
-                        <YAxis
-                          tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                          tickLine={false}
-                          axisLine={false}
-                          allowDecimals={false}
-                          width={30}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            border: "1px solid #e4e4e7",
-                            borderRadius: 8,
-                            fontSize: 12,
-                          }}
-                          labelFormatter={(d) =>
-                            new Date(d).toLocaleDateString("en-US", {
-                              weekday: "short",
-                              month: "short",
-                              day: "numeric",
-                            })
-                          }
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="value"
-                          stroke="#18181b"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </section>
-
-                {/* Page views over time */}
-                <section className="border border-zinc-200 rounded-xl p-6">
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
-                    Page views over time
-                  </h3>
-                  <div className="h-56 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={analytics.growth.pageViewSeries}>
-                        <CartesianGrid stroke="#f4f4f5" vertical={false} />
-                        <XAxis
-                          dataKey="date"
-                          tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                          tickLine={false}
-                          axisLine={false}
-                          tickFormatter={(d) =>
-                            new Date(d).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })
-                          }
-                          minTickGap={30}
-                        />
-                        <YAxis
-                          tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                          tickLine={false}
-                          axisLine={false}
-                          allowDecimals={false}
-                          width={30}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            border: "1px solid #e4e4e7",
-                            borderRadius: 8,
-                            fontSize: 12,
-                          }}
-                          labelFormatter={(d) =>
-                            new Date(d).toLocaleDateString("en-US", {
-                              weekday: "short",
-                              month: "short",
-                              day: "numeric",
-                            })
-                          }
-                        />
-                        <Bar dataKey="value" fill="#18181b" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </section>
-
-                {/* RSVPs by day of week + time of day */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <section className="border border-zinc-200 rounded-xl p-6">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
-                      RSVPs by day of week
-                    </h3>
-                    <div className="h-48 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={analytics.whatsWorking.weekdayDistribution}>
-                          <CartesianGrid stroke="#f4f4f5" vertical={false} />
-                          <XAxis
-                            dataKey="day"
-                            tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                            tickLine={false}
-                            axisLine={false}
-                          />
-                          <YAxis
-                            tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                            tickLine={false}
-                            axisLine={false}
-                            allowDecimals={false}
-                            width={30}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              border: "1px solid #e4e4e7",
-                              borderRadius: 8,
-                              fontSize: 12,
-                            }}
-                          />
-                          <Bar dataKey="value" fill="#18181b" radius={[6, 6, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </section>
-
-                  <section className="border border-zinc-200 rounded-xl p-6">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
-                      RSVPs by time of day
-                    </h3>
-                    <div className="h-48 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={analytics.whatsWorking.timeOfDayDistribution}>
-                          <CartesianGrid stroke="#f4f4f5" vertical={false} />
-                          <XAxis
-                            dataKey="bucket"
-                            tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                            tickLine={false}
-                            axisLine={false}
-                            tickFormatter={(s: string) =>
-                              s.charAt(0).toUpperCase() + s.slice(1)
-                            }
-                          />
-                          <YAxis
-                            tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                            tickLine={false}
-                            axisLine={false}
-                            allowDecimals={false}
-                            width={30}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              border: "1px solid #e4e4e7",
-                              borderRadius: 8,
-                              fontSize: 12,
-                            }}
-                            labelFormatter={(s) => {
-                              const str = String(s ?? "");
-                              return str.charAt(0).toUpperCase() + str.slice(1);
-                            }}
-                          />
-                          <Bar dataKey="value" fill="#18181b" radius={[6, 6, 0, 0]}>
-                            {analytics.whatsWorking.timeOfDayDistribution.map((_, i) => (
-                              <Cell key={i} fill="#18181b" />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </section>
-                </div>
-
-                {/* Posting lead time — avg RSVPs per plan by how far ahead it
-                    was posted (completed plans only, computed server-side). */}
-                {(() => {
-                  const leadDist = analytics.whatsWorking.leadTimeDistribution || [];
-                  const totalLeadPlans = leadDist.reduce((a, b) => a + b.plans, 0);
-                  if (totalLeadPlans === 0) return null;
-                  const arrival = analytics.whatsWorking.rsvpArrival;
-                  return (
-                    <section className="border border-zinc-200 rounded-xl p-6">
-                      <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1">
-                        RSVPs by posting lead time
-                      </h3>
-                      <p className="text-[11px] text-zinc-400 mb-4">
-                        Average RSVPs per completed plan, by how far ahead it was posted
-                      </p>
-                      <div className="h-48 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={leadDist}>
-                            <CartesianGrid stroke="#f4f4f5" vertical={false} />
-                            <XAxis
-                              dataKey="label"
-                              tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <YAxis
-                              tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                              tickLine={false}
-                              axisLine={false}
-                              width={30}
-                            />
-                            <Tooltip
-                              contentStyle={{
-                                border: "1px solid #e4e4e7",
-                                borderRadius: 8,
-                                fontSize: 12,
-                              }}
-                              formatter={(value, _name, entry) => {
-                                const row = entry?.payload as { plans?: number } | undefined;
-                                return [
-                                  `${value} avg RSVPs (${row?.plans ?? 0} plan${row?.plans === 1 ? "" : "s"})`,
-                                  null,
-                                ];
-                              }}
-                            />
-                            <Bar dataKey="avgRsvps" fill="#18181b" radius={[6, 6, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                      {arrival && (
-                        <p className="text-[11px] text-zinc-500 mt-3">
-                          Half of your RSVPs arrive within{" "}
-                          {arrival.medianLeadDays <= 1
-                            ? "a day"
-                            : `${Math.round(arrival.medianLeadDays)} days`}{" "}
-                          of the event · {arrival.withinTwoDaysPct}% come in the final 48 hours
-                        </p>
-                      )}
-                    </section>
-                  );
-                })()}
-
-                {/* Engagement summary */}
-                <section className="border border-zinc-200 rounded-xl p-6">
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
-                    Engagement
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <div>
-                      <p className="text-xs uppercase tracking-widest text-zinc-400 mb-1">
-                        Avg RSVPs / plan
-                      </p>
-                      <p className="text-2xl font-light">{analytics.engagement.rsvpRate}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-widest text-zinc-400 mb-1">
-                        Attendance
-                      </p>
-                      <p className="text-2xl font-light">
-                        {analytics.engagement.attendanceRate}%
-                        <span className="text-sm text-zinc-400 ml-1">
-                          ({analytics.engagement.attendanceCount}/{analytics.engagement.rsvpCount})
-                        </span>
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-widest text-zinc-400 mb-1">
-                        Repeat attendees
-                      </p>
-                      <p className="text-2xl font-light">
-                        {analytics.engagement.repeatAttendeeCount}
-                        <span className="text-sm text-zinc-400 ml-1">
-                          / {analytics.engagement.uniqueRsvpUsersInRange}
-                        </span>
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-widest text-zinc-400 mb-1">
-                        Repeat rate
-                      </p>
-                      <p className="text-2xl font-light">
-                        {Math.round(analytics.engagement.repeatRate * 100)}%
-                      </p>
-                    </div>
-                  </div>
-                </section>
-
-                {/* Top plans */}
-                {analytics.engagement.topPlans.length > 0 && (
-                  <section className="border border-zinc-200 rounded-xl p-6">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
-                      Top plans
-                    </h3>
-                    <div className="space-y-2">
-                      {analytics.engagement.topPlans.map((p, i) => (
-                        <div
-                          key={p.id}
-                          className="flex items-center gap-4 py-2 border-b border-zinc-100 last:border-0"
-                        >
-                          <span className="text-xs text-zinc-400 w-5">{i + 1}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-zinc-900 truncate">{p.title}</p>
-                            <p className="text-[11px] text-zinc-400">{p.category}</p>
-                          </div>
-                          <span className="text-sm font-medium text-zinc-900">
-                            {p.rsvpCount} RSVP{p.rsvpCount === 1 ? "" : "s"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {/* Top categories */}
-                {analytics.whatsWorking.topCategories.length > 0 && (
-                  <section className="border border-zinc-200 rounded-xl p-6">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
-                      Top categories
-                    </h3>
-                    <div className="h-48 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={analytics.whatsWorking.topCategories}
-                          layout="vertical"
-                        >
-                          <CartesianGrid stroke="#f4f4f5" horizontal={false} />
-                          <XAxis
-                            type="number"
-                            tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                            tickLine={false}
-                            axisLine={false}
-                            allowDecimals={false}
-                          />
-                          <YAxis
-                            type="category"
-                            dataKey="category"
-                            tick={{ fill: "#71717a", fontSize: 11 }}
-                            tickLine={false}
-                            axisLine={false}
-                            width={100}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              border: "1px solid #e4e4e7",
-                              borderRadius: 8,
-                              fontSize: 12,
-                            }}
-                          />
-                          <Bar dataKey="rsvps" fill="#18181b" radius={[0, 6, 6, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </section>
-                )}
-              </div>
-            )}
-          </div>
+        {/* Lazily loaded — see the `AnalyticsTab` dynamic import at the top of
+            this file. State stays here so the fetch lifecycle is independent of
+            when the chunk lands. */}
+        {activeTab === "analytics" && isPaid && (
+          <AnalyticsTab
+            analytics={analytics}
+            loading={analyticsLoading}
+            error={analyticsError}
+            range={analyticsRange}
+            onRangeChange={setAnalyticsRange}
+            calendars={dashboard.calendars}
+            calFilter={analyticsCalFilter}
+            onCalFilterChange={setAnalyticsCalFilter}
+            dismissedInsights={dismissedInsights}
+            onDismissInsight={dismissInsight}
+          />
         )}
+
 
         {/* ──────── CALENDARS TAB (3-panel: list · concierge chat · plans) ──────── */}
         {activeTab === "calendars" && (() => {
@@ -4184,14 +3649,20 @@ export default function OrgDashboardPage() {
         </div>
       )}
 
-      {/* Dashboard Tour */}
-      <DashboardTour
-        run={runTour}
-        stepIndex={tourStepIndex}
-        calendarId={calendarId}
-        steps={tourSteps}
-        onCallback={handleTourCallback}
-      />
+      {/* Dashboard Tour. Gated on `tourMounted` (latched, never un-latches) so
+          the react-joyride chunk is only fetched for the one visit per calendar
+          that actually runs the tour — but stays mounted afterwards, as it was
+          when the import was static, rather than unmounting mid-teardown when
+          `runTour` flips back to false. */}
+      {tourMounted && (
+        <DashboardTour
+          run={runTour}
+          stepIndex={tourStepIndex}
+          calendarId={calendarId}
+          steps={tourSteps}
+          onCallback={handleTourCallback}
+        />
+      )}
     </div>
   );
 }

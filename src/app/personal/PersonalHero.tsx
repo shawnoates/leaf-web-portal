@@ -9,7 +9,7 @@ import {
   SEED_POOL,
   type SeedCalendar,
 } from "@/lib/aiCalendarSeed";
-import { detectCity, type DetectedCity } from "@/lib/detectCity";
+import { useDetectedCity } from "@/lib/useDetectedCity";
 
 // /personal hero — Direction B (prompt over atmosphere).
 //
