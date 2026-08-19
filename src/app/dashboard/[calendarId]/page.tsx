@@ -102,6 +102,10 @@ interface OrgDashboard {
   billingInterval: string | null; // "month" or "year"
   isOwner: boolean;
   isOrgCoHost: boolean;
+  /** Whether the viewer has linked the iOS app (functions.js: getOrgDashboard
+   *  returns this off the requesting _User). Only ever used to flip the local
+   *  flag on, never off — the auth effect seeds it from Parse.User.current(). */
+  leafAppConnected?: boolean;
   conciergePersona?: { name: string; avatarUrl: string | null } | null;
   viewerCalendarRole: "Owner" | "Host" | null;
   calendarRoles: Record<string, "Owner" | "Host">;
@@ -543,6 +547,27 @@ export default function OrgDashboardPage() {
     setAuthChecked(true);
   }, []);
 
+  // Mirrors a dashboard payload into the Settings tab's form fields.
+  //
+  // Called from BOTH the cache hydrate and the network response, deliberately:
+  // the two paths have to leave identical component state, because that
+  // equivalence is what lets fetchDashboard skip re-applying an unchanged
+  // payload below. When only the network path seeded these, an early return
+  // there left the Settings tab blank on a cache hit.
+  const applySettingsFields = useCallback((d: OrgDashboard) => {
+    setNameValue(d.name);
+    setDescValue(d.description);
+    setSettingsDaysOfWeek(d.daysOfWeek);
+    setSettingsPreferredTimes(d.preferredTimes || []);
+    setSettingsBlacklistCategories(d.blacklistCategories || []);
+    setSettingsExcludeKeywords(d.excludeKeywords || []);
+    setSettingsBrandColor(d.brandColor);
+    setSettingsImageStyle(d.imageStyle || "default");
+    setSettingsHidePlanIdeas(d.hidePlanIdeas || false);
+    setSettingsHideCustomPlans(d.hideCustomPlans || false);
+    if (d.leafAppConnected) setLeafAppConnected(true);
+  }, []);
+
   // Hydrate instantly from the last-known dashboard so returning owners see
   // their data on paint instead of a blank spinner; fetchDashboard then
   // revalidates in the background.
@@ -550,9 +575,10 @@ export default function OrgDashboardPage() {
     try {
       const raw = localStorage.getItem(dashboardCacheKey);
       if (raw) {
-        const cached = JSON.parse(raw);
+        const cached = JSON.parse(raw) as OrgDashboard;
         dashboardRef.current = cached; // sync, so fetchDashboard skips the spinner
         setDashboard(cached);
+        applySettingsFields(cached);
         setLoading(false);
       }
     } catch { /* corrupt cache — ignore, fall back to network */ }
@@ -565,23 +591,42 @@ export default function OrgDashboardPage() {
     // background so login feels instant instead of staring at a spinner.
     if (!dashboardRef.current) setLoading(true);
     try {
-      const result = await Parse.Cloud.run("getOrgDashboard", { calendarId });
+      const result = (await Parse.Cloud.run("getOrgDashboard", {
+        calendarId,
+      })) as OrgDashboard;
+      setError(null);
+
+      // Byte-compare against what's already on screen before touching state.
+      //
+      // `getOrgDashboard` returns a stable payload — no generatedAt, no
+      // timestamps, and `profilePhoto` is a plain Parse File URL rather than a
+      // signed one that rotates per call — so an identical string genuinely
+      // means nothing changed. Re-applying it would hand React a fresh
+      // `dashboard` identity, re-render the whole tree and re-run all eleven
+      // effects that depend on the object, for zero visible difference. That
+      // churn is the cache→network swap users were seeing as a flicker.
+      //
+      // A real change still applies immediately — showing an RSVP that just
+      // landed isn't flicker, it's the feature working. Only the no-op is
+      // suppressed. It also means a background refresh no longer clobbers
+      // half-typed Settings fields when nothing upstream actually moved.
+      //
+      // Compared against `dashboardRef.current` (live state) rather than a
+      // "last applied response" ref on purpose: the optimistic
+      // `setDashboard(d => ({...d}))` updates scattered through the mutation
+      // handlers move state away from the last server payload. Diffing against
+      // live state means a response that reverts a failed optimistic edit still
+      // counts as a change and gets applied.
+      const serialized = JSON.stringify(result);
+      if (dashboardRef.current && JSON.stringify(dashboardRef.current) === serialized) {
+        return;
+      }
+
       setDashboard(result);
       try {
-        localStorage.setItem(dashboardCacheKey, JSON.stringify(result));
+        localStorage.setItem(dashboardCacheKey, serialized);
       } catch { /* quota / serialization — cache is best-effort */ }
-      setNameValue(result.name);
-      setDescValue(result.description);
-      setSettingsDaysOfWeek(result.daysOfWeek);
-      setSettingsPreferredTimes(result.preferredTimes || []);
-      setSettingsBlacklistCategories(result.blacklistCategories || []);
-      setSettingsExcludeKeywords(result.excludeKeywords || []);
-      setSettingsBrandColor(result.brandColor);
-      setSettingsImageStyle(result.imageStyle || "default");
-      setSettingsHidePlanIdeas(result.hidePlanIdeas || false);
-      setSettingsHideCustomPlans(result.hideCustomPlans || false);
-      if (result.leafAppConnected) setLeafAppConnected(true);
-      setError(null);
+      applySettingsFields(result);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to load dashboard";
       // A background revalidation failure shouldn't wipe out a cached dashboard
@@ -592,7 +637,11 @@ export default function OrgDashboardPage() {
     } finally {
       setLoading(false);
     }
-    // dashboardCacheKey is derived from calendarId, so [calendarId] is exhaustive.
+    // dashboardCacheKey is derived from calendarId, and applySettingsFields is a
+    // useCallback with an empty dep list, so [calendarId] is exhaustive. Keeping
+    // fetchDashboard's identity pinned to calendarId matters: the effect below
+    // re-runs whenever it changes, and an unstable identity would refetch on
+    // every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarId]);
 
