@@ -11,6 +11,9 @@
 export interface SeedEvent {
   tag: string;
   tagVariant?: "default" | "amber";
+  // Catchy activity headline ("Intimate Dinner"). Optional: the curated
+  // seeds and pre-title AICalendar rows fall back to `name`.
+  title?: string;
   name: string;
   time: string;
   venueLine: string;

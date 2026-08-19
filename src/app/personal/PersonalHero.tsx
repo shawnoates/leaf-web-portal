@@ -49,19 +49,11 @@ export default function PersonalHero({ isLoggedIn }: { isLoggedIn: boolean }) {
   }, []);
 
   // Regionalized copy — SSR renders the fallback ("your neighborhood"),
-  // client hydrates with the visitor's timezone-derived city so a
-  // Chicago visitor sees "Wicker Park" not "Fort Greene".
-  const [city, setCity] = useState<DetectedCity>({
-    city: "your area",
-    neighborhoods: ["your neighborhood", "your side of town"],
-    fallback: true,
-    lat: null,
-    lng: null,
-    promptChips: [],
-  });
-  useEffect(() => {
-    setCity(detectCity());
-  }, []);
+  // then the device timezone, then the CDN edge's view of where the
+  // request came from. A Chicago visitor sees "Wicker Park" not "Fort
+  // Greene", and someone in Vancouver on an East Coast laptop clock ends
+  // up on Mount Pleasant rather than Fort Greene.
+  const { city } = useDetectedCity();
   const heroPlaceholder = `Try "date night in ${city.neighborhoods[0]}" or "Thursday happy hours"`;
 
   const [typed, setTyped] = useState("");

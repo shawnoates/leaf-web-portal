@@ -6,7 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Loader2, Sparkles } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { SEED_POOL, type SeedCalendar } from "@/lib/aiCalendarSeed";
-import { detectCity, isNYC, type DetectedCity } from "@/lib/detectCity";
+import { isNYC } from "@/lib/detectCity";
+import { useDetectedCity } from "@/lib/useDetectedCity";
 
 interface GeneratedCalendar {
   slug: string;
@@ -14,6 +15,9 @@ interface GeneratedCalendar {
   area: string | null;
   theme: string | null;
   events: {
+    // Catchy activity headline ("Intimate Dinner"). Older rows predate the
+    // field, so every render falls back to the venue name.
+    title?: string;
     name: string;
     time: string;
     venueLine: string;
@@ -157,21 +161,11 @@ function PromptBar({ initial = "" }: { initial?: string }) {
   const router = useRouter();
   const [typed, setTyped] = useState(initial);
   const isTyping = typed.trim().length > 0;
-  // Timezone-derived city for the placeholder — Chicago sees "Wicker
-  // Park", NYC keeps "Fort Greene". SSR falls back to the generic
-  // "your neighborhood" so a Chicago visitor never sees Fort Greene
-  // flash before hydration.
-  const [city, setCity] = useState<DetectedCity>({
-    city: "your area",
-    neighborhoods: ["your neighborhood", "your side of town"],
-    fallback: true,
-    lat: null,
-    lng: null,
-    promptChips: [],
-  });
-  useEffect(() => {
-    setCity(detectCity());
-  }, []);
+  // Detected city for the placeholder — Chicago sees "Wicker Park", NYC
+  // keeps "Fort Greene". SSR falls back to the generic "your
+  // neighborhood" so a Chicago visitor never sees Fort Greene flash
+  // before hydration.
+  const { city } = useDetectedCity();
   const placeholder = `Try "date night in ${city.neighborhoods[0]}"`;
 
   return (
@@ -229,31 +223,28 @@ function GallerySurface() {
     () => [...SEED_POOL].sort((a, b) => b.adoptionCount - a.adoptionCount),
     []
   );
-  const [city, setCity] = useState<DetectedCity>({
-    city: "your area",
-    neighborhoods: [],
-    fallback: true,
-    lat: null,
-    lng: null,
-    promptChips: [],
-  });
+  const { city, ready } = useDetectedCity();
   // Cached AICalendar rows for the visitor's city — populated after
   // mount. Non-null means we finished the fetch (may still be an empty
   // array). Null → still loading OR skipped because city is NYC.
   const [cityCache, setCityCache] = useState<SeedCalendar[] | null>(null);
   useEffect(() => {
-    const detected = detectCity();
-    setCity(detected);
+    // Wait for the edge geo answer before spending a Parse round trip —
+    // otherwise a Vancouver visitor on an East Coast clock queries the
+    // NYC cache and we'd have to re-query a beat later anyway.
+    if (!ready) return;
+    const detected = city;
     // NYC keeps its curated Brooklyn gallery. Every other detected city
     // gets a cache lookup — if anything comes back we show those; if
     // empty we still show the curated seeds with a "Brooklyn-first" hint.
     if (detected.fallback || isNYC(detected)) return;
+    let cancelled = false;
     (async () => {
       try {
         const result = (await Parse.Cloud.run("listAICalendarsByCity", {
-          city: detected.city,
+          city: detected.resolvedCity || detected.city,
           limit: 12,
-        })) as { calendars: Array<{ objectId: string; slug: string; title: string; prompt: string; area: string | null; theme: string | null; adoptionCount: number; events: { time: string; name: string; tag: string }[] }> };
+        })) as { calendars: Array<{ objectId: string; slug: string; title: string; prompt: string; area: string | null; theme: string | null; adoptionCount: number; events: { time: string; title?: string; name: string; tag: string }[] }> };
         const adapted: SeedCalendar[] = (result?.calendars || []).map((c) => ({
           slug: c.slug,
           chipLabel: c.prompt || c.title,
@@ -265,18 +256,22 @@ function GallerySurface() {
           previewKicker: `Preview · ${(c.events || []).length} stops`,
           adoptionCount: c.adoptionCount || 0,
           events: (c.events || []).map((ev) => ({
+            title: ev.title,
             name: ev.name,
             time: ev.time,
             venueLine: "",
             tag: ev.tag,
           })),
         }));
-        setCityCache(adapted);
+        if (!cancelled) setCityCache(adapted);
       } catch {
-        setCityCache([]);
+        if (!cancelled) setCityCache([]);
       }
     })();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, city]);
   // Use city cache when non-empty; otherwise fall back to Brooklyn.
   // Show the Brooklyn hint when we fell back due to an empty cache.
   const usingCityCache = cityCache !== null && cityCache.length > 0;
@@ -375,7 +370,7 @@ function GalleryCard({ calendar }: { calendar: SeedCalendar }) {
                 {ev.time}
               </span>
               <span className="truncate" style={{ color: "#6B7168" }}>
-                {ev.name}
+                {ev.title || ev.name}
                 <span style={{ color: "#B4B8B0" }}> · {ev.tag}</span>
               </span>
             </li>
@@ -422,18 +417,9 @@ function GenerationSurface({ prompt }: { prompt: string }) {
   );
   // Detect city for the error-copy examples so a Chicago visitor with
   // an unmeaningful prompt sees "date night in Wicker Park", not
-  // "Fort Greene".
-  const [city, setCity] = useState<DetectedCity>({
-    city: "your area",
-    neighborhoods: ["your neighborhood"],
-    fallback: true,
-    lat: null,
-    lng: null,
-    promptChips: [],
-  });
-  useEffect(() => {
-    setCity(detectCity());
-  }, []);
+  // "Fort Greene". `ready` also gates generation below — this is the one
+  // place where a wrong city produces wrong *venues*, not just wrong copy.
+  const { city, ready: cityReady } = useDetectedCity();
   const exampleNeighborhood = city.neighborhoods[0];
 
   const handleToggleEvent = (idx: number) => {
@@ -446,19 +432,25 @@ function GenerationSurface({ prompt }: { prompt: string }) {
   };
 
   useEffect(() => {
+    // Hold until the edge has answered. Generation is one shot — firing
+    // it on the device-timezone guess would build a New York calendar
+    // for someone standing in Vancouver, and no later correction undoes
+    // that. `ready` resolves on failure and on a 2.5s timeout too, so
+    // this can't wedge.
+    if (!cityReady) return;
     let cancelled = false;
     (async () => {
       try {
         // Regionalize server-side. City → LLM prompt system hint;
         // coords → Ticketmaster + Places bias. Server falls back to
         // NYC when either is missing so an SSR / bot request still
-        // works.
-        const detected = detectCity();
+        // works. resolvedCity carries a real place name even when we
+        // have no neighborhood copy for it (Austin gets Austin venues).
         const result = (await Parse.Cloud.run("generateAICalendar", {
           prompt,
-          originCity: detected.fallback ? undefined : detected.city,
-          originLat: detected.lat ?? undefined,
-          originLng: detected.lng ?? undefined,
+          originCity: city.resolvedCity ?? undefined,
+          originLat: city.lat ?? undefined,
+          originLng: city.lng ?? undefined,
         })) as GenerateResponse;
         if (cancelled) return;
         if (result.ok && result.calendar) {
@@ -478,7 +470,7 @@ function GenerationSurface({ prompt }: { prompt: string }) {
     return () => {
       cancelled = true;
     };
-  }, [prompt]);
+  }, [prompt, cityReady, city]);
 
   return (
     <div className="flex flex-col gap-8 max-w-2xl mx-auto py-4">
@@ -593,8 +585,13 @@ function GenerationSurface({ prompt }: { prompt: string }) {
                       fontWeight: 400,
                     }}
                   >
-                    {ev.name}
+                    {ev.title || ev.name}
                   </h3>
+                  {ev.title && ev.title !== ev.name && (
+                    <span className="text-[13px] font-medium" style={{ color: "#3D4A3F" }}>
+                      {ev.name}
+                    </span>
+                  )}
                   <span className="text-[13px]" style={{ color: "#6B7168" }}>
                     {ev.venueLine}
                   </span>
@@ -604,7 +601,7 @@ function GenerationSurface({ prompt }: { prompt: string }) {
                     type="checkbox"
                     checked={selectedEventIndexes.has(i)}
                     onChange={() => handleToggleEvent(i)}
-                    aria-label={`Include ${ev.name}`}
+                    aria-label={`Include ${ev.title || ev.name}`}
                     className="w-4 h-4 rounded"
                     style={{ accentColor: "#1B4332" }}
                   />

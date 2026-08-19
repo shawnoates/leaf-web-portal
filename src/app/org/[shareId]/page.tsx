@@ -1551,7 +1551,9 @@ export default function OrgCalendarPage() {
       const dashboardTarget = org.parentOrgId || org.objectId;
       const params = new URLSearchParams();
       params.set("managePlans", org.objectId);
-      params.set("prefillTitle", ev.name);
+      // Catchy activity headline when the row has one; the server's
+      // _materializeAIEventAsPlan makes the same title-first choice.
+      params.set("prefillTitle", ev.title || ev.name);
       if (ev.description) params.set("prefillDescription", ev.description);
       // resolved.date is a validated Date for any suggestion that rendered;
       // format as the drawer's input types expect.
@@ -5640,8 +5642,11 @@ export default function OrgCalendarPage() {
                     </p>
                   )}
                   <h2 className="text-3xl md:text-4xl font-light tracking-tighter pr-8">
-                    {ev.name}
+                    {ev.title || ev.name}
                   </h2>
+                  {ev.title && ev.title !== ev.name && (
+                    <p className="text-sm text-zinc-700 font-medium">{ev.name}</p>
+                  )}
                   {venueLine && (
                     <p className="text-sm text-zinc-500 font-light">{venueLine}</p>
                   )}

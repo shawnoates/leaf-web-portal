@@ -5,7 +5,7 @@ import Parse from "@/lib/parse-client";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { getDefaultCoverForSeed } from "@/lib/default-covers";
 import VenueSearch from "@/components/VenueSearch";
-import { detectCity } from "@/lib/detectCity";
+import { detectCity, primeGeoCity } from "@/lib/detectCity";
 import {
   ArrowRight,
   Calendar,
@@ -466,12 +466,17 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     setPillsLoading(true);
     setPromptPills([]);
     setSelectedPill(null);
+    // Warm the edge-geo cache so the draft handler below (and a reopen of
+    // this modal) resolves off physical location rather than the device
+    // clock. Fire-and-forget: detectCity() falls back to the timezone
+    // until it lands.
+    void primeGeoCity();
     const detected = detectCity();
     Parse.Cloud.run("suggestPlanPrompts", {
       calendarId: selectedCalendarId,
       todayISO: new Date().toISOString().slice(0, 10),
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      locationHint: detected.fallback ? undefined : detected.city,
+      locationHint: detected.resolvedCity ?? undefined,
     })
       .then((result: { pills?: { text: string; reason: string | null }[]; area?: string | null }) => {
         if (cancelled) return;
@@ -669,11 +674,11 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       // Anchor grounded venue/showtime search to a real place. The calendar's
       // own area wins when we have it — a chip that says "a nearby taproom"
       // was written about the community's neighborhood, so it has to resolve
-      // there. detectCity is the fallback: same timezone-derived signal the
-      // server uses to bias Places grounding elsewhere, skipping its "your
-      // area" case (fallback === true) so the server can use the tz region.
+      // there. detectCity is the fallback: edge geolocation when it has
+      // resolved, device timezone otherwise, and undefined when neither
+      // names a real place so the server can use the tz region.
       const detected = detectCity();
-      const locationHint = calendarArea || (detected.fallback ? undefined : detected.city);
+      const locationHint = calendarArea || (detected.resolvedCity ?? undefined);
       const draft = await Parse.Cloud.run("draftPlanFromPrompt", {
         prompt: trimmed,
         todayISO: new Date().toISOString().slice(0, 10),
