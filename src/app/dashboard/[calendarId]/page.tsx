@@ -1004,10 +1004,21 @@ export default function OrgDashboardPage() {
     () => searchParams.get("cal"),
   );
 
-  // Analytics fetcher — Pro tier only
+  // Analytics fetcher — Pro tier only.
+  //
+  // Deliberately depends on the derived `isPaidTier` boolean rather than the
+  // `dashboard` object. `setDashboard` runs on the cache→network swap at mount
+  // and again after every mutation (~20 call sites, including optimistic
+  // `{...d}` spreads for host/RSVP approvals that have nothing to do with
+  // analytics). Each of those produces a new object identity, which used to
+  // give `fetchAnalytics` a new identity, which re-fired the effect below and
+  // flipped `analyticsLoading` — unmounting every chart. Keying on the tier
+  // string means approving an RSVP no longer reloads the charts.
+  const isPaidTier = dashboard ? PAID_TIERS.includes(dashboard.tier) : false;
+
   const fetchAnalytics = useCallback(
     async (range: "7d" | "30d" | "90d" | "all", calFilter?: string) => {
-      if (!dashboard || !PAID_TIERS.includes(dashboard.tier)) return;
+      if (!isPaidTier) return;
       setAnalyticsLoading(true);
       setAnalyticsError(null);
       try {
@@ -1026,15 +1037,15 @@ export default function OrgDashboardPage() {
         setAnalyticsLoading(false);
       }
     },
-    [calendarId, dashboard, analyticsCalFilter]
+    [calendarId, isPaidTier, analyticsCalFilter]
   );
 
   // Auto-load analytics when the tab opens, range changes, or calendar filter changes
   useEffect(() => {
-    if (activeTab === "analytics" && dashboard && PAID_TIERS.includes(dashboard.tier)) {
+    if (activeTab === "analytics" && isPaidTier) {
       fetchAnalytics(analyticsRange);
     }
-  }, [activeTab, analyticsRange, analyticsCalFilter, dashboard, fetchAnalytics]);
+  }, [activeTab, analyticsRange, analyticsCalFilter, isPaidTier, fetchAnalytics]);
 
   // ── Handlers ──
 
@@ -1338,7 +1349,9 @@ export default function OrgDashboardPage() {
 
   // `growth` is the retired Social tier — existing subscribers still carry it
   // in the DB until the server-side migration runs, so treat them as Pro.
-  const isPaid = PAID_TIERS.includes(dashboard.tier);
+  // Same value as `isPaidTier` above, re-bound here where `dashboard` is
+  // known non-null so the render body reads naturally.
+  const isPaid = isPaidTier;
   const tierLabel = dashboard.tier === "concierge" ? "Concierge" : isPaid ? "Pro" : "Free";
 
   // Build tour steps for DashboardTour component. `disableBeacon` on the first
@@ -2116,21 +2129,33 @@ export default function OrgDashboardPage() {
               </div>
             </div>
 
-            {analyticsLoading && (
+            {/* First load only. Once `analytics` exists we keep the charts
+                mounted and dim them instead — swapping a full chart grid for a
+                one-line spinner collapses the page height and springs it back,
+                which reads as a flicker on every range change. */}
+            {analyticsLoading && !analytics && (
               <div className="border border-zinc-200 rounded-xl p-12 flex items-center justify-center text-zinc-400 text-sm">
                 <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                 Loading analytics…
               </div>
             )}
 
-            {analyticsError && !analyticsLoading && (
+            {/* Shown whether or not charts are on screen: a failed background
+                revalidation still needs surfacing, but it shouldn't wipe out
+                the last-good data underneath it. */}
+            {analyticsError && (
               <div className="border border-red-200 bg-red-50 rounded-xl p-6 text-sm text-red-700">
                 {analyticsError}
               </div>
             )}
 
-            {!analyticsLoading && !analyticsError && analytics && (
-              <>
+            {analytics && (
+              <div
+                className={`space-y-8 transition-opacity duration-200 ${
+                  analyticsLoading ? "opacity-50" : "opacity-100"
+                }`}
+                aria-busy={analyticsLoading}
+              >
                 {/* Insights / recommendations (no_growth lives on the Followers tab) */}
                 {(() => {
                   // Build a stable dismiss key from insight content. If the
@@ -2598,7 +2623,7 @@ export default function OrgDashboardPage() {
                     </div>
                   </section>
                 )}
-              </>
+              </div>
             )}
           </div>
         )}
