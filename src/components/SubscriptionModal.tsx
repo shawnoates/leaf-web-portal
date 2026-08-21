@@ -35,6 +35,7 @@ const TIERS: Tier[] = [
       "Attendance reporting",
       "Photo collection",
       "Access to local events database",
+      "Unlimited scheduling",
     ],
   },
   {
@@ -51,7 +52,6 @@ const TIERS: Tier[] = [
       "Unlimited calendars",
       "15 AI-suggested plans per week",
       "Unlimited RSVPs",
-      "Unlimited scheduling",
       "Custom branding (logo + brand color)",
       "Custom plan-suggestion controls",
       "Analytics dashboard",

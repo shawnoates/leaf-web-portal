@@ -1154,6 +1154,8 @@ export default function PlansManager({
       description: plan.description,
       venue: plan.location,
       imageUrl: plan.image,
+      // The plan being copied IS the subject — no "describe it" prompt bar.
+      hidePromptBar: true,
       ...(plan.isPoll ? { mode: "poll" as const, pollOptions } : {}),
     });
     setEditingPlanId(null);
@@ -1251,6 +1253,9 @@ export default function PlansManager({
       requireApproval: plan.requireApproval,
       additionalStops: extraStops.length > 0 ? extraStops : undefined,
       coverSeed: plan.title,
+      // Repeat carries the whole subject over; only the date is open, so the
+      // "describe it" prompt bar has nothing left to draft.
+      hidePromptBar: true,
       insightCategory: plan.category || null,
       justification: `Repeating "${plan.title}" from ${new Date(plan.expiryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", ...(plan.timezone ? { timeZone: plan.timezone } : {}) })}. Pick a new date below.`,
     });

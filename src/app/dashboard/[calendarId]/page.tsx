@@ -2448,6 +2448,9 @@ export default function OrgDashboardPage() {
                 capacity: event.capacityMax?.toString() || "",
                 imageUrl: event.image,
                 coverSeed: event.id,
+                // The event IS the subject here — a "describe it" prompt bar
+                // would only offer to overwrite what was just picked.
+                hidePromptBar: true,
               });
               setShowCreatePlanModal(true);
             }}
@@ -3590,6 +3593,8 @@ export default function OrgDashboardPage() {
               description: plan.description,
               venue: plan.location,
               imageUrl: plan.image,
+              // The plan being copied IS the subject — no "describe it" bar.
+              hidePromptBar: true,
               ...(plan.isPoll
                 ? { mode: "poll" as const, pollOptions }
                 : {}),

@@ -57,11 +57,11 @@ const PRICING_TIERS: PricingTier[] = [
       "Attendance reporting",
       "Photo collection",
       "Access to local events database",
+      "Unlimited scheduling",
     ],
     excluded: [
       "Custom branding",
       "Analytics",
-      "Unlimited scheduling",
     ],
   },
   {
@@ -80,7 +80,6 @@ const PRICING_TIERS: PricingTier[] = [
       "Unlimited calendars",
       "15 AI-suggested plans per week",
       "Unlimited RSVPs",
-      "Unlimited scheduling",
       "Custom branding (logo + brand color)",
       "Custom plan-suggestion controls",
       "Analytics dashboard",
@@ -532,7 +531,7 @@ export default function OrganizationsPage() {
             <div>
               <h3 className="text-sm font-bold mb-1">How far in advance can I schedule plans?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                On Free, plans can be scheduled up to two weeks out. Pro and Concierge remove the window — schedule as far ahead as you want.
+                As far ahead as you want, on every plan — there&rsquo;s no scheduling window on Free, Pro, or Concierge.
               </p>
             </div>
             <div>

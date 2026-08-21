@@ -83,6 +83,11 @@ export interface CreatePlanPrefill {
   pollClosesAt?: string;
   /** Seed for the placeholder cover gradient — match the source card's color. */
   coverSeed?: string;
+  /** Suppress the "describe it, I'll draft the plan" prompt bar (and its
+   *  recommendation chips). Set by flows that arrive with the subject already
+   *  chosen — the marketplace "add this event" path — where drafting from a
+   *  sentence would only overwrite what the manager just picked. */
+  hidePromptBar?: boolean;
   /** Event type (EventDetail.category) to scope the Date/Time insights to.
    *  Set by the Repeat flow on the dashboard's Past tab so the panel under
    *  the empty Date field reports how THIS kind of plan performs, plus how
@@ -300,7 +305,10 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   // Prompt-first drawer: the manager types a sentence, the LLM extracts a
   // partial plan and we populate empty/AI-filled fields. Never clobber fields
   // the manager has typed into ("user-touched" wins).
-  const showPromptBar = !editMode && !hostRequestMode && !pollConvertMode;
+  const isCreateMode = !editMode && !hostRequestMode && !pollConvertMode;
+  // The prompt bar is a create-mode affordance, but flows that hand us a
+  // ready-made subject (marketplace) opt out — see prefill.hidePromptBar.
+  const showPromptBar = isCreateMode && !prefill?.hidePromptBar;
   const [promptInput, setPromptInput] = useState("");
   const [promptLoading, setPromptLoading] = useState(false);
   const [promptError, setPromptError] = useState<string | null>(null);
@@ -392,30 +400,20 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     return () => { cancelled = true; };
   }, [selectedCalendarId, pollConvertMode, editMode, hostRequestMode, prefill?.insightCategory]);
 
-  // Latest date the tier can post to. Declared here (not with `today` further
-  // down) because the timing-hint target below runs during render and has to
-  // keep its suggestions inside the same window the Date field enforces.
-  const maxDateISO =
-    tier === "starter"
-      ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
-      : undefined;
-
   // Apply-chip target: the best day + the winning start time. Starts at the
   // next occurrence of the best day, then — when the lead-time hint says
   // longer runway earns more RSVPs — skips ahead in week steps until the
   // suggested date carries at least that bucket's minimum lead (e.g. a
   // "1–2 weeks ahead" winner never suggests this Saturday when that's only
-  // 5 days out). Capped at the starter tier's 2-week posting window.
+  // 5 days out).
   const timingHintTarget = (() => {
     if (!timingHints || (!timingHints.bestDay && !timingHints.bestTime && !timingHints.cadence)) return null;
     let dateISO: string | null = null;
     let dateLabel: string | null = null;
     // A repeating event type's own rhythm beats the aggregate best-day: if
     // this thing runs every other Thursday, the next slot IS the answer.
-    // Skipped when the starter tier's posting window can't reach it.
     const cadenceISO = timingHints.cadence?.suggestedDateISO || null;
-    const cadenceInWindow = !!cadenceISO && (!maxDateISO || cadenceISO <= maxDateISO);
-    if (cadenceISO && cadenceInWindow) {
+    if (cadenceISO) {
       dateISO = cadenceISO;
       // Parsed as local noon so the label can't slip a day across timezones.
       const d = new Date(`${cadenceISO}T12:00:00`);
@@ -429,8 +427,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       let delta = ((timingHints.bestDay.dayIndex - nowD.getDay()) + 7) % 7 || 7;
       const LEAD_MIN_DAYS: Record<string, number> = { "0-2": 0, "3-6": 3, "7-13": 7, "14+": 14 };
       const minLead = timingHints.leadTime ? LEAD_MIN_DAYS[timingHints.leadTime.bucket] ?? 0 : 0;
-      const maxLead = tier === "starter" ? 14 : Infinity;
-      while (delta < minLead && delta + 7 <= maxLead) delta += 7;
+      while (delta < minLead) delta += 7;
       const d = new Date(nowD.getTime() + delta * 24 * 60 * 60 * 1000);
       dateISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       dateLabel = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -1141,7 +1138,6 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   }
 
   const today = new Date().toISOString().split("T")[0];
-  const maxDate = maxDateISO;
 
   const headerTitle = pollConvertMode
     ? "Confirm & Convert Poll"
@@ -1179,7 +1175,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
         <div className="border-b border-zinc-100 px-6 pt-4 pb-3 flex items-start justify-between gap-3 shrink-0">
           <div className="min-w-0">
             <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{headerTitle}</h2>
-            {contextCalendarName && showPromptBar && (
+            {contextCalendarName && isCreateMode && (
               <p className="text-xs text-zinc-500 mt-1 truncate">
                 Adding to · <span className="text-zinc-800 font-medium">{contextCalendarName}</span>
               </p>
@@ -1672,15 +1668,12 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                   value={date}
                   onChange={(e) => { setDate(e.target.value); markTouched("date"); }}
                   min={today}
-                  max={maxDate}
                   disabled={pollConvertMode}
                   className={`w-full border-b py-2 text-sm font-light focus:outline-none focus:border-zinc-900 disabled:text-zinc-500 disabled:bg-transparent ${aiFilled.has("date") && !userTouched.has("date") ? "border-emerald-300 bg-emerald-50/40" : "border-zinc-300"}`}
                 />
-                {pollConvertMode ? (
+                {pollConvertMode && (
                   <p className="text-xs text-zinc-400 mt-1">Locked to the winning vote</p>
-                ) : tier === "starter" ? (
-                  <p className="text-xs text-amber-600 mt-1">Free plan: 2 weeks ahead max</p>
-                ) : null}
+                )}
               </div>
               <div>
                 <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Time</label>

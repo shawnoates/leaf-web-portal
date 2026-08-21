@@ -55,11 +55,11 @@ const PRICING_TIERS: PricingTier[] = [
       "Attendance reporting",
       "Photo collection",
       "Access to local events database",
+      "Unlimited scheduling",
     ],
     excluded: [
       "Custom branding",
       "Analytics",
-      "Unlimited scheduling",
     ],
   },
   {
@@ -78,7 +78,6 @@ const PRICING_TIERS: PricingTier[] = [
       "Unlimited calendars",
       "15 AI-suggested plans per week",
       "Unlimited RSVPs",
-      "Unlimited scheduling",
       "Custom branding (logo + brand color)",
       "Custom plan-suggestion controls",
       "Analytics dashboard",
@@ -416,9 +415,9 @@ export default function PersonalPage() {
             <div>
               <h3 className="text-sm font-bold mb-1">How far in advance can I plan?</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                Free schedules up to two weeks out — enough for an active
-                week-to-week calendar. Pro removes the window so you can
-                schedule farther ahead.
+                As far ahead as you want. There&rsquo;s no scheduling window
+                on Free or Pro — put next weekend and next season on the same
+                calendar.
               </p>
             </div>
             <div>

@@ -1,18 +1,29 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Heart } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import HostIdeaModal from "@/components/HostIdeaModal";
 import VirtualHostBadge from "@/components/VirtualHostBadge";
 import { setVerifiedUserCookie } from "@/lib/verified-user";
+import NewPlanModal, {
+  ME_PLAN_DRAFT_KEY,
+  type CreatedPlan,
+  type NewPlanDraftSnapshot,
+  type PostToOption,
+} from "./NewPlanModal";
 
 // ============================================================================
-// Attendee dashboard (/me). Read-mostly. Answers one question — "where am I
-// going next, and am I still going?" It is the live truth (re-fetchable), not
-// a frozen digest. Built to the leaf-attendee-dashboard mockup: Newsreader
-// serif headings, sage/cream tiles, ink rectangular buttons, hairline rules.
+// Attendee dashboard (/me). The signed-in home: the next plan, everything
+// upcoming across followed calendars, plans on those calendars still needing a
+// host, places worth marking interest in, and — new — a way to make a plan of
+// your own without leaving the page.
+//
+// Built to the /me handoff spec: desktop is the 1180px split view (1a, plans
+// left / rail right); mobile is the single scroll with a sticky "+ New plan"
+// (4a). Newsreader for headings and titles, IBM Plex Sans for UI, IBM Plex
+// Mono for the small caps labels.
 // ============================================================================
 
 // ---- Types (mirror the getMeDashboard payload) -----------------------------
@@ -115,7 +126,9 @@ interface Dashboard {
 }
 
 type AuthState = "resolving" | "authed" | "needs-otp" | "error";
-const PROMPT_BASE = "https://joinleaf.com/personal";
+
+/** Rows shown in "Your plans" before the expander. */
+const PLAN_PAGE = 5;
 
 // ---- Date / string helpers -------------------------------------------------
 function parse(iso: string | null) { return iso ? new Date(iso) : null; }
@@ -151,9 +164,14 @@ function relPhrase(iso: string | null) {
   if (diff < 14) return "next week";
   return `in ${Math.round(diff / 7)} weeks`;
 }
+/** Hero eyebrow — "Next up · tomorrow 7:00 PM". */
 function heroWhen(plan: Plan) {
-  const wd = weekday(plan.date); const rel = relPhrase(plan.date); const t = timeLabel(plan);
-  return [wd, rel && `— ${rel}`, t && `, ${t}`].filter(Boolean).join(" ").replace(" ,", ",");
+  return ["Next up", [relPhrase(plan.date), timeLabel(plan)].filter(Boolean).join(" ")]
+    .filter(Boolean).join(" · ");
+}
+/** Long form for the plan modal — "Thursday, tomorrow, 7:00 PM". */
+function fullWhen(plan: Plan) {
+  return [weekday(plan.date), relPhrase(plan.date), timeLabel(plan)].filter(Boolean).join(" · ");
 }
 function dayNum(iso: string | null) { const d = parse(iso); return d ? String(d.getDate()) : ""; }
 function monthAbbr(iso: string | null) {
@@ -178,8 +196,15 @@ function greetingWord() {
   if (h < 17) return "Good afternoon";
   return "Good evening";
 }
+/** Maps deep link for the hero's "Getting there". Null when there's no place. */
+function directionsUrl(plan: Plan): string | null {
+  const q = [plan.venueName, plan.venueAddress].filter(Boolean).join(", ");
+  if (!q) return null;
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}`;
+}
 
-// Tile — Leaf's signature artifact: a colored square with a serif word.
+// Tile — Leaf's signature artifact: a colored square with a serif word. Stands
+// in for the spec's hatch placeholder, and carries more meaning than one.
 function tileFor(plan: Plan, i: number): { tone: "sage" | "cream"; word: string } {
   const tone: "sage" | "cream" = i % 2 === 0 ? "sage" : "cream";
   const s = `${plan.category || ""} ${plan.title} ${plan.venueName || ""}`.toLowerCase();
@@ -195,34 +220,26 @@ function tileFor(plan: Plan, i: number): { tone: "sage" | "cream"; word: string 
 }
 // Plan visual: real photo when the plan has one, else the sage/cream tile.
 function PlanTile({
-  plan, index, sm, onOpen, weather,
+  plan, index, variant, onOpen,
 }: {
   plan: Plan;
   index: number;
-  sm?: boolean;
+  variant: "hero" | "row" | "card";
   onOpen?: () => void;
-  weather?: Weather | null;
 }) {
   const tileEl = plan.image ? (
-    <div className={`tile photo ${sm ? "sm" : ""}`}>
+    <div className={`tile photo ${variant}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={plan.image} alt="" />
     </div>
   ) : (() => {
     const t = tileFor(plan, index);
-    return <div className={`tile ${t.tone} ${sm ? "sm" : ""}`}>{t.word}</div>;
+    return <div className={`tile ${t.tone} ${variant}`}>{t.word}</div>;
   })();
-  const content = (
-    <div className="tile-wrap">
-      {tileEl}
-      {weather && (weather.temp || weather.text) && (
-        <span className="wx wx-over">🌤 <b>{weather.temp}°</b> {weather.text}</span>
-      )}
-    </div>
-  );
+  const content = <div className={`tile-wrap ${variant}`}>{tileEl}</div>;
   if (onOpen) {
     return (
-      <button type="button" onClick={onOpen} className="tile-link" aria-label={`Open ${plan.title}`}>
+      <button type="button" onClick={onOpen} className={`tile-link ${variant}`} aria-label={`Open ${plan.title}`}>
         {content}
       </button>
     );
@@ -230,21 +247,30 @@ function PlanTile({
   return content;
 }
 
+// Speech bubble — the one inline icon the spec keeps.
+function ChatIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden style={{ flex: "none" }}>
+      <path
+        d="M3 5.6c0-1 .8-1.8 1.8-1.8h10.4c1 0 1.8.8 1.8 1.8v6.1c0 1-.8 1.8-1.8 1.8H8.3L4.6 16.6a.5.5 0 0 1-.8-.4v-2.7H4.8c-1 0-1.8-.8-1.8-1.8z"
+        stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function statusFor(plan: Plan): { cls: string; text: string } | null {
   if (plan.hostState === "leaf_hosted" && plan.hostPersona) {
     return { cls: "host", text: `Hosted by Leaf · ${plan.hostPersona.name}` };
   }
   if (plan.hostState === "leaf_hosted") return { cls: "host", text: "Hosted by Leaf" };
-  // A virtual/Leaf host is the public face of the plan even though the owner
-  // technically owns the EventGroup — read like "Organized by {persona}", not
-  // "You're hosting" (mirrors org/[shareId]'s viewerHostsPlan exclusion).
-  // "Organized by", not "Hosted by": a virtual host arranges the plan but
-  // isn't in the room, so the hosting verb would promise a presence nobody
-  // delivers. Kept in sync with org/[shareId] and dashboard/[calendarId].
   // The viewer's own queued state outranks host-context pills — it's the
   // state they act on ("did my request go through?").
   if (plan.rsvpState === "pending") return { cls: "wait", text: "Requested · waiting on host" };
   if (plan.rsvpState === "waitlisted") return { cls: "wait", text: "On the waitlist" };
+  // A virtual/Leaf host is the public face of the plan even though the owner
+  // technically owns the EventGroup — read like "Organized by {persona}", not
+  // "You're hosting" (mirrors org/[shareId]'s viewerHostsPlan exclusion).
   if (plan.hostState === "virtual_host") {
     const by = plan.hostPersona ? `Organized by ${plan.hostPersona.name}` : "Organized by Leaf";
     return { cls: "host", text: plan.attendeeCount > 0 ? `${by} · ${plan.attendeeCount} going` : by };
@@ -263,6 +289,17 @@ function statusFor(plan: Plan): { cls: string; text: string } | null {
 // Capacity reached — no new RSVPs or requests (server enforces this too).
 function planIsFull(plan: Plan) {
   return plan.capacity != null && plan.attendeeCount >= plan.capacity;
+}
+/** Hosting marker belongs to the actual host; a virtual host fronts the plan. */
+function viewerHosts(plan: Plan) {
+  return plan.viewerIsHost && plan.hostState !== "virtual_host";
+}
+/** Chat is for people in the room: attendees and real hosts. */
+function canChat(plan: Plan) {
+  return plan.rsvpState === "going" || viewerHosts(plan);
+}
+function unreadCount(plan: Plan) {
+  return plan.messages.filter((m) => m.unread).length;
 }
 
 // ============================================================================
@@ -304,7 +341,12 @@ export default function MeClient() {
             };
             if (r?.sessionToken?.startsWith("r:")) await Parse.User.become(r.sessionToken);
           } catch { /* fall through */ }
-          window.history.replaceState(null, "", window.location.pathname);
+          // Strip the magic-link credentials but keep any other params (the
+          // Google-Calendar return flag rides on this same URL).
+          const url = new URL(window.location.href);
+          url.searchParams.delete("t");
+          url.searchParams.delete("u");
+          window.history.replaceState(null, "", url.pathname + url.search);
         }
         const current = Parse.User.current();
         if (cancelled) return;
@@ -344,7 +386,7 @@ export default function MeClient() {
   } else if (loadError) {
     body = <div className="lm-center"><p className="lm-muted">{loadError}</p></div>;
   } else if (data) {
-    body = <DashboardView data={data} onRsvp={onRsvp} />;
+    body = <DashboardView data={data} onRsvp={onRsvp} onRefresh={fetchDashboard} />;
   }
 
   return (
@@ -355,115 +397,247 @@ export default function MeClient() {
   );
 }
 
+/** True when this load is the hop back from the Google Calendar consent screen. */
+function isGoogleCalendarReturn(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("openNewPlan") === "1";
+}
+/** The composer draft parked before that redirect, if it survived. */
+function readParkedDraft(): NewPlanDraftSnapshot | null {
+  try {
+    const raw = sessionStorage.getItem(ME_PLAN_DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as NewPlanDraftSnapshot) : null;
+  } catch {
+    return null;
+  }
+}
+/** Newest pending probe this reader hasn't been shown yet — the popup fires
+ *  once per probe, and dismissing without answering still counts as shown. */
+function firstUnseenProbe(probes: SpotProbe[] | undefined): SpotProbe | null {
+  return (probes || []).find((p) => p && p.probeId && p.status === "pending" && !p.seenAt) || null;
+}
+
 // ---- Dashboard view --------------------------------------------------------
 function DashboardView({
-  data, onRsvp,
+  data, onRsvp, onRefresh,
 }: {
   data: Dashboard;
   onRsvp: (id: string, s: RsvpState) => void;
+  onRefresh: () => Promise<void>;
 }) {
   const hero = data.nextPlan;
   const spine = data.plans.slice(1); // hero is plans[0]
   const calCount = new Set(data.plans.map((p) => p.calendarId).filter(Boolean)).size;
   const [openPlanId, setOpenPlanId] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+
+  // ---- New plan ----------------------------------------------------------
+  // Returning from the Google Calendar OAuth redirect reopens the composer with
+  // everything that was typed before the hop — resolved at mount rather than in
+  // an effect so the sheet doesn't flash closed first.
+  const [createOpen, setCreateOpen] = useState(() => isGoogleCalendarReturn());
+  const [restore, setRestore] = useState<NewPlanDraftSnapshot | null>(() =>
+    isGoogleCalendarReturn() ? readParkedDraft() : null,
+  );
+  const [justCreated, setJustCreated] = useState<CreatedPlan | null>(null);
+  // Calendars this person owns — chips in the composer's POST TO row, and the
+  // only ones that can carry a repeating series.
+  const [ownedCalendars, setOwnedCalendars] = useState<PostToOption[]>([]);
+  useEffect(() => {
+    if (!data.person.ownsCalendars) return;
+    let cancelled = false;
+    Parse.Cloud.run("getMyOrganizations")
+      .then((r: { organizations?: { objectId: string; name: string }[] }) => {
+        if (cancelled) return;
+        setOwnedCalendars(
+          (r?.organizations || []).map((o) => ({ id: o.objectId, name: o.name, owned: true })),
+        );
+      })
+      .catch(() => { /* chips just fall back to followed calendars */ });
+    return () => { cancelled = true; };
+  }, [data.person.ownsCalendars]);
+
+  // Clear the OAuth-return breadcrumbs so a refresh doesn't reopen the sheet.
+  useEffect(() => {
+    if (!isGoogleCalendarReturn()) return;
+    try { sessionStorage.removeItem(ME_PLAN_DRAFT_KEY); } catch { /* ignore */ }
+    const url = new URL(window.location.href);
+    url.searchParams.delete("openNewPlan");
+    url.searchParams.delete("google_calendar");
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }, []);
+
+  const postToOptions = useMemo<PostToOption[]>(() => {
+    const byId = new Map<string, PostToOption>();
+    for (const o of ownedCalendars) byId.set(o.id, o);
+    const addFollowed = (id: string | null, name: string) => {
+      if (!id || byId.has(id)) return;
+      byId.set(id, { id, name, owned: false });
+    };
+    for (const p of data.plans) addFollowed(p.calendarId, p.calendarName);
+    for (const c of data.needsHost?.tier2 || []) addFollowed(c.calendarId, c.calendarName);
+    return [...byId.values()].slice(0, 8);
+  }, [ownedCalendars, data.plans, data.needsHost]);
+
+  function openCreate() { setRestore(null); setCreateOpen(true); }
 
   // One-tap probe popup: fires once per unseen pending probe, newest first.
   // Seen is stamped server-side the moment it shows — dismissing without
   // answering still means it never pops again; the inline section remains.
-  const [popupProbe, setPopupProbe] = useState<SpotProbe | null>(null);
+  const [popupProbe, setPopupProbe] = useState<SpotProbe | null>(
+    () => firstUnseenProbe(data.spotProbes),
+  );
   const [popupAnsweredId, setPopupAnsweredId] = useState<string | null>(null);
-  const popupFiredRef = useRef(false);
   useEffect(() => {
-    if (popupFiredRef.current) return;
-    const candidate = (data.spotProbes || []).find(
-      (p) => p && p.probeId && p.status === "pending" && !p.seenAt,
-    );
-    if (!candidate) return;
-    popupFiredRef.current = true;
-    setPopupProbe(candidate);
-    Parse.Cloud.run("markSpotProbesSeen", { probeIds: [candidate.probeId] }).catch(() => {});
-  }, [data.spotProbes]);
-  const sectionProbes = (data.spotProbes || []).filter((p) => p.probeId !== popupAnsweredId);
+    if (!popupProbe) return;
+    Parse.Cloud.run("markSpotProbesSeen", { probeIds: [popupProbe.probeId] }).catch(() => {});
+    // Stamped once, on the probe this mount chose to show — a later refetch
+    // must not re-fire it, so this deliberately doesn't track popupProbe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const places = (data.spotProbes || []).filter(
+    (p) => p && p.probeId && p.probeId !== popupAnsweredId && p.status === "pending",
+  );
+
   // Read the live plan object so RSVP changes reflect inside the modal.
   const openPlan =
     (data.nextPlan && data.nextPlan.id === openPlanId ? data.nextPlan : null) ||
     data.plans.find((p) => p.id === openPlanId) ||
     null;
 
+  const shown = showAll ? spine : spine.slice(0, PLAN_PAGE);
+  const moreCount = spine.length - shown.length;
+  const firstName = (data.person.firstName || "").trim().split(/\s+/)[0] || "";
+  const rail = data.needsHost;
+  const hasRail =
+    (rail && (rail.tier1.length > 0 || rail.tier2.length > 0)) || places.length > 0;
+
   return (
     <>
-      <header className="bar">
-        <div className="wrap bar-in">
+      <header className="topbar">
+        <div className="page topbar-in">
           <div className="brand">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/leaf-logo-black.png" alt="Leaf" className="leaflogo" />
+            <span className="mark" aria-hidden />
+            <span className="wordmark">leaf</span>
           </div>
-          <div className="who">
-            <span>{data.person.firstName || "You"}</span>
-            <div className="ava">{initial(data.person.firstName || "Y")}</div>
+          <div className="topbar-r">
+            <button className="pill" onClick={openCreate}>+ New plan</button>
+            <div className="who">
+              <span>{data.person.firstName || "You"}</span>
+              <div className="ava">{initial(data.person.firstName || "Y")}</div>
+            </div>
           </div>
         </div>
       </header>
 
-      <main>
-        <section className="wrap greet">
-          {data.greeting?.weather && (data.greeting.weather.temp || data.greeting.weather.text) && (
-            <span className="greet-wx">🌤 <b>{data.greeting.weather.temp}°</b> {data.greeting.weather.text}</span>
-          )}
-          <div className="greet-line">
-            {greetingWord()}{data.person.firstName ? `, ${data.person.firstName.trim().split(/\s+/)[0]}` : ""}
-          </div>
-        </section>
-
-        {hero ? (
-          <Hero plan={hero} onRsvp={onRsvp} onOpen={() => setOpenPlanId(hero.id)} />
-        ) : (
-          <EmptyHero ask={data.ask} owner={data.person.ownsCalendars} />
-        )}
-
-        {spine.length > 0 && (
-          <section className="wrap sect">
-            <div className="sect-head">
-              <div className="eyebrow">Your plans</div>
-              <div className="count">
-                {data.plans.length} upcoming · {calCount} calendar{calCount === 1 ? "" : "s"}
-                {data.unreadMessageCount > 0 && (
-                  <> · <span className="new">{data.unreadMessageCount} new message{data.unreadMessageCount === 1 ? "" : "s"}</span></>
-                )}
+      <main className="page cols">
+        <div className={`colL ${hasRail ? "" : "solo"}`}>
+          <div className="greet">
+            {data.greeting?.weather && (data.greeting.weather.temp || data.greeting.weather.text) && (
+              <div className="greet-wx">
+                {data.greeting.weather.temp}° {data.greeting.weather.text}
               </div>
+            )}
+            <h1 className="greet-h">
+              {greetingWord()}{firstName ? `, ${firstName}` : ""}
+            </h1>
+          </div>
+
+          {justCreated && (
+            <div className="created" role="status">
+              <div>
+                <b>{justCreated.title}</b> is live on your calendar.
+              </div>
+              {justCreated.eventGroupId && (
+                <Link className="created-link" href={`/p/${justCreated.eventGroupId}`}>
+                  Open it ↗
+                </Link>
+              )}
             </div>
-            <div className="spine">
-              {spine.map((plan, i) => (
-                <Stop key={plan.id} plan={plan} index={i + 1} onRsvp={onRsvp} onOpen={() => setOpenPlanId(plan.id)} />
-              ))}
+          )}
+
+          {hero ? (
+            <Hero plan={hero} onRsvp={onRsvp} onOpen={() => setOpenPlanId(hero.id)} />
+          ) : (
+            <EmptyHero onCreate={openCreate} />
+          )}
+
+          {spine.length > 0 && (
+            <section className="sect">
+              <div className="sect-head">
+                <div className="eyebrow">Your plans</div>
+                <div className="sect-meta">
+                  {data.plans.length} upcoming · {calCount} calendar{calCount === 1 ? "" : "s"}
+                  {data.unreadMessageCount > 0 && (
+                    <> · <span className="new">{data.unreadMessageCount} new</span></>
+                  )}
+                </div>
+              </div>
+              <div className="rows">
+                {shown.map((plan, i) => (
+                  <PlanRow
+                    key={plan.id}
+                    plan={plan}
+                    index={i + 1}
+                    last={i === shown.length - 1}
+                    onRsvp={onRsvp}
+                    onOpen={() => setOpenPlanId(plan.id)}
+                  />
+                ))}
+              </div>
+              {moreCount > 0 && (
+                <button className="showmore" onClick={() => setShowAll(true)}>
+                  Show {moreCount} more plan{moreCount === 1 ? "" : "s"}
+                </button>
+              )}
+            </section>
+          )}
+
+          <div className="prompt-box">
+            <div className="prompt-body">
+              <div className="prompt-h">Hosting something soon?</div>
+              <p className="prompt-p">
+                Make a plan invitation and collect RSVPs for free. It lives on your own
+                calendar — four fields and a link you can text. No new account needed for
+                you or the guests you invite.
+              </p>
             </div>
-          </section>
-        )}
+            <button className="btn primary" onClick={openCreate}>Make a plan</button>
+          </div>
 
-        {sectionProbes.length > 0 && (
-          <AskAroundSection probes={sectionProbes} />
-        )}
+          {data.person.ownsCalendars && (
+            <div className="prompt-box tight">
+              <div className="prompt-body">
+                <div className="prompt-h sm">Manage your calendars</div>
+                <p className="prompt-p sm">
+                  Edit plans, invite hosts, and see who&rsquo;s coming across everything you organize.
+                </p>
+              </div>
+              <Link className="btn ghost" href="/dashboard">Manage</Link>
+            </div>
+          )}
 
-        {data.needsHost && (data.needsHost.tier1.length > 0 || data.needsHost.tier2.length > 0) && (
-          <NeedsHostSection data={data.needsHost} />
-        )}
+          {!hasRail && <TextsCard />}
+        </div>
 
-        {/* Ask XOR owner strip — never both */}
-        {data.person.ownsCalendars ? (
-          <OwnerStrip count={data.person.pendingReviewCount} />
-        ) : (
-          data.ask && <Ask ask={data.ask} />
+        {hasRail && (
+          <aside className="colR">
+            {rail && rail.tier1.length > 0 && (
+              <NeedsHostRail plans={rail.tier1} onHosted={onRefresh} />
+            )}
+            {places.length > 0 && (
+              <PlacesRail probes={places} onAnswered={(id) => setPopupAnsweredId(id)} />
+            )}
+            {rail && rail.tier2.length > 0 && <CalendarsRail rows={rail.tier2} />}
+            <TextsCard />
+          </aside>
         )}
-
-        <footer className="wrap foot">
-          <p>One text a week, Sunday morning — everything on this page in one link. Plus a heads-up if something lands on your calendars too late to make it. Never a text for every plan on a calendar you follow.</p>
-          <p className="foot-links">
-            <Link href="/unsubscribe">Change how often</Link>
-            <span aria-hidden> · </span>
-            <Link href="/unsubscribe">Stop texts</Link>
-          </p>
-        </footer>
       </main>
+
+      {/* Mobile only — the spec's sticky CTA, with the content fading under it */}
+      <div className="sticky-cta">
+        <button className="btn primary wide" onClick={openCreate}>+ New plan</button>
+      </div>
 
       {openPlan && (
         <PlanModal plan={openPlan} onClose={() => setOpenPlanId(null)} onRsvp={onRsvp} />
@@ -476,76 +650,25 @@ function DashboardView({
           onAnswered={(id) => setPopupAnsweredId(id)}
         />
       )}
+
+      {createOpen && (
+        <NewPlanModal
+          options={postToOptions}
+          firstName={firstName}
+          restore={restore}
+          onClose={() => { setCreateOpen(false); setRestore(null); }}
+          onCreated={(plan) => {
+            setJustCreated(plan);
+            // The new plan belongs in the spine — pull the live payload again.
+            onRefresh().catch(() => {});
+          }}
+        />
+      )}
     </>
   );
 }
 
-// ---- One-tap probe popup ---------------------------------------------------
-// Same guardrails as AskAroundSection: one tap either way, no guilt copy, and
-// closing without answering is a first-class exit (the inline card stays).
-function ProbePopup({
-  probe, onClose, onAnswered,
-}: {
-  probe: SpotProbe;
-  onClose: () => void;
-  onAnswered: (probeId: string) => void;
-}) {
-  const [done, setDone] = useState(false);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const v = probe.venueSnapshot;
-  const catHood = [v?.category, v?.neighborhood].filter(Boolean).join(" · ");
-
-  function respond(response: "interested" | "passed") {
-    if (done) return;
-    setDone(true);
-    onAnswered(probe.probeId);
-    Parse.Cloud.run("respondToSpotProbe", {
-      probeId: probe.probeId, response, respondedVia: "me_popup",
-    }).catch(() => {});
-    window.setTimeout(onClose, 1100);
-  }
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card probe-pop" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-x" onClick={onClose} aria-label="Close">×</button>
-        {v?.imageURL && (
-          <div className="modal-img">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={v.imageURL} alt="" />
-          </div>
-        )}
-        <div className="modal-body">
-          {done ? (
-            <div className="aas-thanks" style={{ padding: "24px 0" }}>Got it 🌱</div>
-          ) : (
-            <>
-              {probe.calendarName && <div className="cal">{probe.calendarName}</div>}
-              <h2 className="modal-title">{v?.name || "A spot nearby"}</h2>
-              {catHood && <div className="hmeta" style={{ marginTop: 4 }}>{catHood}</div>}
-              <p className="blurb" style={{ marginTop: 10 }}>
-                {probe.window?.label
-                  ? `${probe.window.label} could work — would you go?`
-                  : "Would you go sometime?"}
-              </p>
-              <div className="row" style={{ marginTop: 18 }}>
-                <button className="hostbtn" onClick={() => respond("interested")}>Interested</button>
-                <button className="aas-pass" onClick={() => respond("passed")}>Not for me</button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---- Hero ------------------------------------------------------------------
+// ---- Hero (next up) --------------------------------------------------------
 function Hero({
   plan, onRsvp, onOpen,
 }: {
@@ -553,151 +676,68 @@ function Hero({
   onRsvp: (id: string, s: RsvpState) => void;
   onOpen: () => void;
 }) {
-  const addr = [plan.venueName, plan.venueAddress].filter(Boolean).join(" · ");
+  const context = [plan.calendarName, plan.venueName].filter(Boolean).join(" · ");
+  const spotsLeft = plan.capacity != null ? Math.max(0, plan.capacity - plan.attendeeCount) : null;
+  const wx = plan.weather;
+  const statusLine = [
+    plan.attendeeCount > 0 ? `${plan.attendeeCount} going` : null,
+    plan.capacity != null
+      ? planIsFull(plan) ? "Full — waitlist open" : `${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`
+      : null,
+    // Forecast for the day of the plan — the one thing that changes whether
+    // you actually go, so it sits with the rest of the decision.
+    wx && (wx.temp || wx.text) ? [wx.temp && `${wx.temp}°`, wx.text].filter(Boolean).join(" ") : null,
+  ].filter(Boolean).join(" · ");
+
   return (
-    <section className="wrap hero">
-      <div className="eyebrow">Next up</div>
-      <div className="hero-grid">
-        <div>
-          <div className="when">{heroWhen(plan)}</div>
-          <div className="cal">{plan.calendarName}</div>
-          <h1><button className="plan-link" onClick={onOpen}>{plan.title}</button></h1>
-          {addr && <p className="addr">{addr}</p>}
-          {plan.description && <p className="blurb">{plan.description}</p>}
-          {(plan.attendeeCount > 0 || plan.capacity != null) && (() => {
-            const spotsLeft = plan.capacity != null ? Math.max(0, plan.capacity - plan.attendeeCount) : null;
-            return (
-              <p className="meta">
-                {plan.attendeeCount} going
-                {plan.capacity != null
-                  ? planIsFull(plan)
-                    ? " · Full — waitlist open"
-                    : ` · ${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`
-                  : ""}
-              </p>
-            );
-          })()}
-          <div className="row">
-            <AttendButtons plan={plan} onRsvp={onRsvp} />
+    <section className="hero">
+      <div className="hero-top">
+        <PlanTile plan={plan} index={0} variant="hero" onOpen={onOpen} />
+        <div className="hero-text">
+          <div className="eyebrow">{heroWhen(plan)}</div>
+          <h2 className="hero-title">
+            <button className="plan-link" onClick={onOpen}>{plan.title}</button>
+          </h2>
+          {context && <div className="hero-ctx">{context}</div>}
+          {statusLine && <div className="hero-status">{statusLine}</div>}
+        </div>
+      </div>
+      <HeroActions plan={plan} onRsvp={onRsvp} />
+    </section>
+  );
+}
+
+function EmptyHero({ onCreate }: { onCreate: () => void }) {
+  return (
+    <section className="hero">
+      <div className="hero-top">
+        <div className="tile sage hero">plans</div>
+        <div className="hero-text">
+          <div className="eyebrow">Nothing coming up</div>
+          <h2 className="hero-title">No plans yet</h2>
+          <div className="hero-ctx">
+            Nothing on your calendars in the next while. We&rsquo;ll text you the moment there is —
+            or start one of your own.
           </div>
-          <Thread plan={plan} hero />
         </div>
-        <PlanTile plan={plan} index={0} onOpen={onOpen} weather={plan.weather} />
+      </div>
+      <div className="hero-actions">
+        <button className="btn primary" onClick={onCreate}>Make a plan</button>
       </div>
     </section>
   );
 }
 
-function EmptyHero({ ask, owner }: { ask: Dashboard["ask"]; owner: boolean }) {
-  return (
-    <section className="wrap hero">
-      <div className="eyebrow">Nothing coming up</div>
-      <div className="hero-grid">
-        <div>
-          <h1 style={{ marginTop: 8 }}>No plans yet</h1>
-          <p className="blurb">Nothing on your calendars in the next while. We&rsquo;ll text you the moment there is.</p>
-          {owner ? (
-            <div className="row"><Link className="btn ghost" href="/dashboard">Manage your calendars ↗</Link></div>
-          ) : (
-            ask && <div style={{ marginTop: 8 }}><Ask ask={ask} bare /></div>
-          )}
-        </div>
-        <div className="tile sage">plans</div>
-      </div>
-    </section>
-  );
-}
-
-// ---- Spine stop ------------------------------------------------------------
-function Stop({
-  plan, index, onRsvp, onOpen,
-}: {
-  plan: Plan;
-  index: number;
-  onRsvp: (id: string, s: RsvpState) => void;
-  onOpen: () => void;
-}) {
-  const status = statusFor(plan);
-  const going = plan.rsvpState === "going";
-  const meta = [weekday(plan.date), timeLabel(plan), plan.venueName || plan.venueAddress].filter(Boolean).join(" · ");
-  const hostHref = plan.calendarShareId ? `/org/${plan.calendarShareId}?host=${encodeURIComponent(plan.id)}` : `/p/${plan.id}`;
-  // Plans you're neither attending nor hosting (and not Leaf-hosted / waiting on
-  // a host) get a quick "Count me in" CTA on the right instead of a count.
-  // A virtual host fronts the hosting, so the real owner counts as "not
-  // hosting" here too and still gets the CTA (mirrors AttendButtons/canChat).
-  const canAttend = (!plan.viewerIsHost || plan.hostState === "virtual_host") && plan.rsvpState !== "going"
-    && plan.rsvpState !== "pending" && plan.rsvpState !== "waitlisted"
-    && plan.hostState !== "waiting_on_host" && plan.hostState !== "leaf_hosted";
-  return (
-    <article className="stop">
-      <div className="date"><div className="d">{dayNum(plan.date)}</div><div className="m">{monthAbbr(plan.date)}</div></div>
-      <span className={`dot ${going ? "on" : ""}`} />
-      <div className="stop-card">
-        <PlanTile plan={plan} index={index} sm onOpen={onOpen} />
-        <div>
-          <div className="cal">{plan.calendarName}</div>
-          <h3><button className="plan-link" onClick={onOpen}>{plan.title}</button></h3>
-          <p className="meta">{meta}</p>
-          {plan.hostState === "waiting_on_host" && (
-            <div style={{ marginTop: 9 }}><Link className="btn ghost" href={hostHref}>Host this ↗</Link></div>
-          )}
-          <Thread plan={plan} />
-        </div>
-        {canAttend
-          ? <AttendCta plan={plan} onRsvp={onRsvp} />
-          : (status && <span className={`status ${status.cls}`}>{status.text}</span>)}
-      </div>
-    </article>
-  );
-}
-
-// White-bg quick CTA for the spine's not-attending plans. One tap RSVPs going
-// (optimistic); requireApproval plans queue a request ("pending") and full
-// plans join the waitlist ("waitlisted"). Full controls live in the plan modal.
-function AttendCta({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: RsvpState) => void }) {
-  const [busy, setBusy] = useState(false);
-  const full = planIsFull(plan);
-  async function go() {
-    if (busy) return;
-    setBusy(true);
-    const prev = plan.rsvpState;
-    // Optimistically land on the state the server will return; reconcile if
-    // it disagrees (e.g. a stale card missing the approval flag).
-    const target: RsvpState = full ? "waitlisted" : plan.requireApproval ? "pending" : "going";
-    onRsvp(plan.id, target);
-    try {
-      const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: "going" });
-      if (res?.rsvpState && res.rsvpState !== target) onRsvp(plan.id, res.rsvpState as RsvpState);
-    } catch {
-      onRsvp(plan.id, prev);
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <div className="attend-cta-wrap">
-      <div className="going-count">
-        {plan.attendeeCount} going{plan.capacity != null ? ` · ${plan.capacity} max` : ""}
-      </div>
-      <button className="attend-cta" disabled={busy} onClick={go}>
-        {busy ? "…" : full ? "Join Waitlist" : plan.requireApproval ? "Request to Attend" : "Count me in"}
-      </button>
-    </div>
-  );
-}
-
-// ---- Attend buttons --------------------------------------------------------
-function AttendButtons({
-  plan, onRsvp,
-}: {
-  plan: Plan;
-  onRsvp: (id: string, s: RsvpState) => void;
-}) {
+// ---- Hero action bar -------------------------------------------------------
+function HeroActions({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: RsvpState) => void }) {
   const [busy, setBusy] = useState(false);
   const going = plan.rsvpState === "going";
   const pending = plan.rsvpState === "pending";
   const waitlisted = plan.rsvpState === "waitlisted";
+  const hosting = viewerHosts(plan);
   const full = planIsFull(plan) && !going && !pending && !waitlisted;
+  const dir = directionsUrl(plan);
+  const unread = unreadCount(plan);
 
   async function set(next: RsvpState) {
     if (busy || plan.rsvpState === next) return;
@@ -720,101 +760,141 @@ function AttendButtons({
     }
   }
 
-  // Hosts don't RSVP to their own plan — they host it. A virtual host fronts
-  // the plan instead, so the real owner is just another potential attendee
-  // and gets the normal RSVP buttons, same as anyone else.
-  if (plan.viewerIsHost && plan.hostState !== "virtual_host") {
-    return (
-      <span className="attend">
-        <button className="btn" disabled aria-pressed>✓ Hosting</button>
-      </span>
-    );
-  }
+  const primaryLabel = hosting ? "You're hosting"
+    : going ? "Going ✓"
+    : pending ? "Requested ✓"
+    : waitlisted ? "On the waitlist ✓"
+    : full ? "Join waitlist"
+    : plan.requireApproval ? "Request to attend"
+    : "Count me in";
 
   return (
-    <span className="attend">
-      <button className="btn" aria-pressed={going || pending || waitlisted} disabled={busy || pending || waitlisted} onClick={() => set("going")}>
-        {going ? "✓ Going"
-          : pending ? "✓ Requested"
-          : waitlisted ? "✓ On waitlist"
-          : full ? "Join Waitlist"
-          : plan.requireApproval ? "Request to Attend"
-          : "Count me in"}
-      </button>
+    <div className="hero-actions">
       <button
-        className="btn ghost"
-        aria-pressed={plan.rsvpState === "not_going"}
-        disabled={busy}
-        onClick={() => set("not_going")}
+        className="btn primary"
+        disabled={busy || hosting || pending || waitlisted}
+        aria-pressed={going || pending || waitlisted}
+        onClick={() => set("going")}
       >
-        {pending ? "Withdraw request" : waitlisted ? "Leave waitlist" : <>Can&rsquo;t make it</>}
+        {primaryLabel}
       </button>
-    </span>
-  );
-}
-
-// ---- Thread (messages colocated with their plan) ---------------------------
-function Thread({ plan, hero }: { plan: Plan; hero?: boolean }) {
-  const [expanded, setExpanded] = useState(false);
-  // A virtual host fronts the plan's chat — the real owner isn't the one
-  // hosting it there, so viewerIsHost alone shouldn't grant chat access;
-  // only an actual "going" RSVP should (mirrors AttendButtons).
-  const canChat = plan.rsvpState === "going" || (plan.viewerIsHost && plan.hostState !== "virtual_host");
-
-  // Message previews (and the join link) are only for people who can actually
-  // open the chat — not going/not hosting shouldn't see chat content.
-  if (!canChat) return null;
-
-  // Lead with what needs attention: show all UNREAD messages; if everything's
-  // read, fall back to just the latest one for context. Rest collapse behind
-  // an expander so the spine stays scannable.
-  const unread = plan.messages.filter((m) => m.unread);
-  const base = unread.length > 0 ? unread : plan.messages.slice(-1);
-  const shown = expanded ? plan.messages : base;
-  const hidden = expanded ? 0 : plan.messages.length - base.length;
-
-  return (
-    <div className={`thread ${hero ? "hero-thread" : ""}`}>
-      {!expanded && hidden > 0 && (
-        <button className="reply earlier" onClick={() => setExpanded(true)}>
-          Show {hidden} earlier message{hidden === 1 ? "" : "s"}
-        </button>
+      {dir && (
+        <a className="btn ghost" href={dir} target="_blank" rel="noopener noreferrer">Getting there</a>
       )}
-      {shown.map((m, i) => (
-        <div className="msg" key={m.id || i}>
-          <div className={`mava ${m.unread ? "unread" : ""}`}>{initial(m.authorName)}</div>
-          <div className="msg-b">
-            <div className="t">
-              <span style={{ color: m.authorRole === "virtual_host" ? "var(--ink)" : "inherit" }}>{m.authorName}</span>
-              {m.authorRole === "virtual_host" ? (
-                // The same tooltip the web chat bubble carries, rather than a
-                // "· AI-assisted host" role label here and a bare icon there.
-                // One disclosure, one wording, both places it can be read.
-                <>
-                  {" "}
-                  <VirtualHostBadge persona={{ name: m.authorName }} />
-                </>
-              ) : m.authorRole === "leaf" ? (
-                " · Leaf concierge"
-              ) : plan.calendarName ? (
-                ` · ${plan.calendarName}`
-              ) : (
-                ""
-              )}
-            </div>
-            <p className="p">{m.body}</p>
-            {m.sentAt && <div className="ago">{ago(m.sentAt)}</div>}
-          </div>
-        </div>
-      ))}
-      {canChat && (
-        <Link href={`/chat/${plan.id}?from=me`} className="btn ghost chat-btn">Join Plan Chat ↗</Link>
+      {canChat(plan) && (
+        <Link className="btn ghost chat" href={`/chat/${plan.id}?from=me`} aria-label="Plan chat">
+          <ChatIcon />
+          <span className="chat-label">Chat{unread > 0 ? ` · ${unread}` : ""}</span>
+        </Link>
+      )}
+      {!hosting && plan.rsvpState !== "not_going" && (
+        <button className="btn text" disabled={busy} onClick={() => set("not_going")}>
+          {pending ? "Withdraw request" : waitlisted ? "Leave waitlist" : "Can't make it"}
+        </button>
       )}
     </div>
   );
 }
 
-// ---- Plans that need a host (leaf-needs-a-host-cta spec) --------------------
+// ---- "Your plans" row ------------------------------------------------------
+function PlanRow({
+  plan, index, last, onRsvp, onOpen,
+}: {
+  plan: Plan;
+  index: number;
+  last: boolean;
+  onRsvp: (id: string, s: RsvpState) => void;
+  onOpen: () => void;
+}) {
+  const hosting = viewerHosts(plan);
+  const meta = [
+    weekday(plan.date),
+    timeLabel(plan),
+    plan.venueName || plan.venueAddress ||
+      (plan.attendeeCount > 0 ? `${plan.attendeeCount} going` : null),
+    plan.capacity != null ? `${plan.capacity} max` : null,
+  ].filter(Boolean).join(" · ");
+  const hostHref = plan.calendarShareId
+    ? `/org/${plan.calendarShareId}?host=${encodeURIComponent(plan.id)}`
+    : `/p/${plan.id}`;
+  // A virtual host fronts the hosting, so the real owner counts as "not
+  // hosting" here too and still gets the RSVP CTA.
+  const canAttend = !hosting
+    && plan.rsvpState !== "going" && plan.rsvpState !== "pending" && plan.rsvpState !== "waitlisted"
+    && plan.hostState !== "waiting_on_host" && plan.hostState !== "leaf_hosted";
+  const unread = unreadCount(plan);
+
+  return (
+    <article className={`row ${last ? "last" : ""}`}>
+      <div className="row-date">
+        <div className="d">{dayNum(plan.date)}</div>
+        <div className="m">{monthAbbr(plan.date)}</div>
+      </div>
+      <PlanTile plan={plan} index={index} variant="row" onOpen={onOpen} />
+      <div className="row-text">
+        <div className="row-cal">
+          {plan.calendarName}
+          {hosting && (
+            <span className="hostmark"><span className="hostdot" />You&rsquo;re hosting</span>
+          )}
+        </div>
+        <h3 className="row-title">
+          <button className="plan-link" onClick={onOpen}>{plan.title}</button>
+        </h3>
+        <div className="row-meta">{meta}</div>
+      </div>
+      <div className="row-act">
+        {plan.hostState === "waiting_on_host" ? (
+          <Link className="row-btn host" href={hostHref}>Host this</Link>
+        ) : canAttend ? (
+          <AttendCta plan={plan} onRsvp={onRsvp} />
+        ) : canChat(plan) ? (
+          <Link className="row-btn ghost" href={`/chat/${plan.id}?from=me`}>
+            <ChatIcon />
+            <span>Chat{unread > 0 ? ` · ${unread}` : ""}</span>
+          </Link>
+        ) : (
+          (() => {
+            const s = statusFor(plan);
+            return s ? <span className={`status ${s.cls}`}>{s.text}</span> : null;
+          })()
+        )}
+      </div>
+    </article>
+  );
+}
+
+// One tap RSVPs going (optimistic); requireApproval plans queue a request
+// ("pending") and full plans join the waitlist ("waitlisted"). Full controls
+// live in the plan modal.
+function AttendCta({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: RsvpState) => void }) {
+  const [busy, setBusy] = useState(false);
+  const full = planIsFull(plan);
+  async function go() {
+    if (busy) return;
+    setBusy(true);
+    const prev = plan.rsvpState;
+    // Optimistically land on the state the server will return; reconcile if
+    // it disagrees (e.g. a stale card missing the approval flag).
+    const target: RsvpState = full ? "waitlisted" : plan.requireApproval ? "pending" : "going";
+    onRsvp(plan.id, target);
+    try {
+      const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: "going" });
+      if (res?.rsvpState && res.rsvpState !== target) onRsvp(plan.id, res.rsvpState as RsvpState);
+    } catch {
+      onRsvp(plan.id, prev);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <button className="row-btn primary" disabled={busy} onClick={go}>
+      {busy ? "…" : full ? "Join waitlist" : plan.requireApproval ? "Request" : "Count me in"}
+    </button>
+  );
+}
+
+// ---- Rail: plans that need a host -----------------------------------------
 function monthDay(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
@@ -822,7 +902,7 @@ function decayText(p: HostPlan): string {
   const wd = weekday(p.hostDeadline);
   if (p.decayLevel === "soon") {
     if (p.daysToDeadline <= 0) return "Loses its slot today";
-    return `Loses its slot ${wd} — ${p.daysToDeadline} day${p.daysToDeadline === 1 ? "" : "s"} left`;
+    return `Loses its slot ${wd}`;
   }
   return `Needs a host by ${wd}`;
 }
@@ -867,110 +947,87 @@ function markPlanIdeaLocallyInterested(ideaId: string) {
   }
 }
 
-function NeedsHostSection({ data }: { data: NeedsHost }) {
-  // Local copy so a hosted card can leave the section immediately on success.
-  const [tier1, setTier1] = useState<HostPlan[]>(data.tier1);
+function NeedsHostRail({ plans, onHosted }: { plans: HostPlan[]; onHosted: () => Promise<void> }) {
+  // Local copy so a hosted card can leave the rail immediately on success.
+  const [list, setList] = useState<HostPlan[]>(plans);
+  useEffect(() => { setList(plans); }, [plans]);
   const [hostingIdea, setHostingIdea] = useState<HostPlan | null>(null);
-  const tier2 = data.tier2;
-
   const [interested, setInterested] = useState<Set<string>>(new Set());
-  const [interestPending, setInterestPending] = useState<Set<string>>(new Set());
-  const [interestCounts, setInterestCounts] = useState<Record<string, number>>({});
+  const [pendingInterest, setPendingInterest] = useState<Set<string>>(new Set());
+  const [counts, setCounts] = useState<Record<string, number>>({});
 
   // Hydrate "already interested" from localStorage (same key expressInterestOnPlanIdea's
   // org/[shareId] caller uses), so the heart renders filled across reloads.
   useEffect(() => {
     const seen = new Set<string>();
-    for (const p of data.tier1) {
-      if (isPlanIdeaLocallyInterested(p.ideaId)) seen.add(p.ideaId);
-    }
+    for (const p of plans) if (isPlanIdeaLocallyInterested(p.ideaId)) seen.add(p.ideaId);
     if (seen.size > 0) setInterested(seen);
-  }, [data.tier1]);
+  }, [plans]);
 
   async function markInterested(p: HostPlan) {
-    if (interested.has(p.ideaId) || interestPending.has(p.ideaId)) return;
-    const priorCount = interestCounts[p.ideaId] ?? p.interestedCount;
-
-    setInterestPending((s) => new Set(s).add(p.ideaId));
+    if (interested.has(p.ideaId) || pendingInterest.has(p.ideaId)) return;
+    const prior = counts[p.ideaId] ?? p.interestedCount;
+    setPendingInterest((s) => new Set(s).add(p.ideaId));
     setInterested((s) => new Set(s).add(p.ideaId));
-    setInterestCounts((c) => ({ ...c, [p.ideaId]: priorCount + 1 }));
+    setCounts((c) => ({ ...c, [p.ideaId]: prior + 1 }));
     markPlanIdeaLocallyInterested(p.ideaId);
-
     try {
       const cookie = getOrCreateInterestCookie();
       const result = (await Parse.Cloud.run("expressInterestOnPlanIdea", {
-        ideaId: p.ideaId,
-        cookie,
+        ideaId: p.ideaId, cookie,
       })) as { count?: number };
-      if (typeof result?.count === "number") {
-        setInterestCounts((c) => ({ ...c, [p.ideaId]: result.count! }));
-      }
+      if (typeof result?.count === "number") setCounts((c) => ({ ...c, [p.ideaId]: result.count! }));
     } catch {
-      setInterested((s) => {
-        const next = new Set(s);
-        next.delete(p.ideaId);
-        return next;
-      });
-      setInterestCounts((c) => ({ ...c, [p.ideaId]: priorCount }));
+      setInterested((s) => { const n = new Set(s); n.delete(p.ideaId); return n; });
+      setCounts((c) => ({ ...c, [p.ideaId]: prior }));
     } finally {
-      setInterestPending((s) => {
-        const next = new Set(s);
-        next.delete(p.ideaId);
-        return next;
-      });
+      setPendingInterest((s) => { const n = new Set(s); n.delete(p.ideaId); return n; });
     }
   }
 
-  if (tier1.length === 0 && tier2.length === 0) return null;
+  if (list.length === 0) return null;
 
   return (
-    <section className="wrap nhs">
-      <div className="head">
-        <div className="eyebrow">On calendars you follow</div>
-        <h1>Plans that <span className="k">need a host</span>.</h1>
-      </div>
-
-      {tier1.length > 0 && (
-        <>
-          <div className="tierlab">Claim these soon</div>
-          {tier1.map((p) => (
-            <div className="hcard" key={p.ideaId}>
-              <div className="date"><div className="d">{dayNum(p.date)}</div><div className="mo">{monthAbbr(p.date)}</div></div>
+    <section className="rail">
+      <div className="eyebrow">Plans that need a host</div>
+      <div className="hostcards">
+        {list.map((p) => {
+          const count = counts[p.ideaId] ?? p.interestedCount;
+          const on = interested.has(p.ideaId);
+          return (
+            <div className="hostcard" key={p.ideaId}>
               {p.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img className="thumb" src={p.image} alt="" />
+                <img className="hostthumb" src={p.image} alt="" />
               ) : (
-                <div className="thumb ph" />
+                <div className="hostthumb ph" />
               )}
-              <div className="hb">
-                <div className="cal">{p.calendarName}</div>
-                <h3>{p.title}</h3>
-                <div className="hmeta">{[weekday(p.date), fmtTime(p.time, p.date), p.venueName || p.venueAddress].filter(Boolean).join(" · ")}</div>
-                <div className={`decay ${p.decayLevel}`}>{decayText(p)}</div>
-              </div>
-              <div className="hact">
-                {(interestCounts[p.ideaId] ?? p.interestedCount) > 0 && (
-                  <div className="interested">{interestCounts[p.ideaId] ?? p.interestedCount} interested</div>
-                )}
-                <div className="hact-row">
+              <div className="hostbody">
+                <div className="row-cal">{p.calendarName}</div>
+                <h3 className="hostcard-title">{p.title}</h3>
+                <div className="hostcard-when">
+                  {[weekday(p.date)?.slice(0, 3), fmtTime(p.time, p.date), p.venueName || p.venueAddress]
+                    .filter(Boolean).join(" · ")}
+                </div>
+                <div className="hostcard-meta">
+                  {p.decayLevel === "soon" && <span className="urgent">{decayText(p)}</span>}
                   <button
                     type="button"
-                    className={`heart-btn ${interested.has(p.ideaId) ? "on" : ""}`}
-                    aria-label={interested.has(p.ideaId) ? "You're interested" : "I'm interested"}
-                    disabled={interested.has(p.ideaId) || interestPending.has(p.ideaId)}
+                    className={`heart ${on ? "on" : ""}`}
+                    aria-label={on ? "You're interested" : "Mark interest"}
+                    disabled={on || pendingInterest.has(p.ideaId)}
                     onClick={() => markInterested(p)}
                   >
-                    <Heart className="w-4 h-4" fill={interested.has(p.ideaId) ? "currentColor" : "none"} />
-                  </button>
-                  <button className="hostbtn" onClick={() => setHostingIdea(p)}>
-                    Host this
+                    <Heart className="w-3 h-3" fill={on ? "currentColor" : "none"} />
+                    {count > 0 && <span>{count} interested</span>}
                   </button>
                 </div>
               </div>
+              <button className="hostbtn" onClick={() => setHostingIdea(p)}>Host this</button>
             </div>
-          ))}
-        </>
-      )}
+          );
+        })}
+      </div>
 
       {hostingIdea && (
         <HostIdeaModal
@@ -990,174 +1047,290 @@ function NeedsHostSection({ data }: { data: NeedsHost }) {
           hostPhone={Parse.User.current()?.get("phone") || null}
           onClose={() => setHostingIdea(null)}
           onHosted={() => {
-            setTier1((list) => list.filter((x) => x.ideaId !== hostingIdea.ideaId));
+            setList((l) => l.filter((x) => x.ideaId !== hostingIdea.ideaId));
+            onHosted().catch(() => {});
           }}
         />
       )}
-
-      {tier2.length > 0 && (
-        <div className="tier2">
-          <div className="tierlab">More on your calendars</div>
-          {tier2.map((c) => (
-            <Link
-              key={c.calendarId}
-              className="crow"
-              href={c.calendarShareId ? `/org/${c.calendarShareId}` : "#"}
-            >
-              {c.calendarPhoto ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img className="gmark" src={c.calendarPhoto} alt="" />
-              ) : (
-                <span className="gmark ph">{initial(c.calendarName)}</span>
-              )}
-              <div className="cbody">
-                <div className="n">{c.calendarName}</div>
-                <div className="c">
-                  <b className={c.soonestIsUrgent ? "soon" : ""}>
-                    {c.count} plan{c.count === 1 ? "" : "s"} need a host
-                  </b>
-                  {c.soonestIsUrgent
-                    ? ` · one this ${weekday(c.soonestDeadline)}`
-                    : ` · soonest ${monthDay(c.soonestDeadline)}`}
-                </div>
-              </div>
-              <span className="cta">View calendar →</span>
-            </Link>
-          ))}
-        </div>
-      )}
     </section>
   );
 }
 
-// ---- Leaf asked around (spot interest probes — To Plan v2 §C4) --------------
-// GUARDRAIL (spec §7): venue-framed only. The card never names who queued the
-// spot, never says "someone you know", never hints at provenance at all — the
-// venue is the subject and the reader reacts to the place itself. Both answers
-// are one tap; "Not for me" carries no guilt copy. Responses are optimistic:
-// the card flips to a brief "Got it 🌱" then collapses, and once responded it
-// is never re-shown even if a refetch still returns the probe as pending.
-function AskAroundSection({ probes }: { probes: SpotProbe[] }) {
-  // responded → card shows the "Got it 🌱" state; collapsed → card is gone.
-  // Both are local-only so a mid-flight refetch can't resurrect a card.
-  const [responded, setResponded] = useState<Set<string>>(new Set());
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const timersRef = useRef<number[]>([]);
-  useEffect(() => {
-    const timers = timersRef.current;
-    return () => { timers.forEach((t) => window.clearTimeout(t)); };
-  }, []);
-
-  // Pending probes only — resolved/expired rows never render here.
-  const visible = probes.filter(
-    (p) => p && p.probeId && p.status === "pending" && !collapsed.has(p.probeId),
-  );
-  if (visible.length === 0) return null;
+// ---- Rail: places · mark interest -----------------------------------------
+// GUARDRAIL (To Plan v2 §7): venue-framed only. The row never names who queued
+// the spot, never says "someone you know", never hints at provenance — the
+// venue is the subject and the reader reacts to the place itself. One tap
+// either way, no guilt copy, and an answered row is never re-shown.
+function PlacesRail({
+  probes, onAnswered,
+}: {
+  probes: SpotProbe[];
+  onAnswered: (probeId: string) => void;
+}) {
+  const [answers, setAnswers] = useState<Record<string, "interested" | "passed">>({});
 
   function respond(p: SpotProbe, response: "interested" | "passed") {
-    if (responded.has(p.probeId)) return;
-    setResponded((s) => new Set(s).add(p.probeId));
+    if (answers[p.probeId] === response) return;
+    setAnswers((a) => ({ ...a, [p.probeId]: response }));
+    onAnswered(p.probeId);
     // Fire-and-forget: the answer is a soft signal, not an RSVP — never
-    // re-surface the card to retry (spec: no re-show once answered).
+    // re-surface the row to retry.
     Parse.Cloud.run("respondToSpotProbe", { probeId: p.probeId, response }).catch(() => {});
-    timersRef.current.push(window.setTimeout(() => {
-      setCollapsed((s) => new Set(s).add(p.probeId));
-    }, 1400));
   }
 
   return (
-    <section className="wrap sect aas">
-      <div className="eyebrow" style={{ marginBottom: 18 }}>Worth checking out?</div>
-      {visible.map((p) => {
-        const v = p.venueSnapshot;
-        const catHood = [v?.category, v?.neighborhood].filter(Boolean).join(" · ");
-        const windowLine = p.window?.label
-          ? `${p.window.label} could work — would you go?`
-          : "Would you go sometime?";
-        if (responded.has(p.probeId)) {
+    <section className="rail">
+      <div className="rail-head">
+        <div className="eyebrow">Places · mark interest</div>
+      </div>
+      <p className="rail-sub">
+        We&rsquo;ll text you when a plan lands somewhere you&rsquo;re interested in.
+      </p>
+      <div className="places">
+        {probes.map((p) => {
+          const v = p.venueSnapshot;
+          const on = answers[p.probeId] === "interested";
+          const sub = [v?.neighborhood, v?.category].filter(Boolean).join(" · ");
           return (
-            <div className="hcard" key={p.probeId}>
-              <div className="aas-thanks">Got it 🌱</div>
+            <div className={`place ${on ? "on" : ""}`} key={p.probeId}>
+              <div className="place-text">
+                <div className="place-n">{v?.name || "A spot nearby"}</div>
+                <div className="place-s">{sub || p.window?.label || "Worth a look"}</div>
+              </div>
+              <button
+                className={`heart-toggle ${on ? "on" : ""}`}
+                aria-label={on ? "Interested" : "Mark interest"}
+                aria-pressed={on}
+                onClick={() => respond(p, on ? "passed" : "interested")}
+              >
+                <Heart className="w-4 h-4" fill={on ? "currentColor" : "none"} />
+              </button>
             </div>
           );
-        }
-        return (
-          <div className="hcard" key={p.probeId}>
-            {v?.imageURL ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img className="thumb" src={v.imageURL} alt="" />
-            ) : (
-              <div className="thumb ph" />
-            )}
-            <div className="hb">
-              {/* Calendar-framed probes name their calendar; legacy bookmark
-                  probes stay venue-only (provenance guardrail above). */}
-              {p.calendarName && <div className="aas-cal">{p.calendarName}</div>}
-              <h3>{v?.name || "A spot nearby"}</h3>
-              {catHood && <div className="hmeta">{catHood}</div>}
-              <div className="note">{windowLine}</div>
-            </div>
-            <div className="hact aas-act">
-              {/* "Interested", not "I'd go" — this is a soft signal, and the
-                  copy must not read as committing to a plan. */}
-              <button className="hostbtn" onClick={() => respond(p, "interested")}>
-                Interested
-              </button>
-              <button className="aas-pass" onClick={() => respond(p, "passed")}>
-                Not for me
-              </button>
-            </div>
-          </div>
-        );
-      })}
-    </section>
-  );
-}
-
-// ---- The ask ---------------------------------------------------------------
-function Ask({
-  ask, bare,
-}: {
-  ask: NonNullable<Dashboard["ask"]>;
-  bare?: boolean;
-}) {
-  const href = ask.promptPrefill ? `${PROMPT_BASE}?q=${encodeURIComponent(ask.promptPrefill)}` : PROMPT_BASE;
-  const inner = (
-    <div className="start">
-      <p className="lede">{ask.copy}</p>
-      <p className="sub">Real places, real dates, in seconds. Your friends RSVP by text.</p>
-      <a className="prompt" href={href}>
-        <span className="typed">{ask.promptPrefill ? `"${ask.promptPrefill}"` : "Start a calendar"}</span>
-        <span className="btn">Start this ↗</span>
-      </a>
-      <p className="handoff">Opens the prompt on joinleaf.com with this already typed in — still signed in as you, nothing to sign up for.</p>
-    </div>
-  );
-  if (bare) return inner;
-  return (
-    <section className="wrap sect tail">
-      <div className="eyebrow" style={{ marginBottom: 18 }}>Start your own</div>
-      {inner}
-    </section>
-  );
-}
-
-// ---- Owner strip -----------------------------------------------------------
-function OwnerStrip({ count }: { count: number }) {
-  return (
-    <section className="wrap sect tail">
-      <div className="eyebrow" style={{ marginBottom: 18 }}>You also run a calendar</div>
-      <div className="owner">
-        <p>
-          {count > 0 ? (
-            <><b>{count} plan{count === 1 ? "" : "s"} need your review</b></>
-          ) : (
-            <><b>Manage your calendars</b> — review plans, RSVPs, and hosting.</>
-          )}
-        </p>
-        <Link className="btn ghost" href="/dashboard">Manage ↗</Link>
+        })}
       </div>
     </section>
+  );
+}
+
+// ---- Texts / notification card --------------------------------------------
+function TextsCard() {
+  return (
+    <div className="texts">
+      <p>One text a week, Sunday morning. Plus a heads-up when something lands late.</p>
+      <Link className="btn ghost sm" href="/unsubscribe">Texts</Link>
+    </div>
+  );
+}
+
+// ---- Rail: calendars you follow -------------------------------------------
+function CalendarsRail({ rows }: { rows: HostCalRow[] }) {
+  return (
+    <section className="rail">
+      <div className="eyebrow">Calendars you follow</div>
+      <div className="cals">
+        {rows.map((c) => (
+          <Link
+            key={c.calendarId}
+            className="cal-row"
+            href={c.calendarShareId ? `/org/${c.calendarShareId}` : "#"}
+          >
+            {c.calendarPhoto ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="cal-ava" src={c.calendarPhoto} alt="" />
+            ) : (
+              <span className="cal-ava ph">{initial(c.calendarName)}</span>
+            )}
+            <div className="cal-body">
+              <div className="cal-n">{c.calendarName}</div>
+              <div className={`cal-s ${c.soonestIsUrgent ? "urgent" : ""}`}>
+                {c.count} plan{c.count === 1 ? "" : "s"} need{c.count === 1 ? "s" : ""} a host
+                {c.soonestIsUrgent ? "" : ` · ${monthDay(c.soonestDeadline)}`}
+              </div>
+            </div>
+            <span className="cal-cta">View</span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---- One-tap probe popup ---------------------------------------------------
+// Same guardrails as PlacesRail: one tap either way, no guilt copy, and
+// closing without answering is a first-class exit (the inline row stays).
+function ProbePopup({
+  probe, onClose, onAnswered,
+}: {
+  probe: SpotProbe;
+  onClose: () => void;
+  onAnswered: (probeId: string) => void;
+}) {
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const v = probe.venueSnapshot;
+  const catHood = [v?.category, v?.neighborhood].filter(Boolean).join(" · ");
+
+  function respond(response: "interested" | "passed") {
+    if (done) return;
+    setDone(true);
+    onAnswered(probe.probeId);
+    Parse.Cloud.run("respondToSpotProbe", {
+      probeId: probe.probeId, response, respondedVia: "me_popup",
+    }).catch(() => {});
+    window.setTimeout(onClose, 1100);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card probe-pop" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-x" onClick={onClose} aria-label="Close">×</button>
+        {v?.imageURL && (
+          <div className="modal-img">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={v.imageURL} alt="" />
+          </div>
+        )}
+        <div className="modal-body">
+          {done ? (
+            <div className="probe-thanks">Got it</div>
+          ) : (
+            <>
+              {probe.calendarName && <div className="row-cal">{probe.calendarName}</div>}
+              <h2 className="modal-title">{v?.name || "A spot nearby"}</h2>
+              {catHood && <div className="hero-ctx">{catHood}</div>}
+              <p className="modal-blurb">
+                {probe.window?.label
+                  ? `${probe.window.label} could work — would you go?`
+                  : "Would you go sometime?"}
+              </p>
+              <div className="hero-actions flat">
+                <button className="hostbtn" onClick={() => respond("interested")}>Interested</button>
+                <button className="btn ghost" onClick={() => respond("passed")}>Not for me</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Thread (messages, colocated with their plan in the modal) -------------
+function Thread({ plan }: { plan: Plan }) {
+  const [expanded, setExpanded] = useState(false);
+  // Message previews are only for people who can actually open the chat —
+  // not going / not hosting shouldn't see chat content.
+  if (!canChat(plan) || plan.messages.length === 0) return null;
+
+  // Lead with what needs attention: show all UNREAD messages; if everything's
+  // read, fall back to just the latest one for context.
+  const unread = plan.messages.filter((m) => m.unread);
+  const base = unread.length > 0 ? unread : plan.messages.slice(-1);
+  const shown = expanded ? plan.messages : base;
+  const hidden = expanded ? 0 : plan.messages.length - base.length;
+
+  return (
+    <div className="thread">
+      {!expanded && hidden > 0 && (
+        <button className="linkbtn" onClick={() => setExpanded(true)}>
+          Show {hidden} earlier message{hidden === 1 ? "" : "s"}
+        </button>
+      )}
+      {shown.map((m, i) => (
+        <div className="msg" key={m.id || i}>
+          <div className={`mava ${m.unread ? "unread" : ""}`}>{initial(m.authorName)}</div>
+          <div className="msg-b">
+            <div className="t">
+              <span>{m.authorName}</span>
+              {m.authorRole === "virtual_host" ? (
+                // The same tooltip the web chat bubble carries — one
+                // disclosure, one wording, both places it can be read.
+                <> <VirtualHostBadge persona={{ name: m.authorName }} /></>
+              ) : m.authorRole === "leaf" ? (
+                " · Leaf concierge"
+              ) : plan.calendarName ? (
+                ` · ${plan.calendarName}`
+              ) : (
+                ""
+              )}
+            </div>
+            <p className="p">{m.body}</p>
+            {m.sentAt && <div className="ago">{ago(m.sentAt)}</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---- Attend buttons (plan modal) -------------------------------------------
+function AttendButtons({
+  plan, onRsvp,
+}: {
+  plan: Plan;
+  onRsvp: (id: string, s: RsvpState) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const going = plan.rsvpState === "going";
+  const pending = plan.rsvpState === "pending";
+  const waitlisted = plan.rsvpState === "waitlisted";
+  const full = planIsFull(plan) && !going && !pending && !waitlisted;
+
+  async function set(next: RsvpState) {
+    if (busy || plan.rsvpState === next) return;
+    const prev = plan.rsvpState;
+    setBusy(true);
+    const target: RsvpState = next !== "going" ? next
+      : full ? "waitlisted"
+      : plan.requireApproval ? "pending"
+      : "going";
+    onRsvp(plan.id, target);
+    try {
+      const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: next });
+      if (res?.rsvpState && res.rsvpState !== target) onRsvp(plan.id, res.rsvpState as RsvpState);
+    } catch {
+      onRsvp(plan.id, prev);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Hosts don't RSVP to their own plan — they host it. A virtual host fronts
+  // the plan instead, so the real owner is just another potential attendee.
+  if (viewerHosts(plan)) {
+    return <button className="btn primary" disabled>✓ Hosting</button>;
+  }
+
+  return (
+    <>
+      <button
+        className="btn primary"
+        aria-pressed={going || pending || waitlisted}
+        disabled={busy || pending || waitlisted}
+        onClick={() => set("going")}
+      >
+        {going ? "Going ✓"
+          : pending ? "Requested ✓"
+          : waitlisted ? "On waitlist ✓"
+          : full ? "Join waitlist"
+          : plan.requireApproval ? "Request to attend"
+          : "Count me in"}
+      </button>
+      <button
+        className="btn ghost"
+        aria-pressed={plan.rsvpState === "not_going"}
+        disabled={busy}
+        onClick={() => set("not_going")}
+      >
+        {pending ? "Withdraw request" : waitlisted ? "Leave waitlist" : <>Can&rsquo;t make it</>}
+      </button>
+    </>
   );
 }
 
@@ -1191,11 +1364,9 @@ function PlanModal({
   }, [onClose]);
 
   const status = statusFor(plan);
-  // A virtual host fronts the plan's chat — the real owner isn't the one
-  // hosting it there, so viewerIsHost alone shouldn't grant chat access;
-  // only an actual "going" RSVP should (mirrors AttendButtons).
-  const canChat = plan.rsvpState === "going" || (plan.viewerIsHost && plan.hostState !== "virtual_host");
   const addr = [plan.venueName, plan.venueAddress].filter(Boolean).join(" · ");
+  const dir = directionsUrl(plan);
+  const unread = unreadCount(plan);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -1208,24 +1379,29 @@ function PlanModal({
           </div>
         )}
         <div className="modal-body">
-          <div className="cal">{plan.calendarName}</div>
+          <div className="row-cal">{plan.calendarName}</div>
           <h2 className="modal-title">{plan.title}</h2>
-          <div className="when">{heroWhen(plan)}</div>
-          {addr && <p className="addr" style={{ marginTop: 6 }}>{addr}</p>}
-          {plan.description && <p className="blurb" style={{ marginTop: 8 }}>{plan.description}</p>}
+          <div className="hero-ctx">{fullWhen(plan)}</div>
+          {addr && <p className="modal-addr">{addr}</p>}
+          {plan.description && <p className="modal-blurb">{plan.description}</p>}
           {status && (
             <div style={{ marginTop: 8 }}><span className={`status ${status.cls}`}>{status.text}</span></div>
           )}
-          <div className="row" style={{ marginTop: 18 }}>
+          <div className="hero-actions flat">
             <AttendButtons plan={plan} onRsvp={onRsvp} />
+            {dir && (
+              <a className="btn ghost" href={dir} target="_blank" rel="noopener noreferrer">Getting there</a>
+            )}
           </div>
-          {canChat && (
-            <div style={{ marginTop: 12 }}>
-              <Link href={`/chat/${plan.id}?from=me`} className="btn ghost">Join Plan Chat ↗</Link>
-            </div>
-          )}
-          {plan.calendarShareId && (
-            <div style={{ marginTop: 12 }}>
+          <Thread plan={plan} />
+          <div className="modal-links">
+            {canChat(plan) && (
+              <Link href={`/chat/${plan.id}?from=me`} className="btn ghost chat">
+                <ChatIcon />
+                <span>Join plan chat{unread > 0 ? ` · ${unread}` : ""}</span>
+              </Link>
+            )}
+            {plan.calendarShareId && (
               <Link
                 href={`/org/${plan.calendarShareId}?plan=${plan.id}`}
                 className="btn ghost"
@@ -1233,8 +1409,8 @@ function PlanModal({
               >
                 View on calendar ↗
               </Link>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -1285,22 +1461,22 @@ function OtpModal({ onVerified }: { onVerified: () => void | Promise<void> }) {
     <div className="otp">
       <div className="otp-card">
         <div className="eyebrow" style={{ marginBottom: 10 }}>Your plans · Leaf</div>
-        <p className="lede" style={{ fontFamily: "var(--serif)", fontSize: 22, marginBottom: 4 }}>See your week</p>
-        <p className="sub" style={{ color: "var(--ink-3)", fontSize: 13, marginBottom: 18 }}>
+        <h1 className="greet-h" style={{ fontSize: 26, marginBottom: 6 }}>See your week</h1>
+        <p className="otp-sub">
           {step === "phone" ? "Enter the phone on your Leaf account." : `Code sent to +1 ${phone}`}
         </p>
         {step === "phone" ? (
           <>
             <input className="otp-in" type="tel" value={phone} autoFocus placeholder="(555) 123-4567" onChange={(e) => setPhone(fmt(e.target.value))} />
             {err && <p className="otp-err">{err}</p>}
-            <button className="btn" style={{ width: "100%", justifyContent: "center" }} disabled={busy} onClick={sendCode}>{busy ? "Sending…" : "Send code"}</button>
+            <button className="btn primary wide" disabled={busy} onClick={sendCode}>{busy ? "Sending…" : "Send code"}</button>
           </>
         ) : (
           <>
             <input className="otp-in" inputMode="numeric" value={code} autoFocus placeholder="Code" onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} />
             {err && <p className="otp-err">{err}</p>}
-            <button className="btn" style={{ width: "100%", justifyContent: "center" }} disabled={busy} onClick={submit}>{busy ? "Verifying…" : "See my plans"}</button>
-            <button className="reply" style={{ marginTop: 10 }} onClick={() => setStep("phone")}>Use a different number</button>
+            <button className="btn primary wide" disabled={busy} onClick={submit}>{busy ? "Verifying…" : "See my plans"}</button>
+            <button className="linkbtn" style={{ marginTop: 12 }} onClick={() => setStep("phone")}>Use a different number</button>
           </>
         )}
       </div>
@@ -1308,238 +1484,361 @@ function OtpModal({ onVerified }: { onVerified: () => void | Promise<void> }) {
   );
 }
 
-// ---- Scoped CSS (ported from the leaf-attendee-dashboard mockup) ------------
+// ---- Scoped CSS (design tokens from the /me handoff spec) ------------------
 const CSS = `
 .leafme{
-  --ink:#111111; --ink-2:#5c5c5c; --ink-3:#9a9a9a; --rule:#e8e8e6; --paper:#ffffff;
-  --sage:#dce5dc; --sage-deep:#2f5d43; --cream:#f5e6c8; --cream-deep:#8a6a2f; --green:#16a34a;
-  --amber:#b06f22; --danger:#a8401f;
+  --ink:#17150f; --body:#6f6a5f; --muted:#8b8578; --faint:#c9c4b8;
+  --green:#1f6b45; --green-tint:#f4f8f4; --orange:#c2410c;
+  --paper:#fff; --recessed:#faf9f7;
+  --fill:#e3e0d8; --hatch:repeating-linear-gradient(135deg,#e8e4dc 0 6px,#f2efe9 6px 12px);
+  --line:rgba(0,0,0,.07); --rule:rgba(0,0,0,.08); --card:rgba(0,0,0,.09);
+  --edge:rgba(0,0,0,.15); --edge-2:rgba(0,0,0,.18); --dash:rgba(0,0,0,.22);
   --sans:var(--font-me-sans),-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   --serif:var(--font-me-serif),Georgia,serif;
-  background:var(--paper); color:var(--ink); font-family:var(--sans);
-  -webkit-font-smoothing:antialiased; line-height:1.5; min-height:100vh;
-  overflow-x:hidden;
+  --mono:var(--font-me-mono),ui-monospace,SFMono-Regular,monospace;
+  background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.5;
+  -webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:hidden;
 }
 .leafme *{box-sizing:border-box}
-.leafme h1,.leafme .stop h3,.leafme .addr,.leafme .blurb,.leafme .meta,.leafme .cal,.leafme .msg-b .p,.leafme .owner p,.leafme .foot p,.leafme .typed{overflow-wrap:anywhere}
-.leafme .wrap{max-width:940px;margin:0 auto;padding:0 28px}
-.leafme .eyebrow{font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
-.leafme .bar{border-bottom:1px solid var(--rule)}
-.leafme .bar-in{display:flex;align-items:center;justify-content:space-between;height:64px}
-.leafme .leaflogo{height:24px;width:auto;display:block}
-.leafme .who{display:flex;align-items:center;gap:9px}
-.leafme .who span{font-size:12px;color:var(--ink-2)}
-.leafme .ava{width:28px;height:28px;border-radius:50%;background:#d8d4cc;display:grid;place-items:center;font-size:11px;font-weight:600;color:var(--ink-2)}
-.leafme .greet{padding-top:36px;padding-bottom:4px}
-.leafme .greet-wx{display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;font-size:13px;color:var(--ink-2)}
-.leafme .greet-wx b{color:var(--ink);font-weight:600}
-.leafme .greet-line{font-family:var(--serif);font-size:32px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
-.leafme .hero{padding-top:56px;padding-bottom:44px;border-bottom:1px solid var(--rule)}
-.leafme .hero .eyebrow{margin-bottom:18px}
-.leafme .hero-grid{display:grid;grid-template-columns:1fr 420px;gap:40px;align-items:start}
-.leafme .when{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ink-2);margin-bottom:6px}
-.leafme .hero h1{font-family:var(--serif);font-size:40px;line-height:1.08;font-weight:500;letter-spacing:-.02em;margin-bottom:12px}
-.leafme .addr{font-size:13px;color:var(--ink-2);margin-bottom:4px}
-.leafme .blurb{font-size:13px;color:var(--ink-3);max-width:44ch;margin-bottom:22px}
-.leafme .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.leafme .attend{display:inline-flex;gap:10px;flex-wrap:wrap}
-.leafme .btn{display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:#fff;border:0;cursor:pointer;font-family:var(--sans);font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;padding:11px 16px;border-radius:3px;text-decoration:none}
-.leafme .btn:hover{background:#000}
-.leafme .btn:disabled{opacity:.5;cursor:default}
-.leafme .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--rule)}
-.leafme .btn.ghost:hover{border-color:var(--ink-3);background:transparent}
-.leafme .btn:focus-visible{outline:2px solid var(--green);outline-offset:2px}
-.leafme .wx{display:inline-flex;align-items:center;gap:6px;background:#f6f6f4;border-radius:999px;padding:5px 11px;font-size:12px;color:var(--ink-2)}
-.leafme .wx b{font-weight:600;color:var(--ink)}
-.leafme .tile{aspect-ratio:4/3;border-radius:3px;display:grid;place-items:center;font-family:var(--serif);font-size:30px}
-.leafme .tile.sage{background:var(--sage);color:var(--sage-deep)}
-.leafme .tile.cream{background:var(--cream);color:var(--cream-deep)}
-.leafme .tile.sm{aspect-ratio:16/10;font-size:19px}
-.leafme .tile.photo{padding:0;overflow:hidden;background:#f2f2f0}
+.leafme h1,.leafme h2,.leafme h3,.leafme p{margin:0;overflow-wrap:anywhere}
+.leafme button{font-family:var(--sans)}
+.leafme a{color:inherit;text-decoration:none}
+.leafme .page{max-width:1180px;margin:0 auto;width:100%}
+.leafme .eyebrow{font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted)}
+
+/* ---- Top bar ---- */
+.leafme .topbar{background:var(--paper);border-bottom:1px solid var(--rule)}
+.leafme .topbar-in{display:flex;align-items:center;justify-content:space-between;padding:14px 22px}
+.leafme .brand{display:flex;align-items:center;gap:8px}
+.leafme .mark{width:15px;height:19px;background:var(--ink);border-radius:2px 8px 2px 8px}
+.leafme .wordmark{font-size:15px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.leafme .topbar-r{display:flex;align-items:center;gap:14px}
+.leafme .pill{border:0;background:var(--ink);color:#fff;font-size:12px;font-weight:500;
+  padding:9px 16px;border-radius:999px;cursor:pointer;transition:opacity 120ms ease}
+.leafme .pill:hover{opacity:.92}
+.leafme .who{display:flex;align-items:center;gap:8px}
+.leafme .who span{font-size:12.5px;color:var(--body)}
+.leafme .ava{width:26px;height:26px;border-radius:999px;background:var(--fill);
+  display:grid;place-items:center;font-size:11px;font-weight:500;color:var(--body)}
+
+/* ---- Two columns ---- */
+.leafme .cols{display:flex;align-items:stretch;background:var(--paper)}
+.leafme .colL{flex:1 1 0;min-width:0;padding:26px 30px 34px;border-right:1px solid var(--rule)}
+.leafme .colL.solo{border-right:0}
+.leafme .colR{width:440px;flex:none;padding:26px 26px 34px;background:var(--recessed)}
+
+/* ---- Greeting ---- */
+.leafme .greet-wx{font-size:11px;color:var(--muted);margin-bottom:6px}
+.leafme .greet-h{font-family:var(--serif);font-size:30px;line-height:1.15;font-weight:400;color:var(--ink)}
+.leafme .greet{margin-bottom:22px}
+
+/* Post-create confirmation strip */
+.leafme .created{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  border:1px solid rgba(31,107,69,.35);background:var(--green-tint);border-radius:10px;
+  padding:12px 14px;margin-bottom:18px;font-size:12.5px;color:var(--ink)}
+.leafme .created-link{font-size:12px;color:var(--green);text-decoration:underline;white-space:nowrap}
+
+/* ---- Buttons ---- */
+.leafme .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  font-size:11.5px;font-weight:500;padding:9px 14px;border-radius:8px;cursor:pointer;
+  border:1px solid transparent;transition:background 120ms ease,border-color 120ms ease,opacity 120ms ease}
+.leafme .btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.leafme .btn.primary:hover{opacity:.92}
+.leafme .btn.ghost{background:var(--paper);color:var(--ink);border-color:var(--edge)}
+.leafme .btn.ghost:hover{border-color:rgba(0,0,0,.28);background:var(--recessed)}
+.leafme .btn.text{background:none;border-color:transparent;color:var(--muted);
+  font-weight:400;padding:9px 6px}
+.leafme .btn.text:hover{color:var(--ink)}
+.leafme .btn.sm{font-size:11px;padding:8px 12px;border-radius:7px}
+.leafme .btn.wide{width:100%}
+.leafme .btn:disabled{opacity:.55;cursor:default}
+.leafme .btn:focus-visible,.leafme .pill:focus-visible,.leafme .row-btn:focus-visible,
+.leafme .heart-toggle:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.leafme .linkbtn{border:0;background:none;padding:0;cursor:pointer;font-size:12px;
+  color:var(--body);text-decoration:underline}
+.leafme .linkbtn:hover{color:var(--ink)}
+.leafme .plan-link{display:inline;border:0;background:none;padding:0;margin:0;font:inherit;
+  color:inherit;letter-spacing:inherit;text-align:left;cursor:pointer}
+.leafme .plan-link:hover{color:var(--body)}
+
+/* ---- Hero ---- */
+.leafme .hero{border:1px solid rgba(0,0,0,.1);border-radius:14px;overflow:hidden;margin-bottom:22px}
+.leafme .hero-top{display:flex;gap:14px;padding:14px;align-items:center}
+.leafme .hero-text{min-width:0}
+.leafme .hero-text .eyebrow{margin-bottom:5px;display:block}
+.leafme .hero-title{font-family:var(--serif);font-size:21px;line-height:1.2;font-weight:400;
+  color:var(--ink);margin-bottom:4px}
+.leafme .hero-ctx{font-size:12.5px;color:var(--body)}
+.leafme .hero-status{font-size:12px;color:var(--muted);margin-top:3px}
+.leafme .hero-actions{display:flex;gap:8px;flex-wrap:wrap;padding:12px 14px;
+  border-top:1px solid var(--rule);background:var(--recessed)}
+.leafme .hero-actions.flat{padding:0;border-top:0;background:none;margin-top:18px}
+.leafme .chat-label{white-space:nowrap}
+
+/* ---- Tiles ---- */
+.leafme .tile{border-radius:10px;display:grid;place-items:center;font-family:var(--serif);
+  background:var(--hatch);color:#9a9488}
+.leafme .tile.sage{background:#dce5dc;color:#2f5d43}
+.leafme .tile.cream{background:#f5e6c8;color:#8a6a2f}
+.leafme .tile.hero{width:92px;height:92px;flex:none;font-size:19px}
+.leafme .tile.row{width:56px;height:42px;border-radius:6px;font-size:12px}
+.leafme .tile.photo{overflow:hidden;background:#f2f2f0}
 .leafme .tile.photo img{width:100%;height:100%;object-fit:cover;display:block}
 .leafme .tile-wrap{position:relative;display:block}
-.leafme .tile-link{display:block;width:100%;padding:0;margin:0;border:0;background:none;cursor:pointer;text-decoration:none}
-.leafme .plan-link{display:inline;padding:0;margin:0;border:0;background:none;font:inherit;color:inherit;letter-spacing:inherit;cursor:pointer;text-align:left}
-.leafme .plan-link:hover{color:var(--ink-2)}
-.leafme .chat-btn{margin-top:12px}
-.leafme .wx-over{position:absolute;top:10px;right:10px;margin:0;z-index:2;background:rgba(255,255,255,.92);box-shadow:0 1px 3px rgba(0,0,0,.14)}
-.leafme .sect{padding-top:44px;padding-bottom:44px;border-bottom:1px solid var(--rule)}
-.leafme .sect.tail{border-bottom:none;padding-bottom:32px}
-.leafme .sect-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:26px}
-.leafme .count{font-size:11px;color:var(--ink-3)}
-.leafme .count .new{color:var(--green)}
-.leafme .spine{position:relative;padding-left:96px}
-.leafme .spine::before{content:"";position:absolute;left:71px;top:8px;bottom:8px;width:1px;background:var(--rule)}
-.leafme .stop{position:relative;padding-bottom:30px}
-.leafme .stop:last-child{padding-bottom:0}
-.leafme .stop .date{position:absolute;left:-96px;top:0;width:56px;text-align:right}
-.leafme .stop .date .d{font-family:var(--serif);font-size:22px;line-height:1;color:var(--ink)}
-.leafme .stop .date .m{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-top:4px}
-.leafme .dot{position:absolute;left:-30px;top:7px;width:7px;height:7px;border-radius:50%;background:var(--paper);border:1.5px solid var(--ink-3)}
-.leafme .dot.on{background:var(--green);border-color:var(--green)}
-.leafme .stop-card{display:grid;grid-template-columns:120px 1fr auto;gap:18px;align-items:start}
-.leafme .stop h3{font-family:var(--serif);font-size:17px;font-weight:500;letter-spacing:-.01em;margin-bottom:3px}
-.leafme .meta{font-size:12px;color:var(--ink-3);margin-bottom:9px}
-.leafme .cal{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:5px}
-.leafme .status{display:inline-flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);background:none;border:0;padding:0;border-radius:0;box-shadow:none}
-.leafme .status::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--ink-3)}
+.leafme .tile-wrap.hero,.leafme .tile-link.hero{flex:none}
+.leafme .tile-wrap.row,.leafme .tile-link.row{flex:none}
+.leafme .tile-link{display:block;padding:0;margin:0;border:0;background:none;cursor:pointer}
+
+/* ---- Your plans ---- */
+.leafme .sect{margin-bottom:22px}
+.leafme .sect-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  margin-bottom:12px}
+.leafme .sect-meta{font-size:11px;color:var(--muted)}
+.leafme .sect-meta .new{color:var(--green)}
+.leafme .rows{display:flex;flex-direction:column;gap:2px}
+.leafme .row{display:flex;gap:14px;padding:12px 4px;border-top:1px solid var(--line)}
+.leafme .row.last{border-bottom:1px solid var(--line)}
+.leafme .row-date{width:38px;flex:none;text-align:center}
+.leafme .row-date .d{font-family:var(--serif);font-size:18px;line-height:1;color:var(--ink)}
+.leafme .row-date .m{font-family:var(--mono);font-size:8.5px;font-weight:500;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);margin-top:3px}
+.leafme .row-text{flex:1 1 auto;min-width:0}
+.leafme .row-cal{font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted)}
+.leafme .hostmark{display:inline-flex;align-items:center;gap:5px;margin-left:8px;color:var(--green)}
+.leafme .hostdot{width:5px;height:5px;border-radius:999px;background:var(--green)}
+.leafme .row-title{font-family:var(--serif);font-size:15px;line-height:1.3;font-weight:400;color:var(--ink)}
+.leafme .row-meta{font-size:11.5px;color:var(--muted)}
+.leafme .row-act{align-self:center;flex:none}
+.leafme .row-btn{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:500;
+  padding:8px 13px;border-radius:7px;cursor:pointer;border:1px solid transparent;white-space:nowrap;
+  transition:background 120ms ease,border-color 120ms ease,opacity 120ms ease}
+.leafme .row-btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.leafme .row-btn.primary:hover{opacity:.92}
+.leafme .row-btn.ghost{background:var(--paper);color:var(--ink);border-color:var(--edge)}
+.leafme .row-btn.ghost:hover{border-color:rgba(0,0,0,.28);background:var(--recessed)}
+.leafme .row-btn.host{background:var(--green);color:#fff;border-color:var(--green)}
+.leafme .row-btn.host:hover{background:#1a5a3a}
+.leafme .row-btn:disabled{opacity:.55;cursor:default}
+.leafme .status{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.leafme .status::before{content:"";width:5px;height:5px;border-radius:999px;background:var(--muted)}
 .leafme .status.host::before{background:var(--green)}
 .leafme .status.wait::before{background:#d9a441}
-/* Status/CTA is its own grid column (see .stop-card), top-aligned beside the
-   whole title+meta+thread block — so a taller CTA never pushes the title
-   down, same as the "Host this" cards' image | body | action layout. */
-.leafme .attend-cta-wrap{text-align:right}
-.leafme .going-count{font-size:11px;color:var(--ink-3);margin-bottom:6px;white-space:nowrap}
-.leafme .attend-cta{background:#18181b;border:0;border-radius:6px;color:#fff;font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:9px 16px;cursor:pointer;white-space:nowrap}
-.leafme .attend-cta:hover{opacity:.9}
-.leafme .attend-cta:disabled{opacity:.5;cursor:default}
-.leafme .thread{margin-top:14px;padding-top:13px;border-top:1px solid var(--rule)}
-.leafme .thread.hero-thread{max-width:44ch}
-.leafme .msg{display:flex;gap:11px;padding:9px 0}
-.leafme .msg:first-child{padding-top:0}
-.leafme .mava{width:26px;height:26px;border-radius:50%;flex-shrink:0;background:var(--sage);display:grid;place-items:center;font-family:var(--serif);font-size:12px;color:var(--sage-deep);position:relative}
-.leafme .mava.unread::after{content:"";position:absolute;top:-1px;right:-1px;width:7px;height:7px;border-radius:50%;background:var(--green);border:1.5px solid var(--paper)}
-.leafme .msg-b .t{font-size:11px;font-weight:500;color:var(--ink-2);margin-bottom:3px}
-.leafme .msg-b .p{font-size:13px;color:var(--ink);line-height:1.45}
-.leafme .msg-b .ago{font-size:11px;color:var(--ink-3);margin-top:3px}
-.leafme .reply{background:none;border:0;padding:0;margin-top:7px;cursor:pointer;font-family:var(--sans);font-size:11px;color:var(--ink-2);border-bottom:1px solid var(--rule)}
-.leafme .reply:hover{color:var(--ink);border-color:var(--ink-3)}
-.leafme .reply.earlier{margin-top:0;margin-bottom:12px;display:inline-block}
-.leafme .composer{display:flex;gap:8px;margin-top:10px}
-.leafme .composer input{flex:1;border:1px solid var(--rule);border-radius:3px;padding:9px 12px;font-family:var(--sans);font-size:13px;color:var(--ink)}
-.leafme .composer input:focus{outline:2px solid var(--green);outline-offset:1px}
-/* Plans that need a host (leaf-needs-a-host-cta) */
-.leafme .nhs{padding-top:8px;padding-bottom:8px}
-.leafme .nhs .head{padding-bottom:20px}
-.leafme .nhs .head h1{font-family:var(--serif);font-size:24px;font-weight:500;letter-spacing:-.01em;margin-top:6px}
-.leafme .nhs .head h1 .k{color:var(--danger)}
-.leafme .tierlab{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);margin:0 0 12px}
-.leafme .hcard{display:flex;align-items:center;gap:16px;padding:16px 0;border-bottom:1px solid var(--rule)}
-.leafme .hcard .date{width:46px;flex-shrink:0;text-align:left}
-.leafme .hcard .date .d{font-family:var(--serif);font-size:28px;line-height:.85;color:var(--ink)}
-.leafme .hcard .date .mo{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-top:5px}
-.leafme .hcard .thumb{width:82px;height:60px;flex-shrink:0;border-radius:4px;object-fit:cover;display:block}
-.leafme .hcard .thumb.ph{background:var(--sage)}
-.leafme .hcard .hb{flex:1;min-width:0}
-.leafme .hcard .hb h3{font-family:var(--serif);font-size:18px;font-weight:500;letter-spacing:-.01em;line-height:1.2}
-.leafme .heart-btn{background:none;border:0;padding:0;cursor:pointer;display:inline-flex;color:var(--ink-3);flex-shrink:0}
-.leafme .heart-btn:hover{color:var(--ink-2)}
-.leafme .heart-btn.on{color:var(--sage-deep)}
-.leafme .heart-btn:disabled{cursor:default}
-.leafme .hcard .hmeta{font-size:12.5px;color:var(--ink-3);margin-top:3px}
-.leafme .decay{display:inline-flex;align-items:center;gap:6px;margin-top:7px;font-size:12px;font-weight:500}
-.leafme .decay.soon{color:var(--danger)}
-.leafme .decay.warn{color:var(--amber)}
-.leafme .decay::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
-.leafme .hact{flex-shrink:0;text-align:right}
-.leafme .hact-row{display:flex;justify-content:flex-end;align-items:stretch;gap:8px}
-.leafme .hact-row .heart-btn{align-items:center;justify-content:center;border:1px solid var(--rule);border-radius:6px;padding:0 12px}
-.leafme .interested{font-size:11px;color:var(--ink-3);margin-bottom:6px}
-.leafme .hostbtn{background:var(--sage-deep);color:#fff;border:0;border-radius:6px;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:600;padding:11px 17px;white-space:nowrap}
-.leafme .hostbtn:hover{background:#264c37}
-.leafme .hostbtn:disabled{opacity:.6;cursor:default}
-.leafme .tier2{margin-top:36px;padding-top:26px}
-.leafme .crow{display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit;border:1px solid var(--rule);border-radius:8px;padding:15px 16px;margin-bottom:10px;background:#fff}
-.leafme .crow:hover{border-color:var(--ink-3);background:#faf9f6}
-.leafme .crow .gmark{width:34px;height:34px;border-radius:7px;flex-shrink:0;object-fit:cover;display:block}
-.leafme .crow .gmark.ph{background:#d8d4cc;display:grid;place-items:center;font-family:var(--serif);font-size:14px;font-weight:600;color:var(--ink-2)}
-.leafme .crow .cbody{flex:1;min-width:0}
-.leafme .crow .cbody .n{font-size:15px;font-weight:600;letter-spacing:-.01em}
-.leafme .crow .cbody .c{font-size:13px;color:var(--ink-3);margin-top:2px}
-.leafme .crow .cbody .c b{color:var(--amber);font-weight:600}
-.leafme .crow .cbody .c b.soon{color:var(--danger)}
-.leafme .crow .cta{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--sage-deep);white-space:nowrap}
-/* Leaf asked around (spot probes — To Plan v2 §C4) */
-.leafme .aas .note{margin-top:6px;margin-bottom:0}
-.leafme .aas-act{display:flex;gap:8px;align-items:center;justify-content:flex-end}
-.leafme .aas-pass{background:transparent;color:var(--ink-2);border:1px solid var(--rule);border-radius:6px;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:600;padding:11px 17px;white-space:nowrap}
-.leafme .aas-pass:hover{border-color:var(--ink-3);color:var(--ink)}
-.leafme .aas-thanks{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--sage-deep);padding:6px 0}
-.leafme .aas-cal{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
-.leafme .aas .hcard:last-child{border-bottom:0} /* .sect already rules the seam — avoid a double line */
-.leafme .probe-pop{max-width:420px}
-.leafme .probe-pop .row{display:flex;gap:8px;align-items:center}
-.leafme .probe-pop .hmeta{font-size:13px;color:var(--ink-3)}
-.leafme .probe-pop .blurb{margin-bottom:0;font-size:15px;color:var(--ink-2)} /* the ask is the point — body size, and .row's own margin rules the seam */
-@media(max-width:600px){
-  .leafme .hcard{flex-wrap:wrap;gap:12px}
-  .leafme .hcard .thumb{display:none}
-  .leafme .hcard .hact{flex-basis:100%;text-align:right;margin-top:2px}
-  .leafme .crow .cta span{display:none}
-}
-.leafme .start{border:1px solid var(--rule);border-radius:3px;padding:26px 24px}
-.leafme .start .lede{font-family:var(--serif);font-size:20px;line-height:1.3;margin-bottom:5px}
-.leafme .start .sub{font-size:13px;color:var(--ink-3);margin-bottom:18px}
-.leafme .prompt{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--rule);border-radius:3px;padding:5px 5px 5px 15px;background:#fbfbfa;text-decoration:none}
-.leafme .prompt:hover{border-color:var(--ink-3)}
-.leafme .typed{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ink-2);padding:9px 0}
-.leafme .handoff{font-size:11px;color:var(--ink-3);margin-top:12px}
-.leafme .owner{display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid var(--rule);border-radius:3px;padding:16px 18px}
-.leafme .owner p{font-size:13px;color:var(--ink-2)}
-.leafme .owner p b{color:var(--ink);font-weight:500}
-.leafme .foot{border-top:1px solid var(--rule);margin-top:20px;padding-top:44px;padding-bottom:80px}
-.leafme .foot p{font-size:12px;color:var(--ink-3);max-width:52ch;line-height:1.6}
-.leafme .foot a{color:var(--ink-2)}
-.leafme .foot-links{margin-top:12px;font-size:11px;letter-spacing:.04em}
-.leafme .foot-links a{text-decoration:none}
-.leafme .foot-links a:hover{color:var(--ink)}
-.leafme .note{font-family:var(--serif);font-style:italic;font-size:13px;color:var(--ink-3);margin-top:10px;margin-bottom:4px}
-.leafme .lm-center{min-height:100vh;display:grid;place-items:center;padding:0 28px}
-.leafme .lm-muted{font-size:13px;color:var(--ink-3)}
-.leafme .lm-spin{width:22px;height:22px;border-radius:50%;border:2px solid var(--rule);border-top-color:var(--ink-3);animation:lmspin .8s linear infinite;display:inline-block}
-@keyframes lmspin{to{transform:rotate(360deg)}}
-.leafme .otp{min-height:100vh;display:grid;place-items:center;padding:0 24px}
-.leafme .otp-card{width:100%;max-width:360px}
-.leafme .otp-in{width:100%;border:1px solid var(--rule);border-radius:3px;padding:10px 12px;font-family:var(--sans);font-size:14px;margin-bottom:12px}
-.leafme .otp-in:focus{outline:2px solid var(--green);outline-offset:1px}
-.leafme .otp-err{font-size:12px;color:#c0392b;margin-bottom:10px}
-.leafme .modal-overlay{position:fixed;inset:0;z-index:60;background:rgba(17,17,17,.62);display:flex;align-items:center;justify-content:center;padding:16px}
-.leafme .modal-card{position:relative;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;background:var(--paper);border-radius:14px;animation:lmmodal .2s ease}
-@keyframes lmmodal{from{transform:translateY(16px);opacity:.5}to{transform:translateY(0);opacity:1}}
-.leafme .modal-x{position:absolute;top:12px;right:12px;z-index:2;width:32px;height:32px;border:0;border-radius:50%;background:rgba(255,255,255,.92);box-shadow:0 1px 4px rgba(0,0,0,.14);font-size:20px;line-height:1;cursor:pointer;color:var(--ink)}
+.leafme .showmore{border:0;background:none;padding:0;margin-top:14px;cursor:pointer;
+  font-size:12px;color:var(--body);text-decoration:underline}
+.leafme .showmore:hover{color:var(--ink)}
+
+/* ---- Prompt boxes ---- */
+.leafme .prompt-box{display:flex;align-items:center;gap:18px;border:1px dashed var(--dash);
+  background:var(--recessed);border-radius:12px;padding:18px 20px;margin-top:22px}
+.leafme .prompt-box.tight{margin-top:12px}
+.leafme .prompt-body{flex:1 1 auto;min-width:0}
+.leafme .prompt-h{font-family:var(--serif);font-size:19px;line-height:1.25;color:var(--ink)}
+.leafme .prompt-h.sm{font-size:17px}
+.leafme .prompt-p{font-size:12px;line-height:1.5;color:var(--body);margin-top:4px}
+.leafme .prompt-box .btn{flex:none;font-size:12px;padding:11px 17px}
+
+/* ---- Right rail ---- */
+.leafme .rail{margin-bottom:24px}
+.leafme .rail .eyebrow{display:block;margin-bottom:10px}
+.leafme .rail-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.leafme .rail-head .eyebrow{margin-bottom:3px}
+.leafme .rail-sub{font-size:10.5px;color:var(--muted);margin-bottom:9px}
+.leafme .hostcards{display:flex;flex-direction:column;gap:8px}
+.leafme .hostcard{display:flex;gap:11px;align-items:center;background:var(--paper);
+  border:1px solid var(--card);border-radius:10px;padding:10px}
+.leafme .hostthumb{width:44px;height:44px;flex:none;border-radius:7px;object-fit:cover;display:block}
+.leafme .hostthumb.ph{background:var(--hatch)}
+.leafme .hostbody{flex:1 1 auto;min-width:0}
+.leafme .hostcard-title{font-family:var(--serif);font-size:13.5px;line-height:1.25;font-weight:400;
+  color:var(--ink);margin-top:2px}
+.leafme .hostcard-when{font-size:11px;color:var(--muted)}
+.leafme .hostcard-meta{display:flex;align-items:center;gap:8px;margin-top:3px;flex-wrap:wrap}
+.leafme .urgent{font-size:10px;font-weight:500;color:var(--orange)}
+.leafme .heart{display:inline-flex;align-items:center;gap:4px;border:0;background:none;padding:0;
+  cursor:pointer;font-size:10.5px;color:var(--body)}
+.leafme .heart.on{color:var(--green)}
+.leafme .heart:disabled{cursor:default}
+.leafme .hostbtn{flex:none;border:0;background:var(--green);color:#fff;font-size:11px;font-weight:500;
+  padding:8px 12px;border-radius:7px;cursor:pointer}
+.leafme .hostbtn:hover{background:#1a5a3a}
+
+.leafme .places{background:var(--paper);border:1px solid var(--card);border-radius:10px;overflow:hidden}
+.leafme .place{display:flex;align-items:center;gap:10px;padding:9px 11px}
+.leafme .place + .place{border-top:1px solid var(--line)}
+.leafme .place.on{background:var(--green-tint)}
+.leafme .place-text{flex:1 1 auto;min-width:0}
+.leafme .place-n{font-size:12.5px;color:var(--ink)}
+.leafme .place-s{font-size:10.5px;color:var(--muted)}
+.leafme .place.on .place-s{color:var(--body)}
+.leafme .heart-toggle{flex:none;width:30px;height:30px;display:flex;align-items:center;
+  justify-content:center;border:1px solid var(--edge-2);background:var(--paper);color:var(--ink);
+  border-radius:999px;cursor:pointer;padding:0;transition:background 120ms ease}
+.leafme .heart-toggle.on{background:var(--green);border-color:var(--green);color:#fff}
+
+.leafme .cals{display:flex;flex-direction:column;gap:1px}
+.leafme .cal-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.leafme .cal-row:last-child{border-bottom:1px solid var(--line)}
+.leafme .cal-row:hover{background:rgba(0,0,0,.02)}
+.leafme .cal-ava{width:24px;height:24px;flex:none;border-radius:5px;background:var(--fill);
+  object-fit:cover;display:grid;place-items:center;font-size:11px;font-weight:600;color:var(--body)}
+.leafme .cal-body{flex:1 1 auto;min-width:0}
+.leafme .cal-n{font-size:12.5px;color:var(--ink)}
+.leafme .cal-s{font-size:10.5px;color:var(--muted)}
+.leafme .cal-s.urgent{color:var(--orange);font-size:10.5px;font-weight:400}
+.leafme .cal-cta{font-size:11px;color:var(--body);white-space:nowrap}
+
+.leafme .texts{margin-top:22px;padding:13px 14px;background:var(--paper);border:1px solid var(--card);
+  border-radius:10px;display:flex;align-items:center;gap:12px}
+.leafme .texts p{flex:1 1 auto;font-size:11.5px;line-height:1.45;color:var(--body)}
+
+/* ---- Sticky mobile CTA (hidden on desktop) ---- */
+.leafme .sticky-cta{display:none}
+
+/* ---- Modals ---- */
+.leafme .modal-overlay{position:fixed;inset:0;z-index:60;background:rgba(23,21,15,.6);
+  display:flex;align-items:center;justify-content:center;padding:16px}
+.leafme .modal-card{position:relative;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;
+  background:var(--paper);border-radius:14px;animation:lmmodal .2s ease}
+@keyframes lmmodal{from{transform:translateY(16px);opacity:.5}to{transform:none;opacity:1}}
+.leafme .modal-x{position:absolute;top:12px;right:12px;z-index:2;width:32px;height:32px;border:0;
+  border-radius:999px;background:rgba(255,255,255,.92);box-shadow:0 1px 4px rgba(0,0,0,.14);
+  font-size:20px;line-height:1;cursor:pointer;color:var(--ink)}
 .leafme .modal-img{width:100%;aspect-ratio:16/9;overflow:hidden;background:#f2f2f0;border-radius:14px 14px 0 0}
 .leafme .modal-img img{width:100%;height:100%;object-fit:cover;display:block}
 .leafme .modal-body{padding:22px 22px 28px}
-.leafme .modal-title{font-family:var(--serif);font-size:26px;font-weight:500;letter-spacing:-.01em;margin:4px 0 8px}
+.leafme .modal-title{font-family:var(--serif);font-size:26px;line-height:1.15;font-weight:400;
+  color:var(--ink);margin:4px 0 6px}
+.leafme .modal-addr{font-size:12.5px;color:var(--body);margin-top:6px}
+.leafme .modal-blurb{font-size:13px;line-height:1.55;color:var(--body);margin-top:8px}
+.leafme .modal-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.leafme .probe-pop{max-width:420px}
+.leafme .probe-thanks{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--green);
+  padding:24px 0;text-align:center}
+
+/* ---- Thread ---- */
+.leafme .thread{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.leafme .msg{display:flex;gap:11px;padding:9px 0}
+.leafme .msg:first-child{padding-top:0}
+.leafme .mava{width:26px;height:26px;border-radius:999px;flex-shrink:0;background:#dce5dc;
+  display:grid;place-items:center;font-family:var(--serif);font-size:12px;color:#2f5d43;position:relative}
+.leafme .mava.unread::after{content:"";position:absolute;top:-1px;right:-1px;width:7px;height:7px;
+  border-radius:999px;background:var(--green);border:1.5px solid var(--paper)}
+.leafme .msg-b .t{font-size:11px;font-weight:500;color:var(--body);margin-bottom:3px}
+.leafme .msg-b .p{font-size:13px;line-height:1.45;color:var(--ink)}
+.leafme .msg-b .ago{font-size:11px;color:var(--muted);margin-top:3px}
+
+/* ---- Loading / OTP ---- */
+.leafme .lm-center{min-height:100vh;display:grid;place-items:center;padding:0 28px}
+.leafme .lm-muted{font-size:13px;color:var(--muted)}
+.leafme .lm-spin{width:22px;height:22px;border-radius:999px;border:2px solid var(--rule);
+  border-top-color:var(--muted);animation:lmspin .8s linear infinite;display:inline-block}
+@keyframes lmspin{to{transform:rotate(360deg)}}
+.leafme .otp{min-height:100vh;display:grid;place-items:center;padding:0 24px}
+.leafme .otp-card{width:100%;max-width:360px}
+.leafme .otp-sub{font-size:13px;color:var(--body);margin-bottom:18px}
+.leafme .otp-in{width:100%;border:1px solid var(--edge-2);border-radius:8px;padding:12px;
+  font-family:var(--sans);font-size:15px;margin-bottom:12px}
+.leafme .otp-in:focus{outline:2px solid var(--green);outline-offset:1px}
+.leafme .otp-err{font-size:12px;color:var(--orange);margin-bottom:10px}
+
+/* ==========================================================================
+   Mobile (4a) — one scroll, no map, actions under the text, sticky CTA.
+   ========================================================================== */
+@media(max-width:1023px){
+  .leafme .cols{flex-direction:column}
+  .leafme .colL{border-right:0;padding:18px 18px 0}
+  .leafme .colR{width:100%;padding:8px 18px 84px;background:var(--paper)}
+  .leafme .colL.solo{padding-bottom:84px}
+}
 @media(max-width:760px){
-  .leafme .wrap{padding:0 20px}
+  .leafme .topbar-in{padding:8px 18px 12px}
+  .leafme .mark{width:13px;height:17px;border-radius:2px 7px 2px 7px}
+  .leafme .wordmark{font-size:14px}
+  .leafme .pill{display:none}          /* the sticky CTA is the mobile entry */
+  .leafme .who span{display:none}
+  .leafme .ava{width:30px;height:30px;font-size:11.5px}
+  .leafme .greet-wx{font-size:10.5px}
+  .leafme .greet-h{font-size:24px}
+  .leafme .greet{margin-bottom:18px}
+
+  /* Hero: full-bleed photo on top, thumb-sized actions in one row */
+  .leafme .hero-top{display:block;padding:0}
+  .leafme .hero-top > .tile-link,.leafme .hero-top > .tile-wrap{display:block;width:100%}
+  .leafme .tile.hero{width:100%;height:120px;border-radius:0;font-size:22px}
+  .leafme .hero-text{padding:14px 14px 0}
+  .leafme .hero-title{font-size:22px;line-height:1.15;margin:5px 0 4px}
+  .leafme .hero-ctx{font-size:12px}
+  .leafme .hero-status{font-size:11.5px}
+  .leafme .hero-actions{padding:13px 14px 14px;border-top:0;background:none;gap:8px;flex-wrap:wrap}
+  .leafme .hero-actions .btn{flex:1 1 0;padding:14px 0;border-radius:9px;font-size:12.5px}
+  .leafme .hero-actions .btn.chat{flex:none;width:46px;padding:14px 0}
+  .leafme .hero-actions .chat-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+  .leafme .hero-actions .btn.text{flex-basis:100%;padding:10px 0 0;text-align:left;justify-content:flex-start}
+  .leafme .hero-actions.flat{flex-wrap:wrap}
+  .leafme .hero-actions.flat .btn{flex:1 1 40%}
+
+  /* Rows: no thumbnail at this width; the action sits under the text */
+  .leafme .row{gap:12px;padding:13px 0;flex-wrap:wrap}
+  .leafme .row .tile-link,.leafme .row .tile-wrap{display:none}
+  .leafme .row-date{width:34px}
+  .leafme .row-date .d{font-size:17px}
+  .leafme .row-date .m{font-size:8px}
+  .leafme .row-cal{font-size:8.5px}
+  .leafme .row-title{font-size:14.5px}
+  .leafme .row-meta{font-size:11px}
+  .leafme .row-act{align-self:stretch;flex-basis:calc(100% - 46px);order:3;margin-left:46px;margin-top:-2px}
+  .leafme .row-btn{margin-top:9px;font-size:11.5px;padding:12px 16px;border-radius:8px}
+  .leafme .row-text{flex-basis:calc(100% - 46px)}
+
+  /* Prompt boxes stack, buttons go full width */
+  .leafme .prompt-box{display:block;padding:16px 16px 18px;margin-top:20px}
+  .leafme .prompt-box.tight{display:flex;align-items:center;gap:12px;padding:15px 16px;margin-top:10px}
+  .leafme .prompt-h{font-size:18px}
+  .leafme .prompt-h.sm{font-size:16px}
+  .leafme .prompt-p{font-size:11.5px}
+  .leafme .prompt-p.sm{font-size:11px;line-height:1.45}
+  .leafme .prompt-box > .btn{width:100%;margin-top:13px;padding:14px 0;border-radius:9px;font-size:12.5px}
+  .leafme .prompt-box.tight > .btn{width:auto;margin-top:0;padding:12px 15px;border-radius:8px}
+
+  /* Rail: full-width rows, 44px hit targets */
+  .leafme .rail{margin-bottom:24px}
+  .leafme .hostcard{border-radius:11px;padding:11px;gap:11px}
+  .leafme .hostthumb{width:48px;height:48px;border-radius:8px}
+  .leafme .hostcard-title{font-size:14px}
+  .leafme .hostbtn{padding:12px 14px;font-size:11.5px;border-radius:8px}
+  .leafme .places{border-radius:11px}
+  .leafme .place{padding:11px 12px}
+  .leafme .place-n{font-size:13.5px}
+  .leafme .place-s{font-size:11px}
+  .leafme .heart-toggle{width:44px;height:44px}
+  .leafme .cal-row{padding:11px 0;gap:11px}
+  .leafme .cal-ava{width:28px;height:28px;border-radius:6px}
+  .leafme .cal-n{font-size:13px}
+  .leafme .cal-cta{padding:12px 0 12px 12px}
+  .leafme .texts{background:var(--recessed);margin-top:20px}
+  .leafme .texts p{font-size:11px}
+  .leafme .texts .btn{padding:12px 14px}
+
+  /* Sticky CTA — content fades under it */
+  .leafme .sticky-cta{display:block;position:fixed;left:0;right:0;bottom:0;z-index:40;
+    padding:14px 18px calc(20px + env(safe-area-inset-bottom));
+    background:linear-gradient(rgba(255,255,255,0),#fff 42%)}
+  .leafme .sticky-cta .btn{padding:16px 0;border-radius:12px;font-size:13.5px;
+    box-shadow:0 4px 14px rgba(0,0,0,.18)}
+
+  /* Modals become bottom sheets */
   .leafme .modal-overlay{align-items:flex-end;padding:0}
   .leafme .modal-card{max-width:none;border-radius:16px 16px 0 0;max-height:88vh}
   .leafme .modal-img{border-radius:16px 16px 0 0}
-  /* Probe popup reads as a compact bottom sheet, not a takeover: shorter
-     photo, roomier corners, and thumb-sized full-width answers pinned above
-     the home-indicator safe area. */
+  .leafme .modal-body{padding:18px 20px calc(24px + env(safe-area-inset-bottom))}
   .leafme .probe-pop{border-radius:20px 20px 0 0}
   .leafme .probe-pop .modal-img{aspect-ratio:5/2;max-height:160px;border-radius:20px 20px 0 0}
-  .leafme .probe-pop .modal-body{padding:18px 20px calc(20px + env(safe-area-inset-bottom))}
-  .leafme .probe-pop .modal-title{font-size:24px}
-  .leafme .probe-pop .row{gap:10px}
-  .leafme .probe-pop .row .hostbtn,.leafme .probe-pop .row .aas-pass{flex:1;padding:14px 12px;font-size:15px;text-align:center}
-  .leafme .hero-grid{grid-template-columns:1fr;gap:24px}
-  .leafme .greet{padding-top:24px}
-  .leafme .greet-line{font-size:26px}
-  .leafme .hero{padding-top:32px;padding-bottom:32px}
-  .leafme .hero h1{font-size:30px}
-  .leafme .hero-grid > .tile-link,.leafme .hero-grid > .tile-wrap{order:-1;margin-bottom:6px}
-  .leafme .hero-grid .tile{max-width:100%}
-  .leafme .sect-head{flex-direction:column;align-items:flex-start;gap:6px}
-  .leafme .spine{padding-left:0}
-  .leafme .spine::before{display:none}
-  .leafme .stop .date{position:static;width:auto;text-align:left;display:flex;align-items:baseline;gap:7px;margin-bottom:8px}
-  .leafme .stop .date .m{margin-top:0}
-  .leafme .dot{display:none}
-  .leafme .stop-card{grid-template-columns:88px 1fr;gap:14px}
-  /* The desktop layout's third column (status pill / attend CTA) has no home
-     in the collapsed 2-col grid — without this it wraps into the narrow date
-     column. Park it under the text block instead, laid out as a row. */
-  .leafme .stop-card > .status,.leafme .stop-card > .attend-cta-wrap{grid-column:2;justify-self:start;text-align:left;margin-top:2px}
-  .leafme .attend-cta-wrap{display:flex;align-items:center;gap:12px}
-  .leafme .attend-cta-wrap .going-count{margin-bottom:0;order:2}
-  .leafme .owner{flex-direction:column;align-items:stretch;gap:14px;padding:18px}
-  .leafme .owner .btn{width:100%;justify-content:center}
-  .leafme .sect{padding-top:32px;padding-bottom:32px}
-  .leafme .sect.tail{padding-top:32px;padding-bottom:28px}
-  .leafme .foot{margin-top:16px;padding-top:36px;padding-bottom:110px}
+  .leafme .modal-links .btn{flex:1 1 40%;padding:13px 12px}
 }
 @media(prefers-reduced-motion:reduce){.leafme *{transition:none!important;animation:none!important}}
 `;
+
+
