@@ -259,8 +259,6 @@ export default function OrgDashboardPage() {
   const [settingsLogoPreview, setSettingsLogoPreview] = useState<string | null>(null);
   const [settingsLogoBase64, setSettingsLogoBase64] = useState<string | null>(null);
   const [settingsImageStyle, setSettingsImageStyle] = useState("default");
-  const [settingsHidePlanIdeas, setSettingsHidePlanIdeas] = useState(false);
-  const [settingsHideCustomPlans, setSettingsHideCustomPlans] = useState(false);
   // Pending business-event requests for THIS org's primary calendar.
   // Surfaced in Home's NEEDS YOU card, linking to the primary calendar's edit
   // page where owners can review + decide.
@@ -283,7 +281,6 @@ export default function OrgDashboardPage() {
     } catch {
       /* not permitted / none — leave empty */
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarId]);
   useEffect(() => {
     // Load once on mount so Home's NEEDS YOU card can surface pending requests
@@ -449,8 +446,6 @@ export default function OrgDashboardPage() {
     setSettingsExcludeKeywords(d.excludeKeywords || []);
     setSettingsBrandColor(d.brandColor);
     setSettingsImageStyle(d.imageStyle || "default");
-    setSettingsHidePlanIdeas(d.hidePlanIdeas || false);
-    setSettingsHideCustomPlans(d.hideCustomPlans || false);
     if (d.leafAppConnected) setLeafAppConnected(true);
   }, []);
 
@@ -2248,6 +2243,7 @@ export default function OrgDashboardPage() {
                   <div className="flex items-center gap-6">
                     <div className="w-20 h-20 rounded-xl border border-zinc-200 overflow-hidden bg-zinc-50 flex items-center justify-center shrink-0">
                       {settingsLogoPreview || dashboard.profilePhoto ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={settingsLogoPreview || dashboard.profilePhoto || ""}
                           alt="Logo"
