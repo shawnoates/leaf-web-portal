@@ -6,14 +6,12 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import type { Step, CallBackProps } from "react-joyride";
 import Parse from "@/lib/parse-client";
-import { SITE_HOST } from "@/lib/site";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import ConciergeDashboardBanner from "@/components/ConciergeDashboardBanner";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import type { AnalyticsRange, OrgAnalytics } from "@/components/analytics/types";
-import OwnerInbox from "@/components/OwnerInbox";
 import PlanChatDrawer from "@/components/PlanChatDrawer";
 import { type ConciergeMenu } from "@/components/ConciergeMenuCard";
 import ConciergeThread from "@/components/ConciergeThread";
@@ -23,6 +21,19 @@ import MarketplaceTab, { type MarketplaceEvent, type OrgSettings } from "@/compo
 import CreatePlanModal, { type CreatePlanPrefill, NEW_PLAN_DRAFT_SESSION_KEY } from "@/components/CreatePlanModal";
 import PlanDetailModal from "@/components/PlanDetailModal";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
+import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import DashboardBottomBar from "@/components/dashboard/DashboardBottomBar";
+import HomeTab from "@/components/dashboard/HomeTab";
+import CommunityTab, { type CommunitySegment } from "@/components/dashboard/CommunityTab";
+import GrowPerformance from "@/components/dashboard/GrowPerformance";
+import type {
+  CalActivePlan,
+  DashboardTab,
+  GrowSection,
+  HomeView,
+  OrgDashboard,
+} from "@/components/dashboard/types";
+import { buildRsvpCountIndex, rsvpCountForPerson } from "@/components/dashboard/types";
 // react-joyride is ~40KB and the tour runs once per calendar, ever — loading it
 // on every dashboard visit is pure first-paint tax. `ssr: false` because the
 // tour is a browser-only overlay with nothing meaningful to prerender.
@@ -32,15 +43,15 @@ const DashboardTour = dynamic(
 );
 
 // recharts is the largest dependency on this route (~200KB gzipped) and only
-// the Analytics tab uses it — free-tier owners can't even open that tab. Keep
-// it out of the first-paint bundle. `ssr: false` because the charts measure
-// their container on mount and render nothing useful on the server anyway.
+// the "All charts" disclosure under Grow › Performance uses it. Keep it out of
+// the first-paint bundle. `ssr: false` because the charts measure their
+// container on mount and render nothing useful on the server anyway.
 const AnalyticsTab = dynamic(() => import("@/components/analytics/AnalyticsTab"), {
   ssr: false,
   loading: () => (
     <div className="border border-zinc-200 rounded-xl p-12 flex items-center justify-center text-zinc-400 text-sm">
       <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-      Loading analytics…
+      Loading charts…
     </div>
   ),
 });
@@ -49,188 +60,26 @@ import { formatDateInputInTimezone } from "@/lib/date-utils";
 import {
   Calendar,
   Check,
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  Copy,
-  Download,
-  Heart,
-  HelpCircle,
+  Code,
   ImagePlus,
-  Layers,
   Link2,
+  Lock,
+  Mail,
+  Megaphone,
+  MessageCircle,
   Pencil,
   Plus,
   RefreshCw,
-  Settings,
-  Trash2,
-  Users,
-  UserMinus,
-  Lock,
-  ExternalLink,
-  LogOut,
-  TrendingUp,
-  Sparkles,
-  Lightbulb,
-  Code,
-  Megaphone,
-  Ticket,
-  Phone,
   Smartphone,
-  Vote,
+  Sparkles,
   X,
-  MessageCircle,
 } from "lucide-react";
 
 // NOTE: do not import recharts here. It is loaded only via the dynamic
-// <AnalyticsTab> below; a static import would pull it back into the
+// <AnalyticsTab> above; a static import would pull it back into the
 // first-paint bundle for every dashboard visitor.
 
-// ── Types ──────────────────────────────────────────────────────────────
-
-interface OrgDashboard {
-  objectId: string;
-  name: string;
-  description: string;
-  shareId: string;
-  orgType: string | null;
-  tier: string;
-  /** The single calendar the concierge host runs (null unless on concierge). */
-  conciergeServicedCalendarId: string | null;
-  subscriptionStatus: string | null;
-  subscriptionCancelAt: number | null;
-  billingInterval: string | null; // "month" or "year"
-  isOwner: boolean;
-  isOrgCoHost: boolean;
-  /** Whether the viewer has linked the iOS app (functions.js: getOrgDashboard
-   *  returns this off the requesting _User). Only ever used to flip the local
-   *  flag on, never off — the auth effect seeds it from Parse.User.current(). */
-  leafAppConnected?: boolean;
-  conciergePersona?: { name: string; avatarUrl: string | null } | null;
-  viewerCalendarRole: "Owner" | "Host" | null;
-  calendarRoles: Record<string, "Owner" | "Host">;
-  profilePhoto: string | null;
-  bannerUrl: string | null;
-  brandColor: string;
-  daysOfWeek: number[];
-  preferredTimes: string[];
-  blacklistCategories: string[];
-  excludeKeywords: string[];
-  locationTypes: string[];
-  cities: string[];
-  planIdeasPerWeek: number;
-  website: string;
-  imageStyle: string;
-  hidePlanIdeas: boolean;
-  hideCustomPlans: boolean;
-  hideDeals: boolean;
-  memberCount: number;
-  totalRsvpCount: number;
-  rsvpLimit: number | null;
-  rsvpsThisMonth: number;
-  planIdeaCount: number;
-  upcomingPlanCount: number;
-  followerCount: number;
-  members: {
-    membershipId: string | null;
-    objectId: string | null;
-    name: string;
-    email: string | null;
-    status: string;
-    leafAppConnected?: boolean;
-    joinedAt: string;
-    pending?: boolean;
-    scope?: {
-      allCalendars: boolean;
-      calendars: { id: string; name: string }[];
-      membershipIds: string[];
-    };
-  }[];
-  followers: {
-    membershipId: string;
-    objectId: string | null;
-    name: string;
-    phone: string | null;
-    calendarId: string | null;
-    calendarName: string | null;
-    joinedAt: string;
-  }[];
-  rsvps: {
-    objectId: string;
-    eventGroupId: string | null;
-    name: string;
-    phone: string | null;
-    planTitle: string;
-    date: string;
-    source: string;
-  }[];
-  pendingFollowerCount: number;
-  pendingFollowers: {
-    membershipId: string;
-    objectId: string | null;
-    name: string;
-    phone: string | null;
-    calendarId: string | null;
-    calendarName: string | null;
-    requestedAt: string;
-  }[];
-  calendars: {
-    objectId: string;
-    name: string;
-    description: string;
-    shareId: string;
-    city: string;
-    isPrimary: boolean;
-    isActive: boolean;
-    role: "Owner" | "Host";
-    calendarImage: string | null;
-    hideVenueUntilRsvp: boolean;
-    requireApprovalDefault: boolean;
-    isPrivate: boolean;
-    hidePlanIdeas: boolean;
-    hideCustomPlans: boolean;
-    hideDeals: boolean;
-    merchantEventsOptOut: boolean;
-    merchantEventsRequireApproval: boolean;
-    pendingFollowerCount: number;
-    isConciergeServiced?: boolean;
-  }[];
-  calendarLimit: number | null;
-  hostRequests: {
-    planId: string;
-    title: string;
-    description: string;
-    image: string | null;
-    calendarName: string | null;
-    calendarId: string | null;
-    requesterName: string;
-    requesterPhone: string | null;
-    requestedDate: string | null;
-    requestedNote: string | null;
-    requestedVenue: { name: string; address: string; placeId?: string | null } | null;
-    requestedCapacity: number | null;
-    requestedRequireApproval: boolean;
-    requestedAt: string | null;
-  }[];
-  pendingRsvpRequests: {
-    notificationId: string;
-    eventGroupId: string | null;
-    name: string;
-    phone: string | null;
-    planTitle: string;
-    planImage: string | null;
-    rsvpNote: string | null;
-    requestedAt: string;
-  }[];
-  recentPhotos: {
-    objectId: string;
-    url: string | null;
-    uploadedAt: string;
-    uploaderName: string;
-    eventGroupId: string | null;
-    eventTitle: string;
-  }[];
-}
+// ── Constants ──────────────────────────────────────────────────────────
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -252,19 +101,37 @@ const BLACKLIST_PRESETS: string[] = [
   "Fast food",
 ];
 
-const TABS = [
-  { id: "overview", label: "Overview", icon: Calendar },
-  { id: "calendars", label: "Calendars", icon: Layers },
-  { id: "followers", label: "Followers", icon: Heart },
-  { id: "members", label: "Users", icon: Users, ownerOnly: true },
-  { id: "analytics", label: "Analytics", icon: TrendingUp, proOnly: true },
-  { id: "marketplace", label: "Marketplace", icon: Ticket, paidOnly: true },
-  { id: "settings", label: "Settings", icon: Settings, ownerOnly: true },
-];
-
 // Tiers that unlock paid features. Concierge includes everything in Pro, and
 // `growth` is the retired Social tier treated as Pro.
 const PAID_TIERS = ["pro", "growth", "concierge"];
+
+// Old seven-tab ids still arrive via bookmarks and emails — map them onto the
+// four places (+ Inbox + off-nav Settings) so every existing ?tab= deep link
+// keeps working.
+const LEGACY_TAB_MAP: Record<string, DashboardTab> = {
+  overview: "home",
+  followers: "community",
+  members: "community",
+  users: "community",
+  analytics: "grow",
+  marketplace: "grow",
+};
+
+function normalizeTab(raw: string | null): DashboardTab {
+  if (!raw) return "home";
+  if (raw in LEGACY_TAB_MAP) return LEGACY_TAB_MAP[raw];
+  if (["home", "calendars", "community", "grow", "settings"].includes(raw)) {
+    return raw as DashboardTab;
+  }
+  return "home";
+}
+
+const GROW_SECTIONS: { id: GrowSection; label: string }[] = [
+  { id: "performance", label: "Performance" },
+  { id: "marketplace", label: "Marketplace" },
+  { id: "collabs", label: "Collabs" },
+  { id: "concierge", label: "Concierge" },
+];
 
 // react-joyride exports ACTIONS/EVENTS/STATUS as runtime objects — importing
 // them would pull the whole library into the first-paint bundle and undo the
@@ -278,13 +145,6 @@ const TOUR_ACTION_CLOSE = "close" satisfies CallBackProps["action"];
 const TOUR_ACTION_PREV = "prev" satisfies CallBackProps["action"];
 const TOUR_EVENT_STEP_AFTER = "step:after" satisfies CallBackProps["type"];
 
-type CalActivePlan = { objectId: string; calendarId?: string; title: string; description: string; image: string | null; date: string; timezone: string | null; time: string | null; hostName: string; isVirtualHost?: boolean; virtualHostAvatarUrl?: string | null; leafHostState?: "leaf_hosted" | "leaf_arranging" | null; leafHostPersona?: { name: string; avatarUrl: string | null } | null; rsvpCount: number; location: { name: string; address: string; placeId?: string | null } | null; isPoll?: boolean; pollPostId?: string | null; pollOptionCount?: number; pollVoteCount?: number; pollClosesAt?: string | null; hideVenueUntilRsvp?: boolean; requireApproval?: boolean; planSeriesId?: string | null };
-
-// Analytics payload types live in components/analytics/types.ts so this page
-// can hold OrgAnalytics state without importing from the lazily-loaded
-// analytics chunk.
-
-
 // ── Component ──────────────────────────────────────────────────────────
 
 export default function OrgDashboardPage() {
@@ -292,7 +152,8 @@ export default function OrgDashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const calendarId = params.calendarId as string;
-  const initialTab = searchParams.get("tab") || "overview";
+  const rawInitialTab = searchParams.get("tab");
+  const initialTab = normalizeTab(rawInitialTab);
 
   const [user, setUser] = useState<Parse.User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
@@ -305,7 +166,71 @@ export default function OrgDashboardPage() {
   // Per-calendar cache key for the last successful getOrgDashboard payload.
   const dashboardCacheKey = `org_dashboard_cache_${calendarId}`;
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState<DashboardTab>(initialTab);
+  const [growSection, setGrowSection] = useState<GrowSection>(
+    rawInitialTab === "marketplace" ? "marketplace" : "performance",
+  );
+
+  // Home list/spine view — persisted per user.
+  const [homeView, setHomeView] = useState<HomeView>("list");
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("dashboard_home_view");
+      if (v === "spine" || v === "list") setHomeView(v);
+    } catch { /* ignore */ }
+  }, []);
+  const changeHomeView = useCallback((v: HomeView) => {
+    setHomeView(v);
+    try { localStorage.setItem("dashboard_home_view", v); } catch { /* ignore */ }
+  }, []);
+
+  // Publish confirmation banner on Home (set after CreatePlanModal succeeds).
+  const [publishBanner, setPublishBanner] = useState<string | null>(null);
+  const publishBannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (publishBannerTimer.current) clearTimeout(publishBannerTimer.current);
+  }, []);
+
+  // Community deep-link segment (Home "See them" / Grow "See the N"). Changing
+  // the nonce remounts CommunityTab with the segment applied.
+  const [communitySegment, setCommunitySegment] = useState<CommunitySegment | undefined>(undefined);
+  const [communityNonce, setCommunityNonce] = useState(0);
+
+  // Inbox unread — feeds the sidebar dot and the mobile header dot.
+  const [inboxUnread, setInboxUnread] = useState(0);
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    const tick = () =>
+      Parse.Cloud.run("getInbox")
+        .then((r: { totalUnread: number }) => {
+          if (alive) setInboxUnread(r?.totalUnread || 0);
+        })
+        .catch(() => {});
+    tick();
+    const t = setInterval(tick, 30_000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [user]);
+
+  // Navigate between places. Inbox is a real page (three-pane, cross-calendar)
+  // rather than a pane here, so the nav item routes to it. Everything else
+  // mirrors into ?tab= so refresh and deep links keep working.
+  const setTab = useCallback(
+    (tab: DashboardTab) => {
+      if (tab === "inbox") {
+        router.push("/inbox");
+        return;
+      }
+      setActiveTab(tab);
+      const next = new URLSearchParams(searchParams.toString());
+      next.set("tab", tab);
+      router.replace(`/dashboard/${calendarId}?${next.toString()}`, { scroll: false });
+    },
+    [router, searchParams, calendarId],
+  );
 
   // Dashboard tour (first visit walkthrough)
   const [runTour, setRunTour] = useState(false);
@@ -318,7 +243,7 @@ export default function OrgDashboardPage() {
     if (runTour) setTourMounted(true);
   }, [runTour]);
 
-  // Edit states
+  // Edit states (Organization details — lives in Settings now)
   const [editName, setEditName] = useState(false);
   const [nameValue, setNameValue] = useState("");
   const [descValue, setDescValue] = useState("");
@@ -337,9 +262,8 @@ export default function OrgDashboardPage() {
   const [settingsHidePlanIdeas, setSettingsHidePlanIdeas] = useState(false);
   const [settingsHideCustomPlans, setSettingsHideCustomPlans] = useState(false);
   // Pending business-event requests for THIS org's primary calendar.
-  // The banner links to the primary calendar's edit page where owners can
-  // review + decide. Per-child-calendar approvals live on each child's own
-  // edit page.
+  // Surfaced in Home's NEEDS YOU card, linking to the primary calendar's edit
+  // page where owners can review + decide.
   const [eventApprovals, setEventApprovals] = useState<
     {
       objectId: string;
@@ -362,8 +286,8 @@ export default function OrgDashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarId]);
   useEffect(() => {
-    // Load once on mount so the top banner can surface pending requests from
-    // any tab. Server-gated to the owner; non-owners get an empty list.
+    // Load once on mount so Home's NEEDS YOU card can surface pending requests
+    // from any place. Server-gated to the owner; non-owners get an empty list.
     loadEventApprovals();
   }, [loadEventApprovals]);
   const [settingsSaving, setSettingsSaving] = useState(false);
@@ -405,14 +329,11 @@ export default function OrgDashboardPage() {
     }
   };
 
-  // Migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-
   // Toast
   const [toast, setToast] = useState<string | null>(null);
   const [embedCalId, setEmbedCalId] = useState<string | null>(null);
 
-  // Analytics
+  // Analytics — powers Grow › Performance AND Home's deltas / best-day prompts.
   const [analytics, setAnalytics] = useState<OrgAnalytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
@@ -466,33 +387,9 @@ export default function OrgDashboardPage() {
   // team schedule, private book club with a fixed cadence, etc.).
   const [newCalSuggestStarters, setNewCalSuggestStarters] = useState(true);
 
-  // Regenerate (per calendar)
-  const [regeneratingCalId, setRegeneratingCalId] = useState<string | null>(null);
-
   // Plan detail modal
-  const [selectedActivePlan, setSelectedActivePlan] = useState<{
-    objectId: string;
-    calendarId?: string;
-    title: string;
-    description: string;
-    image: string | null;
-    date: string;
-    timezone: string | null;
-    time: string | null;
-    hostName: string;
-    isVirtualHost?: boolean;
-    virtualHostAvatarUrl?: string | null;
-    rsvpCount: number;
-    location: { name: string; address: string; placeId?: string | null } | null;
-    isPoll?: boolean;
-    pollVoteCount?: number;
-    pollOptionCount?: number;
-    pollClosesAt?: string | null;
-    hideVenueUntilRsvp?: boolean;
-    requireApproval?: boolean;
-    planSeriesId?: string | null;
-  } | null>(null);
-  // Create plan modal (used by marketplace + duplicate)
+  const [selectedActivePlan, setSelectedActivePlan] = useState<CalActivePlan | null>(null);
+  // Create plan modal (used by marketplace + duplicate + Home's Fill-it CTAs)
   const [createPlanPrefill, setCreatePlanPrefill] = useState<CreatePlanPrefill | null>(null);
   const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
   // Flipped true when the drawer opens as a return from Google Cal OAuth
@@ -513,18 +410,7 @@ export default function OrgDashboardPage() {
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [phoneJustVerified, setPhoneJustVerified] = useState(false);
 
-  // Co-host invite
-  const [followerCalFilter, setFollowerCalFilter] = useState<string>(searchParams.get("filterCal") || "all");
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteName, setInviteName] = useState("");
-  const [inviting, setInviting] = useState(false);
-  const [inviteSuccess, setInviteSuccess] = useState("");
-  // Scope picker: All Calendars (org-wide) or specific calendar ids.
-  const [inviteScopeAll, setInviteScopeAll] = useState(true);
-  const [inviteScopeIds, setInviteScopeIds] = useState<string[]>([]);
-  const [inviteScopeOpen, setInviteScopeOpen] = useState(false);
-
-  // Edit-scope popover
+  // Edit-scope popover (Community › Manage)
   const [editScopeFor, setEditScopeFor] = useState<{
     name: string;
     userId: string | null;
@@ -657,8 +543,8 @@ export default function OrgDashboardPage() {
     const seen = localStorage.getItem(`dashboard_tour_seen_${calendarId}`);
     if (!seen) {
       // Start on the tab the first step lives on: concierge orgs open on the
-      // Overview concierge card, everyone else on the Calendars plans list.
-      setActiveTab(dashboard.tier === "concierge" ? "overview" : "calendars");
+      // Home concierge card, everyone else on the Calendars plans list.
+      setActiveTab(dashboard.tier === "concierge" ? "home" : "calendars");
       setTourStepIndex(0);
       setRunTour(true);
     }
@@ -684,10 +570,8 @@ export default function OrgDashboardPage() {
     if (!dashboard) return;
     const pollId = searchParams.get("openPoll");
     if (!pollId || autoOpenedPollRef.current === pollId) return;
-    type ActivePlan = NonNullable<typeof selectedActivePlan>;
     for (const cal of dashboard.calendars) {
-      const plans = (cal as Record<string, unknown>).activePlans as ActivePlan[] | undefined;
-      const match = plans?.find((p) => p.objectId === pollId);
+      const match = cal.activePlans?.find((p) => p.objectId === pollId);
       if (match) {
         setSelectedActivePlan(match);
         setActiveTab("calendars");
@@ -748,9 +632,8 @@ export default function OrgDashboardPage() {
   // plan actually appears in the refreshed dashboard.
   useEffect(() => {
     if (!pendingVirtualHostPlanId || !dashboard) return;
-    type ActivePlan = NonNullable<typeof selectedActivePlan>;
     const match = dashboard.calendars
-      .flatMap((cal) => ((cal as Record<string, unknown>).activePlans as ActivePlan[]) || [])
+      .flatMap((cal) => cal.activePlans || [])
       .find((p) => p.objectId === pendingVirtualHostPlanId);
     // One shot: the dashboard was refetched after the attach confirmed, so if
     // the plan isn't here it isn't coming — don't leave a pending id armed to
@@ -772,9 +655,8 @@ export default function OrgDashboardPage() {
   // Concierge chat slide-over — the serviced calendar looks like any other; the
   // concierge conversation opens as a drawer from its "Concierge" button.
   const [showConciergeChat, setShowConciergeChat] = useState(false);
-  // Per-plan chat drawer — Overview tab's Upcoming carousel hover
-  // button routes here. Keeps the owner on the dashboard instead of
-  // navigating to /chat/[eventGroupId].
+  // Per-plan chat drawer — plan rows route here. Keeps the owner on the
+  // dashboard instead of navigating to /chat/[eventGroupId].
   const [chatPlanId, setChatPlanId] = useState<string | null>(null);
 
   // Auto-open the drawer when the global ConciergeInbox routes a
@@ -1041,13 +923,9 @@ export default function OrgDashboardPage() {
   // Analytics fetcher — Pro tier only.
   //
   // Deliberately depends on the derived `isPaidTier` boolean rather than the
-  // `dashboard` object. `setDashboard` runs on the cache→network swap at mount
-  // and again after every mutation (~20 call sites, including optimistic
-  // `{...d}` spreads for host/RSVP approvals that have nothing to do with
-  // analytics). Each of those produces a new object identity, which used to
-  // give `fetchAnalytics` a new identity, which re-fired the effect below and
-  // flipped `analyticsLoading` — unmounting every chart. Keying on the tier
-  // string means approving an RSVP no longer reloads the charts.
+  // `dashboard` object (see the original note on identity churn). Loaded as
+  // soon as the dashboard is available — the payload now powers Home's growth
+  // deltas and best-day prompts, not just Grow › Performance.
   const isPaidTier = dashboard ? PAID_TIERS.includes(dashboard.tier) : false;
 
   const fetchAnalytics = useCallback(
@@ -1074,12 +952,13 @@ export default function OrgDashboardPage() {
     [calendarId, isPaidTier, analyticsCalFilter]
   );
 
-  // Auto-load analytics when the tab opens, range changes, or calendar filter changes
+  // Auto-load analytics once the tier is known, and again when the range or
+  // calendar filter changes.
   useEffect(() => {
-    if (activeTab === "analytics" && isPaidTier) {
+    if (isPaidTier) {
       fetchAnalytics(analyticsRange);
     }
-  }, [activeTab, analyticsRange, analyticsCalFilter, isPaidTier, fetchAnalytics]);
+  }, [analyticsRange, analyticsCalFilter, isPaidTier, fetchAnalytics]);
 
   // ── Handlers ──
 
@@ -1255,7 +1134,6 @@ export default function OrgDashboardPage() {
   }
 
   async function handleRegenerate(targetCalendarId: string) {
-    setRegeneratingCalId(targetCalendarId);
     try {
       await Parse.Cloud.run("generateCalendarPlansForOne", {
         calendarId: targetCalendarId,
@@ -1264,43 +1142,28 @@ export default function OrgDashboardPage() {
       // Wait a moment for background generation
       setTimeout(() => {
         fetchDashboard();
-        setRegeneratingCalId(null);
       }, 3000);
     } catch (err) {
       console.error("Regenerate failed:", err);
-      setRegeneratingCalId(null);
     }
   }
+  // handleRegenerate is kept wired for the calendar edit surface; referenced
+  // here so the Calendars place can grow a Regenerate affordance without
+  // re-plumbing. (PlansManager owns suggestions today.)
+  void handleRegenerate;
 
-  async function handleInviteCoHost() {
-    if (!inviteEmail) return;
-    // Force a real choice: "all" or at least one calendar selected.
-    if (!inviteScopeAll && inviteScopeIds.length === 0) {
-      alert("Pick at least one calendar, or choose All Calendars.");
-      return;
-    }
-    setInviting(true);
-    setInviteSuccess("");
-    try {
+  const handleInviteCoHost = useCallback(
+    async (email: string, name: string, scope: { all: boolean; ids: string[] }) => {
       await Parse.Cloud.run("inviteCoHost", {
         calendarId,
-        email: inviteEmail,
-        name: inviteName,
-        ...(inviteScopeAll ? {} : { calendarIds: inviteScopeIds }),
+        email,
+        name,
+        ...(scope.all ? {} : { calendarIds: scope.ids }),
       });
-      setInviteSuccess(`Invitation sent to ${inviteEmail}`);
-      setInviteEmail("");
-      setInviteName("");
-      setInviteScopeAll(true);
-      setInviteScopeIds([]);
       fetchDashboard();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to send invite";
-      alert(message);
-    } finally {
-      setInviting(false);
-    }
-  }
+    },
+    [calendarId, fetchDashboard],
+  );
 
   async function handleSaveScope() {
     if (!editScopeFor) return;
@@ -1326,21 +1189,191 @@ export default function OrgDashboardPage() {
     }
   }
 
-  function exportRsvpsCsv() {
-    if (!dashboard) return;
-    const header = "Name,Phone,Plan,Date,Source";
-    const rows = dashboard.rsvps.map(
-      (r) => `"${r.name}","${r.phone || ""}","${r.planTitle}","${new Date(r.date).toLocaleDateString()}","${r.source}"`
-    );
-    const csv = [header, ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${dashboard.name}-rsvps.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+  // ── NEEDS YOU / Community mutation handlers ──
+
+  const approveHostRequest = useCallback(
+    async (req: OrgDashboard["hostRequests"][number]) => {
+      try {
+        await Parse.Cloud.run("approveHostRequest", { calendarPlanId: req.planId });
+        setDashboard((d) => d ? { ...d, hostRequests: d.hostRequests.filter((r) => r.planId !== req.planId) } : d);
+      } catch (err) {
+        console.error("Failed to approve:", err);
+      }
+    },
+    [],
+  );
+
+  const declineHostRequest = useCallback(
+    async (req: OrgDashboard["hostRequests"][number]) => {
+      try {
+        await Parse.Cloud.run("declineHostRequest", { calendarPlanId: req.planId });
+        setDashboard((d) => d ? { ...d, hostRequests: d.hostRequests.filter((r) => r.planId !== req.planId) } : d);
+      } catch (err) {
+        console.error("Failed to decline:", err);
+      }
+    },
+    [],
+  );
+
+  const editHostRequest = useCallback(
+    (req: OrgDashboard["hostRequests"][number]) => {
+      const d = req.requestedDate ? new Date(req.requestedDate) : null;
+      const pad = (n: number) => String(n).padStart(2, "0");
+      setCreatePlanPrefill({
+        title: req.title,
+        description: req.description || "",
+        venue: req.requestedVenue ? { name: req.requestedVenue.name, address: req.requestedVenue.address, placeId: req.requestedVenue.placeId ?? null } : null,
+        date: d ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` : "",
+        time: d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : "",
+        capacity: req.requestedCapacity != null ? String(req.requestedCapacity) : "",
+        imageUrl: req.image || null,
+        requireApproval: req.requestedRequireApproval,
+      });
+      setEditingHostRequestId(req.planId);
+      setEditingHostRequestCalendarId(req.calendarId);
+      setShowCreatePlanModal(true);
+    },
+    [],
+  );
+
+  const approveRsvpRequest = useCallback(
+    async (req: OrgDashboard["pendingRsvpRequests"][number]) => {
+      try {
+        await Parse.Cloud.run("approveRsvpRequest", { notificationId: req.notificationId });
+        setDashboard((d) => d ? { ...d, pendingRsvpRequests: d.pendingRsvpRequests.filter((r) => r.notificationId !== req.notificationId) } : d);
+      } catch (err) {
+        console.error("Failed to approve:", err);
+      }
+    },
+    [],
+  );
+
+  const declineRsvpRequest = useCallback(
+    async (req: OrgDashboard["pendingRsvpRequests"][number]) => {
+      try {
+        await Parse.Cloud.run("declineRsvpRequest", { notificationId: req.notificationId });
+        setDashboard((d) => d ? { ...d, pendingRsvpRequests: d.pendingRsvpRequests.filter((r) => r.notificationId !== req.notificationId) } : d);
+      } catch (err) {
+        console.error("Failed to decline:", err);
+      }
+    },
+    [],
+  );
+
+  const approveFollower = useCallback(
+    async (pf: OrgDashboard["pendingFollowers"][number]) => {
+      try {
+        await Parse.Cloud.run("approveFollowerRequest", {
+          calendarId: pf.calendarId || calendarId,
+          membershipId: pf.membershipId,
+        });
+        setDashboard((d) => d ? {
+          ...d,
+          pendingFollowers: d.pendingFollowers.filter((x) => x.membershipId !== pf.membershipId),
+          pendingFollowerCount: d.pendingFollowerCount - 1,
+          followers: [...d.followers, { membershipId: pf.membershipId, objectId: pf.objectId, name: pf.name, phone: pf.phone, calendarId: pf.calendarId, calendarName: pf.calendarName, joinedAt: new Date().toISOString() }],
+          followerCount: d.followerCount + 1,
+          calendars: d.calendars.map((c) => c.objectId === pf.calendarId ? { ...c, pendingFollowerCount: Math.max(0, c.pendingFollowerCount - 1) } : c),
+        } : d);
+        setToast("Follower approved!");
+        setTimeout(() => setToast(null), 2000);
+      } catch (err) {
+        console.error("Failed to approve follower:", err);
+        alert(err instanceof Error ? err.message : "Failed to approve.");
+      }
+    },
+    [calendarId],
+  );
+
+  const rejectFollower = useCallback(
+    async (pf: OrgDashboard["pendingFollowers"][number]) => {
+      try {
+        await Parse.Cloud.run("rejectFollowerRequest", {
+          calendarId: pf.calendarId || calendarId,
+          membershipId: pf.membershipId,
+        });
+        setDashboard((d) => d ? {
+          ...d,
+          pendingFollowers: d.pendingFollowers.filter((x) => x.membershipId !== pf.membershipId),
+          pendingFollowerCount: d.pendingFollowerCount - 1,
+          calendars: d.calendars.map((c) => c.objectId === pf.calendarId ? { ...c, pendingFollowerCount: Math.max(0, c.pendingFollowerCount - 1) } : c),
+        } : d);
+        setToast("Request rejected.");
+        setTimeout(() => setToast(null), 2000);
+      } catch (err) {
+        console.error("Failed to reject follower:", err);
+      }
+    },
+    [calendarId],
+  );
+
+  const removeFollower = useCallback(
+    async (f: OrgDashboard["followers"][number]) => {
+      if (!confirm(`Remove ${f.name} as a follower?`)) return;
+      try {
+        await Parse.Cloud.run("removeFollower", {
+          membershipId: f.membershipId,
+          calendarId,
+        });
+        setDashboard((d) =>
+          d ? { ...d, followers: d.followers.filter((x) => x.membershipId !== f.membershipId), followerCount: d.followerCount - 1 } : d
+        );
+      } catch (err) {
+        console.error("Failed to remove follower:", err);
+      }
+    },
+    [calendarId],
+  );
+
+  const removeMember = useCallback(
+    async (m: OrgDashboard["members"][number]) => {
+      if (!confirm(`Remove ${m.name} from this calendar?`)) return;
+      try {
+        if (m.status === "Host") {
+          await Parse.Cloud.run("removeCoHost", {
+            orgId: calendarId,
+            ...(m.objectId ? { userId: m.objectId } : { email: m.email }),
+          });
+        } else if (m.membershipId) {
+          await Parse.Cloud.run("removeMember", {
+            membershipId: m.membershipId,
+            calendarId,
+          });
+        }
+        fetchDashboard();
+      } catch (err) {
+        console.error("Failed to remove member:", err);
+        alert(err instanceof Error ? err.message : "Failed to remove user.");
+      }
+    },
+    [calendarId, fetchDashboard],
+  );
+
+  const openEditScope = useCallback((m: OrgDashboard["members"][number]) => {
+    const all = m.scope?.allCalendars ?? true;
+    const ids = m.scope?.calendars.map((c) => c.id) ?? [];
+    setEditScopeFor({
+      name: m.name,
+      userId: m.objectId,
+      email: m.email,
+    });
+    setEditScopeAll(all);
+    setEditScopeIds(all ? [] : ids);
+  }, []);
+
+  const openNewPlan = useCallback((prefillDate?: string) => {
+    setCreatePlanPrefill(prefillDate ? { date: prefillDate } : null);
+    setShowCreatePlanModal(true);
+  }, []);
+
+  const goCommunity = useCallback(
+    (segment?: CommunitySegment) => {
+      setCommunitySegment(segment);
+      setCommunityNonce((n) => n + 1);
+      setTab("community");
+    },
+    [setTab],
+  );
 
   // ── Auth gate ──
 
@@ -1386,6 +1419,17 @@ export default function OrgDashboardPage() {
   const isPaid = isPaidTier;
   const tierLabel = dashboard.tier === "concierge" ? "Concierge" : isPaid ? "Pro" : "Free";
 
+  const needsYouCount =
+    dashboard.hostRequests.length +
+    dashboard.pendingRsvpRequests.length +
+    dashboard.pendingFollowers.length +
+    eventApprovals.length;
+
+  const rsvpIndex = buildRsvpCountIndex(dashboard.rsvps);
+  const neverRsvpdCount = dashboard.followers.filter(
+    (f) => rsvpCountForPerson(rsvpIndex, f) === 0,
+  ).length;
+
   // Build tour steps for DashboardTour component. `disableBeacon` on the first
   // step opens the tooltip immediately instead of showing a clickable dot.
   const tourSteps: Step[] = [];
@@ -1426,15 +1470,16 @@ export default function OrgDashboardPage() {
     });
   }
 
-  // Which tab does a given tour step live on? Used to switch tabs in the SAME
-  // batched update that advances the controlled stepIndex, so the target is
-  // always mounted by the time Joyride positions the tooltip.
-  const tabForTourTarget = (target: Step["target"] | undefined): string | null => {
+  // Which place does a given tour step live on? Used to switch tabs in the
+  // SAME batched update that advances the controlled stepIndex, so the target
+  // is always mounted by the time Joyride positions the tooltip.
+  const tabForTourTarget = (target: Step["target"] | undefined): DashboardTab | null => {
     const t = typeof target === "string" ? target : "";
-    if (t.includes("tour-plans") || t.includes("tour-add-calendar")) return "calendars";
-    if (t.includes("tour-members")) return "members";
+    if (t.includes("tour-plans")) return "calendars";
+    if (t.includes("tour-add-calendar")) return "calendars";
+    if (t.includes("tour-members")) return "community";
     if (t.includes("tour-settings")) return "settings";
-    if (t.includes("tour-tabs") || t.includes("tour-concierge")) return "overview";
+    if (t.includes("tour-tabs") || t.includes("tour-concierge")) return "home";
     return null;
   };
 
@@ -1467,1905 +1512,1132 @@ export default function OrgDashboardPage() {
     }
   };
 
-  // ── Render ──
+  // ── Shared fragments ──
 
-  return (
-    <div className="min-h-screen bg-white">
-      {/* Concierge state banner (renders only when relevant) */}
-      <ConciergeDashboardBanner calendarId={calendarId} />
-
-      {/* Header */}
-      <header className="border-b border-zinc-100">
-        <div className="max-w-5xl mx-auto px-6 py-5 flex items-center gap-4">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-medium tracking-tight truncate">{dashboard.name}</h1>
-            <p className="text-xs text-zinc-400">{tierLabel} Plan</p>
-          </div>
-          {/* Persistent inbox — every owner and co-host, every tier.
-              Links to /inbox; hovering peeks at recent threads. */}
-          <OwnerInbox />
-          <Link
-            href="/help"
-            target="_blank"
-            className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-zinc-400 hover:text-zinc-900 transition-colors shrink-0"
-            title="Help Center"
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Help</span>
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-zinc-400 hover:text-zinc-900 transition-colors shrink-0"
-            title="Log out"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Log out</span>
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="max-w-5xl mx-auto px-6">
-          <nav className="flex gap-1 -mb-px overflow-x-auto no-scrollbar" data-tour="tour-tabs">
-            {TABS.map((tab) => {
-              if (tab.ownerOnly && !dashboard.isOwner) return null;
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              const isLocked =
-                (tab.proOnly && !isPaid) ||
-                ((tab as { paidOnly?: boolean }).paidOnly && !isPaid);
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    if (isLocked) {
-                      setShowSubscription(true);
-                    } else {
-                      setActiveTab(tab.id);
-                    }
-                  }}
-                  className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium uppercase tracking-widest border-b-2 transition-colors whitespace-nowrap ${
-                    isActive
-                      ? "border-zinc-900 text-zinc-900"
-                      : "border-transparent text-zinc-400 hover:text-zinc-600"
-                  }`}
-                  data-tour={tab.id === "settings" ? "tour-settings" : undefined}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  {tab.label}
-                  {tab.id === "followers" && dashboard.pendingFollowerCount > 0 && (
-                    <span className="bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[18px] text-center">
-                      {dashboard.pendingFollowerCount}
-                    </span>
-                  )}
-                  {isLocked && <Lock className="w-3 h-3 ml-0.5" />}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      </header>
-
-      {/* Pending business-event requests — thin banner, jumps to the
-          primary calendar's edit page (where approvals now live). */}
-      {dashboard.isOwner && eventApprovals.length > 0 && (
-        <div className="max-w-5xl mx-auto px-6 pt-4">
-          <Link
-            href={`/dashboard/${calendarId}/calendars/${calendarId}/edit`}
-            className="w-full flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-left hover:bg-amber-100/70 transition-colors"
-          >
-            <span className="text-sm text-amber-900">
-              <span className="font-semibold">{eventApprovals.length}</span>{" "}
-              business event{" "}
-              {eventApprovals.length === 1 ? "request" : "requests"} awaiting your
-              review
-            </span>
-            <span className="text-xs font-semibold text-amber-800 shrink-0">
-              Review →
-            </span>
-          </Link>
-        </div>
+  // Concierge entry card — shown at the top of Home for concierge orgs. The
+  // chat drawer is the canonical surface (menu selection, messages); this just
+  // opens it.
+  const conciergeEntryCard = dashboard.tier === "concierge" ? (
+    <button
+      onClick={() => setShowConciergeChat(true)}
+      className="w-full text-left relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 px-5 py-4 flex items-center gap-4 hover:bg-zinc-900 transition-colors"
+      data-tour="tour-concierge"
+    >
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-16 -right-12 h-40 w-40 rounded-full bg-emerald-500/20 blur-3xl" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+      </div>
+      <div className="relative w-10 h-10 rounded-full bg-white/10 flex items-center justify-center overflow-hidden shrink-0">
+        {dashboard.conciergePersona?.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={dashboard.conciergePersona.avatarUrl}
+            alt={dashboard.conciergePersona.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <Sparkles className="w-5 h-5 text-emerald-400" />
+        )}
+      </div>
+      <div className="relative min-w-0 flex-1">
+        <h3 className="text-sm font-semibold text-white">
+          {pendingMenu
+            ? `Your ${pendingMenu.month ? new Date(`${pendingMenu.month}-01T12:00:00Z`).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : "new"} menu is ready`
+            : "Your concierge"}
+        </h3>
+        <p className="text-xs text-zinc-400 truncate">
+          {pendingMenu
+            ? "Tap to pick the event you'd like us to run."
+            : "Message your concierge — ideas, questions, dates."}
+        </p>
+      </div>
+      {conciergeUnread > 0 && (
+        <span className="relative shrink-0 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full leading-none">
+          {conciergeUnread}
+        </span>
       )}
+      <MessageCircle className="relative w-5 h-5 text-zinc-500 shrink-0" />
+    </button>
+  ) : null;
 
-      {/* Leaf app connection banner (owners and co-hosts) */}
+  const homeTopSlot = (
+    <div className="space-y-3 mb-4 empty:mb-0 empty:hidden">
+      {conciergeEntryCard}
       {!leafAppConnected && (
-        <div className="max-w-5xl mx-auto px-6 pt-4">
-          <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <Smartphone className="w-4 h-4 text-amber-600 shrink-0" />
-            <p className="text-xs text-amber-800 flex-1">
-              <span className="font-medium">Connect to Leaf app</span> to manage plans, chat with attendees, and get RSVP notifications.
-            </p>
-            <button
-              onClick={() => setShowPhoneModal(true)}
-              className="text-xs font-medium text-amber-700 hover:text-amber-900 underline shrink-0"
-            >
-              Connect now
-            </button>
-          </div>
+        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <Smartphone className="w-4 h-4 text-amber-600 shrink-0" />
+          <p className="text-xs text-amber-800 flex-1">
+            <span className="font-medium">Connect to Leaf app</span> to manage plans, chat with attendees, and get RSVP notifications.
+          </p>
+          <button
+            onClick={() => setShowPhoneModal(true)}
+            className="text-xs font-medium text-amber-700 hover:text-amber-900 underline shrink-0"
+          >
+            Connect now
+          </button>
         </div>
       )}
       {phoneJustVerified && leafAppConnected && (
-        <div className="max-w-5xl mx-auto px-6 pt-4">
-          <div className="flex items-center gap-3 px-4 py-3 bg-green-50 border border-green-200 rounded-lg">
-            <Check className="w-4 h-4 text-green-600 shrink-0" />
-            <p className="text-xs text-green-800 flex-1">
-              <span className="font-medium">Connected to Leaf app</span>
-            </p>
-            <button
-              onClick={() => setPhoneJustVerified(false)}
-              className="text-xs text-green-600 hover:text-green-800 shrink-0"
-            >
-              Dismiss
-            </button>
-          </div>
+        <div className="flex items-center gap-3 px-4 py-3 bg-green-50 border border-green-300 rounded-xl">
+          <Check className="w-4 h-4 text-emerald-700 shrink-0" />
+          <p className="text-xs text-emerald-800 flex-1">
+            <span className="font-medium">Connected to Leaf app</span>
+          </p>
+          <button
+            onClick={() => setPhoneJustVerified(false)}
+            className="text-xs text-emerald-700 hover:text-emerald-800 shrink-0"
+          >
+            Dismiss
+          </button>
         </div>
       )}
+      {dashboard.rsvpLimit !== null && dashboard.rsvpsThisMonth >= 40 && (
+        <div className={`border rounded-xl p-4 flex items-start gap-3 ${
+          dashboard.rsvpsThisMonth >= dashboard.rsvpLimit
+            ? "border-red-200 bg-red-50"
+            : "border-amber-200 bg-amber-50"
+        }`}>
+          <div className="flex-1">
+            <p className={`text-sm font-medium ${
+              dashboard.rsvpsThisMonth >= dashboard.rsvpLimit ? "text-red-900" : "text-amber-900"
+            }`}>
+              {dashboard.rsvpsThisMonth >= dashboard.rsvpLimit
+                ? "You've hit this month's RSVP limit."
+                : "You're near this month's RSVP limit."}
+            </p>
+            <p className={`text-xs mt-0.5 ${
+              dashboard.rsvpsThisMonth >= dashboard.rsvpLimit ? "text-red-700" : "text-amber-700"
+            }`}>
+              {dashboard.rsvpsThisMonth}/{dashboard.rsvpLimit} RSVPs used. Upgrade to Pro for unlimited — resets on the 1st.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowSubscription(true)}
+            className="bg-zinc-900 text-white px-3 py-1.5 text-xs font-semibold rounded-full hover:bg-zinc-800 transition-colors shrink-0"
+          >
+            Upgrade
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        {/* ──────── OVERVIEW TAB ──────── */}
-        {activeTab === "overview" && (
-          <div className="space-y-8">
-            {/* Concierge — compact entry card. The chat drawer is the canonical
-                surface (menu selection, messages); this just opens it. */}
-            {dashboard.tier === "concierge" && (
-              <button
-                onClick={() => setShowConciergeChat(true)}
-                className="w-full text-left relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 px-5 py-4 flex items-center gap-4 hover:bg-zinc-900 transition-colors"
-                data-tour="tour-concierge"
-              >
-                <div aria-hidden className="pointer-events-none absolute inset-0">
-                  <div className="absolute -top-16 -right-12 h-40 w-40 rounded-full bg-emerald-500/20 blur-3xl" />
-                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                </div>
-                <div className="relative w-10 h-10 rounded-full bg-white/10 flex items-center justify-center overflow-hidden shrink-0">
-                  {dashboard.conciergePersona?.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={dashboard.conciergePersona.avatarUrl}
-                      alt={dashboard.conciergePersona.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <Sparkles className="w-5 h-5 text-emerald-400" />
-                  )}
-                </div>
-                <div className="relative min-w-0 flex-1">
-                  <h3 className="text-sm font-semibold text-white">
-                    {pendingMenu
-                      ? `Your ${pendingMenu.month ? new Date(`${pendingMenu.month}-01T12:00:00Z`).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : "new"} menu is ready`
-                      : "Your concierge"}
-                  </h3>
-                  <p className="text-xs text-zinc-400 truncate">
-                    {pendingMenu
-                      ? "Tap to pick the event you'd like us to run."
-                      : "Message your concierge — ideas, questions, dates."}
-                  </p>
-                </div>
-                {conciergeUnread > 0 && (
-                  <span className="relative shrink-0 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full leading-none">
-                    {conciergeUnread}
-                  </span>
-                )}
-                <MessageCircle className="relative w-5 h-5 text-zinc-500 shrink-0" />
-              </button>
-            )}
+  const lockedPanel = (label: string) => (
+    <div className="border border-zinc-200 rounded-xl p-10 text-center">
+      <Lock className="w-5 h-5 text-zinc-300 mx-auto mb-3" />
+      <p className="text-sm font-medium text-zinc-900 mb-1">{label} is a Pro feature</p>
+      <p className="text-xs text-zinc-500 mb-4">
+        Upgrade to unlock analytics, the marketplace, and unlimited RSVPs.
+      </p>
+      <button
+        onClick={() => setShowSubscription(true)}
+        className="px-5 py-2.5 bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
+      >
+        Upgrade
+      </button>
+    </div>
+  );
 
-            {/* Pending Host Requests */}
-            {dashboard.hostRequests && dashboard.hostRequests.length > 0 && (
-              <section className="border border-amber-200 bg-amber-50/50 rounded-xl p-6">
-                <h2 className="text-sm font-bold uppercase tracking-widest text-amber-600 mb-4">
-                  Pending Host Requests ({dashboard.hostRequests.length})
-                </h2>
-                <div className="space-y-4">
-                  {dashboard.hostRequests.map((req) => (
-                    <div key={req.planId} className="flex items-start gap-4 bg-white border border-zinc-200 rounded-lg p-4">
-                      {req.image && (
-                        <img src={req.image} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-zinc-900 truncate">{req.title}</p>
-                        <p className="text-xs text-zinc-500 mt-0.5">
-                          <strong>{req.requesterName}</strong>
-                          {req.requesterPhone && <> &middot; {req.requesterPhone}</>}
-                          {req.calendarName && <> &middot; {req.calendarName}</>}
-                        </p>
-                        {req.requestedDate && (
-                          <p className="text-xs text-zinc-400 mt-0.5">
-                            <Clock className="w-3 h-3 inline mr-1" />
-                            {new Date(req.requestedDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                          </p>
-                        )}
-                        {req.requestedNote && (
-                          <p className="text-xs text-zinc-400 italic mt-1 truncate">&ldquo;{req.requestedNote}&rdquo;</p>
-                        )}
-                        {req.requestedVenue && (
-                          <p className="text-xs text-zinc-400 mt-0.5">{req.requestedVenue.name}</p>
-                        )}
-                      </div>
-                      <div className="flex gap-2 flex-shrink-0">
-                        <button
-                          onClick={async () => {
-                            try {
-                              await Parse.Cloud.run("approveHostRequest", { calendarPlanId: req.planId });
-                              setDashboard((d) => d ? { ...d, hostRequests: d.hostRequests.filter((r) => r.planId !== req.planId) } : d);
-                            } catch (err) {
-                              console.error("Failed to approve:", err);
-                            }
-                          }}
-                          className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-emerald-700 transition-colors"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => {
-                            const d = req.requestedDate ? new Date(req.requestedDate) : null;
-                            const pad = (n: number) => String(n).padStart(2, "0");
-                            setCreatePlanPrefill({
-                              title: req.title,
-                              description: req.description || "",
-                              venue: req.requestedVenue ? { name: req.requestedVenue.name, address: req.requestedVenue.address, placeId: req.requestedVenue.placeId ?? null } : null,
-                              date: d ? `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` : "",
-                              time: d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : "",
-                              capacity: req.requestedCapacity != null ? String(req.requestedCapacity) : "",
-                              imageUrl: req.image || null,
-                              requireApproval: req.requestedRequireApproval,
-                            });
-                            setEditingHostRequestId(req.planId);
-                            setEditingHostRequestCalendarId(req.calendarId);
-                            setShowCreatePlanModal(true);
-                          }}
-                          className="px-3 py-1.5 bg-white text-zinc-700 text-xs font-bold uppercase tracking-widest rounded-lg border border-zinc-300 hover:bg-zinc-50 transition-colors"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={async () => {
-                            try {
-                              await Parse.Cloud.run("declineHostRequest", { calendarPlanId: req.planId });
-                              setDashboard((d) => d ? { ...d, hostRequests: d.hostRequests.filter((r) => r.planId !== req.planId) } : d);
-                            } catch (err) {
-                              console.error("Failed to decline:", err);
-                            }
-                          }}
-                          className="px-3 py-1.5 bg-white text-zinc-600 text-xs font-bold uppercase tracking-widest rounded-lg border border-zinc-300 hover:bg-zinc-50 transition-colors"
-                        >
-                          Decline
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+  // ── Render ──
 
-            {/* Pending Attendance Requests */}
-            {dashboard.pendingRsvpRequests && dashboard.pendingRsvpRequests.length > 0 && (
-              <section className="border border-amber-200 bg-amber-50/50 rounded-xl p-6">
-                <h2 className="text-sm font-bold uppercase tracking-widest text-amber-600 mb-4">
-                  Pending Attendance Requests ({dashboard.pendingRsvpRequests.length})
-                </h2>
-                <div className="space-y-4">
-                  {dashboard.pendingRsvpRequests.map((req) => (
-                    <div key={req.notificationId} className="flex items-start gap-4 bg-white border border-zinc-200 rounded-lg p-4">
-                      {req.planImage && (
-                        <img src={req.planImage} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-zinc-900 truncate">{req.planTitle}</p>
-                        <p className="text-xs text-zinc-500 mt-0.5">
-                          <strong>{req.name}</strong>
-                          {req.phone && <> &middot; {req.phone}</>}
-                        </p>
-                        {req.rsvpNote && (
-                          <p className="text-xs text-zinc-400 italic mt-1 truncate">&ldquo;{req.rsvpNote}&rdquo;</p>
-                        )}
-                        {req.requestedAt && (
-                          <p className="text-xs text-zinc-400 mt-0.5">
-                            <Clock className="w-3 h-3 inline mr-1" />
-                            {new Date(req.requestedAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex gap-2 flex-shrink-0">
-                        <button
-                          onClick={async () => {
-                            try {
-                              await Parse.Cloud.run("approveRsvpRequest", { notificationId: req.notificationId });
-                              setDashboard((d) => d ? { ...d, pendingRsvpRequests: d.pendingRsvpRequests.filter((r) => r.notificationId !== req.notificationId) } : d);
-                            } catch (err) {
-                              console.error("Failed to approve:", err);
-                            }
-                          }}
-                          className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-emerald-700 transition-colors"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={async () => {
-                            try {
-                              await Parse.Cloud.run("declineRsvpRequest", { notificationId: req.notificationId });
-                              setDashboard((d) => d ? { ...d, pendingRsvpRequests: d.pendingRsvpRequests.filter((r) => r.notificationId !== req.notificationId) } : d);
-                            } catch (err) {
-                              console.error("Failed to decline:", err);
-                            }
-                          }}
-                          className="px-3 py-1.5 bg-white text-zinc-600 text-xs font-bold uppercase tracking-widest rounded-lg border border-zinc-300 hover:bg-zinc-50 transition-colors"
-                        >
-                          Decline
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+  return (
+    <div className="min-h-screen bg-white lg:flex">
+      {/* Desktop sidebar */}
+      <DashboardSidebar
+        orgName={dashboard.name}
+        tierLabel={tierLabel}
+        logoUrl={dashboard.profilePhoto}
+        activeTab={activeTab}
+        needsYouCount={needsYouCount}
+        inboxUnread={inboxUnread}
+        calendars={dashboard.calendars}
+        selectedCalendarId={
+          calendarsSelectedId ||
+          dashboard.calendars.find((c) => c.isPrimary)?.objectId ||
+          null
+        }
+        isOwner={dashboard.isOwner}
+        onNavigate={setTab}
+        onSelectCalendar={(id) => {
+          setCalendarsSelectedId(id);
+          setTab("calendars");
+        }}
+        onAddCalendar={() => {
+          const atLimit = !!(dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit);
+          if (atLimit) setShowSubscription(true);
+          else setShowAddCalendar(true);
+        }}
+        onLogout={handleLogout}
+      />
 
-            {/* Name & Description */}
-            <section className="border border-zinc-200 rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-                  Organization Details
-                </h2>
-                {!editName ? (
-                  <button
-                    onClick={() => setEditName(true)}
-                    className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors"
-                  >
-                    <Pencil className="w-3.5 h-3.5" /> Edit
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => { setEditName(false); setNameValue(dashboard.name); setDescValue(dashboard.description); }}
-                      className="text-xs text-zinc-500 hover:text-zinc-900"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSaveOverview}
-                      disabled={saving}
-                      className="flex items-center gap-1 text-xs bg-zinc-900 text-white px-3 py-1.5 rounded-lg hover:bg-zinc-800 disabled:opacity-50"
-                    >
-                      {saving ? "Saving..." : "Save"}
-                    </button>
-                  </div>
-                )}
-              </div>
-              {editName ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name</label>
-                    <input
-                      value={nameValue}
-                      onChange={(e) => setNameValue(e.target.value)}
-                      className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
-                    <textarea
-                      value={descValue}
-                      onChange={(e) => setDescValue(e.target.value)}
-                      rows={3}
-                      className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-none"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <h3 className="text-xl font-light tracking-tight mb-1">{dashboard.name}</h3>
-                  <p className="text-sm text-zinc-500">{dashboard.description || "No description"}</p>
-                </div>
-              )}
-            </section>
+      {/* Content column */}
+      <div className="flex-1 min-w-0 flex flex-col pb-24 lg:pb-0">
+        {/* Concierge state banner (renders only when relevant) */}
+        <ConciergeDashboardBanner calendarId={calendarId} />
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: "Followers", value: dashboard.followerCount },
-                { label: "Calendars", value: dashboard.calendars.length },
-                {
-                  label: dashboard.rsvpLimit ? "RSVPs (this mo.)" : "Plan RSVPs",
-                  value: dashboard.rsvpLimit
-                    ? `${dashboard.rsvpsThisMonth}/${dashboard.rsvpLimit}`
-                    : dashboard.totalRsvpCount,
-                },
-                { label: "Upcoming Plans", value: dashboard.upcomingPlanCount },
-              ].map((stat) => (
-                <div key={stat.label} className="border border-zinc-200 rounded-xl p-4">
-                  <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1">{stat.label}</p>
-                  <p className="text-2xl font-light">{stat.value}</p>
-                </div>
-              ))}
+        {/* Mobile header */}
+        <header className="lg:hidden border-b border-zinc-100 px-4 py-3.5 flex items-center gap-3">
+          {dashboard.profilePhoto ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={dashboard.profilePhoto}
+              alt=""
+              className="w-[30px] h-[30px] rounded-lg object-cover shrink-0"
+            />
+          ) : (
+            <div className="w-[30px] h-[30px] rounded-lg bg-zinc-200 flex items-center justify-center shrink-0">
+              <span className="text-xs font-semibold text-zinc-500">
+                {dashboard.name.charAt(0).toUpperCase()}
+              </span>
             </div>
-
-            {/* Upcoming plans across all calendars */}
-            {(() => {
-              const upcoming = dashboard.calendars
-                .flatMap((c) => ((c as Record<string, unknown>).activePlans as CalActivePlan[]) || [])
-                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-              if (upcoming.length === 0) return null;
-              return (
-                <section>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Upcoming Plans</h3>
-                    <button
-                      onClick={() => setActiveTab("calendars")}
-                      className="text-xs uppercase tracking-widest font-bold text-zinc-400 hover:text-zinc-900 transition-colors"
-                    >
-                      See all
-                    </button>
-                  </div>
-                  <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mr-6 pr-6 pb-2 no-scrollbar">
-                    {upcoming.slice(0, 12).map((plan) => (
-                      // Card wrapper is now a div (was a button) so the
-                      // hover overlay can nest its own action buttons —
-                      // <button> inside <button> is invalid HTML and
-                      // gives keyboard-nav weirdness. Card body still
-                      // opens the detail modal on click via role=button;
-                      // touch users get the same behavior since the
-                      // hover overlay is hidden on non-hover devices.
-                      <div
-                        key={plan.objectId}
-                        className="group relative text-left border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 snap-start basis-[220px] sm:basis-[240px] md:basis-[260px] cursor-pointer"
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelectedActivePlan(plan)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setSelectedActivePlan(plan);
-                          }
-                        }}
-                      >
-                        {plan.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={plan.image} alt={plan.title} className="w-full h-28 object-cover" />
-                        ) : (
-                          <div className="w-full h-28 bg-zinc-100 flex items-center justify-center">
-                            <Calendar className="w-6 h-6 text-zinc-300" />
-                          </div>
-                        )}
-                        <div className="p-3">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            {plan.isPoll && (
-                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-widest px-1 py-0.5 rounded bg-zinc-900 text-white shrink-0">
-                                <Vote className="w-2.5 h-2.5" /> Poll
-                              </span>
-                            )}
-                            <h4 className="font-medium text-sm truncate">{plan.title}</h4>
-                          </div>
-                          <p className="text-xs text-zinc-400 mb-1">
-                            {new Date(plan.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                          </p>
-                          <div className="flex items-center justify-between text-xs text-zinc-400">
-                            <span className="truncate">
-                              {plan.isVirtualHost ? (
-                                <>Organized by {plan.hostName}</>
-                              ) : plan.leafHostState === "leaf_hosted" ? (
-                                <>Hosted by Leaf{plan.leafHostPersona?.name ? ` · ${plan.leafHostPersona.name}` : ""}</>
-                              ) : plan.leafHostState === "leaf_arranging" ? (
-                                <>Leaf is arranging this</>
-                              ) : (
-                                <>Hosted by {plan.hostName}</>
-                              )}
-                            </span>
-                            <span className="shrink-0 ml-2">
-                              {plan.isPoll ? `${plan.pollVoteCount ?? 0} votes` : `${plan.rsvpCount} RSVPs`}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Hover overlay — two-action panel appears over
-                            the cover image on pointer-hover. Kept off
-                            touch entirely (opacity + pointer-events
-                            gate) so a tap doesn't get an accidental
-                            overlay before the detail-modal open fires. */}
-                        <div className="absolute inset-x-0 top-0 h-28 bg-zinc-900/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none group-hover:pointer-events-auto">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedActivePlan(plan);
-                            }}
-                            className="inline-flex items-center gap-1.5 bg-white text-zinc-900 text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-zinc-50 transition-colors"
-                          >
-                            <Calendar className="w-3.5 h-3.5" />
-                            Details
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setChatPlanId(plan.objectId);
-                            }}
-                            className="inline-flex items-center gap-1.5 bg-white text-zinc-900 text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-zinc-50 transition-colors"
-                          >
-                            <MessageCircle className="w-3.5 h-3.5" />
-                            Chat
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              );
-            })()}
-
-            {dashboard.rsvpLimit !== null && dashboard.rsvpsThisMonth >= 40 && (
-              <div className={`border rounded-xl p-4 flex items-start gap-3 ${
-                dashboard.rsvpsThisMonth >= dashboard.rsvpLimit
-                  ? "border-red-200 bg-red-50"
-                  : "border-amber-200 bg-amber-50"
-              }`}>
-                <div className="flex-1">
-                  <p className={`text-sm font-medium ${
-                    dashboard.rsvpsThisMonth >= dashboard.rsvpLimit ? "text-red-900" : "text-amber-900"
-                  }`}>
-                    {dashboard.rsvpsThisMonth >= dashboard.rsvpLimit
-                      ? "You've hit this month's RSVP limit."
-                      : "You're near this month's RSVP limit."}
-                  </p>
-                  <p className={`text-xs mt-0.5 ${
-                    dashboard.rsvpsThisMonth >= dashboard.rsvpLimit ? "text-red-700" : "text-amber-700"
-                  }`}>
-                    {dashboard.rsvpsThisMonth}/{dashboard.rsvpLimit} RSVPs used. Upgrade to Pro for unlimited — resets on the 1st.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowSubscription(true)}
-                  className="bg-zinc-900 text-white px-3 py-1.5 text-xs font-semibold rounded-full hover:bg-zinc-800 transition-colors shrink-0"
-                >
-                  Upgrade
-                </button>
-              </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-zinc-900 truncate">
+              {dashboard.name}
+            </p>
+            <p className="text-[10px] text-zinc-400">{tierLabel} Plan · all calendars</p>
+          </div>
+          <Link
+            href="/inbox"
+            aria-label={`Inbox${inboxUnread > 0 ? ` (${inboxUnread} unread)` : ""}`}
+            className="relative w-8 h-8 border border-zinc-200 rounded-[9px] flex items-center justify-center text-zinc-500"
+          >
+            <Mail className="w-4 h-4" />
+            {inboxUnread > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500" />
             )}
+          </Link>
+        </header>
 
-            {/* Recent Photos — attendee uploads from past plans */}
-            {dashboard.recentPhotos && dashboard.recentPhotos.length > 0 && (
-              <section>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
-                    Recent Photos
-                  </h3>
-                  <button
-                    onClick={() => { setActiveTab("calendars"); setCalendarsSelectedId(calendarId); setManagePlansCalId(calendarId); }}
-                    className="text-xs uppercase tracking-widest font-bold text-zinc-400 hover:text-zinc-900 transition-colors"
-                  >
-                    See all
-                  </button>
-                </div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 [&>*:nth-child(n+4)]:hidden sm:[&>*:nth-child(-n+4)]:block sm:[&>*:nth-child(n+5)]:hidden md:[&>*:nth-child(-n+6)]:block md:[&>*:nth-child(n+7)]:hidden">
-                  {dashboard.recentPhotos.slice(0, 6).map((photo) =>
-                    photo.url ? (
+        <main className="flex-1 min-w-0">
+          {/* ──────── HOME ──────── */}
+          {activeTab === "home" && (
+            <HomeTab
+              dashboard={dashboard}
+              analytics={analytics}
+              view={homeView}
+              onViewChange={changeHomeView}
+              publishBanner={publishBanner}
+              topSlot={homeTopSlot}
+              onNewPlan={openNewPlan}
+              onOpenPlan={(plan) => setSelectedActivePlan(plan)}
+              onGoCommunity={goCommunity}
+              onApproveHostRequest={approveHostRequest}
+              onDeclineHostRequest={declineHostRequest}
+              onEditHostRequest={editHostRequest}
+              onApproveRsvp={approveRsvpRequest}
+              onDeclineRsvp={declineRsvpRequest}
+              onApproveFollower={approveFollower}
+              onRejectFollower={rejectFollower}
+              eventApprovalsCount={eventApprovals.length}
+              eventApprovalsHref={`/dashboard/${calendarId}/calendars/${calendarId}/edit`}
+            />
+          )}
+          {/* ──────── CALENDARS ──────── */}
+          {activeTab === "calendars" && (() => {
+            const cals = dashboard.calendars;
+            const selectedCal =
+              cals.find((c) => c.objectId === calendarsSelectedId) ||
+              cals.find((c) => c.isConciergeServiced) ||
+              cals.find((c) => c.isPrimary) ||
+              cals[0];
+            if (!selectedCal) return null;
+            const cal = selectedCal;
+            const inactive = cal.isActive === false;
+            return (
+              <div>
+                {/* Calendar header */}
+                <div className="px-4 sm:px-6 lg:px-8 py-4 lg:py-5 border-b border-zinc-100 flex flex-wrap items-center gap-3">
+                  {cal.calendarImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={cal.calendarImage} alt={cal.name} className="w-9 h-9 rounded-[9px] object-cover shrink-0" />
+                  ) : (
+                    <div className="w-9 h-9 rounded-[9px] bg-zinc-100 flex items-center justify-center shrink-0">
+                      <Calendar className="w-4 h-4 text-zinc-300" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-[180px]">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <a
-                        key={photo.objectId}
-                        href={photo.url}
+                        href={`/org/${cal.shareId}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        title={`${photo.eventTitle} · ${photo.uploaderName}`}
-                        className="block aspect-square rounded-lg overflow-hidden bg-zinc-100 group relative"
+                        className={`text-base lg:text-lg font-semibold tracking-[-0.01em] hover:underline ${inactive ? "text-zinc-400" : "text-zinc-900"}`}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={photo.url}
-                          alt={`Photo from ${photo.eventTitle}`}
-                          className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
-                        />
+                        {cal.name}
                       </a>
-                    ) : null
-                  )}
-                </div>
-              </section>
-            )}
-
-            {/* Concierge post-event reports — attendee feedback + recaps. */}
-            {dashboard.tier === "concierge" && (
-              <ConciergeEventReports calendarId={calendarId} />
-            )}
-
-            {/* Concierge upsell — hidden once the calendar is already on the
-                Concierge tier (server reverts tier on cancellation, so this
-                also re-appears if they churn). */}
-            {dashboard.tier !== "concierge" && (
-              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-xl shadow-black/40">
-                {/* Layered ambient background — dark base + an emerald glow
-                    bleeding from the top-right, a faint cool glow bottom-left
-                    for depth, and a hairline sheen along the top edge. */}
-                <div aria-hidden className="pointer-events-none absolute inset-0">
-                  <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black" />
-                  {/* Full-bleed photo behind the whole card, darkened so the
-                      copy layered on top stays legible. */}
-                  <div className="absolute inset-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="https://images.unsplash.com/photo-1545315003-c5ad6226c272?w=1600&q=70&auto=format&fit=crop"
-                      alt=""
-                      className="h-full w-full object-cover object-[center_30%] opacity-60"
-                    />
-                    {/* Even dark scrim so the copy reads across the full width. */}
-                    <div className="absolute inset-0 bg-zinc-950/70" />
-                    <div className="absolute inset-0 bg-black/40" />
+                      {cal.isPrimary && (
+                        <span className="px-2 py-[3px] bg-zinc-100 text-zinc-600 rounded-[5px] text-[9px] font-semibold tracking-[0.1em] uppercase">
+                          Primary
+                        </span>
+                      )}
+                      {cal.role === "Host" && (
+                        <span className="px-2 py-[3px] bg-emerald-50 text-emerald-700 rounded-[5px] text-[9px] font-semibold tracking-[0.1em] uppercase">
+                          Co-host
+                        </span>
+                      )}
+                      {inactive && (
+                        <span className="px-2 py-[3px] bg-amber-100 text-amber-700 rounded-[5px] text-[9px] font-semibold tracking-[0.1em] uppercase">
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-0.5">{cal.city || "No city set"}</p>
                   </div>
-                  <div className="absolute -top-24 -right-16 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl" />
-                  <div className="absolute -bottom-24 -left-12 h-56 w-56 rounded-full bg-sky-500/10 blur-3xl" />
-                  {/* Fine film-grain texture for an editorial, tactile finish. */}
-                  <div
-                    className="absolute inset-0 opacity-[0.18] mix-blend-overlay"
-                    style={{
-                      backgroundImage:
-                        "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-                    }}
-                  />
-                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
-                </div>
-
-                <div className="relative">
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <h3 className="text-lg font-semibold tracking-tight text-white">We&apos;ll run your events for you</h3>
-                    <span className="shrink-0 bg-emerald-500 text-black text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full">New</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {inactive ? (
+                      <button
+                        onClick={() => setShowSubscription(true)}
+                        className="inline-flex items-center gap-1.5 h-9 px-4 bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
+                      >
+                        <Lock className="w-3.5 h-3.5" /> Upgrade to reactivate
+                      </button>
+                    ) : (
+                      <>
+                        {cal.isConciergeServiced && (
+                          <button
+                            onClick={() => setShowConciergeChat(true)}
+                            className="relative inline-flex items-center gap-1.5 h-9 px-3.5 border border-zinc-200 text-zinc-600 rounded-full text-xs font-medium hover:border-zinc-300 transition-colors"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" /> Concierge
+                            {conciergeUnread > 0 && (
+                              <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[16px] text-center">
+                                {conciergeUnread}
+                              </span>
+                            )}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            const url = `${window.location.origin}/org/${cal.shareId}`;
+                            navigator.clipboard.writeText(url);
+                            setToast("Link copied!");
+                            setTimeout(() => setToast(null), 2000);
+                          }}
+                          className="inline-flex items-center gap-1.5 h-9 px-3.5 border border-zinc-200 text-zinc-600 rounded-full text-xs font-medium hover:border-zinc-300 transition-colors"
+                        >
+                          <Link2 className="w-3.5 h-3.5" /> Copy link
+                        </button>
+                        <button
+                          onClick={() => setEmbedCalId(embedCalId === cal.objectId ? null : cal.objectId)}
+                          title="Get embed code"
+                          className="hidden sm:inline-flex items-center gap-1.5 h-9 px-3.5 border border-zinc-200 text-zinc-600 rounded-full text-xs font-medium hover:border-zinc-300 transition-colors"
+                        >
+                          <Code className="w-3.5 h-3.5" /> Embed
+                        </button>
+                        <Link
+                          href={`/org/${cal.shareId}/promote?org=${calendarId}`}
+                          title="Promote — print flyers and door hangers"
+                          className="hidden sm:inline-flex items-center gap-1.5 h-9 px-3.5 border border-zinc-200 text-zinc-600 rounded-full text-xs font-medium hover:border-emerald-300 hover:text-emerald-700 transition-colors"
+                        >
+                          <Megaphone className="w-3.5 h-3.5" /> Promote
+                        </Link>
+                        <Link
+                          href={`/dashboard/${calendarId}/calendars/${cal.objectId}/edit`}
+                          className="inline-flex items-center gap-1.5 h-9 px-3.5 border border-zinc-200 text-zinc-600 rounded-full text-xs font-medium hover:border-zinc-300 transition-colors"
+                        >
+                          <Pencil className="w-3 h-3" /> Edit
+                        </Link>
+                      </>
+                    )}
                   </div>
-                  <p className="text-sm text-zinc-400 leading-relaxed mb-4">
-                    Don&apos;t have time to plan, post, and show up? Bring on a dedicated host to run your calendar and host plans on behalf of your community. From $499/mo.
-                  </p>
-                  <ul className="space-y-2 mb-5 list-disc list-inside marker:text-emerald-500/60">
-                    <li className="text-xs text-zinc-400 leading-relaxed"><strong className="text-zinc-100">Plans posted for you</strong> — your host drafts, schedules, and publishes plans to your calendar on a steady cadence.</li>
-                    <li className="text-xs text-zinc-400 leading-relaxed"><strong className="text-zinc-100">Hosted on your behalf</strong> — a real person shows up, greets attendees, and represents your community at every gathering.</li>
-                    <li className="text-xs text-zinc-400 leading-relaxed"><strong className="text-zinc-100">RSVP &amp; chat management</strong> — from approvals to day-of reminders, your host handles the back-and-forth so you don&apos;t have to.</li>
-                  </ul>
-                  <a href="https://calendar.app.google/NCUYc6LUKSiwLUa67" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-200 transition-colors">
-                    Book a demo
-                  </a>
                 </div>
-              </div>
-            )}
 
-          </div>
-        )}
-
-        {/* ──────── ANALYTICS TAB ──────── */}
-        {/* Lazily loaded — see the `AnalyticsTab` dynamic import at the top of
-            this file. State stays here so the fetch lifecycle is independent of
-            when the chunk lands. */}
-        {activeTab === "analytics" && isPaid && (
-          <AnalyticsTab
-            analytics={analytics}
-            loading={analyticsLoading}
-            error={analyticsError}
-            range={analyticsRange}
-            onRangeChange={setAnalyticsRange}
-            calendars={dashboard.calendars}
-            calFilter={analyticsCalFilter}
-            onCalFilterChange={setAnalyticsCalFilter}
-            dismissedInsights={dismissedInsights}
-            onDismissInsight={dismissInsight}
-          />
-        )}
-
-
-        {/* ──────── CALENDARS TAB (3-panel: list · concierge chat · plans) ──────── */}
-        {activeTab === "calendars" && (() => {
-          const cals = dashboard.calendars;
-          const selectedCal =
-            cals.find((c) => c.objectId === calendarsSelectedId) ||
-            cals.find((c) => c.isConciergeServiced) ||
-            cals.find((c) => c.isPrimary) ||
-            cals[0];
-          return (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-                Calendars ({dashboard.calendars.length}{dashboard.calendarLimit ? `/${dashboard.calendarLimit}` : ""})
-              </h2>
-            </div>
-            <div className="grid grid-cols-1 gap-4 items-start lg:grid-cols-[260px_minmax(0,1fr)]">
-              {selectedCal && (() => {
-                const cal = selectedCal;
-                const inactive = cal.isActive === false;
-                const listPanel = (
-                  <div className="border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden">
+                <div className="px-4 sm:px-6 lg:px-8 py-5 space-y-4">
+                  {/* Mobile calendar switcher — the sidebar owns this on
+                      desktop. */}
+                  <div className="lg:hidden flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4">
                     {cals.map((c) => {
-                      const isSel = selectedCal?.objectId === c.objectId;
-                      const off = c.isActive === false;
+                      const sel = c.objectId === cal.objectId;
                       return (
                         <button
                           key={c.objectId}
                           onClick={() => setCalendarsSelectedId(c.objectId)}
-                          className={`w-full text-left px-3 py-2.5 flex items-center gap-2.5 transition-colors hover:bg-zinc-50 focus:outline-none ${isSel ? "bg-zinc-50" : ""} ${off ? "opacity-60" : ""}`}
+                          className={`px-3.5 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                            sel
+                              ? "bg-zinc-900 text-white"
+                              : "border border-zinc-200 text-zinc-600"
+                          } ${c.isActive === false ? "opacity-60" : ""}`}
                         >
-                          {c.calendarImage ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={c.calendarImage} alt={c.name} className="w-8 h-8 rounded-lg object-cover shrink-0" />
-                          ) : (
-                            <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0">
-                              <Calendar className="w-4 h-4 text-zinc-300" />
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm font-medium text-zinc-900 truncate">{c.name}</span>
-                            </div>
-                            <div className="text-[11px] text-zinc-400 truncate">
-                              {c.isPrimary ? "Primary · " : ""}{c.city || "No city set"}
-                            </div>
-                          </div>
-                          {c.isConciergeServiced && conciergeUnread > 0 ? (
-                            <span className="bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[16px] text-center shrink-0">
-                              {conciergeUnread}
-                            </span>
-                          ) : isSel ? (
-                            <span className="w-1.5 h-1.5 rounded-full bg-zinc-900 shrink-0" />
-                          ) : null}
+                          {c.name}
                         </button>
                       );
                     })}
+                    {dashboard.isOwner && (
+                      <button
+                        onClick={() => {
+                          const atLimit = !!(dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit);
+                          if (atLimit) setShowSubscription(true);
+                          else setShowAddCalendar(true);
+                        }}
+                        className="px-3.5 py-2 rounded-full text-xs font-medium whitespace-nowrap border border-dashed border-zinc-300 text-zinc-500"
+                      >
+                        + New
+                      </button>
+                    )}
                   </div>
-                );
-                return (
-                  <>
-                  {/* LEFT — calendar list + add-calendar */}
-                  <div className="space-y-3 min-w-0">
-                    {listPanel}
-                    {dashboard.isOwner && (() => {
-                      // Only the org owner can add sub-calendars. Co-hosts
-                      // see the calendar list without the Create affordance
-                      // — creating a new calendar changes the org's billing
-                      // footprint and shouldn't be a co-host decision.
-                      const atLimit = !!(dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit);
-                      // Free plan has calendarLimit=1, so their first
-                      // (primary) calendar always trips this. Route the
-                      // click to the subscription modal instead of the
-                      // Create modal so we don't dead-end them.
-                      if (atLimit) {
-                        return (
-                          <button
-                            onClick={() => setShowSubscription(true)}
-                            className="w-full flex items-center justify-center gap-2 border border-dashed border-zinc-300 text-zinc-500 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest hover:border-zinc-400 hover:text-zinc-900 transition-colors"
-                          >
-                            <Lock className="w-3.5 h-3.5" /> Upgrade to add more calendars
-                          </button>
-                        );
-                      }
-                      return (
+
+                  {embedCalId === cal.objectId && (
+                    <div className="border border-zinc-200 rounded-xl p-4">
+                      <p className="text-[10px] font-semibold tracking-[0.14em] uppercase text-zinc-500 mb-2">Embed on your website</p>
+                      <p className="text-xs text-zinc-500 mb-3">Copy this code and paste it into your website&apos;s HTML to show upcoming events.</p>
+                      <div className="relative">
+                        <pre className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 pr-20 text-xs text-zinc-600 overflow-x-auto whitespace-pre-wrap break-all">{`<iframe src="${typeof window !== "undefined" ? window.location.origin : ""}/embed/${cal.shareId}" width="100%" height="400" frameborder="0" style="border:none;border-radius:12px;"></iframe>`}</pre>
                         <button
-                          onClick={() => setShowAddCalendar(true)}
-                          className="w-full flex items-center justify-center gap-2 border border-dashed border-zinc-300 text-zinc-500 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest hover:border-zinc-400 hover:text-zinc-900 transition-colors"
-                          data-tour="tour-add-calendar"
+                          onClick={() => {
+                            const snippet = `<iframe src="${window.location.origin}/embed/${cal.shareId}" width="100%" height="400" frameborder="0" style="border:none;border-radius:12px;"></iframe>`;
+                            navigator.clipboard.writeText(snippet);
+                            setToast("Embed code copied!");
+                            setTimeout(() => setToast(null), 2000);
+                          }}
+                          className="absolute top-2 right-2 text-xs bg-zinc-900 text-white px-3 py-1.5 rounded-full hover:bg-zinc-800 transition-colors font-medium"
                         >
-                          <Plus className="w-3.5 h-3.5" /> Create Calendar
+                          Copy
                         </button>
-                      );
-                    })()}
+                      </div>
+                    </div>
+                  )}
+
+                  <div data-tour="tour-plans">
+                    <PlansManager
+                      calendarId={cal.objectId}
+                      orgId={calendarId}
+                      initialPrefill={managePlansCalId === cal.objectId ? managePlansPrefill : null}
+                      returnTo={managePlansCalId === cal.objectId ? managePlansReturnTo : null}
+                    />
                   </div>
-                  {/* RIGHT — header + plans (or the Manage Plans surface) */}
-                  <div className="space-y-4 min-w-0">
-                    <div
-                      className={`border rounded-xl px-4 py-3 ${
-                        inactive ? "border-zinc-100 bg-zinc-50 opacity-70" : "border-zinc-200"
-                      }`}
-                    >
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {cal.calendarImage ? (
-                          <img src={cal.calendarImage} alt={cal.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0">
-                            <Calendar className="w-5 h-5 text-zinc-300" />
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ──────── COMMUNITY ──────── */}
+          {activeTab === "community" && (
+            <CommunityTab
+              key={`community-${communityNonce}`}
+              dashboard={dashboard}
+              initialSegment={communitySegment}
+              onApproveFollower={approveFollower}
+              onRejectFollower={rejectFollower}
+              onRemoveFollower={removeFollower}
+              onRemoveMember={removeMember}
+              onEditScope={openEditScope}
+              onInviteCoHost={handleInviteCoHost}
+            />
+          )}
+
+          {/* ──────── GROW ──────── */}
+          {activeTab === "grow" && (
+            <div>
+              <div className="px-4 sm:px-6 lg:px-8 pt-4 lg:pt-5">
+                <h1 className="text-lg lg:text-xl font-semibold tracking-[-0.01em] text-zinc-900">
+                  Grow
+                </h1>
+              </div>
+              <div className="px-4 sm:px-6 lg:px-8 flex gap-6 border-b border-zinc-100 overflow-x-auto no-scrollbar">
+                {GROW_SECTIONS.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setGrowSection(s.id)}
+                    className={`py-3 text-[13px] font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
+                      growSection === s.id
+                        ? "border-zinc-900 text-zinc-900"
+                        : "border-transparent text-zinc-500 hover:text-zinc-700"
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              <div className="px-4 sm:px-6 lg:px-8 py-5">
+                {growSection === "performance" &&
+                  (isPaid ? (
+                    <GrowPerformance
+                      analytics={analytics}
+                      loading={analyticsLoading}
+                      error={analyticsError}
+                      range={analyticsRange}
+                      onRangeChange={setAnalyticsRange}
+                      onRetry={() => fetchAnalytics(analyticsRange)}
+                      neverRsvpdCount={neverRsvpdCount}
+                      onNewPlan={() => openNewPlan()}
+                      onGoCommunity={goCommunity}
+                      allCharts={
+                        <AnalyticsTab
+                          analytics={analytics}
+                          loading={analyticsLoading}
+                          error={analyticsError}
+                          range={analyticsRange}
+                          onRangeChange={setAnalyticsRange}
+                          calendars={dashboard.calendars}
+                          calFilter={analyticsCalFilter}
+                          onCalFilterChange={setAnalyticsCalFilter}
+                          dismissedInsights={dismissedInsights}
+                          onDismissInsight={dismissInsight}
+                        />
+                      }
+                    />
+                  ) : (
+                    lockedPanel("Performance")
+                  ))}
+
+                {growSection === "marketplace" &&
+                  (isPaid ? (
+                    <MarketplaceTab
+                      calendarId={calendarId}
+                      city={dashboard.calendars.find((c) => c.objectId === calendarId)?.city}
+                      prefetchedEvents={prefetchedMarketplace}
+                      orgSettings={{
+                        name: dashboard.name,
+                        description: dashboard.description,
+                        orgType: dashboard.orgType,
+                        calendarDescription: dashboard.calendars.find((c) => c.objectId === calendarId)?.description || "",
+                        blacklistCategories: dashboard.blacklistCategories,
+                        excludeKeywords: dashboard.excludeKeywords,
+                        daysOfWeek: dashboard.daysOfWeek,
+                        preferredTimes: dashboard.preferredTimes,
+                      } satisfies OrgSettings}
+                      onAddEvent={(event: MarketplaceEvent) => {
+                        // Gate: require Leaf app connection before creating plans
+                        if (!leafAppConnected) {
+                          setShowPhoneModal(true);
+                          return;
+                        }
+
+                        // Use plan title/description when available (Yelp in recommended view)
+                        const title = event.planTitle || event.title;
+                        const description = event.planDescription || event.description;
+
+                        // Build a suggested date from suggestedDays (find the next matching day)
+                        let date = event.suggestedDate || "";
+                        if (!date && event.suggestedDays?.length > 0) {
+                          const dayMap: Record<string, number> = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+                          const targetDay = dayMap[event.suggestedDays[0]];
+                          if (targetDay !== undefined) {
+                            const d = new Date();
+                            const diff = (targetDay - d.getDay() + 7) % 7 || 7;
+                            d.setDate(d.getDate() + diff);
+                            date = d.toISOString().slice(0, 10);
+                          }
+                        }
+
+                        // Build a suggested time from suggestedTimes
+                        let time = event.suggestedTime || "";
+                        if (!time && event.suggestedTimes?.length > 0) {
+                          const timeMap: Record<string, string> = { morning: "10:00 AM", afternoon: "2:00 PM", evening: "7:00 PM", night: "9:00 PM" };
+                          time = timeMap[event.suggestedTimes[0]] || "";
+                        }
+
+                        setCreatePlanPrefill({
+                          title,
+                          description,
+                          venue: event.venue,
+                          date,
+                          time,
+                          capacity: event.capacityMax?.toString() || "",
+                          imageUrl: event.image,
+                          coverSeed: event.id,
+                          // The event IS the subject here — a "describe it"
+                          // prompt bar would only offer to overwrite what was
+                          // just picked.
+                          hidePromptBar: true,
+                        });
+                        setShowCreatePlanModal(true);
+                      }}
+                    />
+                  ) : (
+                    lockedPanel("Marketplace")
+                  ))}
+
+                {growSection === "collabs" && (
+                  <div className="border border-zinc-200 rounded-xl p-6 max-w-2xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-base font-medium text-zinc-900">Cross-org collabs</h3>
+                      <span className="bg-zinc-900 text-white text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full">Coming soon</span>
+                    </div>
+                    <p className="text-sm text-zinc-500 leading-relaxed mb-4">
+                      Co-host a plan with a nearby org and it lands on both
+                      calendars — shared audiences, doubled reach.
+                    </p>
+                    <ul className="space-y-2 list-disc list-inside">
+                      <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Joint plans</strong> — one plan, posted to several calendars at once.</li>
+                      <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Collab invites</strong> — nearby orgs can propose co-hosting; you accept or message back.</li>
+                      <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Shared audiences</strong> — tap into followers from communities that complement yours.</li>
+                    </ul>
+                  </div>
+                )}
+
+                {growSection === "concierge" && (
+                  <div className="space-y-6 max-w-3xl">
+                    {dashboard.tier === "concierge" ? (
+                      <>
+                        {conciergeEntryCard}
+                        <ConciergeEventReports calendarId={calendarId} />
+                      </>
+                    ) : (
+                      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-xl shadow-black/40">
+                        <div aria-hidden className="pointer-events-none absolute inset-0">
+                          <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black" />
+                          <div className="absolute inset-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src="https://images.unsplash.com/photo-1545315003-c5ad6226c272?w=1600&q=70&auto=format&fit=crop"
+                              alt=""
+                              className="h-full w-full object-cover object-[center_30%] opacity-60"
+                            />
+                            <div className="absolute inset-0 bg-zinc-950/70" />
+                            <div className="absolute inset-0 bg-black/40" />
                           </div>
-                        )}
-                        <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <a
-                            href={`/org/${cal.shareId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className={`font-medium hover:underline ${inactive ? "text-zinc-400" : ""}`}
-                          >
-                            {cal.name}
-                          </a>
-                          {!inactive && (
-                            <>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const url = `${window.location.origin}/org/${cal.shareId}`;
-                                  navigator.clipboard.writeText(url);
-                                  setToast("Link copied!");
-                                  setTimeout(() => setToast(null), 2000);
-                                }}
-                                className="text-zinc-300 hover:text-zinc-600 transition-colors"
-                                title="Copy calendar link"
-                              >
-                                <Link2 className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEmbedCalId(embedCalId === cal.objectId ? null : cal.objectId);
-                                }}
-                                className="text-zinc-300 hover:text-zinc-600 transition-colors"
-                                title="Get embed code"
-                              >
-                                <Code className="w-4 h-4" />
-                              </button>
-                              <Link
-                                href={`/org/${cal.shareId}/promote?org=${calendarId}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-zinc-300 hover:text-emerald-600 transition-colors"
-                                title="Promote — print flyers and door hangers"
-                              >
-                                <Megaphone className="w-4 h-4" />
-                              </Link>
-                            </>
-                          )}
-                          {cal.isPrimary && (
-                            <span className="text-xs font-bold uppercase tracking-widest bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">
-                              Primary
-                            </span>
-                          )}
-                          {cal.role === "Host" && (
-                            <span className="text-xs font-bold uppercase tracking-widest bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
-                              Co-host
-                            </span>
-                          )}
-                          {inactive && (
-                            <span className="text-xs font-bold uppercase tracking-widest bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full">
-                              Inactive
-                            </span>
-                          )}
+                          <div className="absolute -top-24 -right-16 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl" />
+                          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
                         </div>
-                        <p className="text-xs text-zinc-400">{cal.city || "No city set"}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-4 shrink-0 pl-[52px] sm:pl-0">
-                        {inactive ? (
-                          <button
-                            onClick={() => setShowSubscription(true)}
-                            className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
-                          >
-                            <Lock className="w-3.5 h-3.5" /> Upgrade to Reactivate
-                          </button>
-                        ) : (
-                          <>
-                            {cal.isConciergeServiced && (
-                              <button
-                                onClick={() => setShowConciergeChat(true)}
-                                title="Concierge"
-                                className="relative text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 transition-colors"
-                              >
-                                <MessageCircle className="w-4 h-4" />
-                                <span>Concierge</span>
-                                {conciergeUnread > 0 && (
-                                  <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[16px] text-center">
-                                    {conciergeUnread}
-                                  </span>
-                                )}
-                              </button>
-                            )}
-                            <Link
-                              href={`/dashboard/${calendarId}/calendars/${cal.objectId}/edit`}
-                              className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
-                            >
-                              <Pencil className="w-3 h-3" /> Edit
-                            </Link>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    </div>
-                    {embedCalId === cal.objectId && (
-                      <div className="border border-zinc-200 rounded-xl p-4">
-                        <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-2">Embed on Your Website</p>
-                        <p className="text-xs text-zinc-500 mb-3">Copy this code and paste it into your website&apos;s HTML to show upcoming events.</p>
                         <div className="relative">
-                          <pre className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 pr-20 text-xs text-zinc-600 overflow-x-auto whitespace-pre-wrap break-all">{`<iframe src="${typeof window !== "undefined" ? window.location.origin : ""}/embed/${cal.shareId}" width="100%" height="400" frameborder="0" style="border:none;border-radius:12px;"></iframe>`}</pre>
-                          <button
-                            onClick={() => {
-                              const snippet = `<iframe src="${window.location.origin}/embed/${cal.shareId}" width="100%" height="400" frameborder="0" style="border:none;border-radius:12px;"></iframe>`;
-                              navigator.clipboard.writeText(snippet);
-                              setToast("Embed code copied!");
-                              setTimeout(() => setToast(null), 2000);
-                            }}
-                            className="absolute top-2 right-2 text-xs bg-zinc-900 text-white px-3 py-1.5 rounded-lg hover:bg-zinc-800 transition-colors font-bold uppercase tracking-widest"
-                          >
-                            Copy
-                          </button>
+                          <div className="flex items-center justify-between gap-3 mb-2">
+                            <h3 className="text-lg font-semibold tracking-tight text-white">We&apos;ll run your events for you</h3>
+                            <span className="shrink-0 bg-emerald-500 text-black text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full">New</span>
+                          </div>
+                          <p className="text-sm text-zinc-400 leading-relaxed mb-4">
+                            Don&apos;t have time to plan, post, and show up? Bring on a dedicated host to run your calendar and host plans on behalf of your community. From $499/mo.
+                          </p>
+                          <ul className="space-y-2 mb-5 list-disc list-inside marker:text-emerald-500/60">
+                            <li className="text-xs text-zinc-400 leading-relaxed"><strong className="text-zinc-100">Plans posted for you</strong> — your host drafts, schedules, and publishes plans to your calendar on a steady cadence.</li>
+                            <li className="text-xs text-zinc-400 leading-relaxed"><strong className="text-zinc-100">Hosted on your behalf</strong> — a real person shows up, greets attendees, and represents your community at every gathering.</li>
+                            <li className="text-xs text-zinc-400 leading-relaxed"><strong className="text-zinc-100">RSVP &amp; chat management</strong> — from approvals to day-of reminders, your host handles the back-and-forth so you don&apos;t have to.</li>
+                          </ul>
+                          <a href="https://calendar.app.google/NCUYc6LUKSiwLUa67" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-zinc-200 transition-colors">
+                            Book a demo
+                          </a>
                         </div>
                       </div>
                     )}
-                    <div className="pt-2" data-tour="tour-plans">
-                      <PlansManager
-                        calendarId={cal.objectId}
-                        orgId={calendarId}
-                        initialPrefill={managePlansCalId === cal.objectId ? managePlansPrefill : null}
-                        returnTo={managePlansCalId === cal.objectId ? managePlansReturnTo : null}
-                      />
-                    </div>
-                  </div>
-                  </>
-                );
-              })()}
-            </div>
-
-          </div>
-          );
-        })()}
-
-
-        {/* ──────── MARKETPLACE TAB ──────── */}
-        {activeTab === "marketplace" && (
-          <MarketplaceTab
-            calendarId={calendarId}
-            city={dashboard.calendars.find((c) => c.objectId === calendarId)?.city}
-            prefetchedEvents={prefetchedMarketplace}
-            orgSettings={{
-              name: dashboard.name,
-              description: dashboard.description,
-              orgType: dashboard.orgType,
-              calendarDescription: dashboard.calendars.find((c) => c.objectId === calendarId)?.description || "",
-              blacklistCategories: dashboard.blacklistCategories,
-              excludeKeywords: dashboard.excludeKeywords,
-              daysOfWeek: dashboard.daysOfWeek,
-              preferredTimes: dashboard.preferredTimes,
-            } satisfies OrgSettings}
-            onAddEvent={(event: MarketplaceEvent) => {
-              // Gate: require Leaf app connection before creating plans
-              if (!leafAppConnected) {
-                setShowPhoneModal(true);
-                return;
-              }
-
-              // Use plan title/description when available (Yelp in recommended view)
-              const title = event.planTitle || event.title;
-              const description = event.planDescription || event.description;
-
-              // Build a suggested date from suggestedDays (find the next matching day)
-              let date = event.suggestedDate || "";
-              if (!date && event.suggestedDays?.length > 0) {
-                const dayMap: Record<string, number> = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
-                const targetDay = dayMap[event.suggestedDays[0]];
-                if (targetDay !== undefined) {
-                  const d = new Date();
-                  const diff = (targetDay - d.getDay() + 7) % 7 || 7;
-                  d.setDate(d.getDate() + diff);
-                  date = d.toISOString().slice(0, 10);
-                }
-              }
-
-              // Build a suggested time from suggestedTimes
-              let time = event.suggestedTime || "";
-              if (!time && event.suggestedTimes?.length > 0) {
-                const timeMap: Record<string, string> = { morning: "10:00 AM", afternoon: "2:00 PM", evening: "7:00 PM", night: "9:00 PM" };
-                time = timeMap[event.suggestedTimes[0]] || "";
-              }
-
-              setCreatePlanPrefill({
-                title,
-                description,
-                venue: event.venue,
-                date,
-                time,
-                capacity: event.capacityMax?.toString() || "",
-                imageUrl: event.image,
-                coverSeed: event.id,
-                // The event IS the subject here — a "describe it" prompt bar
-                // would only offer to overwrite what was just picked.
-                hidePromptBar: true,
-              });
-              setShowCreatePlanModal(true);
-            }}
-          />
-        )}
-
-        {/* ──────── SETTINGS TAB ──────── */}
-        {activeTab === "settings" && (
-          <div className="space-y-6">
-            {/* Settings sub-tabs */}
-            <div className="flex gap-1 border-b border-zinc-100">
-              <button
-                onClick={() => setSettingsSection("general")}
-                className={`px-4 py-2 text-xs font-medium uppercase tracking-widest border-b-2 transition-colors ${
-                  settingsSection === "general"
-                    ? "border-zinc-900 text-zinc-900"
-                    : "border-transparent text-zinc-400 hover:text-zinc-600"
-                }`}
-              >
-                General
-              </button>
-              <button
-                onClick={() => setSettingsSection("subscription")}
-                className={`px-4 py-2 text-xs font-medium uppercase tracking-widest border-b-2 transition-colors ${
-                  settingsSection === "subscription"
-                    ? "border-zinc-900 text-zinc-900"
-                    : "border-transparent text-zinc-400 hover:text-zinc-600"
-                }`}
-              >
-                Subscription
-              </button>
-            </div>
-
-            {settingsSection === "general" && (
-            <div className="space-y-8">
-            {/* Phone / Leaf App Connection */}
-            <div className="flex items-center justify-between py-3 border-b border-zinc-100">
-              <div className="flex items-center gap-2">
-                <Smartphone className="w-3.5 h-3.5 text-zinc-400" />
-                <span className="text-xs text-zinc-500">Connected to Leaf app</span>
-                <a href="https://apps.apple.com/us/app/leaf-build-your-community/id1040588046" target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-400 hover:text-zinc-600 underline">Visit App Store</a>
-              </div>
-              {leafAppConnected ? (
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3 h-3 text-green-600" />
-                  <span className="text-xs text-green-700">Phone number verified</span>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowPhoneModal(true)}
-                  className="text-xs text-zinc-500 hover:text-zinc-900 underline"
-                >
-                  Connect phone
-                </button>
-              )}
-            </div>
-
-            {/* Organization Logo — open to all users */}
-            <section className="border border-zinc-200 rounded-xl p-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Organization Logo</h2>
-              <div className="flex items-center gap-6">
-                <div className="w-20 h-20 rounded-xl border border-zinc-200 overflow-hidden bg-zinc-50 flex items-center justify-center shrink-0">
-                  {settingsLogoPreview || dashboard.profilePhoto ? (
-                    <img
-                      src={settingsLogoPreview || dashboard.profilePhoto || ""}
-                      alt="Logo"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <ImagePlus className="w-6 h-6 text-zinc-300" />
-                  )}
-                </div>
-                <div>
-                  <label className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors cursor-pointer">
-                    <ImagePlus className="w-4 h-4" />
-                    {dashboard.profilePhoto || settingsLogoPreview ? "Change Logo" : "Upload Logo"}
-                    <input
-                      type="file"
-                      accept={IMAGE_ACCEPT}
-                      onChange={handleLogoSelect}
-                      className="hidden"
-                    />
-                  </label>
-                  <p className="text-xs text-zinc-400 mt-2">Square image recommended. Visible on your public calendar page.</p>
-                </div>
-              </div>
-            </section>
-
-            {/* Brand Color — open to all users */}
-            <section className="border border-zinc-200 rounded-xl p-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Brand Color</h2>
-              <div className="flex items-center gap-4">
-                <div
-                  className="w-10 h-10 rounded-lg border border-zinc-200"
-                  style={{ backgroundColor: settingsBrandColor }}
-                />
-                <input
-                  type="text"
-                  value={settingsBrandColor}
-                  onChange={(e) => setSettingsBrandColor(e.target.value)}
-                  className="border-b border-zinc-300 py-2 text-sm font-mono focus:outline-none focus:border-zinc-900 w-28"
-                  placeholder="#18181b"
-                />
-                <div className="flex gap-2">
-                  {["#18181b", "#dc2626", "#2563eb", "#059669", "#7c3aed", "#ea580c"].map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => setSettingsBrandColor(c)}
-                      className={`w-7 h-7 rounded-full border-2 transition-all ${
-                        settingsBrandColor === c ? "border-zinc-900 scale-110" : "border-zinc-200"
-                      }`}
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            {/* AI Idea Generation */}
-            <div className="relative">
-              {!isPaid && (
-                <div className="absolute top-4 right-4 z-10" onClick={() => setShowSubscription(true)}>
-                  <div className="flex items-center gap-2 bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest cursor-pointer hover:bg-zinc-800 transition-colors">
-                    <Lock className="w-3 h-3" /> Upgrade
-                  </div>
-                </div>
-              )}
-              <section className={`border border-zinc-200 rounded-xl p-6 space-y-8 ${!isPaid ? "opacity-40 pointer-events-none" : ""}`}>
-                <div>
-                  <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Suggested Plans</h2>
-                  <p className="text-xs text-zinc-500 mt-1">Control how Leaf suggests ready-to-host plans for your community.</p>
-                </div>
-
-                {/* Preferred Days */}
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Preferred Days</h3>
-                  <p className="text-xs text-zinc-500 mb-3">Automated scheduling will be limited to these timeframes.</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {DAY_NAMES.map((day, i) => {
-                      const active = settingsDaysOfWeek.includes(i);
-                      return (
-                        <button
-                          key={day}
-                          onClick={() => {
-                            setSettingsDaysOfWeek((prev) =>
-                              active ? prev.filter((d) => d !== i) : [...prev, i]
-                            );
-                          }}
-                          className={`w-12 h-10 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors ${
-                            active
-                              ? "bg-zinc-900 text-white"
-                              : "border border-zinc-200 text-zinc-400 hover:border-zinc-300"
-                          }`}
-                        >
-                          {day}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Preferred Times */}
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Preferred Times</h3>
-                  <p className="text-xs text-zinc-500 mb-3">Suggested days & time will only fall during these designated windows.</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {TIME_OF_DAY_OPTIONS.map((opt) => {
-                      const active = settingsPreferredTimes.includes(opt.id);
-                      return (
-                        <button
-                          key={opt.id}
-                          onClick={() => {
-                            setSettingsPreferredTimes((prev) =>
-                              active ? prev.filter((t) => t !== opt.id) : [...prev, opt.id]
-                            );
-                          }}
-                          className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors flex flex-col items-center gap-0.5 ${
-                            active
-                              ? "bg-zinc-900 text-white"
-                              : "border border-zinc-200 text-zinc-400 hover:border-zinc-300"
-                          }`}
-                        >
-                          <span>{opt.label}</span>
-                          <span className={`text-[9px] font-normal normal-case tracking-normal ${active ? "text-zinc-300" : "text-zinc-400"}`}>
-                            {opt.hint}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Blacklisted Categories */}
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Excluded Venue Categories</h3>
-                  <p className="text-xs text-zinc-500 mb-3">These categories will be omitted from the suggestion engine.</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {BLACKLIST_PRESETS.map((cat) => {
-                      const active = settingsBlacklistCategories.includes(cat);
-                      return (
-                        <button
-                          key={cat}
-                          onClick={() => {
-                            setSettingsBlacklistCategories((prev) =>
-                              active ? prev.filter((c) => c !== cat) : [...prev, cat]
-                            );
-                          }}
-                          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                            active
-                              ? "bg-red-600 text-white border border-red-600"
-                              : "border border-zinc-200 text-zinc-500 hover:border-zinc-300"
-                          }`}
-                        >
-                          {cat}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Excluded Keywords */}
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Excluded Keywords</h3>
-                  <p className="text-xs text-zinc-500 mb-3">AI won&apos;t suggest plans involving these topics (e.g. wine, drinking, gambling).</p>
-                  <div className="flex gap-2 mb-3">
-                    <input
-                      type="text"
-                      value={excludeKeywordInput}
-                      onChange={(e) => setExcludeKeywordInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          const kw = excludeKeywordInput.trim().toLowerCase();
-                          if (kw && !settingsExcludeKeywords.includes(kw)) {
-                            setSettingsExcludeKeywords((prev) => [...prev, kw]);
-                          }
-                          setExcludeKeywordInput("");
-                        }
-                      }}
-                      placeholder="Type a keyword and press Enter"
-                      className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-400 transition-colors"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const kw = excludeKeywordInput.trim().toLowerCase();
-                        if (kw && !settingsExcludeKeywords.includes(kw)) {
-                          setSettingsExcludeKeywords((prev) => [...prev, kw]);
-                        }
-                        setExcludeKeywordInput("");
-                      }}
-                      className="px-4 py-2 bg-zinc-900 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors"
-                    >
-                      Add
-                    </button>
-                  </div>
-                  {settingsExcludeKeywords.length > 0 && (
-                    <div className="flex gap-2 flex-wrap">
-                      {settingsExcludeKeywords.map((kw) => (
-                        <span
-                          key={kw}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-600 text-white"
-                        >
-                          {kw}
-                          <button
-                            type="button"
-                            onClick={() => setSettingsExcludeKeywords((prev) => prev.filter((k) => k !== kw))}
-                            className="hover:text-red-200 transition-colors"
-                          >
-                            &times;
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Photo Style */}
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-700 mb-1">Photo Style</h3>
-                  <p className="text-xs text-zinc-500 mb-3">Control what kind of images AI selects for suggested plans.</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {([
-                      { id: "default", label: "Default" },
-                      { id: "no-people", label: "No People" },
-                      { id: "venue-focused", label: "Venue & Activity" },
-                    ] as const).map((opt) => (
-                      <button
-                        key={opt.id}
-                        onClick={() => setSettingsImageStyle(opt.id)}
-                        className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors ${
-                          settingsImageStyle === opt.id
-                            ? "bg-zinc-900 text-white"
-                            : "border border-zinc-200 text-zinc-400 hover:border-zinc-300"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </section>
-            </div>
-
-            {/* Save */}
-            <button
-              onClick={handleSaveSettings}
-              disabled={settingsSaving}
-              className="bg-zinc-900 text-white px-6 py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
-            >
-              {settingsSaving ? "Saving..." : "Save Settings"}
-            </button>
-
-            {/* Delete organization — single terminal action. Cascade-deletes
-                this organization AND the underlying account in one step. For
-                a non-org (personal) user the same destination page reads
-                "Delete account" — same flow, contextual label. */}
-            <section className="border border-zinc-200 rounded-xl p-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Delete organization</h2>
-              <a
-                href={`/account/delete?from=${calendarId}`}
-                className="text-sm text-red-600 hover:text-red-700 underline font-medium"
-              >
-                Delete organization
-              </a>
-              <p className="text-xs text-zinc-500 mt-2">
-                Permanently removes this organization, its calendar, and your
-                sign-in. Followers and past plans are erased.
-              </p>
-            </section>
-            </div>
-            )}
-
-            {settingsSection === "subscription" && (
-            <div className="space-y-8">
-              <section className="border border-zinc-200 rounded-xl p-6">
-                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-2">Current Plan</h2>
-                <p className="text-2xl font-light mb-1">{tierLabel}</p>
-                <p className="text-xs text-zinc-500">
-                  {dashboard.tier === "starter"
-                    ? "Free — basic features"
-                    : dashboard.tier === "concierge"
-                    ? "$499/month — done-for-you resident events"
-                    : dashboard.tier === "growth"
-                    ? dashboard.billingInterval === "year" ? "$49.99/year — legacy Social plan, grandfathered into Pro features" : "$4.99/month — legacy Social plan, grandfathered into Pro features"
-                    : dashboard.billingInterval === "year" ? "$99/year — full features" : "$9.99/month — full features"}
-                </p>
-                {dashboard.subscriptionStatus === "cancelling" && (
-                  <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-                    <p className="text-sm font-medium text-amber-800">Subscription cancelling</p>
-                    <p className="text-xs text-amber-600 mt-0.5">
-                      Your plan remains active until {(cancelAt || dashboard.subscriptionCancelAt) ? new Date((cancelAt || dashboard.subscriptionCancelAt!) * 1000).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "the end of your billing period"}. After that, you&apos;ll be downgraded to the Free plan.
-                    </p>
                   </div>
                 )}
-              </section>
+              </div>
+            </div>
+          )}
 
-              <button
-                onClick={() => setShowSubscription(true)}
-                className="bg-zinc-900 text-white px-6 py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
-              >
-                {dashboard.tier === "starter" ? "Upgrade Plan" : "Change Plan"}
-              </button>
-
-              {dashboard.tier !== "starter" && dashboard.subscriptionStatus !== "cancelling" && (
+          {/* ──────── SETTINGS (off-nav) ──────── */}
+          {activeTab === "settings" && (
+            <div>
+              <div className="px-4 sm:px-6 lg:px-8 py-4 lg:py-5 border-b border-zinc-100 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] text-zinc-400 truncate">{dashboard.name}</p>
+                  <h1 className="text-lg lg:text-xl font-semibold tracking-[-0.01em] text-zinc-900">
+                    Settings
+                  </h1>
+                </div>
                 <button
-                  onClick={handleCancelSubscription}
-                  disabled={subscriptionLoading}
-                  className="block text-xs text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
+                  onClick={() => setTab("home")}
+                  className="h-9 px-4 border border-zinc-200 text-zinc-600 rounded-full text-xs font-medium hover:border-zinc-300 transition-colors"
                 >
-                  Cancel Subscription
+                  Back to dashboard
                 </button>
-              )}
+              </div>
 
-              {/* Dev — concierge reset (Leaf admins + the org owner) */}
-              {(isLeafAdmin || dashboard.isOwner) && (
-                <section className="border border-dashed border-zinc-300 rounded-xl p-6">
-                  <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-1">
-                    Developer · Concierge
-                  </h2>
-                  <p className="text-xs text-zinc-500 mb-4">
-                    Reset this org&apos;s concierge state to re-run onboarding (deletes the current
-                    intake, chat messages, and menu).
-                  </p>
-                  <div className="flex flex-wrap gap-3">
+              <div className="px-4 sm:px-6 lg:px-8 py-5 max-w-3xl">
+                {/* Settings sub-tabs */}
+                <div className="flex gap-1 border-b border-zinc-100 mb-6">
+                  <button
+                    onClick={() => setSettingsSection("general")}
+                    className={`px-4 py-2 text-xs font-medium uppercase tracking-widest border-b-2 transition-colors ${
+                      settingsSection === "general"
+                        ? "border-zinc-900 text-zinc-900"
+                        : "border-transparent text-zinc-400 hover:text-zinc-600"
+                    }`}
+                  >
+                    General
+                  </button>
+                  <button
+                    onClick={() => setSettingsSection("subscription")}
+                    className={`px-4 py-2 text-xs font-medium uppercase tracking-widest border-b-2 transition-colors ${
+                      settingsSection === "subscription"
+                        ? "border-zinc-900 text-zinc-900"
+                        : "border-transparent text-zinc-400 hover:text-zinc-600"
+                    }`}
+                  >
+                    Plan &amp; billing
+                  </button>
+                </div>
+
+                {settingsSection === "general" && (
+                <div className="space-y-8">
+                {/* Organization details */}
+                <section className="border border-zinc-200 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                      Organization
+                    </h2>
+                    {!editName ? (
+                      <button
+                        onClick={() => setEditName(true)}
+                        className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors"
+                      >
+                        <Pencil className="w-3.5 h-3.5" /> Edit
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { setEditName(false); setNameValue(dashboard.name); setDescValue(dashboard.description); }}
+                          className="text-xs text-zinc-500 hover:text-zinc-900"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveOverview}
+                          disabled={saving}
+                          className="flex items-center gap-1 text-xs bg-zinc-900 text-white px-3 py-1.5 rounded-full hover:bg-zinc-800 disabled:opacity-50"
+                        >
+                          {saving ? "Saving..." : "Save"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {editName ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-400 block mb-1.5">Name</label>
+                        <input
+                          value={nameValue}
+                          onChange={(e) => setNameValue(e.target.value)}
+                          className="w-full border border-zinc-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-zinc-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-400 block mb-1.5">Description</label>
+                        <textarea
+                          value={descValue}
+                          onChange={(e) => setDescValue(e.target.value)}
+                          rows={3}
+                          className="w-full border border-zinc-200 rounded-lg p-3 text-sm focus:outline-none focus:border-zinc-900 resize-none"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <h3 className="text-lg font-medium tracking-tight mb-1">{dashboard.name}</h3>
+                      <p className="text-sm text-zinc-500">{dashboard.description || "No description"}</p>
+                    </div>
+                  )}
+                </section>
+
+                {/* Phone / Leaf App Connection */}
+                <div className="flex items-center justify-between py-3 border-b border-zinc-100">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="w-3.5 h-3.5 text-zinc-400" />
+                    <span className="text-xs text-zinc-500">Connected to Leaf app</span>
+                    <a href="https://apps.apple.com/us/app/leaf-build-your-community/id1040588046" target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-400 hover:text-zinc-600 underline">Visit App Store</a>
+                  </div>
+                  {leafAppConnected ? (
+                    <div className="flex items-center gap-1.5">
+                      <Check className="w-3 h-3 text-green-600" />
+                      <span className="text-xs text-green-700">Phone number verified</span>
+                    </div>
+                  ) : (
                     <button
-                      onClick={() => handleResetConcierge(false)}
-                      disabled={resettingConcierge}
-                      className="text-xs font-bold uppercase tracking-widest text-zinc-700 hover:text-zinc-900 border border-zinc-300 rounded-lg px-4 py-2 transition-colors disabled:opacity-50"
+                      onClick={() => setShowPhoneModal(true)}
+                      className="text-xs text-zinc-500 hover:text-zinc-900 underline"
                     >
-                      {resettingConcierge ? "Working…" : "Reset Concierge"}
+                      Connect phone
                     </button>
-                    <button
-                      onClick={() => handleResetConcierge(true)}
-                      disabled={resettingConcierge}
-                      className="text-xs font-bold uppercase tracking-widest text-white bg-zinc-900 hover:bg-zinc-800 rounded-lg px-4 py-2 transition-colors disabled:opacity-50"
-                    >
-                      {resettingConcierge ? "Working…" : "Reset + Simulate Onboarding"}
-                    </button>
+                  )}
+                </div>
+
+                {/* Organization Logo — open to all users */}
+                <section className="border border-zinc-200 rounded-xl p-6">
+                  <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 mb-4">Organization logo</h2>
+                  <div className="flex items-center gap-6">
+                    <div className="w-20 h-20 rounded-xl border border-zinc-200 overflow-hidden bg-zinc-50 flex items-center justify-center shrink-0">
+                      {settingsLogoPreview || dashboard.profilePhoto ? (
+                        <img
+                          src={settingsLogoPreview || dashboard.profilePhoto || ""}
+                          alt="Logo"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <ImagePlus className="w-6 h-6 text-zinc-300" />
+                      )}
+                    </div>
+                    <div>
+                      <label className="inline-flex items-center gap-2 bg-zinc-900 text-white px-4 py-2.5 rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors cursor-pointer">
+                        <ImagePlus className="w-4 h-4" />
+                        {dashboard.profilePhoto || settingsLogoPreview ? "Replace" : "Upload logo"}
+                        <input
+                          type="file"
+                          accept={IMAGE_ACCEPT}
+                          onChange={handleLogoSelect}
+                          className="hidden"
+                        />
+                      </label>
+                      <p className="text-xs text-zinc-400 mt-2">Square image recommended. Visible on your public calendar page.</p>
+                    </div>
                   </div>
                 </section>
-              )}
-            </div>
-            )}
-          </div>
-        )}
 
-        {/* ──────── MEMBERS & RSVPs TAB (Growth/Pro) ──────── */}
-        {activeTab === "members" && (
-          <div className="space-y-8">
-            {/* Invite Co-Host */}
-            <section className="border border-zinc-200 rounded-xl p-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">
-                Invite Co-Host
-              </h2>
-              <p className="text-xs text-zinc-500 mb-4">
-                Co-hosts can create plans, view RSVPs, and help manage the calendar.
-              </p>
-              {inviteSuccess && (
-                <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg mb-4 text-sm">
-                  <Check className="w-4 h-4" /> {inviteSuccess}
-                </div>
-              )}
-              <div className="flex gap-3 items-end">
-                <div className="flex-1 min-w-0">
-                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
-                    placeholder="cohost@example.com"
-                  />
-                </div>
-                <div className="w-56 relative">
-                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Calendars</label>
-                  <button
-                    type="button"
-                    onClick={() => setInviteScopeOpen((o) => !o)}
-                    className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 text-left flex items-center justify-between gap-2"
-                  >
-                    <span className="truncate">
-                      {inviteScopeAll
-                        ? "All Calendars"
-                        : inviteScopeIds.length === 0
-                        ? "Select calendars…"
-                        : inviteScopeIds.length === 1
-                        ? dashboard.calendars.find((c) => c.objectId === inviteScopeIds[0])?.name || "1 calendar"
-                        : `${inviteScopeIds.length} calendars`}
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${inviteScopeOpen ? "rotate-180" : ""}`} />
-                  </button>
-                  {inviteScopeOpen && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setInviteScopeOpen(false)}
-                      />
-                      <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-lg shadow-lg z-20 max-h-64 overflow-y-auto">
+                {/* Brand Color — open to all users */}
+                <section className="border border-zinc-200 rounded-xl p-6">
+                  <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 mb-4">Brand color</h2>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div
+                      className="w-10 h-10 rounded-lg border border-zinc-200"
+                      style={{ backgroundColor: settingsBrandColor }}
+                    />
+                    <input
+                      type="text"
+                      value={settingsBrandColor}
+                      onChange={(e) => setSettingsBrandColor(e.target.value)}
+                      className="border border-zinc-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-zinc-900 w-28"
+                      placeholder="#18181b"
+                    />
+                    <div className="flex gap-2">
+                      {["#18181b", "#dc2626", "#2563eb", "#059669", "#7c3aed", "#ea580c"].map((c) => (
                         <button
-                          type="button"
-                          onClick={() => { setInviteScopeAll(true); setInviteScopeIds([]); }}
-                          className={`w-full px-3 py-2 text-sm text-left hover:bg-zinc-50 flex items-center gap-2 border-b border-zinc-100 ${inviteScopeAll ? "text-zinc-900 font-medium" : "text-zinc-600"}`}
-                        >
-                          <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${inviteScopeAll ? "bg-zinc-900 border-zinc-900" : "border-zinc-300"}`}>
-                            {inviteScopeAll && <Check className="w-3 h-3 text-white" />}
-                          </span>
-                          All Calendars
-                        </button>
-                        {dashboard.calendars.map((cal) => {
-                          const selected = !inviteScopeAll && inviteScopeIds.includes(cal.objectId);
+                          key={c}
+                          onClick={() => setSettingsBrandColor(c)}
+                          className={`w-7 h-7 rounded-full border-2 transition-all ${
+                            settingsBrandColor === c ? "border-zinc-900 scale-110" : "border-zinc-200"
+                          }`}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </section>
+
+                {/* AI Idea Generation */}
+                <div className="relative">
+                  {!isPaid && (
+                    <div className="absolute top-4 right-4 z-10" onClick={() => setShowSubscription(true)}>
+                      <div className="flex items-center gap-2 bg-zinc-900 text-white px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer hover:bg-zinc-800 transition-colors">
+                        <Lock className="w-3 h-3" /> Upgrade
+                      </div>
+                    </div>
+                  )}
+                  <section className={`border border-zinc-200 rounded-xl p-6 space-y-8 ${!isPaid ? "opacity-40 pointer-events-none" : ""}`}>
+                    <div>
+                      <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Suggested plans</h2>
+                      <p className="text-xs text-zinc-500 mt-1">Control how Leaf suggests ready-to-host plans for your community.</p>
+                    </div>
+
+                    {/* Preferred Days */}
+                    <div>
+                      <h3 className="text-xs font-semibold text-zinc-700 mb-1">Preferred days</h3>
+                      <p className="text-xs text-zinc-500 mb-3">Automated scheduling will be limited to these timeframes.</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {DAY_NAMES.map((day, i) => {
+                          const active = settingsDaysOfWeek.includes(i);
                           return (
                             <button
-                              key={cal.objectId}
-                              type="button"
+                              key={day}
                               onClick={() => {
-                                setInviteScopeAll(false);
-                                setInviteScopeIds((prev) =>
-                                  prev.includes(cal.objectId)
-                                    ? prev.filter((id) => id !== cal.objectId)
-                                    : [...prev, cal.objectId]
+                                setSettingsDaysOfWeek((prev) =>
+                                  active ? prev.filter((d) => d !== i) : [...prev, i]
                                 );
                               }}
-                              className={`w-full px-3 py-2 text-sm text-left hover:bg-zinc-50 flex items-center gap-2 ${selected ? "text-zinc-900 font-medium" : "text-zinc-600"}`}
+                              className={`w-12 h-10 rounded-lg text-xs font-medium transition-colors ${
+                                active
+                                  ? "bg-zinc-900 text-white"
+                                  : "border border-zinc-200 text-zinc-400 hover:border-zinc-300"
+                              }`}
                             >
-                              <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selected ? "bg-zinc-900 border-zinc-900" : "border-zinc-300"}`}>
-                                {selected && <Check className="w-3 h-3 text-white" />}
-                              </span>
-                              <span className="truncate">{cal.name}</span>
+                              {day}
                             </button>
                           );
                         })}
                       </div>
-                    </>
+                    </div>
+
+                    {/* Preferred Times */}
+                    <div>
+                      <h3 className="text-xs font-semibold text-zinc-700 mb-1">Preferred times</h3>
+                      <p className="text-xs text-zinc-500 mb-3">Suggested days &amp; time will only fall during these designated windows.</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {TIME_OF_DAY_OPTIONS.map((opt) => {
+                          const active = settingsPreferredTimes.includes(opt.id);
+                          return (
+                            <button
+                              key={opt.id}
+                              onClick={() => {
+                                setSettingsPreferredTimes((prev) =>
+                                  active ? prev.filter((t) => t !== opt.id) : [...prev, opt.id]
+                                );
+                              }}
+                              className={`px-4 py-2.5 rounded-lg text-xs font-medium transition-colors flex flex-col items-center gap-0.5 ${
+                                active
+                                  ? "bg-zinc-900 text-white"
+                                  : "border border-zinc-200 text-zinc-400 hover:border-zinc-300"
+                              }`}
+                            >
+                              <span>{opt.label}</span>
+                              <span className={`text-[9px] font-normal ${active ? "text-zinc-300" : "text-zinc-400"}`}>
+                                {opt.hint}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Blacklisted Categories */}
+                    <div>
+                      <h3 className="text-xs font-semibold text-zinc-700 mb-1">Excluded venue categories</h3>
+                      <p className="text-xs text-zinc-500 mb-3">These categories will be omitted from the suggestion engine.</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {BLACKLIST_PRESETS.map((cat) => {
+                          const active = settingsBlacklistCategories.includes(cat);
+                          return (
+                            <button
+                              key={cat}
+                              onClick={() => {
+                                setSettingsBlacklistCategories((prev) =>
+                                  active ? prev.filter((c) => c !== cat) : [...prev, cat]
+                                );
+                              }}
+                              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                                active
+                                  ? "bg-red-600 text-white border border-red-600"
+                                  : "border border-zinc-200 text-zinc-500 hover:border-zinc-300"
+                              }`}
+                            >
+                              {cat}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Excluded Keywords */}
+                    <div>
+                      <h3 className="text-xs font-semibold text-zinc-700 mb-1">Excluded keywords</h3>
+                      <p className="text-xs text-zinc-500 mb-3">AI won&apos;t suggest plans involving these topics (e.g. wine, drinking, gambling).</p>
+                      <div className="flex gap-2 mb-3">
+                        <input
+                          type="text"
+                          value={excludeKeywordInput}
+                          onChange={(e) => setExcludeKeywordInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const kw = excludeKeywordInput.trim().toLowerCase();
+                              if (kw && !settingsExcludeKeywords.includes(kw)) {
+                                setSettingsExcludeKeywords((prev) => [...prev, kw]);
+                              }
+                              setExcludeKeywordInput("");
+                            }
+                          }}
+                          placeholder="Type a keyword and press Enter"
+                          className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-900 transition-colors"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const kw = excludeKeywordInput.trim().toLowerCase();
+                            if (kw && !settingsExcludeKeywords.includes(kw)) {
+                              setSettingsExcludeKeywords((prev) => [...prev, kw]);
+                            }
+                            setExcludeKeywordInput("");
+                          }}
+                          className="px-4 py-2 bg-zinc-900 text-white text-xs font-medium rounded-full hover:bg-zinc-800 transition-colors"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {settingsExcludeKeywords.length > 0 && (
+                        <div className="flex gap-2 flex-wrap">
+                          {settingsExcludeKeywords.map((kw) => (
+                            <span
+                              key={kw}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-600 text-white"
+                            >
+                              {kw}
+                              <button
+                                type="button"
+                                onClick={() => setSettingsExcludeKeywords((prev) => prev.filter((k) => k !== kw))}
+                                className="hover:text-red-200 transition-colors"
+                              >
+                                &times;
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Photo Style */}
+                    <div>
+                      <h3 className="text-xs font-semibold text-zinc-700 mb-1">Photo style</h3>
+                      <p className="text-xs text-zinc-500 mb-3">Control what kind of images AI selects for suggested plans.</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {([
+                          { id: "default", label: "Default" },
+                          { id: "no-people", label: "No People" },
+                          { id: "venue-focused", label: "Venue & Activity" },
+                        ] as const).map((opt) => (
+                          <button
+                            key={opt.id}
+                            onClick={() => setSettingsImageStyle(opt.id)}
+                            className={`px-4 py-2.5 rounded-lg text-xs font-medium transition-colors ${
+                              settingsImageStyle === opt.id
+                                ? "bg-zinc-900 text-white"
+                                : "border border-zinc-200 text-zinc-400 hover:border-zinc-300"
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                {/* Save */}
+                <button
+                  onClick={handleSaveSettings}
+                  disabled={settingsSaving}
+                  className="h-11 bg-zinc-900 text-white px-6 rounded-full text-[13px] font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                >
+                  {settingsSaving ? "Saving..." : "Save changes"}
+                </button>
+
+                {/* Delete organization — single terminal action. Cascade-deletes
+                    this organization AND the underlying account in one step. For
+                    a non-org (personal) user the same destination page reads
+                    "Delete account" — same flow, contextual label. */}
+                <section className="border border-zinc-200 rounded-xl p-6">
+                  <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 mb-4">Danger zone</h2>
+                  <a
+                    href={`/account/delete?from=${calendarId}`}
+                    className="text-sm text-red-700 hover:text-red-800 underline font-medium"
+                  >
+                    Delete organization
+                  </a>
+                  <p className="text-xs text-zinc-500 mt-2">
+                    Permanently removes this organization, its calendar, and your
+                    sign-in. Followers and past plans are erased.
+                  </p>
+                </section>
+                </div>
+                )}
+
+                {settingsSection === "subscription" && (
+                <div className="space-y-8">
+                  <section className="border border-zinc-200 rounded-xl p-6">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h2 className="text-[15px] font-semibold text-zinc-900">{tierLabel}</h2>
+                      {dashboard.tier !== "starter" && dashboard.subscriptionStatus !== "cancelling" && (
+                        <span className="px-2 py-[3px] bg-green-50 text-emerald-700 rounded-[5px] text-[9px] font-semibold tracking-[0.08em] uppercase">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-500">
+                      {dashboard.tier === "starter"
+                        ? "Free — basic features"
+                        : dashboard.tier === "concierge"
+                        ? "$499/month — done-for-you resident events"
+                        : dashboard.tier === "growth"
+                        ? dashboard.billingInterval === "year" ? "$49.99/year — legacy Social plan, grandfathered into Pro features" : "$4.99/month — legacy Social plan, grandfathered into Pro features"
+                        : dashboard.billingInterval === "year" ? "$99/year — full features" : "$9.99/month — full features"}
+                    </p>
+                    {dashboard.subscriptionStatus === "cancelling" && (
+                      <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                        <p className="text-sm font-medium text-amber-800">Subscription cancelling</p>
+                        <p className="text-xs text-amber-600 mt-0.5">
+                          Your plan remains active until {(cancelAt || dashboard.subscriptionCancelAt) ? new Date((cancelAt || dashboard.subscriptionCancelAt!) * 1000).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "the end of your billing period"}. After that, you&apos;ll be downgraded to the Free plan.
+                        </p>
+                      </div>
+                    )}
+                  </section>
+
+                  <button
+                    onClick={() => setShowSubscription(true)}
+                    className="h-11 bg-zinc-900 text-white px-6 rounded-full text-[13px] font-medium hover:bg-zinc-800 transition-colors"
+                  >
+                    {dashboard.tier === "starter" ? "Upgrade plan" : "Manage billing"}
+                  </button>
+
+                  {dashboard.tier !== "starter" && dashboard.subscriptionStatus !== "cancelling" && (
+                    <button
+                      onClick={handleCancelSubscription}
+                      disabled={subscriptionLoading}
+                      className="block text-xs text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
+                    >
+                      Cancel subscription
+                    </button>
+                  )}
+
+                  {/* Dev — concierge reset (Leaf admins + the org owner) */}
+                  {(isLeafAdmin || dashboard.isOwner) && (
+                    <section className="border border-dashed border-zinc-300 rounded-xl p-6">
+                      <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 mb-1">
+                        Developer · Concierge
+                      </h2>
+                      <p className="text-xs text-zinc-500 mb-4">
+                        Reset this org&apos;s concierge state to re-run onboarding (deletes the current
+                        intake, chat messages, and menu).
+                      </p>
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          onClick={() => handleResetConcierge(false)}
+                          disabled={resettingConcierge}
+                          className="text-xs font-medium text-zinc-700 hover:text-zinc-900 border border-zinc-300 rounded-full px-4 py-2 transition-colors disabled:opacity-50"
+                        >
+                          {resettingConcierge ? "Working…" : "Reset Concierge"}
+                        </button>
+                        <button
+                          onClick={() => handleResetConcierge(true)}
+                          disabled={resettingConcierge}
+                          className="text-xs font-medium text-white bg-zinc-900 hover:bg-zinc-800 rounded-full px-4 py-2 transition-colors disabled:opacity-50"
+                        >
+                          {resettingConcierge ? "Working…" : "Reset + Simulate Onboarding"}
+                        </button>
+                      </div>
+                    </section>
                   )}
                 </div>
-                <div className="w-40">
-                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name (optional)</label>
-                  <input
-                    type="text"
-                    value={inviteName}
-                    onChange={(e) => setInviteName(e.target.value)}
-                    className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
-                    placeholder="Name"
-                  />
-                </div>
-                <button
-                  onClick={handleInviteCoHost}
-                  disabled={!inviteEmail || inviting || (!inviteScopeAll && inviteScopeIds.length === 0)}
-                  className="bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50 shrink-0"
-                >
-                  {inviting ? "Sending..." : "Send Invite"}
-                </button>
+                )}
               </div>
-              <p className="text-xs text-zinc-400 mt-2">
-                {inviteScopeAll
-                  ? "Co-host will have access to every current and future calendar in this organization."
-                  : `Co-host will have access only to ${inviteScopeIds.length === 0 ? "the calendars you select" : `${inviteScopeIds.length} selected calendar${inviteScopeIds.length === 1 ? "" : "s"}`}.`}
-              </p>
-            </section>
+            </div>
+          )}
+        </main>
+      </div>
 
-            {/* Users */}
-            <section>
-              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">
-                Users ({dashboard.members.length})
-              </h2>
-              {dashboard.members.length === 0 ? (
-                <p className="text-sm text-zinc-400">No users yet.</p>
-              ) : (
-                <div className="border border-zinc-200 rounded-xl overflow-hidden" data-tour="tour-members">
-                  <table className="w-full text-sm">
-                    <thead className="bg-zinc-50 text-xs uppercase tracking-widest text-zinc-400">
-                      <tr>
-                        <th className="text-left px-4 py-3 font-bold">Name</th>
-                        <th className="text-left px-4 py-3 font-bold">Email</th>
-                        <th className="text-left px-4 py-3 font-bold">Role</th>
-                        <th className="text-left px-4 py-3 font-bold">Calendar</th>
-                        <th className="text-left px-4 py-3 font-bold">Joined</th>
-                        <th className="px-4 py-3"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100">
-                      {dashboard.members.map((m, i) => {
-                        const isHost = m.status === "Host";
-                        const isOwnerRow = m.status === "Owned" || m.status === "Owner";
-                        return (
-                          <tr key={m.membershipId || `${m.objectId || m.email}-${i}`}>
-                            <td className="px-4 py-3">{m.name}</td>
-                            <td className="px-4 py-3 text-zinc-400">{m.email || "—"}</td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-xs bg-zinc-100 px-2 py-0.5 rounded-full">
-                                  {isOwnerRow ? "Owner" : m.status}
-                                </span>
-                                {m.pending && (
-                                  <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
-                                    Pending invite
-                                  </span>
-                                )}
-                                {m.leafAppConnected && (
-                                  <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
-                                    Synced to app
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-zinc-500">
-                              {isOwnerRow ? (
-                                <span className="text-xs text-zinc-400">All Calendars</span>
-                              ) : isHost && m.scope ? (
-                                m.scope.allCalendars ? (
-                                  <span className="text-xs">All Calendars</span>
-                                ) : m.scope.calendars.length === 0 ? (
-                                  <span className="text-xs text-zinc-400">—</span>
-                                ) : (
-                                  <span
-                                    className="text-xs"
-                                    title={m.scope.calendars.map((c) => c.name).join(", ")}
-                                  >
-                                    {m.scope.calendars.length === 1
-                                      ? m.scope.calendars[0].name
-                                      : `${m.scope.calendars.length} calendars`}
-                                  </span>
-                                )
-                              ) : (
-                                <span className="text-xs text-zinc-400">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-zinc-400">
-                              {new Date(m.joinedAt).toLocaleDateString()}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                {isHost && (
-                                  <button
-                                    onClick={() => {
-                                      const all = m.scope?.allCalendars ?? true;
-                                      const ids = m.scope?.calendars.map((c) => c.id) ?? [];
-                                      setEditScopeFor({
-                                        name: m.name,
-                                        userId: m.objectId,
-                                        email: m.email,
-                                      });
-                                      setEditScopeAll(all);
-                                      setEditScopeIds(all ? [] : ids);
-                                    }}
-                                    className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
-                                    title="Edit scope"
-                                  >
-                                    Edit
-                                  </button>
-                                )}
-                                {!isOwnerRow && (
-                                  <button
-                                    onClick={async () => {
-                                      if (!confirm(`Remove ${m.name} from this calendar?`)) return;
-                                      try {
-                                        if (isHost) {
-                                          await Parse.Cloud.run("removeCoHost", {
-                                            orgId: calendarId,
-                                            ...(m.objectId ? { userId: m.objectId } : { email: m.email }),
-                                          });
-                                        } else if (m.membershipId) {
-                                          await Parse.Cloud.run("removeMember", {
-                                            membershipId: m.membershipId,
-                                            calendarId,
-                                          });
-                                        }
-                                        fetchDashboard();
-                                      } catch (err) {
-                                        console.error("Failed to remove member:", err);
-                                        alert(err instanceof Error ? err.message : "Failed to remove user.");
-                                      }
-                                    }}
-                                    className="text-zinc-400 hover:text-red-500 transition-colors"
-                                    title="Remove user"
-                                  >
-                                    <UserMinus className="w-4 h-4" />
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-
-          </div>
-        )}
-
-        {/* ──────── FOLLOWERS TAB (Growth/Pro) ──────── */}
-        {activeTab === "followers" && (
-          <div className="space-y-8">
-            {/* Calendar filter — shared by pending + approved sections */}
-            {dashboard.calendars.length > 1 && (
-              <div className="flex justify-end">
-                <select
-                  value={followerCalFilter}
-                  onChange={(e) => setFollowerCalFilter(e.target.value)}
-                  className="text-xs border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 focus:outline-none focus:border-zinc-400"
-                >
-                  <option value="all">All Calendars</option>
-                  {dashboard.calendars.filter((c) => c.isActive).map((cal) => (
-                    <option key={cal.objectId} value={cal.objectId}>{cal.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {/* Pending follow requests */}
-            {(() => {
-              const filteredPending = followerCalFilter === "all"
-                ? dashboard.pendingFollowers
-                : dashboard.pendingFollowers.filter((pf) => pf.calendarId === followerCalFilter);
-              if (filteredPending.length === 0) return null;
-              return (
-              <section>
-                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">
-                  Pending Requests ({filteredPending.length})
-                </h2>
-                <div className="border border-amber-200 bg-amber-50/40 rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-amber-50 text-xs uppercase tracking-widest text-zinc-400">
-                      <tr>
-                        <th className="text-left px-4 py-3 font-bold">Name</th>
-                        {dashboard.calendars.length > 1 && followerCalFilter === "all" && (
-                          <th className="text-left px-4 py-3 font-bold">Calendar</th>
-                        )}
-                        <th className="text-left px-4 py-3 font-bold">Requested</th>
-                        <th className="text-right px-4 py-3 font-bold">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-amber-100">
-                      {filteredPending.map((pf) => (
-                        <tr key={pf.membershipId}>
-                          <td className="px-4 py-3">{pf.name}</td>
-                          {dashboard.calendars.length > 1 && followerCalFilter === "all" && (
-                            <td className="px-4 py-3 text-zinc-400">{pf.calendarName || "—"}</td>
-                          )}
-                          <td className="px-4 py-3 text-zinc-400">
-                            {new Date(pf.requestedAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-3 text-right flex items-center justify-end gap-2">
-                            <button
-                              onClick={async () => {
-                                try {
-                                  await Parse.Cloud.run("approveFollowerRequest", {
-                                    calendarId: pf.calendarId || calendarId,
-                                    membershipId: pf.membershipId,
-                                  });
-                                  setDashboard((d) => d ? {
-                                    ...d,
-                                    pendingFollowers: d.pendingFollowers.filter((x) => x.membershipId !== pf.membershipId),
-                                    pendingFollowerCount: d.pendingFollowerCount - 1,
-                                    followers: [...d.followers, { membershipId: pf.membershipId, objectId: pf.objectId, name: pf.name, phone: pf.phone, calendarId: pf.calendarId, calendarName: pf.calendarName, joinedAt: new Date().toISOString() }],
-                                    followerCount: d.followerCount + 1,
-                                    calendars: d.calendars.map((c) => c.objectId === pf.calendarId ? { ...c, pendingFollowerCount: Math.max(0, c.pendingFollowerCount - 1) } : c),
-                                  } : d);
-                                  setToast("Follower approved!");
-                                  setTimeout(() => setToast(null), 2000);
-                                } catch (err) {
-                                  console.error("Failed to approve follower:", err);
-                                  alert(err instanceof Error ? err.message : "Failed to approve.");
-                                }
-                              }}
-                              className="bg-zinc-900 text-white px-3 py-1.5 text-xs uppercase tracking-wider font-bold rounded-lg hover:bg-zinc-800 transition-colors"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={async () => {
-                                try {
-                                  await Parse.Cloud.run("rejectFollowerRequest", {
-                                    calendarId: pf.calendarId || calendarId,
-                                    membershipId: pf.membershipId,
-                                  });
-                                  setDashboard((d) => d ? {
-                                    ...d,
-                                    pendingFollowers: d.pendingFollowers.filter((x) => x.membershipId !== pf.membershipId),
-                                    pendingFollowerCount: d.pendingFollowerCount - 1,
-                                    calendars: d.calendars.map((c) => c.objectId === pf.calendarId ? { ...c, pendingFollowerCount: Math.max(0, c.pendingFollowerCount - 1) } : c),
-                                  } : d);
-                                  setToast("Request rejected.");
-                                  setTimeout(() => setToast(null), 2000);
-                                } catch (err) {
-                                  console.error("Failed to reject follower:", err);
-                                }
-                              }}
-                              className="text-zinc-300 hover:text-red-500 transition-colors text-xs uppercase tracking-wider font-bold px-3 py-1.5 border border-zinc-200 rounded-lg hover:border-red-200"
-                            >
-                              Reject
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-              );
-            })()}
-            <section>
-              {(() => {
-                const filteredFollowers = followerCalFilter === "all"
-                  ? dashboard.followers
-                  : dashboard.followers.filter((f) => f.calendarId === followerCalFilter);
-                const calendarNames = [...new Map(dashboard.followers.filter((f) => f.calendarId).map((f) => [f.calendarId, f.calendarName])).entries()];
-                const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-                const newFollowersInRange = filteredFollowers.filter(
-                  (f) => f.joinedAt && new Date(f.joinedAt).getTime() >= thirtyDaysAgo
-                ).length;
-                const showNoGrowthCallout = filteredFollowers.length > 0 && newFollowersInRange === 0;
-                return (<>
-              {showNoGrowthCallout && (
-                <div className="border border-emerald-200 bg-emerald-50/40 rounded-xl p-4 flex items-start gap-3 mb-4">
-                  <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center flex-shrink-0">
-                    <Lightbulb className="w-4 h-4" />
-                  </div>
-                  <p className="text-sm text-zinc-700 leading-relaxed pt-1">
-                    No new followers in the last 30 days. Share your calendar link to drive new sign-ups.
-                  </p>
-                </div>
-              )}
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-                  Followers ({filteredFollowers.length})
-                </h2>
-              </div>
-              {filteredFollowers.length === 0 ? (
-                <div className="border border-zinc-200 rounded-xl p-8 space-y-6">
-                  <div className="text-center">
-                    <h3 className="text-lg font-light text-zinc-900 mb-2">Share your calendar to get followers</h3>
-                    <p className="text-sm text-zinc-400">When people follow your calendar, they&apos;ll see your plans and get notified about upcoming events.</p>
-                  </div>
-                  <div className="space-y-3">
-                    {dashboard.calendars.filter((c) => c.isActive).map((cal) => (
-                      <div key={cal.objectId} className="bg-zinc-50 rounded-lg p-4 flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-0.5">{cal.name}</p>
-                          <p className="text-sm font-mono text-zinc-900">{SITE_HOST}/org/{cal.shareId}</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <a
-                            href={`/org/${cal.shareId}`}
-                            target="_blank"
-                            className="bg-zinc-900 text-white px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-lg hover:bg-zinc-800 transition-colors flex items-center gap-1.5"
-                          >
-                            View <ExternalLink className="w-3 h-3" />
-                          </a>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${SITE_HOST}/org/${cal.shareId}`);
-                              setToast("Link copied!");
-                              setTimeout(() => setToast(null), 2000);
-                            }}
-                            className="border border-zinc-200 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-lg hover:bg-white transition-colors flex items-center gap-1.5"
-                          >
-                            <Link2 className="w-3 h-3" /> Copy
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="border border-zinc-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-zinc-50 text-xs uppercase tracking-widest text-zinc-400">
-                      <tr>
-                        <th className="text-left px-4 py-3 font-bold">Name</th>
-                        {dashboard.calendars.length > 1 && followerCalFilter === "all" && (
-                          <th className="text-left px-4 py-3 font-bold">Calendar</th>
-                        )}
-                        <th className="text-left px-4 py-3 font-bold">Joined</th>
-                        <th className="text-right px-4 py-3 font-bold">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100">
-                      {filteredFollowers.map((f) => (
-                        <tr key={f.membershipId}>
-                          <td className="px-4 py-3">{f.name}</td>
-                          {dashboard.calendars.length > 1 && followerCalFilter === "all" && (
-                            <td className="px-4 py-3 text-zinc-400">{f.calendarName || "—"}</td>
-                          )}
-                          <td className="px-4 py-3 text-zinc-400">
-                            {new Date(f.joinedAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <button
-                              onClick={async () => {
-                                if (!confirm(`Remove ${f.name} as a follower?`)) return;
-                                try {
-                                  await Parse.Cloud.run("removeFollower", {
-                                    membershipId: f.membershipId,
-                                    calendarId,
-                                  });
-                                  setDashboard((d) =>
-                                    d ? { ...d, followers: d.followers.filter((x) => x.membershipId !== f.membershipId), followerCount: d.followerCount - 1 } : d
-                                  );
-                                } catch (err) {
-                                  console.error("Failed to remove follower:", err);
-                                }
-                              }}
-                              className="text-zinc-300 hover:text-red-500 transition-colors"
-                            >
-                              <UserMinus className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-                </>);
-              })()}
-            </section>
-          </div>
-        )}
-
-      </main>
+      {/* Mobile bottom bar */}
+      <DashboardBottomBar
+        activeTab={activeTab}
+        onNavigate={setTab}
+        onCreate={() => openNewPlan()}
+      />
 
       {/* ──────── MODALS ──────── */}
 
       {/* Add Calendar Modal */}
       {showAddCalendar && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-xl p-8 relative">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/45 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-t-[20px] md:rounded-[14px] p-8 relative shadow-[0_20px_50px_rgba(0,0,0,0.25)]">
             <button
               onClick={() => setShowAddCalendar(false)}
               className="absolute top-4 right-4 p-2 rounded-full hover:bg-zinc-100"
             >
               <Plus className="w-5 h-5 rotate-45" />
             </button>
-            <h2 className="text-xl font-light tracking-tight mb-6">Create Calendar</h2>
+            <h2 className="text-[19px] font-semibold tracking-tight mb-6">Create calendar</h2>
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name</label>
+                <label className="text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-400 block mb-1.5">Name</label>
                 <input
                   value={newCalName}
                   onChange={(e) => setNewCalName(e.target.value)}
-                  className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
+                  className="w-full border border-zinc-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-zinc-900"
                   placeholder="Calendar name"
                 />
               </div>
               <div>
-                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
+                <label className="text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-400 block mb-1.5">Description</label>
                 <textarea
                   value={newCalDesc}
                   onChange={(e) => setNewCalDesc(e.target.value)}
                   rows={2}
-                  className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-y"
+                  className="w-full border border-zinc-200 rounded-lg p-3 text-sm focus:outline-none focus:border-zinc-900 resize-y"
                   placeholder={newCalSuggestStarters
                     ? "Describe the vibe — e.g., date night ideas in Fort Greene"
                     : "What is this calendar about?"}
@@ -3377,7 +2649,7 @@ export default function OrgDashboardPage() {
                 )}
               </div>
               <div>
-                <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">
+                <label className="text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-400 block mb-1.5">
                   Location
                 </label>
                 <CityAutocomplete
@@ -3392,7 +2664,7 @@ export default function OrgDashboardPage() {
                     }
                   }}
                   placeholder="City, neighborhood, or building address"
-                  className="w-full border-b border-zinc-300 py-2 text-lg font-light focus:outline-none focus:border-zinc-900"
+                  className="w-full border border-zinc-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-zinc-900"
                 />
                 <p className="text-[11px] text-zinc-400 mt-1">
                   More specific = more accurate nearby-deal matching.
@@ -3406,9 +2678,9 @@ export default function OrgDashboardPage() {
                 <button
                   type="button"
                   onClick={() => setNewCalSuggestStarters(!newCalSuggestStarters)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${newCalSuggestStarters ? "bg-zinc-900" : "bg-zinc-200"}`}
+                  className={`relative w-[38px] h-[22px] rounded-full transition-colors shrink-0 ${newCalSuggestStarters ? "bg-zinc-900" : "bg-zinc-200"}`}
                 >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${newCalSuggestStarters ? "left-5" : "left-0.5"}`} />
+                  <div className={`absolute top-[3px] w-4 h-4 bg-white rounded-full shadow transition-transform ${newCalSuggestStarters ? "left-[19px]" : "left-[3px]"}`} />
                 </button>
               </div>
               <div className="flex items-center justify-between py-2">
@@ -3419,17 +2691,17 @@ export default function OrgDashboardPage() {
                 <button
                   type="button"
                   onClick={() => setNewCalHideDeals(!newCalHideDeals)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${!newCalHideDeals ? "bg-zinc-900" : "bg-zinc-200"}`}
+                  className={`relative w-[38px] h-[22px] rounded-full transition-colors shrink-0 ${!newCalHideDeals ? "bg-zinc-900" : "bg-zinc-200"}`}
                 >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${!newCalHideDeals ? "left-5" : "left-0.5"}`} />
+                  <div className={`absolute top-[3px] w-4 h-4 bg-white rounded-full shadow transition-transform ${!newCalHideDeals ? "left-[19px]" : "left-[3px]"}`} />
                 </button>
               </div>
               <button
                 onClick={handleAddCalendar}
                 disabled={!newCalName || !newCalCitySelected || addingCalendar}
-                className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50 mt-2"
+                className="w-full h-11 bg-zinc-900 text-white rounded-full text-[13px] font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50 mt-2"
               >
-                {addingCalendar ? "Creating..." : "Create Calendar"}
+                {addingCalendar ? "Creating..." : "Create calendar"}
               </button>
             </div>
           </div>
@@ -3446,23 +2718,22 @@ export default function OrgDashboardPage() {
         />
       )}
 
-
       {/* Edit Co-Host Scope Modal */}
       {editScopeFor && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-xl p-8 relative">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/45 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-t-[20px] md:rounded-[14px] p-8 relative shadow-[0_20px_50px_rgba(0,0,0,0.25)]">
             <button
               onClick={() => setEditScopeFor(null)}
               className="absolute top-4 right-4 p-2 rounded-full hover:bg-zinc-100"
             >
               <Plus className="w-5 h-5 rotate-45" />
             </button>
-            <h2 className="text-xl font-light tracking-tight mb-1">Edit co-host scope</h2>
+            <h2 className="text-[19px] font-semibold tracking-tight mb-1">Edit co-host scope</h2>
             <p className="text-xs text-zinc-500 mb-6">
               {editScopeFor.name}
             </p>
             <div className="mb-6">
-              <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-2">Calendars</label>
+              <label className="text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-400 block mb-2">Calendars</label>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -3509,9 +2780,9 @@ export default function OrgDashboardPage() {
             <button
               onClick={handleSaveScope}
               disabled={savingScope || (!editScopeAll && editScopeIds.length === 0)}
-              className="w-full bg-zinc-900 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              className="w-full h-11 bg-zinc-900 text-white rounded-full text-[13px] font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50"
             >
-              {savingScope ? "Saving…" : "Save Changes"}
+              {savingScope ? "Saving…" : "Save changes"}
             </button>
           </div>
         </div>
@@ -3521,11 +2792,11 @@ export default function OrgDashboardPage() {
           "Concierge" button. The calendar itself looks like any other. */}
       {showConciergeChat && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowConciergeChat(false)} />
+          <div className="absolute inset-0 bg-zinc-900/45" onClick={() => setShowConciergeChat(false)} />
           <div className="relative bg-white w-full lg:w-1/2 h-full shadow-2xl flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 shrink-0">
               <div className="min-w-0">
-                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Concierge</h2>
+                <h2 className="text-sm font-semibold text-zinc-900">Concierge</h2>
                 <p className="text-xs text-zinc-400 truncate">
                   {dashboard.calendars.find((c) => c.isConciergeServiced)?.name || dashboard.name}
                 </p>
@@ -3547,10 +2818,9 @@ export default function OrgDashboardPage() {
         </div>
       )}
 
-      {/* Per-plan chat drawer — opened from the Upcoming Plans carousel
-          hover overlay. Right-side slide-over that hosts the same
-          ChatShell the /chat/[eventGroupId] route uses, so the owner
-          reads and replies without leaving the dashboard. */}
+      {/* Per-plan chat drawer — right-side slide-over hosting the same
+          ChatShell the /chat/[eventGroupId] route uses, so the owner reads
+          and replies without leaving the dashboard. */}
       {chatPlanId && (
         <PlanChatDrawer
           eventGroupId={chatPlanId}
@@ -3558,7 +2828,7 @@ export default function OrgDashboardPage() {
         />
       )}
 
-      {/* Active Plan Detail Modal — shared component, also used by /plans page */}
+      {/* Active Plan Detail Modal — shared component */}
       {selectedActivePlan && (
         <PlanDetailModal
           plan={{
@@ -3663,7 +2933,7 @@ export default function OrgDashboardPage() {
         />
       )}
 
-      {/* Create Plan Modal (marketplace + duplicate) */}
+      {/* Create Plan Modal (marketplace + duplicate + Home CTAs) */}
       {showCreatePlanModal && (
         <CreatePlanModal
           calendarId={editingHostRequestCalendarId || calendarId}
@@ -3682,7 +2952,21 @@ export default function OrgDashboardPage() {
           pollWinningTime={pollConvertWinningTime}
           autoSyncOnMount={autoSyncNewPlanOnMount}
           onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); setEditingPlanId(null); setEditingHostRequestId(null); setEditingHostRequestCalendarId(null); setPollConvertEventGroupId(null); setPollConvertWinningDate(null); setPollConvertWinningTime(null); setAutoSyncNewPlanOnMount(false); }}
-          onCreated={() => fetchDashboard()}
+          onCreated={() => {
+            fetchDashboard();
+            // Publish confirmation on Home. `onCreated` fires for edits too —
+            // only banner-worthy when it wasn't an edit of an existing plan.
+            if (!editingPlanId) {
+              const followers = dashboardRef.current?.followerCount ?? 0;
+              setPublishBanner(
+                followers > 0
+                  ? `Plan published · ${followers} follower${followers === 1 ? "" : "s"} will be notified`
+                  : "Plan published",
+              );
+              if (publishBannerTimer.current) clearTimeout(publishBannerTimer.current);
+              publishBannerTimer.current = setTimeout(() => setPublishBanner(null), 12_000);
+            }
+          }}
           onUpgrade={() => { setShowCreatePlanModal(false); setShowSubscription(true); }}
         />
       )}
@@ -3697,7 +2981,7 @@ export default function OrgDashboardPage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 text-white px-5 py-3 rounded-lg shadow-lg text-sm flex items-center gap-2 animate-fade-in">
+        <div className="fixed bottom-6 left-6 max-w-[calc(100vw-3rem)] z-50 bg-zinc-900 text-white px-5 py-3 rounded-[10px] shadow-lg text-sm flex items-center gap-2 animate-fade-in">
           <Check className="w-4 h-4" />
           {toast}
         </div>
@@ -3720,4 +3004,3 @@ export default function OrgDashboardPage() {
     </div>
   );
 }
-

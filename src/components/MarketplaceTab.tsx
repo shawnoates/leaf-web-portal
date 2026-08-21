@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from "react";
-import {
-  Plus,
-  MapPin,
-  Sparkles,
-  ExternalLink,
-  Star,
-  Search,
-} from "lucide-react";
+import { Plus, MapPin, Sparkles, ExternalLink, Search } from "lucide-react";
 import { getDefaultCoverForSeed } from "@/lib/default-covers";
+
+// Marketplace discovery cards, redesigned: one image per card (the map is gone
+// — the venue is a text line with a Map link out to Google Maps), a type chip
+// on the cover, and a full-width Add-to-calendar pill. Data flow is unchanged:
+// four sources fetched in parallel, cached per calendar, locally re-ranked
+// against the org's blacklist/keyword settings.
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -56,9 +55,9 @@ interface MarketplaceTabProps {
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const SOURCE_LABELS: Record<string, string> = {
-  ticketmaster_direct: "Events",
-  yelp: "Places",
-  tmdb: "Now Showing",
+  ticketmaster_direct: "Event",
+  yelp: "Place",
+  tmdb: "Movie",
   firecrawl: "Local Find",
 };
 
@@ -70,7 +69,6 @@ const SOURCE_FILTERS = [
   { id: "tmdb", label: "Movies" },
   { id: "firecrawl", label: "Local Finds" },
 ];
-
 
 // ── Cache helpers ──────────────────────────────────────────────────────
 
@@ -148,9 +146,8 @@ function getFallbackRecommended(events: MarketplaceEvent[]): MarketplaceEvent[] 
   return result;
 }
 
-// Local recommendation engine — replaces the Gemini call.
-// Applies the org's blacklist + keyword filters, then round-robins across
-// sources for diversity. No model tokens consumed.
+// Local recommendation engine — applies the org's blacklist + keyword filters,
+// then round-robins across sources for diversity. No model tokens consumed.
 function computeLocalRecommendations(
   events: MarketplaceEvent[],
   orgSettings: OrgSettings,
@@ -175,71 +172,6 @@ function computeLocalRecommendations(
   });
 
   return getFallbackRecommended(filtered).map((e) => e.id);
-}
-
-// ── Venue map (Google Maps Embed iframe with location pin) ──────────────
-
-const VenueMap = memo(function VenueMap({
-  venue,
-}: {
-  venue: { name: string; address: string };
-}) {
-  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-  const [failed, setFailed] = useState(false);
-
-  // Render placeholder when: no API key, network failure on iframe load, OR a
-  // load-timeout watchdog fires (covers DNS failures and very slow loads).
-  // Note: this does NOT catch Google's "API not activated" content page —
-  // that renders as a successful HTML response inside the iframe, which CORS
-  // blocks us from inspecting. Enabling the Maps Embed API in Cloud Console
-  // is the fix for that case.
-  if (!key || failed) {
-    return (
-      <div className="w-full h-full bg-zinc-50 flex items-center justify-center text-zinc-300">
-        <MapPin className="w-6 h-6" />
-      </div>
-    );
-  }
-  const query = encodeURIComponent(`${venue.name}, ${venue.address}`);
-  const src = `https://www.google.com/maps/embed/v1/place?key=${key}&q=${query}&zoom=15`;
-  return (
-    <VenueMapIframe
-      src={src}
-      title={`Map of ${venue.name}`}
-      onFail={() => setFailed(true)}
-    />
-  );
-});
-
-function VenueMapIframe({
-  src,
-  title,
-  onFail,
-}: {
-  src: string;
-  title: string;
-  onFail: () => void;
-}) {
-  const [loaded, setLoaded] = useState(false);
-  // Watchdog: if onLoad hasn't fired within 8s, give up and show fallback.
-  useEffect(() => {
-    if (loaded) return;
-    const t = setTimeout(() => {
-      if (!loaded) onFail();
-    }, 8000);
-    return () => clearTimeout(t);
-  }, [loaded, onFail]);
-  return (
-    <iframe
-      src={src}
-      loading="lazy"
-      referrerPolicy="no-referrer-when-downgrade"
-      className="w-full h-full border-0"
-      title={title}
-      onLoad={() => setLoaded(true)}
-      onError={onFail}
-    />
-  );
 }
 
 // ── Venue photo (lazy Google Places lookup) ─────────────────────────────
@@ -269,7 +201,7 @@ const VenuePhoto = memo(function VenuePhoto({ venue, alt }: { venue: { name: str
 
   if (url) {
     return (
-      <img src={url} alt={alt} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+      <img src={url} alt={alt} className="w-full h-full object-cover" />
     );
   }
 
@@ -293,7 +225,6 @@ const VenuePhoto = memo(function VenuePhoto({ venue, alt }: { venue: { name: str
 // ── Component ──────────────────────────────────────────────────────────
 
 export default function MarketplaceTab({ calendarId, city, orgSettings, prefetchedEvents, onAddEvent }: MarketplaceTabProps) {
-  const [section, setSection] = useState<"discover" | "collabs">("discover");
   const [events, setEvents] = useState<MarketplaceEvent[]>(prefetchedEvents || []);
   const [recommendedIds, setRecommendedIds] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(!prefetchedEvents);
@@ -305,7 +236,7 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [visibleCount, setVisibleCount] = useState(10);
+  const [visibleCount, setVisibleCount] = useState(12);
 
   // Fetch Unsplash images for events missing images (fire-and-forget enrichment)
   const enrichWithUnsplash = useCallback(async (allEvents: MarketplaceEvent[]) => {
@@ -406,7 +337,7 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
     try {
       await fetchFromServer(query);
     } catch {
-      setError("Couldn\u2019t load marketplace events. Try again.");
+      setError("Couldn’t load marketplace events. Try again.");
       setEvents([]);
     } finally {
       setLoading(false);
@@ -414,11 +345,11 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
   }, [calendarId, fetchFromServer]);
 
   useEffect(() => {
-    if (section === "discover" && !initialLoadDone.current) {
+    if (!initialLoadDone.current) {
       initialLoadDone.current = true;
       fetchEvents(true);
     }
-  }, [fetchEvents, section]);
+  }, [fetchEvents]);
 
   // Trigger recommendations for prefetched data
   useEffect(() => {
@@ -434,7 +365,7 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
     searchTimeout.current = setTimeout(() => {
       const trimmed = value.trim();
       setSearchQuery(trimmed);
-      setVisibleCount(10);
+      setVisibleCount(12);
       if (trimmed) {
         setSourceFilter("all");
         fetchEvents(false, trimmed);
@@ -444,19 +375,14 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
     }, 500);
   }, [fetchEvents]);
 
-  const handleAddEvent = (event: MarketplaceEvent) => {
-    onAddEvent(event);
-  };
-
   // Apply source filter or recommendation
   const filtered = useMemo(() => {
     if (sourceFilter === "recommended") {
-      // Use Gemini recommendations if available
       if (recommendedIds && recommendedIds.length > 0) {
         const idSet = new Set(recommendedIds);
         const byId = new Map(events.map((e) => [e.id, e]));
         return recommendedIds
-          .filter((id) => byId.has(id))
+          .filter((id) => idSet.has(id) && byId.has(id))
           .map((id) => byId.get(id)!);
       }
       // Fallback to round-robin
@@ -473,273 +399,213 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
   const isRecommended = sourceFilter === "recommended";
 
   return (
-    <div className="space-y-6">
-      {/* Section sub-tabs */}
-      <div className="flex gap-1 border-b border-zinc-100">
-        <button
-          onClick={() => setSection("discover")}
-          className={`px-4 py-2 text-xs font-medium uppercase tracking-widest border-b-2 transition-colors ${
-            section === "discover"
-              ? "border-zinc-900 text-zinc-900"
-              : "border-transparent text-zinc-400 hover:text-zinc-600"
-          }`}
-        >
-          Discover
-        </button>
-        <button
-          onClick={() => setSection("collabs")}
-          className={`px-4 py-2 text-xs font-medium uppercase tracking-widest border-b-2 transition-colors ${
-            section === "collabs"
-              ? "border-zinc-900 text-zinc-900"
-              : "border-transparent text-zinc-400 hover:text-zinc-600"
-          }`}
-        >
-          Collabs
-        </button>
+    <div className="space-y-4">
+      {/* Search bar */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => handleSearch(e.target.value)}
+          placeholder="Search events, venues, orgs"
+          className="w-full h-10 pl-10 pr-14 text-sm border border-zinc-200 rounded-full focus:outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+        />
+        {searchInput && (
+          <button
+            onClick={() => handleSearch("")}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-zinc-600"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
-      {/* ──── Discover Section ──── */}
-      {section === "discover" && (
-        <>
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Search events, venues, movies..."
-              className="w-full pl-10 pr-4 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-300 focus:border-transparent placeholder:text-zinc-400"
-            />
-            {searchInput && (
-              <button
-                onClick={() => handleSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-zinc-600"
-              >
-                Clear
-              </button>
-            )}
-          </div>
+      {/* DISCOVER row — filter chips + sort note */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase mr-1.5">
+          Discover
+        </span>
+        {SOURCE_FILTERS.map((sf) => (
+          <button
+            key={sf.id}
+            onClick={() => { setSourceFilter(sf.id); setVisibleCount(12); }}
+            className={`px-3.5 py-2 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
+              sourceFilter === sf.id
+                ? "bg-zinc-900 text-white"
+                : "border border-zinc-200 text-zinc-600 hover:border-zinc-300"
+            }`}
+          >
+            {sf.label}
+          </button>
+        ))}
+        <span className="flex-1" />
+        <span className="hidden lg:inline text-[11px] text-zinc-400">
+          Sorted by what fits your community
+        </span>
+      </div>
 
-          {/* Source filter chips */}
-          <div className="flex gap-2 overflow-x-auto no-scrollbar">
-            {SOURCE_FILTERS.map((sf) => (
-              <button
-                key={sf.id}
-                onClick={() => { setSourceFilter(sf.id); setVisibleCount(10); }}
-                className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors flex items-center gap-1 ${
-                  sourceFilter === sf.id
-                    ? "bg-zinc-900 text-white"
-                    : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
-                }`}
-              >
-                {sf.id === "recommended" && <Star className="w-3 h-3" />}
-                {sf.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Loading skeleton */}
-          {loading && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="border border-zinc-100 rounded-lg overflow-hidden animate-pulse">
-                  <div className="h-40 bg-zinc-100" />
-                  <div className="p-4 space-y-3">
-                    <div className="h-4 bg-zinc-100 rounded w-3/4" />
-                    <div className="h-3 bg-zinc-100 rounded w-full" />
-                    <div className="h-3 bg-zinc-100 rounded w-1/2" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Error state */}
-          {!loading && error && (
-            <div className="text-center py-16 space-y-4">
-              <p className="text-sm text-zinc-400">{error}</p>
-              <button
-                onClick={() => fetchEvents(false)}
-                className="text-xs font-medium text-zinc-600 hover:text-zinc-900 underline"
-              >
-                Try again
-              </button>
-            </div>
-          )}
-
-          {/* Empty state */}
-          {!loading && !error && filtered.length === 0 && (
-            <div className="text-center py-16 space-y-3">
-              <Sparkles className="w-8 h-8 text-zinc-300 mx-auto" />
-              <p className="text-sm font-medium text-zinc-500">
-                {!city
-                  ? "Set a city on your calendar to discover events"
-                  : sourceFilter !== "all"
-                  ? "No events match your filters"
-                  : "No events found for your area"}
-              </p>
-              <p className="text-xs text-zinc-400">
-                {!city
-                  ? "Go to Calendars and add a city to get started."
-                  : sourceFilter !== "all"
-                  ? "Try adjusting your filters."
-                  : "Check back later for new ideas."}
-              </p>
-            </div>
-          )}
-
-          {/* Section heading */}
-          {!loading && !error && filtered.length > 0 && (
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
-                {searchQuery
-                  ? `Results for \u201c${searchQuery}\u201d`
-                  : isRecommended
-                  ? "Recommended for You"
-                  : sourceFilter === "all"
-                  ? "All"
-                  : SOURCE_LABELS[sourceFilter] || "Events"}
-              </h3>
-            </div>
-          )}
-
-          {/* Event cards grid */}
-          {!loading && !error && filtered.length > 0 && (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filtered.slice(0, visibleCount).map((event) => {
-                  const sourceLabel = SOURCE_LABELS[event.source] || event.source;
-                  const showPlan = event.planTitle && (isRecommended || event.source === "firecrawl");
-                  const displayTitle = showPlan ? event.planTitle : event.title;
-                  const displayDescription = showPlan ? event.planDescription : event.description;
-
-                  return (
-                    <div
-                      key={event.id}
-                      className="border border-zinc-100 rounded-lg overflow-hidden hover:border-zinc-300 transition-colors group"
-                    >
-                      {/* Image + map split. Map only renders when the result
-                          has a venue address; otherwise image takes full width. */}
-                      <div className="h-40 overflow-hidden relative flex">
-                        <div className={event.venue?.address ? "w-1/2 h-full overflow-hidden" : "w-full h-full overflow-hidden"}>
-                          {event.image ? (
-                            <img
-                              src={event.image}
-                              alt={displayTitle}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            />
-                          ) : event.venue ? (
-                            <VenuePhoto venue={event.venue} alt={displayTitle || ""} />
-                          ) : (
-                            <div
-                              className="w-full h-full flex items-center justify-center"
-                              style={{ background: getDefaultCoverForSeed(event.id).gradient }}
-                            >
-                              <Sparkles className="w-8 h-8 text-white/70" />
-                            </div>
-                          )}
-                        </div>
-                        {event.venue?.address && (
-                          <div className="w-1/2 h-full border-l border-zinc-100">
-                            <VenueMap venue={event.venue} />
-                          </div>
-                        )}
-                        <span className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[9px] font-semibold text-zinc-600 px-2 py-0.5 rounded-full">
-                          {sourceLabel}
-                        </span>
-                      </div>
-
-                      {/* Content */}
-                      <div className="p-4 space-y-3">
-                        <div>
-                          <h3 className="text-sm font-medium text-zinc-900 line-clamp-1">
-                            {displayTitle}
-                          </h3>
-                          <p className="text-xs text-zinc-400 mt-1 line-clamp-2">
-                            {displayDescription}
-                          </p>
-                          {event.url && (
-                            <a
-                              href={event.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 mt-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                              View details
-                            </a>
-                          )}
-                        </div>
-
-                        {/* Metadata */}
-                        {event.venue && (
-                          <div className="text-xs text-zinc-400 uppercase tracking-widest space-y-0.5">
-                            <span className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              {event.venue.name}
-                            </span>
-                            {event.venue.address && (
-                              <a
-                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.venue.address)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block pl-4 normal-case text-blue-600 hover:text-blue-800 transition-colors"
-                              >
-                                {event.venue.address}
-                              </a>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Add button */}
-                        <div className="flex items-center justify-end pt-1">
-                          <button
-                            onClick={() => handleAddEvent(event)}
-                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 transition-colors"
-                          >
-                            <Plus className="w-3 h-3" />
-                            Add to Calendar
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+      {/* Loading skeleton */}
+      {loading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="border border-zinc-200 rounded-xl overflow-hidden animate-pulse">
+              <div className="h-[120px] bg-zinc-100" />
+              <div className="p-4 space-y-3">
+                <div className="h-4 bg-zinc-100 rounded w-3/4" />
+                <div className="h-3 bg-zinc-100 rounded w-full" />
+                <div className="h-9 bg-zinc-100 rounded-full w-full" />
               </div>
-
-              {/* Load more */}
-              {filtered.length > visibleCount && (
-                <div className="flex justify-center pt-2">
-                  <button
-                    onClick={() => setVisibleCount((c) => c + 10)}
-                    className="px-5 py-2 text-xs font-medium text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition-colors"
-                  >
-                    Load more
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </>
+            </div>
+          ))}
+        </div>
       )}
 
-      {/* ──── Collabs Section (Coming Soon) ──── */}
-      {section === "collabs" && (
-        <div className="border border-violet-200 rounded-xl p-6 bg-gradient-to-br from-violet-50/60 to-white">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-base font-medium text-zinc-900">Community Collabs</h3>
-            <span className="bg-violet-600 text-white text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full">Coming Soon</span>
-          </div>
-          <p className="text-sm text-zinc-500 leading-relaxed mb-4">
-            Team up with other community groups to co-host events, share audiences, and grow together.
-          </p>
-          <ul className="space-y-2 list-disc list-inside">
-            <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Joint Events</strong> — Co-host plans with other groups to double the energy and reach.</li>
-            <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Cross-Promotion</strong> — Feature your events on partner community calendars automatically.</li>
-            <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Shared Audiences</strong> — Tap into new members from communities that complement yours.</li>
-          </ul>
+      {/* Error state */}
+      {!loading && error && (
+        <div className="text-center py-16 space-y-4">
+          <p className="text-sm text-zinc-500">{error}</p>
+          <button
+            onClick={() => fetchEvents(false)}
+            className="text-xs font-medium text-zinc-600 hover:text-zinc-900 underline"
+          >
+            Retry
+          </button>
         </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && !error && filtered.length === 0 && (
+        <div className="text-center py-16 space-y-3">
+          <Sparkles className="w-8 h-8 text-zinc-300 mx-auto" />
+          <p className="text-sm font-medium text-zinc-500">
+            {!city
+              ? "Set a city on your calendar to discover events"
+              : sourceFilter !== "all"
+              ? "No events match your filters"
+              : "No events found for your area"}
+          </p>
+          <p className="text-xs text-zinc-400">
+            {!city
+              ? "Go to Calendars and add a city to get started."
+              : sourceFilter !== "all"
+              ? "Try adjusting your filters."
+              : "Check back later for new ideas."}
+          </p>
+        </div>
+      )}
+
+      {/* Event cards grid */}
+      {!loading && !error && filtered.length > 0 && (
+        <>
+          {searchQuery && (
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
+              Results for &ldquo;{searchQuery}&rdquo;
+            </h3>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+            {filtered.slice(0, visibleCount).map((event) => {
+              const sourceLabel = SOURCE_LABELS[event.source] || event.source;
+              const showPlan = event.planTitle && (isRecommended || event.source === "firecrawl");
+              const displayTitle = showPlan ? event.planTitle : event.title;
+              const displayDescription = showPlan ? event.planDescription : event.description;
+
+              return (
+                <div
+                  key={event.id}
+                  className="border border-zinc-200 rounded-xl overflow-hidden flex flex-col"
+                >
+                  {/* One image per card, type chip bottom-left */}
+                  <div className="h-[120px] relative overflow-hidden shrink-0">
+                    {event.image ? (
+                      <img
+                        src={event.image}
+                        alt={displayTitle}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : event.venue ? (
+                      <VenuePhoto venue={event.venue} alt={displayTitle || ""} />
+                    ) : (
+                      <div
+                        className="w-full h-full flex items-center justify-center"
+                        style={{ background: getDefaultCoverForSeed(event.id).gradient }}
+                      >
+                        <Sparkles className="w-8 h-8 text-white/70" />
+                      </div>
+                    )}
+                    <span className="absolute bottom-2 left-2 bg-white/[0.92] text-zinc-900 text-[9px] font-semibold tracking-[0.08em] uppercase px-2 py-1 rounded-[5px]">
+                      {sourceLabel}
+                    </span>
+                  </div>
+
+                  {/* Body */}
+                  <div className="p-4 flex flex-col flex-1">
+                    <h3 className="text-sm font-medium leading-[1.35] text-zinc-900">
+                      {displayTitle}
+                    </h3>
+                    {displayDescription && (
+                      <p className="text-xs leading-normal text-zinc-500 mt-1.5 line-clamp-2">
+                        {displayDescription}
+                      </p>
+                    )}
+
+                    {/* Venue line — text + Map link, no embedded map */}
+                    {event.venue && (
+                      <p className="flex items-center gap-1.5 mt-2.5 text-xs text-zinc-700 min-w-0">
+                        <span className="w-[5px] h-[5px] rounded-full bg-zinc-400 shrink-0" />
+                        <span className="truncate">
+                          {event.venue.name}
+                          {event.venue.address ? ` · ${event.venue.address}` : ""}
+                        </span>
+                        {event.venue.address && (
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${event.venue.name}, ${event.venue.address}`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-zinc-500 underline shrink-0 hover:text-zinc-900"
+                          >
+                            Map
+                          </a>
+                        )}
+                      </p>
+                    )}
+                    {event.url && (
+                      <a
+                        href={event.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 mt-2 text-[11px] text-zinc-400 hover:text-zinc-700 transition-colors"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        View details
+                      </a>
+                    )}
+
+                    <span className="flex-1" />
+                    <button
+                      onClick={() => onAddEvent(event)}
+                      className="mt-3.5 w-full h-[38px] inline-flex items-center justify-center gap-1.5 bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add to calendar
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Load more */}
+          {filtered.length > visibleCount && (
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={() => setVisibleCount((c) => c + 12)}
+                className="px-5 py-2.5 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-full hover:border-zinc-300 transition-colors"
+              >
+                Load more
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
