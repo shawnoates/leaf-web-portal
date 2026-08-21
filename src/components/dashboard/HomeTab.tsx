@@ -342,8 +342,8 @@ export default function HomeTab({
       >
         <div className="flex-1 min-w-[180px]">
           <p className="text-[13px] font-medium text-zinc-900">
-            {neverRsvpd} follower{neverRsvpd === 1 ? " has" : "s have"} never
-            RSVP&apos;d
+            {neverRsvpd} follower{neverRsvpd === 1 ? " has " : "s have "}
+            never RSVP&apos;d
           </p>
           <p className="text-[11px] text-zinc-500 mt-0.5">
             See who they are and reach out
@@ -584,7 +584,13 @@ export default function HomeTab({
           </div>
         </div>
 
-        <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-6">
+        <div
+          className={`mt-6 ${
+            dashboard.recentPhotos.length > 0
+              ? "lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-6"
+              : ""
+          }`}
+        >
           {/* Main column */}
           <div className="min-w-0">
             {view === "list" ? (

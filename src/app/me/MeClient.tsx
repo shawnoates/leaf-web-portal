@@ -884,7 +884,7 @@ function AttendCta({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: RsvpS
   }
   return (
     <button className="row-btn primary" disabled={busy} onClick={go}>
-      {busy ? "…" : full ? "Join waitlist" : plan.requireApproval ? "Request" : "Count me in"}
+      {busy ? "…" : full ? "Join waitlist" : plan.requireApproval ? "Request to Join" : "Count me in"}
     </button>
   );
 }
@@ -1737,7 +1737,7 @@ const CSS = `
 .leafme .otp-card{width:100%;max-width:360px}
 .leafme .otp-sub{font-size:13px;color:var(--body);margin-bottom:18px}
 .leafme .otp-in{width:100%;border:1px solid var(--edge-2);border-radius:8px;padding:12px;
-  font-family:var(--sans);font-size:15px;margin-bottom:12px}
+  font-family:var(--sans);font-size:16px;margin-bottom:12px}
 .leafme .otp-in:focus{outline:2px solid var(--green);outline-offset:1px}
 .leafme .otp-err{font-size:12px;color:var(--orange);margin-bottom:10px}
 

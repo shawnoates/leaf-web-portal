@@ -963,7 +963,10 @@ const NP_CSS = `
   .np-foot{padding:13px 18px calc(13px + env(safe-area-inset-bottom))}
   .np-cols{flex-direction:column;gap:0}
   .np-side{width:100%}
-  .np-under{font-size:15px}
+  /* ≥16px on every focusable field — iOS Safari zooms the page on focus of
+     anything smaller, and the zoom sticks, pushing the sheet off-screen right */
+  .np-under,.np-ai-in,.np-box{font-size:16px}
+  .np-under-lg-m{font-size:17px}
   .np-primary{padding:14px 20px}
   /* Every control clears 44px of thumb (spec: mobile hit targets) */
   .np-chip{padding:11px 15px;font-size:12px}

@@ -347,8 +347,8 @@ export default function GrowPerformance({
               {neverRsvpdCount > 0 && (
                 <p className="text-xs text-zinc-500 mt-2">
                   {neverRsvpdCount} follower
-                  {neverRsvpdCount === 1 ? " has" : "s have"} never RSVP&apos;d
-                  to anything.
+                  {neverRsvpdCount === 1 ? " has " : "s have "}never
+                  RSVP&apos;d to anything.
                 </p>
               )}
               {neverRsvpdCount > 0 && (
