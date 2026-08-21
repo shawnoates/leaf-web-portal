@@ -201,6 +201,7 @@ const VenuePhoto = memo(function VenuePhoto({ venue, alt }: { venue: { name: str
 
   if (url) {
     return (
+      // eslint-disable-next-line @next/next/no-img-element
       <img src={url} alt={alt} className="w-full h-full object-cover" />
     );
   }
@@ -517,6 +518,7 @@ export default function MarketplaceTab({ calendarId, city, orgSettings, prefetch
                   {/* One image per card, type chip bottom-left */}
                   <div className="h-[120px] relative overflow-hidden shrink-0">
                     {event.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={event.image}
                         alt={displayTitle}
