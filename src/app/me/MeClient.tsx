@@ -593,17 +593,19 @@ function DashboardView({
             </section>
           )}
 
-          <div className="prompt-box">
-            <div className="prompt-body">
-              <div className="prompt-h">Hosting an event soon?</div>
-              <p className="prompt-p">
-                Make an invitation and collect RSVPs for free. It can live on your own
-                calendar — four fields and a link you can text. No new account needed for
-                you or the guests you invite.
-              </p>
+          {!data.person.ownsCalendars && (
+            <div className="prompt-box">
+              <div className="prompt-body">
+                <div className="prompt-h">Hosting an event soon?</div>
+                <p className="prompt-p">
+                  Make an invitation and collect RSVPs for free. It can live on your own
+                  calendar — four fields and a link you can text. No new account needed for
+                  you or the guests you invite.
+                </p>
+              </div>
+              <button className="btn primary" onClick={openCreate}>Create an event</button>
             </div>
-            <button className="btn primary" onClick={openCreate}>Make a plan</button>
-          </div>
+          )}
 
           {data.person.ownsCalendars && (
             <div className="prompt-box tight">
