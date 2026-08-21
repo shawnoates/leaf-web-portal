@@ -595,9 +595,9 @@ function DashboardView({
 
           <div className="prompt-box">
             <div className="prompt-body">
-              <div className="prompt-h">Hosting something soon?</div>
+              <div className="prompt-h">Hosting an event soon?</div>
               <p className="prompt-p">
-                Make a plan invitation and collect RSVPs for free. It lives on your own
+                Make an invitation and collect RSVPs for free. It can live on your own
                 calendar — four fields and a link you can text. No new account needed for
                 you or the guests you invite.
               </p>
