@@ -17,7 +17,7 @@ import { APP_LINK_URL } from "@/lib/site";
 // two option groups expand in place (3b). One component, two layouts — the
 // sheet isn't a scaled-down modal, so the branch is explicit rather than CSS.
 //
-// The plan lands on the author's OWN calendar by default ("Invite link only").
+// The plan lands on the author's OWN calendar by default ("My calendar").
 // If they don't have one yet we create it here, silently, on the way through —
 // no org-setup detour, no second account. Guests still RSVP by phone with no
 // account, which is the whole promise of the box that opens this thing.
@@ -27,7 +27,7 @@ export interface PostToOption {
   /** Groups objectId, or LINK_ONLY for "my own calendar". */
   id: string;
   name: string;
-  /** Owner/co-host — only owned calendars can carry a repeating series. */
+  /** Owner/co-host of the calendar, as opposed to a follower. */
   owned: boolean;
 }
 
@@ -42,7 +42,6 @@ const PERSONAL_CAL_KEY = "leaf_me_personal_calendar_id";
  *  MeClient restores it when it sees ?openNewPlan=1 coming back. */
 export const ME_PLAN_DRAFT_KEY = "leaf.mePlanDraftBeforeGoogleAuth";
 
-const SERIES_DEFAULT_OCCURRENCES = 12;
 
 // ---- Formatting ------------------------------------------------------------
 function dateLabel(iso: string): string {
@@ -73,24 +72,6 @@ function daysOut(iso: string): number {
   return Math.round((target.getTime() - start.getTime()) / 86400000);
 }
 
-// ---- Timing hints ("what works for your followers") ------------------------
-interface TimingHints {
-  source: "category" | "calendar" | "global";
-  sampleSize: number;
-  bestDay: { day: string; dayIndex: number; sharePct: number } | null;
-  bestTime: { bucket: string; sharePct: number; suggestedTime: string | null } | null;
-}
-const BUCKET_TIME: Record<string, string> = {
-  morning: "10:00", afternoon: "14:00", evening: "18:30", night: "21:00",
-};
-/** Next occurrence of `dayIndex` (0=Sun) strictly in the future. */
-function nextDateForDayIndex(dayIndex: number): string {
-  const now = new Date();
-  const delta = ((dayIndex - now.getDay()) + 7) % 7 || 7;
-  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + delta);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 export interface CreatedPlan { eventGroupId: string | null; inviteUrl: string | null; title: string }
 
 export interface NewPlanDraftSnapshot {
@@ -107,8 +88,6 @@ export interface NewPlanDraftSnapshot {
   postTo?: string;
   hideVenue?: boolean;
   requireApproval?: boolean;
-  repeats?: boolean;
-  seriesFreq?: "weekly" | "biweekly" | "monthly";
 }
 
 export default function NewPlanModal({
@@ -152,10 +131,6 @@ export default function NewPlanModal({
   const [postTo, setPostTo] = useState<string>(restore?.postTo ?? LINK_ONLY);
   const [hideVenue, setHideVenue] = useState(restore?.hideVenue ?? true);
   const [requireApproval, setRequireApproval] = useState(restore?.requireApproval ?? false);
-  const [repeats, setRepeats] = useState(restore?.repeats ?? false);
-  const [seriesFreq, setSeriesFreq] = useState<"weekly" | "biweekly" | "monthly">(
-    restore?.seriesFreq ?? "weekly",
-  );
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverBase64, setCoverBase64] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -184,27 +159,6 @@ export default function NewPlanModal({
       .catch(() => { /* neutral label */ });
     return () => { cancelled = true; };
   }, []);
-
-  // ---- Timing hints — only when this person already runs a calendar and the
-  // server has enough history to say something true. Spec: no card otherwise.
-  const [hints, setHints] = useState<TimingHints | null>(null);
-  useEffect(() => {
-    const owned = options.find((o) => o.owned);
-    if (!owned) return;
-    let cancelled = false;
-    Parse.Cloud.run("getPlanTimingHints", { calendarId: owned.id })
-      .then((r: TimingHints | null) => {
-        if (cancelled || !r || !r.bestDay || !r.bestTime) return;
-        setHints(r);
-      })
-      .catch(() => { /* no card */ });
-    return () => { cancelled = true; };
-  }, [options]);
-
-  const hintDate = hints?.bestDay ? nextDateForDayIndex(hints.bestDay.dayIndex) : null;
-  const hintTime = hints?.bestTime
-    ? hints.bestTime.suggestedTime || BUCKET_TIME[hints.bestTime.bucket] || null
-    : null;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") requestClose(); };
@@ -274,7 +228,7 @@ export default function NewPlanModal({
   }
 
   // ---- Calendar resolution -------------------------------------------------
-  // "Invite link only" means "my own calendar". Reuse the remembered one, else
+  // "My calendar" is the author's own calendar. Reuse the remembered one, else
   // the first calendar this account already owns, else create one now. This is
   // the whole no-org-setup promise — the author never sees this step.
   async function resolvePersonalCalendarId(): Promise<string> {
@@ -351,23 +305,13 @@ export default function NewPlanModal({
         requireApproval,
       };
 
-      let eventGroupId: string | null = null;
-      if (repeats) {
-        await Parse.Cloud.run("createPlanSeries", {
-          ...shared,
-          firstInstanceDate: when,
-          freq: seriesFreq,
-          maxOccurrences: SERIES_DEFAULT_OCCURRENCES,
-        });
-      } else {
-        const res = (await Parse.Cloud.run("createManualPlan", {
-          ...shared,
-          date: when,
-          isHosted: true,
-          clientTimeZone: tz,
-        })) as { eventGroupId?: string };
-        eventGroupId = res?.eventGroupId || null;
-      }
+      const res = (await Parse.Cloud.run("createManualPlan", {
+        ...shared,
+        date: when,
+        isHosted: true,
+        clientTimeZone: tz,
+      })) as { eventGroupId?: string };
+      const eventGroupId: string | null = res?.eventGroupId || null;
 
       // Sync is a bonus, never a gate — a Google failure can't fail the plan.
       if (eventGroupId && googleConnected) {
@@ -399,7 +343,7 @@ export default function NewPlanModal({
       const snapshot: NewPlanDraftSnapshot = {
         prompt, draftApplied, title, description, date, time,
         venueQuery, venue, capacity, hostNote, postTo,
-        hideVenue, requireApproval, repeats, seriesFreq,
+        hideVenue, requireApproval,
       };
       try { sessionStorage.setItem(ME_PLAN_DRAFT_KEY, JSON.stringify(snapshot)); } catch { /* ignore */ }
       const returnUrl = new URL(window.location.href);
@@ -490,26 +434,15 @@ export default function NewPlanModal({
         className="np-under"
         autoResolveInitial
       />
-      {venueQuery.trim() && !venue && (
+      {venueQuery.trim() && !venue ? (
         <div className="np-hint">Pick a result so guests get directions.</div>
-      )}
+      ) : !venueQuery.trim() ? (
+        <div className="np-hint">
+          The invite reads &ldquo;Location TBD&rdquo; until you add a place.
+        </div>
+      ) : null}
     </>
   );
-
-  const suggestionCard = hints && hintDate && hintTime ? (
-    <div className="np-card">
-      <div className="np-card-label">WHAT WORKS FOR YOUR FOLLOWERS</div>
-      <div className="np-card-line">
-        {hints.bestDay!.day}s draw {hints.bestDay!.sharePct}% of RSVPs · {hints.bestTime!.bucket} starts work best
-      </div>
-      <button
-        className="np-secondary"
-        onClick={() => { touch("date"); touch("time"); setDate(hintDate); setTime(hintTime); }}
-      >
-        Use {dateLabel(hintDate)} · {timeLabel(hintTime)}
-      </button>
-    </div>
-  ) : null;
 
   const coverDrop = (
     <>
@@ -571,36 +504,12 @@ export default function NewPlanModal({
         big={narrow}
       />
       <Toggle
-        label={narrow ? "Require approval to attend" : "Require approval"}
+        label="Require approval to attend"
         helper={narrow ? "Approve visitors before confirming" : undefined}
         on={requireApproval}
         onChange={setRequireApproval}
         big={narrow}
       />
-      <Toggle
-        label="Repeats"
-        helper={narrow ? "Recreate this plan each cycle" : undefined}
-        on={repeats}
-        onChange={setRepeats}
-        big={narrow}
-        // A series is created by the calendar's owner/co-host — posting to a
-        // calendar you only follow can't carry one.
-        disabled={postTo !== LINK_ONLY && !(options.find((o) => o.id === postTo)?.owned ?? false)}
-      />
-      {repeats && (
-        <div className="np-freq">
-          <span>Every</span>
-          <select
-            value={seriesFreq}
-            onChange={(e) => setSeriesFreq(e.target.value as "weekly" | "biweekly" | "monthly")}
-          >
-            <option value="weekly">week</option>
-            <option value="biweekly">other week</option>
-            <option value="monthly">month</option>
-          </select>
-          <span>· {SERIES_DEFAULT_OCCURRENCES} times</span>
-        </div>
-      )}
     </div>
   );
 
@@ -622,13 +531,13 @@ export default function NewPlanModal({
           className={`np-chip ${postTo === LINK_ONLY ? "on" : ""}`}
           onClick={() => setPostTo(LINK_ONLY)}
         >
-          Invite link only
+          My calendar
         </button>
         {options.map((o) => (
           <button
             key={o.id}
             className={`np-chip ${postTo === o.id ? "on" : ""}`}
-            onClick={() => { setPostTo(o.id); if (!o.owned) setRepeats(false); }}
+            onClick={() => setPostTo(o.id)}
           >
             {o.name}
           </button>
@@ -688,7 +597,7 @@ export default function NewPlanModal({
                   </p>
                 </>
               ) : (
-                <p className="np-done-foot">Your repeating plans are on the calendar.</p>
+                <p className="np-done-foot">It&rsquo;s on your calendar.</p>
               )}
               <div className="np-done-actions">
                 <button className="np-primary" onClick={onClose}>Done</button>
@@ -750,7 +659,6 @@ export default function NewPlanModal({
                   </>
                 )}
 
-                {suggestionCard && <div style={{ marginTop: 16 }}>{suggestionCard}</div>}
 
                 <button
                   className="np-group"
@@ -790,11 +698,10 @@ export default function NewPlanModal({
                   aria-expanded={privacyOpen}
                 >
                   <span>
-                    <span className="np-group-t">Privacy &amp; repeats</span>
+                    <span className="np-group-t">Privacy</span>
                     <span className="np-group-s">
                       {hideVenue ? "Venue hidden until RSVP is on" : "Venue shows publicly"}
                       {requireApproval ? " · approval on" : ""}
-                      {repeats ? " · repeating" : ""}
                     </span>
                   </span>
                   <span className="np-chev">{privacyOpen ? "⌃" : "⌄"}</span>
@@ -824,7 +731,6 @@ export default function NewPlanModal({
                     <div style={{ marginTop: 20 }}>{postToChips}</div>
                   </div>
                   <div className="np-side">
-                    {suggestionCard}
                     {coverDrop}
                     <div style={{ marginTop: 14 }}>{capacityRow}</div>
                     <div className="np-label sm" style={{ marginTop: 18 }}>HOST NOTE</div>
@@ -966,13 +872,6 @@ const NP_CSS = `
 .np-hint{margin-top:7px;font-size:11px;color:var(--muted)}
 
 /* Suggestion card */
-.np-card{border:1px solid rgba(0,0,0,.1);border-radius:11px;padding:12px 13px;margin-bottom:14px}
-.np-card-label{font-size:10px;font-weight:600;letter-spacing:.13em;color:var(--muted);margin-bottom:6px}
-.np-card-line{font-size:12.5px;line-height:1.45;color:var(--ink);margin-bottom:10px}
-.np-secondary{border:1px solid rgba(0,0,0,.2);background:#fff;color:var(--ink);
-  font-family:var(--sans);font-size:11.5px;font-weight:500;padding:8px 12px;
-  border-radius:8px;cursor:pointer}
-.np-secondary:hover{border-color:rgba(0,0,0,.35);background:var(--recessed)}
 
 /* Cover dropzone */
 .np-drop{display:block;width:100%;border:1px dashed rgba(0,0,0,.2);background:none;
@@ -1001,9 +900,6 @@ const NP_CSS = `
 .np-switch.big .np-knob{width:20px;height:20px}
 .np-switch.on .np-knob{transform:translateX(17px)}
 .np-switch.big.on .np-knob{transform:translateX(18px)}
-.np-freq{display:flex;align-items:center;gap:8px;padding:11px 0;font-size:12px;color:var(--body)}
-.np-freq select{font-family:var(--sans);font-size:12px;border:1px solid rgba(0,0,0,.18);
-  border-radius:6px;padding:6px 8px;background:#fff;color:var(--ink)}
 
 .np-sync{display:block;width:100%;margin-top:14px;border:1px solid rgba(0,0,0,.2);
   background:#fff;color:var(--ink);font-family:var(--sans);font-size:11.5px;font-weight:600;
@@ -1058,7 +954,6 @@ const NP_CSS = `
   /* Every control clears 44px of thumb (spec: mobile hit targets) */
   .np-chip{padding:11px 15px;font-size:12px}
   .np-ai-go{min-height:44px}
-  .np-secondary{padding:12px 14px}
   .np-sync{padding:14px 0;font-size:12px}
 }
 @media(prefers-reduced-motion:reduce){.np-root *{animation:none!important;transition:none!important}}

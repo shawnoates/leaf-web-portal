@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Lock } from "lucide-react";
+import { Lock, MapPin } from "lucide-react";
 import PlanWhen from "./PlanWhen";
 import StandalonePlanRsvp from "./StandalonePlanRsvp";
 
@@ -119,6 +119,16 @@ export default function StandalonePlanCard({
                 ) : null}
               </div>
             )
+          ) : variant !== "copy" ? (
+            // No Location on the plan at all (the host left the venue blank).
+            // getPlanShareInfo returns null only in that case — gating keeps
+            // the object and nulls the name/address pair — so this can't be
+            // confused with the redacted state above. Copy mode strips
+            // instance context, so a recipe fork says nothing about where.
+            <div className="flex items-center gap-1.5 text-sm text-zinc-400 italic">
+              <MapPin className="w-3 h-3" />
+              <span>Location TBD</span>
+            </div>
           ) : null}
 
           {hostName ? (
