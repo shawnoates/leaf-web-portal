@@ -228,18 +228,18 @@ function PlanTile({
   onOpen?: () => void;
 }) {
   const tileEl = plan.image ? (
-    <div className={`tile photo ${variant}`}>
+    <div className={`tile photo t-${variant}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={plan.image} alt="" />
     </div>
   ) : (() => {
     const t = tileFor(plan, index);
-    return <div className={`tile ${t.tone} ${variant}`}>{t.word}</div>;
+    return <div className={`tile ${t.tone} t-${variant}`}>{t.word}</div>;
   })();
-  const content = <div className={`tile-wrap ${variant}`}>{tileEl}</div>;
+  const content = <div className={`tile-wrap t-${variant}`}>{tileEl}</div>;
   if (onOpen) {
     return (
-      <button type="button" onClick={onOpen} className={`tile-link ${variant}`} aria-label={`Open ${plan.title}`}>
+      <button type="button" onClick={onOpen} className={`tile-link t-${variant}`} aria-label={`Open ${plan.title}`}>
         {content}
       </button>
     );
@@ -517,8 +517,8 @@ function DashboardView({
       <header className="topbar">
         <div className="page topbar-in">
           <div className="brand">
-            <span className="mark" aria-hidden />
-            <span className="wordmark">leaf</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="brand-logo" src="/leaf-logo-black.png" alt="Leaf" />
           </div>
           <div className="topbar-r">
             <button className="pill" onClick={openCreate}>+ New plan</button>
@@ -711,7 +711,7 @@ function EmptyHero({ onCreate }: { onCreate: () => void }) {
   return (
     <section className="hero">
       <div className="hero-top">
-        <div className="tile sage hero">plans</div>
+        <div className="tile sage t-hero">plans</div>
         <div className="hero-text">
           <div className="eyebrow">Nothing coming up</div>
           <h2 className="hero-title">No plans yet</h2>
@@ -1011,19 +1011,24 @@ function NeedsHostRail({ plans, onHosted }: { plans: HostPlan[]; onHosted: () =>
                 </div>
                 <div className="hostcard-meta">
                   {p.decayLevel === "soon" && <span className="urgent">{decayText(p)}</span>}
-                  <button
-                    type="button"
-                    className={`heart ${on ? "on" : ""}`}
-                    aria-label={on ? "You're interested" : "Mark interest"}
-                    disabled={on || pendingInterest.has(p.ideaId)}
-                    onClick={() => markInterested(p)}
-                  >
-                    <Heart className="w-3 h-3" fill={on ? "currentColor" : "none"} />
-                    {count > 0 && <span>{count} interested</span>}
-                  </button>
+                  {count > 0 && (
+                    <span className={`interest ${on ? "on" : ""}`}>{count} interested</span>
+                  )}
                 </div>
               </div>
-              <button className="hostbtn" onClick={() => setHostingIdea(p)}>Host this</button>
+              <div className="hostact">
+                <button className="hostbtn" onClick={() => setHostingIdea(p)}>Host this</button>
+                <button
+                  type="button"
+                  className={`heart-toggle ${on ? "on" : ""}`}
+                  aria-label={on ? "You're interested" : "Mark interest"}
+                  aria-pressed={on}
+                  disabled={on || pendingInterest.has(p.ideaId)}
+                  onClick={() => markInterested(p)}
+                >
+                  <Heart className="w-3.5 h-3.5" fill={on ? "currentColor" : "none"} />
+                </button>
+              </div>
             </div>
           );
         })}
@@ -1510,9 +1515,8 @@ const CSS = `
 /* ---- Top bar ---- */
 .leafme .topbar{background:var(--paper);border-bottom:1px solid var(--rule)}
 .leafme .topbar-in{display:flex;align-items:center;justify-content:space-between;padding:14px 22px}
-.leafme .brand{display:flex;align-items:center;gap:8px}
-.leafme .mark{width:15px;height:19px;background:var(--ink);border-radius:2px 8px 2px 8px}
-.leafme .wordmark{font-size:15px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.leafme .brand{display:flex;align-items:center}
+.leafme .brand-logo{height:22px;width:auto;display:block}
 .leafme .topbar-r{display:flex;align-items:center;gap:14px}
 .leafme .pill{border:0;background:var(--ink);color:#fff;font-size:12px;font-weight:500;
   padding:9px 16px;border-radius:999px;cursor:pointer;transition:opacity 120ms ease}
@@ -1581,13 +1585,13 @@ const CSS = `
   background:var(--hatch);color:#9a9488}
 .leafme .tile.sage{background:#dce5dc;color:#2f5d43}
 .leafme .tile.cream{background:#f5e6c8;color:#8a6a2f}
-.leafme .tile.hero{width:92px;height:92px;flex:none;font-size:19px}
-.leafme .tile.row{width:56px;height:42px;border-radius:6px;font-size:12px}
+.leafme .tile.t-hero{width:92px;height:92px;flex:none;font-size:19px}
+.leafme .tile.t-row{width:56px;height:42px;border-radius:6px;font-size:12px}
 .leafme .tile.photo{overflow:hidden;background:#f2f2f0}
 .leafme .tile.photo img{width:100%;height:100%;object-fit:cover;display:block}
 .leafme .tile-wrap{position:relative;display:block}
-.leafme .tile-wrap.hero,.leafme .tile-link.hero{flex:none}
-.leafme .tile-wrap.row,.leafme .tile-link.row{flex:none}
+.leafme .tile-wrap.t-hero,.leafme .tile-link.t-hero{flex:none}
+.leafme .tile-wrap.t-row,.leafme .tile-link.t-row{flex:none}
 .leafme .tile-link{display:block;padding:0;margin:0;border:0;background:none;cursor:pointer}
 
 /* ---- Your plans ---- */
@@ -1657,12 +1661,11 @@ const CSS = `
 .leafme .hostcard-when{font-size:11px;color:var(--muted)}
 .leafme .hostcard-meta{display:flex;align-items:center;gap:8px;margin-top:3px;flex-wrap:wrap}
 .leafme .urgent{font-size:10px;font-weight:500;color:var(--orange)}
-.leafme .heart{display:inline-flex;align-items:center;gap:4px;border:0;background:none;padding:0;
-  cursor:pointer;font-size:10.5px;color:var(--body)}
-.leafme .heart.on{color:var(--green)}
-.leafme .heart:disabled{cursor:default}
+.leafme .interest{font-size:10.5px;color:var(--body)}
+.leafme .interest.on{color:var(--green)}
+.leafme .hostact{flex:none;display:flex;align-items:center;gap:7px}
 .leafme .hostbtn{flex:none;border:0;background:var(--green);color:#fff;font-size:11px;font-weight:500;
-  padding:8px 12px;border-radius:7px;cursor:pointer}
+  padding:8px 10px;border-radius:7px;cursor:pointer}
 .leafme .hostbtn:hover{background:#1a5a3a}
 
 .leafme .places{background:var(--paper);border:1px solid var(--card);border-radius:10px;overflow:hidden}
@@ -1673,17 +1676,19 @@ const CSS = `
 .leafme .place-n{font-size:12.5px;color:var(--ink)}
 .leafme .place-s{font-size:10.5px;color:var(--muted)}
 .leafme .place.on .place-s{color:var(--body)}
-.leafme .heart-toggle{flex:none;width:30px;height:30px;display:flex;align-items:center;
+.leafme .heart-toggle{flex:none;width:28px;height:28px;display:flex;align-items:center;
   justify-content:center;border:1px solid var(--edge-2);background:var(--paper);color:var(--ink);
   border-radius:999px;cursor:pointer;padding:0;transition:background 120ms ease}
 .leafme .heart-toggle.on{background:var(--green);border-color:var(--green);color:#fff}
+.leafme .heart-toggle:disabled{cursor:default}
 
 .leafme .cals{display:flex;flex-direction:column;gap:1px}
 .leafme .cal-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
 .leafme .cal-row:last-child{border-bottom:1px solid var(--line)}
 .leafme .cal-row:hover{background:rgba(0,0,0,.02)}
-.leafme .cal-ava{width:24px;height:24px;flex:none;border-radius:5px;background:var(--fill);
-  object-fit:cover;display:grid;place-items:center;font-size:11px;font-weight:600;color:var(--body)}
+.leafme .cal-ava{width:24px;height:24px;flex:none;border-radius:5px;background:transparent;
+  object-fit:contain;display:grid;place-items:center;font-size:11px;font-weight:600;color:var(--body)}
+.leafme .cal-ava.ph{background:var(--fill)}
 .leafme .cal-body{flex:1 1 auto;min-width:0}
 .leafme .cal-n{font-size:12.5px;color:var(--ink)}
 .leafme .cal-s{font-size:10.5px;color:var(--muted)}
@@ -1755,8 +1760,7 @@ const CSS = `
 }
 @media(max-width:760px){
   .leafme .topbar-in{padding:8px 18px 12px}
-  .leafme .mark{width:13px;height:17px;border-radius:2px 7px 2px 7px}
-  .leafme .wordmark{font-size:14px}
+  .leafme .brand-logo{height:20px}
   .leafme .pill{display:none}          /* the sticky CTA is the mobile entry */
   .leafme .who span{display:none}
   .leafme .ava{width:30px;height:30px;font-size:11.5px}
@@ -1767,7 +1771,7 @@ const CSS = `
   /* Hero: full-bleed photo on top, thumb-sized actions in one row */
   .leafme .hero-top{display:block;padding:0}
   .leafme .hero-top > .tile-link,.leafme .hero-top > .tile-wrap{display:block;width:100%}
-  .leafme .tile.hero{width:100%;height:120px;border-radius:0;font-size:22px}
+  .leafme .tile.t-hero{width:100%;height:120px;border-radius:0;font-size:22px}
   .leafme .hero-text{padding:14px 14px 0}
   .leafme .hero-title{font-size:22px;line-height:1.15;margin:5px 0 4px}
   .leafme .hero-ctx{font-size:12px}
@@ -1808,12 +1812,14 @@ const CSS = `
   .leafme .hostcard{border-radius:11px;padding:11px;gap:11px}
   .leafme .hostthumb{width:48px;height:48px;border-radius:8px}
   .leafme .hostcard-title{font-size:14px}
-  .leafme .hostbtn{padding:12px 14px;font-size:11.5px;border-radius:8px}
+  .leafme .hostbtn{padding:12px;font-size:11.5px;border-radius:8px}
+  .leafme .hostact{gap:8px}
   .leafme .places{border-radius:11px}
   .leafme .place{padding:11px 12px}
   .leafme .place-n{font-size:13.5px}
   .leafme .place-s{font-size:11px}
   .leafme .heart-toggle{width:44px;height:44px}
+  .leafme .hostact .heart-toggle{width:40px;height:40px}
   .leafme .cal-row{padding:11px 0;gap:11px}
   .leafme .cal-ava{width:28px;height:28px;border-radius:6px}
   .leafme .cal-n{font-size:13px}
