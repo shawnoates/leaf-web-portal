@@ -634,11 +634,6 @@ function DashboardView({
         )}
       </main>
 
-      {/* Mobile only — the spec's sticky CTA, with the content fading under it */}
-      <div className="sticky-cta">
-        <button className="btn primary wide" onClick={openCreate}>+ New plan</button>
-      </div>
-
       {openPlan && (
         <PlanModal plan={openPlan} onClose={() => setOpenPlanId(null)} onRsvp={onRsvp} />
       )}
@@ -1699,9 +1694,6 @@ const CSS = `
   border-radius:10px;display:flex;align-items:center;gap:12px}
 .leafme .texts p{flex:1 1 auto;font-size:11.5px;line-height:1.45;color:var(--body)}
 
-/* ---- Sticky mobile CTA (hidden on desktop) ---- */
-.leafme .sticky-cta{display:none}
-
 /* ---- Modals ---- */
 .leafme .modal-overlay{position:fixed;inset:0;z-index:60;background:rgba(23,21,15,.6);
   display:flex;align-items:center;justify-content:center;padding:16px}
@@ -1754,14 +1746,14 @@ const CSS = `
    ========================================================================== */
 @media(max-width:1023px){
   .leafme .cols{flex-direction:column}
-  .leafme .colL{border-right:0;padding:18px 18px 0}
-  .leafme .colR{width:100%;padding:8px 18px 84px;background:var(--paper)}
-  .leafme .colL.solo{padding-bottom:84px}
+  .leafme .colL{border-right:0;padding:18px 22px 0}
+  .leafme .colR{width:100%;padding:8px 22px 32px;background:var(--paper)}
+  .leafme .colL.solo{padding-bottom:32px}
 }
 @media(max-width:760px){
-  .leafme .topbar-in{padding:8px 18px 12px}
+  .leafme .topbar-in{padding:8px 22px 12px}
   .leafme .brand-logo{height:20px}
-  .leafme .pill{display:none}          /* the sticky CTA is the mobile entry */
+  .leafme .pill{padding:9px 14px;font-size:11.5px}
   .leafme .who span{display:none}
   .leafme .ava{width:30px;height:30px;font-size:11.5px}
   .leafme .greet-wx{font-size:10.5px}
@@ -1828,16 +1820,9 @@ const CSS = `
   .leafme .texts p{font-size:11px}
   .leafme .texts .btn{padding:12px 14px}
 
-  /* Sticky CTA — content fades under it */
-  .leafme .sticky-cta{display:block;position:fixed;left:0;right:0;bottom:0;z-index:40;
-    padding:14px 18px calc(20px + env(safe-area-inset-bottom));
-    background:linear-gradient(rgba(255,255,255,0),#fff 42%)}
-  .leafme .sticky-cta .btn{padding:16px 0;border-radius:12px;font-size:13.5px;
-    box-shadow:0 4px 14px rgba(0,0,0,.18)}
-
   /* Modals become bottom sheets */
   .leafme .modal-overlay{align-items:flex-end;padding:0}
-  .leafme .modal-card{max-width:none;border-radius:16px 16px 0 0;max-height:88vh}
+  .leafme .modal-card{max-width:none;border-radius:16px 16px 0 0;max-height:88vh;max-height:88dvh}
   .leafme .modal-img{border-radius:16px 16px 0 0}
   .leafme .modal-body{padding:18px 20px calc(24px + env(safe-area-inset-bottom))}
   .leafme .probe-pop{border-radius:20px 20px 0 0}

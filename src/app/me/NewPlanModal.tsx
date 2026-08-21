@@ -163,11 +163,24 @@ export default function NewPlanModal({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") requestClose(); };
     window.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
+    const scrollY = window.scrollY;
+    const prev = {
+      overflow: document.body.style.overflow,
+      position: document.body.style.position,
+      top: document.body.style.top,
+      width: document.body.style.width,
+    };
     document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
+      document.body.style.overflow = prev.overflow;
+      document.body.style.position = prev.position;
+      document.body.style.top = prev.top;
+      document.body.style.width = prev.width;
+      window.scrollTo(0, scrollY);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -804,7 +817,7 @@ const NP_CSS = `
 .np-root *{box-sizing:border-box}
 .np-overlay{position:fixed;inset:0;z-index:80;background:rgba(23,21,15,.55);
   display:flex;align-items:center;justify-content:center;padding:24px}
-.np-sheet{background:var(--surface);width:100%;max-width:720px;max-height:92vh;
+.np-sheet{background:var(--surface);width:100%;max-width:720px;max-height:92vh;max-height:92dvh;
   display:flex;flex-direction:column;border-radius:14px;overflow:hidden;
   animation:npin .18s ease}
 @keyframes npin{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}
@@ -813,7 +826,8 @@ const NP_CSS = `
 .np-head-t{font-size:12.5px;font-weight:600;letter-spacing:.13em;color:var(--muted)}
 .np-x{width:44px;height:44px;margin:-10px -12px -10px 0;border:0;background:none;
   font-size:22px;line-height:1;color:var(--ink);cursor:pointer}
-.np-body{padding:20px 24px 24px;overflow-y:auto;flex:1 1 auto}
+.np-body{padding:20px 24px 24px;overflow-y:auto;overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;flex:1 1 auto}
 .np-foot{display:flex;align-items:center;justify-content:flex-end;gap:16px;
   padding:14px 24px;border-top:1px solid rgba(0,0,0,.09);background:#fff;flex:none}
 .np-cancel{border:0;background:none;cursor:pointer;font-family:var(--sans);
@@ -943,7 +957,7 @@ const NP_CSS = `
 
 @media(max-width:760px){
   .np-overlay{padding:0;align-items:stretch}
-  .np-sheet{max-width:none;max-height:100vh;height:100vh;border-radius:0}
+  .np-sheet{max-width:none;max-height:100dvh;height:100dvh;border-radius:0}
   .np-head{padding:14px 18px 12px}
   .np-body{padding:16px 18px 20px}
   .np-foot{padding:13px 18px calc(13px + env(safe-area-inset-bottom))}
