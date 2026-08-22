@@ -188,7 +188,6 @@ export type DashboardTab =
 
 export type GrowSection = "performance" | "marketplace" | "collabs" | "concierge";
 
-export type HomeView = "list" | "spine";
 
 /** Per-person RSVP counts, keyed by phone number (preferred) or lowercased
  *  name. Powers the "Never RSVP'd" segments on Home, Community and Grow. */

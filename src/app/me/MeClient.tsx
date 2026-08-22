@@ -13,6 +13,7 @@ import NewPlanModal, {
   type NewPlanDraftSnapshot,
   type PostToOption,
 } from "./NewPlanModal";
+import { PlanMiniMap, PlansRailMap, type MapPin } from "./PlanMaps";
 
 // ============================================================================
 // Attendee dashboard (/me). The signed-in home: the next plan, everything
@@ -49,6 +50,8 @@ interface Plan {
   time: string | null;
   venueName: string | null;
   venueAddress: string | null;
+  venueLat: number | null;
+  venueLng: number | null;
   calendarId: string | null;
   calendarName: string;
   calendarShareId: string | null;
@@ -509,8 +512,27 @@ function DashboardView({
   const moreCount = spine.length - shown.length;
   const firstName = (data.person.firstName || "").trim().split(/\s+/)[0] || "";
   const rail = data.needsHost;
+
+  // Pins for the rail map — the hero plus everything upcoming with a visible
+  // venue. Plans with a gated venue carry no coordinates by design (server
+  // redacts them alongside the name/address until the viewer RSVPs).
+  const mapPins = useMemo<MapPin[]>(() => {
+    const seen = new Set<string>();
+    const pins: MapPin[] = [];
+    for (const p of [data.nextPlan, ...data.plans]) {
+      if (!p || seen.has(p.id)) continue;
+      seen.add(p.id);
+      if (typeof p.venueLat === "number" && typeof p.venueLng === "number") {
+        pins.push({ id: p.id, lat: p.venueLat, lng: p.venueLng, title: p.title });
+      }
+    }
+    return pins;
+  }, [data.nextPlan, data.plans]);
+
   const hasRail =
-    (rail && (rail.tier1.length > 0 || rail.tier2.length > 0)) || places.length > 0;
+    (rail && (rail.tier1.length > 0 || rail.tier2.length > 0)) ||
+    places.length > 0 ||
+    mapPins.length > 0;
 
   return (
     <>
@@ -624,6 +646,12 @@ function DashboardView({
 
         {hasRail && (
           <aside className="colR">
+            {mapPins.length > 0 && (
+              <section className="rail railmap">
+                <div className="eyebrow">Your week, mapped</div>
+                <PlansRailMap pins={mapPins} onOpen={(id) => setOpenPlanId(id)} />
+              </section>
+            )}
             {rail && rail.tier1.length > 0 && (
               <NeedsHostRail plans={rail.tier1} onHosted={onRefresh} />
             )}
@@ -1385,6 +1413,14 @@ function PlanModal({
           <h2 className="modal-title">{plan.title}</h2>
           <div className="hero-ctx">{fullWhen(plan)}</div>
           {addr && <p className="modal-addr">{addr}</p>}
+          {plan.venueLat != null && plan.venueLng != null && (
+            <PlanMiniMap
+              lat={plan.venueLat}
+              lng={plan.venueLng}
+              title={plan.venueName || plan.title}
+              href={dir}
+            />
+          )}
           {plan.description && <p className="modal-blurb">{plan.description}</p>}
           {status && (
             <div style={{ marginTop: 8 }}><span className={`status ${status.cls}`}>{status.text}</span></div>
@@ -1647,6 +1683,14 @@ const CSS = `
 .leafme .rail-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .leafme .rail-head .eyebrow{margin-bottom:3px}
 .leafme .rail-sub{font-size:10.5px;color:var(--muted);margin-bottom:9px}
+
+/* Maps (restored from the original handoff design) */
+.leafme .lm-map{position:relative;border:1px solid var(--rule);border-radius:11px;
+  overflow:hidden;background:var(--paper)}
+.leafme .lm-map-canvas{position:absolute;inset:0}
+.leafme .lm-map.rail{height:232px}
+.leafme .lm-map.mini{height:150px;margin-top:12px;cursor:pointer}
+.leafme .lm-map.mini:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .leafme .hostcards{display:flex;flex-direction:column;gap:8px}
 .leafme .hostcard{display:flex;gap:11px;align-items:center;background:var(--paper);
   border:1px solid var(--card);border-radius:10px;padding:10px}
@@ -1748,6 +1792,8 @@ const CSS = `
    ========================================================================== */
 @media(max-width:1023px){
   .leafme .cols{flex-direction:column}
+  /* Spec 4a: the mobile scroll carries no map — the modal's mini map stays. */
+  .leafme .railmap{display:none}
   .leafme .colL{border-right:0;padding:18px 22px 0}
   .leafme .colR{width:100%;padding:8px 22px 32px;background:var(--paper)}
   .leafme .colL.solo{padding-bottom:32px}

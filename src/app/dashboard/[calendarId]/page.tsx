@@ -29,7 +29,6 @@ import type {
   CalActivePlan,
   DashboardTab,
   GrowSection,
-  HomeView,
   OrgDashboard,
 } from "@/components/dashboard/types";
 import { buildRsvpCountIndex, rsvpCountForPerson } from "@/components/dashboard/types";
@@ -149,19 +148,6 @@ export default function OrgDashboardPage() {
   const [growSection, setGrowSection] = useState<GrowSection>(
     rawInitialTab === "marketplace" ? "marketplace" : "performance",
   );
-
-  // Home list/spine view — persisted per user.
-  const [homeView, setHomeView] = useState<HomeView>("list");
-  useEffect(() => {
-    try {
-      const v = localStorage.getItem("dashboard_home_view");
-      if (v === "spine" || v === "list") setHomeView(v);
-    } catch { /* ignore */ }
-  }, []);
-  const changeHomeView = useCallback((v: HomeView) => {
-    setHomeView(v);
-    try { localStorage.setItem("dashboard_home_view", v); } catch { /* ignore */ }
-  }, []);
 
   // Publish confirmation banner on Home (set after CreatePlanModal succeeds).
   const [publishBanner, setPublishBanner] = useState<string | null>(null);
@@ -1367,16 +1353,19 @@ export default function OrgDashboardPage() {
   const isPaid = isPaidTier;
   const tierLabel = dashboard.tier === "concierge" ? "Concierge" : isPaid ? "Pro" : "Free";
 
-  const needsYouCount =
-    dashboard.hostRequests.length +
-    dashboard.pendingRsvpRequests.length +
-    dashboard.pendingFollowers.length +
-    eventApprovals.length;
-
   const rsvpIndex = buildRsvpCountIndex(dashboard.rsvps);
   const neverRsvpdCount = dashboard.followers.filter(
     (f) => rsvpCountForPerson(rsvpIndex, f) === 0,
   ).length;
+
+  // Mirrors HomeTab's NEEDS YOU rows: the four actionable queues plus the
+  // never-RSVP'd nudge row, so the sidebar badge matches the section.
+  const needsYouCount =
+    dashboard.hostRequests.length +
+    dashboard.pendingRsvpRequests.length +
+    dashboard.pendingFollowers.length +
+    eventApprovals.length +
+    (neverRsvpdCount > 0 ? 1 : 0);
 
   // ── Shared fragments ──
 
@@ -1580,8 +1569,6 @@ export default function OrgDashboardPage() {
             <HomeTab
               dashboard={dashboard}
               analytics={analytics}
-              view={homeView}
-              onViewChange={changeHomeView}
               publishBanner={publishBanner}
               topSlot={homeTopSlot}
               onNewPlan={openNewPlan}

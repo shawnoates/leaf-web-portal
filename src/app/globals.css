@@ -5,6 +5,20 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@theme {
+  /* Brand green — tints/shades of #253A33 (the 800 step). */
+  --color-leaf-50: #f3f7f5;
+  --color-leaf-100: #e0ebe7;
+  --color-leaf-200: #c2d6cf;
+  --color-leaf-300: #9dbeb3;
+  --color-leaf-400: #74a494;
+  --color-leaf-500: #5a8c7b;
+  --color-leaf-600: #426c5e;
+  --color-leaf-700: #325348;
+  --color-leaf-800: #253a33;
+  --color-leaf-900: #1a2924;
+}
+
 /* Hide scrollbar for carousels */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

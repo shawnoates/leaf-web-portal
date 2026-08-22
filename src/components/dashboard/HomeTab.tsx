@@ -3,13 +3,13 @@
 import { useMemo } from "react";
 import { Calendar, Plus } from "lucide-react";
 import type { OrgAnalytics } from "@/components/analytics/types";
-import type { CalActivePlan, HomeView, OrgDashboard } from "./types";
+import type { CalActivePlan, OrgDashboard } from "./types";
 import { buildRsvpCountIndex, rsvpCountForPerson } from "./types";
 
 // Home — the landing place of the redesigned dashboard. Leads with pending
-// work (NEEDS YOU), then the schedule as either a week LIST or a 14-day SPINE,
-// with a right rail for recent photos. The goal: an admin landing here knows
-// what to do in under five seconds.
+// work (NEEDS YOU), then the schedule as a 14-day timeline spine, with a right
+// rail for recent photos. The goal: an admin landing here knows what to do in
+// under five seconds.
 
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_FULL = [
@@ -97,8 +97,6 @@ function PlanCover({
 export default function HomeTab({
   dashboard,
   analytics,
-  view,
-  onViewChange,
   publishBanner,
   topSlot,
   onNewPlan,
@@ -116,8 +114,6 @@ export default function HomeTab({
 }: {
   dashboard: OrgDashboard;
   analytics: OrgAnalytics | null;
-  view: HomeView;
-  onViewChange: (v: HomeView) => void;
   publishBanner: string | null;
   /** Banners and cards the page owns (concierge entry, app-connect nudge,
    *  RSVP-limit warning) — rendered between the header and the counters. */
@@ -179,12 +175,6 @@ export default function HomeTab({
       ).length,
     [dashboard.followers, rsvpIndex],
   );
-
-  const needsYouCount =
-    dashboard.hostRequests.length +
-    dashboard.pendingRsvpRequests.length +
-    dashboard.pendingFollowers.length +
-    eventApprovalsCount;
 
   const rsvpDelta = analytics ? analytics.growth.rsvpDeltaPct : null;
   const followerDelta = analytics ? analytics.growth.followerDeltaPct : null;
@@ -421,29 +411,29 @@ export default function HomeTab({
         spineEntries.push(
           <div
             key={localDayKey(day.date)}
-            className={`relative border-l-2 border-green-300 pl-4 sm:pl-5 ${isLast ? "" : "pb-5"}`}
+            className={`relative border-l-2 border-leaf-300 pl-4 sm:pl-5 ${isLast ? "" : "pb-5"}`}
           >
-            <span className="absolute -left-[7px] top-[3px] w-3 h-3 rounded-full bg-white border-2 border-emerald-500" />
+            <span className="absolute -left-[7px] top-[3px] w-3 h-3 rounded-full bg-white border-2 border-leaf-600" />
             <div className="sm:flex sm:gap-[18px]">
               <div className="sm:w-[92px] shrink-0">
-                <p className="text-sm font-semibold text-emerald-800">
+                <p className="text-sm font-semibold text-leaf-800">
                   {dateLabel}
                 </p>
-                <p className="text-[11px] text-emerald-700">Empty</p>
+                <p className="text-[11px] text-leaf-700">Empty</p>
               </div>
               <div className="flex-1 min-w-0 mt-2 sm:mt-0">
-                <div className="border border-dashed border-green-300 bg-green-50 rounded-xl p-3.5 flex flex-wrap gap-3 items-center">
+                <div className="border border-dashed border-leaf-300 bg-leaf-50 rounded-xl p-3.5 flex flex-wrap gap-3 items-center">
                   <div className="flex-1 min-w-[160px]">
-                    <p className="text-sm font-medium text-emerald-800">
+                    <p className="text-sm font-medium text-leaf-800">
                       Your best day of the week is unbooked
                     </p>
-                    <p className="text-xs text-emerald-700 mt-0.5">
+                    <p className="text-xs text-leaf-700 mt-0.5">
                       {promptSentence}
                     </p>
                   </div>
                   <button
                     onClick={() => onNewPlan(toDateInputValue(day.date))}
-                    className="px-4 py-2.5 min-h-[36px] bg-emerald-700 text-white rounded-full text-xs font-medium hover:bg-emerald-800 transition-colors"
+                    className="px-4 py-2.5 min-h-[36px] bg-leaf-700 text-white rounded-full text-xs font-medium hover:bg-leaf-800 transition-colors"
                   >
                     Fill it
                   </button>
@@ -490,6 +480,10 @@ export default function HomeTab({
     }
   }
 
+  // Counted from the rendered rows so the counter, header subtitle, and the
+  // NEEDS YOU section can never disagree (the never-RSVP'd nudge is a row too).
+  const needsYouCount = needsYouRows.length;
+
   return (
     <div>
       {/* Header row */}
@@ -507,37 +501,20 @@ export default function HomeTab({
               ` · ${needsYouCount} thing${needsYouCount === 1 ? "" : "s"} need${needsYouCount === 1 ? "s" : ""} you`}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex border border-zinc-200 rounded-full overflow-hidden text-[11px] font-medium">
-            {(["list", "spine"] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => onViewChange(v)}
-                className={`px-3.5 py-2 uppercase tracking-wide transition-colors ${
-                  view === v
-                    ? "bg-zinc-900 text-white"
-                    : "text-zinc-600 hover:bg-zinc-50"
-                }`}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => onNewPlan()}
-            className="hidden sm:inline-flex h-[38px] items-center px-[18px] bg-zinc-900 text-white rounded-full text-[13px] font-medium hover:bg-zinc-800 transition-colors"
-          >
-            + New plan
-          </button>
-        </div>
+        <button
+          onClick={() => onNewPlan()}
+          className="hidden sm:inline-flex h-[38px] items-center px-[18px] bg-zinc-900 text-white rounded-full text-[13px] font-medium hover:bg-zinc-800 transition-colors"
+        >
+          + New plan
+        </button>
       </div>
 
       <div className="px-4 sm:px-6 lg:px-8 py-5 lg:py-6">
         {topSlot}
         {/* Publish confirmation */}
         {publishBanner && (
-          <div className="bg-green-50 border border-green-300 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
-            <p className="flex-1 text-[13px] font-medium text-emerald-800">
+          <div className="bg-leaf-50 border border-leaf-300 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
+            <p className="flex-1 text-[13px] font-medium text-leaf-800">
               {publishBanner}
             </p>
           </div>
@@ -560,7 +537,7 @@ export default function HomeTab({
               {dashboard.rsvpsThisMonth}
               {rsvpDelta != null && rsvpDelta !== 0 && (
                 <span
-                  className={`text-xs font-medium ml-1.5 ${rsvpDelta > 0 ? "text-emerald-700" : "text-zinc-400"}`}
+                  className={`text-xs font-medium ml-1.5 ${rsvpDelta > 0 ? "text-leaf-700" : "text-zinc-400"}`}
                 >
                   {rsvpDelta > 0 ? "+" : ""}
                   {rsvpDelta}%
@@ -574,7 +551,7 @@ export default function HomeTab({
               {dashboard.followerCount}
               {followerDelta != null && followerDelta !== 0 && (
                 <span
-                  className={`text-xs font-medium ml-1.5 ${followerDelta > 0 ? "text-emerald-700" : "text-zinc-400"}`}
+                  className={`text-xs font-medium ml-1.5 ${followerDelta > 0 ? "text-leaf-700" : "text-zinc-400"}`}
                 >
                   {followerDelta > 0 ? "+" : ""}
                   {followerDelta}%
@@ -593,94 +570,10 @@ export default function HomeTab({
         >
           {/* Main column */}
           <div className="min-w-0">
-            {view === "list" ? (
-              <>
-                <p className="text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase mb-2.5">
-                  This week
-                </p>
-                <div className="border border-zinc-200 rounded-xl overflow-hidden">
-                  {days.slice(0, 7).map((day) => {
-                    const strip = day.date
-                      .toLocaleDateString("en-US", {
-                        weekday: "short",
-                        day: "numeric",
-                      })
-                      .toUpperCase();
-                    return (
-                      <div key={localDayKey(day.date)}>
-                        <div className="px-4 sm:px-[18px] py-[9px] bg-zinc-50 border-b border-zinc-100 text-[10px] font-semibold tracking-[0.1em] text-zinc-500 uppercase">
-                          {strip}
-                          {day.plans.length === 0 &&
-                            !emptyDayPrompt(day.date) && (
-                              <span className="text-zinc-400 font-normal tracking-normal normal-case">
-                                {" "}
-                                · nothing scheduled
-                              </span>
-                            )}
-                        </div>
-                        {day.plans.map((plan) => (
-                          <button
-                            key={plan.objectId}
-                            onClick={() => onOpenPlan(plan)}
-                            className="w-full text-left flex items-center gap-3.5 px-4 sm:px-[18px] py-3.5 border-b border-zinc-100 hover:bg-zinc-50 transition-colors"
-                          >
-                            <PlanCover
-                              plan={plan}
-                              className="w-14 h-10 rounded-md shrink-0"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-zinc-900 truncate">
-                                {plan.title}
-                              </p>
-                              <p className="text-xs text-zinc-500 mt-px truncate">
-                                {plan.time ? `${plan.time} · ` : ""}
-                                {hostLine(plan)}
-                                {plan.location ? ` · ${plan.location.name}` : ""}
-                              </p>
-                            </div>
-                            <p className="text-[13px] font-medium text-zinc-900 shrink-0">
-                              {plan.isPoll
-                                ? `${plan.pollVoteCount ?? 0} `
-                                : `${plan.rsvpCount} `}
-                              <span className="text-zinc-400 font-normal">
-                                {plan.isPoll ? "votes" : "going"}
-                              </span>
-                            </p>
-                          </button>
-                        ))}
-                        {day.plans.length === 0 && emptyDayPrompt(day.date) && (
-                          <div className="flex flex-wrap items-center gap-3 px-4 sm:px-[18px] py-3.5 border-b border-zinc-100 bg-green-50">
-                            <div className="flex-1 min-w-[160px]">
-                              <p className="text-sm font-medium text-emerald-800">
-                                {promptSentence}
-                              </p>
-                              <p className="text-xs text-emerald-700 mt-px">
-                                A plan here works harder than anywhere else
-                              </p>
-                            </div>
-                            <button
-                              onClick={() =>
-                                onNewPlan(toDateInputValue(day.date))
-                              }
-                              className="px-4 py-2 min-h-[36px] bg-emerald-700 text-white rounded-full text-xs font-medium hover:bg-emerald-800 transition-colors"
-                            >
-                              Fill {DAY_FULL[day.date.getDay()]}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase mb-3.5">
-                  Next 14 days
-                </p>
-                <div>{spineEntries}</div>
-              </>
-            )}
+            <p className="text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase mb-3.5">
+              Next 14 days
+            </p>
+            <div>{spineEntries}</div>
 
             {/* NEEDS YOU */}
             <p className="text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase mt-6 mb-2.5">

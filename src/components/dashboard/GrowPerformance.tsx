@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, RefreshCw } from "lucide-react";
 import type { AnalyticsRange, OrgAnalytics } from "@/components/analytics/types";
 
@@ -64,6 +64,16 @@ export default function GrowPerformance({
   allCharts: React.ReactNode;
 }) {
   const [chartsOpen, setChartsOpen] = useState(false);
+  // "See the data" opens the charts section, which lives below the fold —
+  // without a scroll the click looks like a no-op.
+  const [scrollToCharts, setScrollToCharts] = useState(false);
+  const chartsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (scrollToCharts && chartsOpen) {
+      chartsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setScrollToCharts(false);
+    }
+  }, [scrollToCharts, chartsOpen]);
 
   const weekday = useMemo(() => {
     if (!analytics?.whatsWorking?.weekdayDistribution?.length) return null;
@@ -226,7 +236,10 @@ export default function GrowPerformance({
                   Plan a {DAY_FULL[weekday.bestIndex]}
                 </button>
                 <button
-                  onClick={() => setChartsOpen(true)}
+                  onClick={() => {
+                    setChartsOpen(true);
+                    setScrollToCharts(true);
+                  }}
                   className="px-4 py-2.5 min-h-[36px] border border-zinc-200 text-zinc-600 rounded-full text-xs font-medium hover:border-zinc-300 transition-colors"
                 >
                   See the data
@@ -419,7 +432,11 @@ export default function GrowPerformance({
           />
         </span>
       </button>
-      {chartsOpen && <div className="mt-5">{allCharts}</div>}
+      {chartsOpen && (
+        <div ref={chartsRef} className="mt-5 scroll-mt-4">
+          {allCharts}
+        </div>
+      )}
     </div>
   );
 }
