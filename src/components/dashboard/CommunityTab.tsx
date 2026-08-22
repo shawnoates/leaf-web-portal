@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ChevronDown, Search, UserMinus } from "lucide-react";
+import { Check, ChevronDown, MessageCircle, Search, UserMinus } from "lucide-react";
 import type { OrgDashboard } from "./types";
 import { buildRsvpCountIndex, rsvpCountForPerson } from "./types";
 
@@ -65,6 +65,8 @@ export default function CommunityTab({
   onRemoveMember,
   onEditScope,
   onInviteCoHost,
+  onNudge,
+  nudgedIds,
 }: {
   dashboard: OrgDashboard;
   initialSegment?: CommunitySegment;
@@ -78,6 +80,9 @@ export default function CommunityTab({
     name: string,
     scope: { all: boolean; ids: string[] },
   ) => Promise<void>;
+  onNudge: (f: OrgDashboard["followers"][number]) => void;
+  /** Memberships nudged this session — their button collapses to "Nudged". */
+  nudgedIds?: Set<string>;
 }) {
   const [segment, setSegment] = useState<CommunitySegment>(
     initialSegment || "everyone",
@@ -580,6 +585,22 @@ export default function CommunityTab({
                         <UserMinus className="w-4 h-4" />
                       </button>
                     )}
+                  {!p.pending &&
+                    p.follower &&
+                    p.follower.phone &&
+                    (nudgedIds?.has(p.follower.membershipId) ? (
+                      <span className="text-[11px] font-medium text-zinc-400">
+                        Nudged
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => onNudge(p.follower!)}
+                        className="text-zinc-400 hover:text-zinc-900 transition-colors"
+                        title="Text a personal nudge"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                      </button>
+                    ))}
                   {!p.pending && p.follower && (
                     <button
                       onClick={() => onRemoveFollower(p.follower!)}

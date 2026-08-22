@@ -24,6 +24,7 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardBottomBar from "@/components/dashboard/DashboardBottomBar";
 import HomeTab from "@/components/dashboard/HomeTab";
 import CommunityTab, { type CommunitySegment } from "@/components/dashboard/CommunityTab";
+import NudgeModal from "@/components/dashboard/NudgeModal";
 import GrowPerformance from "@/components/dashboard/GrowPerformance";
 import type {
   CalActivePlan,
@@ -1241,6 +1242,21 @@ export default function OrgDashboardPage() {
     [calendarId],
   );
 
+  // Nudge — host-authored re-engagement text to one follower, composed in
+  // NudgeModal and delivered server-side (nudgeFollower). nudgedIds only marks
+  // rows nudged this session; the durable record lives on the membership row.
+  const [nudgeFor, setNudgeFor] =
+    useState<OrgDashboard["followers"][number] | null>(null);
+  const [nudgedIds, setNudgedIds] = useState<Set<string>>(new Set());
+  const handleNudgeSent = useCallback(
+    (f: OrgDashboard["followers"][number]) => {
+      setNudgedIds((prev) => new Set(prev).add(f.membershipId));
+      setToast(`Nudge sent to ${f.name.trim().split(/\s+/)[0] || f.name}`);
+      setTimeout(() => setToast(null), 2500);
+    },
+    [],
+  );
+
   const removeFollower = useCallback(
     async (f: OrgDashboard["followers"][number]) => {
       if (!confirm(`Remove ${f.name} as a follower?`)) return;
@@ -1775,6 +1791,8 @@ export default function OrgDashboardPage() {
               onRemoveMember={removeMember}
               onEditScope={openEditScope}
               onInviteCoHost={handleInviteCoHost}
+              onNudge={setNudgeFor}
+              nudgedIds={nudgedIds}
             />
           )}
 
@@ -2639,6 +2657,21 @@ export default function OrgDashboardPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Nudge a follower */}
+      {nudgeFor && dashboard && (
+        <NudgeModal
+          dashboard={dashboard}
+          follower={nudgeFor}
+          hostFirstName={
+            String(user?.get("full_name") || user?.get("name") || "")
+              .trim()
+              .split(/\s+/)[0] || ""
+          }
+          onClose={() => setNudgeFor(null)}
+          onSent={handleNudgeSent}
+        />
       )}
 
       {/* Concierge chat slide-over — opened from the serviced calendar's
