@@ -1130,7 +1130,7 @@ export default function PlansManager({
     setLoadingCandidates(true);
     Parse.Cloud.run("getSuggestionHostCandidates", { ideaId: idea.objectId })
       .then((r: { candidates?: HostCandidate[] }) => setHostCandidates(r.candidates || []))
-      .catch((err) => {
+      .catch((err: unknown) => {
         console.warn("[PlansManager] getSuggestionHostCandidates failed:", err);
         setHostCandidates([]);
       })
