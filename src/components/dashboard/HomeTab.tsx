@@ -39,7 +39,9 @@ function toDateInputValue(d: Date): string {
 
 /** Best day of week for this org, from analytics when loaded (paid tiers) or
  *  a client-side pass over the recent-RSVP list otherwise. Null when there is
- *  not enough signal to make a claim. */
+ *  not enough signal to make a claim. Anchored to the day the plan HAPPENS
+ *  (matching getPlanTimingHints in the composer) — never to the day the RSVP
+ *  came in, which mostly mirrors when the org sends its links. */
 function computeBestDay(
   analytics: OrgAnalytics | null,
   rsvps: OrgDashboard["rsvps"],
@@ -56,7 +58,9 @@ function computeBestDay(
   } else if (rsvps.length > 0) {
     counts = new Array(7).fill(0);
     for (const r of rsvps) {
-      const d = new Date(r.date);
+      // planDate (event day) is the real anchor; r.date (RSVP creation) is
+      // only a stand-in until the server deploy that ships planDate is live.
+      const d = new Date(r.planDate ?? r.date);
       if (!isNaN(d.getTime())) counts[d.getDay()] += 1;
     }
   }

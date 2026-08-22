@@ -135,7 +135,11 @@ export interface OrgDashboard {
     name: string;
     phone: string | null;
     planTitle: string;
+    /** When the RSVP was created — mostly mirrors when links were sent. */
     date: string;
+    /** The plan's event date — the anchor for any "best day" claim.
+     *  Optional until the getOrgDashboard deploy that adds it is live. */
+    planDate?: string | null;
     source: string;
   }[];
   pendingFollowerCount: number;
