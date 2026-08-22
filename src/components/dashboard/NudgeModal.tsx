@@ -54,17 +54,21 @@ function buildDefaultMessage(
   hostFirstName: string,
 ): string {
   const firstName = follower.name.trim().split(/\s+/)[0] || "there";
-  const calName = follower.calendarName || dashboard.name;
-  const from = hostFirstName ? `it's ${hostFirstName} from ${calName}` : `it's ${calName}`;
-  const next = nextPlanFor(dashboard, follower.calendarId);
-  if (next) {
-    const day = planDayLabel(next);
-    return `Hey ${firstName} — ${from}. We've got ${next.title}${day ? ` on ${day}` : ""} and would love to see you there: https://os.joinleaf.com/p/${next.objectId}`;
-  }
+  // Sign with the ORG name (what the follower recognizes), and link the
+  // calendar's shareId slug — never the /p/<objectId> link, whose random id
+  // reads as spam in a personal text.
+  const orgName = dashboard.name;
+  const from = hostFirstName ? `it's ${hostFirstName} from ${orgName}` : `it's ${orgName}`;
   const shareId =
     dashboard.calendars.find((c) => c.objectId === follower.calendarId)
       ?.shareId || dashboard.shareId;
-  return `Hey ${firstName} — ${from}. We'd love to see you at one of our upcoming events: https://www.os.joinleaf.com/org/${shareId}`;
+  const link = `https://www.os.joinleaf.com/org/${shareId}`;
+  const next = nextPlanFor(dashboard, follower.calendarId);
+  if (next) {
+    const day = planDayLabel(next);
+    return `Hey ${firstName} — ${from}. We've got ${next.title}${day ? ` on ${day}` : ""} and would love to see you there: ${link}`;
+  }
+  return `Hey ${firstName} — ${from}. We'd love to see you at one of our upcoming events: ${link}`;
 }
 
 export default function NudgeModal({
