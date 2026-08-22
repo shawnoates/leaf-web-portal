@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Layers, Users, TrendingUp, Mail } from "lucide-react";
+import { Calendar, Users, TrendingUp, Mail } from "lucide-react";
 
 /**
  * Loading chrome for the owner dashboard.
@@ -25,7 +25,6 @@ import { Calendar, Layers, Users, TrendingUp, Mail } from "lucide-react";
 // biggest block of chrome we can paint early.
 const SKELETON_NAV = [
   { label: "Home", icon: Calendar },
-  { label: "Calendars", icon: Layers },
   { label: "Community", icon: Users },
   { label: "Grow", icon: TrendingUp },
   { label: "Inbox", icon: Mail },

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import {
   Calendar,
-  Layers,
   Users,
   TrendingUp,
   Mail,
@@ -15,9 +14,10 @@ import type { DashboardTab, OrgDashboardCalendar } from "./types";
 // Carries the org switcher block, the five places, the calendar list, and the
 // footer (Settings / Help / Log out). Mobile gets DashboardBottomBar instead.
 
+// "calendars" is deliberately absent: on desktop the CALENDARS list below is
+// the navigation for that tab (mobile keeps it in DashboardBottomBar).
 const NAV_ITEMS: { id: DashboardTab; label: string; icon: typeof Calendar }[] = [
   { id: "home", label: "Home", icon: Calendar },
-  { id: "calendars", label: "Calendars", icon: Layers },
   { id: "community", label: "Community", icon: Users },
   { id: "grow", label: "Grow", icon: TrendingUp },
   { id: "inbox", label: "Inbox", icon: Mail },

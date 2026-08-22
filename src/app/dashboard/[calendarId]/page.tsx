@@ -2470,8 +2470,8 @@ export default function OrgDashboardPage() {
       {/* Mobile bottom bar */}
       <DashboardBottomBar
         activeTab={activeTab}
+        isOwner={dashboard.isOwner}
         onNavigate={setTab}
-        onCreate={() => openNewPlan()}
       />
 
       {/* ──────── MODALS ──────── */}
