@@ -1246,12 +1246,16 @@ export default function OrgDashboardPage() {
   // NudgeModal and delivered server-side (nudgeFollower). nudgedIds only marks
   // rows nudged this session; the durable record lives on the membership row.
   const [nudgeFor, setNudgeFor] =
-    useState<OrgDashboard["followers"][number] | null>(null);
+    useState<OrgDashboard["followers"][number][] | null>(null);
   const [nudgedIds, setNudgedIds] = useState<Set<string>>(new Set());
   const handleNudgeSent = useCallback(
-    (f: OrgDashboard["followers"][number]) => {
-      setNudgedIds((prev) => new Set(prev).add(f.membershipId));
-      setToast(`Nudge sent to ${f.name.trim().split(/\s+/)[0] || f.name}`);
+    (membershipIds: string[], toastText: string) => {
+      setNudgedIds((prev) => {
+        const next = new Set(prev);
+        for (const id of membershipIds) next.add(id);
+        return next;
+      });
+      setToast(toastText);
       setTimeout(() => setToast(null), 2500);
     },
     [],
@@ -1791,7 +1795,15 @@ export default function OrgDashboardPage() {
               onRemoveMember={removeMember}
               onEditScope={openEditScope}
               onInviteCoHost={handleInviteCoHost}
-              onNudge={setNudgeFor}
+              onNudge={(f) => {
+                // Pro feature — server enforces the same gate in nudgeFollower.
+                if (isPaidTier) setNudgeFor([f]);
+                else setShowSubscription(true);
+              }}
+              onNudgeAll={(fs) => {
+                if (isPaidTier) setNudgeFor(fs);
+                else setShowSubscription(true);
+              }}
               nudgedIds={nudgedIds}
             />
           )}
@@ -2659,11 +2671,11 @@ export default function OrgDashboardPage() {
         </div>
       )}
 
-      {/* Nudge a follower */}
-      {nudgeFor && dashboard && (
+      {/* Nudge follower(s) */}
+      {nudgeFor && nudgeFor.length > 0 && dashboard && (
         <NudgeModal
           dashboard={dashboard}
-          follower={nudgeFor}
+          followers={nudgeFor}
           hostFirstName={
             String(user?.get("full_name") || user?.get("name") || "")
               .trim()

@@ -84,6 +84,7 @@ const PRICING_TIERS: PricingTier[] = [
       "Custom plan-suggestion controls",
       "Analytics dashboard",
       "Co-host management",
+      "Follower re-engagement texts (nudges)",
     ],
     excluded: [],
   },

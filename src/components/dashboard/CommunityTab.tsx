@@ -66,6 +66,7 @@ export default function CommunityTab({
   onEditScope,
   onInviteCoHost,
   onNudge,
+  onNudgeAll,
   nudgedIds,
 }: {
   dashboard: OrgDashboard;
@@ -81,6 +82,8 @@ export default function CommunityTab({
     scope: { all: boolean; ids: string[] },
   ) => Promise<void>;
   onNudge: (f: OrgDashboard["followers"][number]) => void;
+  /** Bulk form — every nudge-eligible follower in the current filtered view. */
+  onNudgeAll: (fs: OrgDashboard["followers"][number][]) => void;
   /** Memberships nudged this session — their button collapses to "Nudged". */
   nudgedIds?: Set<string>;
 }) {
@@ -209,6 +212,21 @@ export default function CommunityTab({
     if (q) list = list.filter((p) => p.name.toLowerCase().includes(q));
     return list;
   }, [people, segment, calFilter, search]);
+
+  // Followers in the current filtered view a nudge can actually reach: has a
+  // phone on file and hasn't been nudged this session.
+  const nudgeable = useMemo(
+    () =>
+      filtered
+        .filter(
+          (p) =>
+            !p.pending &&
+            p.follower?.phone &&
+            !nudgedIds?.has(p.follower.membershipId),
+        )
+        .map((p) => p.follower!),
+    [filtered, nudgedIds],
+  );
 
   const exportCsv = () => {
     const header = "Name,Role,Calendar,RSVPs,Joined";
@@ -474,6 +492,15 @@ export default function CommunityTab({
                   </option>
                 ))}
             </select>
+          )}
+          {nudgeable.length > 1 && (
+            <button
+              onClick={() => onNudgeAll(nudgeable)}
+              className="px-3.5 py-2 rounded-full text-xs font-medium border border-zinc-200 text-zinc-600 hover:border-zinc-300 transition-colors inline-flex items-center gap-1.5"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              Nudge all {nudgeable.length}
+            </button>
           )}
           <button
             onClick={exportCsv}

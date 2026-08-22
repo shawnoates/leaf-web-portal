@@ -5,15 +5,19 @@ import Parse from "@/lib/parse-client";
 import { Check, Loader2, MessageCircle, X } from "lucide-react";
 import type { CalActivePlan, OrgDashboard } from "./types";
 
-// Nudge — a host-authored re-engagement text to a single follower, sent
-// server-side (nudgeFollower) from the platform number so the follower's phone
-// number is never shown to the host. The server enforces opt-out, quiet hours,
-// and the shared weekly SMS budget; errors from those guards surface verbatim
-// in this modal.
+// Nudge — host-authored re-engagement text(s), sent server-side (nudgeFollower
+// / nudgeFollowers) from the platform number so follower phone numbers are
+// never shown to the host. One follower = single mode; several = bulk mode,
+// where a literal {name} token in the message becomes each person's first
+// name. The server enforces the Pro gate, opt-out, quiet hours, and the shared
+// weekly SMS budget; guard errors surface verbatim in this modal, and bulk
+// sends report how many people were skipped by per-person guards.
 
 const NUDGE_MAX_CHARS = 500;
 
-/** Next upcoming plan on the follower's calendar (any calendar as fallback).
+type Follower = OrgDashboard["followers"][number];
+
+/** Next upcoming plan on the given calendar (any calendar as fallback).
  *  activePlans arrives unsorted, so sort before picking. */
 function nextPlanFor(
   dashboard: OrgDashboard,
@@ -48,50 +52,65 @@ function planDayLabel(p: CalActivePlan): string {
   }
 }
 
+/** The one calendarId every follower in the batch shares, or null. */
+function sharedCalendarId(followers: Follower[]): string | null {
+  const first = followers[0]?.calendarId || null;
+  return followers.every((f) => f.calendarId === first) ? first : null;
+}
+
 function buildDefaultMessage(
   dashboard: OrgDashboard,
-  follower: OrgDashboard["followers"][number],
+  followers: Follower[],
   hostFirstName: string,
 ): string {
-  const firstName = follower.name.trim().split(/\s+/)[0] || "there";
   // Sign with the ORG name (what the follower recognizes), and link the
   // calendar's shareId slug — never the /p/<objectId> link, whose random id
-  // reads as spam in a personal text.
+  // reads as spam in a personal text. Bulk drafts greet with the {name}
+  // token, which the server swaps for each recipient's first name.
+  const greetName =
+    followers.length === 1
+      ? followers[0].name.trim().split(/\s+/)[0] || "there"
+      : "{name}";
   const orgName = dashboard.name;
   const from = hostFirstName ? `it's ${hostFirstName} from ${orgName}` : `it's ${orgName}`;
+  const calId = sharedCalendarId(followers);
   const shareId =
-    dashboard.calendars.find((c) => c.objectId === follower.calendarId)
-      ?.shareId || dashboard.shareId;
+    dashboard.calendars.find((c) => c.objectId === calId)?.shareId ||
+    dashboard.shareId;
   const link = `https://www.os.joinleaf.com/org/${shareId}`;
-  const next = nextPlanFor(dashboard, follower.calendarId);
+  // No em dash in the draft — it reads as AI-written in a personal text.
+  const next = nextPlanFor(dashboard, calId);
   if (next) {
     const day = planDayLabel(next);
-    return `Hey ${firstName} — ${from}. We've got ${next.title}${day ? ` on ${day}` : ""} and would love to see you there: ${link}`;
+    return `Hey ${greetName}, ${from}. We've got ${next.title}${day ? ` on ${day}` : ""} and would love to see you there: ${link}`;
   }
-  return `Hey ${firstName} — ${from}. We'd love to see you at one of our upcoming events: ${link}`;
+  return `Hey ${greetName}, ${from}. We'd love to see you at one of our upcoming events: ${link}`;
 }
 
 export default function NudgeModal({
   dashboard,
-  follower,
+  followers,
   hostFirstName,
   onClose,
   onSent,
 }: {
   dashboard: OrgDashboard;
-  follower: OrgDashboard["followers"][number];
+  followers: Follower[];
   hostFirstName: string;
   onClose: () => void;
-  onSent: (follower: OrgDashboard["followers"][number]) => void;
+  /** Fired once the server confirms: membership ids actually texted + a
+   *  ready-made toast line. */
+  onSent: (membershipIds: string[], toast: string) => void;
 }) {
+  const bulk = followers.length > 1;
   const defaultMessage = useMemo(
-    () => buildDefaultMessage(dashboard, follower, hostFirstName),
-    [dashboard, follower, hostFirstName],
+    () => buildDefaultMessage(dashboard, followers, hostFirstName),
+    [dashboard, followers, hostFirstName],
   );
   const [message, setMessage] = useState(defaultMessage);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
+  const [doneText, setDoneText] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -101,18 +120,33 @@ export default function NudgeModal({
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  const firstName = follower.name.trim().split(/\s+/)[0] || follower.name;
+  const firstName =
+    followers[0]?.name.trim().split(/\s+/)[0] || followers[0]?.name || "";
+  const title = bulk ? `Nudge ${followers.length} people` : `Nudge ${firstName}`;
 
   const send = async () => {
     setError(null);
     setSending(true);
     try {
-      await Parse.Cloud.run("nudgeFollower", {
-        membershipId: follower.membershipId,
-        message: message.trim(),
-      });
-      setDone(true);
-      onSent(follower);
+      if (bulk) {
+        const result = (await Parse.Cloud.run("nudgeFollowers", {
+          membershipIds: followers.map((f) => f.membershipId),
+          message: message.trim(),
+        })) as { sent: number; skipped: number; sentMembershipIds: string[] };
+        const summary =
+          result.skipped > 0
+            ? `Sent ${result.sent} nudge${result.sent === 1 ? "" : "s"} — ${result.skipped} skipped (opted out or at their weekly text limit)`
+            : `Sent ${result.sent} nudge${result.sent === 1 ? "" : "s"}`;
+        setDoneText(summary);
+        onSent(result.sentMembershipIds, summary);
+      } else {
+        await Parse.Cloud.run("nudgeFollower", {
+          membershipId: followers[0].membershipId,
+          message: message.trim(),
+        });
+        setDoneText(`Text sent to ${firstName}.`);
+        onSent([followers[0].membershipId], `Nudge sent to ${firstName}`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't send the nudge");
     } finally {
@@ -126,21 +160,19 @@ export default function NudgeModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
           <h2 className="text-base font-semibold inline-flex items-center gap-2 text-zinc-900">
             <MessageCircle className="w-4 h-4 text-zinc-500" />
-            Nudge {firstName}
+            {title}
           </h2>
           <button onClick={onClose} className="p-1 text-zinc-400 hover:text-zinc-900 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {done ? (
+        {doneText ? (
           <div className="px-6 py-8 text-center space-y-3">
             <div className="w-12 h-12 mx-auto rounded-full bg-emerald-100 flex items-center justify-center">
               <Check className="w-6 h-6 text-emerald-700" />
             </div>
-            <p className="text-sm text-zinc-700">
-              Text sent to {firstName}.
-            </p>
+            <p className="text-sm text-zinc-700">{doneText}</p>
             <button
               onClick={onClose}
               className="mt-2 px-5 py-2 bg-zinc-900 text-white text-xs font-medium rounded-full hover:bg-zinc-800 transition-colors"
@@ -152,9 +184,20 @@ export default function NudgeModal({
           <>
             <div className="px-6 py-5 space-y-4">
               <p className="text-xs text-zinc-500">
-                Sent as a text from Leaf&apos;s number — {firstName}&apos;s
-                phone number stays private, and each follower can get at most
-                one nudge a week.
+                {bulk ? (
+                  <>
+                    Sent as texts from Leaf&apos;s number — phone numbers stay
+                    private, and <span className="font-medium text-zinc-700">{"{name}"}</span>{" "}
+                    becomes each person&apos;s first name. Anyone who opted out
+                    or already got their weekly text is skipped automatically.
+                  </>
+                ) : (
+                  <>
+                    Sent as a text from Leaf&apos;s number — {firstName}&apos;s
+                    phone number stays private, and each follower can get at
+                    most one nudge a week.
+                  </>
+                )}
               </p>
               <label className="block">
                 <span className="text-[9px] font-semibold tracking-[0.12em] uppercase text-zinc-400 block mb-1.5">
@@ -190,7 +233,7 @@ export default function NudgeModal({
                 className="inline-flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 disabled:pointer-events-none text-white text-xs font-medium px-4 py-2.5 rounded-full transition-colors"
               >
                 {sending && <Loader2 className="w-4 h-4 animate-spin" />}
-                Send text
+                {bulk ? `Send ${followers.length} texts` : "Send text"}
               </button>
             </div>
           </>
