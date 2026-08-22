@@ -400,10 +400,21 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     return () => { cancelled = true; };
   }, [selectedCalendarId, pollConvertMode, editMode, hostRequestMode, prefill?.insightCategory]);
 
+  // Minimum scheduling lead for data-driven date suggestions. Driven by the
+  // lead-time hint's bucket when the server surfaced one; when it didn't
+  // clear its stat gates, default to a week of runway rather than 0 — a
+  // suggestion that lands on tomorrow gives RSVPs no time to arrive, and
+  // "tomorrow" was never what the data said, just what its absence allowed.
+  // A surfaced "0-2 days wins" bucket still yields 0: that IS the data.
+  const LEAD_MIN_DAYS: Record<string, number> = { "0-2": 0, "3-6": 3, "7-13": 7, "14+": 14 };
+  const DEFAULT_MIN_LEAD_DAYS = 7;
+  const hintMinLeadDays = timingHints?.leadTime
+    ? LEAD_MIN_DAYS[timingHints.leadTime.bucket] ?? DEFAULT_MIN_LEAD_DAYS
+    : DEFAULT_MIN_LEAD_DAYS;
+
   // Apply-chip target: the best day + the winning start time. Starts at the
-  // next occurrence of the best day, then — when the lead-time hint says
-  // longer runway earns more RSVPs — skips ahead in week steps until the
-  // suggested date carries at least that bucket's minimum lead (e.g. a
+  // next occurrence of the best day, then skips ahead in week steps until the
+  // suggested date carries at least `hintMinLeadDays` of lead (e.g. a
   // "1–2 weeks ahead" winner never suggests this Saturday when that's only
   // 5 days out).
   const timingHintTarget = (() => {
@@ -425,9 +436,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
     if (!dateISO && timingHints.bestDay) {
       const nowD = new Date();
       let delta = ((timingHints.bestDay.dayIndex - nowD.getDay()) + 7) % 7 || 7;
-      const LEAD_MIN_DAYS: Record<string, number> = { "0-2": 0, "3-6": 3, "7-13": 7, "14+": 14 };
-      const minLead = timingHints.leadTime ? LEAD_MIN_DAYS[timingHints.leadTime.bucket] ?? 0 : 0;
-      while (delta < minLead) delta += 7;
+      while (delta < hintMinLeadDays) delta += 7;
       const d = new Date(nowD.getTime() + delta * 24 * 60 * 60 * 1000);
       dateISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       dateLabel = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -676,11 +685,22 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       // names a real place so the server can use the tz region.
       const detected = detectCity();
       const locationHint = calendarArea || (detected.resolvedCity ?? undefined);
+      // Steer the drafter with this calendar's own timing data — without it
+      // an undated sentence resolves to the soonest plausible slot (often
+      // tomorrow), ignoring what actually draws RSVPs here.
+      const schedulingHint = timingHints
+        ? {
+            bestDay: timingHints.bestDay?.day ?? null,
+            minLeadDays: hintMinLeadDays,
+            preferredTimeHHMM: timingHintTarget?.timeHHMM ?? null,
+          }
+        : undefined;
       const draft = await Parse.Cloud.run("draftPlanFromPrompt", {
         prompt: trimmed,
         todayISO: new Date().toISOString().slice(0, 10),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         locationHint,
+        schedulingHint,
       });
       const nextAI = new Set(aiFilled);
       const apply = (field: PlanDraftField, setter: () => void, value: unknown) => {
@@ -695,6 +715,16 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       apply("description", () => setDescription(String(draft.description)), draft.description);
       apply("date", () => setDate(String(draft.dateISO)), draft.dateISO);
       apply("time", () => setTime(String(draft.timeHHMM)), draft.timeHHMM);
+      // The drafter returns null date/time rather than guessing. Fill the
+      // gaps from the calendar's own timing data (same target as the
+      // "What works" chip) instead of leaving the fields blank — the data
+      // answering "when?" is the whole point of collecting it.
+      if (!draft.dateISO && timingHintTarget?.dateISO) {
+        apply("date", () => setDate(timingHintTarget.dateISO!), timingHintTarget.dateISO);
+      }
+      if (!draft.timeHHMM && timingHintTarget?.timeHHMM) {
+        apply("time", () => setTime(timingHintTarget.timeHHMM!), timingHintTarget.timeHHMM);
+      }
       // Cover image auto-pick — LLM returns an unsplashQuery like
       // "sauna wooden steam" tuned for stock-photo results. Fire an
       // Unsplash search with THAT query (not the title) and use the
