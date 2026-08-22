@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import type { Step, CallBackProps } from "react-joyride";
 import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
@@ -34,14 +33,6 @@ import type {
   OrgDashboard,
 } from "@/components/dashboard/types";
 import { buildRsvpCountIndex, rsvpCountForPerson } from "@/components/dashboard/types";
-// react-joyride is ~40KB and the tour runs once per calendar, ever — loading it
-// on every dashboard visit is pure first-paint tax. `ssr: false` because the
-// tour is a browser-only overlay with nothing meaningful to prerender.
-const DashboardTour = dynamic(
-  () => import("@/components/DashboardTour").then((m) => m.DashboardTour),
-  { ssr: false },
-);
-
 // recharts is the largest dependency on this route (~200KB gzipped) and only
 // the "All charts" disclosure under Grow › Performance uses it. Keep it out of
 // the first-paint bundle. `ssr: false` because the charts measure their
@@ -133,18 +124,6 @@ const GROW_SECTIONS: { id: GrowSection; label: string }[] = [
   { id: "concierge", label: "Concierge" },
 ];
 
-// react-joyride exports ACTIONS/EVENTS/STATUS as runtime objects — importing
-// them would pull the whole library into the first-paint bundle and undo the
-// dynamic import of <DashboardTour>. These mirror the five we actually compare
-// against, and `satisfies` types each one against the library's own union, so
-// if an upstream rename drops a member this fails to compile instead of
-// silently never matching.
-const TOUR_STATUS_FINISHED = "finished" satisfies CallBackProps["status"];
-const TOUR_STATUS_SKIPPED = "skipped" satisfies CallBackProps["status"];
-const TOUR_ACTION_CLOSE = "close" satisfies CallBackProps["action"];
-const TOUR_ACTION_PREV = "prev" satisfies CallBackProps["action"];
-const TOUR_EVENT_STEP_AFTER = "step:after" satisfies CallBackProps["type"];
-
 // ── Component ──────────────────────────────────────────────────────────
 
 export default function OrgDashboardPage() {
@@ -231,17 +210,6 @@ export default function OrgDashboardPage() {
     },
     [router, searchParams, calendarId],
   );
-
-  // Dashboard tour (first visit walkthrough)
-  const [runTour, setRunTour] = useState(false);
-  const [tourStepIndex, setTourStepIndex] = useState(0);
-  // Latches true the first time the tour starts and never resets, so the lazy
-  // react-joyride chunk is requested once and the component isn't torn down
-  // while it's finishing. See the render site at the bottom of this file.
-  const [tourMounted, setTourMounted] = useState(false);
-  useEffect(() => {
-    if (runTour) setTourMounted(true);
-  }, [runTour]);
 
   // Edit states (Organization details — lives in Settings now)
   const [editName, setEditName] = useState(false);
@@ -529,21 +497,6 @@ export default function OrgDashboardPage() {
   useEffect(() => {
     if (user) fetchDashboard();
   }, [user, fetchDashboard]);
-
-  // Trigger tour on first visit for owners
-  useEffect(() => {
-    if (!dashboard?.isOwner || !calendarId) return;
-    // Don't show tour if any modals are open
-    if (showSubscription || showCreatePlanModal || showPhoneModal) return;
-    const seen = localStorage.getItem(`dashboard_tour_seen_${calendarId}`);
-    if (!seen) {
-      // Start on the tab the first step lives on: concierge orgs open on the
-      // Home concierge card, everyone else on the Calendars plans list.
-      setActiveTab(dashboard.tier === "concierge" ? "home" : "calendars");
-      setTourStepIndex(0);
-      setRunTour(true);
-    }
-  }, [dashboard?.isOwner, dashboard?.tier, calendarId, showSubscription, showCreatePlanModal, showPhoneModal]);
 
   // Legacy compat: ?editCal=<id> used to open a modal on this page. The
   // edit surface is now its own route — redirect once dashboard is loaded
@@ -1425,88 +1378,6 @@ export default function OrgDashboardPage() {
     (f) => rsvpCountForPerson(rsvpIndex, f) === 0,
   ).length;
 
-  // Build tour steps for DashboardTour component. `disableBeacon` on the first
-  // step opens the tooltip immediately instead of showing a clickable dot.
-  const tourSteps: Step[] = [];
-
-  if (dashboard.tier === "concierge") {
-    tourSteps.push({
-      target: "[data-tour='tour-concierge']",
-      content: "Chat with your concierge here for help with plans and members.",
-      placement: "bottom",
-      disableBeacon: true,
-    });
-  }
-
-  tourSteps.push(
-    {
-      target: "[data-tour='tour-plans']",
-      content: "Your upcoming plans live here — tap one to see details.",
-      placement: "top",
-      disableBeacon: true,
-    },
-    {
-      target: "[data-tour='tour-add-calendar']",
-      content: "Add another calendar to this org anytime.",
-      placement: "right",
-    },
-    {
-      target: "[data-tour='tour-members']",
-      content: "Manage who's on your team and their roles.",
-      placement: "top",
-    }
-  );
-
-  if (dashboard.isOwner) {
-    tourSteps.push({
-      target: "[data-tour='tour-settings']",
-      content: "Update your org's branding and preferences in Settings.",
-      placement: "bottom",
-    });
-  }
-
-  // Which place does a given tour step live on? Used to switch tabs in the
-  // SAME batched update that advances the controlled stepIndex, so the target
-  // is always mounted by the time Joyride positions the tooltip.
-  const tabForTourTarget = (target: Step["target"] | undefined): DashboardTab | null => {
-    const t = typeof target === "string" ? target : "";
-    if (t.includes("tour-plans")) return "calendars";
-    if (t.includes("tour-add-calendar")) return "calendars";
-    if (t.includes("tour-members")) return "community";
-    if (t.includes("tour-settings")) return "settings";
-    if (t.includes("tour-tabs") || t.includes("tour-concierge")) return "home";
-    return null;
-  };
-
-  // Controlled advancement. Joyride never advances on its own (stepIndex is a
-  // prop), so we own Next/Back here — switching the tab and moving the index
-  // together avoids the "target not mounted" skip-to-end bug.
-  const handleTourCallback = (data: CallBackProps) => {
-    const { action, index, status, type } = data;
-
-    if (status === TOUR_STATUS_FINISHED || status === TOUR_STATUS_SKIPPED) {
-      setRunTour(false);
-      setTourStepIndex(0);
-      return;
-    }
-
-    if (action === TOUR_ACTION_CLOSE) {
-      setRunTour(false);
-      setTourStepIndex(0);
-      return;
-    }
-
-    // Advance only on an explicit Next/Back (STEP_AFTER). We deliberately do
-    // NOT react to TARGET_NOT_FOUND — auto-advancing on a missing target is
-    // exactly what made the tour skip straight to the last step.
-    if (type === TOUR_EVENT_STEP_AFTER) {
-      const nextIndex = index + (action === TOUR_ACTION_PREV ? -1 : 1);
-      const tab = tabForTourTarget(tourSteps[nextIndex]?.target);
-      if (tab) setActiveTab(tab);
-      setTourStepIndex(nextIndex);
-    }
-  };
-
   // ── Shared fragments ──
 
   // Concierge entry card — shown at the top of Home for concierge orgs. The
@@ -1516,7 +1387,6 @@ export default function OrgDashboardPage() {
     <button
       onClick={() => setShowConciergeChat(true)}
       className="w-full text-left relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 px-5 py-4 flex items-center gap-4 hover:bg-zinc-900 transition-colors"
-      data-tour="tour-concierge"
     >
       <div aria-hidden className="pointer-events-none absolute inset-0">
         <div className="absolute -top-16 -right-12 h-40 w-40 rounded-full bg-emerald-500/20 blur-3xl" />
@@ -1893,7 +1763,7 @@ export default function OrgDashboardPage() {
                     </div>
                   )}
 
-                  <div data-tour="tour-plans">
+                  <div>
                     <PlansManager
                       calendarId={cal.objectId}
                       orgId={calendarId}
@@ -2981,21 +2851,6 @@ export default function OrgDashboardPage() {
           <Check className="w-4 h-4" />
           {toast}
         </div>
-      )}
-
-      {/* Dashboard Tour. Gated on `tourMounted` (latched, never un-latches) so
-          the react-joyride chunk is only fetched for the one visit per calendar
-          that actually runs the tour — but stays mounted afterwards, as it was
-          when the import was static, rather than unmounting mid-teardown when
-          `runTour` flips back to false. */}
-      {tourMounted && (
-        <DashboardTour
-          run={runTour}
-          stepIndex={tourStepIndex}
-          calendarId={calendarId}
-          steps={tourSteps}
-          onCallback={handleTourCallback}
-        />
       )}
     </div>
   );

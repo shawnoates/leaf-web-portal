@@ -360,17 +360,17 @@ export default function PlanDetailModal({
           <button
             onClick={copyPlanLink}
             title="Copy direct link to this plan"
-            className="p-2 rounded-full bg-white/20 text-white md:text-zinc-900 md:bg-transparent"
+            className="p-2 rounded-full bg-zinc-100 text-zinc-900 md:bg-transparent"
           >
             {linkCopied ? (
-              <Check className="w-5 h-5 text-emerald-400 md:text-emerald-600" />
+              <Check className="w-5 h-5 text-emerald-600" />
             ) : (
               <Link2 className="w-5 h-5" />
             )}
           </button>
           <button
             onClick={onClose}
-            className="p-2 rounded-full bg-white/20 text-white md:text-zinc-900 md:bg-transparent"
+            className="p-2 rounded-full bg-zinc-100 text-zinc-900 md:bg-transparent"
           >
             <Plus className="w-8 h-8 rotate-45" />
           </button>

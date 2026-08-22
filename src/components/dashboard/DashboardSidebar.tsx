@@ -79,7 +79,7 @@ export default function DashboardSidebar({
       </div>
 
       {/* Places */}
-      <nav className="flex flex-col gap-0.5" data-tour="tour-tabs">
+      <nav className="flex flex-col gap-0.5">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = activeTab === item.id;
@@ -163,7 +163,6 @@ export default function DashboardSidebar({
         {isOwner && (
           <button
             onClick={onAddCalendar}
-            data-tour="tour-add-calendar"
             className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-xs text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" /> New calendar
@@ -178,7 +177,6 @@ export default function DashboardSidebar({
         {isOwner && (
           <button
             onClick={() => onNavigate("settings")}
-            data-tour="tour-settings"
             className={`px-2.5 py-2 rounded-lg text-left text-xs transition-colors hover:bg-zinc-100 ${
               activeTab === "settings"
                 ? "text-zinc-900 font-medium"

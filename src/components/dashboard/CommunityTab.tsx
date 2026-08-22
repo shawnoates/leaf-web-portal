@@ -495,7 +495,6 @@ export default function CommunityTab({
         ) : (
           <div
             className="border border-zinc-200 rounded-xl overflow-hidden"
-            data-tour="tour-members"
           >
             {/* Header strip — desktop only */}
             <div className="hidden md:flex gap-3.5 px-[18px] py-[9px] bg-zinc-50 border-b border-zinc-100 text-[9px] font-semibold tracking-[0.12em] uppercase text-zinc-400">
