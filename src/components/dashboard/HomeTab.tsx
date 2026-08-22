@@ -77,6 +77,40 @@ function hostLine(plan: CalActivePlan): string {
   return `${plan.hostName} hosting`;
 }
 
+/** Month-over-month percentage change, or null when there is no last-month
+ *  baseline to compare against (0 or the server field not deployed yet). */
+function momDeltaPct(current: number, previous: number | undefined): number | null {
+  if (previous == null || previous <= 0) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+function StatTile({
+  label,
+  value,
+  deltaPct,
+}: {
+  label: string;
+  value: number;
+  deltaPct: number | null;
+}) {
+  return (
+    <div className="border border-zinc-200 rounded-xl p-3 sm:p-4">
+      <p className="text-[11px] text-zinc-500">{label}</p>
+      <p className="text-xl sm:text-2xl font-semibold text-zinc-900 mt-1.5">
+        {value}
+        {deltaPct != null && deltaPct !== 0 && (
+          <span
+            className={`text-xs font-medium ml-1.5 ${deltaPct > 0 ? "text-leaf-700" : "text-zinc-400"}`}
+          >
+            {deltaPct > 0 ? "+" : ""}
+            {deltaPct}%
+          </span>
+        )}
+      </p>
+    </div>
+  );
+}
+
 function PlanCover({
   plan,
   className,
@@ -176,8 +210,30 @@ export default function HomeTab({
     [dashboard.followers, rsvpIndex],
   );
 
-  const rsvpDelta = analytics ? analytics.growth.rsvpDeltaPct : null;
-  const followerDelta = analytics ? analytics.growth.followerDeltaPct : null;
+  // Stat tiles: this-calendar-month counts, each with a month-over-month
+  // delta from the server's last-month counterparts. Plans and new followers
+  // fall back to client-side counts (upcoming plans only / the follower list)
+  // until the getOrgDashboard deploy that computes them is live.
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const nextMonthStart = new Date(monthStart);
+  nextMonthStart.setMonth(nextMonthStart.getMonth() + 1);
+  const inThisMonth = (raw: string) => {
+    const d = new Date(raw);
+    return !isNaN(d.getTime()) && d >= monthStart && d < nextMonthStart;
+  };
+  const plansThisMonth =
+    dashboard.plansThisMonth ?? allPlans.filter((p) => inThisMonth(p.date)).length;
+  const newFollowersThisMonth =
+    dashboard.newFollowersThisMonth ??
+    dashboard.followers.filter((f) => inThisMonth(f.joinedAt)).length;
+  const plansDelta = momDeltaPct(plansThisMonth, dashboard.plansLastMonth);
+  const followersDelta = momDeltaPct(
+    newFollowersThisMonth,
+    dashboard.newFollowersLastMonth,
+  );
+  const rsvpsDelta = momDeltaPct(dashboard.rsvpsThisMonth, dashboard.rsvpsLastMonth);
 
   const today = new Date();
   const title = today.toLocaleDateString("en-US", {
@@ -520,45 +576,23 @@ export default function HomeTab({
           </div>
         )}
 
-        {/* Counters */}
+        {/* Counters — this calendar month, deltas vs last month */}
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <div className="border border-zinc-200 rounded-xl p-3 sm:p-4">
-            <p className="text-[11px] text-zinc-500">Needs you</p>
-            <p className="text-xl sm:text-2xl font-semibold text-zinc-900 mt-1.5">
-              {needsYouCount}{" "}
-              <span className="text-xs font-normal text-zinc-400">
-                item{needsYouCount === 1 ? "" : "s"}
-              </span>
-            </p>
-          </div>
-          <div className="border border-zinc-200 rounded-xl p-3 sm:p-4">
-            <p className="text-[11px] text-zinc-500">RSVPs this month</p>
-            <p className="text-xl sm:text-2xl font-semibold text-zinc-900 mt-1.5">
-              {dashboard.rsvpsThisMonth}
-              {rsvpDelta != null && rsvpDelta !== 0 && (
-                <span
-                  className={`text-xs font-medium ml-1.5 ${rsvpDelta > 0 ? "text-leaf-700" : "text-zinc-400"}`}
-                >
-                  {rsvpDelta > 0 ? "+" : ""}
-                  {rsvpDelta}%
-                </span>
-              )}
-            </p>
-          </div>
-          <div className="border border-zinc-200 rounded-xl p-3 sm:p-4">
-            <p className="text-[11px] text-zinc-500">Followers</p>
-            <p className="text-xl sm:text-2xl font-semibold text-zinc-900 mt-1.5">
-              {dashboard.followerCount}
-              {followerDelta != null && followerDelta !== 0 && (
-                <span
-                  className={`text-xs font-medium ml-1.5 ${followerDelta > 0 ? "text-leaf-700" : "text-zinc-400"}`}
-                >
-                  {followerDelta > 0 ? "+" : ""}
-                  {followerDelta}%
-                </span>
-              )}
-            </p>
-          </div>
+          <StatTile
+            label="Plans this month"
+            value={plansThisMonth}
+            deltaPct={plansDelta}
+          />
+          <StatTile
+            label="New followers this month"
+            value={newFollowersThisMonth}
+            deltaPct={followersDelta}
+          />
+          <StatTile
+            label="RSVPs this month"
+            value={dashboard.rsvpsThisMonth}
+            deltaPct={rsvpsDelta}
+          />
         </div>
 
         <div

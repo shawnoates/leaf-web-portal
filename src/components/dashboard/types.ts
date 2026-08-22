@@ -94,6 +94,14 @@ export interface OrgDashboard {
   totalRsvpCount: number;
   rsvpLimit: number | null;
   rsvpsThisMonth: number;
+  /** Calendar-month stat-tile counts with last-month counterparts for the
+   *  month-over-month deltas. Optional until the getOrgDashboard deploy that
+   *  adds them is live — HomeTab falls back to client-side counts. */
+  rsvpsLastMonth?: number;
+  plansThisMonth?: number;
+  plansLastMonth?: number;
+  newFollowersThisMonth?: number;
+  newFollowersLastMonth?: number;
   planIdeaCount: number;
   upcomingPlanCount: number;
   followerCount: number;
