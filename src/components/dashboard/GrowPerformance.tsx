@@ -22,10 +22,10 @@ const DAY_FULL = [
 ];
 
 const RANGES: { id: AnalyticsRange; label: string }[] = [
-  { id: "7d", label: "7D" },
-  { id: "30d", label: "30D" },
-  { id: "90d", label: "90D" },
-  { id: "all", label: "ALL" },
+  { id: "7d", label: "7d" },
+  { id: "30d", label: "30d" },
+  { id: "90d", label: "90d" },
+  { id: "all", label: "All" },
 ];
 
 function Delta({ value }: { value: number }) {
@@ -182,8 +182,10 @@ export default function GrowPerformance({
         </div>
         <div className="border border-zinc-200 rounded-xl p-3.5">
           <p className="text-[10px] text-zinc-500 uppercase">Attendance</p>
+          {/* Wire quirk: `attendanceRate` arrives as a percent (31), while
+              `repeatRate` below is a fraction (0.17) — mirror AnalyticsTab. */}
           <p className="text-[21px] font-semibold text-zinc-900 mt-1">
-            {Math.round(e.attendanceRate * 100)}%
+            {Math.round(e.attendanceRate)}%
           </p>
           <p className="text-[11px] text-zinc-400">
             {e.attendanceCount} of {e.rsvpCount}
