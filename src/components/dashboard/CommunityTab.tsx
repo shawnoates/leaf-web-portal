@@ -213,19 +213,23 @@ export default function CommunityTab({
     return list;
   }, [people, segment, calFilter, search]);
 
-  // Followers in the current filtered view a nudge can actually reach: has a
-  // phone on file and hasn't been nudged this session.
+  // Nudging lives on the Never RSVP'd segment only — it's a re-engagement
+  // tool, not a general broadcast channel. Eligible = has a phone on file and
+  // hasn't been nudged this session.
+  const nudgingHere = segment === "never";
   const nudgeable = useMemo(
     () =>
-      filtered
-        .filter(
-          (p) =>
-            !p.pending &&
-            p.follower?.phone &&
-            !nudgedIds?.has(p.follower.membershipId),
-        )
-        .map((p) => p.follower!),
-    [filtered, nudgedIds],
+      nudgingHere
+        ? filtered
+            .filter(
+              (p) =>
+                !p.pending &&
+                p.follower?.phone &&
+                !nudgedIds?.has(p.follower.membershipId),
+            )
+            .map((p) => p.follower!)
+        : [],
+    [nudgingHere, filtered, nudgedIds],
   );
 
   const exportCsv = () => {
@@ -612,7 +616,8 @@ export default function CommunityTab({
                         <UserMinus className="w-4 h-4" />
                       </button>
                     )}
-                  {!p.pending &&
+                  {nudgingHere &&
+                    !p.pending &&
                     p.follower &&
                     p.follower.phone &&
                     (nudgedIds?.has(p.follower.membershipId) ? (

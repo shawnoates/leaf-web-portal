@@ -10,6 +10,7 @@ import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailMod
 import HostIdeaModal from "@/components/HostIdeaModal";
 import PlanChatDrawer from "@/components/PlanChatDrawer";
 import VirtualHostSheet, { DEFAULT_HOST_AVATAR, HostAvatar } from "@/components/VirtualHostSheet";
+import NudgeModal from "@/components/dashboard/NudgeModal";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
 import { featuredWallClockDate } from "@/lib/wall-clock";
@@ -114,6 +115,20 @@ function resolveAIStarterDate(ev: {
   target.setDate(now.getDate() + daysUntil);
   target.setHours(hour, minute, 0, 0);
   return target;
+}
+
+// Ranked "who should host this suggestion" row from getSuggestionHostCandidates:
+// followers who attend (but don't host), scored by similar-event history and
+// whether they tapped interested on this exact idea.
+interface HostCandidate {
+  userId: string;
+  membershipId: string;
+  name: string;
+  hasPhone: boolean;
+  attendedCount: number;
+  similarCount: number;
+  similarTitles: string[];
+  isInterested: boolean;
 }
 
 interface PlanIdea {
@@ -546,6 +561,14 @@ export default function PlansManager({
   const [assigningIdea, setAssigningIdea] = useState<PlanIdea | null>(null);
   const [assignBusyUserId, setAssignBusyUserId] = useState<string | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
+  // Ranked suggested hosts for the idea currently in the assign picker.
+  const [hostCandidates, setHostCandidates] = useState<HostCandidate[] | null>(null);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  // Ask-to-host composer (reuses the Community tab's NudgeModal with a
+  // host-ask draft instead of the re-engagement one).
+  const [nudgeAsk, setNudgeAsk] = useState<{ candidate: HostCandidate; idea: PlanIdea } | null>(null);
+  // Org name for the host-ask draft signature; set by fetchPlanIdeas.
+  const [orgName, setOrgName] = useState("");
 
   // Virtual host — the idea currently being handed to a paid AI-assisted host
   // (null = sheet closed). See VirtualHostSheet.
@@ -717,6 +740,7 @@ export default function PlansManager({
       // Held in state for the host modal — a featured suggestion publishes
       // through requestCustomPlanViaWeb, which is keyed by shareId.
       setCalendarShareId(shareId ?? null);
+      setOrgName(dash.name || "");
       // People eligible to be assigned as a suggestion's host: the calendar's
       // members AND followers. Both need a bound user (objectId) — unbound
       // invites / phone-only followers can't host yet, so drop them. Deduped
@@ -1095,6 +1119,38 @@ export default function PlansManager({
   // Assign a member as the host of a suggestion — publishes it live hosted by
   // them (server: assignPlanIdeaHost). Owner/co-host only; the Calendars tab
   // is already gated to those roles.
+  // Open the assign picker AND kick off the ranked suggested-hosts fetch for
+  // this idea (fetched on open, not in an effect, so the picker opens
+  // instantly and candidates stream in).
+  function openAssignPicker(idea: PlanIdea) {
+    setAssignError(null);
+    setAssigningIdea(idea);
+    setHostCandidates(null);
+    if (!idea.objectId || idea.isFeatured) return;
+    setLoadingCandidates(true);
+    Parse.Cloud.run("getSuggestionHostCandidates", { ideaId: idea.objectId })
+      .then((r: { candidates?: HostCandidate[] }) => setHostCandidates(r.candidates || []))
+      .catch((err) => {
+        console.warn("[PlansManager] getSuggestionHostCandidates failed:", err);
+        setHostCandidates([]);
+      })
+      .finally(() => setLoadingCandidates(false));
+  }
+
+  // Host-ask draft for the nudge composer. Same voice rules as the
+  // re-engagement draft: org-name signature, slug link, no em dash.
+  function hostAskDraft(ask: { candidate: HostCandidate; idea: PlanIdea }): string {
+    const hostFirst = String(Parse.User.current()?.get("full_name") || "")
+      .trim()
+      .split(/\s+/)[0];
+    const first = ask.candidate.name.trim().split(/\s+/)[0] || "there";
+    const from = hostFirst ? `it's ${hostFirst} from ${orgName}` : `it's ${orgName}`;
+    const link = calendarShareId
+      ? ` You can claim it here: https://www.os.joinleaf.com/org/${calendarShareId}`
+      : "";
+    return `Hey ${first}, ${from}. We're planning "${ask.idea.title}" and I think you'd be great at hosting it. Want to lead it?${link}`;
+  }
+
   async function handleAssignHost(idea: PlanIdea, hostUserId: string) {
     setAssignBusyUserId(hostUserId);
     setAssignError(null);
@@ -1627,7 +1683,7 @@ export default function PlansManager({
           // stays hostable and nothing else is offered. Removing a featured
           // suggestion is an admin action in the admin portal, not an owner one.
           onEditSuggestion={detailIdea.isFeatured ? undefined : () => { const idea = detailIdea; setDetailIdea(null); openIdeaEditor(idea); }}
-          onAssignHost={detailIdea.isFeatured ? undefined : () => { const idea = detailIdea; setDetailIdea(null); setAssignError(null); setAssigningIdea(idea); }}
+          onAssignHost={detailIdea.isFeatured ? undefined : () => { const idea = detailIdea; setDetailIdea(null); openAssignPicker(idea); }}
           onEndSeries={detailIdea.isFeatured ? undefined : () => handleEndSeries(detailIdea.ideaSeriesId!)}
           onDelete={detailIdea.isFeatured ? undefined : () => handleRemoveIdea(detailIdea.objectId)}
         />
@@ -1912,6 +1968,76 @@ export default function PlansManager({
                 </span>
                 <Sparkles className="w-4 h-4 text-teal-400 shrink-0" />
               </button>
+              {/* Ranked suggested hosts — followers who attend (but don't
+                  host), similar-event history first. Row click assigns like
+                  any member row; "Ask" texts them a host invite instead. */}
+              {loadingCandidates && (
+                <p className="text-xs text-zinc-400 px-3 py-2.5">Finding suggested hosts…</p>
+              )}
+              {hostCandidates && hostCandidates.length > 0 && (
+                <>
+                  <p className="px-3 pt-2 pb-1 text-[9px] font-semibold tracking-[0.12em] uppercase text-zinc-400">
+                    Suggested hosts
+                  </p>
+                  {hostCandidates.map((c) => (
+                    <div
+                      key={c.userId}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-zinc-50 transition-colors"
+                    >
+                      <button
+                        onClick={() => handleAssignHost(assigningIdea, c.userId)}
+                        disabled={!!assignBusyUserId}
+                        className="flex items-center gap-3 min-w-0 flex-1 text-left disabled:opacity-50"
+                      >
+                        <span className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+                          <UserCheck className="w-4 h-4 text-amber-500" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-medium text-zinc-900 truncate">{c.name}</span>
+                          <span className="block text-xs text-zinc-400 truncate">
+                            {[
+                              c.isInterested ? "tapped interested" : null,
+                              c.similarCount > 0
+                                ? `${c.similarCount} similar event${c.similarCount === 1 ? "" : "s"}`
+                                : null,
+                              c.attendedCount > 0 ? `attended ${c.attendedCount}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                        </span>
+                      </button>
+                      {assignBusyUserId === c.userId ? (
+                        <span className="w-4 h-4 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin shrink-0" />
+                      ) : (
+                        c.hasPhone && (
+                          <button
+                            onClick={() => {
+                              if (tierLoaded && tier === "starter") {
+                                setAssigningIdea(null);
+                                setShowUpgradeModal(true);
+                                return;
+                              }
+                              const idea = assigningIdea;
+                              setAssigningIdea(null);
+                              setNudgeAsk({ candidate: c, idea });
+                            }}
+                            disabled={!!assignBusyUserId}
+                            className="px-2.5 py-1.5 rounded-full border border-zinc-200 text-[11px] font-medium text-zinc-600 hover:border-zinc-400 transition-colors inline-flex items-center gap-1 shrink-0 disabled:opacity-50"
+                            title="Text them a host invite"
+                          >
+                            <MessageCircle className="w-3 h-3" />
+                            Ask
+                          </button>
+                        )
+                      )}
+                    </div>
+                  ))}
+                  <p className="px-3 pt-3 pb-1 text-[9px] font-semibold tracking-[0.12em] uppercase text-zinc-400">
+                    Everyone
+                  </p>
+                </>
+              )}
               {members.length === 0 ? (
                 <p className="text-sm text-zinc-400 text-center py-8 px-4">
                   No members or followers yet. Once people join your calendar you can assign them as hosts.
@@ -1941,6 +2067,29 @@ export default function PlansManager({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Ask-to-host composer — same NudgeModal as the Community tab, with a
+          host-ask draft. Sends via nudgeFollower (membership-addressed), so
+          opt-out, quiet hours, Pro gate and the weekly SMS budget all apply. */}
+      {nudgeAsk && (
+        <NudgeModal
+          followers={[
+            {
+              membershipId: nudgeAsk.candidate.membershipId,
+              objectId: nudgeAsk.candidate.userId,
+              name: nudgeAsk.candidate.name,
+              phone: "on-file",
+              calendarId,
+              calendarName: null,
+              joinedAt: "",
+            },
+          ]}
+          hostFirstName=""
+          draft={hostAskDraft(nudgeAsk)}
+          onClose={() => setNudgeAsk(null)}
+          onSent={() => {}}
+        />
       )}
 
       {/* Past Plan Photos Modal */}

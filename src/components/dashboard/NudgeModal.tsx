@@ -91,12 +91,17 @@ export default function NudgeModal({
   dashboard,
   followers,
   hostFirstName,
+  draft,
   onClose,
   onSent,
 }: {
-  dashboard: OrgDashboard;
+  /** Needed only when no `draft` is passed — feeds the default message. */
+  dashboard?: OrgDashboard;
   followers: Follower[];
   hostFirstName: string;
+  /** Caller-authored default message (e.g. a host-ask); skips the built-in
+   *  re-engagement draft entirely. */
+  draft?: string;
   onClose: () => void;
   /** Fired once the server confirms: membership ids actually texted + a
    *  ready-made toast line. */
@@ -104,8 +109,10 @@ export default function NudgeModal({
 }) {
   const bulk = followers.length > 1;
   const defaultMessage = useMemo(
-    () => buildDefaultMessage(dashboard, followers, hostFirstName),
-    [dashboard, followers, hostFirstName],
+    () =>
+      draft ??
+      (dashboard ? buildDefaultMessage(dashboard, followers, hostFirstName) : ""),
+    [draft, dashboard, followers, hostFirstName],
   );
   const [message, setMessage] = useState(defaultMessage);
   const [sending, setSending] = useState(false);
