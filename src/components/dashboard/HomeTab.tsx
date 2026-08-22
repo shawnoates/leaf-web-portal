@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Calendar, Plus } from "lucide-react";
 import type { OrgAnalytics } from "@/components/analytics/types";
+import { formatWallClockTime12h } from "@/lib/date-utils";
 import type { CalActivePlan, OrgDashboard } from "./types";
 import { buildRsvpCountIndex, rsvpCountForPerson } from "./types";
 
@@ -449,7 +450,9 @@ export default function HomeTab({
                         {plan.title}
                       </p>
                       <p className="text-xs text-zinc-500 mt-0.5 truncate">
-                        {plan.time ? `${plan.time} · ` : ""}
+                        {plan.time
+                          ? `${formatWallClockTime12h(plan.time)} · `
+                          : ""}
                         {hostLine(plan)} ·{" "}
                         {plan.isPoll
                           ? `${plan.pollVoteCount ?? 0} votes`
