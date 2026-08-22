@@ -1138,7 +1138,10 @@ export default function PlansManager({
   }
 
   // Host-ask draft for the nudge composer. Same voice rules as the
-  // re-engagement draft: org-name signature, slug link, no em dash.
+  // re-engagement draft: org-name signature, human-readable link, no em dash.
+  // The ?idea= param deep-links to THIS suggestion on the public page (the
+  // /org page auto-opens its hosting flow), so the tap lands on the plan
+  // itself rather than the whole calendar.
   function hostAskDraft(ask: { candidate: HostCandidate; idea: PlanIdea }): string {
     const hostFirst = String(Parse.User.current()?.get("full_name") || "")
       .trim()
@@ -1146,9 +1149,9 @@ export default function PlansManager({
     const first = ask.candidate.name.trim().split(/\s+/)[0] || "there";
     const from = hostFirst ? `it's ${hostFirst} from ${orgName}` : `it's ${orgName}`;
     const link = calendarShareId
-      ? ` You can claim it here: https://www.os.joinleaf.com/org/${calendarShareId}`
+      ? ` Claim it here: https://www.os.joinleaf.com/org/${calendarShareId}?idea=${ask.idea.objectId}`
       : "";
-    return `Hey ${first}, ${from}. We're planning "${ask.idea.title}" and I think you'd be great at hosting it. Want to lead it?${link}`;
+    return `Hey ${first}, ${from}. Would you host "${ask.idea.title}"? It's really easy, for most plans you just show up and keep the group chat going.${link}`;
   }
 
   async function handleAssignHost(idea: PlanIdea, hostUserId: string) {

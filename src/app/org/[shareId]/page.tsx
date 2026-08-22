@@ -2183,11 +2183,17 @@ export default function OrgCalendarPage() {
   // Read directly from window.location to avoid the Suspense requirement
   // that next/navigation's useSearchParams imposes on this client page.
   const [planQueryId, setPlanQueryId] = useState<string | null>(null);
+  // ?idea= counterpart — set by the same param effect, consumed below.
+  const [ideaQueryId, setIdeaQueryId] = useState<string | null>(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const search = new URLSearchParams(window.location.search);
     const id = search.get("plan");
     if (id) setPlanQueryId(id);
+    // ?idea={CalendarGeneratedPlan id} — the landing target for host-ask
+    // texts (PlansManager's "Ask" button), pointing at one suggestion.
+    const ideaParam = search.get("idea");
+    if (ideaParam) setIdeaQueryId(ideaParam);
     if (search.get("welcome") === "1") setShowWelcomeInvite(true);
 
     // Auto-open the custom-plan ("Suggest the next one") form when arriving
@@ -2258,6 +2264,34 @@ export default function OrgCalendarPage() {
       autoOpenedPlanRef.current = planQueryId;
     }
   }, [org, planQueryId]);
+
+  // ?idea= auto-open — the host-ask SMS landing. If the visitor can host
+  // right now (owner/co-host, or follower on an allowFollowersToHost
+  // calendar), open the hosting flow on that suggestion directly; otherwise
+  // surface the suggestion as the popup card, whose Host This Plan CTA walks
+  // them through the follow-first path.
+  const autoOpenedIdeaRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!org || !ideaQueryId) return;
+    if (autoOpenedIdeaRef.current === ideaQueryId) return;
+    const match = org.planIdeas.find((i) => i.id === ideaQueryId);
+    if (!match) return;
+    autoOpenedIdeaRef.current = ideaQueryId;
+    const canHostNow =
+      org.isOwner ||
+      org.isHost ||
+      (!!org.allowFollowersToHost && !!org.isFollower);
+    if (canHostNow && !org.rsvpLimitReached) {
+      setHostingIdea(match);
+      setHostSubmitting(false);
+      setHostSuccess(false);
+      setHostNote("");
+      setSelectedVenue(null);
+    } else {
+      setPopupIdea(match);
+      setShowPlanIdeaPopup(true);
+    }
+  }, [org, ideaQueryId]);
 
   // ── Return from the AI-assisted host purchase (?virtualHostAttached=1) ────
   // Stripe sends the owner back to this page with the sheet (and any modal it
