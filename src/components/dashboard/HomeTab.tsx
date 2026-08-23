@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Calendar, Plus } from "lucide-react";
+import { Calendar, Lock, Plus } from "lucide-react";
 import type { OrgAnalytics } from "@/components/analytics/types";
 import { formatWallClockTime12h } from "@/lib/date-utils";
 import type {
@@ -155,6 +155,7 @@ export default function HomeTab({
   onNudgeToHost,
   onReengagementEdit,
   nudgedIds,
+  isPaidTier,
   eventApprovalsCount,
   eventApprovalsHref,
 }: {
@@ -184,6 +185,10 @@ export default function HomeTab({
   ) => void;
   /** Membership ids already nudged this session — their prompt card drops out. */
   nudgedIds?: Set<string>;
+  /** Both nudge cards send an SMS, which is paid-only. The handlers already
+   *  open the upgrade modal; this just puts a lock on the button so free
+   *  owners can see the gate before they click it. */
+  isPaidTier?: boolean;
   eventApprovalsCount: number;
   eventApprovalsHref: string;
 }) {
@@ -296,8 +301,9 @@ export default function HomeTab({
         </div>
         <button
           onClick={() => onNudgeToHost?.(hc, calendar.objectId)}
-          className="px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0"
         >
+          {!isPaidTier && <Lock className="w-3.5 h-3.5" />}
           Ask {hc.candidate_user.name.trim().split(/\s+/)[0]}
         </button>
       </div>,
@@ -333,9 +339,10 @@ export default function HomeTab({
         </div>
         <button
           onClick={() => onReengagementEdit?.(re, calendar.objectId)}
-          className="px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0"
         >
-          Write invite
+          {!isPaidTier && <Lock className="w-3.5 h-3.5" />}
+          Draft invite
         </button>
       </div>,
     );

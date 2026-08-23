@@ -1689,6 +1689,7 @@ export default function OrgDashboardPage() {
               onNudgeToHost={handleNudgeToHost}
               onReengagementEdit={handleReengagementEdit}
               nudgedIds={nudgedIds}
+              isPaidTier={isPaidTier}
               eventApprovalsCount={eventApprovals.length}
               eventApprovalsHref={`/dashboard/${calendarId}/calendars/${calendarId}/edit`}
             />
