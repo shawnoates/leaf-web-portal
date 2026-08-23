@@ -148,6 +148,8 @@ export default function HomeTab({
   onDeclineRsvp,
   onApproveFollower,
   onRejectFollower,
+  onNudgeToHost,
+  onReengagementEdit,
   eventApprovalsCount,
   eventApprovalsHref,
 }: {
@@ -167,6 +169,16 @@ export default function HomeTab({
   onDeclineRsvp: (req: OrgDashboard["pendingRsvpRequests"][number]) => void;
   onApproveFollower: (pf: OrgDashboard["pendingFollowers"][number]) => void;
   onRejectFollower: (pf: OrgDashboard["pendingFollowers"][number]) => void;
+  onNudgeToHost?: (
+    idea: { objectId: string; title: string },
+    candidate: { name: string; phone: string | null },
+    calendarId: string,
+  ) => void;
+  onReengagementEdit?: (
+    plan: { objectId: string; title: string; date: string },
+    target: { name: string; phone: string | null },
+    calendarId: string,
+  ) => void;
   eventApprovalsCount: number;
   eventApprovalsHref: string;
 }) {
@@ -256,6 +268,77 @@ export default function HomeTab({
 
   // ── NEEDS YOU rows ────────────────────────────────────────────────────
   const needsYouRows: React.ReactNode[] = [];
+
+  // Host candidate cards per calendar (if ideas are hidden + urgent idea needing host exists)
+  for (const calendar of dashboard.calendars) {
+    if (calendar.hidePlanIdeas && calendar.host_candidate) {
+      const { idea, candidate_user, reason } = calendar.host_candidate;
+      needsYouRows.push(
+        <div
+          key={`host-candidate-${calendar.objectId}`}
+          className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
+        >
+          <div className="flex-1 min-w-[180px]">
+            <p className="text-[13px] font-medium text-zinc-900">
+              {candidate_user.name} would be great
+            </p>
+            <p className="text-[11px] text-zinc-500 mt-0.5">
+              {reason}
+            </p>
+          </div>
+          <button
+            onClick={() =>
+              onNudgeToHost?.(idea, candidate_user, calendar.objectId)
+            }
+            className="px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0"
+          >
+            Ask
+          </button>
+        </div>,
+      );
+    }
+  }
+
+  // Re-engagement cards per calendar (nudge never-RSVP'd to upcoming plan)
+  for (const calendar of dashboard.calendars) {
+    if (calendar.reengagement) {
+      const { plan, target_user } = calendar.reengagement;
+      needsYouRows.push(
+        <div
+          key={`reengagement-${calendar.objectId}`}
+          className="flex flex-col gap-2 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
+        >
+          <div>
+            <p className="text-[13px] font-medium text-zinc-900">
+              Invite {target_user.name} to {plan.title}
+            </p>
+            <p className="text-[11px] text-zinc-500 mt-0.5">
+              {plan.date}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() =>
+                onReengagementEdit?.(plan, target_user, calendar.objectId)
+              }
+              className="flex-1 px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
+            >
+              Customize
+            </button>
+            <button
+              onClick={() => {
+                onGoCommunity?.("never");
+              }}
+              className="px-3.5 py-2 min-h-[36px] border border-zinc-300 text-zinc-900 rounded-full text-xs font-medium hover:bg-zinc-50 transition-colors"
+            >
+              Skip
+            </button>
+          </div>
+        </div>,
+      );
+    }
+  }
+
   for (const req of dashboard.hostRequests) {
     needsYouRows.push(
       <div

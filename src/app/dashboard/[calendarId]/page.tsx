@@ -1261,6 +1261,48 @@ export default function OrgDashboardPage() {
     [],
   );
 
+  // Host candidate nudge (from HomeTab Needs You card)
+  const handleNudgeToHost = useCallback(
+    (
+      idea: { objectId: string; title: string },
+      candidate: { name: string; phone: string | null },
+      calendarId: string,
+    ) => {
+      const stubFollower: OrgDashboard["followers"][number] = {
+        membershipId: `host-candidate-${idea.objectId}`,
+        objectId: null,
+        name: candidate.name,
+        phone: candidate.phone,
+        calendarId,
+        calendarName: dashboard?.calendars.find((c) => c.objectId === calendarId)?.name || null,
+        joinedAt: new Date().toISOString(),
+      };
+      setNudgeFor([stubFollower]);
+    },
+    [dashboard],
+  );
+
+  // Re-engagement nudge (from HomeTab Needs You card)
+  const handleReengagementEdit = useCallback(
+    (
+      plan: { objectId: string; title: string; date: string },
+      target: { name: string; phone: string | null },
+      calendarId: string,
+    ) => {
+      const stubFollower: OrgDashboard["followers"][number] = {
+        membershipId: `reengagement-${plan.objectId}`,
+        objectId: null,
+        name: target.name,
+        phone: target.phone,
+        calendarId,
+        calendarName: dashboard?.calendars.find((c) => c.objectId === calendarId)?.name || null,
+        joinedAt: new Date().toISOString(),
+      };
+      setNudgeFor([stubFollower]);
+    },
+    [dashboard],
+  );
+
   const removeFollower = useCallback(
     async (f: OrgDashboard["followers"][number]) => {
       if (!confirm(`Remove ${f.name} as a follower?`)) return;
@@ -1601,6 +1643,8 @@ export default function OrgDashboardPage() {
               onDeclineRsvp={declineRsvpRequest}
               onApproveFollower={approveFollower}
               onRejectFollower={rejectFollower}
+              onNudgeToHost={handleNudgeToHost}
+              onReengagementEdit={handleReengagementEdit}
               eventApprovalsCount={eventApprovals.length}
               eventApprovalsHref={`/dashboard/${calendarId}/calendars/${calendarId}/edit`}
             />
