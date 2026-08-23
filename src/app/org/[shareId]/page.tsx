@@ -16,6 +16,7 @@ import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-use
 import { renderLinkedText } from "@/lib/linkify";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
 import { zoneOffsetSuffix, featuredWallClockDate } from "@/lib/wall-clock";
+import { AUDIENCE_COHORT_LABELS } from "@/lib/audience-cohorts";
 import { isVenueBlacklisted } from "@/lib/venue-blacklist";
 import { fetchVenuePhotoUrl } from "@/lib/google-places";
 import {
@@ -255,6 +256,10 @@ interface OrgData {
         // from weekday. Weekly Shape-A events leave this null and get the
         // rolling "next Friday" treatment.
         dateISO?: string | null;
+        // Which cohort the plan is aimed at ("moms", "parents_kids", …).
+        // Absent on rows generated before cohorts existed, and "any" when the
+        // plan is deliberately open — both render without a chip.
+        audienceTag?: string | null;
       }[]
     | null;
   // Per-event interest counts, keyed by eventIndex → count. Server
@@ -3284,6 +3289,7 @@ export default function OrgCalendarPage() {
                         FLOATING_EVENT_TZ
                       )}`;
                       const isAmber = ev.tagVariant === "amber";
+                      const cohortLabel = AUDIENCE_COHORT_LABELS[ev.audienceTag ?? ""];
                       return (
                         <article
                           key={index}
@@ -3351,8 +3357,20 @@ export default function OrgCalendarPage() {
                           <div className="w-full md:w-2/5 space-y-6">
                             <div className="flex items-start justify-between gap-4">
                               <div className="space-y-2 min-w-0">
-                                <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
-                                  {kicker}
+                                <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400 flex items-center gap-2 flex-wrap">
+                                  <span>{kicker}</span>
+                                  {/* Cohort chip. "any" and untagged rows show
+                                      nothing — a chip on every card would make
+                                      the targeted ones stop standing out, which
+                                      is the entire point of tagging them. */}
+                                  {cohortLabel && (
+                                    <>
+                                      <span aria-hidden="true">·</span>
+                                      <span className="text-zinc-900">
+                                        {cohortLabel}
+                                      </span>
+                                    </>
+                                  )}
                                 </p>
                                 <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
                                   {ev.title || ev.name}
