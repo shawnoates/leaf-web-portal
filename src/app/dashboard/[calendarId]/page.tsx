@@ -33,7 +33,12 @@ import type {
   OrgDashboard,
   OrgDashboardCalendar,
 } from "@/components/dashboard/types";
-import { buildRsvpCountIndex, rsvpCountForPerson } from "@/components/dashboard/types";
+import {
+  buildRsvpCountIndex,
+  rsvpCountForPerson,
+  senderNameFor,
+  tidyTitle,
+} from "@/components/dashboard/types";
 // recharts is the largest dependency on this route (~200KB gzipped) and only
 // the "All charts" disclosure under Grow › Performance uses it. Keep it out of
 // the first-paint bundle. `ssr: false` because the charts measure their
@@ -1299,17 +1304,17 @@ export default function OrgDashboardPage() {
       calId: string,
     ) => {
       if (!isPaidTier) { setShowSubscription(true); return; }
-      const cal = dashboard?.calendars.find((c) => c.objectId === calId);
+      if (!dashboard) return;
+      const cal = dashboard.calendars.find((c) => c.objectId === calId);
       const first = hc.candidate_user.name.trim().split(/\s+/)[0] || "there";
       const me = hostFirstName();
-      const from = me
-        ? `it's ${me} from ${dashboard?.name || cal?.name || "us"}`
-        : `it's ${dashboard?.name || cal?.name || "us"}`;
+      const senderName = senderNameFor(dashboard, calId);
+      const from = me ? `it's ${me} from ${senderName}` : `it's ${senderName}`;
       const link = cal?.shareId
         ? ` Claim it here: https://www.os.joinleaf.com/org/${cal.shareId}?idea=${hc.idea.objectId}`
         : "";
       setNudgeDraft(
-        `Hey ${first}, ${from}. Would you host "${hc.idea.title}"? It's really easy, for most plans you just show up and keep the group chat going.${link}`,
+        `Hey ${first}, ${from}. Would you host "${tidyTitle(hc.idea.title)}"? It's really easy, for most plans you just show up and keep the group chat going.${link}`,
       );
       setNudgeFor([promptFollower(hc.candidate_user, calId)]);
     },
@@ -1322,20 +1327,20 @@ export default function OrgDashboardPage() {
       calId: string,
     ) => {
       if (!isPaidTier) { setShowSubscription(true); return; }
-      const cal = dashboard?.calendars.find((c) => c.objectId === calId);
+      if (!dashboard) return;
+      const cal = dashboard.calendars.find((c) => c.objectId === calId);
       const first = re.target_user.name.trim().split(/\s+/)[0] || "there";
       const me = hostFirstName();
-      const from = me
-        ? `it's ${me} from ${dashboard?.name || cal?.name || "us"}`
-        : `it's ${dashboard?.name || cal?.name || "us"}`;
+      const senderName = senderNameFor(dashboard, calId);
+      const from = me ? `it's ${me} from ${senderName}` : `it's ${senderName}`;
       const day = re.plan.date
         ? new Date(re.plan.date).toLocaleDateString("en-US", { weekday: "long" })
         : "";
       const link = cal?.shareId
-        ? ` ${`https://www.os.joinleaf.com/org/${cal.shareId}`}`
+        ? ` https://www.os.joinleaf.com/org/${cal.shareId}`
         : "";
       setNudgeDraft(
-        `Hey ${first}, ${from}. We've got ${re.plan.title}${day ? ` on ${day}` : ""} and I'd love for you to come to this one.${link}`,
+        `Hey ${first}, ${from}. We've got ${tidyTitle(re.plan.title)}${day ? ` on ${day}` : ""} and I'd love for you to come to this one.${link}`,
       );
       setNudgeFor([promptFollower(re.target_user, calId)]);
     },

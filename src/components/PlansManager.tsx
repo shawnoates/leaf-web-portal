@@ -735,12 +735,20 @@ export default function PlansManager({
     try {
       const dash = await Parse.Cloud.run("getOrgDashboard", { calendarId: orgId });
       let shareId = dash.shareId;
-      const cal = dash.calendars?.find((c: { objectId: string }) => c.objectId === calendarId);
+      const cal = dash.calendars?.find(
+        (c: { objectId: string; name?: string; isPrimary?: boolean; shareId?: string }) =>
+          c.objectId === calendarId,
+      );
       if (cal?.shareId) shareId = cal.shareId;
       // Held in state for the host modal — a featured suggestion publishes
       // through requestCustomPlanViaWeb, which is keyed by shareId.
       setCalendarShareId(shareId ?? null);
-      setOrgName(dash.name || "");
+      // Sign texts with the calendar the link opens, not the umbrella org —
+      // an org's own name is often an artifact while the child calendar is the
+      // identity followers recognize. Mirrors senderNameFor in dashboard/types.
+      setOrgName(
+        (cal && !cal.isPrimary && cal.name) ? cal.name : (dash.name || ""),
+      );
       // People eligible to be assigned as a suggestion's host: the calendar's
       // members AND followers. Both need a bound user (objectId) — unbound
       // invites / phone-only followers can't host yet, so drop them. Deduped
@@ -1138,7 +1146,8 @@ export default function PlansManager({
   }
 
   // Host-ask draft for the nudge composer. Same voice rules as the
-  // re-engagement draft: org-name signature, human-readable link, no em dash.
+  // re-engagement draft: signed with the calendar the link opens (see the
+  // setOrgName call above), human-readable link, no em dash.
   // The ?idea= param deep-links to THIS suggestion on the public page (the
   // /org page auto-opens its hosting flow), so the tap lands on the plan
   // itself rather than the whole calendar.
@@ -1151,7 +1160,8 @@ export default function PlansManager({
     const link = calendarShareId
       ? ` Claim it here: https://www.os.joinleaf.com/org/${calendarShareId}?idea=${ask.idea.objectId}`
       : "";
-    return `Hey ${first}, ${from}. Would you host "${ask.idea.title}"? It's really easy, for most plans you just show up and keep the group chat going.${link}`;
+    const title = String(ask.idea.title || "").replace(/\s+/g, " ").trim();
+    return `Hey ${first}, ${from}. Would you host "${title}"? It's really easy, for most plans you just show up and keep the group chat going.${link}`;
   }
 
   async function handleAssignHost(idea: PlanIdea, hostUserId: string) {

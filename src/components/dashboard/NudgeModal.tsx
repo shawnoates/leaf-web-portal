@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { Check, Loader2, MessageCircle, X } from "lucide-react";
 import type { CalActivePlan, OrgDashboard } from "./types";
+import { senderNameFor, tidyTitle } from "./types";
 
 // Nudge — host-authored re-engagement text(s), sent server-side (nudgeFollower
 // / nudgeFollowers) from the platform number so follower phone numbers are
@@ -63,7 +64,7 @@ function buildDefaultMessage(
   followers: Follower[],
   hostFirstName: string,
 ): string {
-  // Sign with the ORG name (what the follower recognizes), and link the
+  // Sign with the calendar the link opens (see senderNameFor), and link the
   // calendar's shareId slug — never the /p/<objectId> link, whose random id
   // reads as spam in a personal text. Bulk drafts greet with the {name}
   // token, which the server swaps for each recipient's first name.
@@ -71,9 +72,11 @@ function buildDefaultMessage(
     followers.length === 1
       ? followers[0].name.trim().split(/\s+/)[0] || "there"
       : "{name}";
-  const orgName = dashboard.name;
-  const from = hostFirstName ? `it's ${hostFirstName} from ${orgName}` : `it's ${orgName}`;
   const calId = sharedCalendarId(followers);
+  const senderName = senderNameFor(dashboard, calId);
+  const from = hostFirstName
+    ? `it's ${hostFirstName} from ${senderName}`
+    : `it's ${senderName}`;
   const shareId =
     dashboard.calendars.find((c) => c.objectId === calId)?.shareId ||
     dashboard.shareId;
@@ -82,7 +85,7 @@ function buildDefaultMessage(
   const next = nextPlanFor(dashboard, calId);
   if (next) {
     const day = planDayLabel(next);
-    return `Hey ${greetName}, ${from}. We've got ${next.title}${day ? ` on ${day}` : ""} and would love to see you there: ${link}`;
+    return `Hey ${greetName}, ${from}. We've got ${tidyTitle(next.title)}${day ? ` on ${day}` : ""} and would love to see you there: ${link}`;
   }
   return `Hey ${greetName}, ${from}. We'd love to see you at one of our upcoming events: ${link}`;
 }

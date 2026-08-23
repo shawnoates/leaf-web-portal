@@ -225,6 +225,33 @@ export type DashboardTab =
 export type GrowSection = "performance" | "marketplace" | "collabs" | "concierge";
 
 
+/** How a follower-facing text should identify the sender: the specific
+ *  calendar the person follows — which is also what the link in the text
+ *  opens — falling back to the org name when the calendar is the org itself,
+ *  can't be resolved, or a bulk send spans several calendars.
+ *
+ *  Signing with the org name regardless is wrong whenever an org's own name is
+ *  an artifact ("Shawn's NYC Summer Happy Hour") while the child calendar is
+ *  the identity people actually recognize ("11 Hoyt Hangouts") — the recipient
+ *  would be greeted by one name and land on another. */
+export function senderNameFor(
+  dashboard: Pick<OrgDashboard, "name" | "calendars">,
+  calendarId: string | null,
+): string {
+  const cal = calendarId
+    ? dashboard.calendars.find((c) => c.objectId === calendarId)
+    : null;
+  if (cal && !cal.isPrimary && cal.name) return cal.name;
+  return dashboard.name;
+}
+
+/** Shortest safe form of a plan/idea title for interpolation into a sentence.
+ *  Titles carry stray whitespace often enough that "X  on Saturday" shows up
+ *  in real drafts. */
+export function tidyTitle(title: string | null | undefined): string {
+  return String(title || "").replace(/\s+/g, " ").trim();
+}
+
 /** Per-person RSVP counts, keyed by phone number (preferred) or lowercased
  *  name. Powers the "Never RSVP'd" segments on Home, Community and Grow. */
 export function buildRsvpCountIndex(

@@ -12,7 +12,7 @@ import type {
 import { buildRsvpCountIndex, rsvpCountForPerson } from "./types";
 
 // Home — the landing place of the redesigned dashboard. Leads with pending
-// work (NEEDS YOU), then the schedule as a 14-day timeline spine, with a right
+// work (NEEDS YOU) above the schedule's 14-day timeline spine, with a right
 // rail for recent photos. The goal: an admin landing here knows what to do in
 // under five seconds.
 
@@ -694,15 +694,11 @@ export default function HomeTab({
               : ""
           }`}
         >
-          {/* Main column */}
+          {/* Main column. NEEDS YOU leads — pending work is the reason an
+              owner opens this page; the schedule is reference below it. */}
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase mb-3.5">
-              Next 14 days
-            </p>
-            <div>{spineEntries}</div>
-
             {/* NEEDS YOU */}
-            <p className="text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase mt-6 mb-2.5">
+            <p className="text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase mb-2.5">
               Needs you
             </p>
             {needsYouRows.length > 0 ? (
@@ -722,6 +718,11 @@ export default function HomeTab({
                 </button>
               </div>
             )}
+
+            <p className="text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase mt-6 mb-3.5">
+              Next 14 days
+            </p>
+            <div>{spineEntries}</div>
           </div>
 
           {/* Right rail */}
