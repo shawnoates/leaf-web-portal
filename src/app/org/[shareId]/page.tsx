@@ -3403,6 +3403,17 @@ export default function OrgCalendarPage() {
                                   {ev.description}
                                 </p>
                               )}
+                              {/* Venue name. The headline deliberately never
+                                  names the place (the generator strips it), so
+                                  without this line the card showed a street
+                                  address with nothing to attach it to — the
+                                  address was public while the name it belongs
+                                  to was not. */}
+                              {ev.name && (
+                                <p className="text-zinc-900 font-medium text-sm">
+                                  {ev.name}
+                                </p>
+                              )}
                               <p className="text-zinc-500 leading-relaxed font-light text-sm">
                                 {ev.venueLine}
                               </p>
