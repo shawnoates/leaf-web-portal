@@ -68,7 +68,13 @@ export interface OrgDashboardCalendar {
    *  — someone who has never RSVP'd, or the best-matched follower who hasn't
    *  RSVP'd to that plan yet (`never_rsvpd` says which). */
   reengagement?: {
-    plan: { objectId: string; title: string; date: string | null };
+    plan: {
+      objectId: string;
+      title: string;
+      date: string | null;
+      /** Venue IANA zone — the day label must be formatted in it. */
+      timezone: string | null;
+    };
     target_user: {
       name: string;
       phone: string | null;
@@ -243,6 +249,29 @@ export function senderNameFor(
     : null;
   if (cal && !cal.isPrimary && cal.name) return cal.name;
   return dashboard.name;
+}
+
+/** Day label for a plan inside a text message: always weekday AND date
+ *  ("Saturday, Aug 30"). A bare weekday reads as "this coming Saturday" no
+ *  matter how far out the plan actually is, which is exactly the ambiguity a
+ *  recipient can't resolve. Formatted in the venue's timezone when known —
+ *  the venue's wall clock is the source of truth for when a plan happens. */
+export function formatPlanDay(
+  dateISO: string | null | undefined,
+  timezone?: string | null,
+): string {
+  if (!dateISO) return "";
+  try {
+    const opts: Intl.DateTimeFormatOptions = {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    };
+    if (timezone) opts.timeZone = timezone;
+    return new Intl.DateTimeFormat("en-US", opts).format(new Date(dateISO));
+  } catch {
+    return "";
+  }
 }
 
 /** Shortest safe form of a plan/idea title for interpolation into a sentence.

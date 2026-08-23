@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { Check, Loader2, MessageCircle, X } from "lucide-react";
 import type { CalActivePlan, OrgDashboard } from "./types";
-import { senderNameFor, tidyTitle } from "./types";
+import { formatPlanDay, senderNameFor, tidyTitle } from "./types";
 
 // Nudge — host-authored re-engagement text(s), sent server-side (nudgeFollower
 // / nudgeFollowers) from the platform number so follower phone numbers are
@@ -34,23 +34,6 @@ function nextPlanFor(
     .filter((p) => new Date(p.date).getTime() > now)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   return plans[0] || null;
-}
-
-/** "Friday" inside the coming week, "Fri, Sep 4" past it — labeled in the
- *  venue's timezone when the plan carries one (mirrors the server's
- *  planDayLabel). */
-function planDayLabel(p: CalActivePlan): string {
-  try {
-    const d = new Date(p.date);
-    const farOut = d.getTime() - Date.now() > 6 * 86400000;
-    const opts: Intl.DateTimeFormatOptions = farOut
-      ? { weekday: "short", month: "short", day: "numeric" }
-      : { weekday: "long" };
-    if (p.timezone) opts.timeZone = p.timezone;
-    return new Intl.DateTimeFormat("en-US", opts).format(d);
-  } catch {
-    return "";
-  }
 }
 
 /** The one calendarId every follower in the batch shares, or null. */
@@ -84,7 +67,7 @@ function buildDefaultMessage(
   // No em dash in the draft — it reads as AI-written in a personal text.
   const next = nextPlanFor(dashboard, calId);
   if (next) {
-    const day = planDayLabel(next);
+    const day = formatPlanDay(next.date, next.timezone);
     return `Hey ${greetName}, ${from}. We've got ${tidyTitle(next.title)}${day ? ` on ${day}` : ""} and would love to see you there: ${link}`;
   }
   return `Hey ${greetName}, ${from}. We'd love to see you at one of our upcoming events: ${link}`;

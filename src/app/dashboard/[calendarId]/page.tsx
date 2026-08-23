@@ -35,6 +35,7 @@ import type {
 } from "@/components/dashboard/types";
 import {
   buildRsvpCountIndex,
+  formatPlanDay,
   rsvpCountForPerson,
   senderNameFor,
   tidyTitle,
@@ -1333,9 +1334,7 @@ export default function OrgDashboardPage() {
       const me = hostFirstName();
       const senderName = senderNameFor(dashboard, calId);
       const from = me ? `it's ${me} from ${senderName}` : `it's ${senderName}`;
-      const day = re.plan.date
-        ? new Date(re.plan.date).toLocaleDateString("en-US", { weekday: "long" })
-        : "";
+      const day = formatPlanDay(re.plan.date, re.plan.timezone);
       const link = cal?.shareId
         ? ` https://www.os.joinleaf.com/org/${cal.shareId}`
         : "";
