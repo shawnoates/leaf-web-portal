@@ -122,6 +122,10 @@ interface PlanIdea {
   // Public — anyone can express interest on a plan idea (same shape as
   // AI-suggested events). Server aggregates via PlanIdeaInterest.
   interestCount?: number;
+  // Cohort the idea was generated for ("moms", "parents_kids", …). Null on
+  // ideas generated before cohort rotation and on calendars that declare their
+  // own audience — both render without a chip.
+  audienceTag?: string | null;
   // Venue anchor for the inline card, and — when the owner picked one while
   // creating the suggestion — the venue the host modal pre-selects. Optional;
   // some ideas render with a location line, others don't.
@@ -2033,6 +2037,7 @@ export default function OrgCalendarPage() {
         icebreakerQuestion: idea.icebreakerQuestion as string || null,
         suggestedCapacity: idea.suggestedCapacity as number || null,
         centroid: idea.centroid as string || null,
+        audienceTag: (idea.audienceTag as string) ?? null,
         interestCount: typeof idea.interestCount === "number" ? (idea.interestCount as number) : 0,
         location: idea.location && typeof idea.location === "object"
           ? {
@@ -3562,6 +3567,8 @@ export default function OrgCalendarPage() {
                   })
                   .toUpperCase()}`;
               }
+              const ideaCohortLabel =
+                AUDIENCE_COHORT_LABELS[idea.audienceTag ?? ""];
               const priorCount =
                 planIdeaInterestCounts[idea.id] ??
                 idea.interestCount ??
@@ -3617,9 +3624,18 @@ export default function OrgCalendarPage() {
                   <div className="w-full md:w-2/5 space-y-6">
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-2 min-w-0">
-                        {dateLabel && (
-                          <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
-                            {dateLabel}
+                        {(dateLabel || ideaCohortLabel) && (
+                          <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400 flex items-center gap-2 flex-wrap">
+                            {dateLabel && <span>{dateLabel}</span>}
+                            {/* Cohort chip — same treatment the starter cards
+                                get. "any" and untagged render nothing so the
+                                targeted ideas keep standing out. */}
+                            {ideaCohortLabel && (
+                              <>
+                                {dateLabel && <span aria-hidden="true">·</span>}
+                                <span className="text-zinc-900">{ideaCohortLabel}</span>
+                              </>
+                            )}
                           </p>
                         )}
                         <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
