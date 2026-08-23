@@ -31,6 +31,7 @@ import type {
   DashboardTab,
   GrowSection,
   OrgDashboard,
+  OrgDashboardCalendar,
 } from "@/components/dashboard/types";
 import { buildRsvpCountIndex, rsvpCountForPerson } from "@/components/dashboard/types";
 // recharts is the largest dependency on this route (~200KB gzipped) and only
@@ -1247,6 +1248,9 @@ export default function OrgDashboardPage() {
   // rows nudged this session; the durable record lives on the membership row.
   const [nudgeFor, setNudgeFor] =
     useState<OrgDashboard["followers"][number][] | null>(null);
+  // Caller-authored default message. Set by the Home prompt cards (host ask /
+  // re-engagement invite); null means NudgeModal writes its own draft.
+  const [nudgeDraft, setNudgeDraft] = useState<string | null>(null);
   const [nudgedIds, setNudgedIds] = useState<Set<string>>(new Set());
   const handleNudgeSent = useCallback(
     (membershipIds: string[], toastText: string) => {
@@ -1261,46 +1265,81 @@ export default function OrgDashboardPage() {
     [],
   );
 
-  // Host candidate nudge (from HomeTab Needs You card)
-  const handleNudgeToHost = useCallback(
+  // Home NEEDS YOU prompt cards. Both open the same composer the Community
+  // tab uses; the server addresses the send by the membership id it handed
+  // back, so these are real followers, not synthesized rows.
+  const hostFirstName = useCallback(
+    () =>
+      String(user?.get("full_name") || user?.get("name") || "")
+        .trim()
+        .split(/\s+/)[0] || "",
+    [user],
+  );
+
+  const promptFollower = useCallback(
     (
-      idea: { objectId: string; title: string },
-      candidate: { name: string; phone: string | null },
+      person: { name: string; phone: string | null; membership_id: string },
       calendarId: string,
-    ) => {
-      const stubFollower: OrgDashboard["followers"][number] = {
-        membershipId: `host-candidate-${idea.objectId}`,
-        objectId: null,
-        name: candidate.name,
-        phone: candidate.phone,
-        calendarId,
-        calendarName: dashboard?.calendars.find((c) => c.objectId === calendarId)?.name || null,
-        joinedAt: new Date().toISOString(),
-      };
-      setNudgeFor([stubFollower]);
-    },
+    ): OrgDashboard["followers"][number] => ({
+      membershipId: person.membership_id,
+      objectId: null,
+      name: person.name,
+      phone: person.phone,
+      calendarId,
+      calendarName:
+        dashboard?.calendars.find((c) => c.objectId === calendarId)?.name || null,
+      joinedAt: new Date().toISOString(),
+    }),
     [dashboard],
   );
 
-  // Re-engagement nudge (from HomeTab Needs You card)
+  const handleNudgeToHost = useCallback(
+    (
+      hc: NonNullable<OrgDashboardCalendar["host_candidate"]>,
+      calId: string,
+    ) => {
+      if (!isPaidTier) { setShowSubscription(true); return; }
+      const cal = dashboard?.calendars.find((c) => c.objectId === calId);
+      const first = hc.candidate_user.name.trim().split(/\s+/)[0] || "there";
+      const me = hostFirstName();
+      const from = me
+        ? `it's ${me} from ${dashboard?.name || cal?.name || "us"}`
+        : `it's ${dashboard?.name || cal?.name || "us"}`;
+      const link = cal?.shareId
+        ? ` Claim it here: https://www.os.joinleaf.com/org/${cal.shareId}?idea=${hc.idea.objectId}`
+        : "";
+      setNudgeDraft(
+        `Hey ${first}, ${from}. Would you host "${hc.idea.title}"? It's really easy, for most plans you just show up and keep the group chat going.${link}`,
+      );
+      setNudgeFor([promptFollower(hc.candidate_user, calId)]);
+    },
+    [dashboard, isPaidTier, hostFirstName, promptFollower],
+  );
+
   const handleReengagementEdit = useCallback(
     (
-      plan: { objectId: string; title: string; date: string },
-      target: { name: string; phone: string | null },
-      calendarId: string,
+      re: NonNullable<OrgDashboardCalendar["reengagement"]>,
+      calId: string,
     ) => {
-      const stubFollower: OrgDashboard["followers"][number] = {
-        membershipId: `reengagement-${plan.objectId}`,
-        objectId: null,
-        name: target.name,
-        phone: target.phone,
-        calendarId,
-        calendarName: dashboard?.calendars.find((c) => c.objectId === calendarId)?.name || null,
-        joinedAt: new Date().toISOString(),
-      };
-      setNudgeFor([stubFollower]);
+      if (!isPaidTier) { setShowSubscription(true); return; }
+      const cal = dashboard?.calendars.find((c) => c.objectId === calId);
+      const first = re.target_user.name.trim().split(/\s+/)[0] || "there";
+      const me = hostFirstName();
+      const from = me
+        ? `it's ${me} from ${dashboard?.name || cal?.name || "us"}`
+        : `it's ${dashboard?.name || cal?.name || "us"}`;
+      const day = re.plan.date
+        ? new Date(re.plan.date).toLocaleDateString("en-US", { weekday: "long" })
+        : "";
+      const link = cal?.shareId
+        ? ` ${`https://www.os.joinleaf.com/org/${cal.shareId}`}`
+        : "";
+      setNudgeDraft(
+        `Hey ${first}, ${from}. We've got ${re.plan.title}${day ? ` on ${day}` : ""} and I'd love for you to come to this one.${link}`,
+      );
+      setNudgeFor([promptFollower(re.target_user, calId)]);
     },
-    [dashboard],
+    [dashboard, isPaidTier, hostFirstName, promptFollower],
   );
 
   const removeFollower = useCallback(
@@ -1645,6 +1684,7 @@ export default function OrgDashboardPage() {
               onRejectFollower={rejectFollower}
               onNudgeToHost={handleNudgeToHost}
               onReengagementEdit={handleReengagementEdit}
+              nudgedIds={nudgedIds}
               eventApprovalsCount={eventApprovals.length}
               eventApprovalsHref={`/dashboard/${calendarId}/calendars/${calendarId}/edit`}
             />
@@ -2725,7 +2765,11 @@ export default function OrgDashboardPage() {
               .trim()
               .split(/\s+/)[0] || ""
           }
-          onClose={() => setNudgeFor(null)}
+          draft={nudgeDraft ?? undefined}
+          onClose={() => {
+            setNudgeFor(null);
+            setNudgeDraft(null);
+          }}
           onSent={handleNudgeSent}
         />
       )}

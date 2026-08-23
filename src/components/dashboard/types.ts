@@ -52,18 +52,30 @@ export interface OrgDashboardCalendar {
   isConciergeServiced?: boolean;
   /** Present on the wire but untyped upstream — upcoming plans per calendar. */
   activePlans?: CalActivePlan[];
-  /** Host candidate for most-urgent idea needing a host (if hidePlanIdeas && ideas exist). */
+  /** Home NEEDS YOU card: the most urgent idea still needing a host plus the
+   *  follower most likely to say yes. Only sent for calendars that hide plan
+   *  ideas — when ideas are public, followers can claim them unprompted. */
   host_candidate?: {
-    idea: { objectId: string; title: string };
-    candidate_user: { name: string; phone: string | null };
+    idea: { objectId: string; title: string; date: string | null };
+    candidate_user: {
+      name: string;
+      phone: string | null;
+      membership_id: string;
+    };
     reason: string;
-  };
-  /** Re-engagement target: upcoming plan + never-RSVP'd follower to invite. */
+  } | null;
+  /** Home NEEDS YOU card: the soonest upcoming plan plus a follower to invite
+   *  — someone who has never RSVP'd, or the best-matched follower who hasn't
+   *  RSVP'd to that plan yet (`never_rsvpd` says which). */
   reengagement?: {
-    plan: { objectId: string; title: string; date: string };
-    target_user: { name: string; phone: string | null };
-    draft_message: string;
-  };
+    plan: { objectId: string; title: string; date: string | null };
+    target_user: {
+      name: string;
+      phone: string | null;
+      membership_id: string;
+    };
+    never_rsvpd: boolean;
+  } | null;
 }
 
 export interface OrgDashboard {

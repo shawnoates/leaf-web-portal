@@ -4,7 +4,11 @@ import { useMemo } from "react";
 import { Calendar, Plus } from "lucide-react";
 import type { OrgAnalytics } from "@/components/analytics/types";
 import { formatWallClockTime12h } from "@/lib/date-utils";
-import type { CalActivePlan, OrgDashboard } from "./types";
+import type {
+  CalActivePlan,
+  OrgDashboard,
+  OrgDashboardCalendar,
+} from "./types";
 import { buildRsvpCountIndex, rsvpCountForPerson } from "./types";
 
 // Home — the landing place of the redesigned dashboard. Leads with pending
@@ -150,6 +154,7 @@ export default function HomeTab({
   onRejectFollower,
   onNudgeToHost,
   onReengagementEdit,
+  nudgedIds,
   eventApprovalsCount,
   eventApprovalsHref,
 }: {
@@ -170,15 +175,15 @@ export default function HomeTab({
   onApproveFollower: (pf: OrgDashboard["pendingFollowers"][number]) => void;
   onRejectFollower: (pf: OrgDashboard["pendingFollowers"][number]) => void;
   onNudgeToHost?: (
-    idea: { objectId: string; title: string },
-    candidate: { name: string; phone: string | null },
+    hostCandidate: NonNullable<OrgDashboardCalendar["host_candidate"]>,
     calendarId: string,
   ) => void;
   onReengagementEdit?: (
-    plan: { objectId: string; title: string; date: string },
-    target: { name: string; phone: string | null },
+    reengagement: NonNullable<OrgDashboardCalendar["reengagement"]>,
     calendarId: string,
   ) => void;
+  /** Membership ids already nudged this session — their prompt card drops out. */
+  nudgedIds?: Set<string>;
   eventApprovalsCount: number;
   eventApprovalsHref: string;
 }) {
@@ -269,74 +274,71 @@ export default function HomeTab({
   // ── NEEDS YOU rows ────────────────────────────────────────────────────
   const needsYouRows: React.ReactNode[] = [];
 
-  // Host candidate cards per calendar (if ideas are hidden + urgent idea needing host exists)
+  // Host-ask prompts — one per calendar, and only for calendars that hide
+  // plan ideas (the server enforces the same rule). Host asks come first: a
+  // plan with no host is a harder problem than a plan with no guest.
   for (const calendar of dashboard.calendars) {
-    if (calendar.hidePlanIdeas && calendar.host_candidate) {
-      const { idea, candidate_user, reason } = calendar.host_candidate;
-      needsYouRows.push(
-        <div
-          key={`host-candidate-${calendar.objectId}`}
-          className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
+    const hc = calendar.host_candidate;
+    if (!hc || nudgedIds?.has(hc.candidate_user.membership_id)) continue;
+    needsYouRows.push(
+      <div
+        key={`host-candidate-${calendar.objectId}`}
+        className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
+      >
+        <div className="flex-1 min-w-[180px]">
+          <p className="text-[13px] font-medium text-zinc-900">
+            {hc.candidate_user.name} could host {hc.idea.title}
+          </p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">
+            {hc.reason}
+            {dashboard.calendars.length > 1 ? ` · ${calendar.name}` : ""}
+          </p>
+        </div>
+        <button
+          onClick={() => onNudgeToHost?.(hc, calendar.objectId)}
+          className="px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0"
         >
-          <div className="flex-1 min-w-[180px]">
-            <p className="text-[13px] font-medium text-zinc-900">
-              {candidate_user.name} would be great
-            </p>
-            <p className="text-[11px] text-zinc-500 mt-0.5">
-              {reason}
-            </p>
-          </div>
-          <button
-            onClick={() =>
-              onNudgeToHost?.(idea, candidate_user, calendar.objectId)
-            }
-            className="px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0"
-          >
-            Ask
-          </button>
-        </div>,
-      );
-    }
+          Ask {hc.candidate_user.name.trim().split(/\s+/)[0]}
+        </button>
+      </div>,
+    );
   }
 
-  // Re-engagement cards per calendar (nudge never-RSVP'd to upcoming plan)
+  // Re-engagement prompts — one per calendar: invite someone who hasn't been
+  // to anything to the soonest upcoming plan.
   for (const calendar of dashboard.calendars) {
-    if (calendar.reengagement) {
-      const { plan, target_user } = calendar.reengagement;
-      needsYouRows.push(
-        <div
-          key={`reengagement-${calendar.objectId}`}
-          className="flex flex-col gap-2 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
+    const re = calendar.reengagement;
+    if (!re || nudgedIds?.has(re.target_user.membership_id)) continue;
+    const planDay = re.plan.date
+      ? new Date(re.plan.date).toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        })
+      : null;
+    needsYouRows.push(
+      <div
+        key={`reengagement-${calendar.objectId}`}
+        className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
+      >
+        <div className="flex-1 min-w-[180px]">
+          <p className="text-[13px] font-medium text-zinc-900">
+            Invite {re.target_user.name} to {re.plan.title}
+          </p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">
+            {re.never_rsvpd ? "Has never RSVP'd" : "Hasn't RSVP'd to this one"}
+            {planDay ? ` · ${planDay}` : ""}
+            {dashboard.calendars.length > 1 ? ` · ${calendar.name}` : ""}
+          </p>
+        </div>
+        <button
+          onClick={() => onReengagementEdit?.(re, calendar.objectId)}
+          className="px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0"
         >
-          <div>
-            <p className="text-[13px] font-medium text-zinc-900">
-              Invite {target_user.name} to {plan.title}
-            </p>
-            <p className="text-[11px] text-zinc-500 mt-0.5">
-              {plan.date}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() =>
-                onReengagementEdit?.(plan, target_user, calendar.objectId)
-              }
-              className="flex-1 px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
-            >
-              Customize
-            </button>
-            <button
-              onClick={() => {
-                onGoCommunity?.("never");
-              }}
-              className="px-3.5 py-2 min-h-[36px] border border-zinc-300 text-zinc-900 rounded-full text-xs font-medium hover:bg-zinc-50 transition-colors"
-            >
-              Skip
-            </button>
-          </div>
-        </div>,
-      );
-    }
+          Write invite
+        </button>
+      </div>,
+    );
   }
 
   for (const req of dashboard.hostRequests) {
