@@ -4,17 +4,21 @@ import { useMemo } from "react";
 import { Calendar, Lock, Plus } from "lucide-react";
 import type { OrgAnalytics } from "@/components/analytics/types";
 import { formatWallClockTime12h } from "@/lib/date-utils";
+import { calculateHealthScore, getBandLabel } from "@/lib/health-score";
 import type {
   CalActivePlan,
   OrgDashboard,
   OrgDashboardCalendar,
 } from "./types";
 import { buildRsvpCountIndex, rsvpCountForPerson } from "./types";
+import GaugeStat from "./GaugeStat";
 
 // Home — the landing place of the redesigned dashboard. Leads with pending
 // work (NEEDS YOU) above the schedule's 14-day timeline spine, with a right
 // rail for recent photos. The goal: an admin landing here knows what to do in
 // under five seconds.
+
+const PLANS_MONTHLY_GOAL = 5;
 
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_FULL = [
@@ -93,32 +97,6 @@ function momDeltaPct(current: number, previous: number | undefined): number | nu
   return Math.round(((current - previous) / previous) * 100);
 }
 
-function StatTile({
-  label,
-  value,
-  deltaPct,
-}: {
-  label: string;
-  value: number;
-  deltaPct: number | null;
-}) {
-  return (
-    <div className="border border-zinc-200 rounded-xl p-3 sm:p-4">
-      <p className="text-[11px] text-zinc-500">{label}</p>
-      <p className="text-xl sm:text-2xl font-semibold text-zinc-900 mt-1.5">
-        {value}
-        {deltaPct != null && deltaPct !== 0 && (
-          <span
-            className={`text-xs font-medium ml-1.5 ${deltaPct > 0 ? "text-leaf-700" : "text-zinc-400"}`}
-          >
-            {deltaPct > 0 ? "+" : ""}
-            {deltaPct}%
-          </span>
-        )}
-      </p>
-    </div>
-  );
-}
 
 function PlanCover({
   plan,
@@ -256,11 +234,16 @@ export default function HomeTab({
     dashboard.newFollowersThisMonth ??
     dashboard.followers.filter((f) => inThisMonth(f.joinedAt)).length;
   const plansDelta = momDeltaPct(plansThisMonth, dashboard.plansLastMonth);
-  const followersDelta = momDeltaPct(
-    newFollowersThisMonth,
-    dashboard.newFollowersLastMonth,
-  );
   const rsvpsDelta = momDeltaPct(dashboard.rsvpsThisMonth, dashboard.rsvpsLastMonth);
+
+  // Gauge references. Plans fills against a fixed monthly goal; followers and
+  // RSVPs have no goal, so they fill against last month's number (with a floor)
+  // — which makes the arc read as "ahead of / behind where you were".
+  const followerScale = Math.max(
+    5,
+    Math.round((dashboard.newFollowersLastMonth ?? 0) * 1.5),
+  );
+  const rsvpScale = Math.max(10, Math.round(dashboard.rsvpsLastMonth ?? 0));
 
   const today = new Date();
   const title = today.toLocaleDateString("en-US", {
@@ -275,6 +258,11 @@ export default function HomeTab({
   const promptSentence = bestDay
     ? `${DAY_FULL[bestDay.dayIndex]}s drive ${bestDay.sharePct}% of your RSVPs`
     : "";
+
+  const healthScoreResult = useMemo(
+    () => calculateHealthScore(dashboard),
+    [dashboard],
+  );
 
   // ── NEEDS YOU rows ────────────────────────────────────────────────────
   const needsYouRows: React.ReactNode[] = [];
@@ -675,22 +663,74 @@ export default function HomeTab({
           </div>
         )}
 
-        {/* Counters — this calendar month, deltas vs last month */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <StatTile
+        {/* Gauge stats — consistent design language for all 4 boxes */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <GaugeStat
+            label="Community health"
+            value={healthScoreResult.score}
+            reference={100}
+            fillColor="green"
+            subLabel="/ 100"
+            trend={{
+              text: getBandLabel(healthScoreResult.band),
+              deltaPoints: healthScoreResult.trend,
+            }}
+            bandPill={true}
+            band={`band-${healthScoreResult.band}`}
+            state={healthScoreResult.band === "warming-up" ? "warming-up" : "normal"}
+          />
+          <GaugeStat
             label="Plans this month"
             value={plansThisMonth}
-            deltaPct={plansDelta}
+            reference={PLANS_MONTHLY_GOAL}
+            fillColor="blue"
+            subLabel={`of ${PLANS_MONTHLY_GOAL} goal`}
+            trend={{
+              text:
+                plansDelta != null
+                  ? `${plansDelta > 0 ? "▲" : "▼"} ${Math.abs(plansDelta)}% vs last mo`
+                  : "no baseline yet",
+              tone:
+                plansDelta == null
+                  ? "neutral"
+                  : plansDelta > 0
+                    ? "positive"
+                    : "negative",
+            }}
           />
-          <StatTile
-            label="New followers this month"
+          <GaugeStat
+            label="New followers"
             value={newFollowersThisMonth}
-            deltaPct={followersDelta}
+            reference={followerScale}
+            fillColor="violet"
+            subLabel="this month"
+            trend={{
+              text: `${dashboard.followerCount} total`,
+              tone: "neutral",
+            }}
+            state={newFollowersThisMonth === 0 ? "empty" : "normal"}
           />
-          <StatTile
+          <GaugeStat
             label="RSVPs this month"
             value={dashboard.rsvpsThisMonth}
-            deltaPct={rsvpsDelta}
+            reference={rsvpScale}
+            fillColor="neutral"
+            subLabel="this month"
+            trend={{
+              text:
+                dashboard.rsvpsThisMonth === 0
+                  ? "none yet"
+                  : rsvpsDelta != null
+                    ? `${rsvpsDelta > 0 ? "▲" : "▼"} ${Math.abs(rsvpsDelta)}% vs last mo`
+                    : `${dashboard.totalRsvpCount} total`,
+              tone:
+                dashboard.rsvpsThisMonth === 0 || rsvpsDelta == null
+                  ? "neutral"
+                  : rsvpsDelta > 0
+                    ? "positive"
+                    : "negative",
+            }}
+            state={dashboard.rsvpsThisMonth === 0 ? "empty" : "normal"}
           />
         </div>
 

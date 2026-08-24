@@ -164,6 +164,7 @@ interface PlanIdea {
   // suggestion spread; and since there's no CalendarGeneratedPlan behind it,
   // edit/assign/delete/end-series don't apply — see the detail modal below.
   isFeatured?: boolean;
+  sourceKind?: string | null;
   whenLabel?: string | null;
   timeMode?: "fixed_instant" | "local_wall_clock";
   venueTimeZone?: string | null;
@@ -192,6 +193,7 @@ interface RawPlanIdea {
   datePinned?: boolean;
   preferredTime?: string | null;
   isFeatured?: boolean;
+  sourceKind?: string | null;
   whenLabel?: string | null;
   timeMode?: "fixed_instant" | "local_wall_clock";
   venueTimeZone?: string | null;
@@ -226,6 +228,7 @@ function mapPlanIdea(idea: RawPlanIdea): PlanIdea {
     datePinned: idea.datePinned === true,
     preferredTime: idea.preferredTime ?? null,
     isFeatured: idea.isFeatured === true,
+    sourceKind: idea.sourceKind ?? null,
     whenLabel: idea.whenLabel ?? null,
     timeMode: idea.timeMode,
     venueTimeZone: idea.venueTimeZone ?? null,
@@ -353,9 +356,9 @@ function IdeaCard({
         <PlanImage src={idea.image} alt={idea.title} className="w-full h-28" />
         {/* Same badge treatment as the public /org card, so the owner and the
             visitor are looking at the same thing. */}
-        {idea.isFeatured ? (
+        {idea.isFeatured || idea.sourceKind === "featured" ? (
           <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-[#1B4332]/[0.92] text-white backdrop-blur-sm">
-            ★ Featured
+            Around the city
           </span>
         ) : (
           <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-white/85 text-[#1B4332] backdrop-blur-sm">

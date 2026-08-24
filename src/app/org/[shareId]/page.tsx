@@ -126,6 +126,11 @@ interface PlanIdea {
   // ideas generated before cohort rotation and on calendars that declare their
   // own audience — both render without a chip.
   audienceTag?: string | null;
+  // "featured" marks a citywide idea that was localized onto this calendar by
+  // the resolver. It is an ordinary suggestion row — the only difference is
+  // that it badges as "Around the city" and pins to the top.
+  sourceKind?: string | null;
+  localFormat?: string | null;
   // Venue anchor for the inline card, and — when the owner picked one while
   // creating the suggestion — the venue the host modal pre-selects. Optional;
   // some ideas render with a location line, others don't.
@@ -2038,6 +2043,8 @@ export default function OrgCalendarPage() {
         suggestedCapacity: idea.suggestedCapacity as number || null,
         centroid: idea.centroid as string || null,
         audienceTag: (idea.audienceTag as string) ?? null,
+        sourceKind: (idea.sourceKind as string) ?? null,
+        localFormat: (idea.localFormat as string) ?? null,
         interestCount: typeof idea.interestCount === "number" ? (idea.interestCount as number) : 0,
         location: idea.location && typeof idea.location === "object"
           ? {
@@ -3569,6 +3576,12 @@ export default function OrgCalendarPage() {
               }
               const ideaCohortLabel =
                 AUDIENCE_COHORT_LABELS[idea.audienceTag ?? ""];
+              // Two routes to the same treatment: a read-time featured
+              // projection (venue already chosen by the admin) and a localized
+              // row the resolver materialized here. Both read as "Around the
+              // city" to a visitor — the distinction is ours, not theirs.
+              const isAroundTheCity =
+                idea.isFeatured === true || idea.sourceKind === "featured";
               const priorCount =
                 planIdeaInterestCounts[idea.id] ??
                 idea.interestCount ??
@@ -3605,7 +3618,7 @@ export default function OrgCalendarPage() {
                     <span
                       className="absolute top-4 left-4 text-[10px] font-bold uppercase tracking-widest rounded-full px-3 py-1"
                       style={
-                        idea.isFeatured
+                        isAroundTheCity
                           ? {
                               background: "rgba(27,67,50,0.92)",
                               color: "#FFFFFF",
@@ -3618,7 +3631,7 @@ export default function OrgCalendarPage() {
                             }
                       }
                     >
-                      {idea.isFeatured ? "★ Featured" : "Suggested"}
+                      {isAroundTheCity ? "Around the city" : "Suggested"}
                     </span>
                   </div>
                   <div className="w-full md:w-2/5 space-y-6">
@@ -3790,11 +3803,13 @@ export default function OrgCalendarPage() {
               );
           };
           if (!org.hidePlanIdeas && org.planIdeas.length > 0) {
-          const orderedIdeas = [...org.planIdeas].sort((a, b) => {
+          const aroundTheCity = (i: PlanIdea) =>
+    i.isFeatured === true || i.sourceKind === "featured";
+  const orderedIdeas = [...org.planIdeas].sort((a, b) => {
             // Featured is editorial and pins ahead of the date sort — it took a
             // slot from an algorithmic idea, so burying it below them would
             // spend the displacement for nothing.
-            if (!!a.isFeatured !== !!b.isFeatured) return a.isFeatured ? -1 : 1;
+            if (aroundTheCity(a) !== aroundTheCity(b)) return aroundTheCity(a) ? -1 : 1;
             const at = spreadOf(a)?.getTime() ?? Number.POSITIVE_INFINITY;
             const bt = spreadOf(b)?.getTime() ?? Number.POSITIVE_INFINITY;
             if (at !== bt) return at - bt;
@@ -3810,7 +3825,7 @@ export default function OrgCalendarPage() {
               streamItems.push({
                 key: `idea-${idea.id}`,
                 date: d ? d.getTime() : Number.POSITIVE_INFINITY,
-                pinned: idea.isFeatured === true,
+                pinned: aroundTheCity(idea),
                 render: (index) => renderPlanIdeaCard(idea, index),
               });
             });
