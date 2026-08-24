@@ -62,17 +62,19 @@ export default function GaugeStat({
 
   const bandColor = band ? bandColorMap[band] : colorMap[fillColor];
 
-  // SVG gauge dimensions
+  // SVG gauge geometry. The viewBox is cropped to just the half-circle plus
+  // its stroke — a full `size`-tall box would leave the bottom half empty and
+  // the card would carry that dead space at every width.
   const size = 120;
   const strokeWidth = 8;
   const radius = (size - strokeWidth) / 2;
+  const centerX = size / 2;
+  const centerY = radius + strokeWidth / 2 + 4; // 4px of top breathing room
+  const viewBoxHeight = centerY + 6;
 
   // Half-circle: πr is the full length of the drawn arc.
   const arcLength = Math.PI * radius;
   const filledArcLength = (displayPercentage / 100) * arcLength;
-
-  const centerX = size / 2;
-  const centerY = size / 2 + 10; // Slight offset to accommodate label above
 
   // Warming-up state: show faint arc only
   const isWarmingUp = state === "warming-up";
@@ -80,19 +82,25 @@ export default function GaugeStat({
   const valueOpacity = isWarmingUp ? 0.5 : 1;
 
   return (
-    <div className="relative border border-zinc-200 rounded-xl p-4 flex flex-col items-center overflow-hidden">
+    <div className="relative border border-zinc-200 rounded-xl px-3 py-3 sm:px-4 flex flex-col items-center overflow-hidden">
       {bandPill && (
         <span
           className="absolute inset-x-0 top-0 h-[3px]"
           style={{ backgroundColor: bandColor }}
         />
       )}
-      <p className="text-[11px] font-medium text-zinc-600 mb-3 h-[16px] text-center">
+      <p className="text-[11px] font-medium text-zinc-600 mb-2 text-center leading-tight min-h-[28px] sm:min-h-[16px] flex items-center">
         {label}
       </p>
 
-      {/* SVG Gauge */}
-      <svg width={size} height={size + 20} className="mb-2" viewBox={`0 0 ${size} ${size + 20}`}>
+      {/* Explicit sizing, not just width/height attributes — a bare <svg> will
+          stretch to its flex container and scale its height with it. */}
+      <svg
+        viewBox={`0 0 ${size} ${viewBoxHeight}`}
+        className="w-full max-w-[120px] h-auto"
+        role="img"
+        aria-label={`${label}: ${isWarmingUp ? "warming up" : `${value} ${subLabel}`}`}
+      >
         {/* Background arc (half circle) */}
         <path
           d={`M ${centerX - radius} ${centerY} A ${radius} ${radius} 0 0 1 ${centerX + radius} ${centerY}`}
@@ -102,25 +110,30 @@ export default function GaugeStat({
           strokeLinecap="round"
         />
 
-        {/* Filled arc */}
-        <path
-          d={`M ${centerX - radius} ${centerY} A ${radius} ${radius} 0 0 1 ${centerX + radius} ${centerY}`}
-          stroke={bandColor}
-          strokeWidth={strokeWidth}
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={`${filledArcLength} ${arcLength}`}
-          opacity={arcOpacity}
-        />
+        {/* Filled arc. Skipped entirely at zero — a round linecap on a
+            zero-length dash still paints a dot, which reads as a stray mark
+            rather than an honest empty state. */}
+        {filledArcLength > 0 && (
+          <path
+            d={`M ${centerX - radius} ${centerY} A ${radius} ${radius} 0 0 1 ${centerX + radius} ${centerY}`}
+            stroke={bandColor}
+            strokeWidth={strokeWidth}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={`${filledArcLength} ${arcLength}`}
+            opacity={arcOpacity}
+          />
+        )}
 
-        {/* Center value + sub-label, nested inside the arc. SVG text paints
-            with `fill`, so these can't use Tailwind text-color classes. */}
+        {/* Value + sub-label nested INSIDE the arc, both above the baseline.
+            SVG text paints with `fill`, so these can't use Tailwind text
+            color classes. */}
         <text
           x={centerX}
-          y={centerY - 8}
+          y={centerY - 18}
           textAnchor="middle"
           fill="#18181b"
-          fontSize="28"
+          fontSize="26"
           fontWeight="600"
           opacity={valueOpacity}
         >
@@ -129,10 +142,10 @@ export default function GaugeStat({
 
         <text
           x={centerX}
-          y={centerY + 12}
+          y={centerY - 5}
           textAnchor="middle"
           fill="#71717a"
-          fontSize="10"
+          fontSize="9"
           opacity={valueOpacity}
         >
           {isWarmingUp ? "Warming up" : subLabel}
@@ -141,9 +154,9 @@ export default function GaugeStat({
 
       {/* Trend line */}
       {bandPill ? (
-        <div className="mt-1 flex items-center gap-2">
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1">
           <span
-            className="inline-block px-3 py-1 rounded-full text-xs font-medium"
+            className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap"
             style={{
               backgroundColor: bgColorMap[band || "band-warming-up"],
               color: bandColorMap[band || "band-warming-up"],
@@ -153,7 +166,7 @@ export default function GaugeStat({
           </span>
           {trend.deltaPoints != null && trend.deltaPoints !== 0 && (
             <span
-              className={`text-xs font-medium ${
+              className={`text-[11px] font-medium whitespace-nowrap ${
                 trend.deltaPoints > 0 ? "text-green-700" : "text-zinc-400"
               }`}
             >
@@ -165,7 +178,7 @@ export default function GaugeStat({
         /* Regular trend for other stats */
         <div className="mt-2 text-center">
           <p
-            className={`text-xs font-medium ${
+            className={`text-[11px] font-medium leading-tight ${
               trend.tone === "positive"
                 ? "text-green-700"
                 : trend.tone === "negative"

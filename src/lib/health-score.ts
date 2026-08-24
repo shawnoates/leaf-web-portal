@@ -26,12 +26,37 @@ export interface HealthScorePillars {
   followThrough: number | null;
 }
 
+export type PillarName = keyof HealthScorePillars;
+
+/** The raw numbers behind the pillars. Owners never see pillar SCORES — they
+ *  see a Needs You card that names the fact ("3 people account for 61% of your
+ *  RSVPs"), and these are what that copy is written from. */
+export interface HealthFacts {
+  /** Distinct people who RSVP'd in the window. */
+  engagedCount: number;
+  /** Follower base — the denominator, never a score in its own right. */
+  reach: number;
+  /** Of the engaged, the share who came to ≥2 plans. */
+  repeatRate: number;
+  /** How much of the RSVP volume the top decile accounts for. */
+  topDecileShare: number;
+  /** How many people that top decile is. */
+  topDecileCount: number;
+  plansThisMonth: number;
+  /** null when host mix couldn't be measured (too few plans). */
+  memberLedRate: number | null;
+  distinctHosts: number | null;
+  /** Plans visible on the calendar that a non-Leaf, non-venue host runs. */
+  communityHostedPlans: number | null;
+}
+
 export interface HealthScoreResult {
   score: number;
   /** Δ points vs 30 days ago, or null with no comparable baseline. */
   trend: number | null;
   band: HealthBand;
   pillars: HealthScorePillars;
+  facts: HealthFacts;
   hasAttendanceData: boolean;
 }
 
@@ -107,6 +132,23 @@ function retentionPillar(rsvps: Rsvp[]): number {
   return clamp100((repeat / counts.size / TARGETS.repeatRate) * 100);
 }
 
+/** How concentrated RSVP volume is in the top decile of RSVPers. Shared by
+ *  the breadth pillar and the Needs You copy, so the number an owner reads is
+ *  literally the number the pillar scored. */
+function concentration(rsvps: Rsvp[]): { share: number; count: number } {
+  const counts = rsvpCountsByPerson(rsvps);
+  if (counts.size === 0) return { share: 0, count: 0 };
+
+  const sorted = Array.from(counts.values()).sort((a, b) => b - a);
+  const total = sorted.reduce((a, b) => a + b, 0);
+  if (total === 0) return { share: 0, count: 0 };
+
+  const topDecileSize = Math.max(1, Math.ceil(sorted.length * 0.1));
+  const share =
+    sorted.slice(0, topDecileSize).reduce((a, b) => a + b, 0) / total;
+  return { share, count: topDecileSize };
+}
+
 /** Breadth — participation spread, measured as how much of the RSVP volume
  *  the top decile accounts for. Lower concentration is healthier. This is
  *  spread ONLY; it is never any kind of demographic inference. */
@@ -114,22 +156,14 @@ function breadthPillar(rsvps: Rsvp[]): number {
   const counts = rsvpCountsByPerson(rsvps);
   if (counts.size === 0) return 0;
 
-  const sorted = Array.from(counts.values()).sort((a, b) => b - a);
-  const total = sorted.reduce((a, b) => a + b, 0);
-  if (total === 0) return 0;
-
-  const topDecileSize = Math.max(1, Math.ceil(sorted.length * 0.1));
-  const topShare =
-    sorted.slice(0, topDecileSize).reduce((a, b) => a + b, 0) / total;
-
   // With few enough people the top decile is one person and their share is
   // mechanically huge — that's small-sample noise, not concentration.
   if (counts.size < 5) return 50;
 
-  if (topShare <= TARGETS.topDecileShare) return 100;
+  const { share } = concentration(rsvps);
+  if (share <= TARGETS.topDecileShare) return 100;
   // Degrade from 100 at target down to 0 when the top decile owns everything.
-  const excess =
-    (topShare - TARGETS.topDecileShare) / (1 - TARGETS.topDecileShare);
+  const excess = (share - TARGETS.topDecileShare) / (1 - TARGETS.topDecileShare);
   return clamp100((1 - excess) * 100);
 }
 
@@ -160,7 +194,7 @@ function memberLedPillar(
 export function hostMixFor(
   plans: { hostName: string; isVirtualHost?: boolean; leafHostState?: string | null }[],
   ownerNames: string[],
-): { memberLedRate: number; distinctHosts: number } | null {
+): { memberLedRate: number; distinctHosts: number; communityHostedPlans: number } | null {
   const ownerSet = new Set(
     ownerNames.map((n) => n.trim().toLowerCase()).filter(Boolean),
   );
@@ -183,6 +217,7 @@ export function hostMixFor(
   return {
     memberLedRate: nonOwnerPlans / communityHosted.length,
     distinctHosts: nonOwnerHosts.size,
+    communityHostedPlans: communityHosted.length,
   };
 }
 
@@ -323,13 +358,55 @@ export function calculateHealthScore(
   const band: HealthBand =
     currentRsvps.length < MIN_RSVPS_FOR_SCORE ? "warming-up" : bandFor(score);
 
+  const engagedCounts = rsvpCountsByPerson(currentRsvps);
+  const repeat = Array.from(engagedCounts.values()).filter((c) => c >= 2).length;
+  const conc = concentration(currentRsvps);
+
+  const facts: HealthFacts = {
+    engagedCount: engagedCounts.size,
+    reach,
+    repeatRate: engagedCounts.size > 0 ? repeat / engagedCounts.size : 0,
+    topDecileShare: conc.share,
+    topDecileCount: conc.count,
+    plansThisMonth: dashboard.plansThisMonth ?? 0,
+    memberLedRate: hostMix?.memberLedRate ?? null,
+    distinctHosts: hostMix?.distinctHosts ?? null,
+    communityHostedPlans: hostMix?.communityHostedPlans ?? null,
+  };
+
   return {
     score,
     trend,
     band,
     pillars,
+    facts,
     hasAttendanceData: pillars.followThrough != null,
   };
+}
+
+/** The pillar dragging the score down hardest — ranked by how much weighted
+ *  headroom it has, not by raw score, so a 10%-weight pillar at 20 never
+ *  outranks a 28%-weight pillar at 40. Pillars with no data are skipped:
+ *  they renormalized out of the score, so they can't be the reason it's low.
+ *
+ *  Returns null while the calendar is warming up — with almost no data every
+ *  pillar reads low, and picking one would be noise dressed as a diagnosis. */
+export function weakestPillars(
+  result: HealthScoreResult,
+  limit = 1,
+): PillarName[] {
+  if (result.band === "warming-up") return [];
+
+  const scored = (Object.keys(PILLAR_WEIGHTS) as PillarName[])
+    .map((name) => ({ name, value: result.pillars[name] }))
+    .filter(
+      (p): p is { name: PillarName; value: number } =>
+        p.value != null && p.value < 100,
+    )
+    .map((p) => ({ ...p, headroom: (100 - p.value) * PILLAR_WEIGHTS[p.name] }))
+    .sort((a, b) => b.headroom - a.headroom);
+
+  return scored.slice(0, limit).map((p) => p.name);
 }
 
 /** Owner-facing labels soften the bottom band — an owner reading "At risk"

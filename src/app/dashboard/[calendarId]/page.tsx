@@ -2106,7 +2106,9 @@ export default function OrgDashboardPage() {
               </div>
 
               <div className="px-4 sm:px-6 lg:px-8 py-5 max-w-3xl">
-                {/* Settings sub-tabs */}
+                {/* Settings sub-tabs — org settings are owner-only; co-hosts
+                    only get the Account section below */}
+                {dashboard.isOwner && (
                 <div className="flex gap-1 border-b border-zinc-100 mb-6">
                   <button
                     onClick={() => setSettingsSection("general")}
@@ -2129,8 +2131,9 @@ export default function OrgDashboardPage() {
                     Plan &amp; billing
                   </button>
                 </div>
+                )}
 
-                {settingsSection === "general" && (
+                {dashboard.isOwner && settingsSection === "general" && (
                 <div className="space-y-8">
                 {/* Organization details */}
                 <section className="border border-zinc-200 rounded-xl p-6">
@@ -2490,7 +2493,7 @@ export default function OrgDashboardPage() {
                 </div>
                 )}
 
-                {settingsSection === "subscription" && (
+                {dashboard.isOwner && settingsSection === "subscription" && (
                 <div className="space-y-8">
                   <section className="border border-zinc-200 rounded-xl p-6">
                     <div className="flex items-center gap-2 mb-1">
@@ -2567,6 +2570,25 @@ export default function OrgDashboardPage() {
                   )}
                 </div>
                 )}
+
+                {/* Account — shown to everyone; the only logout on mobile,
+                    where the sidebar footer is hidden */}
+                {(!dashboard.isOwner || settingsSection === "general") && (
+                <section className={`border border-zinc-200 rounded-xl p-6 ${dashboard.isOwner ? "mt-8" : ""}`}>
+                  <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 mb-1">
+                    Account
+                  </h2>
+                  <p className="text-xs text-zinc-500 mb-4">
+                    Signed in as {user?.get("email") || user?.get("username") || "your account"}
+                  </p>
+                  <button
+                    onClick={handleLogout}
+                    className="text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
+                  >
+                    Log out
+                  </button>
+                </section>
+                )}
               </div>
             </div>
           )}
@@ -2576,7 +2598,6 @@ export default function OrgDashboardPage() {
       {/* Mobile bottom bar */}
       <DashboardBottomBar
         activeTab={activeTab}
-        isOwner={dashboard.isOwner}
         onNavigate={setTab}
       />
 

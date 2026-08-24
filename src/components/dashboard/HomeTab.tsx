@@ -4,7 +4,11 @@ import { useMemo } from "react";
 import { Calendar, Lock, Plus } from "lucide-react";
 import type { OrgAnalytics } from "@/components/analytics/types";
 import { formatWallClockTime12h } from "@/lib/date-utils";
-import { calculateHealthScore, getBandLabel } from "@/lib/health-score";
+import {
+  calculateHealthScore,
+  getBandLabel,
+  weakestPillars,
+} from "@/lib/health-score";
 import type {
   CalActivePlan,
   OrgDashboard,
@@ -264,6 +268,86 @@ export default function HomeTab({
     [dashboard],
   );
 
+  /** The health score's action layer. The owner never sees the six pillars —
+   *  they see the score, and one card naming the fact behind whichever pillar
+   *  is costing them the most points. Acting on it moves the number.
+   *
+   *  Returns null when there's nothing honest to say: while warming up, when
+   *  the weakest pillar has no fix we can offer, or when an existing row
+   *  already puts the same action in front of them. */
+  const pillarPrompt = useMemo((): {
+    title: string;
+    detail: string;
+    cta: string;
+    onClick: () => void;
+  } | null => {
+    const [weakest] = weakestPillars(healthScoreResult);
+    if (!weakest) return null;
+    const f = healthScoreResult.facts;
+
+    switch (weakest) {
+      case "breadth": {
+        if (f.topDecileCount < 1 || f.topDecileShare < 0.3) return null;
+        return {
+          title: `${f.topDecileCount} ${f.topDecileCount === 1 ? "person accounts" : "people account"} for ${Math.round(f.topDecileShare * 100)}% of your RSVPs`,
+          detail: "Your regulars are carrying it — widen who shows up",
+          cta: "See who's quiet",
+          onClick: () => onGoCommunity("never"),
+        };
+      }
+      case "participation": {
+        // The never-RSVP'd row already sends them to the same place.
+        if (neverRsvpd > 0) return null;
+        return {
+          title: `${f.engagedCount} of ${f.reach} followers RSVP'd in the last 90 days`,
+          detail: "Reach out to the ones who haven't",
+          cta: "See them",
+          onClick: () => onGoCommunity(),
+        };
+      }
+      case "retention": {
+        if (f.engagedCount < 5) return null;
+        return {
+          title: `Only ${Math.round(f.repeatRate * 100)}% of your RSVPers came back for a second plan`,
+          detail: "First-timers aren't turning into regulars",
+          cta: "See them",
+          onClick: () => onGoCommunity(),
+        };
+      }
+      case "activity": {
+        return {
+          title:
+            f.plansThisMonth === 0
+              ? "Nothing on the calendar this month"
+              : `${f.plansThisMonth} plan${f.plansThisMonth === 1 ? "" : "s"} this month, below your goal of ${PLANS_MONTHLY_GOAL}`,
+          detail: "A quiet calendar is the fastest way to lose a community",
+          cta: "New plan",
+          onClick: () => onNewPlan(),
+        };
+      }
+      case "memberLed": {
+        if (f.communityHostedPlans == null) return null;
+        // A host-ask card for this calendar already covers it, with a named
+        // person attached — strictly better than this generic nudge.
+        if (dashboard.calendars.some((c) => c.host_candidate)) return null;
+        return {
+          title:
+            f.distinctHosts === 0
+              ? `You're hosting all ${f.communityHostedPlans} upcoming plan${f.communityHostedPlans === 1 ? "" : "s"}`
+              : `${f.distinctHosts} member${f.distinctHosts === 1 ? "" : "s"} host${f.distinctHosts === 1 ? "s" : ""} alongside you`,
+          detail: "Communities that last have more than one host",
+          cta: "Find a host",
+          onClick: () => onGoCommunity(),
+        };
+      }
+      // Attendance has no owner-facing fix while we can't collect it.
+      case "followThrough":
+        return null;
+      default:
+        return null;
+    }
+  }, [healthScoreResult, neverRsvpd, dashboard.calendars, onGoCommunity, onNewPlan]);
+
   // ── NEEDS YOU rows ────────────────────────────────────────────────────
   const needsYouRows: React.ReactNode[] = [];
 
@@ -289,7 +373,7 @@ export default function HomeTab({
         </div>
         <button
           onClick={() => onNudgeToHost?.(hc, calendar.objectId)}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0"
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 min-h-[30px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0"
         >
           {!isPaidTier && <Lock className="w-3.5 h-3.5" />}
           Ask {hc.candidate_user.name.trim().split(/\s+/)[0]}
@@ -327,7 +411,7 @@ export default function HomeTab({
         </div>
         <button
           onClick={() => onReengagementEdit?.(re, calendar.objectId)}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0"
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 min-h-[30px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0"
         >
           {!isPaidTier && <Lock className="w-3.5 h-3.5" />}
           Draft invite
@@ -356,19 +440,19 @@ export default function HomeTab({
         <div className="flex gap-2 shrink-0">
           <button
             onClick={() => onApproveHostRequest(req)}
-            className="px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
+            className="px-3.5 py-1.5 min-h-[30px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
           >
             Approve
           </button>
           <button
             onClick={() => onEditHostRequest(req)}
-            className="px-3.5 py-2 min-h-[36px] border border-zinc-300 text-zinc-900 rounded-full text-xs font-medium hover:bg-zinc-50 transition-colors"
+            className="px-3.5 py-1.5 min-h-[30px] border border-zinc-300 text-zinc-900 rounded-full text-xs font-medium hover:bg-zinc-50 transition-colors"
           >
             Edit
           </button>
           <button
             onClick={() => onDeclineHostRequest(req)}
-            className="px-3.5 py-2 min-h-[36px] text-zinc-500 rounded-full text-xs font-medium hover:text-red-700 transition-colors"
+            className="px-3.5 py-1.5 min-h-[30px] text-zinc-500 rounded-full text-xs font-medium hover:text-red-700 transition-colors"
           >
             Decline
           </button>
@@ -395,13 +479,13 @@ export default function HomeTab({
         <div className="flex gap-2 shrink-0">
           <button
             onClick={() => onApproveRsvp(req)}
-            className="px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
+            className="px-3.5 py-1.5 min-h-[30px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
           >
             Approve
           </button>
           <button
             onClick={() => onDeclineRsvp(req)}
-            className="px-3.5 py-2 min-h-[36px] border border-zinc-300 text-zinc-900 rounded-full text-xs font-medium hover:bg-zinc-50 transition-colors"
+            className="px-3.5 py-1.5 min-h-[30px] border border-zinc-300 text-zinc-900 rounded-full text-xs font-medium hover:bg-zinc-50 transition-colors"
           >
             Decline
           </button>
@@ -427,13 +511,13 @@ export default function HomeTab({
         <div className="flex gap-2 shrink-0">
           <button
             onClick={() => onApproveFollower(pf)}
-            className="px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
+            className="px-3.5 py-1.5 min-h-[30px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
           >
             Approve
           </button>
           <button
             onClick={() => onRejectFollower(pf)}
-            className="px-3.5 py-2 min-h-[36px] border border-zinc-300 text-zinc-900 rounded-full text-xs font-medium hover:bg-zinc-50 transition-colors"
+            className="px-3.5 py-1.5 min-h-[30px] border border-zinc-300 text-zinc-900 rounded-full text-xs font-medium hover:bg-zinc-50 transition-colors"
           >
             Reject
           </button>
@@ -458,7 +542,7 @@ export default function HomeTab({
         </div>
         <a
           href={eventApprovalsHref}
-          className="px-3.5 py-2 min-h-[36px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0 inline-flex items-center"
+          className="px-3.5 py-1.5 min-h-[30px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0 inline-flex items-center"
         >
           Review
         </a>
@@ -482,9 +566,35 @@ export default function HomeTab({
         </div>
         <button
           onClick={() => onGoCommunity("never")}
-          className="px-3.5 py-2 min-h-[36px] border border-zinc-300 text-zinc-900 rounded-full text-xs font-medium hover:bg-zinc-50 transition-colors shrink-0"
+          className="px-3.5 py-1.5 min-h-[30px] border border-zinc-300 text-zinc-900 rounded-full text-xs font-medium hover:bg-zinc-50 transition-colors shrink-0"
         >
           See them
+        </button>
+      </div>,
+    );
+  }
+
+  // The health score's action layer, last because it's the only row that
+  // isn't time-sensitive — everything above it is someone waiting on a reply.
+  if (pillarPrompt) {
+    needsYouRows.push(
+      <div
+        key="pillar-prompt"
+        className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
+      >
+        <div className="flex-1 min-w-[180px]">
+          <p className="text-[13px] font-medium text-zinc-900">
+            {pillarPrompt.title}
+          </p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">
+            {pillarPrompt.detail}
+          </p>
+        </div>
+        <button
+          onClick={pillarPrompt.onClick}
+          className="px-3.5 py-1.5 min-h-[30px] border border-zinc-300 text-zinc-900 rounded-full text-xs font-medium hover:bg-zinc-50 transition-colors shrink-0"
+        >
+          {pillarPrompt.cta}
         </button>
       </div>,
     );
@@ -576,7 +686,7 @@ export default function HomeTab({
                   </div>
                   <button
                     onClick={() => onNewPlan(toDateInputValue(day.date))}
-                    className="px-4 py-2.5 min-h-[36px] bg-leaf-700 text-white rounded-full text-xs font-medium hover:bg-leaf-800 transition-colors"
+                    className="px-4 py-1.5 min-h-[30px] bg-leaf-700 text-white rounded-full text-xs font-medium hover:bg-leaf-800 transition-colors"
                   >
                     Fill it
                   </button>
@@ -663,8 +773,9 @@ export default function HomeTab({
           </div>
         )}
 
-        {/* Gauge stats — consistent design language for all 4 boxes */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Gauge stats — one design language for all four. 2×2 at narrow
+            widths, 4-across from lg up; health leads in both. */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
           <GaugeStat
             label="Community health"
             value={healthScoreResult.score}
