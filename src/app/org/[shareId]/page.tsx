@@ -2086,6 +2086,7 @@ export default function OrgCalendarPage() {
           ? null
           : result.aiSourceEvents;
 
+
       setOrg({
         objectId: result.objectId,
         parentOrgId: result.parentOrgId || null,
@@ -2111,10 +2112,17 @@ export default function OrgCalendarPage() {
         // The stored flag still wins: when the owner turns suggestions off,
         // visibleAiSourceEvents is already null, so this collapses to the
         // stored value and every suggestion surface goes dark together.
-        hidePlanIdeas:
-          (Array.isArray(visibleAiSourceEvents) && visibleAiSourceEvents.length > 0)
-            ? true
-            : (result.hidePlanIdeas || false),
+        // Starter events and plan ideas are the SAME surface — a suggested
+        // plan someone still has to host. Starter events are just the ones
+        // minted when the calendar was created; plan ideas recur weekly.
+        //
+        // This used to be forced true whenever starter events existed, to stop
+        // a "second here-are-some-ideas section" colliding with the first. That
+        // collision no longer exists: both sources push into one date-sorted
+        // stream. What the override actually did was hide every recurring idea
+        // forever on any calendar that shipped with starter events — which is
+        // every admin-created one. Only the owner's own setting hides them now.
+        hidePlanIdeas: result.hidePlanIdeas || false,
         hideCustomPlans: result.hideCustomPlans || false,
         hideDeals: result.hideDeals || false,
         blacklistCategories: result.orgBlacklistCategories || [],
@@ -3545,7 +3553,7 @@ export default function OrgCalendarPage() {
             const visibleAi = showAllIdeas
               ? rendered
               : rendered.slice(0, IDEA_INLINE_CAP);
-            hiddenSuggestedCount = rendered.length - visibleAi.length;
+            hiddenSuggestedCount += rendered.length - visibleAi.length;
             visibleAi.forEach((entry) => {
               streamItems.push({
                 key: `ai-${entry.originalIndex}`,
@@ -3819,7 +3827,7 @@ export default function OrgCalendarPage() {
             ? orderedIdeas
             : orderedIdeas.slice(0, IDEA_INLINE_CAP);
           const hiddenIdeaCount = orderedIdeas.length - visibleIdeas.length;
-            hiddenSuggestedCount = hiddenIdeaCount;
+            hiddenSuggestedCount += hiddenIdeaCount;
             visibleIdeas.forEach((idea) => {
               const d = spreadOf(idea);
               streamItems.push({
