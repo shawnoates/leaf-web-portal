@@ -654,7 +654,7 @@ function SetupPageInner() {
                 : "bg-zinc-100 text-zinc-400 cursor-not-allowed"
             }`}
           >
-            Create Calendar <Sparkles className="w-4 h-4" />
+            Create Calendar
           </button>
         </div>
       </div>
