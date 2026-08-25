@@ -1,31 +1,12 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import Parse from "@/lib/parse-client";
-import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
-import {
-  Camera,
-  Loader2,
-  MapPin,
-  Calendar,
-  X,
-  Upload,
-  Check,
-  ShieldCheck,
-  UserCheck,
-  Star,
-} from "lucide-react";
+import { MapPin, Calendar, X, Check, ShieldCheck, UserCheck } from "lucide-react";
 import HostTheNextOne from "@/components/HostTheNextOne";
-
-type Photo = {
-  objectId: string;
-  url: string | null;
-  caption: string | null;
-  uploadedAt: string;
-  uploaderName: string;
-  uploaderId: string | null;
-  eventGroupId: string | null;
-};
+import SurveyCard from "@/components/recap/SurveyCard";
+import PhotoUpload from "@/components/recap/PhotoUpload";
+import type { Photo, SurveyState, VirtualHostInfo } from "@/components/recap/types";
 
 type Attendee = {
   notificationId: string;
@@ -84,24 +65,10 @@ type AttendeeMemoryInfo = {
   photoCount: number;
   uploadsClosed?: boolean;
   limits: { maxBytes: number; maxPerAttendee: number; maxPerEvent: number };
-  survey?: {
-    acceptingResponses: boolean;
-    existing: {
-      objectId: string;
-      rating: number | null;
-      comment: string | null;
-      hostRating: number | null;
-      hostComment: string | null;
-      submittedAt: string;
-      updatedAt: string;
-    } | null;
-    ratingMin: number;
-    ratingMax: number;
-    commentMaxLen: number;
-  };
+  survey?: SurveyState;
   // Present only on virtual-hosted plans — gates the private host-feedback
   // section of the survey card.
-  virtualHost?: { personaName: string; personaAvatarUrl: string | null } | null;
+  virtualHost?: VirtualHostInfo | null;
 };
 
 function formatEventDate(iso: string | null): string {
@@ -125,30 +92,9 @@ export default function MemoryClient({
   initialError?: string | null;
 }) {
   const [info, setInfo] = useState<AttendeeMemoryInfo | null>(initialInfo);
-  const [staged, setStaged] = useState<
-    { id: string; preview: string; base64: string }[]
-  >([]);
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHostOtp, setShowHostOtp] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [surveyRating, setSurveyRating] = useState<number>(
-    initialInfo?.survey?.existing?.rating ?? 0
-  );
-  const [surveyComment, setSurveyComment] = useState<string>(
-    initialInfo?.survey?.existing?.comment ?? ""
-  );
-  const [hostRating, setHostRating] = useState<number>(
-    initialInfo?.survey?.existing?.hostRating ?? 0
-  );
-  const [hostComment, setHostComment] = useState<string>(
-    initialInfo?.survey?.existing?.hostComment ?? ""
-  );
-  const [surveySubmitting, setSurveySubmitting] = useState(false);
-  const [surveyError, setSurveyError] = useState<string | null>(null);
-  const [surveyJustSaved, setSurveyJustSaved] = useState(false);
 
   async function refreshInfo() {
     try {
