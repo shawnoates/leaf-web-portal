@@ -2868,43 +2868,32 @@ export default function OrgCalendarPage() {
     );
   }
 
+  const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming");
+
   return (
     <div className="min-h-screen">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-zinc-100 px-6 py-6 md:py-8">
-        <div className="max-w-6xl mx-auto flex justify-between items-center gap-3">
-          <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
+      {/* Desktop Header (2 rows) */}
+      <nav className="sticky top-0 z-40 w-full bg-white hidden md:block border-b border-[#ececea]">
+        {/* Row 1: Identity Bar */}
+        <div className="h-[62px] flex items-center justify-between px-10 border-b border-[#ececea]">
+          <div className="flex items-center gap-3.5">
             {org.profilePhoto && org.tier !== "starter" && (
               <img
                 src={org.profilePhoto}
                 alt={org.name}
-                className="w-10 h-10 md:w-12 md:h-12 rounded-lg object-cover shrink-0 self-stretch"
+                className="w-[34px] h-[34px] rounded object-cover flex-none"
               />
             )}
-            <div className="min-w-0">
-              <h1 className="text-sm md:text-2xl font-light tracking-[0.1em] md:tracking-wider uppercase line-clamp-2 md:truncate">
+            <div className="flex items-center gap-3.5">
+              <h1 className="text-[18px] font-bold tracking-[0.05em] uppercase text-[#1a1a1a] whitespace-nowrap">
                 {org.name}
               </h1>
-              <span className="text-xs tracking-wider uppercase font-bold text-zinc-400 block">
-                <span className="block sm:inline">
-                  {followerCount} followers
-                </span>
-                {org.pastPlanCount > 0 && (
-                  <>
-                    <span className="mx-1.5 text-zinc-300 hidden sm:inline">·</span>
-                    <span className="block sm:inline">
-                      {org.pastPlanCount} past plan{org.pastPlanCount === 1 ? "" : "s"}
-                    </span>
-                  </>
-                )}
+              <span className="text-[10px] font-bold tracking-[0.11em] uppercase text-[#9a9a9a]">
+                {followerCount} followers {org.pastPlanCount > 0 && `· ${org.pastPlanCount} past plan${org.pastPlanCount === 1 ? "" : "s"}`}
               </span>
             </div>
-            <div className="h-4 w-px bg-zinc-200 hidden md:block" />
-            <span className="text-xs tracking-wider uppercase text-zinc-400 font-bold hidden md:block">
-              Calendar
-            </span>
           </div>
-          <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <div className="flex items-center gap-3">
             {!org.isOwner && !org.isHost && (
               isFollowing ? (
                 <button
@@ -2932,7 +2921,7 @@ export default function OrgCalendarPage() {
               )
             )}
             {(org.isOwner || org.isHost) && (
-              <div className="flex items-center gap-2">
+              <>
                 <button
                   onClick={async () => {
                     const url = window.location.href;
@@ -2951,36 +2940,126 @@ export default function OrgCalendarPage() {
                       }
                     }
                   }}
-                  className="flex items-center justify-center text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 w-9 h-9 rounded-full"
+                  className="h-[34px] px-4 flex items-center justify-center text-[11px] font-bold tracking-[0.11em] uppercase text-[#4a4a4a] border border-[#dcdcdc] hover:bg-zinc-50 transition-colors"
+                  aria-label="Share calendar"
+                >
+                  Share
+                </button>
+                <Link
+                  href={`/dashboard/${org.parentOrgId || org.objectId}`}
+                  className="h-[34px] px-[18px] flex items-center gap-1.5 text-[11px] font-bold tracking-[0.11em] uppercase text-white bg-[#1a1a1a] hover:opacity-90 transition-opacity"
+                >
+                  Manage
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Row 2: Tabs */}
+        <div className="h-[44px] flex items-center px-10 gap-8">
+          <button
+            onClick={() => setActiveTab("upcoming")}
+            className={`text-[12px] font-bold tracking-[0.12em] uppercase ${
+              activeTab === "upcoming"
+                ? "text-[#1a1a1a] border-b-2 border-[#1a1a1a]"
+                : "text-[#a0a0a0]"
+            } pb-1 transition-colors`}
+          >
+            Upcoming Plans
+          </button>
+          {org.pastPlanCount > 0 && (
+            <button
+              onClick={() => setActiveTab("past")}
+              className={`text-[12px] font-bold tracking-[0.12em] uppercase ${
+                activeTab === "past"
+                  ? "text-[#1a1a1a] border-b-2 border-[#1a1a1a]"
+                  : "text-[#a0a0a0]"
+              } pb-1 transition-colors`}
+            >
+              Past Plans
+            </button>
+          )}
+        </div>
+      </nav>
+
+      {/* Mobile Header (single row) */}
+      <nav className="sticky top-0 z-40 w-full bg-white md:hidden border-b border-[#ececea]">
+        <div className="flex items-center gap-3 px-4 py-3">
+          {org.profilePhoto && org.tier !== "starter" && (
+            <img
+              src={org.profilePhoto}
+              alt={org.name}
+              className="w-[34px] h-[34px] rounded object-cover flex-none"
+            />
+          )}
+          <div className="flex-1 min-w-0 gap-[3px] flex flex-col">
+            <h1 className="text-[12px] font-bold tracking-[0.06em] uppercase leading-[1.35] line-clamp-2 text-[#1a1a1a]">
+              {org.name}
+            </h1>
+            <span className="text-[9px] font-bold tracking-[0.08em] uppercase text-[#9a9a9a] whitespace-nowrap">
+              {followerCount} followers · {org.pastPlanCount} past plan{org.pastPlanCount === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 flex-none">
+            {!org.isOwner && !org.isHost && (
+              isFollowing ? (
+                <button
+                  onClick={handleUnfollow}
+                  className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-emerald-600 border border-emerald-200 bg-emerald-50 hover:bg-red-50 hover:border-red-200 hover:text-red-600 px-3 py-1.5 rounded-full transition-colors group"
+                >
+                  <Check className="w-3.5 h-3.5 group-hover:hidden" />
+                  <X className="w-3.5 h-3.5 hidden group-hover:block" />
+                  <span className="group-hover:hidden">Following</span>
+                  <span className="hidden group-hover:inline">Unfollow</span>
+                </button>
+              ) : followRequestPending ? (
+                <span className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-amber-600 border border-amber-200 bg-amber-50 px-3 py-1.5 rounded-full">
+                  <Clock className="w-3.5 h-3.5" />
+                  Pending
+                </span>
+              ) : (
+                <button
+                  onClick={() => setShowFollowModal(true)}
+                  className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
+                >
+                  <Heart className="w-3.5 h-3.5" />
+                  {org.isPrivate ? "Request to Follow" : "Follow"}
+                </button>
+              )
+            )}
+            {(org.isOwner || org.isHost) && (
+              <>
+                <button
+                  onClick={async () => {
+                    const url = window.location.href;
+                    const title = org.name;
+                    if (navigator.share) {
+                      try {
+                        await navigator.share({ title, url });
+                      } catch {
+                        /* user cancelled */
+                      }
+                    } else {
+                      try {
+                        await navigator.clipboard.writeText(url);
+                      } catch {
+                        /* clipboard blocked */
+                      }
+                    }
+                  }}
+                  className="h-8 w-8 p-2.5 flex items-center justify-center text-[9px] font-bold tracking-[0.09em] uppercase text-[#4a4a4a] border border-[#dcdcdc] hover:bg-zinc-50 transition-colors"
                   aria-label="Share calendar"
                 >
                   <Share2 className="w-3.5 h-3.5" />
                 </button>
                 <Link
                   href={`/dashboard/${org.parentOrgId || org.objectId}`}
-                  className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
+                  className="h-8 px-2.5 flex items-center text-[9px] font-bold tracking-[0.09em] uppercase text-white bg-[#1a1a1a] hover:opacity-90 transition-opacity"
                 >
                   <Settings className="w-3.5 h-3.5" />
-                  Manage
                 </Link>
-              </div>
-            )}
-            {!org.isOwner && !org.isHost && (
-              parseUser ? (
-                <Link
-                  href="/dashboard"
-                  className="text-[9px] tracking-wider uppercase text-zinc-300 hover:text-zinc-500 transition-colors"
-                >
-                  My Dashboard
-                </Link>
-              ) : (
-                <button
-                  onClick={() => setShowHostLogin(true)}
-                  className="text-[9px] tracking-wider uppercase text-zinc-300 hover:text-zinc-500 transition-colors"
-                >
-                  Host login
-                </button>
-              )
+              </>
             )}
           </div>
         </div>
@@ -3021,13 +3100,16 @@ export default function OrgCalendarPage() {
           pitch (residents host things for each other) drives the visual
           identity. Local deals appear below the plans stream as a
           supporting benefit, not the main attraction. */}
-      <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100">
-        <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
-          Upcoming Plans
-        </p>
-      </div>
+      {activeTab === "upcoming" && (
+        <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100 md:hidden">
+          <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
+            Upcoming Plans
+          </p>
+        </div>
+      )}
 
       {/* Plans Stream */}
+      {activeTab === "upcoming" && (
       <main className="max-w-6xl mx-auto px-6 py-12">
         {org.plans.length === 0 &&
           (!org.aiSourceEvents || org.aiSourceEvents.length === 0) && (
@@ -4059,6 +4141,7 @@ export default function OrgCalendarPage() {
           </section>
         )}
       </main>
+      )}
 
       {/* Plan Detail Overlay */}
       {selectedEvent && (
