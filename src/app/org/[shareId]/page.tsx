@@ -1388,6 +1388,11 @@ export default function OrgCalendarPage() {
   // "needs a host" ideas are capped in-line so they never bury confirmed
   // plans; the rest expand behind a show-more toggle.
   const [showAllIdeas, setShowAllIdeas] = useState(false);
+  // Must live up here with the other hooks, not beside the tab UI it drives:
+  // the loading and error branches below return early, so a hook declared
+  // after them is skipped on the first render and called on the second, which
+  // is React error #310 ("rendered more hooks than during the previous render").
+  const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming");
   // Free-text venue search when hosting a suggested plan — lets the hoster
   // pick a venue the AI didn't surface. A non-owner's choice still routes
   // through owner/co-host approval (server holds it pending).
@@ -2867,8 +2872,6 @@ export default function OrgCalendarPage() {
       </div>
     );
   }
-
-  const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming");
 
   return (
     <div className="min-h-screen">

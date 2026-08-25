@@ -251,6 +251,12 @@ function SetupPageInner() {
         tier: "starter",
       });
 
+      // Track registration completion
+      trackOpenAIConversion("registration_completed", {
+        type: "customer_action",
+        calendar_id: result.calendarId,
+      });
+
       // If this came from a building claim, link the lead to the new
       // calendar and fire the rep's $25 RM-click bonus.
       if (claimToken && claimInfo) {
