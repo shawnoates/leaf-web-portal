@@ -161,108 +161,6 @@ export default function MemoryClient({
     );
   }
 
-  const maxMb = Math.round(info.limits.maxBytes / 1024 / 1024);
-
-  async function handleFiles(files: FileList | null) {
-    if (!files || files.length === 0) return;
-    setError(null);
-    const remaining =
-      info!.limits.maxPerAttendee - info!.photoCount - staged.length;
-    const next: { id: string; preview: string; base64: string }[] = [];
-    for (const file of Array.from(files)) {
-      if (next.length >= remaining) {
-        setError(
-          `You can only add ${info!.limits.maxPerAttendee} photos to this event.`
-        );
-        break;
-      }
-      if (file.size > info!.limits.maxBytes) {
-        setError(`"${file.name}" is over ${maxMb} MB. Skipping.`);
-        continue;
-      }
-      try {
-        const { preview, base64 } = await processImageFile(file);
-        next.push({ id: crypto.randomUUID(), preview, base64 });
-      } catch {
-        setError(`Couldn't read "${file.name}".`);
-      }
-    }
-    if (next.length > 0) setStaged((prev) => [...prev, ...next]);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }
-
-  function removeStaged(id: string) {
-    setStaged((prev) => prev.filter((s) => s.id !== id));
-  }
-
-  async function submitSurvey() {
-    // Either half is enough — an event rating, or private host feedback alone.
-    const hasEventRating = surveyRating >= 1;
-    const hasHostFeedback = hostRating >= 1 || hostComment.trim().length > 0;
-    if (!info?.survey || (!hasEventRating && !hasHostFeedback)) return;
-    setSurveyError(null);
-    setSurveySubmitting(true);
-    setSurveyJustSaved(false);
-    try {
-      const result = (await Parse.Cloud.run("submitAttendeeSurvey", {
-        notificationId,
-        rating: hasEventRating ? surveyRating : undefined,
-        comment: hasEventRating ? surveyComment.trim() || undefined : undefined,
-        hostRating: hostRating >= 1 ? hostRating : undefined,
-        hostComment: hostComment.trim() || undefined,
-      })) as {
-        objectId: string;
-        rating: number | null;
-        comment: string | null;
-        hostRating: number | null;
-        hostComment: string | null;
-        submittedAt: string;
-        updatedAt: string;
-      };
-      setInfo((prev) =>
-        prev && prev.survey
-          ? { ...prev, survey: { ...prev.survey, existing: result } }
-          : prev
-      );
-      setSurveyJustSaved(true);
-    } catch (err: unknown) {
-      setSurveyError(
-        err instanceof Error ? err.message : "Couldn't save your rating."
-      );
-    } finally {
-      setSurveySubmitting(false);
-    }
-  }
-
-  async function submitStaged() {
-    if (staged.length === 0) return;
-    setError(null);
-    setUploading(true);
-    try {
-      for (const s of staged) {
-        const result = (await Parse.Cloud.run("uploadEventPhoto", {
-          notificationId,
-          fileBase64: s.base64,
-          mimeType: "image/jpeg",
-        })) as Photo;
-        setInfo((prev) =>
-          prev
-            ? {
-                ...prev,
-                photos: [result, ...prev.photos],
-                photoCount: prev.photoCount + 1,
-              }
-            : prev
-        );
-        setStaged((prev) => prev.filter((p) => p.id !== s.id));
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
-    } finally {
-      setUploading(false);
-    }
-  }
-
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 sm:py-12">
       {/* Event header */}
@@ -297,253 +195,39 @@ export default function MemoryClient({
         </div>
       </div>
 
-      {/* Upload area — hidden once the 7-day upload window closes */}
-      {info.uploadsClosed ? (
-        <div className="border-2 border-dashed border-zinc-200 rounded-xl p-6 mb-6 bg-zinc-50/50 text-center">
-          <p className="text-sm text-zinc-500">
-            Photo uploads for this event have closed.
-          </p>
-          <p className="text-[11px] text-zinc-400 mt-1">
-            The gallery is still open for viewing.
-          </p>
-        </div>
-      ) : (
-      <div className="border-2 border-dashed border-zinc-200 rounded-xl p-6 mb-6 bg-zinc-50/50">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={IMAGE_ACCEPT}
-          multiple
-          onChange={(e) => handleFiles(e.target.files)}
-          className="hidden"
-          id="photo-upload-input"
-        />
-        <div className="text-center">
-          <label
-            htmlFor="photo-upload-input"
-            className={`inline-flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest cursor-pointer hover:bg-zinc-800 transition-colors ${
-              uploading ? "opacity-50 pointer-events-none" : ""
-            }`}
-          >
-            <Camera className="w-3.5 h-3.5" />
-            {staged.length > 0 ? "Add more" : "Add photos"}
-          </label>
-          <p className="text-[11px] text-zinc-400 mt-3">
-            Up to {info.limits.maxPerAttendee} photos · {maxMb} MB each
-          </p>
-        </div>
+      {/* Upload area — hidden once the 7-day upload window closes. Shared with
+          the /me recap popup so both surfaces enforce the same limits. */}
+      <PhotoUpload
+        notificationId={notificationId}
+        limits={info.limits}
+        photoCount={info.photoCount}
+        uploadsClosed={!!info.uploadsClosed}
+        onUploaded={(photo) =>
+          setInfo((prev) =>
+            prev
+              ? { ...prev, photos: [photo, ...prev.photos], photoCount: prev.photoCount + 1 }
+              : prev
+          )
+        }
+      />
 
-        {staged.length > 0 && (
-          <div className="mt-5">
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {staged.map((s) => (
-                <div key={s.id} className="relative aspect-square">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={s.preview}
-                    alt=""
-                    className="w-full h-full object-cover rounded-lg"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeStaged(s.id)}
-                    disabled={uploading}
-                    aria-label="Remove photo"
-                    className="absolute top-1 right-1 bg-zinc-900/80 text-white w-6 h-6 rounded-full flex items-center justify-center hover:bg-zinc-900 disabled:opacity-40"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={submitStaged}
-                disabled={uploading}
-                className="inline-flex items-center gap-2 bg-emerald-700 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-emerald-800 transition-colors disabled:opacity-50"
-              >
-                {uploading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Upload className="w-3.5 h-3.5" />
-                )}
-                {uploading
-                  ? "Uploading…"
-                  : `Submit ${staged.length} ${staged.length === 1 ? "photo" : "photos"}`}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <p className="text-xs text-red-600 mt-3 text-center">{error}</p>
-        )}
-      </div>
-      )}
-
-      {/* Post-event rating — single 1-5 stars + optional comment. Only shown
-          once the event has actually ended (server gates with acceptingResponses). */}
+      {/* Post-event rating — single 1-5 stars + optional comment, plus the
+          private virtual-host half. Only shown once the event has actually
+          ended (server gates with acceptingResponses). */}
       {info.survey?.acceptingResponses && (
-        <div className="border border-zinc-200 rounded-xl p-5 mb-6">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-1">
-            How was it?
-          </h2>
-          <p className="text-xs text-zinc-500 mb-4">
-            {info.survey.existing
-              ? "Update your rating below — the host can see your response."
-              : "Rate the event so the host knows what's landing. Optional."}
-          </p>
-
-          <div
-            className="flex items-center gap-1 mb-4"
-            role="radiogroup"
-            aria-label="Rate this event from 1 to 5 stars"
-          >
-            {Array.from({ length: info.survey.ratingMax }, (_, i) => i + 1).map(
-              (n) => {
-                const filled = surveyRating >= n;
-                return (
-                  <button
-                    key={n}
-                    type="button"
-                    role="radio"
-                    aria-checked={surveyRating === n}
-                    aria-label={`${n} star${n === 1 ? "" : "s"}`}
-                    onClick={() => {
-                      setSurveyRating(n);
-                      setSurveyJustSaved(false);
-                    }}
-                    disabled={surveySubmitting}
-                    className="p-1 disabled:opacity-50 transition-transform hover:scale-110"
-                  >
-                    <Star
-                      className={`w-7 h-7 ${
-                        filled
-                          ? "fill-amber-400 text-amber-400"
-                          : "fill-zinc-100 text-zinc-300"
-                      }`}
-                    />
-                  </button>
-                );
-              }
-            )}
-            {surveyRating > 0 && (
-              <span className="text-xs text-zinc-500 ml-2">
-                {surveyRating} of {info.survey.ratingMax}
-              </span>
-            )}
-          </div>
-
-          <label className="block">
-            <span className="sr-only">Optional comment</span>
-            <textarea
-              value={surveyComment}
-              onChange={(e) => {
-                setSurveyComment(e.target.value);
-                setSurveyJustSaved(false);
-              }}
-              maxLength={info.survey.commentMaxLen}
-              rows={2}
-              disabled={surveySubmitting}
-              placeholder="Anything you'd want the host to know? (optional)"
-              className="w-full text-sm border border-zinc-200 rounded-lg p-3 focus:outline-none focus:border-zinc-400 resize-y disabled:opacity-50"
-            />
-          </label>
-
-          {/* Private feedback about the AI-assisted host. Only rendered on
-              virtual-hosted plans; goes to the Leaf team, never to the plan
-              host, the calendar owner, or the group. */}
-          {info.virtualHost && (
-            <div className="border-t border-zinc-100 mt-5 pt-5">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-1">
-                How was {info.virtualHost.personaName}, your host?
-              </h3>
-              <p className="text-xs text-zinc-500 mb-3">
-                Private — this goes only to the Leaf team, not the group or the
-                calendar.
-              </p>
-              <div
-                className="flex items-center gap-1 mb-3"
-                role="radiogroup"
-                aria-label={`Rate ${info.virtualHost.personaName} from 1 to 5 stars`}
-              >
-                {Array.from({ length: info.survey.ratingMax }, (_, i) => i + 1).map(
-                  (n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      role="radio"
-                      aria-checked={hostRating === n}
-                      aria-label={`${n} star${n === 1 ? "" : "s"}`}
-                      onClick={() => {
-                        setHostRating(n);
-                        setSurveyJustSaved(false);
-                      }}
-                      disabled={surveySubmitting}
-                      className="p-1 disabled:opacity-50 transition-transform hover:scale-110"
-                    >
-                      <Star
-                        className={`w-6 h-6 ${
-                          hostRating >= n
-                            ? "fill-amber-400 text-amber-400"
-                            : "fill-zinc-100 text-zinc-300"
-                        }`}
-                      />
-                    </button>
-                  )
-                )}
-              </div>
-              <label className="block">
-                <span className="sr-only">Private feedback about your host</span>
-                <textarea
-                  value={hostComment}
-                  onChange={(e) => {
-                    setHostComment(e.target.value);
-                    setSurveyJustSaved(false);
-                  }}
-                  maxLength={info.survey.commentMaxLen}
-                  rows={2}
-                  disabled={surveySubmitting}
-                  placeholder={`How did ${info.virtualHost.personaName} do? (private, optional)`}
-                  className="w-full text-sm border border-zinc-200 rounded-lg p-3 focus:outline-none focus:border-zinc-400 resize-y disabled:opacity-50"
-                />
-              </label>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between mt-3">
-            <p className="text-[11px] text-zinc-400">
-              Visible to the host as {info.attendee.name}.
-            </p>
-            <button
-              type="button"
-              onClick={submitSurvey}
-              disabled={
-                surveySubmitting ||
-                (surveyRating < 1 && hostRating < 1 && !hostComment.trim())
-              }
-              className="inline-flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
-            >
-              {surveySubmitting ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : surveyJustSaved ? (
-                <Check className="w-3.5 h-3.5" />
-              ) : null}
-              {surveySubmitting
-                ? "Saving…"
-                : surveyJustSaved
-                ? "Saved"
-                : info.survey.existing
-                ? "Update"
-                : "Submit"}
-            </button>
-          </div>
-
-          {surveyError && (
-            <p className="text-xs text-red-600 mt-2">{surveyError}</p>
-          )}
-        </div>
+        <SurveyCard
+          notificationId={notificationId}
+          survey={info.survey}
+          virtualHost={info.virtualHost}
+          attendeeName={info.attendee.name}
+          onSaved={(result) =>
+            setInfo((prev) =>
+              prev && prev.survey
+                ? { ...prev, survey: { ...prev.survey, existing: result } }
+                : prev
+            )
+          }
+        />
       )}
 
       {/* Mark Attendance — host-only. Visible when the link belongs to the host
@@ -571,6 +255,8 @@ export default function MemoryClient({
               ? "Attendance editing closed 7 days after the event. Existing marks are still counted."
               : "Check off who actually showed up. People who checked in on the Leaf app are already counted."}
           </p>
+
+          {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
 
           {info.attendanceClosed ? (
             <ul className="divide-y divide-zinc-100">

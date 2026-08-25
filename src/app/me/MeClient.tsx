@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Heart } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import HostIdeaModal from "@/components/HostIdeaModal";
+import RecapPopup from "@/components/recap/RecapPopup";
 import VirtualHostBadge from "@/components/VirtualHostBadge";
 import { setVerifiedUserCookie } from "@/lib/verified-user";
 import NewPlanModal, {
@@ -117,10 +118,29 @@ interface SpotProbe {
   // re-fires for a seen probe, answered or not.
   seenAt?: string | null;
 }
+// A plan this person attended and hasn't rated yet. The server's gate is "no
+// EventAttendeeSurvey row", not "hasn't opened /m" — visits aren't tracked, and
+// a visit that produced no rating is still an unanswered ask.
+interface PendingRecap {
+  notificationId: string;
+  planId: string;
+  planTitle: string;
+  calendarName: string | null;
+  image: string | null;
+  endedAt: string | null;
+  // Photo uploads close 7 days after the event while ratings stay open for 90.
+  // Doubles as the popup cutoff: fresh plans interrupt, older ones wait in the
+  // rail.
+  uploadsOpen: boolean;
+  // Stamped when the popup has shown this one — it never re-fires, answered or
+  // not.
+  promptSeenAt: string | null;
+}
 interface Dashboard {
   person: { firstName: string; ownsCalendars: boolean; pendingReviewCount: number };
   greeting?: { weather: Weather | null };
   needsHost?: NeedsHost;
+  pendingRecaps?: PendingRecap[]; // may be absent while the server side ships
   spotProbes?: SpotProbe[]; // may be absent while the server side ships
   nextPlan: Plan | null;
   plans: Plan[];
@@ -419,6 +439,12 @@ function readParkedDraft(): NewPlanDraftSnapshot | null {
 function firstUnseenProbe(probes: SpotProbe[] | undefined): SpotProbe | null {
   return (probes || []).find((p) => p && p.probeId && p.status === "pending" && !p.seenAt) || null;
 }
+/** The one unrated plan worth interrupting for: never shown before, and recent
+ *  enough that photos are still open. Everything older waits in the rail —
+ *  a modal about a plan from twelve days ago is a tax, not a prompt. */
+function firstUnseenRecap(recaps: PendingRecap[] | undefined): PendingRecap | null {
+  return (recaps || []).find((r) => r && r.notificationId && r.uploadsOpen && !r.promptSeenAt) || null;
+}
 
 // ---- Dashboard view --------------------------------------------------------
 function DashboardView({
@@ -484,11 +510,33 @@ function DashboardView({
 
   function openCreate() { setRestore(null); setCreateOpen(true); }
 
+  // ---- Recap: rate a plan you actually went to ---------------------------
+  // Same one-shot contract as the probe popup below, and it outranks it: this
+  // is about something that already happened and stops being askable, where a
+  // spot probe keeps. Only ONE modal may auto-open per load.
+  const [popupRecap, setPopupRecap] = useState<PendingRecap | null>(
+    () => firstUnseenRecap(data.pendingRecaps),
+  );
+  const [answeredRecapIds, setAnsweredRecapIds] = useState<string[]>([]);
+  useEffect(() => {
+    if (!popupRecap) return;
+    Parse.Cloud.run("markRecapPromptSeen", {
+      notificationIds: [popupRecap.notificationId],
+    }).catch(() => {});
+    // Stamped once, on the recap this mount chose to show — reopening it from
+    // the rail later must not re-stamp, so this deliberately doesn't track
+    // popupRecap.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const recaps = (data.pendingRecaps || []).filter(
+    (r) => r && r.notificationId && !answeredRecapIds.includes(r.notificationId),
+  );
+
   // One-tap probe popup: fires once per unseen pending probe, newest first.
   // Seen is stamped server-side the moment it shows — dismissing without
   // answering still means it never pops again; the inline section remains.
   const [popupProbe, setPopupProbe] = useState<SpotProbe | null>(
-    () => firstUnseenProbe(data.spotProbes),
+    () => (firstUnseenRecap(data.pendingRecaps) ? null : firstUnseenProbe(data.spotProbes)),
   );
   const [popupAnsweredId, setPopupAnsweredId] = useState<string | null>(null);
   useEffect(() => {
@@ -532,6 +580,7 @@ function DashboardView({
   const hasRail =
     (rail && (rail.tier1.length > 0 || rail.tier2.length > 0)) ||
     places.length > 0 ||
+    recaps.length > 0 ||
     mapPins.length > 0;
 
   return (
@@ -646,6 +695,9 @@ function DashboardView({
 
         {hasRail && (
           <aside className="colR">
+            {recaps.length > 0 && (
+              <RecapRail rows={recaps} onOpen={(r) => setPopupRecap(r)} />
+            )}
             {mapPins.length > 0 && (
               <section className="rail railmap">
                 <div className="eyebrow">Your week, mapped</div>
@@ -673,6 +725,20 @@ function DashboardView({
           probe={popupProbe}
           onClose={() => setPopupProbe(null)}
           onAnswered={(id) => setPopupAnsweredId(id)}
+        />
+      )}
+
+      {popupRecap && (
+        <RecapPopup
+          notificationId={popupRecap.notificationId}
+          planTitle={popupRecap.planTitle}
+          calendarName={popupRecap.calendarName}
+          image={popupRecap.image}
+          endedAt={popupRecap.endedAt}
+          onClose={() => setPopupRecap(null)}
+          onAnswered={(id) =>
+            setAnsweredRecapIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+          }
         />
       )}
 
@@ -1082,6 +1148,44 @@ function NeedsHostRail({ plans, onHosted }: { plans: HostPlan[]; onHosted: () =>
           }}
         />
       )}
+    </section>
+  );
+}
+
+// ---- Rail: plans you went to but haven't rated -----------------------------
+// The non-interrupting half of the recap ask. Everything pending lives here —
+// including the one the popup already showed, so dismissing the modal doesn't
+// bury the plan forever. Rating happens in the same popup, so there's exactly
+// one place the survey is written from on this page.
+function RecapRail({
+  rows, onOpen,
+}: {
+  rows: PendingRecap[];
+  onOpen: (recap: PendingRecap) => void;
+}) {
+  return (
+    <section className="rail">
+      <div className="rail-head">
+        <div className="eyebrow">Plans you went to</div>
+      </div>
+      <p className="rail-sub">
+        A rating tells the host what landed. Photos stay open for a week.
+      </p>
+      <div className="places">
+        {rows.map((r) => (
+          <div className="place" key={r.notificationId}>
+            <div className="place-text">
+              <div className="place-n">{r.planTitle}</div>
+              <div className="place-s">
+                {[r.calendarName, ago(r.endedAt)].filter(Boolean).join(" · ")}
+              </div>
+            </div>
+            <button className="row-btn ghost" onClick={() => onOpen(r)}>
+              Rate it
+            </button>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
