@@ -2290,11 +2290,14 @@ export default function OrgCalendarPage() {
     }
   }, [org, planQueryId]);
 
-  // ?idea= auto-open — the host-ask SMS landing. If the visitor can host
-  // right now (owner/co-host, or follower on an allowFollowersToHost
-  // calendar), open the hosting flow on that suggestion directly; otherwise
-  // surface the suggestion as the popup card, whose Host This Plan CTA walks
-  // them through the follow-first path.
+  // ?idea= auto-open — the host-ask SMS landing. If the visitor can host,
+  // open the hosting flow on that suggestion directly; otherwise surface the
+  // suggestion as the popup card.
+  //
+  // Not being a follower no longer counts against them. This link is sent TO
+  // ask someone to host, so routing the not-yet-following recipient into a
+  // follow-first detour was pushing back exactly the person who had just said
+  // yes. The follow now happens as part of hosting.
   const autoOpenedIdeaRef = useRef<string | null>(null);
   useEffect(() => {
     if (!org || !ideaQueryId) return;
@@ -2303,9 +2306,7 @@ export default function OrgCalendarPage() {
     if (!match) return;
     autoOpenedIdeaRef.current = ideaQueryId;
     const canHostNow =
-      org.isOwner ||
-      org.isHost ||
-      (!!org.allowFollowersToHost && !!org.isFollower);
+      org.isOwner || org.isHost || !!org.allowFollowersToHost;
     if (canHostNow && !org.rsvpLimitReached) {
       setHostingIdea(match);
       setHostSubmitting(false);
@@ -3460,47 +3461,35 @@ export default function OrgCalendarPage() {
                             <div className="pt-2 flex flex-col gap-6">
                               <div className="flex flex-col sm:flex-row gap-4">
                                 {/* Host This — permission matrix:
-                                      owner/co-host                  → active
-                                      follower + allowFollowersToHost → active
-                                      non-follower + allow           → disabled + "follow to host"
-                                      not allowed                    → hidden
+                                      owner/co-host                   → active
+                                      allowFollowersToHost            → active
+                                      not allowed                     → hidden
 
-                                    Tap always opens the confirmation modal,
-                                    which spells out that followers and
-                                    interested users will be notified when
-                                    the plan is created. */}
+                                    Non-followers get an ACTIVE button, not a
+                                    disabled one. Hosting is a strictly stronger
+                                    commitment than following, so requiring the
+                                    follow first gated the most valuable action
+                                    behind the weaker one — and the explanation
+                                    lived in a `title` tooltip, which does not
+                                    exist on a phone, so the reader saw a dead
+                                    grey button and no reason why. It bit hardest
+                                    on the host-ask SMS, which deep-links exactly
+                                    the people who have not followed yet.
+
+                                    The server creates the follow as part of
+                                    hosting; the confirmation modal says so. */}
                                 {(() => {
                                   const canHostAsHost = org.isOwner || org.isHost;
-                                  const canHostAsFollower =
-                                    !!org.allowFollowersToHost && !!org.isFollower;
-                                  const shouldShow =
-                                    canHostAsHost ||
-                                    canHostAsFollower ||
-                                    !!org.allowFollowersToHost; // shows disabled follow-to-host state
-                                  if (!shouldShow) return null;
-                                  const active = canHostAsHost || canHostAsFollower;
+                                  const active =
+                                    canHostAsHost || !!org.allowFollowersToHost;
+                                  if (!active) return null;
                                   return (
                                     <button
                                       onClick={() => {
-                                        if (!active) return;
                                         setHostThisEventIndex(originalIndex);
                                       }}
-                                      disabled={!active}
-                                      title={
-                                        active
-                                          ? undefined
-                                          : "Follow the calendar to host"
-                                      }
-                                      className={`px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 transition-opacity ${
-                                        active
-                                          ? "text-white hover:opacity-90"
-                                          : "text-zinc-400 border border-zinc-200 bg-white cursor-not-allowed"
-                                      }`}
-                                      style={
-                                        active
-                                          ? { backgroundColor: org.brandColor || "#18181b" }
-                                          : undefined
-                                      }
+                                      className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 transition-opacity text-white hover:opacity-90"
+                                      style={{ backgroundColor: org.brandColor || "#18181b" }}
                                     >
                                       Host This
                                     </button>
@@ -3749,37 +3738,31 @@ export default function OrgCalendarPage() {
                             modal prefilled from the idea). */}
                         {(() => {
                           const canHostAsHost = org.isOwner || org.isHost;
-                          const canHostAsFollower =
-                            !!org.allowFollowersToHost && !!org.isFollower;
-                          const shouldShow =
-                            canHostAsHost ||
-                            canHostAsFollower ||
-                            !!org.allowFollowersToHost;
-                          if (!shouldShow) return null;
-                          const active = canHostAsHost || canHostAsFollower;
+                          // Hosting implies following: a non-follower gets an
+                          // ACTIVE button, and the server creates the follow as
+                          // part of hosting. See the AI-suggested-events block
+                          // above for why the old disabled state was a dead end.
+                          const active =
+                            canHostAsHost || !!org.allowFollowersToHost;
+                          if (!active) return null;
                           return (
                             <button
                               onClick={() => {
-                                if (!active || org.rsvpLimitReached) return;
+                                if (org.rsvpLimitReached) return;
                                 setHostingIdea(idea);
                                 setHostSubmitting(false);
                                 setHostSuccess(false);
                                 setHostNote("");
                                 setSelectedVenue(null);
                               }}
-                              disabled={!active || org.rsvpLimitReached}
-                              title={
-                                active
-                                  ? undefined
-                                  : "Follow the calendar to host"
-                              }
+                              disabled={org.rsvpLimitReached}
                               className={`px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 transition-opacity ${
-                                active && !org.rsvpLimitReached
+                                !org.rsvpLimitReached
                                   ? "text-white hover:opacity-90"
                                   : "text-zinc-400 border border-zinc-200 bg-white cursor-not-allowed"
                               }`}
                               style={
-                                active && !org.rsvpLimitReached
+                                !org.rsvpLimitReached
                                   ? { backgroundColor: org.brandColor || "#18181b" }
                                   : undefined
                               }
@@ -4791,6 +4774,15 @@ export default function OrgCalendarPage() {
                         </span>
                       </div>
                     </div>
+                    {/* Disclosed, not silent: hosting creates the follow, so
+                        say so before the tap rather than surprising them after. */}
+                    {!org.isFollower && (
+                      <p className="text-sm text-zinc-500 leading-relaxed pt-2">
+                        Hosting also follows{" "}
+                        <span className="font-medium text-zinc-700">{org.name}</span>, so
+                        you&rsquo;ll get updates. You can unfollow any time.
+                      </p>
+                    )}
                     <div className="pt-8 flex gap-4">
                       <button
                         type="button"
@@ -5812,6 +5804,15 @@ export default function OrgCalendarPage() {
                       </>
                     )}
                   </p>
+                  {/* Disclosed, not silent: hosting creates the follow, so say
+                      so before the tap rather than surprising them after. */}
+                  {!org.isFollower && (
+                    <p className="text-sm text-zinc-500 leading-relaxed">
+                      Hosting also follows{" "}
+                      <span className="font-medium text-zinc-700">{org.name}</span>, so
+                      you&rsquo;ll get updates. You can unfollow any time.
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-3 pt-2">
