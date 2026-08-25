@@ -1820,6 +1820,9 @@ const CSS = `
 .leafme .place-text{flex:1 1 auto;min-width:0}
 .leafme .place-n{font-size:12.5px;color:var(--ink)}
 .leafme .place-s{font-size:10.5px;color:var(--muted)}
+/* Recap rows reuse the .place shell but carry a button, not a heart — the
+   mobile rules below give .row-btn a top margin meant for the plan spine. */
+.leafme .place .row-btn{flex:none;margin-top:0}
 .leafme .place.on .place-s{color:var(--body)}
 .leafme .heart-toggle{flex:none;width:28px;height:28px;display:flex;align-items:center;
   justify-content:center;border:1px solid var(--edge-2);background:var(--paper);color:var(--ink);
