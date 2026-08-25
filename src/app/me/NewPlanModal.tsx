@@ -810,8 +810,8 @@ const NP_CSS = `
   --ink:#17150f; --body:#6f6a5f; --muted:#8b8578; --faint:#b5afa2;
   --green:#1f6b45; --green-soft:#7fb894; --orange:#c2410c;
   --surface:#fff; --recessed:#faf9f7;
-  --sans:var(--font-me-sans),-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  --serif:var(--font-me-serif),Georgia,serif;
+  --sans:var(--font-geist-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  --serif:var(--font-geist-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
   font-family:var(--sans);
 }
 .np-root *{box-sizing:border-box}
@@ -949,7 +949,7 @@ const NP_CSS = `
 .np-link{display:flex;align-items:center;gap:10px;border:1px solid rgba(0,0,0,.13);
   border-radius:10px;padding:10px 10px 10px 13px}
 .np-link span{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;
-  font-family:var(--font-me-mono),ui-monospace,monospace;font-size:13px;color:var(--ink)}
+  font-family:var(--font-geist-mono, ui-monospace, monospace);font-size:13px;color:var(--ink)}
 .np-copy{flex:none;border:0;background:var(--ink);color:#fff;font-family:var(--sans);
   font-size:11.5px;font-weight:500;padding:9px 14px;border-radius:7px;cursor:pointer}
 .np-done-foot{font-size:12px;line-height:1.6;color:var(--body);margin-top:14px}

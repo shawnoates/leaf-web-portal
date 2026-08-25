@@ -1407,6 +1407,7 @@ export default function OrgCalendarPage() {
   const [virtualHostAvatar, setVirtualHostAvatar] = useState<string | null>(null);
   const [hostSuccess, setHostSuccess] = useState<boolean | "pending">(false);
   const [hostSubmitting, setHostSubmitting] = useState(false);
+  const [hostError, setHostError] = useState<string | null>(null);
   const [hostNote, setHostNote] = useState("");
   const [hostEmail, setHostEmail] = useState("");
   const [hostRequireApproval, setHostRequireApproval] = useState(false);
@@ -2601,6 +2602,7 @@ export default function OrgCalendarPage() {
     if (!isOwnerOrHost && !hostVerify.isVerified) return;
 
     setHostSubmitting(true);
+    setHostError(null);
 
     const form = e.target as HTMLFormElement;
     const dateInput = form.querySelector('input[type="date"]') as HTMLInputElement;
@@ -2705,7 +2707,15 @@ export default function OrgCalendarPage() {
         setHostSuccess(false);
       }, 2000);
     } catch (err) {
+      // This used to only console.error, so a rejected submit looked like
+      // nothing happened at all — the server's reason (venue closed at that
+      // time, idea already claimed) never reached the person who could act on it.
       console.error("Failed to host plan idea:", err);
+      setHostError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Couldn't send that. Try again in a moment.",
+      );
       setHostSubmitting(false);
     }
   };
@@ -3751,6 +3761,7 @@ export default function OrgCalendarPage() {
                                 if (org.rsvpLimitReached) return;
                                 setHostingIdea(idea);
                                 setHostSubmitting(false);
+                                setHostError(null);
                                 setHostSuccess(false);
                                 setHostNote("");
                                 setSelectedVenue(null);
@@ -4783,6 +4794,14 @@ export default function OrgCalendarPage() {
                         you&rsquo;ll get updates. You can unfollow any time.
                       </p>
                     )}
+                    {hostError && (
+                      <p
+                        role="alert"
+                        className="text-sm text-red-600 leading-relaxed pt-2"
+                      >
+                        {hostError}
+                      </p>
+                    )}
                     <div className="pt-8 flex gap-4">
                       <button
                         type="button"
@@ -4881,6 +4900,7 @@ export default function OrgCalendarPage() {
                               setCreatingCustomPlan(false);
                               setHostingIdea(idea);
                               setHostSubmitting(false);
+                              setHostError(null);
                               setHostSuccess(false);
                               setHostNote("");
                               setSelectedVenue(null);
@@ -5700,34 +5720,49 @@ export default function OrgCalendarPage() {
                 <Plus className="w-8 h-8 rotate-45" />
               </button>
 
-              {/* Cover — suggestions have no image, so reuse the card's
-                  gradient + serif tag treatment verbatim. */}
+              {/* Cover — the generator's Unsplash photo when it resolved one,
+                  otherwise the gradient + serif tag treatment. Same order as
+                  the card, so opening a suggestion shows the same image the
+                  reader just tapped rather than swapping it for the fallback.
+                  (This block predates suggestions having photos at all, and
+                  kept rendering the no-image state after they gained one.) */}
               <div
-                className="hidden md:flex w-2/5 shrink-0 items-center justify-center relative"
+                className="hidden md:flex w-2/5 shrink-0 items-center justify-center relative overflow-hidden"
                 style={{
                   background: isAmber
                     ? "linear-gradient(135deg, #f5e6d0 0%, #e8d1a5 100%)"
                     : "linear-gradient(135deg, #e8efe9 0%, #cddcd0 100%)",
                 }}
               >
-                <div
-                  className="absolute inset-0 opacity-[0.07]"
-                  style={{
-                    backgroundImage:
-                      "radial-gradient(circle at 25% 30%, rgba(0,0,0,0.15) 1px, transparent 2px)",
-                    backgroundSize: "18px 18px",
-                  }}
-                />
-                <span
-                  className="relative text-4xl lg:text-5xl font-light tracking-tight text-center px-6"
-                  style={{
-                    fontFamily: 'ui-serif, Georgia, "Times New Roman", serif',
-                    color: isAmber ? "#8A5F1E" : "#1B4332",
-                    letterSpacing: "-0.01em",
-                  }}
-                >
-                  {(ev.tag || "Event").toLowerCase()}
-                </span>
+                {ev.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={ev.imageUrl}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                ) : (
+                  <>
+                    <div
+                      className="absolute inset-0 opacity-[0.07]"
+                      style={{
+                        backgroundImage:
+                          "radial-gradient(circle at 25% 30%, rgba(0,0,0,0.15) 1px, transparent 2px)",
+                        backgroundSize: "18px 18px",
+                      }}
+                    />
+                    <span
+                      className="relative text-4xl lg:text-5xl font-light tracking-tight text-center px-6"
+                      style={{
+                        fontFamily: 'ui-serif, Georgia, "Times New Roman", serif',
+                        color: isAmber ? "#8A5F1E" : "#1B4332",
+                        letterSpacing: "-0.01em",
+                      }}
+                    >
+                      {(ev.tag || "Event").toLowerCase()}
+                    </span>
+                  </>
+                )}
                 <span
                   className="absolute top-4 left-4 text-[10px] font-bold uppercase tracking-widest rounded-full px-3 py-1"
                   style={{

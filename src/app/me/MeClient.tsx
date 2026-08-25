@@ -1636,9 +1636,9 @@ const CSS = `
   --fill:#e3e0d8; --hatch:repeating-linear-gradient(135deg,#e8e4dc 0 6px,#f2efe9 6px 12px);
   --line:rgba(0,0,0,.07); --rule:rgba(0,0,0,.08); --card:rgba(0,0,0,.09);
   --edge:rgba(0,0,0,.15); --edge-2:rgba(0,0,0,.18); --dash:rgba(0,0,0,.22);
-  --sans:var(--font-me-sans),-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  --serif:var(--font-me-serif),Georgia,serif;
-  --mono:var(--font-me-mono),ui-monospace,SFMono-Regular,monospace;
+  --sans:var(--font-geist-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  --serif:var(--font-geist-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  --mono:var(--font-geist-mono, ui-monospace, SFMono-Regular, monospace);
   background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.5;
   -webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:hidden;
 }
