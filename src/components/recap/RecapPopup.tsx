@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Loader2, X, Check } from "lucide-react";
+import { Loader2, X, Check, CalendarX } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import SurveyCard from "./SurveyCard";
 import PhotoUpload from "./PhotoUpload";
@@ -174,6 +174,42 @@ export default function RecapPopup({
                 {[when, venue].filter(Boolean).join(" · ")}
               </p>
 
+              {/* The escape hatch sits with the header, not under the form:
+                  someone who wasn't there shouldn't have to scroll past a
+                  rating they can't give to say so — and it's a real button,
+                  because a text link reads as fine print you're meant to skip. */}
+              <div className="mt-4">
+                {confirmingDecline ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={declineAttendance}
+                      disabled={declining}
+                      className="inline-flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                    >
+                      {declining && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      {declining ? "Saving…" : "Yes, I didn't go"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingDecline(false)}
+                      className="px-3 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-800"
+                    >
+                      Never mind
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingDecline(true)}
+                    className="inline-flex items-center gap-2 border border-zinc-300 text-zinc-700 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:border-zinc-400 hover:text-zinc-900 hover:bg-zinc-50 transition-colors"
+                  >
+                    <CalendarX className="w-3.5 h-3.5" />
+                    I didn&apos;t attend
+                  </button>
+                )}
+              </div>
+
               {loadError ? (
                 <p className="text-sm text-zinc-600 mt-6">{loadError}</p>
               ) : !info ? (
@@ -200,8 +236,10 @@ export default function RecapPopup({
 
                   {!info.uploadsClosed && (
                     <div className="mt-5 pt-5 border-t border-zinc-100">
+                      {/* Time-neutral on purpose — plenty of plans are a
+                          morning run or a lunch, not a night out. */}
                       <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-3">
-                        Photos from the night
+                        Add your photos
                       </h3>
                       <PhotoUpload
                         notificationId={notificationId}
@@ -214,34 +252,7 @@ export default function RecapPopup({
                     </div>
                   )}
 
-                  <div className="mt-5 pt-4 border-t border-zinc-100 flex items-center justify-between gap-3 flex-wrap">
-                    {confirmingDecline ? (
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={declineAttendance}
-                          disabled={declining}
-                          className="text-xs font-medium text-zinc-900 underline disabled:opacity-50"
-                        >
-                          {declining ? "Saving…" : "Yes, I didn't go"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmingDecline(false)}
-                          className="text-xs text-zinc-400 hover:text-zinc-600"
-                        >
-                          Never mind
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmingDecline(true)}
-                        className="text-xs text-zinc-400 hover:text-zinc-700 underline"
-                      >
-                        I didn&apos;t attend
-                      </button>
-                    )}
+                  <div className="mt-5 pt-4 border-t border-zinc-100 text-right">
                     <Link
                       href={`/m/${notificationId}`}
                       className="text-xs text-zinc-500 hover:text-zinc-800 underline"

@@ -439,6 +439,7 @@ function readParkedDraft(): NewPlanDraftSnapshot | null {
 function firstUnseenProbe(probes: SpotProbe[] | undefined): SpotProbe | null {
   return (probes || []).find((p) => p && p.probeId && p.status === "pending" && !p.seenAt) || null;
 }
+
 /** The one unrated plan worth interrupting for: never shown before, and recent
  *  enough that photos are still open. Everything older waits in the rail —
  *  a modal about a plan from twelve days ago is a tax, not a prompt. */
