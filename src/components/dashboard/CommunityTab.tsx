@@ -3,7 +3,12 @@
 import { useMemo, useState } from "react";
 import { Check, ChevronDown, MessageCircle, Search, UserMinus } from "lucide-react";
 import type { OrgDashboard } from "./types";
-import { buildRsvpCountIndex, rsvpCountForPerson } from "./types";
+import {
+  buildRsvpCountIndex,
+  rsvpCountForPerson,
+  rsvpWindowDays,
+  rsvpWindowLabel,
+} from "./types";
 
 // Community — Followers and Users merged into one list of people with a role
 // column and segment filters, replacing the two separate tabs. Pending follow
@@ -107,6 +112,10 @@ export default function CommunityTab({
     () => buildRsvpCountIndex(dashboard.rsvps),
     [dashboard.rsvps],
   );
+  // Every RSVP number below is bounded by the server's plan window — say so
+  // rather than letting "0" read as "never, ever".
+  const windowLabel = rsvpWindowLabel(dashboard);
+  const windowDays = rsvpWindowDays(dashboard);
 
   const people: Person[] = useMemo(() => {
     const out: Person[] = [];
@@ -150,8 +159,8 @@ export default function CommunityTab({
         name: f.name,
         context:
           count === 0
-            ? `Never RSVP'd · joined ${daysAgo(f.joinedAt)}`
-            : `${count} RSVP${count === 1 ? "" : "s"} · joined ${daysAgo(f.joinedAt)}`,
+            ? `No RSVPs in ${windowLabel} · joined ${daysAgo(f.joinedAt)}`
+            : `${count} RSVP${count === 1 ? "" : "s"} in ${windowLabel} · joined ${daysAgo(f.joinedAt)}`,
         role: "follower",
         pending: false,
         calendarName: f.calendarName,
@@ -176,7 +185,7 @@ export default function CommunityTab({
       });
     }
     return out;
-  }, [dashboard.members, dashboard.followers, dashboard.pendingFollowers, rsvpIndex]);
+  }, [dashboard.members, dashboard.followers, dashboard.pendingFollowers, rsvpIndex, windowLabel]);
 
   const counts = useMemo(
     () => ({
@@ -216,7 +225,7 @@ export default function CommunityTab({
     return list;
   }, [people, segment, calFilter, search]);
 
-  // Nudging lives on the Never RSVP'd segment only — it's a re-engagement
+  // Nudging lives on the "No recent RSVPs" segment only — it's a re-engagement
   // tool, not a general broadcast channel. Eligible = has a phone on file and
   // hasn't been nudged this session.
   const nudgingHere = segment === "never";
@@ -236,7 +245,7 @@ export default function CommunityTab({
   );
 
   const exportCsv = () => {
-    const header = "Name,Role,Calendar,RSVPs,Joined";
+    const header = `Name,Role,Calendar,RSVPs (last ${windowDays} days),Joined`;
     const rows = filtered.map(
       (p) =>
         `"${p.name}","${p.pending ? "Pending" : p.role}","${p.calendarName || ""}","${p.rsvps ?? ""}","${p.joinedAt ? new Date(p.joinedAt).toLocaleDateString() : ""}"`,
@@ -277,7 +286,7 @@ export default function CommunityTab({
 
   const segments: { id: CommunitySegment; label: string; count: number }[] = [
     { id: "everyone", label: "Everyone", count: counts.everyone },
-    { id: "never", label: "Never RSVP'd", count: counts.never },
+    { id: "never", label: "No recent RSVPs", count: counts.never },
     { id: "repeat", label: "Repeat", count: counts.repeat },
     { id: "hosts", label: "Hosts", count: counts.hosts },
     ...(counts.pending > 0
@@ -298,7 +307,8 @@ export default function CommunityTab({
             {dashboard.followerCount === 1 ? "" : "s"} ·{" "}
             {dashboard.members.length} member
             {dashboard.members.length === 1 ? "" : "s"}
-            {counts.never > 0 && ` · ${counts.never} have never RSVP'd`}
+            {counts.never > 0 &&
+              ` · ${counts.never} with no RSVPs in ${windowLabel}`}
           </p>
         </div>
         <div className="relative hidden md:block">
@@ -540,7 +550,12 @@ export default function CommunityTab({
               <span className="flex-1">Name</span>
               <span className="w-[100px]">Role</span>
               <span className="w-[150px]">Calendar</span>
-              <span className="w-[70px] text-right">RSVPs</span>
+              <span
+                className="w-[70px] text-right"
+                title={`RSVPs in ${windowLabel}`}
+              >
+                RSVPs {windowDays}d
+              </span>
               <span className="w-[80px] text-right">Joined</span>
               <span className="w-[130px]" />
             </div>

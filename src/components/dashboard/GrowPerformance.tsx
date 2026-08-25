@@ -48,6 +48,7 @@ export default function GrowPerformance({
   onRangeChange,
   onRetry,
   neverRsvpdCount,
+  rsvpWindowDays,
   onNewPlan,
   onGoCommunity,
   allCharts,
@@ -59,6 +60,9 @@ export default function GrowPerformance({
   onRangeChange: (r: AnalyticsRange) => void;
   onRetry: () => void;
   neverRsvpdCount: number;
+  /** Bound on the RSVP tallies `neverRsvpdCount` comes from — the copy below
+   *  must not imply a lifetime count. */
+  rsvpWindowDays: number;
   onNewPlan: (dayIndex?: number) => void;
   onGoCommunity: (segment: "never") => void;
   allCharts: React.ReactNode;
@@ -362,8 +366,8 @@ export default function GrowPerformance({
               {neverRsvpdCount > 0 && (
                 <p className="text-xs text-zinc-500 mt-2">
                   {neverRsvpdCount} follower
-                  {neverRsvpdCount === 1 ? " has " : "s have "}never
-                  RSVP&apos;d to anything.
+                  {neverRsvpdCount === 1 ? " hasn't " : "s haven't "}RSVP&apos;d
+                  to anything in the last {rsvpWindowDays} days.
                 </p>
               )}
               {neverRsvpdCount > 0 && (
@@ -380,7 +384,7 @@ export default function GrowPerformance({
             <div className="mt-4 lg:mt-0 w-full lg:w-[280px] shrink-0 space-y-2.5">
               {[
                 {
-                  label: "Followed, never RSVP'd",
+                  label: "Followed, no recent RSVP",
                   value: neverRsvpdCount,
                   fill: "bg-zinc-400",
                 },

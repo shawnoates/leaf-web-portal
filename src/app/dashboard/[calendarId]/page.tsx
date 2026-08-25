@@ -37,6 +37,7 @@ import {
   buildRsvpCountIndex,
   formatPlanDay,
   rsvpCountForPerson,
+  rsvpWindowDays,
   senderNameFor,
   tidyTitle,
 } from "@/components/dashboard/types";
@@ -1931,6 +1932,7 @@ export default function OrgDashboardPage() {
                       onRangeChange={setAnalyticsRange}
                       onRetry={() => fetchAnalytics(analyticsRange)}
                       neverRsvpdCount={neverRsvpdCount}
+                      rsvpWindowDays={rsvpWindowDays(dashboard)}
                       onNewPlan={() => openNewPlan()}
                       onGoCommunity={goCommunity}
                       allCharts={

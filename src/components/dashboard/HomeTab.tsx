@@ -14,7 +14,11 @@ import type {
   OrgDashboard,
   OrgDashboardCalendar,
 } from "./types";
-import { buildRsvpCountIndex, rsvpCountForPerson } from "./types";
+import {
+  buildRsvpCountIndex,
+  rsvpCountForPerson,
+  rsvpWindowLabel,
+} from "./types";
 import GaugeStat from "./GaugeStat";
 
 // Home — the landing place of the redesigned dashboard. Leads with pending
@@ -404,7 +408,12 @@ export default function HomeTab({
             Invite {re.target_user.name} to {re.plan.title}
           </p>
           <p className="text-[11px] text-zinc-500 mt-0.5">
-            {re.never_rsvpd ? "Has never RSVP'd" : "Hasn't RSVP'd to this one"}
+            {/* Server-computed off its own PAST_WINDOW_MS (365d) — a different,
+                wider window than the RSVP tallies elsewhere on the dashboard,
+                so this one says "past year", not "last 90 days". */}
+            {re.never_rsvpd
+              ? "No RSVPs in the past year"
+              : "Hasn't RSVP'd to this one"}
             {planDay ? ` · ${planDay}` : ""}
             {dashboard.calendars.length > 1 ? ` · ${calendar.name}` : ""}
           </p>
@@ -557,8 +566,8 @@ export default function HomeTab({
       >
         <div className="flex-1 min-w-[180px]">
           <p className="text-[13px] font-medium text-zinc-900">
-            {neverRsvpd} follower{neverRsvpd === 1 ? " has " : "s have "}
-            never RSVP&apos;d
+            {neverRsvpd} follower{neverRsvpd === 1 ? " hasn't " : "s haven't "}
+            RSVP&apos;d in {rsvpWindowLabel(dashboard)}
           </p>
           <p className="text-[11px] text-zinc-500 mt-0.5">
             See who they are and reach out

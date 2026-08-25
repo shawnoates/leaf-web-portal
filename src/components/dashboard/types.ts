@@ -175,6 +175,10 @@ export interface OrgDashboard {
     planDate?: string | null;
     source: string;
   }[];
+  /** How far back `rsvps` reaches, in days — every per-person tally on the
+   *  dashboard is bounded by it. Optional until the getOrgDashboard deploy
+   *  that sends it is live; see RSVP_WINDOW_FALLBACK_DAYS. */
+  rsvpWindowDays?: number;
   pendingFollowerCount: number;
   pendingFollowers: {
     membershipId: string;
@@ -282,6 +286,25 @@ export function formatPlanDay(
  *  in real drafts. */
 export function tidyTitle(title: string | null | undefined): string {
   return String(title || "").replace(/\s+/g, " ").trim();
+}
+
+/** Mirrors PLAN_WINDOW_MS in getOrgDashboard. Only used until the deploy that
+ *  sends `rsvpWindowDays` is live — read the payload value, not this. */
+export const RSVP_WINDOW_FALLBACK_DAYS = 90;
+
+export function rsvpWindowDays(dashboard: {
+  rsvpWindowDays?: number;
+}): number {
+  return dashboard.rsvpWindowDays || RSVP_WINDOW_FALLBACK_DAYS;
+}
+
+/** "the last 90 days" — the qualifier every RSVP tally on the dashboard needs.
+ *  The window is anchored on plan date and has no upper bound, so it also
+ *  sweeps in upcoming plans; "last N days" is the honest short form because
+ *  what it rules out is older history, which is what a reader would otherwise
+ *  assume is included. */
+export function rsvpWindowLabel(dashboard: { rsvpWindowDays?: number }): string {
+  return `the last ${rsvpWindowDays(dashboard)} days`;
 }
 
 /** Per-person RSVP tallies, keyed by phone number (preferred) or lowercased
