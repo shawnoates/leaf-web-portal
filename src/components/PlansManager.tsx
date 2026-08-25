@@ -827,11 +827,17 @@ export default function PlansManager({
         name: string;
         time: string;
         venueLine: string;
+        // The vibe-setting blurb. Present on every generated starter event and
+        // rendered on the public page — it was missing from this type, so the
+        // manager surfaces showed a blank description for a card that clearly
+        // had one on /org.
+        description?: string | null;
         tag: string;
         tagVariant?: "default" | "amber";
         isoDatetime?: string | null;
         dateISO?: string | null;
         imageUrl?: string | null;
+        audienceTag?: string | null;
       }>;
       const aiStarters: UpcomingPlan[] = aiEvents
         .map((ev, index) => ({ ev, index, resolved: resolveAIStarterDate(ev) }))
@@ -839,7 +845,7 @@ export default function PlansManager({
         .map(({ ev, index, resolved }) => ({
           objectId: `ai-${index}`,
           title: ev.title || ev.name,
-          description: "",
+          description: ev.description || "",
           image: ev.imageUrl || null,
           expiryDate: (resolved as Date).toISOString(),
           timezone: null,

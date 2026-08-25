@@ -141,7 +141,10 @@ export default function CommunityTab({
       });
     }
     for (const f of dashboard.followers) {
-      const count = rsvpCountForPerson(rsvpIndex, f);
+      // Scoped to the calendar this follower actually follows — an org-wide
+      // tally reads as "10 RSVPs" beside "Kinfolk Collective" when only one
+      // of them happened there.
+      const count = rsvpCountForPerson(rsvpIndex, f, f.calendarId);
       out.push({
         key: `f-${f.membershipId}`,
         name: f.name,

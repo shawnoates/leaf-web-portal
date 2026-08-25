@@ -162,6 +162,9 @@ export interface OrgDashboard {
   rsvps: {
     objectId: string;
     eventGroupId: string | null;
+    /** The calendar the plan sits on. Optional until the getOrgDashboard
+     *  deploy that adds it is live — without it, counts fall back to org-wide. */
+    calendarId?: string | null;
     name: string;
     phone: string | null;
     planTitle: string;
@@ -281,25 +284,69 @@ export function tidyTitle(title: string | null | undefined): string {
   return String(title || "").replace(/\s+/g, " ").trim();
 }
 
-/** Per-person RSVP counts, keyed by phone number (preferred) or lowercased
- *  name. Powers the "Never RSVP'd" segments on Home, Community and Grow. */
+/** Per-person RSVP tallies, keyed by phone number (preferred) or lowercased
+ *  name. Powers the "Never RSVP'd" segments on Home, Community and Grow.
+ *
+ *  Tallied two ways because the dashboard is org-scoped: `byCalendar` answers
+ *  "how many times has this person RSVP'd to THIS calendar" — what a follower
+ *  row needs, since a follower belongs to one calendar — while `all` answers
+ *  it org-wide, which is the right frame for members, who have access across
+ *  calendars. Sets, not counters: one person can only attend a plan once, so
+ *  the twin Accepted rows the joinOpenInvite race leaves behind must not
+ *  double-count. */
+export interface RsvpCountIndex {
+  all: Map<string, Set<string>>;
+  byCalendar: Map<string, Set<string>>;
+  /** False until the getOrgDashboard deploy that stamps `calendarId` on RSVP
+   *  rows is live. Calendar-scoped lookups fall back to the org-wide tally
+   *  while it is false — otherwise every follower would score 0 and the whole
+   *  community would land in "Never RSVP'd". */
+  hasCalendarIds: boolean;
+}
+
+const CAL_KEY_SEP = " ";
+
 export function buildRsvpCountIndex(
   rsvps: OrgDashboard["rsvps"],
-): Map<string, number> {
-  const index = new Map<string, number>();
+): RsvpCountIndex {
+  const all = new Map<string, Set<string>>();
+  const byCalendar = new Map<string, Set<string>>();
+  let hasCalendarIds = false;
+  const add = (map: Map<string, Set<string>>, key: string, plan: string) => {
+    const set = map.get(key);
+    if (set) set.add(plan);
+    else map.set(key, new Set([plan]));
+  };
   for (const r of rsvps) {
     const key = r.phone || r.name.trim().toLowerCase();
     if (!key) continue;
-    index.set(key, (index.get(key) || 0) + 1);
+    // Fall back to the row id so an RSVP with no plan pointer still counts
+    // once rather than collapsing every such row into a single tally.
+    const plan = r.eventGroupId || r.objectId;
+    add(all, key, plan);
+    if (r.calendarId) {
+      hasCalendarIds = true;
+      add(byCalendar, `${r.calendarId}${CAL_KEY_SEP}${key}`, plan);
+    }
   }
-  return index;
+  return { all, byCalendar, hasCalendarIds };
 }
 
+/** Pass `calendarId` to scope the tally to one calendar (follower rows);
+ *  omit it for an org-wide tally (members, who span calendars). */
 export function rsvpCountForPerson(
-  index: Map<string, number>,
+  index: RsvpCountIndex,
   person: { phone?: string | null; name: string },
+  calendarId?: string | null,
 ): number {
-  if (person.phone && index.has(person.phone)) return index.get(person.phone)!;
-  const nameKey = person.name.trim().toLowerCase();
-  return index.get(nameKey) || 0;
+  const scoped = Boolean(calendarId) && index.hasCalendarIds;
+  const map = scoped ? index.byCalendar : index.all;
+  const prefix = scoped ? `${calendarId}${CAL_KEY_SEP}` : "";
+  // Phone is the trustworthy key; fall through to name when this person has
+  // no phone on file, or none of their rows carried one.
+  if (person.phone) {
+    const byPhone = map.get(`${prefix}${person.phone}`);
+    if (byPhone) return byPhone.size;
+  }
+  return map.get(`${prefix}${person.name.trim().toLowerCase()}`)?.size || 0;
 }

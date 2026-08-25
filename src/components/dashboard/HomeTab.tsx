@@ -214,7 +214,7 @@ export default function HomeTab({
   const neverRsvpd = useMemo(
     () =>
       dashboard.followers.filter(
-        (f) => rsvpCountForPerson(rsvpIndex, f) === 0,
+        (f) => rsvpCountForPerson(rsvpIndex, f, f.calendarId) === 0,
       ).length,
     [dashboard.followers, rsvpIndex],
   );

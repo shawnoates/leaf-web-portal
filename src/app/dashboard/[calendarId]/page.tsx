@@ -1460,7 +1460,7 @@ export default function OrgDashboardPage() {
 
   const rsvpIndex = buildRsvpCountIndex(dashboard.rsvps);
   const neverRsvpdCount = dashboard.followers.filter(
-    (f) => rsvpCountForPerson(rsvpIndex, f) === 0,
+    (f) => rsvpCountForPerson(rsvpIndex, f, f.calendarId) === 0,
   ).length;
 
   // Mirrors HomeTab's NEEDS YOU rows: the four actionable queues plus the
