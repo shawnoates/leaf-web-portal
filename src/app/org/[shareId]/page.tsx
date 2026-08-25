@@ -5612,17 +5612,29 @@ export default function OrgCalendarPage() {
         const venueLine = ev.venueLine || ev.address || null;
 
         const confirmHostThis = async () => {
+          if (!canHostAsHost && !hostVerify.isVerified) return;
           setHostThisSubmitting(true);
           try {
             // Server owns venue resolution + role gating and auto-approves
             // owner/co-host (it delegates to requestCustomPlanViaWeb, which
             // creates the EventGroup directly for them and falls back to the
             // owner's approval queue for followers).
+            // /org identifies people by verified phone, not Parse session, so
+            // pass that identity through — otherwise the server has nothing to
+            // act on and rejects a visitor the page considers known.
             const result = (await Parse.Cloud.run("proposeAIEventPlan", {
               shareId,
               eventIndex,
+              hostName: !canHostAsHost ? hostVerify.name.trim() : undefined,
+              hostPhone: !canHostAsHost
+                ? `+1${hostVerify.phone.replace(/\D/g, "")}`
+                : undefined,
             })) as { pendingApproval?: boolean; eventGroupId?: string };
             setHostThisEventIndex(null);
+            if (!canHostAsHost && !isFollowing) {
+              setIsFollowing(true);
+              setFollowerCount((c) => c + 1);
+            }
 
             if (result?.pendingApproval) {
               setToast(
@@ -5815,10 +5827,26 @@ export default function OrgCalendarPage() {
                   )}
                 </div>
 
+                {/* Identity. The server needs a verified phone to know who is
+                    hosting — this modal previously collected none, which is why
+                    it only ever worked for someone who happened to hold a Parse
+                    session. Owners and co-hosts are already identified. */}
+                {!canHostAsHost && !hostVerify.isVerified && (
+                  <div className="border-t border-zinc-100 pt-6 space-y-4">
+                    <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                      Confirm it&rsquo;s you
+                    </p>
+                    <PhoneVerifyFields verify={hostVerify} />
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-3 pt-2">
                   <button
                     onClick={confirmHostThis}
-                    disabled={hostThisSubmitting}
+                    disabled={
+                      hostThisSubmitting ||
+                      (!canHostAsHost && !hostVerify.isVerified)
+                    }
                     className="w-full px-6 py-4 text-xs uppercase tracking-widest font-medium text-white flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity"
                     style={{ backgroundColor: org.brandColor || "#18181b" }}
                   >
