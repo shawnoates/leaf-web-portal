@@ -3,7 +3,7 @@ import UnsubscribeClient from "./UnsubscribeClient";
 export default async function UnsubscribePage({
   searchParams,
 }: {
-  searchParams: Promise<{ u?: string; t?: string; g?: string; c?: string }>;
+  searchParams: Promise<{ u?: string; t?: string; g?: string; c?: string; k?: string }>;
 }) {
   const params = await searchParams;
   return (
@@ -12,6 +12,7 @@ export default async function UnsubscribePage({
       token={params.t || ""}
       eventGroupId={params.g || ""}
       calendarId={params.c || ""}
+      kind={params.k || ""}
     />
   );
 }

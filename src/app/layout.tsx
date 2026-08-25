@@ -66,6 +66,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
+      <head>
+        {/* OpenAI Ads conversion pixel */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.oaiq = window.oaiq || function () {
+                (window.oaiq.q = window.oaiq.q || []).push(arguments);
+              };
+              oaiq("init", { pixelId: "FVMLwvPMmn8xZGNNktSZ6H" });
+            `,
+          }}
+        />
+        <script async src="https://bzrcdn.openai.com/sdk/oaiq.min.js" />
+      </head>
       <body className="min-h-full flex flex-col font-sans bg-white text-zinc-900 selection:bg-zinc-200">
         <UserActivityBeacon />
         {children}

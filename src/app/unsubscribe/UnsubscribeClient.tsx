@@ -5,26 +5,34 @@ import Parse from "@/lib/parse-client";
 import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 type Status = "working" | "done" | "error";
-type Mode = "muteChat" | "unfollowCalendar" | "digest";
+type Mode = "muteChat" | "unfollowCalendar" | "ownerDrip" | "digest";
 
 export default function UnsubscribeClient({
   userId,
   token,
   eventGroupId,
   calendarId,
+  kind,
 }: {
   userId: string;
   token: string;
   eventGroupId: string;
   calendarId: string;
+  kind?: string;
 }) {
   const [status, setStatus] = useState<Status>("working");
   const [errorMsg, setErrorMsg] = useState<string>("");
-  const mode: Mode = eventGroupId
-    ? "muteChat"
-    : calendarId
-      ? "unfollowCalendar"
-      : "digest";
+  // `k` is checked first: the owner drip carries no group or calendar id, and
+  // without this it would fall through to the chat-digest handler and opt the
+  // recipient out of the wrong thing.
+  const mode: Mode =
+    kind === "owner-drip"
+      ? "ownerDrip"
+      : eventGroupId
+        ? "muteChat"
+        : calendarId
+          ? "unfollowCalendar"
+          : "digest";
 
   useEffect(() => {
     if (!userId || !token) {
@@ -37,7 +45,9 @@ export default function UnsubscribeClient({
         ? Parse.Cloud.run("muteChatFromEmail", { userId, eventGroupId, token })
         : mode === "unfollowCalendar"
           ? Parse.Cloud.run("unfollowCalendarFromEmail", { userId, calendarId, token })
-          : Parse.Cloud.run("unsubscribeFromDigest", { userId, token });
+          : mode === "ownerDrip"
+            ? Parse.Cloud.run("unsubscribeFromOwnerDrip", { userId, token })
+            : Parse.Cloud.run("unsubscribeFromDigest", { userId, token });
 
     call
       .then(() => setStatus("done"))
@@ -53,6 +63,11 @@ export default function UnsubscribeClient({
         return {
           title: "Chat muted",
           body: "You won't get email digests for this chat anymore. You're still in the chat — open it in Leaf to unmute.",
+        };
+      case "ownerDrip":
+        return {
+          title: "You're unsubscribed",
+          body: "You won't receive Leaf emails for calendar owners anymore. This doesn't change your chat digest or any calendar you follow.",
         };
       case "unfollowCalendar":
         return {
