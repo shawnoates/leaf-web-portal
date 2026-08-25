@@ -2958,32 +2958,6 @@ export default function OrgCalendarPage() {
             )}
           </div>
         </div>
-
-        {/* Row 2: Tabs */}
-        <div className="h-[44px] flex items-center px-10 gap-8">
-          <button
-            onClick={() => setActiveTab("upcoming")}
-            className={`text-[12px] font-bold tracking-[0.12em] uppercase ${
-              activeTab === "upcoming"
-                ? "text-[#1a1a1a] border-b-2 border-[#1a1a1a]"
-                : "text-[#a0a0a0]"
-            } pb-1 transition-colors`}
-          >
-            Upcoming Plans
-          </button>
-          {org.pastPlanCount > 0 && (
-            <button
-              onClick={() => setActiveTab("past")}
-              className={`text-[12px] font-bold tracking-[0.12em] uppercase ${
-                activeTab === "past"
-                  ? "text-[#1a1a1a] border-b-2 border-[#1a1a1a]"
-                  : "text-[#a0a0a0]"
-              } pb-1 transition-colors`}
-            >
-              Past Plans
-            </button>
-          )}
-        </div>
       </nav>
 
       {/* Mobile Header (single row) */}
@@ -3103,16 +3077,13 @@ export default function OrgCalendarPage() {
           pitch (residents host things for each other) drives the visual
           identity. Local deals appear below the plans stream as a
           supporting benefit, not the main attraction. */}
-      {activeTab === "upcoming" && (
-        <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100 md:hidden">
-          <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
-            Upcoming Plans
-          </p>
-        </div>
-      )}
+      <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100 md:hidden">
+        <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
+          Upcoming Plans
+        </p>
+      </div>
 
       {/* Plans Stream */}
-      {activeTab === "upcoming" && (
       <main className="max-w-6xl mx-auto px-6 py-12">
         {org.plans.length === 0 &&
           (!org.aiSourceEvents || org.aiSourceEvents.length === 0) && (
@@ -4144,7 +4115,6 @@ export default function OrgCalendarPage() {
           </section>
         )}
       </main>
-      )}
 
       {/* Plan Detail Overlay */}
       {selectedEvent && (
