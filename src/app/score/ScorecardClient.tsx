@@ -15,6 +15,7 @@ import {
   scorecardBand,
   type GroupType,
   type ScorecardAnswers,
+  type ScorecardMetric,
   type ScorecardResult,
 } from "@/lib/scorecard";
 import { PILLAR_WEIGHTS } from "@/lib/health-score";
@@ -89,10 +90,16 @@ export default function ScorecardClient() {
   const [barsFilled, setBarsFilled] = useState(false);
   const [bandShown, setBandShown] = useState(false);
 
+  // Mirrors of phase/index for the pagehide listener, which is registered once
+  // and would otherwise close over the mount-time values. Synced in an effect
+  // rather than during render — a ref write during render is a React rules
+  // violation and, here, would run on every idle-gauge frame.
   const phaseRef = useRef<Phase>("hero");
   const indexRef = useRef(0);
-  phaseRef.current = phase;
-  indexRef.current = index;
+  useEffect(() => {
+    phaseRef.current = phase;
+    indexRef.current = index;
+  }, [phase, index]);
 
   // ── Mount: view event, and restore a session if there is one ────────────
 
@@ -106,27 +113,35 @@ export default function ScorecardClient() {
     const saved = loadPersisted();
     if (!saved) return;
 
-    if (saved.done && saved.groupType && isCompleteAnswers(saved.answers)) {
-      // Return visit after a reveal. Nobody wants to answer six questions
-      // twice — go straight to the result with a retake link.
-      setGroupType(saved.groupType);
-      setAnswers(saved.answers);
-      setResult(scoreAnswers(saved.answers));
-      setSid(isValidSid(saved.sid) ? saved.sid : null);
-      setPhase("reveal");
-      setResumed(true);
-      return;
-    }
+    // Applied on the next frame rather than synchronously in the effect body.
+    // sessionStorage cannot be read during render (it does not exist on the
+    // server, so a lazy initializer would hydrate-mismatch), and setting state
+    // straight from an effect body cascades a render. One frame of hero before
+    // a restored reveal is imperceptible.
+    const raf = requestAnimationFrame(() => {
+      if (saved.done && saved.groupType && isCompleteAnswers(saved.answers)) {
+        // Return visit after a reveal. Nobody wants to answer six questions
+        // twice — go straight to the result with a retake link.
+        setGroupType(saved.groupType);
+        setAnswers(saved.answers);
+        setResult(scoreAnswers(saved.answers));
+        setSid(isValidSid(saved.sid) ? saved.sid : null);
+        setResumed(true);
+        setPhase("reveal");
+        return;
+      }
 
-    if (saved.index > 0) {
-      // Mid-quiz reload. Restore, but stay on the hero so the visitor chooses
-      // to continue rather than being dropped back into a question they may
-      // not remember leaving.
-      setGroupType(saved.groupType);
-      setAnswers(saved.answers);
-      setIndex(saved.index);
-      setResumed(true);
-    }
+      if (saved.index > 0) {
+        // Mid-quiz reload. Restore, but stay on the hero so the visitor
+        // chooses to continue rather than being dropped back into a question
+        // they may not remember leaving.
+        setGroupType(saved.groupType);
+        setAnswers(saved.answers);
+        setIndex(saved.index);
+        setResumed(true);
+      }
+    });
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   // ── Abandonment ─────────────────────────────────────────────────────────
@@ -293,11 +308,18 @@ export default function ScorecardClient() {
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-    if (reduced) {
-      setGaugeValue(result.score);
-      setBarsFilled(true);
-      setBandShown(true);
-      return;
+    // Two reasons to land on the final state instead of animating to it:
+    // the visitor asked for reduced motion, or this is a restored session —
+    // the sweep is a reward for finishing the quiz, not something to replay
+    // on every reload. Deferred a frame in both cases so the state change
+    // happens outside the effect body.
+    if (reduced || resumed) {
+      const skip = requestAnimationFrame(() => {
+        setGaugeValue(result.score);
+        setBarsFilled(true);
+        setBandShown(true);
+      });
+      return () => cancelAnimationFrame(skip);
     }
 
     // Gauge sweeps 0 → score over 800ms on an ease-out curve, so it decelerates
@@ -322,17 +344,7 @@ export default function ScorecardClient() {
       window.clearTimeout(barsTimer);
       window.clearTimeout(bandTimer);
     };
-  }, [phase, result]);
-
-  // Resumed sessions skip the animation — it is a reward for finishing the
-  // quiz, not something to replay on every reload.
-  useEffect(() => {
-    if (phase === "reveal" && resumed && result) {
-      setGaugeValue(result.score);
-      setBarsFilled(true);
-      setBandShown(true);
-    }
-  }, [phase, resumed, result]);
+  }, [phase, result, resumed]);
 
   const retake = useCallback(() => {
     clearPersisted();
@@ -523,21 +535,34 @@ export default function ScorecardClient() {
 /** Hero card. Same component as the reveal's, driven by the idle loop instead
  *  of a real score, so the two are guaranteed to look identical — the whole
  *  point of the hero is that it is the thing the visitor tapped. */
+/** Fixed per-pillar offsets from the gauge value. Constant rather than random
+ *  so the bars keep their relative shape as the needle moves — the card has to
+ *  read as one instrument drifting, not six independent meters. */
+const IDLE_OFFSETS: Record<ScorecardMetric, number> = {
+  participation: 6,
+  retention: -4,
+  breadth: 9,
+  activity: -7,
+  memberLed: -11,
+  followThrough: 3,
+};
+
 function IdleCard({ value }: { value: number }) {
-  const answers = SCORECARD_QUESTIONS.reduce((acc, q) => {
-    // Move the bars in sympathy with the gauge rather than independently, so
-    // the card reads as one instrument.
-    acc[q.metric] = Math.max(20, Math.min(100, value + ((q.metric.length * 7) % 17) - 8));
-    return acc;
-  }, {} as Record<string, number>);
+  const pillarScores = {} as Record<ScorecardMetric, number>;
+  for (const q of SCORECARD_QUESTIONS) {
+    pillarScores[q.metric] = Math.max(
+      20,
+      Math.min(100, value + IDLE_OFFSETS[q.metric]),
+    );
+  }
 
   return (
     <ScoreCard
       score={value}
       band={scorecardBand(value)}
-      pillarScores={answers as never}
+      pillarScores={pillarScores}
       weakMetric={null}
-      benchmark={value}
+      benchmark={null}
       groupNoun="community"
     />
   );

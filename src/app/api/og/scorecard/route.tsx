@@ -83,7 +83,15 @@ export async function GET(request: Request) {
         }}
       >
         <div
-          style={{ display: "flex", position: "relative", flexShrink: 0 }}
+          style={{
+            display: "flex",
+            position: "relative",
+            flexShrink: 0,
+            width: "260px",
+            height: "260px",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
           <svg width="260" height="260" viewBox="0 0 200 200">
             <g transform="rotate(135 100 100)">
@@ -109,19 +117,27 @@ export async function GET(request: Request) {
                 strokeDashoffset={ARC * (1 - pct)}
               />
             </g>
-            <text
-              x="100"
-              y="100"
-              textAnchor="middle"
-              dominantBaseline="central"
-              fill="#f4f6f5"
-              fontSize="62"
-              fontWeight="700"
-              letterSpacing="-3"
-            >
-              {shown}
-            </text>
           </svg>
+
+          {/* The number is a positioned div, not an SVG <text> node — Satori
+              (what next/og rasterizes with) does not support <text> and fails
+              the whole response if it encounters one. */}
+          <div
+            style={{
+              position: "absolute",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "260px",
+              height: "260px",
+              fontSize: "80px",
+              fontWeight: 700,
+              letterSpacing: "-4px",
+              color: "#f4f6f5",
+            }}
+          >
+            {shown}
+          </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>

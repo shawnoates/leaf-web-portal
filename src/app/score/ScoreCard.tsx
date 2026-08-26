@@ -141,18 +141,25 @@ export default function ScoreCard({
   band: ScorecardBand;
   pillarScores: Record<ScorecardMetric, number>;
   weakMetric: ScorecardMetric | null;
-  benchmark: number;
+  /** null on the hero, where the card is a sample and there is nothing yet to
+   *  compare against. */
+  benchmark: number | null;
   groupNoun: string;
   filled?: boolean;
 }) {
-  const delta = score - benchmark;
   // Where the ad creative shows a trend arrow, the page shows this — a
   // visitor's number means little on its own, and "+4 vs. a typical run club"
   // is what lets them locate themselves.
-  const deltaText =
-    delta === 0
-      ? `Right at the typical ${groupNoun}`
-      : `${delta > 0 ? "+" : "−"}${Math.abs(delta)} vs. a typical ${groupNoun}`;
+  let deltaText: string;
+  if (benchmark === null) {
+    deltaText = "Yours goes here.";
+  } else {
+    const delta = score - benchmark;
+    deltaText =
+      delta === 0
+        ? `Right at the typical ${groupNoun}`
+        : `${delta > 0 ? "+" : "−"}${Math.abs(delta)} vs. a typical ${groupNoun}`;
+  }
 
   return (
     <div className="card">
