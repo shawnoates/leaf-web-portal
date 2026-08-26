@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import { SITE_HOST } from "@/lib/site";
-import { trackOpenAIConversion } from "@/lib/openai-conversions";
 import {
   ArrowRight,
   Check,
@@ -243,19 +242,6 @@ function SetupPageInner() {
       setShareId(result.shareId);
       setCalendarId(result.calendarId);
       setGenerationDone(true);
-
-      // Track conversion for OpenAI Ads
-      trackOpenAIConversion("calendar_created", {
-        calendar_id: result.calendarId,
-        org_type: form.orgType,
-        tier: "starter",
-      });
-
-      // Track registration completion
-      trackOpenAIConversion("registration_completed", {
-        type: "customer_action",
-        calendar_id: result.calendarId,
-      });
 
       // If this came from a building claim, link the lead to the new
       // calendar and fire the rep's $25 RM-click bonus.

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Parse from "@/lib/parse-client";
-import { trackOpenAIConversion } from "@/lib/openai-conversions";
 import VenueSearch from "@/components/VenueSearch";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { detectCity } from "@/lib/detectCity";
@@ -278,12 +277,6 @@ export default function NewPlanModal({
     if (!created?.calendarId) throw new Error("Couldn't set up your calendar. Try again.");
     try { localStorage.setItem(PERSONAL_CAL_KEY, created.calendarId); } catch { /* ignore */ }
 
-    // Track conversion for OpenAI Ads
-    trackOpenAIConversion("personal_calendar_created", {
-      calendar_id: created.calendarId,
-      org_type: "community",
-    });
-
     return created.calendarId;
   }
 
@@ -344,13 +337,6 @@ export default function NewPlanModal({
       setCreated({
         eventGroupId,
         inviteUrl: eventGroupId ? `${APP_LINK_URL}/p/${eventGroupId}` : null,
-        title: title.trim(),
-      });
-
-      // Track plan creation for OpenAI Ads
-      trackOpenAIConversion("plan_created", {
-        plan_id: eventGroupId,
-        calendar_id: calendarId,
         title: title.trim(),
       });
 
