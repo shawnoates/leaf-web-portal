@@ -1,0 +1,807 @@
+/* Community Scorecard — /score
+ *
+ * Scoped under .score-landing. Every selector in this file carries that
+ * prefix, same as partners/creators/church-leaders, so nothing here can leak
+ * into the app pages that use Tailwind utilities directly.
+ *
+ * The design brief is unusual for a landing page: this one is not free to
+ * look like itself. It is the destination for a paid-social ad, and a visitor
+ * arriving from that ad has about three seconds to confirm they are in the
+ * right place. So the hero reproduces the ad creative — black ground, white
+ * score card, green gauge, six-bar breakdown, "UPDATING LIVE" eyebrow — and
+ * the rest of the page is built outward from that card rather than the card
+ * being dropped into a page that already had a look.
+ *
+ * NOTE FOR WHOEVER SHIPS THIS WITH THE REAL CREATIVE: the values below are a
+ * reconstruction from the spec, not the creative's own tokens. Before spend
+ * starts, diff this against the actual ad file and make the black, the green,
+ * and the type scale match exactly. A hero that reads differently from the
+ * thing they tapped wastes the click.
+ *
+ * Palette
+ *   --ink       #0a0e0c  near-black with a green bias, not a neutral black —
+ *                        it sits under a green gauge all day
+ *   --ink-soft  #141a17  raised surfaces on the dark ground
+ *   --card      #ffffff  the score card, which is white in the creative
+ *   --green     #34d399  the gauge. Bright enough to hold on black.
+ *   --green-ink #047857  the same hue at text contrast on white
+ *   --amber     #e8a33d  the lower two bands. Never red — see the band note.
+ *   --amber-ink #92400e
+ *
+ * Type: Inter throughout (the only face the app loads), doing three jobs —
+ * tight negative tracking at display sizes for the score, tabular figures
+ * everywhere digits appear, and wide positive tracking on the small caps
+ * labels so the card reads as an instrument rather than a document.
+ */
+
+.score-landing {
+  --ink: #0a0e0c;
+  --ink-soft: #141a17;
+  --ink-line: #232b27;
+  --card: #ffffff;
+  --card-line: #e6e9e7;
+  --card-mute: #6b7671;
+  --paper-ink: #0a0e0c;
+
+  --green: #34d399;
+  --green-ink: #047857;
+  --amber: #e8a33d;
+  --amber-ink: #92400e;
+
+  --on-dark: #f4f6f5;
+  --on-dark-mute: #9aa5a0;
+
+  --max: 34rem;
+  --gutter: 1.25rem;
+
+  background: var(--ink);
+  color: var(--on-dark);
+  font-family: var(--font-sans), Inter, system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The root layout paints the document white for the rest of the app. This
+ * page is dark edge to edge, including the overscroll area on iOS. */
+body:has(.score-landing) {
+  background: #0a0e0c;
+}
+
+.score-landing *,
+.score-landing *::before,
+.score-landing *::after {
+  box-sizing: border-box;
+}
+
+.score-landing main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.score-landing .wrap {
+  width: 100%;
+  max-width: var(--max);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* ── Shared atoms ─────────────────────────────────────────────────────── */
+
+.score-landing .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--on-dark-mute);
+}
+
+.score-landing .eyebrow .dot {
+  width: 0.4em;
+  height: 0.4em;
+  border-radius: 50%;
+  background: var(--green);
+  animation: score-pulse 2s ease-in-out infinite;
+}
+
+@keyframes score-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.score-landing .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 1.0625rem 1.5rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--green);
+  color: #06231a;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    transform 0.12s ease,
+    background 0.16s ease;
+}
+
+.score-landing .btn:hover {
+  background: #4ee0aa;
+}
+
+.score-landing .btn:active {
+  transform: translateY(1px);
+}
+
+.score-landing .btn-quiet {
+  background: none;
+  border: 1px solid var(--ink-line);
+  color: var(--on-dark);
+  width: auto;
+  padding: 0.625rem 1.125rem;
+  font-size: 0.8125rem;
+  font-weight: 550;
+}
+
+.score-landing .btn-quiet:hover {
+  background: var(--ink-soft);
+}
+
+.score-landing .fineprint {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--on-dark-mute);
+  text-align: center;
+}
+
+.score-landing :focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.score-landing .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────── */
+
+.score-landing .hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1.75rem;
+  padding-block: 2.5rem 3rem;
+  text-align: center;
+}
+
+.score-landing .hero h1 {
+  margin: 0;
+  font-size: clamp(2.125rem, 9.5vw, 3rem);
+  line-height: 1.02;
+  font-weight: 680;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.score-landing .hero .sub {
+  margin: 0;
+  max-width: 26ch;
+  font-size: 1.0625rem;
+  line-height: 1.45;
+  color: var(--on-dark-mute);
+  text-wrap: balance;
+}
+
+.score-landing .hero-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 21rem;
+}
+
+/* ── Score card ───────────────────────────────────────────────────────── */
+/* White card on the black ground, exactly as in the creative. Its internals
+ * use the paper palette, never the dark one. */
+
+.score-landing .card {
+  width: 100%;
+  background: var(--card);
+  color: var(--paper-ink);
+  border-radius: 1.25rem;
+  padding: 1.375rem 1.25rem 1.25rem;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06),
+    0 24px 48px -24px rgba(0, 0, 0, 0.9);
+  text-align: left;
+}
+
+.score-landing .card .eyebrow {
+  color: var(--card-mute);
+}
+
+.score-landing .card-top {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 1.125rem;
+  margin-top: 0.875rem;
+}
+
+.score-landing .gauge {
+  display: block;
+  width: 7.25rem;
+  height: 7.25rem;
+}
+
+.score-landing .gauge-track {
+  stroke: #eceeed;
+}
+
+.score-landing .gauge-fill {
+  stroke: var(--green-ink);
+  transition: stroke-dashoffset 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.score-landing .gauge[data-tone="amber"] .gauge-fill {
+  stroke: var(--amber-ink);
+}
+
+.score-landing .gauge-num {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  fill: var(--paper-ink);
+}
+
+.score-landing .band {
+  font-size: 0.9375rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+}
+
+/* The band is carried by a word, a shape, AND a hue — never hue alone.
+ * Thriving/Healthy get a filled disc, Warming up/Fading get a ring, so the
+ * two green bands and the two amber bands stay distinguishable in greyscale
+ * and to anyone who does not separate those hues. */
+.score-landing .band::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  flex: none;
+}
+
+.score-landing .band[data-tone="green"] {
+  color: var(--green-ink);
+}
+
+.score-landing .band[data-tone="green"]::before {
+  background: var(--green-ink);
+}
+
+.score-landing .band[data-tone="amber"] {
+  color: var(--amber-ink);
+}
+
+.score-landing .band[data-tone="amber"]::before {
+  border: 2px solid var(--amber-ink);
+}
+
+.score-landing .delta {
+  margin-top: 0.3125rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--card-mute);
+}
+
+/* ── Six-bar breakdown ────────────────────────────────────────────────── */
+
+.score-landing .bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  margin-top: 1.25rem;
+  padding-top: 1.125rem;
+  border-top: 1px solid var(--card-line);
+}
+
+.score-landing .bar {
+  display: grid;
+  grid-template-columns: 5.75rem 1fr 2ch;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.score-landing .bar-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  color: var(--card-mute);
+}
+
+.score-landing .bar-track {
+  height: 0.4375rem;
+  border-radius: 999px;
+  background: #eceeed;
+  overflow: hidden;
+}
+
+.score-landing .bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--green-ink);
+  transform-origin: left center;
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The weakest pillar is the one the whole page is about. It gets the amber
+ * and a heavier label so the eye lands on it before reading the callout. */
+.score-landing .bar[data-weak="true"] .bar-fill {
+  background: var(--amber-ink);
+}
+
+.score-landing .bar[data-weak="true"] .bar-label {
+  color: var(--amber-ink);
+  font-weight: 700;
+}
+
+.score-landing .bar-val {
+  font-size: 0.8125rem;
+  font-weight: 650;
+  text-align: right;
+  color: var(--paper-ink);
+}
+
+.score-landing .honesty {
+  margin: 1.125rem 0 0;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--card-line);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--card-mute);
+}
+
+/* ── Quiz ─────────────────────────────────────────────────────────────── */
+/* A single-screen takeover rather than a section scrolled into view: on a
+ * phone, page furniture next to a question is competition the question does
+ * not need. */
+
+.score-landing .quiz {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-block: 1rem 2rem;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.score-landing .quiz-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding-block: 0.5rem 1.5rem;
+}
+
+.score-landing .quiz-back {
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--on-dark-mute);
+  cursor: pointer;
+  font-size: 1.125rem;
+  line-height: 1;
+}
+
+.score-landing .quiz-back:hover {
+  background: var(--ink-soft);
+  color: var(--on-dark);
+}
+
+.score-landing .quiz-back[disabled] {
+  opacity: 0.25;
+  cursor: default;
+}
+
+/* Six segments, one per scored question, so progress reads as "how many
+ * questions" rather than an abstract percentage. */
+.score-landing .segments {
+  flex: 1;
+  display: flex;
+  gap: 0.25rem;
+}
+
+.score-landing .segments span {
+  flex: 1;
+  height: 0.1875rem;
+  border-radius: 999px;
+  background: var(--ink-line);
+  transition: background 0.3s ease;
+}
+
+.score-landing .segments span[data-done="true"] {
+  background: var(--green);
+}
+
+.score-landing .quiz-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1.75rem;
+  padding-bottom: 2rem;
+}
+
+.score-landing .quiz-q {
+  margin: 0;
+  font-size: clamp(1.5rem, 6vw, 1.875rem);
+  line-height: 1.15;
+  font-weight: 650;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+}
+
+.score-landing .quiz-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+/* No Next button anywhere in the quiz — selecting an answer advances. Every
+ * target is full-width and at least 56px tall, because this is a thumb on a
+ * phone and a mis-tap here is an abandoned quiz. */
+.score-landing .opt {
+  width: 100%;
+  min-height: 3.5rem;
+  padding: 0.9375rem 1.125rem;
+  text-align: left;
+  background: var(--ink-soft);
+  border: 1px solid var(--ink-line);
+  border-radius: 0.875rem;
+  color: var(--on-dark);
+  font: inherit;
+  font-size: 0.9688rem;
+  font-weight: 500;
+  line-height: 1.35;
+  cursor: pointer;
+  transition:
+    border-color 0.14s ease,
+    background 0.14s ease,
+    transform 0.1s ease;
+}
+
+.score-landing .opt:hover {
+  border-color: #3d4a44;
+  background: #1a221e;
+}
+
+.score-landing .opt:active {
+  transform: scale(0.985);
+}
+
+.score-landing .opt[data-picked="true"] {
+  border-color: var(--green);
+  background: #17281f;
+}
+
+.score-landing .quiz-anim {
+  animation: score-slide 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes score-slide {
+  from {
+    opacity: 0;
+    transform: translateY(0.625rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Reveal ───────────────────────────────────────────────────────────── */
+
+.score-landing .reveal {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-block: 2rem 3rem;
+}
+
+.score-landing .reveal-in {
+  animation: score-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes score-rise {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The weak-link callout. Amber rail, not red — the visitor just told us
+ * honest things about a community they care about, and the entire pitch is
+ * that this is fixable. */
+.score-landing .callout {
+  display: flex;
+  gap: 0.875rem;
+  padding: 1rem 1.125rem;
+  background: var(--ink-soft);
+  border-left: 3px solid var(--amber);
+  border-radius: 0 0.75rem 0.75rem 0;
+}
+
+.score-landing .callout p {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.35;
+  font-weight: 550;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+.score-landing .callout .callout-label {
+  display: block;
+  margin-bottom: 0.3125rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.score-landing .cta-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.score-landing .cta-block h2 {
+  margin: 0;
+  font-size: clamp(1.4375rem, 5.5vw, 1.75rem);
+  line-height: 1.15;
+  font-weight: 660;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+}
+
+.score-landing .cta-block p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--on-dark-mute);
+}
+
+.score-landing .retake {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--on-dark-mute);
+  font: inherit;
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.score-landing .retake:hover {
+  color: var(--on-dark);
+}
+
+/* ── How the score works ──────────────────────────────────────────────── */
+
+.score-landing .method h2 {
+  margin: 0 0 0.875rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--on-dark-mute);
+}
+
+.score-landing details {
+  border-top: 1px solid var(--ink-line);
+}
+
+.score-landing .method details:last-of-type {
+  border-bottom: 1px solid var(--ink-line);
+}
+
+.score-landing summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 0;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.9375rem;
+  font-weight: 550;
+}
+
+.score-landing summary::-webkit-details-marker {
+  display: none;
+}
+
+.score-landing summary .weight {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--on-dark-mute);
+}
+
+.score-landing details[open] summary .weight {
+  color: var(--green);
+}
+
+.score-landing details p {
+  margin: 0 0 1rem;
+  padding-right: 2rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--on-dark-mute);
+}
+
+/* ── Benchmark strip ──────────────────────────────────────────────────── */
+
+.score-landing .bench h2 {
+  margin: 0 0 0.875rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--on-dark-mute);
+}
+
+.score-landing .bench ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 0.25rem;
+}
+
+.score-landing .bench ul::-webkit-scrollbar {
+  display: none;
+}
+
+.score-landing .bench li {
+  flex: none;
+  min-width: 7.5rem;
+  padding: 0.75rem 0.875rem;
+  background: var(--ink-soft);
+  border: 1px solid var(--ink-line);
+  border-radius: 0.75rem;
+}
+
+.score-landing .bench li[data-you="true"] {
+  border-color: var(--green);
+}
+
+.score-landing .bench .n {
+  display: block;
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.score-landing .bench .t {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--on-dark-mute);
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────── */
+/* Minimal on purpose. Nothing on this page should offer an exit that is not
+ * the CTA — no nav, no pricing, no blog. */
+
+.score-landing footer {
+  border-top: 1px solid var(--ink-line);
+  padding-block: 1.5rem 2.25rem;
+  text-align: center;
+}
+
+.score-landing footer nav {
+  display: flex;
+  justify-content: center;
+  gap: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.score-landing footer a {
+  color: var(--on-dark-mute);
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+
+.score-landing footer a:hover {
+  color: var(--on-dark);
+}
+
+.score-landing footer .mark {
+  font-size: 0.75rem;
+  color: #5d6a64;
+}
+
+/* ── Wider viewports ──────────────────────────────────────────────────── */
+/* Desktop is a widened version of the same single column, not a second
+ * layout — 80%+ of ad traffic is a phone, and a two-column desktop variant
+ * would be a second thing to keep correct for a fifth of the visitors. */
+
+@media (min-width: 40rem) {
+  .score-landing {
+    --max: 36rem;
+    --gutter: 2rem;
+  }
+
+  .score-landing .card {
+    padding: 1.75rem 1.625rem 1.5rem;
+  }
+
+  .score-landing .gauge {
+    width: 8.5rem;
+    height: 8.5rem;
+  }
+
+  .score-landing .bar {
+    grid-template-columns: 6.5rem 1fr 2ch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .score-landing *,
+  .score-landing *::before,
+  .score-landing *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
