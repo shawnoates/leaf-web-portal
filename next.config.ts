@@ -37,6 +37,14 @@ const nextConfig: NextConfig = {
       // land on /personal. Now that the apex serves the real app, without
       // this alias those two menu items 404.
       { source: "/faqs", destination: "/help/faq", permanent: true },
+      // The scorecard landing lives at /score; /scorecard is the longer name
+      // people type and the one the spec was written against. One canonical
+      // URL matters more here than most places — this is a paid-ad
+      // destination, and two live URLs would split the conversion data.
+      // Note the ordering constraint documented below: redirects are
+      // evaluated before routing, so there must never also be a
+      // src/app/scorecard/page.tsx.
+      { source: "/scorecard", destination: "/score", permanent: true },
       // joinleaf.com is the canonical product domain. It used to 308 every
       // path except the legal pages and /help over to
       // os.joinleaf.com/personal; that catch-all is gone, so the apex now

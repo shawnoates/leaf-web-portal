@@ -17,6 +17,12 @@ import {
 import CityAutocomplete from "@/components/CityAutocomplete";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import { ORG_TYPES } from "@/lib/orgTypes";
+import {
+  groupTypeFor,
+  isValidSid,
+  type ScorecardSession,
+} from "@/lib/scorecard";
+import { trackScorecard } from "@/lib/scorecard-track";
 
 const GENERATION_MESSAGES = [
   "Finding venues near you...",
@@ -84,6 +90,19 @@ function SetupPageInner() {
     rmEmail: string;
   } | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
+
+  // Community Scorecard flow: visitor took the quiz at /score and clicked
+  // "Create your first plan" → here with ?src=scorecard&sid=sc_...
+  //
+  // Everything this does is additive and optional. The sid prefills a name
+  // and preselects a type, and it carries the visitor's estimated score
+  // through to createOrganization so it lands on the calendar. If it is
+  // missing, expired, or garbage, this whole branch no-ops and setup behaves
+  // exactly as it does for anyone else — a stale share link must never be
+  // able to block onboarding.
+  const scorecardSid = searchParams.get("sid");
+  const fromScorecard = searchParams.get("src") === "scorecard";
+  const [scorecard, setScorecard] = useState<ScorecardSession | null>(null);
 
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>({
@@ -159,6 +178,31 @@ function SetupPageInner() {
         setClaimError(e instanceof Error ? e.message : "Couldn't validate claim link.");
       });
   }, [claimToken]);
+  // Load the scorecard session and prefill. Runs once on mount.
+  useEffect(() => {
+    if (!fromScorecard) return;
+    trackScorecard("setup_started_from_scorecard", { sid: scorecardSid });
+    if (!isValidSid(scorecardSid)) return;
+
+    Parse.Cloud.run("getScorecardSession", { sid: scorecardSid })
+      .then((session: ScorecardSession | null) => {
+        if (!session) return;
+        setScorecard(session);
+        const group = groupTypeFor(session.groupType);
+        setForm((prev) => ({
+          ...prev,
+          // Placeholders, not answers — both stay fully editable, and a
+          // visitor who already typed something keeps it.
+          name: prev.name || group.calendarName,
+          orgType: prev.orgType || group.orgType,
+        }));
+      })
+      .catch((err: unknown) => {
+        // Prefill is a nicety. Losing it is not worth surfacing.
+        console.error("[setup] getScorecardSession failed:", err);
+      });
+  }, [fromScorecard, scorecardSid]);
+
   const [shareId, setShareId] = useState("");
   const [calendarId, setCalendarId] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -238,10 +282,24 @@ function SetupPageInner() {
         vibes: [],
         blacklistCategories: [],
         tier: "starter",
+        // Attribution + the estimate. The server validates the sid and
+        // ignores it if it doesn't resolve; an invalid one can't fail the
+        // creation. This is the piece that cannot be backfilled — once the
+        // calendar starts accruing a real score, the estimate the visitor was
+        // shown is gone unless it was written down here.
+        scorecardSid: isValidSid(scorecardSid) ? scorecardSid : undefined,
       });
       setShareId(result.shareId);
       setCalendarId(result.calendarId);
       setGenerationDone(true);
+
+      if (fromScorecard) {
+        trackScorecard("calendar_created", {
+          sid: scorecardSid,
+          org_id: result.calendarId,
+          estimated_score: scorecard?.estimatedScore ?? null,
+        });
+      }
 
       // If this came from a building claim, link the lead to the new
       // calendar and fire the rep's $25 RM-click bonus.
@@ -286,7 +344,19 @@ function SetupPageInner() {
     } finally {
       setSubmitting(false);
     }
-  }, [form, initialBillingPeriod]);
+    // claimToken/claimInfo were missing here before the scorecard work and
+    // are added with it: without them this callback could close over a null
+    // claimInfo and silently skip completeBuildingClaim (and the rep's
+    // bonus) whenever the claim resolved after the last form edit.
+  }, [
+    form,
+    initialBillingPeriod,
+    claimToken,
+    claimInfo,
+    scorecardSid,
+    fromScorecard,
+    scorecard,
+  ]);
 
   const handleGenerateClick = useCallback(() => {
     if (parseUser) {

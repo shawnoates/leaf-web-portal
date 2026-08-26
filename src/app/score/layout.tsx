@@ -3,10 +3,11 @@ import type { ReactNode } from "react";
 import { SITE_URL } from "@/lib/site";
 import "./styles.css";
 
-// Reuses the existing OG asset until the ad creative's own gauge frame is
-// exported. Swap this for a still of the score card before spend starts — the
-// unfurl is the first impression on every shared reveal.
-const OG_IMAGE = `${SITE_URL}/og-default.png`;
+// Rendered at request time by /api/og/scorecard, same as the site-wide
+// default card. No query params here, so it draws the generic gauge; the
+// shared reveal at /score/<sid> passes a real score and gets a card with that
+// visitor's number on it.
+const OG_IMAGE = `${SITE_URL}/api/og/scorecard`;
 
 const TITLE = "Your community has a score";
 const DESCRIPTION =
