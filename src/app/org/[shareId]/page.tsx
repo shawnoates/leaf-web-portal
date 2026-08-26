@@ -1433,6 +1433,11 @@ export default function OrgCalendarPage() {
   const [customDescription, setCustomDescription] = useState("");
   const [customCategory, setCustomCategory] = useState("");
   const [customCapacity, setCustomCapacity] = useState("");
+  // Prefill for the date/time inputs, which are uncontrolled. Set when the
+  // custom-plan modal is opened from an AI suggestion the visitor wants to
+  // change before proposing; "" leaves the inputs empty as before.
+  const [customPrefillDate, setCustomPrefillDate] = useState("");
+  const [customPrefillTime, setCustomPrefillTime] = useState("");
   const [customSubmitting, setCustomSubmitting] = useState(false);
   const [customSuccess, setCustomSuccess] = useState<false | true | "published">(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
@@ -1609,6 +1614,54 @@ export default function OrgCalendarPage() {
       router.push(`/dashboard/${dashboardTarget}?${params.toString()}`);
     },
     [org, router],
+  );
+
+  // Non-owner counterpart to openAIEventInDashboard. /dashboard is owner-only,
+  // so a follower who wants to change a suggestion's time or venue goes to the
+  // Propose-a-plan form instead, prefilled from the suggestion. That form
+  // already submits as pendingHostRequest and already emails the owner —
+  // which is the intended split: confirming a suggestion verbatim publishes
+  // immediately, changing it needs the owner's approval.
+  const openSuggestionInCustomPlan = useCallback(
+    (ev: NonNullable<OrgData["aiSourceEvents"]>[number]) => {
+      setCustomTitle(ev.title || ev.name);
+      setCustomDescription(ev.description || ev.venueLine || ev.name);
+      setCustomCategory(ev.name);
+      setCustomCapacity("");
+      setHostNote("");
+      setCustomFromDeal(false);
+      setCustomSubmitting(false);
+      setCustomSuccess(false);
+      setSelectedImageUrl(null);
+      // Carry the grounded placeId through so they don't have to re-find a
+      // venue the server already resolved.
+      setSelectedVenue(
+        ev.placeId
+          ? {
+              placeId: ev.placeId,
+              name: ev.name,
+              address: ev.address || ev.venueLine || "",
+              rating: null,
+              photoUrl: null,
+            }
+          : null,
+      );
+      const d = resolveAIEventDate(ev).date;
+      if (d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        setCustomPrefillDate(`${y}-${m}-${day}`);
+        setCustomPrefillTime(
+          `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
+        );
+      } else {
+        setCustomPrefillDate("");
+        setCustomPrefillTime("");
+      }
+      setCreatingCustomPlan(true);
+    },
+    [],
   );
 
   // Hydrate "already interested" from localStorage on mount so the
@@ -2249,6 +2302,8 @@ export default function OrgCalendarPage() {
       setCustomDescription(d);
       setCustomCategory(venueName);
       setCustomCapacity("");
+      setCustomPrefillDate("");
+      setCustomPrefillTime("");
       setHostNote("");
       setSelectedVenue(null);
       setCustomSubmitting(false);
@@ -2792,7 +2847,14 @@ export default function OrgCalendarPage() {
         setCustomSuccess(false);
       }, 2500);
     } catch (err) {
+      // Previously console-only, so a rejected submit looked like a dead
+      // button. This is now the non-owner "edit a suggestion" path too, so the
+      // reason has to reach the person.
       console.error("Failed to submit custom plan:", err);
+      setToast(
+        (err as Error)?.message || "Couldn’t submit that plan. Try again in a moment.",
+      );
+      setTimeout(() => setToast(null), 5000);
       setCustomSubmitting(false);
     }
   };
@@ -3930,6 +3992,8 @@ export default function OrgCalendarPage() {
                     setCustomDescription("");
                     setCustomCategory("");
                     setCustomCapacity("");
+                    setCustomPrefillDate("");
+                    setCustomPrefillTime("");
                     setHostNote("");
                     setSelectedVenue(null);
                     setCustomSubmitting(false);
@@ -3999,6 +4063,8 @@ export default function OrgCalendarPage() {
               setCustomTitle(deal.title);
               setCustomDescription(deal.description || "");
               setCustomCategory("");
+              setCustomPrefillDate("");
+              setCustomPrefillTime("");
               setCustomFromDeal(true);
               setCreatingCustomPlan(true);
             }}
@@ -4067,6 +4133,8 @@ export default function OrgCalendarPage() {
                     setCustomDescription("");
                     setCustomCategory("");
                     setCustomCapacity("");
+                    setCustomPrefillDate("");
+                    setCustomPrefillTime("");
                     setHostNote("");
                     setSelectedVenue(null);
                     setCustomSubmitting(false);
@@ -5024,6 +5092,10 @@ export default function OrgCalendarPage() {
                         <input
                           type="date"
                           required
+                          // Uncontrolled — keyed so a prefill from a suggestion
+                          // remounts the input instead of being ignored.
+                          key={`custom-date-${customPrefillDate}`}
+                          defaultValue={customPrefillDate || undefined}
                           min={new Date().toISOString().split("T")[0]}
                           max={org.tier === "starter" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] : undefined}
                           className="w-full border-b border-zinc-300 py-4 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors"
@@ -5036,7 +5108,8 @@ export default function OrgCalendarPage() {
                         <input
                           type="time"
                           required
-                          defaultValue="18:00"
+                          key={`custom-time-${customPrefillTime}`}
+                          defaultValue={customPrefillTime || "18:00"}
                           className="w-full border-b border-zinc-300 py-4 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors"
                         />
                       </div>
@@ -5650,9 +5723,12 @@ export default function OrgCalendarPage() {
         </div>
       )}
 
-      {/* Toast */}
+      {/* Toast. z-[60] because the modals below are z-50 and render LATER in
+          the DOM — at equal z-index they painted over the toast, so every
+          error surfaced inside an open modal was invisible and the failure
+          read as "the button does nothing". */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 text-white px-5 py-3 rounded-lg shadow-lg text-sm flex items-center gap-2 animate-fade-in">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-zinc-900 text-white px-5 py-3 rounded-lg shadow-lg text-sm flex items-center gap-2 animate-fade-in">
           <Check className="w-4 h-4" />
           {toast}
         </div>
@@ -5701,13 +5777,28 @@ export default function OrgCalendarPage() {
             const result = (await Parse.Cloud.run("proposeAIEventPlan", {
               shareId,
               eventIndex,
-              hostName: !canHostAsHost ? hostVerify.name.trim() : undefined,
-              hostPhone: !canHostAsHost
+              // Always send the verified identity, even for someone the page
+              // considers the owner. /org derives isOwner from the phone
+              // cookie while Parse.Cloud.run transmits the SESSION — those can
+              // be two different accounts. Withholding the phone here left the
+              // server with only the session, and if that account wasn't the
+              // owner the call died with "name and phoneNumber are required."
+              hostName: hostVerify.isVerified
+                ? hostVerify.name.trim()
+                : undefined,
+              hostPhone: hostVerify.isVerified
                 ? `+1${hostVerify.phone.replace(/\D/g, "")}`
                 : undefined,
-            })) as { pendingApproval?: boolean; eventGroupId?: string };
+            })) as {
+              pendingApproval?: boolean;
+              eventGroupId?: string;
+              role?: string;
+            };
             setHostThisEventIndex(null);
-            if (!canHostAsHost && !isFollowing) {
+            // The server only auto-follows the follower path; trust its role
+            // rather than the page's own guess, so an owner confirming their
+            // own suggestion doesn't inflate the follower count.
+            if (result?.role === "follower" && !isFollowing) {
               setIsFollowing(true);
               setFollowerCount((c) => c + 1);
             }
@@ -5883,29 +5974,24 @@ export default function OrgCalendarPage() {
                     existed to say, kept verbatim in intent. */}
                 <div className="border-t border-zinc-100 pt-6 space-y-2">
                   <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
-                    {canHostAsHost ? "When you confirm" : "What happens next"}
+                    When you confirm
                   </p>
+                  {/* Confirming a suggestion VERBATIM publishes immediately for
+                      everyone, follower or owner — the calendar already opted
+                      into these suggestions, so accepting one unchanged needs
+                      no second sign-off. Changing the details is what routes
+                      through the owner; "Edit details first" says so. */}
                   <p className="text-sm text-zinc-600 leading-relaxed">
-                    {canHostAsHost ? (
-                      <>
-                        This becomes a real plan on{" "}
-                        <span className="font-medium text-zinc-900">{org.name}</span> with
-                        you as the host. Followers of this calendar
-                        {interestCount > 0
-                          ? ` and the ${interestCount} ${interestCount === 1 ? "person" : "people"} interested in it`
-                          : ""}
-                        {" "}will be notified, and you can manage RSVPs from your dashboard.
-                      </>
-                    ) : (
-                      <>
-                        You&rsquo;re proposing to host this. The calendar host reviews it; if
-                        they approve, followers
-                        {interestCount > 0
-                          ? ` and the ${interestCount} ${interestCount === 1 ? "person" : "people"} interested in it`
-                          : ""}
-                        {" "}will be notified.
-                      </>
-                    )}
+                    This becomes a real plan on{" "}
+                    <span className="font-medium text-zinc-900">{org.name}</span> with you
+                    as the host. Followers of this calendar
+                    {interestCount > 0
+                      ? ` and the ${interestCount} ${interestCount === 1 ? "person" : "people"} interested in it`
+                      : ""}
+                    {" "}will be notified
+                    {canHostAsHost
+                      ? ", and you can manage RSVPs from your dashboard."
+                      : ", and you can manage RSVPs from the plan page."}
                   </p>
                   {/* Disclosed, not silent: hosting creates the follow, so say
                       so before the tap rather than surprising them after. */}
@@ -5945,23 +6031,30 @@ export default function OrgCalendarPage() {
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" /> Publishing…
                       </>
-                    ) : canHostAsHost ? (
-                      "Confirm — I'll host this"
                     ) : (
-                      "Send proposal"
+                      "Confirm — I'll host this"
                     )}
                   </button>
-                  {canHostAsHost && (
-                    <button
-                      onClick={() => {
-                        setHostThisEventIndex(null);
-                        openAIEventInDashboard(ev);
-                      }}
-                      disabled={hostThisSubmitting}
-                      className="w-full px-6 py-3 text-xs uppercase tracking-widest font-medium border border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 disabled:opacity-50 transition-colors"
-                    >
-                      Edit details first
-                    </button>
+                  {/* Editing is the path that still needs the owner. Owners get
+                      the dashboard drawer; everyone else gets the
+                      Propose-a-plan form, prefilled, which submits for
+                      approval. */}
+                  <button
+                    onClick={() => {
+                      setHostThisEventIndex(null);
+                      if (canHostAsHost) openAIEventInDashboard(ev);
+                      else openSuggestionInCustomPlan(ev);
+                    }}
+                    disabled={hostThisSubmitting}
+                    className="w-full px-6 py-3 text-xs uppercase tracking-widest font-medium border border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 disabled:opacity-50 transition-colors"
+                  >
+                    Edit details first
+                  </button>
+                  {!canHostAsHost && (
+                    <p className="text-[11px] text-zinc-400 text-center leading-relaxed">
+                      Changing the date, venue, or description sends it to the
+                      calendar host for approval instead.
+                    </p>
                   )}
                   <button
                     onClick={() => setHostThisEventIndex(null)}
