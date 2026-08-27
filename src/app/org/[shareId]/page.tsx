@@ -3728,13 +3728,14 @@ export default function OrgCalendarPage() {
                   ? `${idea.location.name}${idea.location.address ? ` · ${idea.location.address}` : ""}`
                   : idea.location?.neighborhood || null;
                 return (
-                  <article
-                    key={idea.id}
-                    className="w-full grid grid-cols-1 sm:grid-cols-[232px_1fr] sm:h-[122px] overflow-hidden bg-[#0a0a0a]"
-                    style={{
-                      fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
-                    }}
-                  >
+                  <div className="w-screen -ml-[calc(50vw-50%)] -mr-[calc(50vw-50%)]">
+                    <article
+                      key={idea.id}
+                      className="grid grid-cols-1 sm:grid-cols-[232px_1fr] sm:h-[122px] overflow-hidden bg-[#0a0a0a]"
+                      style={{
+                        fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+                      }}
+                    >
                     <div className="relative h-40 sm:h-[122px] bg-[#161616]">
                       {idea.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -3852,7 +3853,8 @@ export default function OrgCalendarPage() {
                         )}
                       </div>
                     </div>
-                  </article>
+                    </article>
+                  </div>
                 );
               }
               // Flip alternation continuous with real plans below —
