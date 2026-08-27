@@ -433,7 +433,9 @@ export const WEAK_LINK_COPY: Record<
   },
   memberLed: {
     callout: "You're the only one planning. That's the number that breaks groups.",
+    heading: "Give your members a seat at the table.",
     cta: "Every community that outlasts its founder does one thing first: someone other than the founder puts something on the calendar. Start yours, then hand someone the pen.",
+    ctaLabel: "Create a member-led calendar",
   },
   followThrough: {
     callout: "Good ideas, not enough dates.",
