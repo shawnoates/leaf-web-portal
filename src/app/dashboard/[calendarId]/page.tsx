@@ -56,6 +56,7 @@ const AnalyticsTab = dynamic(() => import("@/components/analytics/AnalyticsTab")
 });
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
+import { trackScorecard } from "@/lib/scorecard-track";
 import {
   Calendar,
   Check,
@@ -2966,7 +2967,26 @@ export default function OrgDashboardPage() {
           pollWinningTime={pollConvertWinningTime}
           autoSyncOnMount={autoSyncNewPlanOnMount}
           onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); setEditingPlanId(null); setEditingHostRequestId(null); setEditingHostRequestCalendarId(null); setPollConvertEventGroupId(null); setPollConvertWinningDate(null); setPollConvertWinningTime(null); setAutoSyncNewPlanOnMount(false); }}
-          onCreated={() => {
+          onCreated={async () => {
+            if (!editingPlanId) {
+              // Check if this was the first plan created on this calendar.
+              // Fetch fresh to see activePlanCount before the UI state updates.
+              try {
+                const freshDashboard = (await Parse.Cloud.run("getOrgDashboard", {
+                  calendarId,
+                })) as OrgDashboard;
+                const cal = freshDashboard.calendars?.find((c) => c.objectId === calendarId);
+                if (cal?.activePlans?.length === 1) {
+                  trackScorecard("first_plan_created", {
+                    calendar_id: calendarId,
+                    calendar_name: cal.name,
+                  });
+                }
+              } catch (err) {
+                console.warn("[Dashboard] first_plan_created tracking failed:", err);
+              }
+            }
+
             fetchDashboard();
             // Publish confirmation on Home. `onCreated` fires for edits too —
             // only banner-worthy when it wasn't an edit of an existing plan.

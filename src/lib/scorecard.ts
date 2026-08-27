@@ -378,16 +378,35 @@ export function scoreAnswers(answers: ScorecardAnswers): ScorecardResult {
   };
 }
 
+export const DEFAULT_CTA_HEADING =
+  "The fastest way to move this number is one plan on the calendar.";
+export const DEFAULT_CTA_LABEL = "Create your first plan";
+export const DEFAULT_CTA_CLOSER = "Pick a day. Pick your people.";
+
 /** The emotional hinge of the page. The lowest pillar gets named in one line
  *  under the bars, and that same pillar sets the CTA's body copy — the
  *  diagnosis and the prescription have to be the same sentence, or the button
  *  reads as a non-sequitur after everything above it.
  *
+ *  `heading` and `ctaLabel` are optional overrides, and the `activity` entry
+ *  is the reason they exist. Its diagnosis names deciding-what-to-do as the
+ *  pain; a button reading "Create your first plan" then asks the visitor to
+ *  go do the exact thing they just admitted they avoid, which reads as not
+ *  having listened. Where the diagnosis is about reach or habit, "put one
+ *  plan up" is the right ask. Where it is about the blank page, the ask has
+ *  to be "we draft them for you" — which is what setup actually does.
+ *
  *  Brand rule: none of this copy may use "game-changer", "obsessed", "group
  *  chat", "curated experiences", or "seamlessly". */
 export const WEAK_LINK_COPY: Record<
   ScorecardMetric,
-  { callout: string; cta: string }
+  {
+    callout: string;
+    cta: string;
+    heading?: string;
+    ctaLabel?: string;
+    closer?: string;
+  }
 > = {
   participation: {
     callout: "People are on your list. They're not in the room.",
@@ -403,7 +422,14 @@ export const WEAK_LINK_COPY: Record<
   },
   activity: {
     callout: "Not much has been happening.",
-    cta: "You don't hate getting people together. You hate deciding what and when. Put one thing down and the next one gets easier.",
+    // The only entry that overrides both. See the note above the object.
+    heading: "You don't hate getting people together. You hate the blank page.",
+    cta: "So don't start there. Leaf builds your calendar with plans already drafted — real places near you, on real dates. You pick one and send it, and the next one gets easier.",
+    ctaLabel: "Draft my first plans",
+    // The default closer ("Pick a day. Pick your people.") undoes the promise
+    // right after the button — it puts the choosing back on them. This one
+    // splits the work the way the body just did.
+    closer: "You bring the when. We'll bring the what.",
   },
   memberLed: {
     callout: "You're the only one planning. That's the number that breaks groups.",

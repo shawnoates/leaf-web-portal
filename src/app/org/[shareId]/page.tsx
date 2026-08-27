@@ -3713,6 +3713,148 @@ export default function OrgCalendarPage() {
                 0;
               const isInterested = planIdeaLocallyInterested.has(idea.id);
               const isPending = planIdeaInterestPending.has(idea.id);
+              // 2a — Around the city gets a slim 122px band instead of the tall
+              // alternating card. The two rows the tall version spent on status
+              // ("Waiting on host") and the "Run it yourself…" caption are gone:
+              // the meta chips and the two buttons already say both, and at this
+              // height a third text row reads as clutter rather than hierarchy.
+              if (isAroundTheCity) {
+                const canHost =
+                  org.isOwner || org.isHost || !!org.allowFollowersToHost;
+                // Same entitlement split as the tall card — the server already
+                // nulled name+address for viewers who don't get the venue, so
+                // this just renders whatever survived, collapsed to one line.
+                const venueLine = idea.location?.name
+                  ? `${idea.location.name}${idea.location.address ? ` · ${idea.location.address}` : ""}`
+                  : idea.location?.neighborhood || null;
+                return (
+                  <article
+                    key={idea.id}
+                    className="w-full grid grid-cols-1 sm:grid-cols-[232px_1fr] sm:h-[122px] overflow-hidden bg-[#0a0a0a]"
+                    style={{
+                      fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+                    }}
+                  >
+                    <div className="relative h-40 sm:h-[122px] bg-[#161616]">
+                      {idea.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={idea.image}
+                          alt={idea.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Sparkles className="w-6 h-6 text-zinc-600" />
+                        </div>
+                      )}
+                      {/* Same featured gate as the tall card: this writes a
+                          PlanIdeaInterest pointing at a CalendarGeneratedPlan,
+                          and a featured suggestion has no such row. */}
+                      {!idea.isFeatured && (
+                        <button
+                          type="button"
+                          onClick={() => handlePlanIdeaInterest(idea.id)}
+                          disabled={isInterested || isPending}
+                          aria-label={isInterested ? "You're interested" : "I'm interested"}
+                          className={`absolute top-[10px] right-[10px] w-7 h-7 rounded-full border flex items-center justify-center transition-colors disabled:cursor-default ${
+                            isInterested
+                              ? "bg-emerald-900/70 border-emerald-400/60"
+                              : "bg-[rgba(10,10,10,0.55)] border-[rgba(255,255,255,0.22)] hover:bg-[rgba(10,10,10,0.85)] hover:border-[rgba(255,255,255,0.55)]"
+                          }`}
+                        >
+                          {isPending ? (
+                            <Loader2 className="w-3 h-3 animate-spin text-white" />
+                          ) : (
+                            <Heart
+                              className="w-3 h-3 text-white"
+                              fill={isInterested ? "currentColor" : "none"}
+                            />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 px-5 py-[14px] min-w-0">
+                      <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                        <div className="flex flex-wrap items-center gap-3 text-[9px] leading-none font-medium uppercase tracking-[0.16em] whitespace-nowrap">
+                          <span className="border border-[#3a3a3a] px-[7px] py-1 text-white">
+                            Around the city
+                          </span>
+                          {dateLabel && <span className="text-[#8f8f8a]">{dateLabel}</span>}
+                          {/* The band has no heart badge to carry the count, so
+                              unlike the tall card this shows for localized rows
+                              too — where the count is this calendar's, not the
+                              admin suggestion's shared global one. */}
+                          {priorCount > 0 && (
+                            <span className="text-[#7fd6a8]">
+                              {priorCount} nearby interested
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-[21px] leading-[1.1] font-normal tracking-[-0.01em] text-white truncate">
+                          {idea.title}
+                        </h3>
+                        {(idea.description || venueLine) && (
+                          <div className="flex gap-2.5 text-xs leading-[1.4] overflow-hidden">
+                            {idea.description && (
+                              <span className="shrink-0 whitespace-nowrap text-[#d9d9d5]">
+                                {idea.description}
+                              </span>
+                            )}
+                            {venueLine && (
+                              <span className="flex-1 min-w-0 truncate text-[#6d6d68]">
+                                {venueLine}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-none flex flex-col gap-1.5 whitespace-nowrap">
+                        {canHost && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (org.rsvpLimitReached) return;
+                              setHostingIdea(idea);
+                              setHostSubmitting(false);
+                              setHostError(null);
+                              setHostSuccess(false);
+                              setHostNote("");
+                              setSelectedVenue(null);
+                            }}
+                            disabled={org.rsvpLimitReached}
+                            className={`px-4 py-[9px] text-[10px] leading-none font-medium uppercase tracking-[0.16em] transition-colors ${
+                              org.rsvpLimitReached
+                                ? "bg-transparent border border-[#3a3a3a] text-[#6d6d68] cursor-not-allowed"
+                                : "bg-white text-[#0a0a0a] hover:bg-[#dcdcd8]"
+                            }`}
+                          >
+                            Host this
+                          </button>
+                        )}
+                        {org.isOwner && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setVirtualHostPlan({
+                                calendarId: org.objectId,
+                                planIdeaId: idea.id,
+                              })
+                            }
+                            className="px-4 py-[9px] text-[10px] leading-none font-medium uppercase tracking-[0.16em] bg-transparent border border-[#3a3a3a] text-white hover:border-[#7a7a7a] transition-colors flex items-center gap-[7px]"
+                          >
+                            <span className="w-[7px] h-[7px] rounded-full bg-[#8f7a4a] shrink-0" />
+                            Let Leaf host it
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                );
+              }
               // Flip alternation continuous with real plans below —
               // planIdeas rendered first means real plans start at the
               // idea count's parity.

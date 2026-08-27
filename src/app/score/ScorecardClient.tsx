@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Parse from "@/lib/parse-client";
 import {
   BENCHMARK_MEDIANS,
+  DEFAULT_CTA_CLOSER,
+  DEFAULT_CTA_HEADING,
+  DEFAULT_CTA_LABEL,
   GROUP_TYPES,
   METRIC_EXPLAINERS,
   METRIC_LABELS,
@@ -505,9 +508,7 @@ export default function ScorecardClient() {
         </div>
 
         <div className="cta-block">
-          <h2>
-            The fastest way to move this number is one plan on the calendar.
-          </h2>
+          <h2>{weak.heading ?? DEFAULT_CTA_HEADING}</h2>
           <p>{weak.cta}</p>
           <a
             href={setupHref}
@@ -515,9 +516,9 @@ export default function ScorecardClient() {
             data-cta="score_create_first_plan"
             onClick={onCtaClick}
           >
-            Create your first plan
+            {weak.ctaLabel ?? DEFAULT_CTA_LABEL}
           </a>
-          <p className="fineprint">Pick a day. Pick your people.</p>
+          <p className="fineprint">{weak.closer ?? DEFAULT_CTA_CLOSER}</p>
           <p style={{ textAlign: "center", margin: 0 }}>
             <button type="button" className="retake" onClick={retake}>
               Retake the quiz
