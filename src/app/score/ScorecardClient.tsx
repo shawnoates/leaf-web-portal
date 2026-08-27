@@ -564,6 +564,7 @@ function IdleCard({ value }: { value: number }) {
       weakMetric={null}
       benchmark={null}
       groupNoun="community"
+      showHonesty={false}
     />
   );
 }

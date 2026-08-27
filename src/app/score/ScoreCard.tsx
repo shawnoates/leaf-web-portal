@@ -136,6 +136,7 @@ export default function ScoreCard({
   benchmark,
   groupNoun,
   filled = true,
+  showHonesty = true,
 }: {
   score: number;
   band: ScorecardBand;
@@ -146,6 +147,11 @@ export default function ScoreCard({
   benchmark: number | null;
   groupNoun: string;
   filled?: boolean;
+  /** The hero passes false. "This is an estimate from what you told us" is
+   *  false on a card the visitor has not filled in yet, and it is the single
+   *  tallest block on the card — dropping it is what gets the CTA above the
+   *  fold. It belongs on the reveal, where it is both true and load-bearing. */
+  showHonesty?: boolean;
 }) {
   // Where the ad creative shows a trend arrow, the page shows this — a
   // visitor's number means little on its own, and "+4 vs. a typical run club"
@@ -184,11 +190,13 @@ export default function ScoreCard({
         filled={filled}
       />
 
-      <p className="honesty">
-        This is an estimate from what you told us. Once your calendar is live,
-        Leaf measures the real number from what actually happens, and updates it
-        every week.
-      </p>
+      {showHonesty && (
+        <p className="honesty">
+          This is an estimate from what you told us. Once your calendar is live,
+          Leaf measures the real number from what actually happens, and updates
+          it every week.
+        </p>
+      )}
     </div>
   );
 }
