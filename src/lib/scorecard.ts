@@ -448,7 +448,9 @@ export const WEAK_LINK_COPY: Record<
   },
   followThrough: {
     callout: "Good ideas, not enough dates.",
+    heading: "Ideas need dates to become real.",
     cta: "The difference between an idea and a plan is a day and a place. Pick both once and the pattern sets.",
+    ctaLabel: "Put ideas on the calendar",
   },
 };
 
