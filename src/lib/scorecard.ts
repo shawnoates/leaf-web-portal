@@ -389,21 +389,38 @@ export function scoreAnswers(answers: ScorecardAnswers): ScorecardResult {
 
 export const DEFAULT_CTA_HEADING =
   "The fastest way to move this number is one plan on the calendar.";
-export const DEFAULT_CTA_LABEL = "Create your first plan";
 export const DEFAULT_CTA_CLOSER = "Pick a day. Pick your people.";
 
+/** One label for every weak link, on purpose.
+ *
+ *  The earlier draft varied the button per metric ("Draft my first plans",
+ *  "Create a member-led calendar", …) so it would answer the diagnosis. That
+ *  put an outcome promise on a control that opens a setup form, and a button
+ *  promising a result while delivering a name field is where a funnel leaks.
+ *  The promise now lives in the `heading` and `closer` above and below it,
+ *  where it can be specific without being a claim about what one click does.
+ *  The button states plainly what it makes. */
+export const DEFAULT_CTA_LABEL = "Create your community calendar";
+
 /** The emotional hinge of the page. The lowest pillar gets named in one line
- *  under the bars, and that same pillar sets the CTA's body copy — the
- *  diagnosis and the prescription have to be the same sentence, or the button
+ *  under the bars, and that same pillar sets everything in the CTA block — the
+ *  diagnosis and the prescription have to be the same sentence, or the block
  *  reads as a non-sequitur after everything above it.
  *
- *  `heading` and `ctaLabel` are optional overrides, and the `activity` entry
- *  is the reason they exist. Its diagnosis names deciding-what-to-do as the
- *  pain; a button reading "Create your first plan" then asks the visitor to
- *  go do the exact thing they just admitted they avoid, which reads as not
- *  having listened. Where the diagnosis is about reach or habit, "put one
- *  plan up" is the right ask. Where it is about the blank page, the ask has
- *  to be "we draft them for you" — which is what setup actually does.
+ *  Every entry sets its own `heading` and `closer`; the DEFAULT_ constants are
+ *  a safety net for a metric added without them, not a shared fallback anyone
+ *  relies on. The pattern in each entry is the same three beats:
+ *
+ *    heading — the state they get back, in the callout's own words
+ *    cta     — the mechanism, so the promise has a reason to be believed
+ *    closer  — the size of the next step, so the button doesn't oversell
+ *
+ *  Several headings deliberately reuse a phrase from their own callout ("the
+ *  room", "the same six", "the only one planning"). The visitor read that line
+ *  four seconds earlier, and finishing the sentence they just started is what
+ *  makes the page feel like it listened.
+ *
+ *  Closers must not restate the body — an echo two lines down reads as padding.
  *
  *  Brand rule: none of this copy may use "game-changer", "obsessed", "group
  *  chat", "curated experiences", or "seamlessly". */
@@ -413,44 +430,47 @@ export const WEAK_LINK_COPY: Record<
     callout: string;
     cta: string;
     heading?: string;
-    ctaLabel?: string;
     closer?: string;
   }
 > = {
   participation: {
     callout: "People are on your list. They're not in the room.",
+    heading: "Get them in the room.",
     cta: "The gap between a list and a turnout is almost always notice. A plan on a shared calendar with an RSVP attached closes most of it.",
+    closer: "Pick a day. We'll handle the asking.",
   },
   retention: {
     callout: "You're refilling the room faster than you're keeping it.",
+    heading: "Keep the people you already have.",
     cta: 'Groups hold on to people who know what’s next. One thing on the calendar, visible to everyone, is what "next" looks like.',
+    closer: "One plan up, and there's always a next one.",
   },
   breadth: {
     callout: "The same six people are carrying your whole community.",
+    heading: "Get past the same six.",
     cta: "A calendar anyone can see is how the seventh person finds a night that works. Start with one plan and watch who turns up.",
+    closer: "The seventh person is waiting on a date.",
   },
   activity: {
     callout: "Not much has been happening.",
-    // The only entry that overrides both. See the note above the object.
+    // The one heading that leads with empathy rather than the outcome. The
+    // outcome ("a calendar that isn't empty") is weaker than naming why it is
+    // empty, and the body delivers the promise immediately after.
     heading: "You don't hate getting people together. You hate the blank page.",
     cta: "So don't start there. Leaf builds your calendar with plans already drafted — real places near you, on real dates. You pick one and send it, and the next one gets easier.",
-    ctaLabel: "Draft my first plans",
-    // The default closer ("Pick a day. Pick your people.") undoes the promise
-    // right after the button — it puts the choosing back on them. This one
-    // splits the work the way the body just did.
     closer: "You bring the when. We'll bring the what.",
   },
   memberLed: {
     callout: "You're the only one planning. That's the number that breaks groups.",
-    heading: "Give your members a seat at the table.",
+    heading: "Get others planning too.",
     cta: "Every community that outlasts its founder does one thing first: someone other than the founder puts something on the calendar. Start yours, then hand someone the pen.",
-    ctaLabel: "Create a member-led calendar",
+    closer: "You start it. Someone else takes the next one.",
   },
   followThrough: {
     callout: "Good ideas, not enough dates.",
-    heading: "Ideas need dates to become real.",
+    heading: "Make the good ideas actually happen.",
     cta: "The difference between an idea and a plan is a day and a place. Pick both once and the pattern sets.",
-    ctaLabel: "Put ideas on the calendar",
+    closer: "One date is all it takes to start.",
   },
 };
 

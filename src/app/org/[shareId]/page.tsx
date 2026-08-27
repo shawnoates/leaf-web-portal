@@ -3727,8 +3727,21 @@ export default function OrgCalendarPage() {
                 const venueLine = idea.location?.name
                   ? `${idea.location.name}${idea.location.address ? ` · ${idea.location.address}` : ""}`
                   : idea.location?.neighborhood || null;
+                // Full-bleed: escape main's max-w-6xl/px-6 so the black runs
+                // edge to edge. When the band leads the stream it also cancels
+                // main's py-12 so it sits flush under the header — but only
+                // then, since the empty-state block can render above it and
+                // pulling up through that would overlap.
+                const leadsPage =
+                  index === 0 &&
+                  !(
+                    org.plans.length === 0 &&
+                    (!org.aiSourceEvents || org.aiSourceEvents.length === 0)
+                  );
                 return (
-                  <div className="w-screen -ml-[calc(50vw-50%)] -mr-[calc(50vw-50%)] -mt-32">
+                  <div
+                    className={`w-screen -ml-[calc(50vw-50%)] -mr-[calc(50vw-50%)] ${leadsPage ? "-mt-12" : ""}`}
+                  >
                     <article
                       key={idea.id}
                       className="grid grid-cols-1 sm:grid-cols-[232px_1fr] sm:h-[122px] overflow-hidden bg-[#0a0a0a]"

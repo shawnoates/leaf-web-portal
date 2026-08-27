@@ -516,7 +516,7 @@ export default function ScorecardClient() {
             data-cta="score_create_first_plan"
             onClick={onCtaClick}
           >
-            {weak.ctaLabel ?? DEFAULT_CTA_LABEL}
+            {DEFAULT_CTA_LABEL}
           </a>
           <p className="fineprint">{weak.closer ?? DEFAULT_CTA_CLOSER}</p>
           <p style={{ textAlign: "center", margin: 0 }}>
