@@ -3728,7 +3728,7 @@ export default function OrgCalendarPage() {
                   ? `${idea.location.name}${idea.location.address ? ` · ${idea.location.address}` : ""}`
                   : idea.location?.neighborhood || null;
                 return (
-                  <div className="w-screen -ml-[calc(50vw-50%)] -mr-[calc(50vw-50%)]">
+                  <div className="w-screen -ml-[calc(50vw-50%)] -mr-[calc(50vw-50%)] -mt-32">
                     <article
                       key={idea.id}
                       className="grid grid-cols-1 sm:grid-cols-[232px_1fr] sm:h-[122px] overflow-hidden bg-[#0a0a0a]"

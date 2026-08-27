@@ -54,6 +54,7 @@ export type GroupType =
   | "ministry"
   | "class"
   | "neighborhood"
+  | "friend_group"
   | "other";
 
 export interface ScorecardQuestion {
@@ -112,6 +113,13 @@ export const GROUP_TYPES: {
     noun: "neighborhood group",
     calendarName: "Our Neighborhood",
     orgType: "neighborhood",
+  },
+  {
+    value: "friend_group",
+    label: "Friend group",
+    noun: "friend group",
+    calendarName: "Our Friends",
+    orgType: "community",
   },
   {
     value: "other",
@@ -255,6 +263,7 @@ export const BENCHMARK_MEDIANS: Record<GroupType, number> = {
   ministry: 69,
   class: 72,
   neighborhood: 63,
+  friend_group: 72,
   other: 70,
 };
 export const BENCHMARKS_ARE_PLACEHOLDERS = true;
