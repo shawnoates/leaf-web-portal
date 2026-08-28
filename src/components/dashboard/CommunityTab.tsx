@@ -510,7 +510,7 @@ export default function CommunityTab({
                 ))}
             </select>
           )}
-          {nudgeable.length > 1 && (
+          {nudgeable.length > 1 && calFilter !== "all" && (
             <button
               onClick={() => onNudgeAll(nudgeable)}
               className="px-3.5 py-2 rounded-full text-xs font-medium border border-zinc-200 text-zinc-600 hover:border-zinc-300 transition-colors inline-flex items-center gap-1.5"
