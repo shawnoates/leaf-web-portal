@@ -1040,6 +1040,10 @@ function usePhoneVerify() {
   const [step, setStep] = useState<"phone" | "code" | "verified">(cached ? "verified" : "phone");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  // Exposed for callers that need a real Parse session, not just the phone
+  // cookie — `requireUser` cloud functions won't accept the cookie identity.
+  // Additive: existing callers ignore it and keep their cookie-only behavior.
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const isVerified = step === "verified";
 
   const sendOTP = async () => {
@@ -1063,6 +1067,7 @@ function usePhoneVerify() {
       const result = await Parse.Cloud.run("verifyOTP", { phone: `+1${digits}`, code });
       if (result && typeof result === "object" && result.sessionToken) {
         setStep("verified");
+        setSessionToken(result.sessionToken as string);
         setVerifiedUserCookie(name, phone);
       } else {
         setError("Invalid code. Please try again.");
@@ -1078,7 +1083,7 @@ function usePhoneVerify() {
     setError("");
   };
 
-  return { name, setName, phone, setPhone, code, setCode, step, isVerified, sending, setSending, error, sendOTP, verifyOTP, reset };
+  return { name, setName, phone, setPhone, code, setCode, step, isVerified, sending, setSending, error, sendOTP, verifyOTP, reset, sessionToken };
 }
 
 // --- Shared Phone Verify Fields Component ---
@@ -1230,6 +1235,91 @@ function CancelRsvpModal({
             className="w-full border border-red-200 text-red-600 py-3.5 text-xs uppercase tracking-wider font-bold hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm Cancellation"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Featured Interest Modal ---
+
+/**
+ * Interest on an "Around the city" featured suggestion can't ride the cookie
+ * path the way plan-idea interest does: `expressFeaturedInterest` calls
+ * `requireUser`, because the interest row feeds cohort matching and needs a
+ * real account rather than a browser cookie. So an anonymous visitor verifies
+ * by phone here, we `become` the session that mints, and only then write.
+ */
+function FeaturedInterestModal({
+  suggestionId,
+  suggestionTitle,
+  onClose,
+  onInterested,
+}: {
+  suggestionId: string;
+  suggestionTitle: string;
+  onClose: () => void;
+  onInterested: (suggestionId: string, interestCount: number | null) => void;
+}) {
+  const verify = usePhoneVerify();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleConfirm = async () => {
+    if (!verify.isVerified) return;
+    setSaving(true);
+    setError("");
+    try {
+      // The cookie alone won't satisfy requireUser — adopt the session the
+      // OTP minted before calling. A cached session from a *different*
+      // identity would otherwise write the interest to the wrong account.
+      if (verify.sessionToken) {
+        await Parse.User.become(verify.sessionToken);
+      }
+      const result = (await Parse.Cloud.run("expressFeaturedInterest", {
+        suggestionId,
+      })) as { interestCount?: number; alreadyInterested?: boolean };
+      setVerifiedUserCookie(verify.name, verify.phone);
+      onInterested(
+        suggestionId,
+        typeof result?.interestCount === "number" ? result.interestCount : null
+      );
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "Couldn't save your interest."
+      );
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-none p-8 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-900"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-2xl font-light tracking-tight">
+              Count me in
+            </h3>
+            <p className="text-sm text-zinc-500 mt-1">
+              Verify your phone so we can tell you when someone hosts{" "}
+              {suggestionTitle}.
+            </p>
+          </div>
+          <PhoneVerifyFields verify={verify} />
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          <button
+            onClick={handleConfirm}
+            disabled={!verify.isVerified || saving}
+            className="w-full bg-zinc-900 text-white py-3.5 text-xs uppercase tracking-wider font-bold hover:bg-zinc-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "I'm Interested"}
           </button>
         </div>
       </div>
@@ -1472,6 +1562,11 @@ export default function OrgCalendarPage() {
   const [planIdeaInterestCounts, setPlanIdeaInterestCounts] = useState<Record<string, number>>({});
   const [planIdeaLocallyInterested, setPlanIdeaLocallyInterested] = useState<Set<string>>(new Set());
   const [planIdeaInterestPending, setPlanIdeaInterestPending] = useState<Set<string>>(new Set());
+  // Featured suggestion awaiting phone verification before its interest write.
+  const [featuredInterestFor, setFeaturedInterestFor] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
   const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   // Which AI event index (if any) the visitor tapped Host This on.
@@ -1723,6 +1818,69 @@ export default function OrgCalendarPage() {
         setPlanIdeaInterestPending((prev) => {
           const next = new Set(prev);
           next.delete(ideaId);
+          return next;
+        });
+      }
+    },
+    [
+      planIdeaInterestCounts,
+      planIdeaLocallyInterested,
+      planIdeaInterestPending,
+      org?.planIdeas,
+    ],
+  );
+
+  // Featured ("Around the city") interest. Separate cloud function from the
+  // plan-idea path above: featured rows are global admin suggestions with no
+  // CalendarGeneratedPlan to point a PlanIdeaInterest at, and the write is
+  // account-scoped rather than cookie-deduped. Anonymous viewers verify first.
+  const handleFeaturedInterest = useCallback(
+    async (suggestionId: string, title: string) => {
+      if (planIdeaLocallyInterested.has(suggestionId)) return;
+      if (planIdeaInterestPending.has(suggestionId)) return;
+
+      if (!Parse.User.current()) {
+        setFeaturedInterestFor({ id: suggestionId, title });
+        return;
+      }
+
+      const priorCount =
+        planIdeaInterestCounts[suggestionId] ??
+        (org?.planIdeas.find((i) => i.id === suggestionId)?.interestCount ?? 0);
+
+      setPlanIdeaInterestPending((prev) => new Set(prev).add(suggestionId));
+      setPlanIdeaLocallyInterested((prev) => new Set(prev).add(suggestionId));
+      setPlanIdeaInterestCounts((prev) => ({
+        ...prev,
+        [suggestionId]: priorCount + 1,
+      }));
+      markPlanIdeaLocallyInterested(suggestionId);
+
+      try {
+        const result = (await Parse.Cloud.run("expressFeaturedInterest", {
+          suggestionId,
+        })) as { interestCount?: number; alreadyInterested?: boolean };
+        if (typeof result?.interestCount === "number") {
+          setPlanIdeaInterestCounts((prev) => ({
+            ...prev,
+            [suggestionId]: result.interestCount!,
+          }));
+        }
+      } catch (err) {
+        console.error("[org] expressFeaturedInterest failed:", err);
+        setPlanIdeaLocallyInterested((prev) => {
+          const next = new Set(prev);
+          next.delete(suggestionId);
+          return next;
+        });
+        setPlanIdeaInterestCounts((prev) => ({
+          ...prev,
+          [suggestionId]: priorCount,
+        }));
+      } finally {
+        setPlanIdeaInterestPending((prev) => {
+          const next = new Set(prev);
+          next.delete(suggestionId);
           return next;
         });
       }
@@ -3765,31 +3923,36 @@ export default function OrgCalendarPage() {
                           <Sparkles className="w-6 h-6 text-zinc-600" />
                         </div>
                       )}
-                      {/* Same featured gate as the tall card: this writes a
-                          PlanIdeaInterest pointing at a CalendarGeneratedPlan,
-                          and a featured suggestion has no such row. */}
-                      {!idea.isFeatured && (
-                        <button
-                          type="button"
-                          onClick={() => handlePlanIdeaInterest(idea.id)}
-                          disabled={isInterested || isPending}
-                          aria-label={isInterested ? "You're interested" : "I'm interested"}
-                          className={`absolute top-[10px] right-[10px] w-7 h-7 rounded-full border flex items-center justify-center transition-colors disabled:cursor-default ${
-                            isInterested
-                              ? "bg-emerald-900/70 border-emerald-400/60"
-                              : "bg-[rgba(10,10,10,0.55)] border-[rgba(255,255,255,0.22)] hover:bg-[rgba(10,10,10,0.85)] hover:border-[rgba(255,255,255,0.55)]"
-                          }`}
-                        >
-                          {isPending ? (
-                            <Loader2 className="w-3 h-3 animate-spin text-white" />
-                          ) : (
-                            <Heart
-                              className="w-3 h-3 text-white"
-                              fill={isInterested ? "currentColor" : "none"}
-                            />
-                          )}
-                        </button>
-                      )}
+                      {/* Both kinds get the heart, but they write through
+                          different cloud functions — a featured suggestion has
+                          no CalendarGeneratedPlan for a PlanIdeaInterest to
+                          point at, so it goes to expressFeaturedInterest (and
+                          verifies phone first, since that one needs a real
+                          account rather than the interest cookie). */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          idea.isFeatured
+                            ? handleFeaturedInterest(idea.id, idea.title)
+                            : handlePlanIdeaInterest(idea.id)
+                        }
+                        disabled={isInterested || isPending}
+                        aria-label={isInterested ? "You're interested" : "I'm interested"}
+                        className={`absolute top-[10px] right-[10px] w-7 h-7 rounded-full border flex items-center justify-center transition-colors disabled:cursor-default ${
+                          isInterested
+                            ? "bg-emerald-900/70 border-emerald-400/60"
+                            : "bg-[rgba(10,10,10,0.55)] border-[rgba(255,255,255,0.22)] hover:bg-[rgba(10,10,10,0.85)] hover:border-[rgba(255,255,255,0.55)]"
+                        }`}
+                      >
+                        {isPending ? (
+                          <Loader2 className="w-3 h-3 animate-spin text-white" />
+                        ) : (
+                          <Heart
+                            className="w-3 h-3 text-white"
+                            fill={isInterested ? "currentColor" : "none"}
+                          />
+                        )}
+                      </button>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 px-5 py-[14px] min-w-0">
                       <div className="flex-1 min-w-0 flex flex-col gap-1.5">
@@ -4770,6 +4933,27 @@ export default function OrgCalendarPage() {
           onCancelled={(planId) => {
             setCancelRsvpModalPlan(null);
             completeCancelRsvp(planId);
+          }}
+        />
+      )}
+
+      {featuredInterestFor && (
+        <FeaturedInterestModal
+          suggestionId={featuredInterestFor.id}
+          suggestionTitle={featuredInterestFor.title}
+          onClose={() => setFeaturedInterestFor(null)}
+          onInterested={(suggestionId, interestCount) => {
+            setFeaturedInterestFor(null);
+            setPlanIdeaLocallyInterested((prev) =>
+              new Set(prev).add(suggestionId)
+            );
+            markPlanIdeaLocallyInterested(suggestionId);
+            if (interestCount !== null) {
+              setPlanIdeaInterestCounts((prev) => ({
+                ...prev,
+                [suggestionId]: interestCount,
+              }));
+            }
           }}
         />
       )}
