@@ -1032,12 +1032,18 @@ function formatPhoneNumber(value: string) {
 }
 
 // --- Phone Verify Hook ---
-function usePhoneVerify() {
+function usePhoneVerify(options?: { requireSession?: boolean }) {
   const cached = getVerifiedUserCookie();
   const [name, setName] = useState(cached?.name || "");
   const [phone, setPhone] = useState(cached?.phone || "");
   const [code, setCode] = useState("");
-  const [step, setStep] = useState<"phone" | "code" | "verified">(cached ? "verified" : "phone");
+  // The cookie proves a phone, not an account. Callers whose cloud function
+  // calls requireUser pass requireSession, so a cached cookie can't skip OTP
+  // here — only verifyOTP mints the session token those writes need. Name and
+  // phone still prefill either way.
+  const [step, setStep] = useState<"phone" | "code" | "verified">(
+    cached && !options?.requireSession ? "verified" : "phone"
+  );
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   // Exposed for callers that need a real Parse session, not just the phone
@@ -1262,19 +1268,13 @@ function FeaturedInterestModal({
   onClose: () => void;
   onInterested: (suggestionId: string, interestCount: number | null) => void;
 }) {
-  const verify = usePhoneVerify();
+  // requireSession: expressFeaturedInterest calls requireUser, so a cached
+  // phone cookie can't stand in for a session — only OTP mints one. Setting it
+  // at the initial state (rather than correcting in an effect) means the modal
+  // never paints a "verified" frame it has to take back.
+  const verify = usePhoneVerify({ requireSession: true });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
-  // A prior RSVP's verified-user cookie makes usePhoneVerify open already at
-  // "verified" — but that cookie is a phone identity, not a session, and this
-  // write needs a session. Send them back through OTP so a token actually
-  // mints; name and phone stay prefilled, so it's one tap and a code.
-  useEffect(() => {
-    if (verify.step === "verified" && !verify.sessionToken) verify.reset();
-    // Mount-only: re-running on step changes would undo a real verification.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleConfirm = async () => {
     if (!verify.isVerified) return;
