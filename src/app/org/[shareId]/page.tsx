@@ -1266,6 +1266,16 @@ function FeaturedInterestModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // A prior RSVP's verified-user cookie makes usePhoneVerify open already at
+  // "verified" — but that cookie is a phone identity, not a session, and this
+  // write needs a session. Send them back through OTP so a token actually
+  // mints; name and phone stay prefilled, so it's one tap and a code.
+  useEffect(() => {
+    if (verify.step === "verified" && !verify.sessionToken) verify.reset();
+    // Mount-only: re-running on step changes would undo a real verification.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleConfirm = async () => {
     if (!verify.isVerified) return;
     setSaving(true);
