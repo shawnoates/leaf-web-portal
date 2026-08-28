@@ -3054,6 +3054,177 @@ export default function OrgCalendarPage() {
     );
   }, [org, nowBucket]);
 
+  // 2a — "Around the city": a slim 122px full-width band. These are citywide
+  // happenings looking for a host, not this calendar's own upcoming plans, so
+  // they render ABOVE the "Upcoming Plans" label rather than inside that list.
+  // Living outside <main> is also why there's no full-bleed hack here — the
+  // band isn't inside the max-w-6xl column, so it has nothing to escape.
+  //
+  // Dropped from the tall card: the "Waiting on host" status row and the
+  // "Run it yourself…" caption. The meta chips and the two buttons already say
+  // both, and at this height a third text row reads as clutter, not hierarchy.
+  const renderAroundTheCityBand = (idea: PlanIdea) => {
+    if (!org) return null;
+    const spreadDate =
+      spreadIdeaDates.get(idea.id) ?? (idea.date ? new Date(idea.date) : null);
+    let dateLabel: string | null = null;
+    if (idea.isFeatured && idea.whenLabel) {
+      // Server-rendered in the VENUE's zone. Reformatting from a UTC instant
+      // would re-anchor it to the browser's zone — a 7:30 PM ET showtime is
+      // not 4:30 PM for anyone.
+      dateLabel = idea.whenLabel.toUpperCase();
+    } else if (spreadDate) {
+      dateLabel = spreadDate
+        .toLocaleDateString("en-US", {
+          weekday: "long",
+          month: "short",
+          day: "numeric",
+        })
+        .toUpperCase();
+    }
+    const priorCount =
+      planIdeaInterestCounts[idea.id] ?? idea.interestCount ?? 0;
+    const isInterested = planIdeaLocallyInterested.has(idea.id);
+    const isPending = planIdeaInterestPending.has(idea.id);
+    const canHost = org.isOwner || org.isHost || !!org.allowFollowersToHost;
+    // Same entitlement split as the tall card — the server already nulled
+    // name+address for viewers who don't get the venue, so this just renders
+    // whatever survived, collapsed to one line.
+    const venueLine = idea.location?.name
+      ? `${idea.location.name}${idea.location.address ? ` · ${idea.location.address}` : ""}`
+      : idea.location?.neighborhood || null;
+    return (
+      <article
+        key={idea.id}
+        className="grid grid-cols-1 sm:grid-cols-[232px_1fr] sm:h-[122px] overflow-hidden bg-[#0a0a0a]"
+        style={{
+          fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+        }}
+      >
+        <div className="relative h-40 sm:h-[122px] bg-[#161616]">
+          {idea.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={idea.image}
+              alt={idea.title}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Sparkles className="w-6 h-6 text-zinc-600" />
+            </div>
+          )}
+          {/* Both kinds get the heart, but they write through different cloud
+              functions — a featured suggestion has no CalendarGeneratedPlan for
+              a PlanIdeaInterest to point at, so it goes to
+              expressFeaturedInterest (and verifies phone first, since that one
+              needs a real account rather than the interest cookie). */}
+          <button
+            type="button"
+            onClick={() =>
+              idea.isFeatured
+                ? handleFeaturedInterest(idea.id, idea.title)
+                : handlePlanIdeaInterest(idea.id)
+            }
+            disabled={isInterested || isPending}
+            aria-label={isInterested ? "You're interested" : "I'm interested"}
+            className={`absolute top-[10px] right-[10px] w-7 h-7 rounded-full border flex items-center justify-center transition-colors disabled:cursor-default ${
+              isInterested
+                ? "bg-emerald-900/70 border-emerald-400/60"
+                : "bg-[rgba(10,10,10,0.55)] border-[rgba(255,255,255,0.22)] hover:bg-[rgba(10,10,10,0.85)] hover:border-[rgba(255,255,255,0.55)]"
+            }`}
+          >
+            {isPending ? (
+              <Loader2 className="w-3 h-3 animate-spin text-white" />
+            ) : (
+              <Heart
+                className="w-3 h-3 text-white"
+                fill={isInterested ? "currentColor" : "none"}
+              />
+            )}
+          </button>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 px-5 py-[14px] min-w-0">
+          <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-3 text-[9px] leading-none font-medium uppercase tracking-[0.16em] whitespace-nowrap">
+              <span className="border border-[#3a3a3a] px-[7px] py-1 text-white">
+                Around the city
+              </span>
+              {dateLabel && <span className="text-[#8f8f8a]">{dateLabel}</span>}
+              {/* The band has no heart badge to carry the count, so unlike the
+                  tall card this shows for localized rows too — where the count
+                  is this calendar's, not the admin suggestion's global one. */}
+              {priorCount > 0 && (
+                <span className="text-[#7fd6a8]">
+                  {priorCount} nearby interested
+                </span>
+              )}
+            </div>
+            <h3 className="text-[21px] leading-[1.1] font-normal tracking-[-0.01em] text-white truncate">
+              {idea.title}
+            </h3>
+            {(idea.description || venueLine) && (
+              <div className="flex gap-2.5 text-xs leading-[1.4] overflow-hidden">
+                {idea.description && (
+                  <span className="shrink-0 whitespace-nowrap text-[#d9d9d5]">
+                    {idea.description}
+                  </span>
+                )}
+                {venueLine && (
+                  <span className="flex-1 min-w-0 truncate text-[#6d6d68]">
+                    {venueLine}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex-none flex flex-col gap-1.5 whitespace-nowrap">
+            {canHost && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (org.rsvpLimitReached) return;
+                  setHostingIdea(idea);
+                  setHostSubmitting(false);
+                  setHostError(null);
+                  setHostSuccess(false);
+                  setHostNote("");
+                  setSelectedVenue(null);
+                }}
+                disabled={org.rsvpLimitReached}
+                className={`px-4 py-[9px] text-[10px] leading-none font-medium uppercase tracking-[0.16em] transition-colors ${
+                  org.rsvpLimitReached
+                    ? "bg-transparent border border-[#3a3a3a] text-[#6d6d68] cursor-not-allowed"
+                    : "bg-white text-[#0a0a0a] hover:bg-[#dcdcd8]"
+                }`}
+              >
+                Host this
+              </button>
+            )}
+            {org.isOwner && (
+              <button
+                type="button"
+                onClick={() =>
+                  setVirtualHostPlan({
+                    calendarId: org.objectId,
+                    planIdeaId: idea.id,
+                  })
+                }
+                className="px-4 py-[9px] text-[10px] leading-none font-medium uppercase tracking-[0.16em] bg-transparent border border-[#3a3a3a] text-white hover:border-[#7a7a7a] transition-colors flex items-center gap-[7px]"
+              >
+                <span className="w-[7px] h-[7px] rounded-full bg-[#8f7a4a] shrink-0" />
+                Let Leaf host it
+              </button>
+            )}
+          </div>
+        </div>
+      </article>
+    );
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -3307,6 +3478,13 @@ export default function OrgCalendarPage() {
           pitch (residents host things for each other) drives the visual
           identity. Local deals appear below the plans stream as a
           supporting benefit, not the main attraction. */}
+      {/* Around the city — full-width, flush under the profile header and
+          above the "Upcoming Plans" label, which belongs to the list below. */}
+      {!org.hidePlanIdeas &&
+        org.planIdeas
+          .filter((i) => i.isFeatured === true || i.sourceKind === "featured")
+          .map((idea) => renderAroundTheCityBand(idea))}
+
       <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100 md:hidden">
         <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
           Upcoming Plans
@@ -3346,10 +3524,6 @@ export default function OrgCalendarPage() {
           type StreamEntry = {
             key: string;
             date: number;
-            // Editorial pin. The stream is date-ordered, so a featured
-            // suggestion would otherwise sink to wherever its date falls —
-            // undoing the ordering it was given upstream.
-            pinned?: boolean;
             render: (index: number) => React.ReactNode;
           };
           const streamItems: StreamEntry[] = [];
@@ -4096,12 +4270,13 @@ export default function OrgCalendarPage() {
           };
           if (!org.hidePlanIdeas && org.planIdeas.length > 0) {
           const aroundTheCity = (i: PlanIdea) =>
-    i.isFeatured === true || i.sourceKind === "featured";
-  const orderedIdeas = [...org.planIdeas].sort((a, b) => {
-            // Featured is editorial and pins ahead of the date sort — it took a
-            // slot from an algorithmic idea, so burying it below them would
-            // spend the displacement for nothing.
-            if (aroundTheCity(a) !== aroundTheCity(b)) return aroundTheCity(a) ? -1 : 1;
+            i.isFeatured === true || i.sourceKind === "featured";
+          // Around-the-city ideas render as hoisted bands above the stream, so
+          // they're excluded here rather than pinned to the top of it. Dropping
+          // them before the cap also stops them consuming an inline idea slot.
+          const orderedIdeas = [...org.planIdeas]
+            .filter((i) => !aroundTheCity(i))
+            .sort((a, b) => {
             const at = spreadOf(a)?.getTime() ?? Number.POSITIVE_INFINITY;
             const bt = spreadOf(b)?.getTime() ?? Number.POSITIVE_INFINITY;
             if (at !== bt) return at - bt;
@@ -4117,7 +4292,6 @@ export default function OrgCalendarPage() {
               streamItems.push({
                 key: `idea-${idea.id}`,
                 date: d ? d.getTime() : Number.POSITIVE_INFINITY,
-                pinned: aroundTheCity(idea),
                 render: (index) => renderPlanIdeaCard(idea, index),
               });
             });
@@ -4126,7 +4300,6 @@ export default function OrgCalendarPage() {
           // Interleave by date; stable by key on ties.
           streamItems.sort(
             (a, b) =>
-              Number(!!b.pinned) - Number(!!a.pinned) ||
               a.date - b.date ||
               (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)
           );
