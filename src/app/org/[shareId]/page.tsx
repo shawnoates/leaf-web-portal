@@ -3896,10 +3896,12 @@ export default function OrgCalendarPage() {
                   ? `${idea.location.name}${idea.location.address ? ` · ${idea.location.address}` : ""}`
                   : idea.location?.neighborhood || null;
                 // Full-bleed: escape main's max-w-6xl/px-6 so the black runs
-                // edge to edge. When the band leads the stream it also cancels
-                // main's py-12 so it sits flush under the header — but only
-                // then, since the empty-state block can render above it and
-                // pulling up through that would overlap.
+                // edge to edge. When the band leads the stream it also pulls up
+                // to sit flush against what's above it — 48px of main's py-12
+                // on desktop, plus the 24px pb-6 of the md:hidden "Upcoming
+                // Plans" heading on mobile, so 72px there. Gated on leading,
+                // since the empty-state block can render above it and pulling
+                // up through that would overlap.
                 const leadsPage =
                   index === 0 &&
                   !(
@@ -3908,7 +3910,7 @@ export default function OrgCalendarPage() {
                   );
                 return (
                   <div
-                    className={`w-screen -ml-[calc(50vw-50%)] -mr-[calc(50vw-50%)] ${leadsPage ? "-mt-12" : ""}`}
+                    className={`w-screen -ml-[calc(50vw-50%)] -mr-[calc(50vw-50%)] ${leadsPage ? "-mt-[72px] md:-mt-12" : ""}`}
                   >
                     <article
                       key={idea.id}
