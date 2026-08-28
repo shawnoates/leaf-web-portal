@@ -53,8 +53,9 @@ export interface OrgDashboardCalendar {
   /** Present on the wire but untyped upstream — upcoming plans per calendar. */
   activePlans?: CalActivePlan[];
   /** Home NEEDS YOU card: the most urgent idea still needing a host plus the
-   *  follower most likely to say yes. Only sent for calendars that hide plan
-   *  ideas — when ideas are public, followers can claim them unprompted. */
+   *  follower most likely to say yes. Only sent for calendars that SHOW plan
+   *  ideas — `hidePlanIdeas` is the owner opting out of the suggestion
+   *  surface, and the card names a specific suggestion. */
   host_candidate?: {
     idea: { objectId: string; title: string; date: string | null };
     candidate_user: {

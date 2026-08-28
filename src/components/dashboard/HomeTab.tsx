@@ -332,8 +332,11 @@ export default function HomeTab({
       case "memberLed": {
         if (f.communityHostedPlans == null) return null;
         // A host-ask card for this calendar already covers it, with a named
-        // person attached — strictly better than this generic nudge.
-        if (dashboard.calendars.some((c) => c.host_candidate)) return null;
+        // person attached — strictly better than this generic nudge. Match the
+        // row loop's `hidePlanIdeas` filter, or a suppressed host_candidate
+        // silently swallows this nudge and NEEDS YOU shows neither.
+        if (dashboard.calendars.some((c) => c.host_candidate && !c.hidePlanIdeas))
+          return null;
         return {
           title:
             f.distinctHosts === 0
@@ -355,12 +358,16 @@ export default function HomeTab({
   // ── NEEDS YOU rows ────────────────────────────────────────────────────
   const needsYouRows: React.ReactNode[] = [];
 
-  // Host-ask prompts — one per calendar, and only for calendars that hide
-  // plan ideas (the server enforces the same rule). Host asks come first: a
-  // plan with no host is a harder problem than a plan with no guest.
+  // Host-ask prompts — one per calendar, and only for calendars that show
+  // plan ideas (the server enforces the same rule; the client check keeps a
+  // calendar whose owner just switched suggestions off from being asked to
+  // recruit a host for an idea its Suggested Plans tab no longer lists). Host
+  // asks come first: a plan with no host is a harder problem than a plan with
+  // no guest.
   for (const calendar of dashboard.calendars) {
     const hc = calendar.host_candidate;
-    if (!hc || nudgedIds?.has(hc.candidate_user.membership_id)) continue;
+    if (!hc || calendar.hidePlanIdeas) continue;
+    if (nudgedIds?.has(hc.candidate_user.membership_id)) continue;
     needsYouRows.push(
       <div
         key={`host-candidate-${calendar.objectId}`}
