@@ -57,8 +57,17 @@ export async function generateMetadata({
   // photo, then the first plan or idea image as fallback.
   const firstPlanImage = info.plans?.find((p) => p.image)?.image;
   const firstIdeaImage = info.planIdeas?.find((p) => p.image)?.image;
-  const imageUrl = info.bannerUrl || info.profilePhoto || firstPlanImage || firstIdeaImage || null;
-  const ogImages = imageUrl ? [{ url: imageUrl }] : undefined;
+  const calendarImage = info.bannerUrl || info.profilePhoto || firstPlanImage || firstIdeaImage;
+  // Metadata merging is shallow per-key, so exporting `openGraph` here replaces
+  // the root layout's wholesale — including its default card. Without an
+  // explicit fallback a calendar with no imagery of its own unfurls with no
+  // og:image at all. Only declare dimensions for the generated card, since we
+  // know those; a real photo's size is unknown and a wrong og:image:width makes
+  // some unfurlers crop or reject it.
+  const image = calendarImage
+    ? { url: calendarImage }
+    : { url: "/api/og/default", width: 1200, height: 630 };
+  const imageUrl = image.url;
 
   const icons = info.profilePhoto
     ? {
@@ -78,14 +87,14 @@ export async function generateMetadata({
       // Must be the www host. The apex joinleaf.com 308s to www, and
       // unfurlers that re-resolve og:url take a second hop for nothing.
       url: `${SITE_URL}/org/${shareId}`,
-      images: ogImages,
+      images: [image],
       siteName: "Leaf",
     },
     twitter: {
-      card: imageUrl ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title,
       description,
-      images: imageUrl ? [imageUrl] : undefined,
+      images: [imageUrl],
     },
   };
 }
