@@ -1583,6 +1583,11 @@ export default function OrgCalendarPage() {
   // Non-null → confirmation modal is open for that event.
   const [hostThisEventIndex, setHostThisEventIndex] = useState<number | null>(null);
   const [hostThisSubmitting, setHostThisSubmitting] = useState(false);
+  // Note from Host for the Host This flow. Deliberately NOT the `hostNote`
+  // state above — that one belongs to the custom-plan / plan-idea modals and
+  // is reset by their own open handlers, so sharing it let a note typed in one
+  // surface reappear in the other.
+  const [hostThisNote, setHostThisNote] = useState("");
   const [rsvpedPlanIds, setRsvpedPlanIds] = useState<Set<string>>(new Set());
   const [pendingRsvpIds, setPendingRsvpIds] = useState<Set<string>>(new Set());
   // planId → EventNotification.objectId for the viewer's own RSVP. Powers
@@ -3956,6 +3961,19 @@ export default function OrgCalendarPage() {
                                   return (
                                     <button
                                       onClick={() => {
+                                        // Prefill the follower's note with the
+                                        // attribution line the server used to
+                                        // stamp on silently, so it stays the
+                                        // default but is theirs to rewrite.
+                                        // Owners/co-hosts start blank — they
+                                        // never got an auto-note, and "hosted
+                                        // from a suggestion on your own
+                                        // calendar" reads as noise.
+                                        setHostThisNote(
+                                          canHostAsHost
+                                            ? ""
+                                            : `Hosted from an AI Suggestion on ${org.name}.`
+                                        );
                                         setHostThisEventIndex(originalIndex);
                                       }}
                                       className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 transition-opacity text-white hover:opacity-90"
@@ -6155,6 +6173,10 @@ export default function OrgCalendarPage() {
               hostPhone: hostVerify.isVerified
                 ? `+1${hostVerify.phone.replace(/\D/g, "")}`
                 : undefined,
+              // Omitting it (cleared field) makes the server fall back to its
+              // own attribution line for followers, which is what shipped
+              // before this field existed.
+              hostNote: hostThisNote.trim() || undefined,
             })) as {
               pendingApproval?: boolean;
               eventGroupId?: string;
@@ -6178,7 +6200,11 @@ export default function OrgCalendarPage() {
               return;
             }
 
-            setToast(`You’re hosting ${ev.name}. Followers have been notified.`);
+            setToast(
+              interestCount > 0
+                ? `You’re hosting ${ev.name}. The ${interestCount} interested ${interestCount === 1 ? "person has" : "people have"} been texted.`
+                : `You’re hosting ${ev.name}. Followers have been notified.`,
+            );
             setTimeout(() => setToast(null), 5000);
             // Refresh so the suggestion card is replaced by the live plan,
             // then hand the new plan's id to the ?plan= auto-open effect so
@@ -6347,17 +6373,31 @@ export default function OrgCalendarPage() {
                       into these suggestions, so accepting one unchanged needs
                       no second sign-off. Changing the details is what routes
                       through the owner; "Edit details first" says so. */}
+                  {/* Says what actually fires, which this copy did not. Per-plan
+                      follower SMS is gated OFF by default
+                      (`perPlanFollowerSmsEnabled`) in favor of the Sunday
+                      digest, so followers get a push and the rest wait for the
+                      weekly roundup — promising a flat "followers will be
+                      notified" oversold it. Interested people ARE texted
+                      immediately now (notifyInterestedOnAIEventHosted). */}
                   <p className="text-sm text-zinc-600 leading-relaxed">
                     This becomes a real plan on{" "}
                     <span className="font-medium text-zinc-900">{org.name}</span> with you
-                    as the host. Followers of this calendar
-                    {interestCount > 0
-                      ? ` and the ${interestCount} ${interestCount === 1 ? "person" : "people"} interested in it`
-                      : ""}
-                    {" "}will be notified
+                    as the host.{" "}
+                    {interestCount > 0 ? (
+                      <>
+                        The {interestCount}{" "}
+                        {interestCount === 1 ? "person" : "people"} interested in it
+                        {interestCount === 1 ? " gets" : " get"} a text right away, and
+                        followers get a notification
+                      </>
+                    ) : (
+                      <>Followers get a notification</>
+                    )}
+                    {" "}— everyone else sees it in the weekly roundup
                     {canHostAsHost
-                      ? ", and you can manage RSVPs from your dashboard."
-                      : ", and you can manage RSVPs from the plan page."}
+                      ? ". You can manage RSVPs from your dashboard."
+                      : ". You can manage RSVPs from the plan page."}
                   </p>
                   {/* Disclosed, not silent: hosting creates the follow, so say
                       so before the tap rather than surprising them after. */}
@@ -6368,6 +6408,34 @@ export default function OrgCalendarPage() {
                       you&rsquo;ll get updates. You can unfollow any time.
                     </p>
                   )}
+                </div>
+
+                {/* Note from Host. Followers open with the attribution line
+                    prefilled; before this field existed the server stamped
+                    that same line on silently and the host had no way to say
+                    anything in their own voice. Editing it does NOT route the
+                    plan through the owner's approval queue — the note isn't
+                    one of the plan details ("Edit details first") that does. */}
+                <div className="border-t border-zinc-100 pt-6 space-y-2">
+                  <label
+                    htmlFor="host-this-note"
+                    className="text-[11px] tracking-wider uppercase font-bold text-zinc-400"
+                  >
+                    Note from Host
+                  </label>
+                  <textarea
+                    id="host-this-note"
+                    value={hostThisNote}
+                    onChange={(e) => setHostThisNote(e.target.value)}
+                    disabled={hostThisSubmitting}
+                    rows={3}
+                    maxLength={500}
+                    className="w-full border border-zinc-200 rounded-lg p-4 text-sm font-light focus:outline-none focus:border-zinc-900 transition-colors resize-none disabled:opacity-50"
+                    placeholder="Add a note for attendees (optional)"
+                  />
+                  <p className="text-[11px] text-zinc-400 text-right">
+                    {hostThisNote.length}/500
+                  </p>
                 </div>
 
                 {/* Identity. The server needs a verified phone to know who is
