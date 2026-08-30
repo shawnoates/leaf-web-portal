@@ -1599,6 +1599,80 @@ export default function OrgCalendarPage() {
   const [cancelRsvpModalPlan, setCancelRsvpModalPlan] = useState<{ id: string; title: string } | null>(null);
   const [cancellingPlan, setCancellingPlan] = useState(false);
 
+  // "Text me when this gets hosted" — offered AFTER an interest tap from a
+  // browser with no identity on it.
+  //
+  // Anonymous taps are the norm on this page, not the exception: every
+  // AIEventInterest row in production carries a cookie and nothing else, so
+  // the interest count is real but the people behind it are uncontactable.
+  // This asks for a phone once the tap is already recorded, so the count never
+  // depends on them answering and a dismissal costs an identity we never had.
+  //
+  // OTP rather than a bare phone field, matching every other phone capture on
+  // this page: an unverified number means texting someone who never asked.
+  // The cost is paid once per browser — verifying sets leaf_verified_user, so
+  // every later interest tap is identified with no prompt at all.
+  const [notifyPromptFor, setNotifyPromptFor] = useState<
+    { kind: "ai"; eventIndex: number; title: string }
+    | { kind: "idea"; ideaId: string; title: string }
+    | null
+  >(null);
+  const notifyVerify = usePhoneVerify();
+  const [notifyAttaching, setNotifyAttaching] = useState(false);
+  // Guards the attach against re-firing. A `notifyAttaching` dep would loop on
+  // failure: the flag flips back to false, the effect re-runs, it retries
+  // forever. Keyed by prompt so a second card in the same session still works.
+  const notifyAttachedRef = useRef<string | null>(null);
+
+  // Once the phone is verified, re-send the SAME interest call with the same
+  // cookie. Both express* cloud functions dedupe on cookie and backfill
+  // identity onto the row they find, so this attaches the phone to the
+  // existing tap rather than creating a second one — no new endpoint needed,
+  // and the count does not move.
+  useEffect(() => {
+    if (!notifyPromptFor || !notifyVerify.isVerified) return;
+    const key =
+      notifyPromptFor.kind === "ai"
+        ? `ai:${notifyPromptFor.eventIndex}`
+        : `idea:${notifyPromptFor.ideaId}`;
+    if (notifyAttachedRef.current === key) return;
+    notifyAttachedRef.current = key;
+
+    (async () => {
+      setNotifyAttaching(true);
+      try {
+        const cookie = getOrCreateAIInterestCookie();
+        const identity = interestIdentityParams();
+        if (notifyPromptFor.kind === "ai") {
+          await Parse.Cloud.run("expressInterestOnAIEvent", {
+            groupShareId: shareId,
+            eventIndex: notifyPromptFor.eventIndex,
+            cookie,
+            ...identity,
+          });
+        } else {
+          await Parse.Cloud.run("expressInterestOnPlanIdea", {
+            ideaId: notifyPromptFor.ideaId,
+            cookie,
+            ...identity,
+          });
+        }
+        setNotifyPromptFor(null);
+        setToast("Got it — we’ll text you when someone hosts this.");
+        setTimeout(() => setToast(null), 5000);
+      } catch (err) {
+        console.error("[org] attaching identity to interest failed:", err);
+        // The tap itself is already recorded, so this failing costs the text,
+        // not the interest. Say that rather than implying the tap was lost.
+        setToast("Couldn’t save your number — your interest still counts.");
+        setTimeout(() => setToast(null), 5000);
+        setNotifyPromptFor(null);
+      } finally {
+        setNotifyAttaching(false);
+      }
+    })();
+  }, [notifyPromptFor, notifyVerify.isVerified, shareId]);
+
   // AI-event interest tap. Optimistic: bump count + mark local
   // immediately so the button state doesn't wait on the round-trip.
   // Rolls back on failure.
@@ -1642,6 +1716,16 @@ export default function OrgCalendarPage() {
             [eventIndex]: result.count!,
           }));
         }
+        // Only for a browser we can't already reach. Checked AFTER the write
+        // lands, so the prompt never appears on a tap that failed to record.
+        if (!interestIdentityParams().phone) {
+          const ev = org?.aiSourceEvents?.[eventIndex];
+          setNotifyPromptFor({
+            kind: "ai",
+            eventIndex,
+            title: ev?.title || ev?.name || "this plan",
+          });
+        }
       } catch (err) {
         console.error("[org] expressInterestOnAIEvent failed:", err);
         // Roll back optimistic UI on failure.
@@ -1668,6 +1752,8 @@ export default function OrgCalendarPage() {
       aiLocallyInterested,
       aiInterestPending,
       org?.aiSourceEventInterests,
+      // Read for the notify prompt's title.
+      org?.aiSourceEvents,
     ]
   );
 
@@ -1820,6 +1906,14 @@ export default function OrgCalendarPage() {
         })) as { count?: number; alreadyInterested?: boolean };
         if (typeof result?.count === "number") {
           setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: result.count! }));
+        }
+        if (!interestIdentityParams().phone) {
+          setNotifyPromptFor({
+            kind: "idea",
+            ideaId,
+            title:
+              org?.planIdeas.find((i) => i.id === ideaId)?.title || "this plan",
+          });
         }
       } catch (err) {
         console.error("[org] expressInterestOnPlanIdea failed:", err);
@@ -6115,6 +6209,53 @@ export default function OrgCalendarPage() {
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-zinc-900 text-white px-5 py-3 rounded-lg shadow-lg text-sm flex items-center gap-2 animate-fade-in">
           <Check className="w-4 h-4" />
           {toast}
+        </div>
+      )}
+
+      {/* "Text me when this gets hosted" — shown after an interest tap from a
+          browser with no identity. Deliberately AFTER the tap: the count is
+          already saved, so this is a bonus ask and "No thanks" costs nothing.
+          Compact and dismissible on purpose — an anonymous tap that stays
+          anonymous is the status quo, not a failure. */}
+      {notifyPromptFor && (
+        <div
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm"
+          onClick={() => { if (!notifyAttaching) setNotifyPromptFor(null); }}
+        >
+          <div
+            className="bg-white w-full max-w-md p-8 md:p-10 space-y-6 shadow-2xl rounded-t-3xl md:rounded-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="space-y-2">
+              <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                You&rsquo;re interested
+              </p>
+              <h3 className="text-2xl font-light tracking-tight">
+                Want a text if someone hosts{" "}
+                <span className="font-medium">{notifyPromptFor.title}</span>?
+              </h3>
+              <p className="text-sm text-zinc-500 font-light leading-relaxed">
+                We&rsquo;ll only text you about this plan. Your interest is
+                already counted either way.
+              </p>
+            </div>
+
+            {notifyAttaching ? (
+              <div className="flex items-center gap-2 py-3 text-sm text-zinc-500">
+                <Loader2 className="w-4 h-4 animate-spin" /> Saving your number…
+              </div>
+            ) : (
+              <PhoneVerifyFields verify={notifyVerify} />
+            )}
+
+            <button
+              onClick={() => setNotifyPromptFor(null)}
+              disabled={notifyAttaching}
+              className="w-full py-2 text-[11px] uppercase tracking-widest text-zinc-400 hover:text-zinc-600 transition-colors disabled:opacity-50"
+            >
+              No thanks
+            </button>
+          </div>
         </div>
       )}
 
