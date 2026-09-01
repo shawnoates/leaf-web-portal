@@ -204,6 +204,9 @@ export interface OrgDashboard {
     requestedDate: string | null;
     requestedNote: string | null;
     requestedVenue: { name: string; address: string; placeId?: string | null } | null;
+    // True when the requester picked their own venue; false when they kept the
+    // suggestion's (in which case requestedVenue is that one, not null).
+    requesterChoseVenue?: boolean;
     requestedCapacity: number | null;
     requestedRequireApproval: boolean;
     requestedAt: string | null;

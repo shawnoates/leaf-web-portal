@@ -1017,7 +1017,16 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
             description,
             date: `${date}T${time || "12:00"}:00${tzSuffix}`,
             time: time || null,
-            venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
+            // Tri-state per the venue contract on approveHostRequest: absent
+            // = leave the venue alone, null = delete it, object = set it.
+            // This sent `null` whenever nothing happened to be selected, which
+            // reads as "delete the venue" — so an owner who opened Edit before
+            // the venue finished loading and saved would silently strip it.
+            // Clearing a venue is not an affordance in this modal, so the only
+            // two states it can legitimately express are set-it and leave-it.
+            venue: selectedVenue
+              ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId }
+              : undefined,
             capacity: capacity ? parseInt(capacity) : null,
             requireApproval,
             imageBase64: imageBase64 || undefined,

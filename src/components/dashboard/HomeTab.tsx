@@ -452,6 +452,27 @@ export default function HomeTab({
               ` · ${new Date(req.requestedDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`}
             {req.calendarName && ` · ${req.calendarName}`}
           </p>
+          {/* A swapped venue is the part of a request most worth a second look,
+              and it used to be invisible until the owner opened Edit. Keeping
+              the suggested venue is the quiet case, so it stays unemphasized. */}
+          {req.requestedVenue?.name && (
+            <p className="text-[11px] text-zinc-500 mt-0.5">
+              {req.requestedVenue.name}
+              {/* The origin flag only exists on a server new enough to send it.
+                  The portal auto-deploys while the server needs a manual
+                  release, so this WILL render against an older server for a
+                  while — and defaulting the flag to false would label every
+                  request "your suggested venue", including the swaps this is
+                  meant to surface. Undefined means "don't know", so say
+                  nothing rather than something wrong. */}
+              {req.requesterChoseVenue === true && (
+                <span className="text-amber-700"> · their venue</span>
+              )}
+              {req.requesterChoseVenue === false && (
+                <span className="text-zinc-400"> · your suggested venue</span>
+              )}
+            </p>
+          )}
         </div>
         <div className="flex gap-2 shrink-0">
           <button
