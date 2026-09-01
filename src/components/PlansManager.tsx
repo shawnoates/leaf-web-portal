@@ -336,21 +336,40 @@ interface UpcomingPlan {
 
 // Suggested Plans card for a real, persisted PlanIdea — image-top cover,
 // "Needs a host" badge, recurring badge, interest count. Tapping opens the
-// detail + self-host modal (host/edit/assign/delete all live there).
+// detail + self-host modal (host/edit/assign all live there); delete is also
+// offered inline via the × so it matches AIStarterCard and doesn't require
+// digging to the bottom of the host form to find it.
+//
+// Root is a div rather than a button: the × is itself a button, and a button
+// inside a button is invalid HTML that React warns on and browsers handle
+// inconsistently. role/tabIndex/onKeyDown restore what the native button gave.
 function IdeaCard({
   idea,
   date,
   onClick,
+  onDelete,
 }: {
   idea: PlanIdea;
   date: Date | null;
   onClick: () => void;
+  // Omitted for featured "Around the city" rows — those are admin-curated
+  // FeaturedSuggestions with no CalendarGeneratedPlan behind them, so
+  // removePlanIdea has nothing to delete. Same reasoning as the modal's
+  // isFeatured gate on onEditSuggestion/onAssignHost/onDelete.
+  onDelete?: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="group relative border border-zinc-100 rounded-lg overflow-hidden shrink-0 w-48 text-left hover:border-zinc-300 hover:shadow-sm transition-all"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className="group relative border border-zinc-100 rounded-lg overflow-hidden shrink-0 w-48 text-left cursor-pointer hover:border-zinc-300 hover:shadow-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
     >
       <div className="relative">
         <PlanImage src={idea.image} alt={idea.title} className="w-full h-28" />
@@ -366,10 +385,34 @@ function IdeaCard({
             Needs a host
           </span>
         )}
+        {/* Bottom-right, not top-right: the × claims the top-right corner, and
+            on a w-48 card the "Needs a host" badge already owns enough of the
+            top row that shifting Recurring left would collide with it. */}
         {idea.ideaSeriesId && (
-          <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-700 bg-white/85 backdrop-blur-sm">
+          <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-700 bg-white/85 backdrop-blur-sm">
             <Repeat className="w-3 h-3" /> Recurring
           </span>
+        )}
+        {/* Delete. Hover-revealed on desktop so the rail stays calm — the card's
+            own click target is "host this", and a persistent × competes with it.
+            But an opacity-0 button is still TAPPABLE, and touch has no hover:
+            left hover-only, this would sit invisible over the top-right of every
+            card and swallow taps meant to open it. So it is always visible below
+            md, and hover-revealed only where a real cursor exists.
+            stopPropagation keeps it from also opening the host modal. */}
+        {onDelete && (
+          <button
+            type="button"
+            aria-label={`Delete suggestion ${idea.title}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="absolute top-2 right-2 p-1 rounded-full bg-white/85 text-zinc-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 hover:bg-white hover:text-red-600 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+            style={{ backdropFilter: "blur(4px)" }}
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         )}
       </div>
       <div className="p-3">
@@ -399,7 +442,7 @@ function IdeaCard({
           )}
         </p>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -1067,7 +1110,12 @@ export default function PlansManager({
       // Close the detail modal if it's open on the idea we just removed.
       setDetailIdea((cur) => (cur && cur.objectId === ideaId ? null : cur));
     } catch (err) {
+      // Surfaced, not just logged: the server rejects non-owners, and a
+      // console-only failure is indistinguishable from a successful delete
+      // that simply left the card on screen. Matches handleDismissAiStarter.
       console.error("Failed to remove idea:", err);
+      const msg = err instanceof Error ? err.message : "Please try again.";
+      alert(`Could not delete that suggestion. ${msg}`);
     }
   }
 
@@ -1660,12 +1708,19 @@ export default function PlansManager({
                   item.kind === "idea" ? (
                     // Tapping the card opens the detail + self-host modal
                     // (openIdeaDetail); the owner/co-host actions — host, edit
-                    // the suggestion, assign, delete — all live in that modal.
+                    // the suggestion, assign — live in that modal. Delete is
+                    // ALSO surfaced inline, because in the modal it sits below
+                    // the whole hosting form and was effectively undiscoverable.
                     <IdeaCard
                       key={`idea-${item.idea.objectId}`}
                       idea={item.idea}
                       date={spreadDateOf(item.idea)}
                       onClick={() => openIdeaDetail(item.idea)}
+                      onDelete={
+                        item.idea.isFeatured || item.idea.sourceKind === "featured"
+                          ? undefined
+                          : () => handleRemoveIdea(item.idea.objectId)
+                      }
                     />
                   ) : (
                     // AI starter → open the New Plan drawer prefilled so the

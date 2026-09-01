@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import CityAutocomplete from "@/components/CityAutocomplete";
+import { ORG_TYPES } from "@/lib/orgTypes";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import ConciergeDashboardBanner from "@/components/ConciergeDashboardBanner";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
@@ -347,6 +348,11 @@ export default function OrgDashboardPage() {
   // Owner flips off for calendars that don't map to AI ideation (soccer
   // team schedule, private book club with a fixed cadence, etc.).
   const [newCalSuggestStarters, setNewCalSuggestStarters] = useState(true);
+  // Empty = "inherit from the parent org", which is what every calendar
+  // created before this dropdown existed did (createCalendarUnderOrg copies
+  // the parent's orgType). Only a non-empty value is sent, so leaving this
+  // alone preserves the old behaviour exactly.
+  const [newCalOrgType, setNewCalOrgType] = useState("");
 
   // Plan detail modal
   const [selectedActivePlan, setSelectedActivePlan] = useState<CalActivePlan | null>(null);
@@ -994,6 +1000,10 @@ export default function OrgDashboardPage() {
       // Only send suggestStarters when toggled off — server defaults to
       // true, so the wire stays minimal on the happy path.
       if (!newCalSuggestStarters) params.suggestStarters = false;
+      // Omitted when blank so the server falls back to inheriting the parent
+      // org's type rather than writing an untyped calendar — every type-aware
+      // rule downstream keys off orgType.
+      if (newCalOrgType) params.orgType = newCalOrgType;
       const created = (await Parse.Cloud.run("createCalendarUnderOrg", params)) as
         | { calendarId?: string }
         | undefined;
@@ -1007,6 +1017,21 @@ export default function OrgDashboardPage() {
       setNewCalLng(null);
       setNewCalHideDeals(false);
       setNewCalSuggestStarters(true);
+      setNewCalOrgType("");
+      // Land the owner on the calendar they just made. The modal opens from
+      // Home/Grow/Settings too, where selecting it in state alone left them
+      // on the old tab looking at an unchanged screen. Done as one replace
+      // rather than setTab(...) + a second write so `tab` and `cal` land
+      // together; `cal` is what makes the selection survive a refresh
+      // (activeTab is seeded from the URL only at mount, so the state write
+      // is still required — the URL alone would not switch the pane).
+      if (created?.calendarId) {
+        setActiveTab("calendars");
+        const next = new URLSearchParams(searchParams.toString());
+        next.set("tab", "calendars");
+        next.set("cal", created.calendarId);
+        router.replace(`/dashboard/${calendarId}?${next.toString()}`, { scroll: false });
+      }
       fetchDashboard();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to add calendar";
@@ -2664,6 +2689,24 @@ export default function OrgDashboardPage() {
                 />
                 <p className="text-[11px] text-zinc-400 mt-1">
                   More specific = more accurate nearby-deal matching.
+                </p>
+              </div>
+              <div>
+                <label className="text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-400 block mb-1.5">Category</label>
+                <select
+                  value={newCalOrgType}
+                  onChange={(e) => setNewCalOrgType(e.target.value)}
+                  className="w-full border border-zinc-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-zinc-900"
+                >
+                  <option value="">Same as organization</option>
+                  {ORG_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.emoji} {type.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-zinc-400 mt-1">
+                  Shapes the plan suggestions. Leave as-is to match your organization.
                 </p>
               </div>
               <div className="flex items-center justify-between py-2">
