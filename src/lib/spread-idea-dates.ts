@@ -12,7 +12,9 @@
 // ideas still spread by week instead of stacking. Assignment is a stable
 // round-robin: ideas ordered by their original date walk forward through the
 // cadence slots week over week, skipping any day a real plan already owns so
-// a suggestion never shadows a confirmed event.
+// a suggestion never shadows a confirmed event. The walk stops at a fixed
+// horizon (MAX_WEEKS) so ideas can't drift into a season their copy was never
+// written for; anything left unslotted keeps the server's own date.
 //
 // Shared by the public /org calendar page and the owner dashboard's
 // suggested-plans list so both surfaces show the same fanned-out dates.
@@ -84,19 +86,42 @@ export function computeSpreadIdeaDates(
   const startOfWeek = new Date(earliest);
   startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // back to Sunday
   startOfWeek.setHours(0, 0, 0, 0);
-  const MAX_WEEKS = 52;
-  for (let week = 0; week < MAX_WEEKS && candidates.length < toFan.length; week++) {
-    for (const slot of slots) {
-      const d = new Date(startOfWeek);
-      d.setDate(startOfWeek.getDate() + week * 7 + slot.dow);
-      d.setHours(slot.hour, slot.minute, 0, 0);
-      if (d.getTime() < earliest.getTime()) continue;
-      const dayKey = dayKeyOf(d);
-      if (takenDays.has(dayKey)) continue;
-      takenDays.add(dayKey); // one suggestion per day
-      candidates.push(d);
-      if (candidates.length >= toFan.length) break;
+  // Horizon cap. Fanning out over a full year silently re-dates ideas months
+  // past the season their copy was written for: the server writes a plan for
+  // *today's* season, but an unbounded round-robin will happily hand the 13th
+  // idea a slot 14 weeks out — which is how a September-authored outdoor
+  // playground plan surfaced as a December afternoon in NYC.
+  const MAX_WEEKS = 6;
+  // Backlogged calendars carry far more ideas than a 6-week window has days
+  // (some hold hundreds). Rather than strand the overflow — which would drop
+  // it back to the server's single fallback date, restacking the very pile
+  // this module exists to break up, and sorting that pile *above* the fanned
+  // ideas — we re-walk the horizon in successive passes, doubling ideas up on
+  // a day only once every day in the window is spoken for. Days owned by real
+  // plans or by pinned ideas stay reserved in every pass: a suggestion must
+  // never shadow a confirmed event.
+  const fannedDays = new Set<string>();
+  for (let pass = 0; candidates.length < toFan.length; pass++) {
+    const filledBefore = candidates.length;
+    for (let week = 0; week < MAX_WEEKS && candidates.length < toFan.length; week++) {
+      for (const slot of slots) {
+        const d = new Date(startOfWeek);
+        d.setDate(startOfWeek.getDate() + week * 7 + slot.dow);
+        d.setHours(slot.hour, slot.minute, 0, 0);
+        if (d.getTime() < earliest.getTime()) continue;
+        const dayKey = dayKeyOf(d);
+        if (takenDays.has(dayKey)) continue;
+        // First pass keeps the one-suggestion-per-day rule; later passes
+        // revisit the same days to absorb the backlog in place.
+        if (pass === 0 && fannedDays.has(dayKey)) continue;
+        fannedDays.add(dayKey);
+        candidates.push(d);
+        if (candidates.length >= toFan.length) break;
+      }
     }
+    // Every day in the horizon is reserved by a real plan — no progress is
+    // possible, so leave the remainder on the server's date rather than spin.
+    if (candidates.length === filledBefore) break;
   }
 
   // Stable idea order: original date (nulls last), then id — so the same
