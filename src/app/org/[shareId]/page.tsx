@@ -181,6 +181,16 @@ interface NearbyVenue {
   flagged?: boolean;
 }
 
+// Shape returned by getPlanIdeaVenueForHosting. Everything but `name` may be
+// absent, and `placeId` is null for an owner-typed venue with no Google id.
+interface RevealedVenueResponse {
+  name?: string;
+  address?: string | null;
+  placeId?: string | null;
+  photoUrl?: string | null;
+  rating?: number | null;
+}
+
 // Stand-in placeId for a suggestion venue saved without a Google place id
 // (owner-typed venues). Never sent to the server — a pick still on the
 // suggested venue submits no `venue`, so the server keeps the suggestion's own
@@ -1522,6 +1532,22 @@ export default function OrgCalendarPage() {
   // Cover photo for the hosting suggestion's own venue — saved venues store no
   // photo, so we look one up from Places when the host modal opens.
   const [ideaVenuePhotoUrl, setIdeaVenuePhotoUrl] = useState<string | null>(null);
+  // The organizer's venue for a gated idea, fetched on demand when the host
+  // modal opens (getOrgCalendarPage redacts it for non-owners, so it is never
+  // in the page payload). Null until it arrives, or when the idea has none.
+  const [revealedVenue, setRevealedVenue] = useState<NearbyVenue | null>(null);
+  // Which idea the in-flight reveal belongs to, so a slow response can't land
+  // on a modal the user has since closed or reopened on a different idea.
+  const revealRequestRef = useRef<string | null>(null);
+  // The idea's own venue, with the redacted case filled in by the on-demand
+  // reveal. EVERY consumer must read this rather than calling
+  // suggestedVenueFor directly: the pinned carousel card, the pre-selection,
+  // and the "did the host change the venue?" submit check have to agree on
+  // one answer, and for a non-owner that answer only exists after the fetch.
+  const hostSuggestedVenue = useMemo(
+    () => suggestedVenueFor(hostingIdea) ?? revealedVenue,
+    [hostingIdea, revealedVenue],
+  );
   const [selectedVenue, setSelectedVenue] = useState<NearbyVenue | null>(null);
   // Custom plan creation state
   const [creatingCustomPlan, setCreatingCustomPlan] = useState(false);
@@ -2744,7 +2770,7 @@ export default function OrgCalendarPage() {
 
     // A suggestion that already has a venue IS the answer — don't sweep Places
     // for alternatives nobody asked for. Typing in the search box opts back in.
-    const ideaVenue = suggestedVenueFor(hostingIdea);
+    const ideaVenue = hostSuggestedVenue;
     if (ideaVenue && !typedVenueQuery) {
       setNearbyVenues([]);
       setSelectedVenue(ideaVenue);
@@ -2853,7 +2879,11 @@ export default function OrgCalendarPage() {
 
     }, debounceMs); // end setTimeout
     return () => clearTimeout(timer);
-  }, [hostingIdea, creatingCustomPlan, customCategory, venueSearchQuery, org]);
+  // hostSuggestedVenue is a dependency because for a non-owner it starts null
+  // and only becomes real when the on-demand reveal lands — without it the
+  // Places sweep would already have run and the organizer's venue would never
+  // get pinned or pre-selected.
+  }, [hostingIdea, creatingCustomPlan, customCategory, venueSearchQuery, org, hostSuggestedVenue]);
 
   // Sync the proposer-side "require approval" toggles to the calendar default
   // whenever a proposal form opens. Owners/hosts editing on the dashboard get
@@ -2863,6 +2893,32 @@ export default function OrgCalendarPage() {
     if (hostingIdea) {
       setHostRequireApproval(org?.requireApprovalDefault === true);
       setVenueSearchQuery(""); // clear the venue search each time the modal opens
+      // Reveal the organizer's venue for a gated idea. Someone volunteering to
+      // run the event needs to know where it is; the card stays redacted and
+      // this never rides along in the page payload. Failures are silent — the
+      // modal just falls back to the Places carousel, which is what a
+      // non-owner saw before this existed.
+      setRevealedVenue(null);
+      if (hostingIdea.location?.isPrivate === true) {
+        const ideaId = hostingIdea.id;
+        revealRequestRef.current = ideaId;
+        Parse.Cloud.run("getPlanIdeaVenueForHosting", { calendarPlanId: ideaId })
+          .then((res: { ok?: boolean; venue?: RevealedVenueResponse | null }) => {
+            // Ignore a late response for a modal the user has already left.
+            if (revealRequestRef.current !== ideaId) return;
+            if (!res?.ok || !res.venue?.name) return;
+            setRevealedVenue({
+              placeId: res.venue.placeId || SUGGESTED_VENUE_ID,
+              name: res.venue.name,
+              address: res.venue.address || "",
+              rating: res.venue.rating ?? null,
+              photoUrl: res.venue.photoUrl ?? null,
+            });
+          })
+          .catch(() => {});
+      } else {
+        revealRequestRef.current = null;
+      }
       // Start on the suggestion's own venue. Also covers ideas with no search
       // category, where the venue effect bails before it can select anything.
       const ideaVenue = suggestedVenueFor(hostingIdea);
@@ -3008,7 +3064,7 @@ export default function OrgCalendarPage() {
         // Omitting `venue` tells the server to keep the suggestion's own
         // location — right when the pick is still the suggested one, and it
         // preserves that location's already-resolved timezone.
-        venue: selectedVenue && selectedVenue.placeId !== suggestedVenueFor(hostingIdea)?.placeId ? {
+        venue: selectedVenue && selectedVenue.placeId !== hostSuggestedVenue?.placeId ? {
           placeId: selectedVenue.placeId,
           name: selectedVenue.name,
           address: selectedVenue.address,
@@ -5154,7 +5210,7 @@ export default function OrgCalendarPage() {
                       leads and search drops below it — swapping a settled
                       venue is the secondary action. */}
                   {(() => {
-                    const chosen = suggestedVenueFor(hostingIdea);
+                    const chosen = hostSuggestedVenue;
                     // Free-text venue search — type a specific place to
                     // override the AI's suggested category results.
                     const venueSearchInput = (
@@ -5193,7 +5249,7 @@ export default function OrgCalendarPage() {
                     {(() => {
                       // The suggestion's own venue leads the row (pre-selected);
                       // Places results follow, minus any duplicate of it.
-                      const base = suggestedVenueFor(hostingIdea);
+                      const base = hostSuggestedVenue;
                       const ideaVenue = base
                         ? { ...base, photoUrl: base.photoUrl || ideaVenuePhotoUrl }
                         : null;
