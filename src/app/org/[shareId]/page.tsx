@@ -295,6 +295,10 @@ interface OrgData {
   // or virtual-hosted). Skipped when rendering starter cards so a hosted
   // suggestion doesn't show twice. Positional — see server comment.
   hostedAiEventIndexes?: number[];
+  // Indices the owner/co-host deleted via dismissAiSourceEvent. Server resolves
+  // these from stored uids to today's positions, so they stay correct across an
+  // admin reorder of the array.
+  dismissedAiEventIndexes?: number[];
   // Owner-only payload for the "Let Leaf host it" band (spec §2, §6a).
   // Only present when the viewer is verified as the calendar owner
   // server-side — non-owner payloads omit this entirely so the persona
@@ -2490,6 +2494,9 @@ export default function OrgCalendarPage() {
           typeof result.aiSourceEventInterests === "object"
             ? result.aiSourceEventInterests
             : {},
+        dismissedAiEventIndexes: Array.isArray(result.dismissedAiEventIndexes)
+          ? (result.dismissedAiEventIndexes as number[])
+          : [],
         hostedAiEventIndexes: Array.isArray(result.hostedAiEventIndexes)
           ? (result.hostedAiEventIndexes as number[])
           : [],
@@ -4161,13 +4168,21 @@ export default function OrgCalendarPage() {
               // virtual-hosted) are dropped here so they don't render twice —
               // once as a starter card and once as the real plan above.
               const hostedIdx = new Set(org.hostedAiEventIndexes || []);
+              // Deleted by the owner — same skip-list treatment as hosted, so
+              // followers stop seeing a card the owner removed.
+              const dismissedIdx = new Set(org.dismissedAiEventIndexes || []);
               const rendered = org.aiSourceEvents
                 .map((ev, originalIndex) => ({
                   ev,
                   originalIndex,
                   resolved: resolveAIEventDate(ev),
                 }))
-                .filter((r) => r.resolved.date !== null && !hostedIdx.has(r.originalIndex))
+                .filter(
+                  (r) =>
+                    r.resolved.date !== null &&
+                    !hostedIdx.has(r.originalIndex) &&
+                    !dismissedIdx.has(r.originalIndex),
+                )
                 // Client-side chronological safety net — the server sorts
                 // on generate, but adopted calendars persisted before that
                 // sort landed still show in emit order. Cost is a stable

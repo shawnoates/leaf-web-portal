@@ -411,9 +411,11 @@ function IdeaCard({
 function AIStarterCard({
   plan,
   onClick,
+  onDelete,
 }: {
   plan: UpcomingPlan;
   onClick: () => void;
+  onDelete: () => void;
 }) {
   const isAmber = plan.aiTagVariant === "amber";
   return (
@@ -472,6 +474,25 @@ function AIStarterCard({
         >
           Suggestion
         </span>
+        {/* Delete. Hover-revealed on desktop so the rail stays calm — the
+            card's own click target is "host this", and a persistent × competes
+            with it. But an opacity-0 button is still TAPPABLE, and touch has no
+            hover: left hover-only, this would sit invisible over the top-right
+            of every card and swallow taps meant to open it. So it is always
+            visible below md, and hover-revealed only where a real cursor
+            exists. stopPropagation keeps it from also opening Create Plan. */}
+        <button
+          type="button"
+          aria-label={`Delete suggestion ${plan.title}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="absolute top-2 right-2 p-1 rounded-full bg-white/85 text-zinc-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 hover:bg-white hover:text-red-600 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+          style={{ backdropFilter: "blur(4px)" }}
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
       </div>
       <div className="p-3">
         <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
@@ -839,9 +860,17 @@ export default function PlansManager({
         imageUrl?: string | null;
         audienceTag?: string | null;
       }>;
+      // Suggestions the owner/co-host deleted via dismissAiSourceEvent. The
+      // server ships positions rather than filtering the array, because the
+      // index is the key for interest counts and the hosting attach — so the
+      // surviving entries have to keep their original positions. Filtering
+      // here (after the index is captured, not before) preserves that.
+      const dismissedAi = new Set<number>(
+        Array.isArray(page.dismissedAiEventIndexes) ? page.dismissedAiEventIndexes : [],
+      );
       const aiStarters: UpcomingPlan[] = aiEvents
         .map((ev, index) => ({ ev, index, resolved: resolveAIStarterDate(ev) }))
-        .filter((r) => r.resolved !== null)
+        .filter((r) => r.resolved !== null && !dismissedAi.has(r.index))
         .map(({ ev, index, resolved }) => ({
           objectId: `ai-${index}`,
           title: ev.title || ev.name,
@@ -999,6 +1028,26 @@ export default function PlansManager({
       alert(message);
     } finally {
       setSubscriptionLoading(false);
+    }
+  }
+
+  // Delete a starter suggestion (Groups.aiSourceEvents). These are plain JSON
+  // with no objectId, so removePlanIdea does not apply — dismissAiSourceEvent
+  // records the entry's uid on the calendar instead. Unlike handleRemoveIdea
+  // below, a failure is surfaced: the server rejects non-owners, and a silently
+  // swallowed 403 would look exactly like a successful delete until reload.
+  async function handleDismissAiStarter(plan: UpcomingPlan) {
+    const index = plan.aiEventIndex;
+    if (typeof index !== "number") return;
+    if (!confirm(`Delete the suggestion "${plan.title}"?`)) return;
+    const previous = aiStarterPlans;
+    setAiStarterPlans((prev) => prev.filter((p) => p.aiEventIndex !== index));
+    try {
+      await Parse.Cloud.run("dismissAiSourceEvent", { calendarId, eventIndex: index });
+    } catch (err) {
+      setAiStarterPlans(previous);
+      const msg = err instanceof Error ? err.message : "Please try again.";
+      alert(`Could not delete that suggestion. ${msg}`);
     }
   }
 
@@ -1624,6 +1673,7 @@ export default function PlansManager({
                     <AIStarterCard
                       key={`ai-${item.plan.objectId}`}
                       plan={item.plan}
+                      onDelete={() => handleDismissAiStarter(item.plan)}
                       onClick={() => {
                         setCreatePlanPrefill({
                           title: item.plan.title,
