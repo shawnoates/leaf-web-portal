@@ -58,6 +58,7 @@ const AnalyticsTab = dynamic(() => import("@/components/analytics/AnalyticsTab")
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { trackScorecard } from "@/lib/scorecard-track";
+import SettingsSwitch from "@/components/SettingsSwitch";
 import {
   Calendar,
   Check,
@@ -1120,6 +1121,42 @@ export default function OrgDashboardPage() {
   // here so the Calendars place can grow a Regenerate affordance without
   // re-plumbing. (PlansManager owns suggestions today.)
   void handleRegenerate;
+
+  // Notification preferences. A convenience for signed-in users; the tokenized
+  // /unsubscribe link in every email stays the compliance mechanism, because
+  // CAN-SPAM opt-out cannot require an account.
+  const [notifPrefs, setNotifPrefs] = useState<{ ownerDrip: boolean; chatDigest: boolean } | null>(null);
+  const [notifSaving, setNotifSaving] = useState<string | null>(null);
+  const [notifError, setNotifError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeTab !== "settings") return;
+    if (notifPrefs) return;
+    Parse.Cloud.run("getMyNotificationPrefs")
+      .then((r: { ownerDrip: boolean; chatDigest: boolean }) => setNotifPrefs(r))
+      .catch(() => setNotifPrefs(null));
+  }, [activeTab, notifPrefs]);
+
+  const updateNotifPref = useCallback(
+    async (key: "ownerDrip" | "chatDigest", value: boolean) => {
+      if (!notifPrefs) return;
+      const prev = notifPrefs;
+      setNotifPrefs({ ...notifPrefs, [key]: value }); // optimistic
+      setNotifSaving(key);
+      setNotifError(null);
+      try {
+        const r = await Parse.Cloud.run("setMyNotificationPrefs", { [key]: value });
+        setNotifPrefs(r as { ownerDrip: boolean; chatDigest: boolean });
+      } catch (e) {
+        // Roll back, or the switch silently lies about what the server holds.
+        setNotifPrefs(prev);
+        setNotifError(e instanceof Error ? e.message : "Could not save that.");
+      } finally {
+        setNotifSaving(null);
+      }
+    },
+    [notifPrefs]
+  );
 
   const handleInviteCoHost = useCallback(
     async (email: string, name: string, scope: { all: boolean; ids: string[] }) => {
@@ -2597,6 +2634,62 @@ export default function OrgDashboardPage() {
                     </section>
                   )}
                 </div>
+                )}
+
+                {/* Notifications — per person, not per calendar */}
+                {(!dashboard.isOwner || settingsSection === "general") && (
+                <section className={`border border-zinc-200 rounded-xl p-6 ${dashboard.isOwner ? "mt-8" : ""}`}>
+                  <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 mb-1">
+                    Email notifications
+                  </h2>
+                  <p className="text-xs text-zinc-500 mb-5">
+                    These apply to you, not to this calendar.
+                  </p>
+
+                  {notifPrefs === null ? (
+                    <p className="text-xs text-zinc-400">Loading…</p>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="text-sm text-zinc-900">Organizer emails</p>
+                          <p className="text-xs text-zinc-500 mt-0.5">
+                            Occasional notes about the calendars you run.
+                          </p>
+                        </div>
+                        <SettingsSwitch
+                          label="Organizer emails"
+                          checked={notifPrefs.ownerDrip}
+                          disabled={notifSaving === "ownerDrip"}
+                          onChange={(v) => updateNotifPref("ownerDrip", v)}
+                        />
+                      </div>
+
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="text-sm text-zinc-900">Chat digest</p>
+                          <p className="text-xs text-zinc-500 mt-0.5">
+                            A daily summary of messages in your plan chats.
+                          </p>
+                        </div>
+                        <SettingsSwitch
+                          label="Chat digest"
+                          checked={notifPrefs.chatDigest}
+                          disabled={notifSaving === "chatDigest"}
+                          onChange={(v) => updateNotifPref("chatDigest", v)}
+                        />
+                      </div>
+
+                      {notifError && (
+                        <p className="text-xs text-red-500">{notifError}</p>
+                      )}
+                      <p className="text-[11px] text-zinc-400 pt-1">
+                        You can also unsubscribe from any email using the link in its
+                        footer, without signing in.
+                      </p>
+                    </div>
+                  )}
+                </section>
                 )}
 
                 {/* Account — shown to everyone; the only logout on mobile,

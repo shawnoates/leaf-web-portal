@@ -291,6 +291,11 @@ interface OrgData {
         // Absent on rows generated before cohorts existed, and "any" when the
         // plan is deliberately open — both render without a chip.
         audienceTag?: string | null;
+        // Stable identity for this card, independent of its position in the
+        // array. Dismissals key on it, and so does the hosted-plan link —
+        // positions shift on every admin edit. Absent on rows minted before
+        // uids existed (backfillAIEventInterestUids stamps those).
+        uid?: string | null;
       }[]
     | null;
   // Per-event interest counts, keyed by eventIndex → count. Server
@@ -1629,6 +1634,17 @@ export default function OrgCalendarPage() {
   // change before proposing; "" leaves the inputs empty as before.
   const [customPrefillDate, setCustomPrefillDate] = useState("");
   const [customPrefillTime, setCustomPrefillTime] = useState("");
+  /**
+   * Which starter card opened the custom-plan drawer, if one did.
+   *
+   * Sent to requestCustomPlanViaWeb so the created plan carries a link back to
+   * the suggestion. Without it the server has no way to know the two are the
+   * same thing, and /org renders both — the card AND the plan it became. Null
+   * whenever the drawer was opened from scratch.
+   */
+  const [customPrefillAiSource, setCustomPrefillAiSource] = useState<
+    { index: number; uid: string | null } | null
+  >(null);
   const [customSubmitting, setCustomSubmitting] = useState(false);
   const [customSuccess, setCustomSuccess] = useState<false | true | "published">(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
@@ -1913,7 +1929,13 @@ export default function OrgCalendarPage() {
   // which is the intended split: confirming a suggestion verbatim publishes
   // immediately, changing it needs the owner's approval.
   const openSuggestionInCustomPlan = useCallback(
-    (ev: NonNullable<OrgData["aiSourceEvents"]>[number]) => {
+    (ev: NonNullable<OrgData["aiSourceEvents"]>[number], eventIndex: number) => {
+      // Remember which card this came from so the submit can link the plan
+      // back to it — otherwise the suggestion survives as a duplicate.
+      setCustomPrefillAiSource({
+        index: eventIndex,
+        uid: typeof ev.uid === "string" && ev.uid ? ev.uid : null,
+      });
       setCustomTitle(ev.title || ev.name);
       setCustomDescription(ev.description || ev.venueLine || ev.name);
       setCustomCategory(ev.name);
@@ -2677,6 +2699,7 @@ export default function OrgCalendarPage() {
       setCustomCapacity("");
       setCustomPrefillDate("");
       setCustomPrefillTime("");
+      setCustomPrefillAiSource(null);
       setHostNote("");
       setSelectedVenue(null);
       setCustomSubmitting(false);
@@ -3224,6 +3247,11 @@ export default function OrgCalendarPage() {
         capacity: customCapacity ? parseInt(customCapacity, 10) : undefined,
         hostNote: hostNote.trim() || undefined,
         imageUrl: selectedImageUrl || undefined,
+        // Link back to the starter card this was opened from, so the server
+        // can stamp it and /org stops rendering the suggestion beside the plan
+        // it became. Undefined for a from-scratch plan.
+        aiSourceEventIndex: customPrefillAiSource?.index,
+        aiSourceEventUid: customPrefillAiSource?.uid ?? undefined,
       });
       if (!isOwnerOrHost) {
         setVerifiedUserCookie(customVerify.name, customVerify.phone);
@@ -4595,6 +4623,7 @@ export default function OrgCalendarPage() {
                     setCustomCapacity("");
                     setCustomPrefillDate("");
                     setCustomPrefillTime("");
+                    setCustomPrefillAiSource(null);
                     setHostNote("");
                     setSelectedVenue(null);
                     setCustomSubmitting(false);
@@ -4666,6 +4695,7 @@ export default function OrgCalendarPage() {
               setCustomCategory("");
               setCustomPrefillDate("");
               setCustomPrefillTime("");
+              setCustomPrefillAiSource(null);
               setCustomFromDeal(true);
               setCreatingCustomPlan(true);
             }}
@@ -4736,6 +4766,7 @@ export default function OrgCalendarPage() {
                     setCustomCapacity("");
                     setCustomPrefillDate("");
                     setCustomPrefillTime("");
+                    setCustomPrefillAiSource(null);
                     setHostNote("");
                     setSelectedVenue(null);
                     setCustomSubmitting(false);
@@ -6780,7 +6811,7 @@ export default function OrgCalendarPage() {
                     onClick={() => {
                       setHostThisEventIndex(null);
                       if (canHostAsHost) openAIEventInDashboard(ev);
-                      else openSuggestionInCustomPlan(ev);
+                      else openSuggestionInCustomPlan(ev, eventIndex);
                     }}
                     disabled={hostThisSubmitting}
                     className="w-full px-6 py-3 text-xs uppercase tracking-widest font-medium border border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 disabled:opacity-50 transition-colors"
