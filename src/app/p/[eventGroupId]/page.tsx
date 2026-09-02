@@ -22,6 +22,9 @@ type PlanShareInfo = {
   // inline.
   location: { name: string | null; address: string | null; timezone: string | null } | null;
   host: { name: string } | null;
+  // The assigned roster host — the person who will physically be there, as
+  // distinct from `host` (whose plan it is). Null when none is assigned.
+  rosterHost: { name: string; photoUrl: string | null; bio: string } | null;
   shareId: string | null;
   calendarName: string | null;
   calendarIsPrivate: boolean;
@@ -248,6 +251,7 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
       expiryDate={info.expiryDate}
       location={info.location}
       hostName={info.host?.name ?? null}
+      rosterHost={info.rosterHost ?? null}
       calendarName={info.calendarName}
       calendarProfilePhoto={info.calendarProfilePhoto}
       shareId={info.shareId}

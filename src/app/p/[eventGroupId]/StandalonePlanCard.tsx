@@ -23,6 +23,9 @@ type Props = {
   // them back via onLocationRevealed so the card swaps in the values.
   location: { name: string | null; address: string | null; timezone: string | null } | null;
   hostName: string | null;
+  // The roster host who will physically be there — a different person from
+  // `hostName` (whose plan it is). Null unless one has been assigned.
+  rosterHost: { name: string; photoUrl: string | null; bio: string } | null;
   calendarName: string | null;
   calendarProfilePhoto: string | null;
   // Only present when variant === "privateCalendar"
@@ -48,6 +51,7 @@ export default function StandalonePlanCard({
   expiryDate,
   location,
   hostName,
+  rosterHost,
   calendarName,
   calendarProfilePhoto,
   shareId,
@@ -150,6 +154,40 @@ export default function StandalonePlanCard({
             <p className="text-sm text-zinc-600 whitespace-pre-wrap">
               {description}
             </p>
+          ) : null}
+
+          {/*
+            The assigned roster host. This block is the promise /hosts/apply
+            makes to applicants — "your photo and your description are shown to
+            the people attending that event" — so it renders their words
+            verbatim, not a summary, and shows nothing else about them.
+
+            Not gated behind RSVP like the address is. Knowing a friendly face
+            will be there is exactly the thing that gets a stranger over the
+            line into RSVPing, and unlike the venue it leaks nothing about who
+            else is coming or where anyone lives.
+          */}
+          {variant !== "copy" && rosterHost ? (
+            <div className="flex gap-3 rounded-lg bg-zinc-50 p-3">
+              {rosterHost.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={rosterHost.photoUrl}
+                  alt={rosterHost.name}
+                  className="h-12 w-12 shrink-0 rounded-full object-cover"
+                />
+              ) : null}
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-zinc-900">
+                  Your host, {rosterHost.name}
+                </p>
+                {rosterHost.bio ? (
+                  <p className="mt-0.5 text-sm text-zinc-600 whitespace-pre-wrap">
+                    {rosterHost.bio}
+                  </p>
+                ) : null}
+              </div>
+            </div>
           ) : null}
         </div>
 
