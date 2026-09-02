@@ -20,6 +20,7 @@ import {
   featuredWallClockDate,
   floatingIsoToInstant,
   tzOffsetMs,
+  calendarDayVisibilityCutoff,
 } from "@/lib/wall-clock";
 import { AUDIENCE_COHORT_LABELS } from "@/lib/audience-cohorts";
 import { isVenueBlacklisted } from "@/lib/venue-blacklist";
@@ -466,9 +467,12 @@ function resolveAIEventDate(
     // Hide past fixed-date events (that game is over, that concert
     // already happened) — the list should stay actionable. Anchored to the
     // calendar's zone: the floating value is hours off as an instant, and
-    // comparing it raw retired each card early by exactly that offset.
+    // comparing it raw retired each card early by exactly that offset. Same
+    // cutoff the server uses for real plans, so a card and the plan it becomes
+    // leave the page together.
     const instant = floatingIsoToInstant(ev.isoDatetime, timeZone) ?? d;
-    if (instant.getTime() < Date.now() - 3 * 60 * 60 * 1000) return NO_AI_EVENT_DATE;
+    if (instant.getTime() <= calendarDayVisibilityCutoff(timeZone).getTime())
+      return NO_AI_EVENT_DATE;
     return { date: d, instant, isWeekly: false };
   }
 

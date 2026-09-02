@@ -87,6 +87,47 @@ export function floatingIsoToInstant(
   }
 }
 
+/** Minimum visibility after start, when end-of-local-day would be sooner. */
+export const PLAN_MIN_GRACE_MS = 3 * 60 * 60 * 1000;
+
+/**
+ * Lower bound on a plan/suggestion's start for it to still be worth showing:
+ * visible while `start > cutoff`.
+ *
+ * A plan stays up until the end of its own local day, with a 3h floor so an
+ * 11 PM plan doesn't vanish at midnight. Mirrors the server's
+ * `calendarDayVisibilityCutoff` (cloud/timezone-utils.js) — the card filter
+ * and the plans query have to agree, or a card and the plan it became
+ * disappear at different times.
+ */
+export function calendarDayVisibilityCutoff(
+  timeZone: string | null,
+  now: Date = new Date(),
+  minGraceMs: number = PLAN_MIN_GRACE_MS,
+): Date {
+  const floor = new Date(now.getTime() - minGraceMs);
+  if (!timeZone) return floor;
+  try {
+    // Local midnight today: read now's calendar date in the zone, then
+    // resolve that date at 00:00 back to an instant.
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(now);
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+    const midnight = floatingIsoToInstant(
+      `${get("year")}-${get("month")}-${get("day")}T00:00:00Z`,
+      timeZone,
+    );
+    if (!midnight) return floor;
+    return midnight.getTime() < floor.getTime() ? midnight : floor;
+  } catch {
+    return floor;
+  }
+}
+
 /**
  * The calendar DAY a featured suggestion happens on, as a local Date.
  *
