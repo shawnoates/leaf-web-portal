@@ -76,6 +76,10 @@ interface HostPlan {
   time: string | null;
   venueName: string | null;
   venueAddress: string | null;
+  // Queue target for the popup's "Interested" tap. Null when the idea's
+  // lookupLocations join is empty or corrupt — interest still counts, the
+  // bookmark is just skipped.
+  venueId?: string | null;
   calendarId: string | null;
   calendarName: string;
   calendarShareId: string | null;
@@ -97,6 +101,11 @@ interface HostCalRow {
 interface NeedsHost {
   tier1: HostPlan[];
   tier2: HostCalRow[];
+  // The one idea worth auto-opening a modal for: at least a week out, so
+  // saying yes is a plan rather than a scramble. Server-picked and
+  // server-deduped (PlanIdeaPopupSeen), and drawn from the whole needs-host
+  // list rather than tier1 — tier1 is the expiring end of it.
+  popup?: HostPlan | null;
 }
 // Spot interest probe (To Plan v2 §C4). Venue-framed by design: the payload
 // carries no owner identity and the card must never imply "someone you know".
@@ -434,11 +443,6 @@ function readParkedDraft(): NewPlanDraftSnapshot | null {
     return null;
   }
 }
-/** Newest pending probe this reader hasn't been shown yet — the popup fires
- *  once per probe, and dismissing without answering still counts as shown. */
-function firstUnseenProbe(probes: SpotProbe[] | undefined): SpotProbe | null {
-  return (probes || []).find((p) => p && p.probeId && p.status === "pending" && !p.seenAt) || null;
-}
 
 /** The one unrated plan worth interrupting for: never shown before, and recent
  *  enough that photos are still open. Everything older waits in the rail —
@@ -533,18 +537,23 @@ function DashboardView({
     (r) => r && r.notificationId && !answeredRecapIds.includes(r.notificationId),
   );
 
-  // One-tap probe popup: fires once per unseen pending probe, newest first.
-  // Seen is stamped server-side the moment it shows — dismissing without
-  // answering still means it never pops again; the inline section remains.
-  const [popupProbe, setPopupProbe] = useState<SpotProbe | null>(
-    () => (firstUnseenRecap(data.pendingRecaps) ? null : firstUnseenProbe(data.spotProbes)),
+  // Needs-a-host popup: one idea, at least a week out, server-picked and
+  // server-deduped. Seen is stamped the moment it shows, so dismissing without
+  // answering still means it never pops again — the idea stays in the rail and
+  // on the calendar either way.
+  //
+  // Spot probes no longer auto-open at all; they live in PlacesRail only. A
+  // venue question and a hostable plan were competing for the same one modal,
+  // and only one of them is something a person can act on.
+  const [popupIdea, setPopupIdea] = useState<HostPlan | null>(
+    () => (firstUnseenRecap(data.pendingRecaps) ? null : data.needsHost?.popup || null),
   );
   const [popupAnsweredId, setPopupAnsweredId] = useState<string | null>(null);
   useEffect(() => {
-    if (!popupProbe) return;
-    Parse.Cloud.run("markSpotProbesSeen", { probeIds: [popupProbe.probeId] }).catch(() => {});
-    // Stamped once, on the probe this mount chose to show — a later refetch
-    // must not re-fire it, so this deliberately doesn't track popupProbe.
+    if (!popupIdea) return;
+    Parse.Cloud.run("markPlanIdeaPopupSeen", { ideaIds: [popupIdea.ideaId] }).catch(() => {});
+    // Stamped once, on the idea this mount chose to show — a later refetch
+    // must not re-fire it, so this deliberately doesn't track popupIdea.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const places = (data.spotProbes || []).filter(
@@ -721,11 +730,11 @@ function DashboardView({
         <PlanModal plan={openPlan} onClose={() => setOpenPlanId(null)} onRsvp={onRsvp} />
       )}
 
-      {popupProbe && (
-        <ProbePopup
-          probe={popupProbe}
-          onClose={() => setPopupProbe(null)}
-          onAnswered={(id) => setPopupAnsweredId(id)}
+      {popupIdea && (
+        <NeedsHostPopup
+          idea={popupIdea}
+          onClose={() => setPopupIdea(null)}
+          onHosted={onRefresh}
         />
       )}
 
@@ -1291,62 +1300,102 @@ function CalendarsRail({ rows }: { rows: HostCalRow[] }) {
   );
 }
 
-// ---- One-tap probe popup ---------------------------------------------------
-// Same guardrails as PlacesRail: one tap either way, no guilt copy, and
-// closing without answering is a first-class exit (the inline row stays).
-function ProbePopup({
-  probe, onClose, onAnswered,
+// ---- Needs-a-host popup ----------------------------------------------------
+// One idea, at least a week out (the server picks it), with the full ladder of
+// answers: host it, say you'd go, or leave. Same guardrails as PlacesRail — no
+// guilt copy, and closing without answering is a first-class exit. The idea
+// stays in the rail and on its calendar whatever happens here.
+//
+// "Interested" is deliberately more than a counter: it also drops the venue in
+// this person's own queue (queuePlanIdeaVenue), so a yes leaves them something
+// they can see later instead of evaporating into the calendar's tally.
+function NeedsHostPopup({
+  idea, onClose, onHosted,
 }: {
-  probe: SpotProbe;
+  idea: HostPlan;
   onClose: () => void;
-  onAnswered: (probeId: string) => void;
+  onHosted: () => Promise<void>;
 }) {
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState<"interested" | null>(null);
+  const [hosting, setHosting] = useState(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const v = probe.venueSnapshot;
-  const catHood = [v?.category, v?.neighborhood].filter(Boolean).join(" · ");
+  const when = idea.date
+    ? [weekday(idea.date), monthDay(idea.date), fmtTime(idea.time, idea.date)]
+      .filter(Boolean).join(" · ")
+    : "";
+  const where = idea.venueName || idea.venueAddress;
 
-  function respond(response: "interested" | "passed") {
+  function markInterested() {
     if (done) return;
-    setDone(true);
-    onAnswered(probe.probeId);
-    Parse.Cloud.run("respondToSpotProbe", {
-      probeId: probe.probeId, response, respondedVia: "me_popup",
-    }).catch(() => {});
-    window.setTimeout(onClose, 1100);
+    setDone("interested");
+    markPlanIdeaLocallyInterested(idea.ideaId);
+    const cookie = getOrCreateInterestCookie();
+    Parse.Cloud.run("expressInterestOnPlanIdea", { ideaId: idea.ideaId, cookie }).catch(() => {});
+    // Separate call on purpose: the queue write is a convenience for one
+    // person and must never cost the calendar its interest count if it fails.
+    Parse.Cloud.run("queuePlanIdeaVenue", { ideaId: idea.ideaId }).catch(() => {});
+    window.setTimeout(onClose, 1400);
+  }
+
+  // The host flow replaces the popup rather than stacking on it — two modals
+  // deep for one tap is a trap on mobile.
+  if (hosting) {
+    return (
+      <HostIdeaModal
+        idea={{
+          objectId: idea.ideaId,
+          title: idea.title,
+          image: idea.image,
+          category: idea.category,
+          centroid: idea.venueAddress,
+          location: idea.venueName && idea.venueAddress
+            ? { name: idea.venueName, address: idea.venueAddress }
+            : null,
+          preferredTime: idea.time,
+        }}
+        prefillDate={parse(idea.date)}
+        hostName={Parse.User.current()?.get("full_name") || null}
+        hostPhone={Parse.User.current()?.get("phone") || null}
+        onClose={onClose}
+        onHosted={() => { onHosted().catch(() => {}); onClose(); }}
+      />
+    );
   }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card probe-pop" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <button className="modal-x" onClick={onClose} aria-label="Close">×</button>
-        {v?.imageURL && (
+        {idea.image && (
           <div className="modal-img">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={v.imageURL} alt="" />
+            <img src={idea.image} alt="" />
           </div>
         )}
         <div className="modal-body">
           {done ? (
-            <div className="probe-thanks">Got it</div>
+            <div className="probe-thanks">Got it — saved to your queue</div>
           ) : (
             <>
-              {probe.calendarName && <div className="row-cal">{probe.calendarName}</div>}
-              <h2 className="modal-title">{v?.name || "A spot nearby"}</h2>
-              {catHood && <div className="hero-ctx">{catHood}</div>}
+              <div className="row-cal">{idea.calendarName}</div>
+              <h2 className="modal-title">{idea.title}</h2>
+              {(when || where) && (
+                <div className="hero-ctx">{[when, where].filter(Boolean).join(" · ")}</div>
+              )}
               <p className="modal-blurb">
-                {probe.window?.label
-                  ? `${probe.window.label} could work — would you go?`
-                  : "Would you go sometime?"}
+                Nobody&rsquo;s hosting this yet
+                {idea.interestedCount > 0 ? ` — ${idea.interestedCount} interested` : ""}.
+                Want to take it?
               </p>
               <div className="hero-actions flat">
-                <button className="hostbtn" onClick={() => respond("interested")}>Interested</button>
-                <button className="btn ghost" onClick={() => respond("passed")}>Not for me</button>
+                <button className="hostbtn" onClick={() => setHosting(true)}>Host this</button>
+                <button className="btn ghost" onClick={markInterested}>Interested</button>
+                <button className="btn ghost" onClick={onClose}>Skip</button>
               </div>
             </>
           )}
