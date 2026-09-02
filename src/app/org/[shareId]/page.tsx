@@ -15,7 +15,12 @@ import VirtualHostBadge from "@/components/VirtualHostBadge";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
-import { zoneOffsetSuffix, featuredWallClockDate } from "@/lib/wall-clock";
+import {
+  zoneOffsetSuffix,
+  featuredWallClockDate,
+  floatingIsoToInstant,
+  tzOffsetMs,
+} from "@/lib/wall-clock";
 import { AUDIENCE_COHORT_LABELS } from "@/lib/audience-cohorts";
 import { isVenueBlacklisted } from "@/lib/venue-blacklist";
 import { fetchVenuePhotoUrl } from "@/lib/google-places";
@@ -427,11 +432,25 @@ function isPlanIdeaLocallyInterested(ideaId: string): boolean {
 //   don't leak through.
 //
 // Returns { date: Date | null, isWeekly: boolean }.
-function resolveAIEventDate(ev: {
-  time?: string;
-  isoDatetime?: string | null;
-  dateISO?: string | null;
-}): { date: Date | null; isWeekly: boolean } {
+//
+const NO_AI_EVENT_DATE = { date: null, instant: null, isWeekly: false } as const;
+//
+// Returns TWO dates, and they are not interchangeable:
+//   `date`    — the FLOATING wall clock (see FLOATING_EVENT_TZ). Read it with
+//               UTC getters or format it in UTC; that yields the hour the
+//               generator wrote, for every viewer. This is the display value.
+//   `instant` — the real moment that wall clock names in the calendar's zone.
+//               This is the ONLY value that may be compared to `Date.now()`.
+// Conflating them is what hid an 8:30 PM Eastern card at 7:30 PM: the floating
+// value is 20:30Z, which as an instant is 4:30 PM, already past the 3h grace.
+function resolveAIEventDate(
+  ev: {
+    time?: string;
+    isoDatetime?: string | null;
+    dateISO?: string | null;
+  },
+  timeZone: string | null = null,
+): { date: Date | null; instant: Date | null; isWeekly: boolean } {
   const timeStr = String(ev.time || "").trim();
   const MONTH_RX = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i;
   // A dateISO on the event means the server locked a specific calendar
@@ -441,13 +460,16 @@ function resolveAIEventDate(ev: {
   const isFixedDate = MONTH_RX.test(timeStr) || !!(ev.dateISO && /^\d{4}-\d{2}-\d{2}$/.test(ev.dateISO));
 
   if (isFixedDate) {
-    if (!ev.isoDatetime) return { date: null, isWeekly: false };
+    if (!ev.isoDatetime) return NO_AI_EVENT_DATE;
     const d = new Date(ev.isoDatetime);
-    if (Number.isNaN(d.getTime())) return { date: null, isWeekly: false };
+    if (Number.isNaN(d.getTime())) return NO_AI_EVENT_DATE;
     // Hide past fixed-date events (that game is over, that concert
-    // already happened) — the list should stay actionable.
-    if (d.getTime() < Date.now() - 3 * 60 * 60 * 1000) return { date: null, isWeekly: false };
-    return { date: d, isWeekly: false };
+    // already happened) — the list should stay actionable. Anchored to the
+    // calendar's zone: the floating value is hours off as an instant, and
+    // comparing it raw retired each card early by exactly that offset.
+    const instant = floatingIsoToInstant(ev.isoDatetime, timeZone) ?? d;
+    if (instant.getTime() < Date.now() - 3 * 60 * 60 * 1000) return NO_AI_EVENT_DATE;
+    return { date: d, instant, isWeekly: false };
   }
 
   // Weekly path — parse weekday + time from the display string and
@@ -466,35 +488,64 @@ function resolveAIEventDate(ev: {
     .match(/\b(sun|sunday|mon|monday|tue|tues|tuesday|wed|weds|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday)\b/);
   if (!weekdayMatch) {
     // No weekday in the string — fall back to the stored isoDatetime.
-    if (!ev.isoDatetime) return { date: null, isWeekly: false };
+    if (!ev.isoDatetime) return NO_AI_EVENT_DATE;
     const d = new Date(ev.isoDatetime);
-    if (Number.isNaN(d.getTime())) return { date: null, isWeekly: false };
-    return { date: d, isWeekly: true };
+    if (Number.isNaN(d.getTime())) return NO_AI_EVENT_DATE;
+    return {
+      date: d,
+      instant: floatingIsoToInstant(ev.isoDatetime, timeZone) ?? d,
+      isWeekly: true,
+    };
   }
   const targetDow = WEEKDAYS[weekdayMatch[1]];
 
   const timeMatch = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*([ap]m)?/i);
-  if (!timeMatch) return { date: null, isWeekly: true };
+  if (!timeMatch) return NO_AI_EVENT_DATE;
   let hour = parseInt(timeMatch[1], 10);
   const minute = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
   const meridiem = timeMatch[3] ? timeMatch[3].toLowerCase() : null;
   if (meridiem === "pm" && hour < 12) hour += 12;
   if (meridiem === "am" && hour === 12) hour = 0;
   if (Number.isNaN(hour) || Number.isNaN(minute) || hour > 23 || minute > 59)
-    return { date: null, isWeekly: true };
+    return NO_AI_EVENT_DATE;
 
+  // "Which day is next Friday" is a question about the CALENDAR's clock, not
+  // the viewer's: a Pacific reader at 11 PM Tuesday is already Wednesday in
+  // Brooklyn and would otherwise resolve a week off. Shifting `now` by the
+  // zone offset lets the UTC getters read as that calendar's wall clock.
   const now = new Date();
-  const currentDow = now.getDay();
+  const offsetMs = timeZone
+    ? tzOffsetMs(now, timeZone)
+    : -now.getTimezoneOffset() * 60 * 1000;
+  const nowWall = new Date(now.getTime() + offsetMs);
+  const currentDow = nowWall.getUTCDay();
   let daysUntil = (targetDow - currentDow + 7) % 7;
   if (daysUntil === 0) {
-    const nowHour = now.getHours();
-    const nowMin = now.getMinutes();
+    const nowHour = nowWall.getUTCHours();
+    const nowMin = nowWall.getUTCMinutes();
     if (hour < nowHour || (hour === nowHour && minute <= nowMin)) daysUntil = 7;
   }
-  const target = new Date(now);
-  target.setDate(now.getDate() + daysUntil);
-  target.setHours(hour, minute, 0, 0);
-  return { date: target, isWeekly: true };
+  const targetWall = new Date(nowWall.getTime() + daysUntil * 24 * 60 * 60 * 1000);
+  // Built as a floating value (wall clock stamped UTC) so it renders through
+  // FLOATING_EVENT_TZ identically to the fixed-date branch. The old code
+  // returned a browser-local Date here, which the UTC formatter then shifted
+  // by the viewer's offset — weekly cards showed the wrong hour.
+  const date = new Date(
+    Date.UTC(
+      targetWall.getUTCFullYear(),
+      targetWall.getUTCMonth(),
+      targetWall.getUTCDate(),
+      hour,
+      minute,
+      0,
+      0,
+    ),
+  );
+  return {
+    date,
+    instant: floatingIsoToInstant(date.toISOString(), timeZone) ?? date,
+    isWeekly: true,
+  };
 }
 
 
@@ -1808,13 +1859,16 @@ export default function OrgCalendarPage() {
       if (ev.description) params.set("prefillDescription", ev.description);
       // resolved.date is a validated Date for any suggestion that rendered;
       // format as the drawer's input types expect.
-      const d = resolveAIEventDate(ev).date;
+      // UTC getters, not local: `date` is a floating wall clock, so the UTC
+      // face IS the hour the card displays. Local getters shifted the prefill
+      // by the viewer's offset — an 8:30 PM card opened the drawer at 4:30 PM.
+      const d = resolveAIEventDate(ev, org.orgTimezone ?? null).date;
       if (d) {
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        const hh = String(d.getHours()).padStart(2, "0");
-        const mm = String(d.getMinutes()).padStart(2, "0");
+        const y = d.getUTCFullYear();
+        const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(d.getUTCDate()).padStart(2, "0");
+        const hh = String(d.getUTCHours()).padStart(2, "0");
+        const mm = String(d.getUTCMinutes()).padStart(2, "0");
         params.set("prefillDate", `${y}-${m}-${day}`);
         params.set("prefillTime", `${hh}:${mm}`);
       }
@@ -1872,14 +1926,15 @@ export default function OrgCalendarPage() {
             }
           : null,
       );
-      const d = resolveAIEventDate(ev).date;
+      // UTC getters — see the prefill above; `date` is a floating wall clock.
+      const d = resolveAIEventDate(ev, org?.orgTimezone ?? null).date;
       if (d) {
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
+        const y = d.getUTCFullYear();
+        const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(d.getUTCDate()).padStart(2, "0");
         setCustomPrefillDate(`${y}-${m}-${day}`);
         setCustomPrefillTime(
-          `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
+          `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`,
         );
       } else {
         setCustomPrefillDate("");
@@ -1887,7 +1942,7 @@ export default function OrgCalendarPage() {
       }
       setCreatingCustomPlan(true);
     },
-    [],
+    [org?.orgTimezone],
   );
 
   // Hydrate "already interested" from localStorage on mount so the
@@ -2488,6 +2543,13 @@ export default function OrgCalendarPage() {
         followRequestPending: result.followRequestPending || false,
         requireApprovalDefault: result.requireApprovalDefault === true,
         allowFollowersToHost: result.allowFollowersToHost !== false,
+        // The zone starter-event wall clocks are anchored to. Typed since the
+        // server started sending it, but never actually read off the payload —
+        // so every AI-event date resolved with no zone at all.
+        orgTimezone:
+          typeof result.orgTimezone === "string" && result.orgTimezone
+            ? result.orgTimezone
+            : null,
         aiSourceEvents: visibleAiSourceEvents,
         aiSourceEventInterests:
           result.aiSourceEventInterests &&
@@ -3922,7 +3984,7 @@ export default function OrgCalendarPage() {
             entry: {
               ev: NonNullable<OrgData["aiSourceEvents"]>[number];
               originalIndex: number;
-              resolved: { date: Date | null; isWeekly: boolean };
+              resolved: { date: Date | null; instant: Date | null; isWeekly: boolean };
             },
             index: number
           ) => {
@@ -4175,7 +4237,7 @@ export default function OrgCalendarPage() {
                 .map((ev, originalIndex) => ({
                   ev,
                   originalIndex,
-                  resolved: resolveAIEventDate(ev),
+                  resolved: resolveAIEventDate(ev, org.orgTimezone ?? null),
                 }))
                 .filter(
                   (r) =>
@@ -6346,7 +6408,7 @@ export default function OrgCalendarPage() {
           aiInterestCounts[eventIndex] ??
           org.aiSourceEventInterests?.[eventIndex] ??
           0;
-        const resolvedDate = resolveAIEventDate(ev).date;
+        const resolvedDate = resolveAIEventDate(ev, org.orgTimezone ?? null).date;
         const whenLabel = resolvedDate
           ? `${formatDate(
               resolvedDate.toISOString(),

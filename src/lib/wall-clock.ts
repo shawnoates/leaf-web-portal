@@ -31,6 +31,63 @@ export function zoneOffsetSuffix(dateStr: string, timeStr: string, timeZone: str
 }
 
 /**
+ * UTC offset in ms for an instant in a given IANA zone. Mirrors the server's
+ * `getTimezoneOffsetMs` (cloud/timezone-utils.js) so both sides resolve DST
+ * identically.
+ */
+export function tzOffsetMs(instant: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(instant);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const asUTC = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    // Intl renders midnight as "24" in some engines.
+    get("hour") % 24,
+    get("minute"),
+    get("second"),
+  );
+  return asUTC - instant.getTime();
+}
+
+/**
+ * A FLOATING ISO string — a wall clock stamped with a `Z` it never earned —
+ * resolved to the real instant it names in `timeZone`.
+ *
+ * `aiSourceEvents[].isoDatetime` is written this way (see FLOATING_EVENT_TZ in
+ * the /org page): "8:30 PM" is stored as `...T20:30:00Z`, which as an actual
+ * moment is 4:30 PM Eastern. Reading it with a bare `new Date()` is right for
+ * DISPLAY (formatted back out in UTC, it returns the generator's wall clock to
+ * every viewer) and wrong for everything else — comparing it to `Date.now()`
+ * hid day-of cards hours early, and it stamped hosted plans at the wrong time.
+ *
+ * Mirrors the server's `parseFloatingIsoInTimezone`, single-pass, so the two
+ * agree. Falls back to the bare read when no zone is known.
+ */
+export function floatingIsoToInstant(
+  iso: string,
+  timeZone: string | null,
+): Date | null {
+  const wallAsUTC = new Date(iso);
+  if (Number.isNaN(wallAsUTC.getTime())) return null;
+  if (!timeZone) return wallAsUTC;
+  try {
+    return new Date(wallAsUTC.getTime() - tzOffsetMs(wallAsUTC, timeZone));
+  } catch {
+    return wallAsUTC;
+  }
+}
+
+/**
  * The calendar DAY a featured suggestion happens on, as a local Date.
  *
  * Read off `localWallClock` (the string the admin typed, verbatim) rather than
