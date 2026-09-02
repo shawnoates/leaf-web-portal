@@ -20,7 +20,6 @@ import {
   featuredWallClockDate,
   floatingIsoToInstant,
   tzOffsetMs,
-  calendarDayVisibilityCutoff,
   planLifecycle,
 } from "@/lib/wall-clock";
 import { AUDIENCE_COHORT_LABELS } from "@/lib/audience-cohorts";
@@ -475,15 +474,14 @@ function resolveAIEventDate(
     if (!ev.isoDatetime) return NO_AI_EVENT_DATE;
     const d = new Date(ev.isoDatetime);
     if (Number.isNaN(d.getTime())) return NO_AI_EVENT_DATE;
-    // Hide past fixed-date events (that game is over, that concert
-    // already happened) — the list should stay actionable. Anchored to the
-    // calendar's zone: the floating value is hours off as an instant, and
-    // comparing it raw retired each card early by exactly that offset. Same
-    // cutoff the server uses for real plans, so a card and the plan it becomes
-    // leave the page together.
+    // A starter card is ALWAYS "Waiting on host" — nobody has committed to
+    // running it — so it retires at its own start time, not at the end of the
+    // local day the way a hosted plan does. A 9 AM suggestion still sitting
+    // there at 11 AM is advertising something that never happened.
+    // Anchored to the calendar's zone: the stored value is a floating wall
+    // clock, so comparing it raw retires the card early by the UTC offset.
     const instant = floatingIsoToInstant(ev.isoDatetime, timeZone) ?? d;
-    if (instant.getTime() <= calendarDayVisibilityCutoff(timeZone).getTime())
-      return NO_AI_EVENT_DATE;
+    if (instant.getTime() <= Date.now()) return NO_AI_EVENT_DATE;
     return { date: d, instant, isWeekly: false };
   }
 
