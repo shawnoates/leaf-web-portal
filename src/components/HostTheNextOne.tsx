@@ -162,7 +162,7 @@ export default function HostTheNextOne({
 
   const headline =
     source === "idea" ? "Host the next one" : "Host another like this";
-  const ctaLabel = "Host Another";
+  const ctaLabel = "Host This";
   const subhead =
     source === "idea"
       ? "Pick this up — it's pre-loaded with details. Choose a date and confirm."

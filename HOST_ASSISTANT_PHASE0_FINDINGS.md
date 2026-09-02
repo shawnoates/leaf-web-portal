@@ -33,7 +33,7 @@ Two corrections to the brief's stated assumptions, both load-bearing:
 | 2.1 | Approver role | Hard-coded to `proposal.get('owner')` | **Owner-specific**, `_requireProposalOwner:51` |
 | 2.1 | Audit trail | `transitions` array + `_recordTransition:130` | **Reusable as-is** (copy the helper) |
 | 2.2 | Post-first-approval preference capture | `prefsPrompt` flag `:510`, `setConciergeReviewMode` `:578`, field `conciergeReviewMode` | **Needs generalization** — server side is thin and copyable; the UI is web-only and does not exist on iOS |
-| 2.3 | Push provider | Parse Server built-in push. APNs `.p8` token auth; Android on **legacy GCM** | Reusable for iOS; **Android is likely broken** (§2.3) |
+| 2.3 | Push provider | Parse Server built-in push. APNs `.p8` token auth | **Reusable as-is** (iOS only — Android app is deprecated) |
 | 2.3 | Notification categories with actions | — | **Does not exist.** Zero `UNNotificationCategory` in the iOS codebase |
 | 2.3 | Action-tap handling | — | **Does not exist.** No `UNUserNotificationCenterDelegate` at all |
 | 2.3 | Deep link router | `leaf-appcode/Leaflet/AppDelegate.swift:83`, `PushNotificationManager` | **Reusable, needs a new case** |
@@ -121,11 +121,9 @@ The UI half **does not transfer at all**: the existing component is React in the
 Parse Server's built-in push (`parse-server@7.5.0`, `@parse/push-adapter`), configured at `leaflets-server/index.js:120`:
 
 - **iOS:** APNs token auth, `push/AuthKey_4A34DW47VQ.p8`, teamId `P2Q3GJZDXM`, topic `com.kontrast.leaflets`. Both a `production: false` and a `production: true` provider are registered; the adapter tries them in priority order.
-- **Android:** `{ apiKey: 'AAAA...' }` — the **legacy GCM/FCM server key**.
+- **Android:** a legacy GCM/FCM server key is still configured, but **the Android app is deprecated** — iOS is the only client that matters for this feature. The stale config is dead weight, not a risk.
 
 Tokens are stored on the standard Parse `Installation` class, registered in `leaf-appcode/Leaflet/AppDelegate.swift:44`, which sets `installation["user"]`, `channels = ["global"]`, and app-version fields. Reachability filtering is centralized in `leaflets-server/helpers/pushReachability.js` (`activeInstallationQuery()`) — **use it**, it is what keeps the send path and the SMS-fallback check from disagreeing.
-
-> **Flag for Shawn — Android push is probably dead.** `@parse/push-adapter/src/ParsePushAdapter.js:50` selects `FCM` only when the config has a `firebaseServiceAccount` key; ours has `apiKey`, so it instantiates the legacy `GCM` sender. Google decommissioned the legacy FCM/GCM HTTP APIs in mid-2024. This is not a blocker for this feature (host nudges can ship iOS-first) but it means the Android half of any push feature is silently no-op'ing, and it should be verified independently of this work.
 
 #### 2.3.2 Categories with actions — the good news and the bad news
 
@@ -328,7 +326,7 @@ This did not have a line in the Phase 0 checklist, but it materially affects §7
 | `sendPlan7DayReminders` | T-7d | All attendees (push + SMS) | — |
 | `sendPlanRsvpReminders` (`:33228`) | T-24h | All attendees (push + SMS) | `rsvp_nudge` |
 | `sendPlan4HourReminders` | T-4h | All attendees (push + SMS) | **`day_of_details`** (T-3h) |
-| `sendEventPhotoRecapSms` (`:37242`) | end +~4h | Accepted attendees | **`post_recap`** |
+| `sendEventPhotoRecapSms` (`:37364`) | end +~4h | Accepted attendees **and the host** | **`post_recap`**, **`thank_you`** |
 
 `sendHostPlanHypeSms` deserves particular attention: it is **already a host nudge, already guarded on chat emptiness**. It fires at T-24h to the host by SMS, skips if `hostNotif.chatOpenedAt` is set, and skips if fewer than 2 attendees have accepted. That is `kickoff_chat`'s guard logic, shipped, in a different channel, at a different time.
 
@@ -340,9 +338,104 @@ Consequences:
 
 ---
 
-## 4. Open decisions for Shawn
+## 4. Addendum: the `thank_you` task type
 
-Carrying forward the brief's five, with what Phase 0 learned, plus three new ones.
+Added to scope after Phase 0 review. Recorded here because the existing post-event
+machinery constrains how it should be built.
+
+### 4.1 What already happens after a plan ends
+
+The rating request is real, and it is worth being precise about what it is, because
+its shape decides what `thank_you` should and should not say.
+
+`sendEventPhotoRecapSms` (`cloud/functions.js:37364`, cron `20 * * * *`) fires on
+plans whose `expiryDate` was **≥ 4h ago** and sends **one personal SMS per person**,
+carrying a link to that person's recap page. Its own copy states the purpose:
+
+> "add any photos you took so the whole group can see them, and you can rate the plan there too"
+
+Three details that matter:
+
+- **The host receives it too.** The recipient query is `status IN ('Accepted', 'Owned')`
+  (`:37437`), explicitly so the host's page renders the Mark Attendance section.
+- **It is per-person and link-bearing.** The group chat cannot carry the link, so on
+  virtual-hosted plans the job also posts one persona chat message that just says
+  "I texted each of you" (`:37419`).
+- **Rating lives on that recap page**, not in a push and not in the chat. The in-app
+  `FeedbackCardView` ("Rate your experience and add notes for future reference") is the
+  other surface, rendered in Plan History from `Feedback` rows written by
+  `createPlanHistoryFeedbacks` (`cloud/planHistoryFeedbacks.js:243`, every 6h).
+
+So the post-event sequence today is: **end +4h** — everyone, host included, gets an SMS
+asking for photos and a rating.
+
+> **Secondary finding, adjacent but separate.** The `EventGroupMeet` push — the 60-day
+> "meet these people again" nudge that deep-links into Plan History — is **dead**. iOS
+> still handles it (`PushNotificationManager.swift:697`, `AppNotificationsView.swift:128`),
+> but nothing writes it: zero matches for `GroupMeet` anywhere in `leaflets-server`. It was
+> sent by the old admin-portal Express cron (`leaf-admin-portal-old/server/cron/EventGroup Meetup/EventGroupRemeet.js:97`),
+> which stopped running around 2026-04-29 — the same shutdown that
+> `planHistoryFeedbacks.js` was written to recover from. That port restored the `Feedback`
+> **rows** but not the **push** that surfaced them. Not this feature's problem; flagging
+> because it is a silently broken re-engagement loop sitting in the same window.
+
+### 4.2 Proposed catalog row
+
+| type | scheduled for | guard re-evaluated at fire time | host action |
+|---|---|---|---|
+| `thank_you` | day after the event, ~10:00 local | ≥ 2 accepted attendees, plan not cancelled, **and the host has posted no chat message since the event ended** | send one of 3 chips |
+
+**"Next day" must be wall-clock, not `end + 24h`.** A dinner ending at 11 PM plus 24 hours
+is 11 PM the following night — the worst possible moment for a thank-you. The anchor should
+be the morning *after* the event's local calendar day, resolved in the venue's IANA zone via
+`venueTimeZoneOf` (`cloud/virtual-host-helpers.js:318`). Read `leaflets-server/CLAUDE.md`'s
+`expiryDate` section first — this is exactly the arithmetic that has corrupted plans by an
+hour across DST before.
+
+**The "host already thanked them" guard is the important one.** A host who wrote "last night
+was so fun" unprompted at 9 AM must not get nudged at 10 AM to do the thing they just did.
+That is the same Firebase read as the `kickoff_chat` guard (§2.5.3) — messages since
+`expiryDate`, filtered for `from == hostUserId` and real chat types.
+
+**Auto-approve: never.** §4 of the brief restricts auto-approval to impersonal task types.
+A thank-you addressed to named friends is the most personal message in the catalog. It joins
+`kickoff_chat`, `rsvp_nudge`, and `post_recap` on the never list.
+
+**TTL:** ~48h after the event. A thank-you that lands three days later reads worse than none.
+
+### 4.3 Copy: do not ask for the rating
+
+The chip must be **purely social** — thanks, and optionally a hook to the next plan. It must
+not ask anyone to rate anything, and should not ask for photos either. Both are already
+covered by an SMS that carried a working link 4 hours earlier, and a host chip repeating the
+ask double-prompts the same people for the same thing from a second direction.
+
+Three meaningfully different variants, per §9:
+one plain thanks; one naming a specific moment or the venue; one that opens the door to a next plan.
+Same rules otherwise — host's first person, under 90 characters, no mention of Leaf, no emoji
+unless the host used emoji in that chat.
+
+### 4.4 This forces a decision on `post_recap`
+
+`thank_you` and `post_recap` are now two host-facing post-event nudges on the same plan, and
+`post_recap`'s brief-specified content — "prompting split, photos, or the next plan" — is
+**two-thirds redundant with the recap SMS**, and arrives at end +2h, i.e. *two hours before*
+the SMS that actually provides the photo link. Ordering a prompt ahead of the tool it needs is
+backwards.
+
+My recommendation: **drop `post_recap` and keep `thank_you`.** One post-event host touch, the
+next morning, doing the one thing no automated system can do — sound like the host. Splitting
+the bill is the only element not already covered elsewhere, and it can ride in a variant.
+
+If both are kept, they need an explicit priority under §7's 3-push cap, because post-event
+tasks are the last to fire and will be the first starved by a plan that already spent its
+budget on `kickoff_chat` and `rsvp_nudge`. In that case `thank_you` should outrank `post_recap`.
+
+---
+
+## 5. Open decisions for Shawn
+
+Carrying forward the brief's five, with what Phase 0 learned, plus four new ones.
 
 **From §13:**
 
@@ -357,22 +450,26 @@ Carrying forward the brief's five, with what Phase 0 learned, plus three new one
 6. **`post_recap` has no anchor** — no event end time exists anywhere. Fixed offset from `expiryDate` (matching the existing recap job's ~4h assumption), or add a duration field?
 7. **Does `kickoff_chat` retire `sendHostPlanHypeSms`?** They are the same nudge on the same guard in different channels. (See §3.)
 8. **What happens to the existing per-plan host checklist** on `EventNotification.checklist`? Merge, replace, or run both side by side? (See §2.6.1.)
+9. **Does `thank_you` replace `post_recap`, or run alongside it?** (See §4.4 — my read is replace.)
 
 ---
 
-## 5. Recommended revisions to the brief before Phase 1
+## 6. Recommended revisions to the brief before Phase 1
 
 Not a request to change scope — these are places where the brief specifies something the stack cannot do as written:
 
 - §5: rewrite the schema in Parse terms; drop the DB-level uniqueness constraint in favor of upsert-by-key (precedent: `generateVirtualHostTasks`, `virtual-host-tasks.js:676`).
 - §6: drop "inside the same transaction." Specify write-Firebase-then-transition with idempotency instead.
 - §10 reuse map: change "Approval and review states → add `host_review` as peer of `owner_review`" to a parallel machine (§2.1), and change "Rollout → existing feature flag system" to a `Config`-row allowlist (§2.7).
-- §3: schedule `post_recap` off `expiryDate + constant`, pending decision 6.
+- §3: add the `thank_you` row (§4.2) and resolve its overlap with `post_recap` (§4.4); schedule any
+  surviving post-event task off `expiryDate + constant`, pending decision 6. `thank_you` is anchored to
+  local wall-clock the next morning, not a fixed hour offset.
+- §4: add `thank_you` to the never-auto-approve list.
 - §7: say explicitly whether the 3-push budget counts the existing reminder crons.
 
 ---
 
-## 6. Suggested Phase 1 entry point
+## 7. Suggested Phase 1 entry point
 
 Unchanged from the brief's PR breakdown, with the following adjustments:
 
