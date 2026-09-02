@@ -21,6 +21,7 @@ import {
   floatingIsoToInstant,
   tzOffsetMs,
   calendarDayVisibilityCutoff,
+  planLifecycle,
 } from "@/lib/wall-clock";
 import { AUDIENCE_COHORT_LABELS } from "@/lib/audience-cohorts";
 import { isVenueBlacklisted } from "@/lib/venue-blacklist";
@@ -60,6 +61,11 @@ interface Plan {
   time: string;
   /** Raw ISO timestamp from the server (used to build .ics calendar invites). */
   dateISO?: string | null;
+  /**
+   * When the plan is over — the RSVP cutoff. Null on the ~94% of plans with no
+   * stored end_date; `planEndInstant` then assumes PLAN_DEFAULT_DURATION_MS.
+   */
+  endDateISO?: string | null;
   description: string;
   image: string;
   hostId: string | null;
@@ -2398,6 +2404,7 @@ export default function OrgCalendarPage() {
         date: p.expiryDate ? formatDate(p.expiryDate as string, (p.timezone as string | null) ?? null) : "",
         time: p.time ? normalizeTimeString(p.time as string) : (p.expiryDate ? formatTime(p.expiryDate as string, (p.timezone as string | null) ?? null) : ""),
         dateISO: (p.expiryDate as string) || null,
+        endDateISO: (p.endDate as string) || null,
         description: p.description as string || "",
         image: p.image as string || "",
         hostId: (p.host as Record<string, string>)?.objectId || null,
@@ -5070,16 +5077,34 @@ export default function OrgCalendarPage() {
                   </div>
                 ) : (
                   <div className="flex gap-4">
-                    <button
-                      onClick={() => {
-                        setRsvpPlan(selectedEvent);
-                        setSelectedEvent(null);
-                      }}
-                      className="flex-1 text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90"
-                      style={{ backgroundColor: org.brandColor || "#18181b" }}
-                    >
-                      {selectedEvent.requireApproval ? "Request to Attend" : "I\u0027m Attending"}
-                    </button>
+                    {/* RSVP closes when the plan ENDS, not when it starts — a
+                        plan that began 20 minutes ago is exactly the one
+                        someone wants to join. The card itself stays up until
+                        local midnight, so without a state of its own this
+                        button outlived its usefulness by hours. */}
+                    {planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "ended" ? (
+                      <div
+                        aria-disabled="true"
+                        className="flex-1 py-3 text-xs uppercase tracking-wider font-bold bg-zinc-100 text-zinc-400 flex items-center justify-center cursor-not-allowed select-none"
+                      >
+                        This Plan Has Ended
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setRsvpPlan(selectedEvent);
+                          setSelectedEvent(null);
+                        }}
+                        className="flex-1 text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90"
+                        style={{ backgroundColor: org.brandColor || "#18181b" }}
+                      >
+                        {planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "live"
+                          ? "Happening Now · Join Them"
+                          : selectedEvent.requireApproval
+                            ? "Request to Attend"
+                            : "I\u0027m Attending"}
+                      </button>
+                    )}
                     <button
                       onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
                       className="border border-zinc-200 px-5 hover:bg-zinc-50 transition-colors flex items-center gap-2"

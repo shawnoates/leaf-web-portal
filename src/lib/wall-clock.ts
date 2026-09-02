@@ -91,6 +91,45 @@ export function floatingIsoToInstant(
 export const PLAN_MIN_GRACE_MS = 3 * 60 * 60 * 1000;
 
 /**
+ * Assumed plan length when the server sends no `endDate`. That is the common
+ * case, not the rare one — only ~6% of plans carry an end_date. Mirrors the
+ * server's PLAN_DEFAULT_DURATION_MS.
+ */
+export const PLAN_DEFAULT_DURATION_MS = 2 * 60 * 60 * 1000;
+
+/** When a plan is over: its endDate if present, else start + default duration. */
+export function planEndInstant(
+  startISO: string | null | undefined,
+  endISO: string | null | undefined = null,
+): Date | null {
+  const startMs = Date.parse(String(startISO ?? ""));
+  if (!Number.isFinite(startMs)) return null;
+  const endMs = Date.parse(String(endISO ?? ""));
+  if (Number.isFinite(endMs) && endMs > startMs) return new Date(endMs);
+  return new Date(startMs + PLAN_DEFAULT_DURATION_MS);
+}
+
+/**
+ * Lifecycle of a plan, for deciding what the RSVP button should say.
+ *
+ * "live" is a real state, not a rounding error: a neighborhood plan that
+ * started 20 minutes ago is exactly the one someone wants to join. RSVP stays
+ * open through it and closes at `ended`. An unknown/unparseable start reads as
+ * "upcoming" — never refuse an RSVP because a date is missing.
+ */
+export function planLifecycle(
+  startISO: string | null | undefined,
+  endISO: string | null | undefined = null,
+  now: Date = new Date(),
+): "upcoming" | "live" | "ended" {
+  const startMs = Date.parse(String(startISO ?? ""));
+  if (!Number.isFinite(startMs)) return "upcoming";
+  if (now.getTime() < startMs) return "upcoming";
+  const end = planEndInstant(startISO, endISO);
+  return end && now.getTime() >= end.getTime() ? "ended" : "live";
+}
+
+/**
  * Lower bound on a plan/suggestion's start for it to still be worth showing:
  * visible while `start > cutoff`.
  *
