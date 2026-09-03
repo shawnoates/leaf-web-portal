@@ -5,7 +5,7 @@ import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { SEED_POOL, type SeedCalendar } from "@/lib/aiCalendarSeed";
 import { coverFor } from "./covers";
-import { photoForTheme, PHOTO_FILTER } from "./photos";
+import { assignCoverPhotos, PHOTO_FILTER, type Photo } from "./photos";
 import { useDetectedCity } from "@/lib/useDetectedCity";
 import { focusHeroInput } from "./useGenerate";
 import { trackMarketingEvent } from "./analytics";
@@ -33,16 +33,15 @@ interface GridCalendar extends SeedCalendar {
 const seedRow = (c: SeedCalendar): GridCalendar => ({ ...c, fromServer: false });
 
 function CoverArt({
-  calendar,
+  photo,
   index,
 }: {
-  calendar: GridCalendar;
+  photo: Photo | null;
   index: number;
 }) {
-  // A theme-matched photo when we have one; otherwise the gradient wash.
-  // Never a stand-in from another subject — these cards link to real
-  // calendars, and a wrong photo misrepresents one.
-  const photo = photoForTheme(calendar.theme);
+  // A theme-matched photo when one is free; otherwise the gradient wash.
+  // Never a stand-in from another subject, and never the same photo twice
+  // on a page — these cards link to real calendars.
   if (!photo) {
     return (
       <div
@@ -66,9 +65,11 @@ function CoverArt({
 function CalendarCard({
   calendar,
   index,
+  photo,
 }: {
   calendar: GridCalendar;
   index: number;
+  photo: Photo | null;
 }) {
   const stops = calendar.events?.length ?? 0;
   const meta = [
@@ -100,7 +101,7 @@ function CalendarCard({
         e.currentTarget.style.boxShadow = "none";
       }}
     >
-      <CoverArt calendar={calendar} index={index} />
+      <CoverArt photo={photo} index={index} />
       <div className="flex flex-col gap-1.5 p-3 sm:gap-1.5 sm:p-[18px]">
         {/* Clamped to two lines so a long title can't push one card
             taller than its neighbours and break the grid's baseline. */}
@@ -232,6 +233,10 @@ export default function CalendarGrid() {
     };
   }, [ready, city]);
 
+  // Photos are allocated across the whole grid in one pass so no two
+  // cards can land on the same image.
+  const photos = assignCoverPhotos(calendars.map((c) => c.theme));
+
   // Slot sits at index 3 so it lands in the first row's last column at
   // the 4-column desktop width.
   const firstRow = calendars.slice(0, 3);
@@ -241,13 +246,13 @@ export default function CalendarGrid() {
     <section className="px-5 pb-10 pt-4 sm:px-12 sm:pb-[88px] sm:pt-6">
       <div className="mx-auto grid max-w-[1440px] grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-[18px]">
         {firstRow.map((c, i) => (
-          <CalendarCard key={c.slug} calendar={c} index={i} />
+          <CalendarCard key={c.slug} calendar={c} index={i} photo={photos[i]} />
         ))}
         <YourCalendarSlot />
         {/* Mobile shows the first 3 + slot only (spec §Mobile). */}
         {rest.map((c, i) => (
           <div key={c.slug} className="hidden md:block">
-            <CalendarCard calendar={c} index={i + 3} />
+            <CalendarCard calendar={c} index={i + 3} photo={photos[i + 3]} />
           </div>
         ))}
       </div>
