@@ -458,8 +458,16 @@ function AIStarterCard({
   const isAmber = plan.aiTagVariant === "amber";
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="group relative border rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-48 cursor-pointer border-emerald-200/70 bg-emerald-50/30"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className="group relative border border-zinc-100 rounded-lg overflow-hidden shrink-0 w-48 text-left cursor-pointer hover:border-zinc-300 hover:shadow-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
     >
       <div
         className="relative w-full h-28 flex items-center justify-center"
@@ -502,15 +510,20 @@ function AIStarterCard({
         </span>
           </>
         )}
-        <span
-          className="absolute top-2 left-2 text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5"
-          style={{
-            background: "rgba(255,255,255,0.85)",
-            color: isAmber ? "#8A5F1E" : "#1B4332",
-            backdropFilter: "blur(4px)",
-          }}
-        >
-          Suggestion
+        {/* Byte-identical to IdeaCard's badge, deliberately. Both cards are an
+            unclaimed suggestion the manager can turn into a plan; which model
+            backs it (aiSourceEvents vs a persisted PlanIdea) is an
+            implementation detail they can't act on, and differentiating the
+            chrome by backing class just leaked the schema into the UI. The old
+            "Suggestion" pill + emerald tint also read as LOWER commitment than
+            "Needs a host" — backwards, since on a fresh AI calendar the
+            starters are the only inventory there is. Note the two cards still
+            do different things on click (this one prefills Create Plan, an
+            IdeaCard opens detail + self-host); that divergence is fine, "turn
+            this into a plan" is the same intent either way. */}
+        <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-white/85 text-[#1B4332] backdrop-blur-sm">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#1B4332]" />
+          Needs a host
         </span>
         {/* Delete. Hover-revealed on desktop so the rail stays calm — the
             card's own click target is "host this", and a persistent × competes
@@ -534,7 +547,7 @@ function AIStarterCard({
       </div>
       <div className="p-3">
         <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
-        <p className="text-xs text-zinc-400 mb-1">
+        <p className="text-xs text-zinc-400 mb-1 truncate">
           {new Date(plan.expiryDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
         </p>
         <p className="text-xs text-zinc-400">Waiting on host</p>
