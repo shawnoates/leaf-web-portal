@@ -13,7 +13,6 @@ import {
 } from "./photos";
 import { selectFeatured, type FeaturedRow } from "./featuredCalendars";
 import { useDetectedCity } from "@/lib/useDetectedCity";
-import { focusHeroInput } from "./useGenerate";
 import { trackMarketingEvent } from "./analytics";
 
 // "Real calendars first" — the grid that carries the page's social
@@ -104,7 +103,7 @@ function CalendarCard({
       onClick={() =>
         trackMarketingEvent("calendar_card_opened", { slug: calendar.slug })
       }
-      className="group block overflow-hidden rounded-[14px] bg-white transition-all sm:rounded-2xl"
+      className="group flex h-full flex-col overflow-hidden rounded-[14px] bg-white transition-all sm:rounded-2xl"
       style={{ border: "1px solid var(--mkt-line)" }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = "translateY(-2px)";
@@ -116,24 +115,23 @@ function CalendarCard({
       }}
     >
       <CoverArt calendar={calendar} photo={photo} index={index} />
-      <div className="flex flex-col gap-1.5 p-3 sm:gap-1.5 sm:p-[18px]">
-        {/* Clamped to two lines so a long title can't push one card
-            taller than its neighbours and break the grid's baseline. */}
+      <div className="flex flex-1 flex-col gap-1.5 p-3 sm:gap-1.5 sm:p-[18px]">
+        {/* Always two lines tall, clamped at two: a one-line title would
+            otherwise pull its meta row up and leave the card shorter than
+            the one beside it. Size is a class rather than an inline style
+            so the em-based min-height tracks it at both breakpoints. */}
         <div
-          className="mkt-serif overflow-hidden italic"
+          className="mkt-serif overflow-hidden text-[17px] italic sm:text-[22px]"
           style={{
-            fontSize: "17px",
             lineHeight: 1.15,
+            minHeight: "2.3em",
             display: "-webkit-box",
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical",
           }}
           title={calendar.title}
         >
-          <span className="sm:hidden">{calendar.title}</span>
-          <span className="hidden sm:inline" style={{ fontSize: "22px" }}>
-            {calendar.title}
-          </span>
+          {calendar.title}
         </div>
         <div
           className="text-[11.5px] sm:text-[13px]"
@@ -146,53 +144,10 @@ function CalendarCard({
   );
 }
 
-function YourCalendarSlot() {
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        trackMarketingEvent("generate_submit_intent", { source: "slot" });
-        focusHeroInput();
-      }}
-      className="flex flex-col items-center justify-center gap-2 rounded-[14px] p-3.5 text-center transition-colors sm:gap-3 sm:rounded-2xl sm:p-[22px]"
-      style={{
-        border: "2px dashed var(--mkt-line-dash)",
-        background: "var(--mkt-bg-tile)",
-      }}
-    >
-      <span
-        className="flex items-center justify-center rounded-full text-white"
-        style={{
-          width: 36,
-          height: 36,
-          background: "var(--mkt-ink)",
-          fontSize: 20,
-          fontWeight: 300,
-        }}
-      >
-        +
-      </span>
-      <span className="mkt-serif italic text-[18px] sm:text-[26px]">
-        Your calendar here
-      </span>
-      <span
-        className="text-[11.5px] leading-[1.45] sm:text-[14px]"
-        style={{ color: "var(--mkt-ink-2)" }}
-      >
-        <span className="hidden sm:inline">Type a vibe above.</span>
-        <span className="hidden sm:inline">
-          <br />
-        </span>
-        Free, no signup.
-      </span>
-    </button>
-  );
-}
-
 export default function CalendarGrid() {
   const { city, ready } = useDetectedCity();
   const [calendars, setCalendars] = useState<GridCalendar[]>(() =>
-    SEED_POOL.slice(0, 7).map(seedRow)
+    SEED_POOL.slice(0, 8).map(seedRow)
   );
 
   useEffect(() => {
@@ -211,7 +166,7 @@ export default function CalendarGrid() {
         const picked = selectFeatured(result?.calendars || [], {
           visitorCity: city.fallback ? null : city.city,
           visitorNeighborhoods: city.neighborhoods,
-          limit: 7,
+          limit: 8,
           hasVisual: (row) =>
             !!row.coverImageUrl || hasSubjectForTheme(row.theme),
         });
@@ -257,22 +212,14 @@ export default function CalendarGrid() {
     calendars.map((c) => c.coverImageUrl).filter(Boolean) as string[]
   );
 
-  // Slot sits at index 3 so it lands in the first row's last column at
-  // the 4-column desktop width.
-  const firstRow = calendars.slice(0, 3);
-  const rest = calendars.slice(3);
-
   return (
     <section className="px-5 pb-10 pt-4 sm:px-12 sm:pb-[88px] sm:pt-6">
       <div className="mx-auto grid max-w-[1440px] grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-[18px]">
-        {firstRow.map((c, i) => (
-          <CalendarCard key={c.slug} calendar={c} index={i} photo={photos[i]} />
-        ))}
-        <YourCalendarSlot />
-        {/* Mobile shows the first 3 + slot only (spec §Mobile). */}
-        {rest.map((c, i) => (
-          <div key={c.slug} className="hidden md:block">
-            <CalendarCard calendar={c} index={i + 3} photo={photos[i + 3]} />
+        {calendars.map((c, i) => (
+          // Mobile shows the first four; the rest would push the RSVP
+          // section too far down the fold on a phone.
+          <div key={c.slug} className={i > 3 ? "hidden md:block" : undefined}>
+            <CalendarCard calendar={c} index={i} photo={photos[i]} />
           </div>
         ))}
       </div>
