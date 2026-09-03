@@ -113,14 +113,16 @@ export default function HostOfferClient({ token }: { token: string }) {
   const [paypalHandle, setPaypalHandle] = useState("");
   const [paymentSaved, setPaymentSaved] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<Offer | null> => {
     setLoading(true);
     try {
       const r = (await Parse.Cloud.run("getHostOffer", { token })) as Offer;
       setOffer(r);
       setPaymentSaved(r.hasPaymentDetails);
+      return r;
     } catch {
       setNotFound(true);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -139,9 +141,13 @@ export default function HostOfferClient({ token }: { token: string }) {
       setView("done");
       await load();
     } catch (e) {
-      // A lost double-tap race is a success from here — re-read and show it.
-      await load();
-      setError(e instanceof Error ? e.message : "Something went wrong.");
+      // A double-tap loses the atomic claim, but the first tap already did the
+      // work. Re-read: if the offer is no longer live, the answer landed and
+      // showing an error would be a lie.
+      const fresh = await load();
+      if (fresh && fresh.state === "offered") {
+        setError(e instanceof Error ? e.message : "Something went wrong.");
+      }
     } finally {
       setBusy(false);
     }
@@ -155,8 +161,10 @@ export default function HostOfferClient({ token }: { token: string }) {
       await load();
       setView("done");
     } catch (e) {
-      await load();
-      setError(e instanceof Error ? e.message : "Something went wrong.");
+      const fresh = await load();
+      if (fresh && fresh.state === "offered") {
+        setError(e instanceof Error ? e.message : "Something went wrong.");
+      }
     } finally {
       setBusy(false);
     }
@@ -289,7 +297,7 @@ export default function HostOfferClient({ token }: { token: string }) {
               {busy ? "Sending…" : "I can't make this one"}
             </button>
             <button onClick={() => setView("done")} className={btnQuiet}>
-              Never mind, I'm still on
+              Never mind, I&rsquo;m still on
             </button>
           </div>
         </Shell>
