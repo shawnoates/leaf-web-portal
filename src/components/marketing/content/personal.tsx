@@ -17,7 +17,7 @@ export const personalContent: MarketingContent = {
         .
       </>
     ),
-    lead: "Real calendars made by real planners, below. Yours takes about 20 seconds. Free, no signup to generate.",
+    lead: "Real places, real dates, one link your friends can RSVP to by text. Free, no signup required.",
     chips: [
       "LES first date",
       "Family fun this month",

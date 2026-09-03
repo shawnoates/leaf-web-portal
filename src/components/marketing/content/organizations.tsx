@@ -16,7 +16,7 @@ export const organizationsContent: MarketingContent = {
         .
       </>
     ),
-    lead: "Real calendars made by real organizers, below. Yours takes about 20 seconds. Free, no signup to generate.",
+    lead: "Real places, real dates, one link your members can RSVP to by text. Free, no signup.",
     chips: [
       "Monthly member mixers",
       "Weeknight fitness classes",

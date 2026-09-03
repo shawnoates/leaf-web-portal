@@ -116,15 +116,14 @@ function CalendarCard({
     >
       <CoverArt calendar={calendar} photo={photo} index={index} />
       <div className="flex flex-1 flex-col gap-1.5 p-3 sm:gap-1.5 sm:p-[18px]">
-        {/* Always two lines tall, clamped at two: a one-line title would
-            otherwise pull its meta row up and leave the card shorter than
-            the one beside it. Size is a class rather than an inline style
-            so the em-based min-height tracks it at both breakpoints. */}
+        {/* Clamped at two lines, but no reserved second line: a one-line
+            title used to hold 2.3em of height and leave a visible gap
+            under itself. The meta row bottom-aligns instead (mt-auto),
+            so meta stays level across cards without the dead space. */}
         <div
           className="mkt-serif overflow-hidden text-[17px] italic sm:text-[22px]"
           style={{
             lineHeight: 1.15,
-            minHeight: "2.3em",
             display: "-webkit-box",
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical",
@@ -134,7 +133,7 @@ function CalendarCard({
           {calendar.title}
         </div>
         <div
-          className="text-[11.5px] sm:text-[13px]"
+          className="mt-auto text-[11.5px] sm:text-[13px]"
           style={{ color: "var(--mkt-ink-3)" }}
         >
           {meta}
