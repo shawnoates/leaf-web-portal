@@ -904,7 +904,6 @@ function PlanRow({
     // Its own segment, never a fallback behind the venue — a plan almost always
     // has a venue, so an `||` chain here silently hid every attendee count.
     plan.attendeeCount > 0 ? `${plan.attendeeCount} going` : null,
-    plan.capacity != null ? `${plan.capacity} max` : null,
   ].filter(Boolean).join(" · ");
   const hostHref = plan.calendarShareId
     ? `/org/${plan.calendarShareId}?host=${encodeURIComponent(plan.id)}`
