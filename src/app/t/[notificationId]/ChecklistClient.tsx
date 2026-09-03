@@ -59,14 +59,167 @@ function formatShort(iso: string | null): string | null {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+// The draft lives HERE, on the task that produced it — not on the Needs You
+// card. A card is a one-tap nag the host scrolls past; a message to the whole
+// group deserves reading before it goes. The card points at this page.
+function DraftPanel({
+  task,
+  notificationId,
+  onSent,
+}: {
+  task: HostTask;
+  notificationId: string;
+  onSent: (taskId: string, sentAt: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(task.draftMessage ?? "");
+  const [sending, setSending] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [variants, setVariants] = useState<string[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  if (!task.draftMessage) return null;
+
+  if (task.draftSentAt) {
+    return (
+      <p className="flex items-center gap-1.5 text-[12px] text-zinc-400 mt-2">
+        <Check className="w-3 h-3" />
+        Sent to the group
+      </p>
+    );
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+        className="inline-flex items-center gap-1.5 mt-2 text-[12px] font-medium text-zinc-600 bg-zinc-100 hover:bg-zinc-200 rounded-full px-2.5 py-1 transition-colors"
+      >
+        <MessageSquare className="w-3 h-3" />
+        Message the group
+      </button>
+    );
+  }
+
+  async function send() {
+    const body = text.trim();
+    if (!body) return;
+    setSending(true);
+    setErr(null);
+    try {
+      const res = (await Parse.Cloud.run("sendHostTaskDraft", {
+        taskId: task.id,
+        notificationId,
+        text: body,
+      })) as { sentAt: string };
+      onSent(task.id, res.sentAt);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "That didn't send.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function suggest() {
+    setSuggesting(true);
+    setErr(null);
+    try {
+      const res = (await Parse.Cloud.run("suggestHostMessage", {
+        notificationId,
+        taskId: task.id,
+      })) as { suggestions: string[] };
+      setVariants(res.suggestions?.length ? res.suggestions : []);
+    } catch {
+      setErr("Couldn't come up with anything else.");
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  return (
+    <div
+      className="mt-2.5 rounded-xl border border-zinc-200 bg-zinc-50/70 p-3"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
+        Goes to the group chat, from you
+      </p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={Math.min(8, Math.max(3, Math.ceil(text.length / 42)))}
+        className="w-full text-[14px] leading-relaxed text-zinc-900 bg-white border border-zinc-200 rounded-lg p-2.5 outline-none focus:border-zinc-400 resize-none"
+      />
+
+      {variants && variants.length > 0 && (
+        <div className="mt-2 space-y-1.5">
+          {variants.map((v, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setText(v)}
+              className="block w-full text-left text-[13px] leading-relaxed text-zinc-700 bg-white border border-zinc-200 hover:border-zinc-400 rounded-lg p-2 transition-colors"
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+      )}
+      {variants && variants.length === 0 && (
+        <p className="text-[12px] text-zinc-400 mt-2">
+          Nothing better to suggest — the draft above is the one.
+        </p>
+      )}
+
+      {err && <p className="text-[12px] text-amber-700 mt-2">{err}</p>}
+
+      <div className="flex items-center gap-2 mt-2.5">
+        <button
+          type="button"
+          onClick={send}
+          disabled={sending || !text.trim()}
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-white bg-zinc-900 disabled:bg-zinc-300 rounded-lg px-3 py-1.5 transition-colors"
+        >
+          <Send className="w-3.5 h-3.5" />
+          {sending ? "Sending…" : "Send"}
+        </button>
+        <button
+          type="button"
+          onClick={suggest}
+          disabled={suggesting}
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-zinc-600 hover:text-zinc-900 px-2 py-1.5"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          {suggesting ? "Thinking…" : "Reword"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="text-[13px] text-zinc-400 hover:text-zinc-600 px-2 py-1.5 ml-auto"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Row({
   task,
   busy,
+  notificationId,
   onToggle,
+  onSent,
 }: {
   task: HostTask;
   busy: boolean;
+  notificationId: string;
   onToggle: (t: HostTask) => void;
+  onSent: (taskId: string, sentAt: string) => void;
 }) {
   const done = task.status === "done";
 
