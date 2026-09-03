@@ -44,9 +44,18 @@ export default function ChatShell({
   eventGroupId,
   hidePlanDetails = false,
   fitParent = false,
+  initialDraft,
 }: {
   eventGroupId: string;
   hidePlanDetails?: boolean;
+  /**
+   * Seeds the composer, unsent. The host assistant hands a drafted group
+   * message off this way: the card opens the chat with the text already typed,
+   * so it gets read in the room it's going to and sent with the composer's own
+   * button. Nothing here sends — a draft that arrives and posts itself would be
+   * the virtual host again.
+   */
+  initialDraft?: string;
   // Standalone /chat pages have no height-defining parent, so the shell
   // sizes itself to the viewport (h-dvh). When embedded in a container that
   // already sets a height (PlanChatDrawer's bottom-sheet / slide-over), pass
@@ -75,7 +84,7 @@ export default function ChatShell({
   const [showQrModal, setShowQrModal] = useState(false);
   const [messages, setMessages] = useState<FirMessage[]>([]);
   const [users, setUsers] = useState<Map<string, UserLite>>(new Map());
-  const [composeText, setComposeText] = useState("");
+  const [composeText, setComposeText] = useState(initialDraft ?? "");
   const [sending, setSending] = useState(false);
 
   useEffect(() => {

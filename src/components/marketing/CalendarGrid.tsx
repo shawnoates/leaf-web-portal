@@ -6,6 +6,7 @@ import Parse from "@/lib/parse-client";
 import { SEED_POOL, type SeedCalendar } from "@/lib/aiCalendarSeed";
 import { coverFor } from "./covers";
 import { assignCoverPhotos, PHOTO_FILTER, type Photo } from "./photos";
+import { selectFeatured, type FeaturedRow } from "./featuredCalendars";
 import { useDetectedCity } from "@/lib/useDetectedCity";
 import { focusHeroInput } from "./useGenerate";
 import { trackMarketingEvent } from "./analytics";
@@ -28,21 +29,29 @@ interface GridCalendar extends SeedCalendar {
    *  pool — gates display of adoptionCount, which is fabricated on
    *  seeds and real on server rows. */
   fromServer: boolean;
+  /** The calendar's own cover, when the generator gave it one. Preferred
+   *  over anything we'd pick for it. */
+  coverImageUrl?: string | null;
 }
 
 const seedRow = (c: SeedCalendar): GridCalendar => ({ ...c, fromServer: false });
 
 function CoverArt({
+  calendar,
   photo,
   index,
 }: {
+  calendar: GridCalendar;
   photo: Photo | null;
   index: number;
 }) {
-  // A theme-matched photo when one is free; otherwise the gradient wash.
-  // Never a stand-in from another subject, and never the same photo twice
-  // on a page — these cards link to real calendars.
-  if (!photo) {
+  // The calendar's own cover first — it's what the generator actually
+  // chose for it. Then a theme-matched photo, never repeated on the page.
+  // Then the gradient: a card whose theme we can't read gets an abstract
+  // wash rather than a confidently wrong picture, since it links to a
+  // real calendar.
+  const src = calendar.coverImageUrl || photo?.url || null;
+  if (!src) {
     return (
       <div
         className="h-[120px] w-full sm:h-[190px]"
@@ -53,8 +62,8 @@ function CoverArt({
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={photo.url}
-      alt={photo.alt}
+      src={src}
+      alt={calendar.coverImageUrl ? "" : (photo?.alt ?? "")}
       loading={index < 4 ? "eager" : "lazy"}
       className="h-[120px] w-full object-cover sm:h-[190px]"
       style={{ filter: PHOTO_FILTER, background: coverFor(index).gradient }}
@@ -101,7 +110,7 @@ function CalendarCard({
         e.currentTarget.style.boxShadow = "none";
       }}
     >
-      <CoverArt photo={photo} index={index} />
+      <CoverArt calendar={calendar} photo={photo} index={index} />
       <div className="flex flex-col gap-1.5 p-3 sm:gap-1.5 sm:p-[18px]">
         {/* Clamped to two lines so a long title can't push one card
             taller than its neighbours and break the grid's baseline. */}
@@ -186,24 +195,23 @@ export default function CalendarGrid() {
     let cancelled = false;
     (async () => {
       try {
+        // Ask for far more than we show: the endpoint buckets by the
+        // generating visitor's city, not the calendar's own area, so most
+        // of what comes back has to be filtered out.
         const result = (await Parse.Cloud.run("listAICalendarsByCity", {
           city: city.resolvedCity || city.city,
+          limit: 24,
+        })) as { calendars?: FeaturedRow[] };
+
+        const picked = selectFeatured(result?.calendars || [], {
+          visitorCity: city.fallback ? null : city.city,
+          visitorNeighborhoods: city.neighborhoods,
           limit: 7,
-        })) as {
-          calendars?: Array<{
-            slug: string;
-            title: string;
-            prompt: string;
-            area: string | null;
-            theme: string | null;
-            adoptionCount: number;
-            events?: { time: string; title?: string; name: string; tag: string }[];
-          }>;
-        };
-        const rows = result?.calendars || [];
-        if (cancelled || rows.length === 0) return;
+        });
+        if (cancelled || picked.length === 0) return;
+
         setCalendars(
-          rows.map((c) => ({
+          picked.map((c) => ({
             slug: c.slug,
             chipLabel: c.prompt || c.title,
             title: c.title,
@@ -213,6 +221,7 @@ export default function CalendarGrid() {
             sourceName: "Leaf",
             previewKicker: `${(c.events || []).length} stops`,
             adoptionCount: c.adoptionCount || 0,
+            coverImageUrl: c.coverImageUrl || null,
             events: (c.events || []).map((ev) => ({
               title: ev.title,
               name: ev.name,
@@ -234,8 +243,12 @@ export default function CalendarGrid() {
   }, [ready, city]);
 
   // Photos are allocated across the whole grid in one pass so no two
-  // cards can land on the same image.
-  const photos = assignCoverPhotos(calendars.map((c) => c.theme));
+  // cards can land on the same image. A calendar that brought its own
+  // cover is passed a null theme so it consumes nothing from the pool.
+  const photos = assignCoverPhotos(
+    calendars.map((c) => (c.coverImageUrl ? null : c.theme)),
+    calendars.map((c) => c.coverImageUrl).filter(Boolean) as string[]
+  );
 
   // Slot sits at index 3 so it lands in the first row's last column at
   // the 4-column desktop width.

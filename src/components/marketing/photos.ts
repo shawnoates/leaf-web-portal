@@ -382,9 +382,13 @@ const RESERVED = new Set(DEMO_VENUE_PHOTOS.map((p) => p.url));
  * confidently wrong picture is worse than an abstract one.
  */
 export function assignCoverPhotos(
-  themes: Array<string | null | undefined>
+  themes: Array<string | null | undefined>,
+  /** URLs already spoken for elsewhere on the page — typically the real
+   *  cover images calendars brought with them, which are Unsplash URLs
+   *  too and could otherwise be handed out a second time. */
+  alreadyUsed: string[] = []
 ): Array<Photo | null> {
-  const used = new Set<string>(RESERVED);
+  const used = new Set<string>([...RESERVED, ...alreadyUsed]);
   return themes.map((theme) => {
     const subject = subjectForTheme(theme);
     if (!subject) return null;
