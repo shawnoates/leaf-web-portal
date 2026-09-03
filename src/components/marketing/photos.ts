@@ -354,7 +354,13 @@ const THEME_RULES: Array<[RegExp, PhotoKey]> = [
   [/\bskate|skateboard/i, "skate"],
   [/\bbooks?\b|\breading\b|literar|\bwriting\b/i, "books"],
   [/\bmusic\b|concert|\bbands?\b|\blive\b|\bshows?\b|\bdj\b/i, "music"],
+  [/\bchill\b|relax|mellow|\bcafe\b/i, "books"],
+  [/community|neighbou?rhood|\blocal\b|meetup|social/i, "dinner"],
 ];
+
+export function hasSubjectForTheme(theme: string | null | undefined): boolean {
+  return subjectForTheme(theme) !== null;
+}
 
 function subjectForTheme(theme: string | null | undefined): PhotoKey | null {
   if (!theme) return null;

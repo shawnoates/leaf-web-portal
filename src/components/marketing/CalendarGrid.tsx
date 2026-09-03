@@ -5,7 +5,12 @@ import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { SEED_POOL, type SeedCalendar } from "@/lib/aiCalendarSeed";
 import { coverFor } from "./covers";
-import { assignCoverPhotos, PHOTO_FILTER, type Photo } from "./photos";
+import {
+  assignCoverPhotos,
+  hasSubjectForTheme,
+  PHOTO_FILTER,
+  type Photo,
+} from "./photos";
 import { selectFeatured, type FeaturedRow } from "./featuredCalendars";
 import { useDetectedCity } from "@/lib/useDetectedCity";
 import { focusHeroInput } from "./useGenerate";
@@ -207,6 +212,8 @@ export default function CalendarGrid() {
           visitorCity: city.fallback ? null : city.city,
           visitorNeighborhoods: city.neighborhoods,
           limit: 7,
+          hasVisual: (row) =>
+            !!row.coverImageUrl || hasSubjectForTheme(row.theme),
         });
         if (cancelled || picked.length === 0) return;
 

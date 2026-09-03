@@ -128,6 +128,11 @@ export function selectFeatured(
     visitorNeighborhoods?: string[];
     limit: number;
     now?: Date;
+    /** Whether a row can show a picture — its own cover, or a theme we
+     *  have photography for. Rows that can't are demoted to the back and
+     *  used only to fill, so a single flat gradient card doesn't sit in a
+     *  grid of photos looking like a failed image load. */
+    hasVisual?: (row: FeaturedRow) => boolean;
   }
 ): FeaturedRow[] {
   const now = opts.now ?? new Date();
@@ -151,9 +156,13 @@ export function selectFeatured(
       ? local
       : [...local, ...fresh.filter((r) => !local.includes(r))];
 
-  const ranked = [...chosen].sort(
-    (a, b) => (b.adoptionCount || 0) - (a.adoptionCount || 0)
-  );
+  const hasVisual = opts.hasVisual ?? (() => true);
+  const ranked = [...chosen].sort((a, b) => {
+    const va = hasVisual(a) ? 1 : 0;
+    const vb = hasVisual(b) ? 1 : 0;
+    if (va !== vb) return vb - va;
+    return (b.adoptionCount || 0) - (a.adoptionCount || 0);
+  });
 
   return spreadByTheme(ranked, opts.limit);
 }
