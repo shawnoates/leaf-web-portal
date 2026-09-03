@@ -35,7 +35,9 @@ type AttendeeMemoryInfo = {
     hidePlanIdeas?: boolean;
     hideCustomPlans?: boolean;
   } | null;
-  viewerRole?: "owner" | "host" | "attendee";
+  // staff_host = the assigned roster host's seat: attendance + photos,
+  // no rating card (server sends survey: null), no "host the next one".
+  viewerRole?: "owner" | "host" | "attendee" | "staff_host";
   canMarkAttendance?: boolean;
   attendanceClosed?: boolean;
   nextPlanIdea?: {
@@ -230,7 +232,9 @@ export default function MemoryClient({
 
       {/* Mark Attendance — host-only. Visible when the link belongs to the host
           (viewerRole === host|owner); writes require host-phone OTP verification. */}
-      {(info.viewerRole === "host" || info.viewerRole === "owner") &&
+      {(info.viewerRole === "host" ||
+        info.viewerRole === "owner" ||
+        info.viewerRole === "staff_host") &&
         info.attendees && info.attendees.length > 0 && (
         <div className="border border-zinc-200 rounded-xl p-5 mb-6">
           <div className="flex items-center justify-between mb-1">
@@ -407,7 +411,7 @@ export default function MemoryClient({
 
       {/* Host the next one — prefers a real plan idea, falls back to a
           repeat of this plan when custom plans are enabled. */}
-      {info.recap && info.calendar && (
+      {info.recap && info.calendar && info.viewerRole !== "staff_host" && (
         <HostTheNextOne
           viewerRole={info.viewerRole || "attendee"}
           calendar={info.calendar}

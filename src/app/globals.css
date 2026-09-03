@@ -32,3 +32,61 @@
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ── Marketing pages (/personal, /organizations) ─────────────────────
+   Design tokens from the "Real calendars first" homepage v2 spec.
+   Scoped under .mkt so the rest of the app keeps its zinc palette. */
+.mkt {
+  --mkt-bg: #fafaf8;
+  --mkt-bg-alt: #f1f0eb;
+  --mkt-bg-tile: #f5f4ef;
+  --mkt-ink: #141414;
+  --mkt-ink-2: #5c5c58;
+  --mkt-ink-3: #8a8a84;
+  --mkt-line: #e2e1db;
+  --mkt-line-input: #d9d8d2;
+  --mkt-line-section: #e9e8e3;
+  --mkt-line-faq: #dcdbd4;
+  --mkt-line-dash: #b8b7b0;
+  --mkt-green: #2f6b3a;
+  --mkt-green-light: #a7dcb0;
+  --mkt-green-avatar: #6dbf7a;
+  --mkt-forest: #1d261f;
+  background: var(--mkt-bg);
+  color: var(--mkt-ink);
+  font-family: var(--font-manrope), var(--font-geist-sans), system-ui, sans-serif;
+}
+.mkt-serif {
+  font-family: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
+  font-weight: 400;
+}
+.mkt-eyebrow {
+  font-family: var(--font-jetbrains-mono), ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mkt-ink-3);
+}
+.mkt-mono {
+  font-family: var(--font-jetbrains-mono), ui-monospace, Menlo, monospace;
+}
+
+@keyframes mktFadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes mktToastPop {
+  0% { opacity: 0; transform: translateY(10px) scale(0.96); }
+  12% { opacity: 1; transform: none; }
+  80% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mkt [style*="mktFadeUp"],
+  .mkt [style*="mktToastPop"] {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

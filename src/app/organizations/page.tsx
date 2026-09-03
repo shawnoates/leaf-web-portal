@@ -1,68 +1,97 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import Parse from "@/lib/parse-client";
-import ConciergeCta from "@/components/ConciergeCta";
-import {
-  Sparkles,
-  Calendar,
-  Users,
-  ArrowRight,
-  Phone,
-  BarChart3,
-  Shield,
-  Zap,
-  Check,
-  ChevronRight,
-} from "lucide-react";
+import { useIsLoggedIn } from "@/components/marketing/useMarketingSession";
+import MarketingNav from "@/components/marketing/MarketingNav";
+import MarketingHero from "@/components/marketing/MarketingHero";
+import CalendarGrid from "@/components/marketing/CalendarGrid";
+import RsvpDemoSection from "@/components/marketing/RsvpDemoSection";
+import HowItWorks, { type Step } from "@/components/marketing/HowItWorks";
+import Toolkit, { type ToolkitItem } from "@/components/marketing/Toolkit";
+import PricingSection, {
+  type PricingTier,
+} from "@/components/marketing/PricingSection";
+import FaqAccordion, { type FaqItem } from "@/components/marketing/FaqAccordion";
+import ClosingCta from "@/components/marketing/ClosingCta";
+import StickyGenerateBar from "@/components/marketing/StickyGenerateBar";
+import MarketingFooter from "@/components/marketing/MarketingFooter";
 
-type PricingTier = {
-  id: string;
-  name: string;
-  monthlyPrice: string;
-  yearlyPrice: string;
-  monthlyPeriod: string;
-  yearlyPeriod: string;
-  yearlySavings?: string;
-  customPrice?: string;
-  description: string;
-  cta: string;
-  ctaHref?: string;
-  highlight: boolean;
-  dark?: boolean;
-  inheritsLabel?: string;
-  features: string[];
-  excluded: string[];
-};
+// /organizations — same "Real calendars first" design as /personal, with
+// the org framing: members host, the calendar carries a brand, and the
+// Concierge tier is available for orgs that want Leaf run for them.
+
+const CHIPS = [
+  "Monthly member mixers",
+  "Weeknight fitness classes",
+  "Family weekend programming",
+  "Quarterly volunteer days",
+];
+
+const STEPS: Step[] = [
+  {
+    number: "01",
+    title: "Describe your organization",
+    body: "Your type, vibe, location, and preferences. Leaf builds a real calendar: venues, times, photos. In seconds.",
+  },
+  {
+    number: "02",
+    title: "Make it yours",
+    body: "Swap a venue, shift a date, cut anything that isn't right for your community. Add your logo and color.",
+  },
+  {
+    number: "03",
+    title: "Members host, people RSVP",
+    body: "Members claim a plan and run it. Anyone RSVPs with a phone number and gets SMS reminders. No app required.",
+  },
+];
+
+const TOOLKIT: ToolkitItem[] = [
+  {
+    title: "AI-suggested plans, ready to host",
+    body: "Curated plans matched to your org's vibe and location, every week. Real venues, smart timing.",
+  },
+  {
+    title: "A branded calendar page",
+    body: "Your logo, your color, one page your members follow. Share the link and people discover what's happening.",
+  },
+  {
+    title: "Phone-number RSVPs",
+    body: "Members sign up with just a number and get SMS confirmations. No app, no account.",
+  },
+  {
+    title: "Member hosting",
+    body: "Members browse suggested plans and host on behalf of your community. Distributed leadership.",
+  },
+  {
+    title: "Full control",
+    body: "Block event types, set capacity limits, choose days, and cap how many events run at once.",
+  },
+  {
+    title: "See what's actually working",
+    body: "Track RSVPs, follower growth, and attendance. Understand what resonates with your community.",
+  },
+];
 
 const PRICING_TIERS: PricingTier[] = [
   {
     id: "starter",
     name: "Free",
-    monthlyPrice: "Free",
-    yearlyPrice: "Free",
+    monthlyPrice: "$0",
+    yearlyPrice: "$0",
     monthlyPeriod: "",
     yearlyPeriod: "",
     description: "For getting your community off the ground",
-    cta: "Get started free",
+    cta: "Start free →",
     highlight: false,
+    ctaFocusesHero: true,
     features: [
       "1 calendar",
       "5 AI-suggested plans per week",
       "Up to 50 RSVPs per month",
-      "Phone-number RSVP with SMS confirmations",
+      "SMS confirmations & reminders",
       "Member hosting",
-      "Automated follower notifications",
       "Attendance reporting",
-      "Photo collection",
-      "Access to local events database",
-      "Unlimited scheduling",
     ],
-    excluded: [
-      "Custom branding",
-      "Analytics",
-    ],
+    excluded: ["Custom branding", "Analytics"],
   },
   {
     id: "pro",
@@ -73,18 +102,17 @@ const PRICING_TIERS: PricingTier[] = [
     yearlyPeriod: "/yr",
     yearlySavings: "2 months free",
     description: "For organizers who want their own brand and room to grow",
-    cta: "Start with Pro",
+    cta: "Go Pro →",
     highlight: true,
     inheritsLabel: "Everything in Free, plus:",
     features: [
       "Unlimited calendars",
       "15 AI-suggested plans per week",
       "Unlimited RSVPs",
-      "Custom branding (logo + brand color)",
-      "Custom plan-suggestion controls",
+      "Custom branding (logo + color)",
       "Analytics dashboard",
       "Co-host management",
-      "Follower re-engagement texts (nudges)",
+      "Follower re-engagement texts",
     ],
     excluded: [],
   },
@@ -96,7 +124,8 @@ const PRICING_TIERS: PricingTier[] = [
     monthlyPeriod: "/mo",
     yearlyPeriod: "/mo",
     customPrice: "$499",
-    description: "For apartment buildings and professional orgs that want Leaf run for them",
+    description:
+      "For apartment buildings and professional orgs that want Leaf run for them",
     cta: "Book a demo",
     ctaHref: "https://calendar.app.google/NCUYc6LUKSiwLUa67",
     highlight: false,
@@ -104,8 +133,8 @@ const PRICING_TIERS: PricingTier[] = [
     inheritsLabel: "Everything in Pro, plus:",
     features: [
       "A dedicated host who plans and coordinates your events",
-      "Post-event surveys feed a personalized monthly event plan tuned to what's landing",
-      "Vendor coordination, setup, and member communication handled for you",
+      "Post-event surveys feed a personalized monthly plan",
+      "Vendor coordination, setup, and member communication",
       "Local merchant deals featured on your calendar",
       "Priority support",
     ],
@@ -113,541 +142,101 @@ const PRICING_TIERS: PricingTier[] = [
   },
 ];
 
-const STEPS = [
+// Verbatim from the page's existing FAQ, per the spec.
+const FAQ: FaqItem[] = [
   {
-    number: "01",
-    icon: <Sparkles className="w-6 h-6" />,
-    title: "Describe your organization",
-    description:
-      "Tell us your type, vibe, location, and preferences. We handle the rest.",
+    q: "What are AI-suggested plans?",
+    a: "Every week, Leaf automatically generates personalized, ready-to-host plans for your calendar based on your location, vibe, and preferences. These include real venues, smart timing, and images — each just needs a host, so you or your members can claim one and run it. Free includes 5 per week; Pro and Concierge get 15.",
   },
   {
-    number: "02",
-    icon: <Zap className="w-6 h-6" />,
-    title: "AI creates personalized suggested plans",
-    description:
-      "Every week, Leaf generates curated, ready-to-host plans with real venues, times, and images tailored to your community.",
+    q: "Do my members need to download the app?",
+    a: "No. Anyone can RSVP to your plans with just their phone number — no app download required. They'll receive SMS confirmations and reminders automatically.",
   },
   {
-    number: "03",
-    icon: <Users className="w-6 h-6" />,
-    title: "Members host, people RSVP",
-    description:
-      "Organization members claim suggested plans and host them. Anyone can RSVP with just a phone number.",
-  },
-];
-
-const FEATURES = [
-  {
-    icon: <Sparkles className="w-5 h-5" />,
-    title: "AI-Suggested Plans",
-    description:
-      "Curated event suggestions based on your org's vibe, location, and preferences. Real venues, smart timing, beautiful images.",
+    q: "What is the events database?",
+    a: "The events database gives you access to local events happening in your area. Browse concerts, shows, festivals, and more — then turn them into plans for your community with one tap. Available on every plan.",
   },
   {
-    icon: <Calendar className="w-5 h-5" />,
-    title: "Branded Calendar Page",
-    description:
-      "A beautiful public page for your organization. Share the link and let people discover what's happening.",
+    q: "How many calendars can I run?",
+    a: "Free includes one calendar. Pro lets you run up to five — useful when one organization covers multiple buildings, chapters, or cohorts. Concierge is set up per calendar; talk to us if you need to run several.",
   },
   {
-    icon: <Phone className="w-5 h-5" />,
-    title: "Phone Number RSVP",
-    description:
-      "No app download required. People sign up with just their phone number and get SMS confirmations.",
+    q: "What's the difference between member hosting and co-host management?",
+    a: "Member hosting (included on every plan) lets anyone you've added as a member claim a suggested plan and run that single event. Co-host management (Pro and Concierge) lets you invite trusted people who can manage every plan, approve RSVPs, and co-run the whole calendar.",
   },
   {
-    icon: <Users className="w-5 h-5" />,
-    title: "Member Hosting",
-    description:
-      "Organization members browse suggested plans and host events on behalf of your community. Distributed leadership.",
+    q: "What counts as an RSVP?",
+    a: "An RSVP is counted each time someone confirms attendance to one of your plans. On the Free plan you get up to 50 RSVPs per month, which resets at the start of each calendar month. Pro and Concierge plans have unlimited RSVPs.",
   },
   {
-    icon: <Shield className="w-5 h-5" />,
-    title: "Full Control",
-    description:
-      "Blacklist event types, set capacity limits, choose days of the week, and control how many events run at once.",
+    q: "How far in advance can I schedule plans?",
+    a: "As far ahead as you want, on every plan — there's no scheduling window on Free, Pro, or Concierge.",
   },
   {
-    icon: <BarChart3 className="w-5 h-5" />,
-    title: "Analytics",
-    description:
-      "Track RSVPs, follower growth, and event attendance. Understand what resonates with your community.",
+    q: "Can I switch plans later?",
+    a: "Yes. You can upgrade or downgrade at any time from your dashboard. If you upgrade, you'll be charged the new rate immediately. If you downgrade, your current plan stays active until the end of the billing period.",
+  },
+  {
+    q: "What does custom branding include?",
+    a: "On the Pro and Concierge plans, you can upload your own logo and set a brand color for your calendar page. This replaces the default Leaf branding so your community sees your identity.",
+  },
+  {
+    q: "What's the Concierge plan?",
+    a: "Concierge is our done-for-you service for organizations that want Leaf run for them — apartment buildings, churches, clubs, HOAs, and more. We build a personalized monthly event plan for your community and handle the coordination, setup, and communication — plus we feature local merchant deals on your calendar. You get a thriving community calendar without adding any work for your team. $499/mo. Book a demo to get set up.",
   },
 ];
 
 export default function OrganizationsPage() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly");
-
-  useEffect(() => {
-    const currentUser = Parse.User.current();
-    setIsLoggedIn(!!currentUser);
-  }, []);
+  const isLoggedIn = useIsLoggedIn();
 
   return (
-    <div className="min-h-screen">
-      {/* Hero with background video */}
-      <section className="relative h-[100vh] min-h-[600px] overflow-hidden">
-        {/* Background video/image */}
-        <div className="absolute inset-0 bg-zinc-900">
-          <video
-            className="w-full h-full object-cover opacity-50 scale-105"
-            src="/hero-video.mp4"
-            autoPlay
-            muted
-            loop
-            playsInline
-            poster="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&q=80&w=2000"
-          />
-        </div>
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/50 to-black/80 z-10" />
+    <div className="mkt min-h-screen pb-24 sm:pb-0">
+      <MarketingNav isLoggedIn={isLoggedIn} />
 
-        {/* Nav overlay */}
-        <nav className="absolute top-0 left-0 right-0 z-30 px-6 py-6">
-          <div className="max-w-6xl mx-auto flex justify-between items-center">
-            <Link href="/" className="flex items-center gap-3">
-              <img src="/leaf-logo-white.svg" alt="Leaf" className="h-8" />
-              <span className="text-xl font-light tracking-wider uppercase text-white">OS</span>
-            </Link>
-            <div className="flex gap-6 items-center">
-              <a
-                href="#pricing"
-                className="text-sm font-medium text-white/70 hover:text-white transition-colors hidden sm:block"
-              >
-                Pricing
-              </a>
-              {!isLoggedIn && (
-                <Link
-                  href="/dashboard"
-                  className="text-sm font-medium text-white/70 hover:text-white transition-colors"
-                >
-                  Sign in
-                </Link>
-              )}
-              <Link
-                href={isLoggedIn ? "/dashboard" : "/organizations/setup"}
-                className="bg-white text-zinc-900 px-5 py-2.5 text-sm font-semibold rounded-full hover:bg-white/90 transition-colors"
-              >
-                {isLoggedIn ? "Dashboard" : "Get Started"}
-              </Link>
-            </div>
-          </div>
-        </nav>
-
-        {/* Hero content */}
-        <div className="relative z-20 h-full flex items-center">
-          <div className="max-w-6xl mx-auto px-6 w-full">
-            <div className="max-w-3xl space-y-8">
-              <h1 className="text-5xl md:text-7xl font-light tracking-tight leading-[1.05] text-white">
-                Community activated,{" "}
-                <span className="italic">by its members.</span>
-              </h1>
-              <p className="text-xl text-white/70 font-light leading-relaxed max-w-xl">
-                Leaf generates personalized, ready-to-host plans for your
-                organization. Members host plans, people RSVP with just a phone
-                number. No app required.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Link
-                  href={isLoggedIn ? "/dashboard" : "/organizations/setup"}
-                  className="bg-white text-zinc-900 px-8 py-4 text-base font-semibold rounded-full hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
-                >
-                  {isLoggedIn ? "Dashboard" : "Get started free"} <ArrowRight className="w-4 h-4" />
-                </Link>
-                <a
-                  href="#how-it-works"
-                  className="border border-white/30 text-white px-8 py-4 text-base font-medium rounded-full hover:bg-white/10 transition-colors text-center"
-                >
-                  See how it works
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section id="how-it-works" className="bg-zinc-50 py-32">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="mb-20">
-            <p className="text-xs tracking-wider uppercase text-zinc-500 font-semibold mb-3">
-              How It Works
-            </p>
-            <h2 className="text-4xl font-light tracking-tight italic">
-              A thriving community, starts with a living calendar
-            </h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-16">
-            {STEPS.map((step) => (
-              <div key={step.number} className="space-y-6">
-                <div className="flex items-center gap-4">
-                  <span className="text-xs tracking-wider uppercase font-semibold text-zinc-400">
-                    {step.number}
-                  </span>
-                  <div className="h-px flex-1 bg-zinc-200" />
-                </div>
-                <div className="w-12 h-12 border border-zinc-200 flex items-center justify-center">
-                  {step.icon}
-                </div>
-                <h3 className="text-xl font-light tracking-tight">
-                  {step.title}
-                </h3>
-                <p className="text-sm text-zinc-500 font-light leading-relaxed">
-                  {step.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="py-32">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="mb-20">
-            <p className="text-xs tracking-wider uppercase text-zinc-500 font-semibold mb-3">
-              Everything You Need
-            </p>
-            <h2 className="text-4xl font-light tracking-tight italic">
-              Built for real community building
-            </h2>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-12">
-            {FEATURES.map((feature) => (
-              <div key={feature.title} className="space-y-4">
-                <div className="w-10 h-10 bg-zinc-100 flex items-center justify-center">
-                  {feature.icon}
-                </div>
-                <h3 className="text-lg font-medium tracking-tight">
-                  {feature.title}
-                </h3>
-                <p className="text-sm text-zinc-500 font-light leading-relaxed">
-                  {feature.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section id="pricing" className="bg-zinc-50 py-32">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="mb-12 text-center">
-            <p className="text-xs tracking-wider uppercase text-zinc-500 font-semibold mb-3">
-              Pricing
-            </p>
-            <h2 className="text-4xl font-light tracking-tight italic mb-3">
-              Simple pricing that grows with you
-            </h2>
-            <p className="text-zinc-500 font-light mb-8 max-w-xl mx-auto">
-              Start free. Upgrade when you want your own brand — or let us run it for you.
-            </p>
-            {/* Billing period toggle */}
-            <div className="inline-flex items-center gap-1 bg-zinc-100 rounded-full p-1">
-              <button
-                onClick={() => setBillingPeriod("monthly")}
-                className={`px-5 py-2 text-sm font-medium rounded-full transition-colors ${
-                  billingPeriod === "monthly"
-                    ? "bg-zinc-900 text-white"
-                    : "text-zinc-500 hover:text-zinc-700"
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setBillingPeriod("yearly")}
-                className={`px-5 py-2 text-sm font-medium rounded-full transition-colors ${
-                  billingPeriod === "yearly"
-                    ? "bg-zinc-900 text-white"
-                    : "text-zinc-500 hover:text-zinc-700"
-                }`}
-              >
-                Yearly
-              </button>
-            </div>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {PRICING_TIERS.map((tier) => {
-              const price = tier.customPrice
-                ? tier.customPrice
-                : billingPeriod === "yearly"
-                  ? tier.yearlyPrice
-                  : tier.monthlyPrice;
-              const period = tier.customPrice
-                ? "/mo"
-                : billingPeriod === "yearly"
-                  ? tier.yearlyPeriod
-                  : tier.monthlyPeriod;
-              const isExternal = /^(mailto:|https?:)/.test(tier.ctaHref || "");
-              const href = tier.ctaHref
-                ? tier.ctaHref
-                : isLoggedIn
-                  ? "/dashboard"
-                  : `/organizations/setup?tier=${tier.id}&billingPeriod=${billingPeriod}`;
-              const ctaLabel = !tier.ctaHref && isLoggedIn ? "Go to dashboard" : tier.cta;
-              return (
-              <div
-                key={tier.name}
-                className={`p-8 flex flex-col ${
-                  tier.dark
-                    ? "bg-zinc-900 text-white relative"
-                    : tier.highlight
-                      ? "bg-white ring-2 ring-zinc-900 relative"
-                      : "bg-white border border-zinc-200"
-                }`}
-              >
-                {tier.highlight && (
-                  <div className="absolute -top-3 left-8 bg-zinc-900 text-white px-3.5 py-1 text-xs tracking-wider uppercase font-semibold rounded-full">
-                    Most popular
-                  </div>
-                )}
-                <div className="mb-8">
-                  <h3 className={`text-xs tracking-wider uppercase font-semibold mb-4 ${
-                    tier.dark ? "text-white/60" : "text-zinc-500"
-                  }`}>
-                    {tier.name}
-                  </h3>
-                  <div className="flex items-baseline gap-1 flex-wrap">
-                    <span className="text-4xl font-light tracking-tight">
-                      {price}
-                    </span>
-                    {period && (
-                      <span className={`text-sm ${tier.dark ? "text-white/50" : "text-zinc-400"}`}>
-                        {period}
-                      </span>
-                    )}
-                  </div>
-                  {!tier.customPrice && billingPeriod === "yearly" && tier.yearlySavings && (
-                    <span className="text-xs text-green-600 font-medium mt-1 inline-block">
-                      {tier.yearlySavings}
-                    </span>
-                  )}
-                  <p className={`text-sm font-light mt-2 ${
-                    tier.dark ? "text-white/70" : "text-zinc-500"
-                  }`}>
-                    {tier.description}
-                  </p>
-                </div>
-                <div className="flex-1 space-y-3 mb-8">
-                  {tier.inheritsLabel && (
-                    <p className={`text-xs font-semibold tracking-wide mb-4 ${
-                      tier.dark ? "text-white/80" : "text-zinc-700"
-                    }`}>
-                      {tier.inheritsLabel}
-                    </p>
-                  )}
-                  {tier.features.map((feature) => (
-                    <div
-                      key={feature}
-                      className="flex items-start gap-3 text-sm"
-                    >
-                      <Check className={`w-4 h-4 mt-0.5 shrink-0 ${
-                        tier.dark ? "text-white" : "text-zinc-900"
-                      }`} />
-                      <span>{feature}</span>
-                    </div>
-                  ))}
-                  {tier.excluded.map((feature) => (
-                    <div
-                      key={feature}
-                      className={`flex items-start gap-3 text-sm ${
-                        tier.dark ? "text-white/30" : "text-zinc-300"
-                      }`}
-                    >
-                      <span className="w-4 h-4 flex items-center justify-center mt-0.5 shrink-0">
-                        &mdash;
-                      </span>
-                      <span>{feature}</span>
-                    </div>
-                  ))}
-                </div>
-                {tier.id === "managed" ? (
-                  <ConciergeCta dark={tier.dark} />
-                ) : isExternal ? (
-                  <a
-                    href={href}
-                    target={href.startsWith("mailto:") ? undefined : "_blank"}
-                    rel={href.startsWith("mailto:") ? undefined : "noopener noreferrer"}
-                    className={`w-full py-3.5 text-sm font-semibold text-center flex items-center justify-center gap-2 rounded-full transition-colors ${
-                      tier.dark
-                        ? "bg-white text-zinc-900 hover:bg-white/90"
-                        : "border border-zinc-200 text-zinc-900 hover:bg-zinc-50"
-                    }`}
-                  >
-                    {ctaLabel} <ChevronRight className="w-3.5 h-3.5" />
-                  </a>
-                ) : (
-                  <Link
-                    href={href}
-                    className={`w-full py-3.5 text-sm font-semibold text-center flex items-center justify-center gap-2 rounded-full transition-colors ${
-                      tier.highlight
-                        ? "bg-zinc-900 text-white hover:bg-zinc-800"
-                        : "border border-zinc-200 text-zinc-900 hover:bg-zinc-50"
-                    }`}
-                  >
-                    {ctaLabel} <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
-                )}
-              </div>
-              );
-            })}
-          </div>
-          <p className="text-center text-sm text-zinc-500 font-light mt-10 max-w-2xl mx-auto">
-            You keep your event budget — we make it effortless. Curated, locally-sponsored events with zero work for your team. Perfect for apartment buildings, churches, clubs, and any community that wants a thriving calendar without the lift.
-          </p>
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section className="py-24">
-        <div className="max-w-3xl mx-auto px-6">
-          <p className="text-xs tracking-wider uppercase text-zinc-500 font-semibold mb-3 text-center">
-            FAQ
-          </p>
-          <h2 className="text-3xl font-light tracking-tight italic mb-12 text-center">
-            Common questions
-          </h2>
-          <div className="space-y-8">
-            <div>
-              <h3 className="text-sm font-bold mb-1">What are AI-suggested plans?</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">
-                Every week, Leaf automatically generates personalized, ready-to-host plans for your calendar based on your location, vibe, and preferences. These include real venues, smart timing, and images — each just needs a host, so you or your members can claim one and run it. Free includes 5 per week; Pro and Concierge get 15.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-sm font-bold mb-1">What is the events database?</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">
-                The events database gives you access to local events happening in your area. Browse concerts, shows, festivals, and more — then turn them into plans for your community with one tap. Available on every plan.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-sm font-bold mb-1">How many calendars can I run?</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">
-                Free includes one calendar. Pro lets you run up to five — useful when one organization covers multiple buildings, chapters, or cohorts. Concierge is set up per calendar; talk to us if you need to run several.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-sm font-bold mb-1">How far in advance can I schedule plans?</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">
-                As far ahead as you want, on every plan — there&rsquo;s no scheduling window on Free, Pro, or Concierge.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-sm font-bold mb-1">What's the difference between member hosting and co-host management?</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">
-                Member hosting (included on every plan) lets anyone you've added as a member claim a suggested plan and run that single event. Co-host management (Pro and Concierge) lets you invite trusted people who can manage every plan, approve RSVPs, and co-run the whole calendar.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-sm font-bold mb-1">Can I switch plans later?</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">
-                Yes. You can upgrade or downgrade at any time from your dashboard. If you upgrade, you'll be charged the new rate immediately. If you downgrade, your current plan stays active until the end of the billing period.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-sm font-bold mb-1">What counts as an RSVP?</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">
-                An RSVP is counted each time someone confirms attendance to one of your plans. On the Free plan you get up to 50 RSVPs per month, which resets at the start of each calendar month. Pro and Concierge plans have unlimited RSVPs.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-sm font-bold mb-1">Do my members need to download the app?</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">
-                No. Anyone can RSVP to your plans with just their phone number — no app download required. They'll receive SMS confirmations and reminders automatically.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-sm font-bold mb-1">What does custom branding include?</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">
-                On the Pro and Concierge plans, you can upload your own logo and set a brand color for your calendar page. This replaces the default Leaf branding so your community sees your identity.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-sm font-bold mb-1">What's the Concierge plan?</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">
-                Concierge is our done-for-you service for organizations that want Leaf run for them — apartment buildings, churches, clubs, HOAs, and more. We build a personalized monthly event plan for your community and handle the coordination, setup, and communication — plus we feature local merchant deals on your calendar. You get a thriving community calendar without adding any work for your team. $499/mo. Book a demo to get set up.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="py-32">
-        <div className="max-w-6xl mx-auto px-6 text-center">
-          <h2 className="text-4xl md:text-5xl font-light tracking-tight mb-6">
-            Ready to bring your community
+      <MarketingHero
+        headline={
+          <>
+            Type a vibe.
             <br />
-            <span className="italic">together?</span>
-          </h2>
-          <p className="text-zinc-500 text-lg font-light mb-10 max-w-lg mx-auto">
-            Set up your organization calendar in minutes. Your first suggested
-            plans are generated instantly.
-          </p>
-          <Link
-            href={isLoggedIn ? "/dashboard" : "/organizations/setup"}
-            className="inline-flex bg-zinc-900 text-white px-10 py-4 text-base font-semibold rounded-full hover:bg-zinc-800 transition-colors items-center gap-2"
-          >
-            {isLoggedIn ? "Dashboard" : "Get started free"} <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </section>
+            Get a community{" "}
+            <em className="italic" style={{ color: "var(--mkt-green)" }}>
+              calendar
+            </em>
+            .
+          </>
+        }
+        lead="Real calendars made by real organizers, below. Yours takes about 20 seconds. Free, no signup to generate."
+        chips={CHIPS}
+      />
 
-      {/* Footer */}
-      <footer className="py-16 px-6 border-t border-zinc-100">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start gap-12">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <img src="/leaf-logo-black.png" alt="Leaf" className="h-7" />
-              <span className="text-lg font-light tracking-wider uppercase">OS</span>
-            </div>
-            <p className="text-zinc-400 text-sm font-light max-w-xs leading-relaxed">
-              AI-powered community calendars that help organizations plan
-              meaningful gatherings.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-16">
-            <div className="space-y-4">
-              <h5 className="text-xs tracking-wider uppercase font-bold text-zinc-900">
-                Platform
-              </h5>
-              <div className="flex flex-col gap-2 text-sm text-zinc-500 mt-4">
-                <Link href="/about" className="hover:text-zinc-900">
-                  About
-                </Link>
-                <Link href="/organizations" className="hover:text-zinc-900">
-                  Organizations
-                </Link>
-                <Link href="/help" className="hover:text-zinc-900">
-                  Help
-                </Link>
-                <a href="#pricing" className="hover:text-zinc-900">
-                  Pricing
-                </a>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <h5 className="text-xs tracking-wider uppercase font-bold text-zinc-900">
-                Legal
-              </h5>
-              <div className="flex flex-col gap-2 text-sm text-zinc-500 mt-4">
-                <Link href="/terms-conditions" className="hover:text-zinc-900">
-                  Terms
-                </Link>
-                <Link href="/privacy-policy" className="hover:text-zinc-900">
-                  Privacy
-                </Link>
-                <Link href="/safety" className="hover:text-zinc-900">
-                  Safety
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <CalendarGrid />
+
+      <RsvpDemoSection />
+
+      <HowItWorks
+        steps={STEPS}
+        heading="A thriving community starts with a living calendar"
+      />
+
+      <Toolkit items={TOOLKIT} heading="Built for real community building" />
+
+      <PricingSection
+        tiers={PRICING_TIERS}
+        isLoggedIn={isLoggedIn}
+        subhead="Start free. Upgrade when you want your own brand — or let us run it for you."
+        footnote="You keep your event budget — we make it effortless. Curated, locally-sponsored events with zero work for your team. Perfect for apartment buildings, churches, clubs, and any community that wants a thriving calendar without the lift."
+      />
+
+      <FaqAccordion items={FAQ} defaultOpen={1} />
+
+      <ClosingCta
+        headline="Join the organizers above."
+        emphasis="Start a calendar."
+      />
+
+      <MarketingFooter blurb="AI-powered community calendars for the organizations that bring people together." />
+
+      <StickyGenerateBar />
     </div>
   );
 }

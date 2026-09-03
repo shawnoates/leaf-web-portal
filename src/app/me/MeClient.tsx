@@ -31,7 +31,6 @@ import { PlanMiniMap, PlansRailMap, type MapPin } from "./PlanMaps";
 type HostState = "waiting_on_host" | "human_host" | "leaf_arranging" | "leaf_hosted";
 type RsvpState = "going" | "not_going" | "no_response" | "pending" | "waitlisted";
 
-interface Persona { id: string; name: string; avatarUrl: string | null }
 interface Weather { temp: string; icon: string; text: string }
 interface PlanMessage {
   id: string | null;
@@ -57,7 +56,6 @@ interface Plan {
   calendarShareId: string | null;
   image: string | null;
   hostState: HostState;
-  hostPersona: Persona | null;
   viewerIsHost: boolean;
   rsvpState: RsvpState;
   attendeeCount: number;

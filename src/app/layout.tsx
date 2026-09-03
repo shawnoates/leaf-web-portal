@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Instrument_Serif, JetBrains_Mono, Manrope } from "next/font/google";
 import "./globals.css";
 import UserActivityBeacon from "@/components/UserActivityBeacon";
 import { SITE_URL } from "@/lib/site";
@@ -7,6 +7,28 @@ import { SITE_URL } from "@/lib/site";
 const inter = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+});
+
+// Marketing typeface set — used by /personal and /organizations via the
+// `.mkt` scope in globals.css. Self-hosted by next/font so the landing
+// pages don't block on a Google Fonts round trip.
+const manrope = Manrope({
+  variable: "--font-manrope",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument-serif",
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 const SITE_TITLE = "Leaf OS — Community Calendars";
@@ -65,7 +87,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${inter.variable} ${manrope.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable} h-full antialiased`}
+    >
       <head>
         {/* OpenAI Ads conversion pixel */}
         <script

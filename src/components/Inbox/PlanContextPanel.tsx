@@ -14,7 +14,6 @@ export interface PlanContext {
   locationName: string | null;
   locationAddress: string | null;
   attendeeCount: number | null;
-  isVirtualHosted: boolean;
   personaName: string | null;
   personaAvatarUrl: string | null;
 }
