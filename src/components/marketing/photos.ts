@@ -376,7 +376,16 @@ export const DEMO_VENUE_PHOTOS: Photo[] = [
   SUBJECTS.oysters[0],
 ];
 
-const RESERVED = new Set(DEMO_VENUE_PHOTOS.map((p) => p.url));
+/** The organizations band's image. A run-club group shot, since that
+ *  section's headline literally names run clubs, studios and community
+ *  groups. Reserved like the venue thumbs so the grid can't hand the same
+ *  photo out to a run-themed calendar further up the page. */
+export const ORG_BAND_PHOTO: Photo = SUBJECTS.run[0];
+
+const RESERVED = new Set([
+  ...DEMO_VENUE_PHOTOS.map((p) => p.url),
+  ORG_BAND_PHOTO.url,
+]);
 
 /**
  * One photo per calendar, never repeating within the page.
