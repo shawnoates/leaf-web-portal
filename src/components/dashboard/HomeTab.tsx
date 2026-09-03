@@ -636,6 +636,35 @@ export default function HomeTab({
     );
   }
 
+  const formatDueDate = (date: Date | null | undefined): string | null => {
+    if (!date || isNaN(date.getTime())) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 6);
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+
+    if (checkDate.getTime() === today.getTime()) return "Due today";
+    if (checkDate.getTime() === tomorrow.getTime()) return "Due tomorrow";
+    if (checkDate <= nextWeek) {
+      return `Due ${checkDate.toLocaleDateString("en-US", { weekday: "long" })}`;
+    }
+    return `Due ${checkDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  };
+
+  const formatRelativeSavedDate = (date: Date | null | undefined): string => {
+    if (!date || isNaN(date.getTime())) return "Saved";
+    const now = new Date();
+    const daysAgo = Math.floor((now.getTime() - new Date(date).getTime()) / (1000 * 60 * 60 * 24));
+    if (daysAgo === 0) return "Saved today";
+    if (daysAgo === 1) return "Saved yesterday";
+    if (daysAgo < 60) return `Saved ${daysAgo} days ago`;
+    return `Saved ${new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  };
+
   // ── Spine entries (14 days, quiet stretches collapsed) ────────────────
   const spineEntries: React.ReactNode[] = [];
   {
@@ -892,11 +921,16 @@ export default function HomeTab({
               owner opens this page; the schedule is reference below it. */}
           <div className="min-w-0">
             {/* NEEDS YOU */}
-            <p className="text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase mb-2.5">
-              Needs you
-            </p>
+            <div className="mb-4 flex items-baseline gap-2">
+              <h2 className="text-[20px] font-bold tracking-[-0.3px] text-zinc-900">
+                Needs you
+              </h2>
+              <span className="text-[20px] font-medium text-zinc-400">
+                {needsYouCount}
+              </span>
+            </div>
             {needsYouRows.length > 0 ? (
-              <div className="border border-zinc-200 rounded-xl overflow-hidden">
+              <div className="border border-zinc-200 rounded-xl overflow-hidden bg-white">
                 {needsYouRows}
               </div>
             ) : (
@@ -913,9 +947,11 @@ export default function HomeTab({
               </div>
             )}
 
-            <p className="text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase mt-6 mb-3.5">
-              Next 14 days
-            </p>
+            <div className="mt-6 mb-3.5">
+              <h2 className="text-[20px] font-bold tracking-[-0.3px] text-zinc-900">
+                Next 14 days
+              </h2>
+            </div>
             <div>{spineEntries}</div>
           </div>
 
