@@ -327,15 +327,26 @@ export default function HostApplyForm() {
       <main className="mx-auto max-w-lg px-5 py-16">
         <div className="rounded-2xl border border-leaf-200 bg-leaf-50 p-6">
           <h1 className="text-xl font-semibold text-leaf-900">
-            You&rsquo;re on the list.
+            Thanks{firstName ? `, ${firstName}` : ""}. You&rsquo;re on the list.
           </h1>
           <p className="mt-3 text-[15px] leading-relaxed text-leaf-800">
-            Thanks{firstName ? `, ${firstName}` : ""}. We&rsquo;ve sent a
-            confirmation to {email}. When a night in your neighborhood needs a
-            host, we&rsquo;ll get in touch.
+            We&rsquo;ve sent a confirmation to {email}.
+          </p>
+          {/*
+            Sets the waiting expectation. A quiet month has two readings and
+            people pick the worse one, so the reason is put on OUR schedule —
+            what we have running near them. Deliberately does not mention their
+            application: naming the worry ("this isn't about how you did") is
+            what plants it.
+          */}
+          <p className="mt-3 text-[15px] leading-relaxed text-leaf-800">
+            I&rsquo;ll be in touch as soon as there&rsquo;s a night near you
+            that fits. Sometimes that&rsquo;s quick, sometimes it takes a little
+            longer. It just depends what we have running in your neighborhood.
+            Either way, you don&rsquo;t need to do a thing.
           </p>
           <p className="mt-3 text-[15px] leading-relaxed text-leaf-800">
-            Nothing else to do for now.
+            Really glad you put your name in.
           </p>
         </div>
       </main>
@@ -645,10 +656,13 @@ export default function HostApplyForm() {
             <div className="rounded-xl bg-zinc-50 p-4 text-[14px] leading-relaxed text-zinc-700">
               <p className="font-medium text-leaf-900">What happens next</p>
               <p className="mt-1.5">
-                You go on a list. When a night in your neighborhood needs a host,
-                we get in touch. It is contract work, paid the same night or the
-                next morning. Your photo and your description are shown to the
-                people attending that event. Nothing else is shared with anyone.
+                You go on a list, and I&rsquo;ll be in touch as soon as
+                there&rsquo;s a night near you that fits. Sometimes that&rsquo;s
+                quick, sometimes it takes a little longer, depending what we
+                have running in your neighborhood. It&rsquo;s contract work,
+                paid the same night or the next morning. Your photo and your
+                description are shown to the people attending that event.
+                Nothing else is shared with anyone.
               </p>
             </div>
           </>
