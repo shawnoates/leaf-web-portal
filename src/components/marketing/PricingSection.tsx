@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
 import ConciergeCta from "@/components/ConciergeCta";
 import { focusHeroInput } from "./useGenerate";
 import { trackMarketingEvent } from "./analytics";
@@ -260,7 +259,7 @@ function TierCard({
             focusHeroInput();
           }}
         >
-          {tier.cta} <ChevronRight className="h-3.5 w-3.5" />
+          {tier.cta}
         </button>
       ) : isExternal ? (
         <a
@@ -270,11 +269,11 @@ function TierCard({
           className={ctaClasses}
           style={ctaStyle}
         >
-          {ctaLabel} <ChevronRight className="h-3.5 w-3.5" />
+          {ctaLabel}
         </a>
       ) : (
         <Link href={href} className={ctaClasses} style={ctaStyle}>
-          {ctaLabel} <ChevronRight className="h-3.5 w-3.5" />
+          {ctaLabel}
         </Link>
       )}
     </div>
