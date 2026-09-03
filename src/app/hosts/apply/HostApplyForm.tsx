@@ -646,10 +646,9 @@ export default function HostApplyForm() {
               <p className="font-medium text-leaf-900">What happens next</p>
               <p className="mt-1.5">
                 You go on a list. When a night in your neighborhood needs a host,
-                we get in touch. It is contract work, 1099, paid the same night
-                or the next morning. Your photo and your description are shown to
-                the people attending that event. Nothing else is shared with
-                anyone.
+                we get in touch. It is contract work, paid the same night or the
+                next morning. Your photo and your description are shown to the
+                people attending that event. Nothing else is shared with anyone.
               </p>
             </div>
           </>
