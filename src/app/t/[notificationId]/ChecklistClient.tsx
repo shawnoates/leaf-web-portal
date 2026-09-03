@@ -289,6 +289,19 @@ function Row({
           )}
         </span>
       </button>
+
+      {/* Sibling of the button, never a child — a textarea and its send button
+          cannot live inside another button. Indented to line up with the task
+          text rather than the checkbox. */}
+      {task.draftMessage && (
+        <div className="pl-12 pr-4 pb-3 -mt-1">
+          <DraftPanel
+            task={task}
+            notificationId={notificationId}
+            onSent={onSent}
+          />
+        </div>
+      )}
     </li>
   );
 }
@@ -350,6 +363,22 @@ export default function ChecklistClient({
       }
     },
     [data, notificationId],
+  );
+
+  const markSent = useCallback(
+    (taskId: string, sentAt: string) => {
+      setData((d) =>
+        d
+          ? {
+              ...d,
+              tasks: d.tasks.map((t) =>
+                t.id === taskId ? { ...t, draftSentAt: sentAt } : t,
+              ),
+            }
+          : d,
+      );
+    },
+    [],
   );
 
   const addTask = useCallback(async () => {
@@ -429,7 +458,14 @@ export default function ChecklistClient({
 
         <ul className="mt-1">
           {open.map((t) => (
-            <Row key={t.id} task={t} busy={busyId === t.id} onToggle={toggle} />
+            <Row
+              key={t.id}
+              task={t}
+              busy={busyId === t.id}
+              notificationId={notificationId}
+              onToggle={toggle}
+              onSent={markSent}
+            />
           ))}
         </ul>
 
@@ -470,7 +506,9 @@ export default function ChecklistClient({
                   key={t.id}
                   task={t}
                   busy={busyId === t.id}
+                  notificationId={notificationId}
                   onToggle={toggle}
+                  onSent={markSent}
                 />
               ))}
             </ul>
