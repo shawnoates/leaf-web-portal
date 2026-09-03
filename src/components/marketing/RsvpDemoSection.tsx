@@ -61,7 +61,13 @@ const prefersReducedMotion = makeClientValue(
   false
 );
 
-export default function RsvpDemoSection() {
+export default function RsvpDemoSection({
+  audience,
+}: {
+  /** "Friends" on /personal, "Members" on /organizations — the people
+   *  doing the RSVPing are not the same crowd. */
+  audience: string;
+}) {
   const sectionRef = useRef<HTMLDivElement>(null);
   const [started, setStarted] = useState(false);
   const [loop, setLoop] = useState(0);
@@ -119,7 +125,7 @@ export default function RsvpDemoSection() {
               fontWeight: 400,
             }}
           >
-            Friends tap in with a phone number.{" "}
+            {audience} tap in with a phone number.{" "}
             <em
               className="mkt-serif italic"
               style={{ fontSize: "1.14em", color: "var(--mkt-green-light)" }}
@@ -235,7 +241,7 @@ export default function RsvpDemoSection() {
             </span>
             <div className="min-w-0">
               <div className="text-[13px] font-semibold sm:text-[14px]">
-                {toast.name} RSVP&rsquo;d
+                {`${toast.name} RSVP\u2019d`}
               </div>
               <div
                 className="truncate text-[11px] sm:text-[12.5px]"

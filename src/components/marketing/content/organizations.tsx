@@ -25,6 +25,7 @@ export const organizationsContent: MarketingContent = {
     ],
   },
 
+  audience: "Members",
   stepsHeading: "A thriving community starts with a living calendar",
   steps: [
     {

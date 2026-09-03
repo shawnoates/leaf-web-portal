@@ -12,6 +12,8 @@ export interface MarketingContent {
     lead: string;
     chips: string[];
   };
+  /** What this page calls the people who RSVP — "Friends" vs "Members". */
+  audience: string;
   stepsHeading: string;
   steps: Step[];
   toolkitHeading: string;

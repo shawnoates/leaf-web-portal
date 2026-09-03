@@ -26,6 +26,7 @@ export const personalContent: MarketingContent = {
     ],
   },
 
+  audience: "Friends",
   stepsHeading: 'From a vibe to "see you Saturday"',
   steps: [
     {

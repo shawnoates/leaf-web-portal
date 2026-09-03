@@ -43,7 +43,7 @@ export default function MarketingPage({
 
       <CalendarGrid />
 
-      <RsvpDemoSection />
+      <RsvpDemoSection audience={content.audience} />
 
       <HowItWorks steps={content.steps} heading={content.stepsHeading} />
 
