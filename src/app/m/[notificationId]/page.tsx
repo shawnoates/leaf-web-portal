@@ -82,7 +82,6 @@ type AttendeeMemoryInfo = {
     ratingMax: number;
     commentMaxLen: number;
   };
-  virtualHost?: { personaName: string; personaAvatarUrl: string | null } | null;
 };
 
 async function fetchInfo(

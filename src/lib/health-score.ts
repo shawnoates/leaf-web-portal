@@ -192,7 +192,7 @@ function memberLedPillar(
  *  itself, and counting them would let a calendar look member-led purely
  *  because Leaf is filling its gaps. */
 export function hostMixFor(
-  plans: { hostName: string; isVirtualHost?: boolean; leafHostState?: string | null }[],
+  plans: { hostName: string; leafHostState?: string | null }[],
   ownerNames: string[],
 ): { memberLedRate: number; distinctHosts: number; communityHostedPlans: number } | null {
   const ownerSet = new Set(
@@ -200,7 +200,7 @@ export function hostMixFor(
   );
 
   const communityHosted = plans.filter(
-    (p) => !p.isVirtualHost && !p.leafHostState,
+    (p) => !p.leafHostState,
   );
   // Too small a sample to make a claim about how hosting is distributed.
   if (communityHosted.length < 3) return null;

@@ -31,12 +31,6 @@ export type SurveyState = {
   commentMaxLen: number;
 };
 
-/** Present only on virtual-hosted plans — gates the private host-feedback half. */
-export type VirtualHostInfo = {
-  personaName: string;
-  personaAvatarUrl: string | null;
-};
-
 export type PhotoLimits = {
   maxBytes: number;
   maxPerAttendee: number;

@@ -6,7 +6,6 @@ import { Heart } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import HostIdeaModal from "@/components/HostIdeaModal";
 import RecapPopup from "@/components/recap/RecapPopup";
-import VirtualHostBadge from "@/components/VirtualHostBadge";
 import { setVerifiedUserCookie } from "@/lib/verified-user";
 import NewPlanModal, {
   ME_PLAN_DRAFT_KEY,
@@ -29,7 +28,7 @@ import { PlanMiniMap, PlansRailMap, type MapPin } from "./PlanMaps";
 // ============================================================================
 
 // ---- Types (mirror the getMeDashboard payload) -----------------------------
-type HostState = "waiting_on_host" | "human_host" | "leaf_arranging" | "leaf_hosted" | "virtual_host";
+type HostState = "waiting_on_host" | "human_host" | "leaf_arranging" | "leaf_hosted";
 type RsvpState = "going" | "not_going" | "no_response" | "pending" | "waitlisted";
 
 interface Persona { id: string; name: string; avatarUrl: string | null }
@@ -292,21 +291,13 @@ function ChatIcon({ size = 13 }: { size?: number }) {
 }
 
 function statusFor(plan: Plan): { cls: string; text: string } | null {
-  if (plan.hostState === "leaf_hosted" && plan.hostPersona) {
-    return { cls: "host", text: `Hosted by Leaf · ${plan.hostPersona.name}` };
-  }
+  // Was "Hosted by Leaf · Sara". The server stopped sending a persona on
+  // 2026-09-02, so this is the whole label now.
   if (plan.hostState === "leaf_hosted") return { cls: "host", text: "Hosted by Leaf" };
   // The viewer's own queued state outranks host-context pills — it's the
   // state they act on ("did my request go through?").
   if (plan.rsvpState === "pending") return { cls: "wait", text: "Requested · waiting on host" };
   if (plan.rsvpState === "waitlisted") return { cls: "wait", text: "On the waitlist" };
-  // A virtual/Leaf host is the public face of the plan even though the owner
-  // technically owns the EventGroup — read like "Organized by {persona}", not
-  // "You're hosting" (mirrors org/[shareId]'s viewerHostsPlan exclusion).
-  if (plan.hostState === "virtual_host") {
-    const by = plan.hostPersona ? `Organized by ${plan.hostPersona.name}` : "Organized by Leaf";
-    return { cls: "host", text: plan.attendeeCount > 0 ? `${by} · ${plan.attendeeCount} going` : by };
-  }
   if (plan.viewerIsHost) {
     return { cls: "host", text: plan.attendeeCount > 0 ? `You're hosting · ${plan.attendeeCount} going` : "You're hosting" };
   }
@@ -322,9 +313,9 @@ function statusFor(plan: Plan): { cls: string; text: string } | null {
 function planIsFull(plan: Plan) {
   return plan.capacity != null && plan.attendeeCount >= plan.capacity;
 }
-/** Hosting marker belongs to the actual host; a virtual host fronts the plan. */
+/** Hosting marker belongs to the actual host — who is now always a person. */
 function viewerHosts(plan: Plan) {
-  return plan.viewerIsHost && plan.hostState !== "virtual_host";
+  return plan.viewerIsHost;
 }
 /** Chat is for people in the room: attendees and real hosts. */
 function canChat(plan: Plan) {
@@ -1432,11 +1423,7 @@ function Thread({ plan }: { plan: Plan }) {
           <div className="msg-b">
             <div className="t">
               <span>{m.authorName}</span>
-              {m.authorRole === "virtual_host" ? (
-                // The same tooltip the web chat bubble carries — one
-                // disclosure, one wording, both places it can be read.
-                <> <VirtualHostBadge persona={{ name: m.authorName }} /></>
-              ) : m.authorRole === "leaf" ? (
+              {m.authorRole === "leaf" ? (
                 " · Leaf concierge"
               ) : plan.calendarName ? (
                 ` · ${plan.calendarName}`

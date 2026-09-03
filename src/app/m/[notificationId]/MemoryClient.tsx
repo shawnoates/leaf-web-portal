@@ -6,7 +6,7 @@ import { MapPin, Calendar, X, Check, ShieldCheck, UserCheck } from "lucide-react
 import HostTheNextOne from "@/components/HostTheNextOne";
 import SurveyCard from "@/components/recap/SurveyCard";
 import PhotoUpload from "@/components/recap/PhotoUpload";
-import type { Photo, SurveyState, VirtualHostInfo } from "@/components/recap/types";
+import type { Photo, SurveyState } from "@/components/recap/types";
 
 type Attendee = {
   notificationId: string;
@@ -68,7 +68,6 @@ type AttendeeMemoryInfo = {
   survey?: SurveyState;
   // Present only on virtual-hosted plans — gates the private host-feedback
   // section of the survey card.
-  virtualHost?: VirtualHostInfo | null;
 };
 
 function formatEventDate(iso: string | null): string {
@@ -218,7 +217,6 @@ export default function MemoryClient({
         <SurveyCard
           notificationId={notificationId}
           survey={info.survey}
-          virtualHost={info.virtualHost}
           attendeeName={info.attendee.name}
           onSaved={(result) =>
             setInfo((prev) =>

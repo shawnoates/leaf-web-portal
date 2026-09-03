@@ -2,7 +2,6 @@
 
 import { MapPin, CheckCircle2, ExternalLink, Smartphone } from "lucide-react";
 import type { FirMessage, UserLite } from "./types";
-import VirtualHostBadge from "@/components/VirtualHostBadge";
 
 const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
 
@@ -11,8 +10,6 @@ interface Props {
   user?: UserLite;
   isFromCurrentUser: boolean;
   hideAvatar: boolean;
-  virtualHostPersonaName?: string | null;
-  virtualHostPersonaAvatarUrl?: string | null;
 }
 
 export default function MessageRow({
@@ -20,8 +17,6 @@ export default function MessageRow({
   user,
   isFromCurrentUser,
   hideAvatar,
-  virtualHostPersonaName,
-  virtualHostPersonaAvatarUrl,
 }: Props) {
   const type = message.type;
 
@@ -57,8 +52,6 @@ export default function MessageRow({
       user={user}
       isFromCurrentUser={isFromCurrentUser}
       hideAvatar={hideAvatar}
-      virtualHostPersonaName={virtualHostPersonaName}
-      virtualHostPersonaAvatarUrl={virtualHostPersonaAvatarUrl}
     />
   );
 }
@@ -70,36 +63,24 @@ function TextBubbleRow({
   user,
   isFromCurrentUser,
   hideAvatar,
-  virtualHostPersonaName,
-  virtualHostPersonaAvatarUrl,
 }: {
   message: FirMessage;
   user?: UserLite;
   isFromCurrentUser: boolean;
   hideAvatar: boolean;
-  virtualHostPersonaName?: string | null;
-  virtualHostPersonaAvatarUrl?: string | null;
 }) {
   const isLeafAI = message.from === "leaf_ai";
-  const senderName = isLeafAI ? (virtualHostPersonaName || "Leaf") : user?.name || "";
+  // Server-posted messages are attributed to Leaf, openly. A persona name
+  // used to override this; removed 2026-09-02.
+  const senderName = isLeafAI ? "Leaf" : user?.name || "";
   const text = (message.text || "").trim();
 
-  // Virtual-hosted plans speak as a named persona (Marcus, Jules…), so the
-  // AI bubble wears that persona's face. Falls back to the persona initial,
-  // and to Leaf's "L" only when no persona is attached.
+  // Server-posted messages wear Leaf's mark. This used to swap in a persona's
+  // photograph, which is what made an assistant read as a person.
   const avatar = isLeafAI ? (
-    virtualHostPersonaAvatarUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={virtualHostPersonaAvatarUrl}
-        alt={senderName}
-        className="w-8 h-8 rounded-full object-cover shrink-0"
-      />
-    ) : (
-      <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold shrink-0">
-        {senderName.charAt(0).toUpperCase() || "L"}
-      </div>
-    )
+    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold shrink-0">
+      L
+    </div>
   ) : user?.profilePictureUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -124,9 +105,6 @@ function TextBubbleRow({
         {!hideAvatar && senderName && (
           <span className="text-[11px] mb-0.5 px-1 inline-flex items-center gap-1.5">
             <span className={isLeafAI ? "text-zinc-900" : "text-zinc-400"}>{senderName}</span>
-            {isLeafAI && virtualHostPersonaName && (
-              <VirtualHostBadge persona={{ name: virtualHostPersonaName }} />
-            )}
           </span>
         )}
         <div

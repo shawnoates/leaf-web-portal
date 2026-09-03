@@ -2,7 +2,7 @@
 
 export interface InboxThread {
   threadKey: string;
-  threadKind: "concierge" | "virtual_host" | "leaf_host" | string;
+  threadKind: "concierge" | "leaf_host" | string;
   calendarId: string;
   calendarName: string;
   planId: string | null;

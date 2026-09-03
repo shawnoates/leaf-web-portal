@@ -7,7 +7,7 @@ import { Loader2, X, Check, CalendarX } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import SurveyCard from "./SurveyCard";
 import PhotoUpload from "./PhotoUpload";
-import type { PhotoLimits, SurveyState, VirtualHostInfo } from "./types";
+import type { PhotoLimits, SurveyState } from "./types";
 
 // The post-event ask, shown over /me for a plan the viewer attended and hasn't
 // rated. Same three actions as the /m memory page — rate the plan, rate the
@@ -38,7 +38,6 @@ type MemoryInfo = {
   uploadsClosed?: boolean;
   limits: PhotoLimits;
   survey?: SurveyState;
-  virtualHost?: VirtualHostInfo | null;
 };
 
 function whenLabel(iso: string | null): string {
@@ -223,7 +222,6 @@ export default function RecapPopup({
                       <SurveyCard
                         notificationId={notificationId}
                         survey={info.survey}
-                        virtualHost={info.virtualHost}
                         attendeeName={info.attendee?.name || "you"}
                         variant="bare"
                         onSaved={() => {

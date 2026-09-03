@@ -91,7 +91,6 @@ function computeBestDay(
 }
 
 function hostLine(plan: CalActivePlan): string {
-  if (plan.isVirtualHost) return `${plan.hostName} hosting`;
   if (plan.leafHostState === "leaf_hosted")
     return `Leaf hosting${plan.leafHostPersona?.name ? ` · ${plan.leafHostPersona.name}` : ""}`;
   if (plan.leafHostState === "leaf_arranging") return "Leaf is arranging this";

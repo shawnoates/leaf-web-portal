@@ -18,8 +18,6 @@ import {
 import { Loader2, Send, ArrowLeft, Calendar, MapPin, Users, X, Smartphone } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import MessageRow from "./MessageRow";
-import VirtualHostTimelineView from "./VirtualHostTimelineView";
-import type { UpcomingMilestone } from "./VirtualHostTimelineView";
 import type { FirMessage, UserLite } from "./types";
 
 type AuthState = "checking" | "ready" | "denied" | "error";
@@ -79,11 +77,6 @@ export default function ChatShell({
   const [users, setUsers] = useState<Map<string, UserLite>>(new Map());
   const [composeText, setComposeText] = useState("");
   const [sending, setSending] = useState(false);
-  const [virtualHostPersonaName, setVirtualHostPersonaName] = useState<string | null>(null);
-  const [virtualHostPersonaAvatarUrl, setVirtualHostPersonaAvatarUrl] = useState<string | null>(null);
-  const [timeline, setTimeline] = useState<Array<{ id: string; stepType: string; label: string; notes: string; createdAt: string | null; createdAtLocal: string }> | null>(null);
-  const [timelineLoading, setTimelineLoading] = useState(false);
-  const [upcomingMilestone, setUpcomingMilestone] = useState<UpcomingMilestone | null>(null);
 
   useEffect(() => {
     setDevice(detectDevice());
@@ -92,28 +85,9 @@ export default function ChatShell({
   const currentUserIdRef = useRef<string | null>(null);
   const composerRef = useRef<HTMLInputElement>(null);
 
-  // Tap-to-mention. The persona only answers when tagged by name, so leaving
-  // guests to type "@Marcus" by hand is the difference between a question that
-  // reaches a human and one that sits unread. Inserting the canonical spelling
-  // also keeps the text matching the server's detection.
-  const personaMentionPresent =
-    Boolean(virtualHostPersonaName) &&
-    new RegExp(`@${virtualHostPersonaName}\\b`, "i").test(composeText);
-
-  const insertPersonaMention = useCallback(() => {
-    if (!virtualHostPersonaName) return;
-    setComposeText((prev) => {
-      if (new RegExp(`@${virtualHostPersonaName}\\b`, "i").test(prev)) return prev;
-      return prev.trim() ? `@${virtualHostPersonaName} ${prev.trimStart()}` : `@${virtualHostPersonaName} `;
-    });
-    // Focus after the state flush so the caret lands at the end of the new text.
-    requestAnimationFrame(() => {
-      const el = composerRef.current;
-      if (!el) return;
-      el.focus();
-      el.setSelectionRange(el.value.length, el.value.length);
-    });
-  }, [virtualHostPersonaName]);
+  // A tap-to-mention affordance lived here: the persona only replied when
+  // tagged by name, so the composer offered "Ask @Marcus". Removed 2026-09-02 —
+  // there is no one to tag, and questions go to the human host.
 
   // Tell the server the user has caught up. Failures are silent — stale read
   // state just means an extra digest email, not a user-visible error.
@@ -147,7 +121,6 @@ export default function ChatShell({
           attendeeCount?: number | null;
           notificationId?: string | null;
           users?: Record<string, { name: string; profilePictureUrl?: string | null }>;
-          virtualHostPersona?: { id: string; name: string; avatarUrl?: string | null } | null;
         };
 
         await signInToChat(tokenResult.firebaseToken);
@@ -194,23 +167,9 @@ export default function ChatShell({
         if (tokenResult.planLocationName) setPlanLocationName(tokenResult.planLocationName);
         if (typeof tokenResult.attendeeCount === "number") setAttendeeCount(tokenResult.attendeeCount);
         if (tokenResult.notificationId) setNotificationId(tokenResult.notificationId);
-        if (tokenResult.virtualHostPersona?.name) setVirtualHostPersonaName(tokenResult.virtualHostPersona.name);
-        if (tokenResult.virtualHostPersona?.avatarUrl)
-          setVirtualHostPersonaAvatarUrl(tokenResult.virtualHostPersona.avatarUrl);
-
-        // Fetch timeline if this is a virtual-hosted plan (owner/co-host only)
-        setTimelineLoading(true);
-        Parse.Cloud.run("getVirtualHostTimeline", { eventGroupId })
-          .then((r: any) => {
-            setTimeline(r.entries || []);
-            setUpcomingMilestone(r.upcomingMilestone || null);
-          })
-          .catch(() => {
-            // Timeline not available (not a virtual-hosted plan or no access)
-            setTimeline(null);
-            setUpcomingMilestone(null);
-          })
-          .finally(() => setTimelineLoading(false));
+        // The persona name/avatar and the servicing timeline were read here.
+        // Both went with the virtual host (2026-09-02); getVirtualHostTimeline
+        // no longer exists server-side.
 
         const messagesRef = ref(db, `groups/${eventGroupId}/messages`);
         const recentMessages = query(
@@ -625,19 +584,6 @@ export default function ChatShell({
           </div>
         </header>
 
-        {/* Virtual Host Timeline (owner-only). Renders on a pending milestone
-            alone — a plan waiting on an onsale has no completed steps yet, and
-            that silent stretch is exactly when the owner wants to see one. */}
-        {(timeline || upcomingMilestone) && (
-          <VirtualHostTimelineView
-            entries={timeline}
-            loading={timelineLoading}
-            personaName={virtualHostPersonaName}
-            personaAvatarUrl={virtualHostPersonaAvatarUrl}
-            upcomingMilestone={upcomingMilestone}
-          />
-        )}
-
         <div
           ref={messagesContainerRef}
           className="flex-1 overflow-y-auto px-4 md:px-6 py-4 space-y-3"
@@ -662,8 +608,6 @@ export default function ChatShell({
                   user={users.get(msg.from)}
                   isFromCurrentUser={msg.from === currentUserIdRef.current}
                   hideAvatar={Boolean(sameUser)}
-                  virtualHostPersonaName={virtualHostPersonaName}
-                  virtualHostPersonaAvatarUrl={virtualHostPersonaAvatarUrl}
                 />
               );
             })
@@ -679,30 +623,6 @@ export default function ChatShell({
               Enter handling removes the form context entirely; the name/type
               and the password-manager opt-outs below stop the field from
               looking anonymous to the remaining heuristics. */}
-          {virtualHostPersonaName && !personaMentionPresent && (
-            <div className="flex items-center gap-2 pb-2">
-              <button
-                type="button"
-                onClick={insertPersonaMention}
-                className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 pl-1 pr-3 py-1 text-xs text-zinc-600 hover:bg-zinc-100 hover:border-zinc-300 transition-colors"
-                aria-label={`Ask ${virtualHostPersonaName}`}
-              >
-                {virtualHostPersonaAvatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={virtualHostPersonaAvatarUrl}
-                    alt=""
-                    className="w-5 h-5 rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="w-5 h-5 rounded-full bg-zinc-200 flex items-center justify-center text-[10px] font-medium text-zinc-600">
-                    {virtualHostPersonaName.charAt(0).toUpperCase()}
-                  </span>
-                )}
-                Ask @{virtualHostPersonaName}
-              </button>
-            </div>
-          )}
           <div className="flex items-center gap-2">
             <input
               ref={composerRef}

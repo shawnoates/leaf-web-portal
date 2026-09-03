@@ -10,8 +10,6 @@ import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
 import LeafHostPlanThread from "@/components/LeafHostPlanThread";
-import VirtualHostSheet, { DEFAULT_HOST_AVATAR, HostAvatar } from "@/components/VirtualHostSheet";
-import VirtualHostBadge from "@/components/VirtualHostBadge";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
@@ -114,10 +112,7 @@ interface Plan {
   // Owner-only: unread concierge messages in the plan-scoped thread.
   leafHostChatUnread?: number;
   // Virtual host (VIRTUAL_HOST_SPEC) — persona-fronted paid host on this plan.
-  virtualHost?: boolean;
-  virtualHostPersona?: { id: string; name: string | null; avatarUrl: string | null } | null;
   // Owner-only: can the owner attach a virtual host to this (host-less) plan?
-  virtualHostAddable?: boolean;
 }
 
 interface PlanIdea {
@@ -1582,12 +1577,8 @@ export default function OrgCalendarPage() {
   // Owner-only: the target the owner is attaching a virtual host to — either a
   // published host-less plan (eventGroupId) or an AI starter suggestion
   // (aiEventIndex, materialized into a plan on attach).
-  const [virtualHostPlan, setVirtualHostPlan] = useState<
-    { calendarId: string; eventGroupId?: string; planIdeaId?: string; aiEventIndex?: number } | null
-  >(null);
   // Real, current persona avatar for the "Add virtual host" button (server-
   // provided; seed URLs go stale).
-  const [virtualHostAvatar, setVirtualHostAvatar] = useState<string | null>(null);
   const [hostSuccess, setHostSuccess] = useState<boolean | "pending">(false);
   const [hostSubmitting, setHostSubmitting] = useState(false);
   const [hostError, setHostError] = useState<string | null>(null);
@@ -2435,7 +2426,7 @@ export default function OrgCalendarPage() {
         // attendee, so don't pad the count for those.
         attendeeCount:
           ((p.rsvpCount as number) || 0) +
-          (p.virtualHost || p.leafHostState === "leaf_arranging" ? 0 : 1),
+          (p.leafHostState === "leaf_arranging" ? 0 : 1),
         location: p.location ? {
           name: (p.location as Record<string, unknown>).name as string | null,
           address: (p.location as Record<string, unknown>).address as string | null,
@@ -2461,9 +2452,6 @@ export default function OrgCalendarPage() {
         pollClosesAt: (p.pollClosesAt as string) || null,
         leafHostState: (p.leafHostState as Plan["leafHostState"]) || null,
         leafHostPersona: (p.leafHostPersona as Plan["leafHostPersona"]) || null,
-        virtualHost: (p.virtualHost as boolean) || false,
-        virtualHostPersona: (p.virtualHostPersona as Plan["virtualHostPersona"]) || null,
-        virtualHostAddable: (p.virtualHostAddable as boolean) || false,
         hasLeafHostChat: Boolean(p.hasLeafHostChat),
         leafHostChatUnread:
           typeof p.leafHostChatUnread === "number" ? p.leafHostChatUnread : 0,
@@ -2515,8 +2503,6 @@ export default function OrgCalendarPage() {
         localWallClock: (idea.localWallClock as string) ?? null,
         venueName: (idea.venueName as string) ?? null,
       }));
-
-      setVirtualHostAvatar((result.virtualHostPreview as { avatarUrl?: string | null } | null)?.avatarUrl ?? null);
 
       // "Show suggested and featured plans" covers the AI starter cards too —
       // they render as "Suggested" and are the ONLY suggestion surface on a
@@ -2774,48 +2760,6 @@ export default function OrgCalendarPage() {
     }
   }, [org, ideaQueryId]);
 
-  // ── Return from the AI-assisted host purchase (?virtualHostAttached=1) ────
-  // Stripe sends the owner back to this page with the sheet (and any modal it
-  // was opened from) gone. Resolve the checkout session to the plan that got
-  // hosted, refresh, and hand the id to the ?plan= auto-open above so they land
-  // on the plan detail — where the host they just paid for actually shows.
-  // The attach itself lands on the Stripe webhook (and on the idea / AI-starter
-  // paths the plan is created there), so poll until it reports ready.
-  const virtualHostReturnRef = useRef(false);
-  useEffect(() => {
-    if (typeof window === "undefined" || virtualHostReturnRef.current) return;
-    const search = new URLSearchParams(window.location.search);
-    if (search.get("virtualHostAttached") !== "1") return;
-    virtualHostReturnRef.current = true;
-    const sessionId = search.get("session_id");
-    search.delete("virtualHostAttached");
-    search.delete("session_id");
-    const qs = search.toString();
-    window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
-    if (!sessionId) return;
-    let cancelled = false;
-    (async () => {
-      for (let i = 0; i < 8 && !cancelled; i++) {
-        try {
-          const r: { ready: boolean; eventGroupId?: string } = await Parse.Cloud.run(
-            "getVirtualHostAttachStatus",
-            { sessionId },
-          );
-          if (r.ready && r.eventGroupId) {
-            if (cancelled) return;
-            await fetchOrg();
-            if (!cancelled) setPlanQueryId(r.eventGroupId);
-            return;
-          }
-        } catch {
-          return; // not our session / signed out — leave them on the page
-        }
-        await new Promise((res) => setTimeout(res, 1500));
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [fetchOrg]);
-
   // Keep the open detail modal in sync with the live plans list. `selectedEvent`
   // is a frozen snapshot taken when the card was clicked, so any later
   // fetchOrg() (RSVP, host reassignment, virtual host, etc.) refreshes the card
@@ -2836,7 +2780,7 @@ export default function OrgCalendarPage() {
   // visitor's plan ("Organized by Marcus"), not "You're Hosting". The owner still
   // manages it from the dashboard. Excludes those personas from the host view.
   const viewerHostsPlan = (plan: Plan) =>
-    hostedPlanIds.has(plan.id) && !plan.virtualHost && plan.leafHostState !== "leaf_hosted";
+    hostedPlanIds.has(plan.id) && plan.leafHostState !== "leaf_hosted";
 
   // Auto-load the host notification id when a host opens their own plan
   // (powers the "Message Attendees" button → /h/{id}).
@@ -3465,21 +3409,6 @@ export default function OrgCalendarPage() {
                 Host this
               </button>
             )}
-            {org.isOwner && (
-              <button
-                type="button"
-                onClick={() =>
-                  setVirtualHostPlan({
-                    calendarId: org.objectId,
-                    planIdeaId: idea.id,
-                  })
-                }
-                className="px-4 py-[9px] text-[10px] leading-none font-medium uppercase tracking-[0.16em] bg-transparent border border-[#3a3a3a] text-white hover:border-[#7a7a7a] transition-colors flex items-center gap-[7px]"
-              >
-                <span className="w-[7px] h-[7px] rounded-full bg-[#8f7a4a] shrink-0" />
-                Let Leaf host it
-              </button>
-            )}
           </div>
         </div>
       </article>
@@ -3845,23 +3774,7 @@ export default function OrgCalendarPage() {
                           * leaf_hosted   → public: HOSTED BY LEAF · Sara
                           * leaf_arranging → owner-only: LEAF IS ARRANGING THIS
                           * default        → Hosted by {plan.hostName} */}
-                      {plan.virtualHost ? (
-                        <div className="flex items-center gap-2">
-                          {plan.virtualHostPersona?.avatarUrl && (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img
-                              src={plan.virtualHostPersona.avatarUrl}
-                              alt=""
-                              aria-hidden="true"
-                              className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200 flex-shrink-0"
-                            />
-                          )}
-                          <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold">
-                            Organized by {plan.virtualHostPersona?.name || "your host"}
-                          </p>
-                          <VirtualHostBadge persona={plan.virtualHostPersona} />
-                        </div>
-                      ) : plan.leafHostState === "leaf_hosted" ? (
+                      {plan.leafHostState === "leaf_hosted" ? (
                         <div className="flex items-center gap-2">
                           {plan.leafHostPersona?.avatarUrl && (
                             /* eslint-disable-next-line @next/next/no-img-element */
@@ -3887,19 +3800,6 @@ export default function OrgCalendarPage() {
                           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: org.brandColor || "#18181b" }} />
                           Hosted by {plan.hostName}
                         </p>
-                      )}
-                      {/* Owner-only: let Leaf host this host-less plan (virtual
-                          host). Server sets virtualHostAddable only for the owner
-                          on plans with no host and no RSVPs yet. Same label/style
-                          as the suggested-card CTA for one consistent action. */}
-                      {plan.virtualHostAddable && (
-                        <button
-                          type="button"
-                          onClick={() => setVirtualHostPlan({ calendarId: org.objectId, eventGroupId: plan.id })}
-                          className="mt-2 w-fit px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center gap-2 border border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 transition-colors"
-                        >
-                          <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Let Leaf host it
-                        </button>
                       )}
                       {/* Per-plan leaf-host chat pill — owner-only.
                           Server strips these fields for non-owners so
@@ -4239,24 +4139,7 @@ export default function OrgCalendarPage() {
                                     </button>
                                   );
                                 })()}
-                                {/* Owner-only: let Leaf host it (virtual host).
-                                    Sits inline beside Host This — Host This runs
-                                    it yourself; this hands it to an AI-assisted
-                                    Leaf host. Server re-checks owner + venue/date
-                                    eligibility; the client gate is convenience. */}
-                                {org.isOwner && ev.placeId && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setVirtualHostPlan({ calendarId: org.objectId, aiEventIndex: originalIndex })}
-                                    className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 border border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 transition-colors"
-                                  >
-                                    <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Let Leaf host it
-                                  </button>
-                                )}
-                              </div>
-                              {org.isOwner && ev.placeId && (
-                                <p className="text-xs text-zinc-400 italic">Run it yourself, or let Leaf plan &amp; run it for you.</p>
-                              )}
+                                                              </div>
                             </div>
                           </div>
                         </article>
@@ -4528,23 +4411,7 @@ export default function OrgCalendarPage() {
                             </button>
                           );
                         })()}
-                        {/* Owner-only: let Leaf host it (virtual host). Sits
-                            inline beside Host This — Host This runs it yourself;
-                            this hands it to an AI-assisted Leaf host. Server
-                            re-checks owner + idea eligibility. */}
-                        {org.isOwner && (
-                          <button
-                            type="button"
-                            onClick={() => setVirtualHostPlan({ calendarId: org.objectId, planIdeaId: idea.id })}
-                            className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 border border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 transition-colors"
-                          >
-                            <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-4 h-4" /> Let Leaf host it
-                          </button>
-                        )}
                       </div>
-                      {org.isOwner && (
-                        <p className="text-xs text-zinc-400 italic">Run it yourself, or let Leaf plan &amp; run it for you.</p>
-                      )}
                     </div>
                   </div>
                 </article>
@@ -4849,23 +4716,7 @@ export default function OrgCalendarPage() {
                     hostName. Without this the modal showed the underlying
                     EventGroup owner (e.g. "Shawn Oates") for a plan the card
                     correctly attributes to its virtual host ("Marcus"). */}
-                {selectedEvent.virtualHost ? (
-                  <div className="flex items-center gap-2">
-                    {selectedEvent.virtualHostPersona?.avatarUrl && (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={selectedEvent.virtualHostPersona.avatarUrl}
-                        alt=""
-                        aria-hidden="true"
-                        className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200 flex-shrink-0"
-                      />
-                    )}
-                    <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
-                      Organized by {selectedEvent.virtualHostPersona?.name || "your host"}
-                    </p>
-                    <VirtualHostBadge persona={selectedEvent.virtualHostPersona} />
-                  </div>
-                ) : selectedEvent.leafHostState === "leaf_hosted" ? (
+                {selectedEvent.leafHostState === "leaf_hosted" ? (
                   <div className="flex items-center gap-2">
                     {selectedEvent.leafHostPersona?.avatarUrl && (
                       /* eslint-disable-next-line @next/next/no-img-element */
@@ -6236,17 +6087,6 @@ export default function OrgCalendarPage() {
         />
       )}
 
-      {virtualHostPlan && org.isOwner && (
-        <VirtualHostSheet
-          calendarId={virtualHostPlan.calendarId}
-          eventGroupId={virtualHostPlan.eventGroupId}
-          planIdeaId={virtualHostPlan.planIdeaId}
-          aiEventIndex={virtualHostPlan.aiEventIndex}
-          returnTo={typeof window !== "undefined" ? window.location.href : undefined}
-          onClose={() => setVirtualHostPlan(null)}
-          onAttached={() => { setVirtualHostPlan(null); fetchOrg(); }}
-        />
-      )}
 
       {/* Welcome / "Make it your own" invite — shown after first calendar creation */}
       {showWelcomeInvite && org.isOwner && (

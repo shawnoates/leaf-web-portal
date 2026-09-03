@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2, Check, Star } from "lucide-react";
 import Parse from "@/lib/parse-client";
-import type { SurveyState, SurveyResult, VirtualHostInfo } from "./types";
+import type { SurveyState, SurveyResult } from "./types";
 
 // The post-event rating, shared by /m/[notificationId] and the /me recap
 // popup. Single 1-5 stars + optional comment, plus the private virtual-host
@@ -16,14 +16,12 @@ import type { SurveyState, SurveyResult, VirtualHostInfo } from "./types";
 export default function SurveyCard({
   notificationId,
   survey,
-  virtualHost,
   attendeeName,
   variant = "card",
   onSaved,
 }: {
   notificationId: string;
   survey: SurveyState;
-  virtualHost?: VirtualHostInfo | null;
   attendeeName: string;
   /** "card" draws its own border (the /m page); "bare" sits inside a modal. */
   variant?: "card" | "bare";
@@ -31,18 +29,16 @@ export default function SurveyCard({
 }) {
   const [rating, setRating] = useState<number>(survey.existing?.rating ?? 0);
   const [comment, setComment] = useState<string>(survey.existing?.comment ?? "");
-  const [hostRating, setHostRating] = useState<number>(survey.existing?.hostRating ?? 0);
-  const [hostComment, setHostComment] = useState<string>(survey.existing?.hostComment ?? "");
   const [existing, setExisting] = useState<SurveyResult | null>(survey.existing);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState(false);
 
   async function submit() {
-    // Either half is enough — an event rating, or private host feedback alone.
+    // The private host-feedback half is gone, so an event rating is the whole
+    // form — nothing to submit without one.
     const hasEventRating = rating >= 1;
-    const hasHostFeedback = hostRating >= 1 || hostComment.trim().length > 0;
-    if (!hasEventRating && !hasHostFeedback) return;
+    if (!hasEventRating) return;
     setError(null);
     setSubmitting(true);
     setJustSaved(false);
@@ -51,8 +47,6 @@ export default function SurveyCard({
         notificationId,
         rating: hasEventRating ? rating : undefined,
         comment: hasEventRating ? comment.trim() || undefined : undefined,
-        hostRating: hostRating >= 1 ? hostRating : undefined,
-        hostComment: hostComment.trim() || undefined,
       })) as SurveyResult;
       setExisting(result);
       setJustSaved(true);
@@ -126,70 +120,18 @@ export default function SurveyCard({
         />
       </label>
 
-      {/* Private feedback about the AI-assisted host. Only rendered on
-          virtual-hosted plans; goes to the Leaf team, never to the plan
-          host, the calendar owner, or the group. */}
-      {virtualHost && (
-        <div className="border-t border-zinc-100 mt-5 pt-5">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-1">
-            How was {virtualHost.personaName}, your host?
-          </h3>
-          <p className="text-xs text-zinc-500 mb-3">
-            Private — this goes only to the Leaf team, not the group or the calendar.
-          </p>
-          <div
-            className="flex items-center gap-1 mb-3"
-            role="radiogroup"
-            aria-label={`Rate ${virtualHost.personaName} from 1 to 5 stars`}
-          >
-            {stars.map((n) => (
-              <button
-                key={n}
-                type="button"
-                role="radio"
-                aria-checked={hostRating === n}
-                aria-label={`${n} star${n === 1 ? "" : "s"}`}
-                onClick={() => {
-                  setHostRating(n);
-                  setJustSaved(false);
-                }}
-                disabled={submitting}
-                className="p-1 disabled:opacity-50 transition-transform hover:scale-110"
-              >
-                <Star
-                  className={`w-6 h-6 ${
-                    hostRating >= n
-                      ? "fill-amber-400 text-amber-400"
-                      : "fill-zinc-100 text-zinc-300"
-                  }`}
-                />
-              </button>
-            ))}
-          </div>
-          <label className="block">
-            <span className="sr-only">Private feedback about your host</span>
-            <textarea
-              value={hostComment}
-              onChange={(e) => {
-                setHostComment(e.target.value);
-                setJustSaved(false);
-              }}
-              maxLength={survey.commentMaxLen}
-              rows={2}
-              disabled={submitting}
-              placeholder={`How did ${virtualHost.personaName} do? (private, optional)`}
-              className="w-full text-sm border border-zinc-200 rounded-lg p-3 focus:outline-none focus:border-zinc-400 resize-y disabled:opacity-50"
-            />
-          </label>
-        </div>
-      )}
+      {/* A private "how was your host?" half used to sit here, rendered only on
+          virtual-hosted plans and routed to the Leaf team rather than the group.
+          It went with the persona on 2026-09-02: rating a person who does not
+          exist is not feedback anyone can act on. Attendee ratings above are
+          unchanged. */}
 
       <div className="flex items-center justify-between gap-3 mt-3">
         <p className="text-[11px] text-zinc-400">Visible to the host as {attendeeName}.</p>
         <button
           type="button"
           onClick={submit}
-          disabled={submitting || (rating < 1 && hostRating < 1 && !hostComment.trim())}
+          disabled={submitting || rating < 1}
           className="inline-flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
         >
           {submitting ? (

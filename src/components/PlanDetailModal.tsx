@@ -5,8 +5,6 @@ import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { renderLinkedText } from "@/lib/linkify";
 import { formatWallClockTime12h } from "@/lib/date-utils";
-import VirtualHostSheet, { DEFAULT_HOST_AVATAR, HostAvatar } from "@/components/VirtualHostSheet";
-import VirtualHostBadge from "@/components/VirtualHostBadge";
 import {
   Calendar,
   Check,
@@ -59,12 +57,6 @@ export type PlanDetailData = {
    *  modal exposes a "Cancel future occurrences" action that stops further
    *  materialization without touching already-created instances. */
   planSeriesId?: string | null;
-  /** Already has an AI-assisted (virtual) host attached — hides the
-   *  "Add AI-assisted host" CTA next to Change host. */
-  isVirtualHost?: boolean;
-  /** Persona avatar for the byline, mirroring the public /org page. Only
-   *  meaningful when `isVirtualHost` — a real host has no avatar here. */
-  virtualHostAvatarUrl?: string | null;
 };
 
 type PollOptionDetail = { date: string; time: string | null; count: number };
@@ -155,11 +147,7 @@ export default function PlanDetailModal({
   // AI-assisted host purchase sheet, opened from the Change host popup —
   // attaches (and pays for, unless Concierge-tier) an AI-assisted host that
   // replaces whoever is currently hosting this plan, live RSVPs included.
-  const [showVirtualHostSheet, setShowVirtualHostSheet] = useState(false);
-  const [isVirtualHostOverride, setIsVirtualHostOverride] = useState(false);
-  const [virtualHostAvatarOverride, setVirtualHostAvatarOverride] = useState<string | null>(null);
   // Attaching a persona mid-session flips this on without a parent refetch.
-  const isVirtualHost = plan.isVirtualHost === true || isVirtualHostOverride;
 
   // Load attendees for non-poll plans. Re-fires when the parent triggers a
   // refresh (planRsvpsRefreshTick) so RSVPs that land after the modal
@@ -393,28 +381,9 @@ export default function PlanDetailModal({
               {plan.title}
             </h2>
             <div className="flex items-center gap-3 flex-wrap">
-              {isVirtualHost && (
-                /* Persona avatar ahead of the byline, matching the public /org
-                   page's virtual-host header. HostAvatar (not a bare <img>) so
-                   a stale persona URL degrades to a sparkle, never a broken
-                   image. Sits inside the same gap-3 row, so no extra wrapper. */
-                <HostAvatar
-                  src={virtualHostAvatarOverride || plan.virtualHostAvatarUrl}
-                  className="w-5 h-5 rounded-full ring-1 ring-zinc-200 -mr-1 text-zinc-400"
-                />
-              )}
               <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
-                {/* Virtual hosts arrange the plan but don't attend it, so they
-                    read as "Organized by" — same wording the public /org card
-                    and modal use. A real human host keeps "Hosted by". */}
-                {isVirtualHost ? "Organized by" : "Hosted by"}{" "}
-                {hostNameOverride || plan.hostName}
+                Hosted by {hostNameOverride || plan.hostName}
               </p>
-              {isVirtualHost && (
-                /* Same plain-text badge the public org calendar page uses —
-                   kept as the shared component so the two stay identical. */
-                <VirtualHostBadge persona={{ name: hostNameOverride || plan.hostName }} />
-              )}
               {!plan.isPoll && (
                 <button
                   onClick={openChangeHost}
@@ -480,34 +449,7 @@ export default function PlanDetailModal({
                     </p>
                   )}
                 </div>
-                {!plan.isVirtualHost && !isVirtualHostOverride && (
-                  <div className="border-t border-zinc-100 p-1">
-                    <button
-                      onClick={() => setShowVirtualHostSheet(true)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-zinc-50 transition-colors text-left text-sm font-medium text-teal-700"
-                    >
-                      <HostAvatar src={DEFAULT_HOST_AVATAR} className="w-4 h-4 shrink-0" />
-                      Hire an AI-assisted host
-                    </button>
-                  </div>
-                )}
               </div>
-            )}
-
-            {showVirtualHostSheet && (
-              <VirtualHostSheet
-                calendarId={calendarId}
-                eventGroupId={plan.objectId}
-                onClose={() => setShowVirtualHostSheet(false)}
-                onAttached={(personaName, personaAvatarUrl) => {
-                  setShowVirtualHostSheet(false);
-                  setShowChangeHost(false);
-                  setIsVirtualHostOverride(true);
-                  if (personaName) setHostNameOverride(personaName);
-                  setVirtualHostAvatarOverride(personaAvatarUrl || DEFAULT_HOST_AVATAR);
-                  onChanged();
-                }}
-              />
             )}
 
             <div className="flex gap-6 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">

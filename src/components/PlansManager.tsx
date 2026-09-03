@@ -9,7 +9,6 @@ import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlan
 import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailModal";
 import HostIdeaModal from "@/components/HostIdeaModal";
 import PlanChatDrawer from "@/components/PlanChatDrawer";
-import VirtualHostSheet, { DEFAULT_HOST_AVATAR, HostAvatar } from "@/components/VirtualHostSheet";
 import NudgeModal from "@/components/dashboard/NudgeModal";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
@@ -297,10 +296,6 @@ interface UpcomingPlan {
   /** True when `host.name` is a virtual-host persona rather than a real person.
    *  Owner/co-host only (getOrgDashboard is management-scoped) — drives the
    *  small ring next to the byline so the manager can tell the two apart. */
-  isVirtualHost?: boolean;
-  /** Persona avatar (server `activePlans[i].virtualHostAvatarUrl`) — shown next
-   *  to the byline in the detail modal, same as the public /org page. */
-  virtualHostAvatarUrl?: string | null;
   location: { name: string; address: string } | null;
   /** Full itinerary (server `getOrgDashboard` calendar.activePlans[i].locations).
    *  Threaded into `PlanDetailData.locations` for the edit modal to hydrate its
@@ -638,8 +633,6 @@ export default function PlansManager({
   const [orgName, setOrgName] = useState("");
 
   // Virtual host — the idea currently being handed to a paid AI-assisted host
-  // (null = sheet closed). See VirtualHostSheet.
-  const [virtualHostIdea, setVirtualHostIdea] = useState<PlanIdea | null>(null);
 
   // Host-a-suggestion modal (tap a suggestion card) — the same modal the public
   // /org page uses, with Google Places venue selection. Owner/co-host publishes
@@ -651,7 +644,6 @@ export default function PlansManager({
   const [orgAddress, setOrgAddress] = useState<string | null>(null);
   // Real (current, gender-matched) persona avatar for the "Add virtual host"
   // button, from the server — seed URLs go stale so we don't hardcode.
-  const [virtualHostAvatar, setVirtualHostAvatar] = useState<string | null>(null);
   const [orgBlacklist, setOrgBlacklist] = useState<string[]>([]);
   const [orgExcludeKeywords, setOrgExcludeKeywords] = useState<string[]>([]);
   const [orgBrandColor, setOrgBrandColor] = useState<string | null>(null);
@@ -837,8 +829,6 @@ export default function PlansManager({
         timezone: string | null;
         time: string | null;
         hostName: string;
-        isVirtualHost?: boolean;
-        virtualHostAvatarUrl?: string | null;
         rsvpCount: number;
         location: { name: string; address: string; placeId?: string | null } | null;
         locations?: {
@@ -866,8 +856,6 @@ export default function PlansManager({
         time: p.time,
         rsvpCount: p.rsvpCount,
         host: p.hostName ? { name: p.hostName } : null,
-        isVirtualHost: p.isVirtualHost === true,
-        virtualHostAvatarUrl: p.virtualHostAvatarUrl ?? null,
         location: p.location ? { name: p.location.name, address: p.location.address } : null,
         locations: p.locations,
         isPoll: p.isPoll,
@@ -935,7 +923,6 @@ export default function PlansManager({
       // Capture org context for the host modal's venue search + approval default.
       setOrgCity(page.orgCity ?? null);
       setOrgAddress(page.orgAddress ?? null);
-      setVirtualHostAvatar(page.virtualHostPreview?.avatarUrl ?? null);
       setOrgBlacklist(Array.isArray(page.orgBlacklistCategories) ? page.orgBlacklistCategories : []);
       setOrgExcludeKeywords(Array.isArray(page.orgExcludeKeywords) ? page.orgExcludeKeywords : []);
       setOrgBrandColor(page.orgBrandColor ?? null);
@@ -1502,13 +1489,6 @@ export default function PlansManager({
                             on every card, survives name truncation, and costs
                             no width against the RSVP count. */}
                         <span className="flex items-center gap-1.5 min-w-0">
-                          {plan.isVirtualHost && (
-                            <span
-                              title="AI-assisted host — this is a persona, not a member"
-                              aria-label="AI-assisted host"
-                              className="shrink-0 w-1.5 h-1.5 rounded-full bg-emerald-500"
-                            />
-                          )}
                           <span className="truncate">{plan.host?.name || "You"}</span>
                         </span>
                         <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -1758,24 +1738,6 @@ export default function PlansManager({
         />
       )}
 
-      {/* Virtual host info/pay sheet — attaches a paid AI-assisted host to the
-          idea (publishes it), or redirects to Stripe Checkout when not on the
-          Concierge tier. */}
-      {virtualHostIdea && (
-        <VirtualHostSheet
-          calendarId={calendarId}
-          planIdeaId={virtualHostIdea.objectId}
-          returnTo={typeof window !== "undefined" ? window.location.href : undefined}
-          onClose={() => setVirtualHostIdea(null)}
-          onAttached={() => {
-            // Free (Concierge) attach: idea is now hosted → drop it from the
-            // rail. The paid path redirects to Stripe and never reaches here.
-            setPlanIdeas((prev) => prev.filter((p) => p.objectId !== virtualHostIdea.objectId));
-            setVirtualHostIdea(null);
-          }}
-        />
-      )}
-
       {/* Host-a-suggestion modal — the same modal the public /org page uses
           (Google Places venue search + date/time/note), opened when a suggestion
           card is tapped. Owner tools (edit the suggestion, assign, virtual host,
@@ -2003,8 +1965,6 @@ export default function PlansManager({
             hideVenueUntilRsvp: selectedPlan.hideVenueUntilRsvp,
             requireApproval: selectedPlan.requireApproval,
             planSeriesId: selectedPlan.planSeriesId,
-            isVirtualHost: selectedPlan.isVirtualHost,
-            virtualHostAvatarUrl: selectedPlan.virtualHostAvatarUrl,
           }}
           calendarId={calendarId}
           onClose={() => setSelectedPlan(null)}
@@ -2078,23 +2038,8 @@ export default function PlansManager({
               <p className="text-xs text-red-500 px-5 pt-3">{assignError}</p>
             )}
             <div className="overflow-y-auto p-2">
-              {/* Leaf's AI-assisted host is one of the hosts you can hand the
-                  plan to, so it leads this list rather than sitting as a
-                  separate action on the host modal. */}
-              <button
-                onClick={() => { const idea = assigningIdea; setAssigningIdea(null); setVirtualHostIdea(idea); }}
-                disabled={!!assignBusyUserId}
-                className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-lg border border-teal-100 bg-teal-50/60 hover:bg-teal-50 transition-colors text-left disabled:opacity-50 mb-1"
-              >
-                <span className="flex items-center gap-3 min-w-0">
-                  <HostAvatar src={virtualHostAvatar || DEFAULT_HOST_AVATAR} className="w-8 h-8 shrink-0" />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium text-teal-800 truncate">AI-assisted host</span>
-                    <span className="block text-xs text-teal-700/70 truncate">Leaf hosts it for you — greets guests and runs the plan</span>
-                  </span>
-                </span>
-                <Sparkles className="w-4 h-4 text-teal-400 shrink-0" />
-              </button>
+              {/* An "AI-assisted host" option led this list until 2026-09-02.
+                  A plan is handed to a person now, so the list is only people. */}
               {/* Ranked suggested hosts — followers who attend (but don't
                   host), similar-event history first. Row click assigns like
                   any member row; "Ask" texts them a host invite instead. */}
