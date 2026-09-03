@@ -2,14 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { makeClientValue } from "./useClientValue";
+import { DEMO_VENUE_PHOTOS, PHOTO_FILTER } from "./photos";
 
 // "How RSVPs work" — the forest band. Rows fade up in sequence when the
 // section enters the viewport, then an RSVP toast loops over the card.
 //
 // Dates are computed from today (the next three Thursdays) so the demo
-// never goes stale, and the demo venues are labelled rather than
-// photographed: there is no venue-photo source on this page that isn't
-// either a stock shot or an invented one.
+// never goes stale. Venue thumbs are Unsplash stand-ins for the subject
+// (a wine bar, a rooftop, a raw bar) rather than photographs of the
+// named venues, so they carry no alt text — they're decoration inside a
+// product demo, and describing them as those businesses would be a
+// claim the picture can't support.
 
 const TOAST_NAMES = [
   { name: "Jordan", initial: "J" },
@@ -168,22 +171,19 @@ export default function RsvpDemoSection() {
                     ...anim(i * 500),
                   }}
                 >
-                  <div
-                    className="flex shrink-0 items-center justify-center rounded-md sm:rounded-lg"
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={DEMO_VENUE_PHOTOS[i].url}
+                    alt=""
+                    loading="lazy"
+                    className="shrink-0 rounded-md object-cover sm:rounded-lg"
                     style={{
                       width: 44,
                       height: 44,
-                      background:
-                        "linear-gradient(135deg,#dcdad3,#e6e4de)",
+                      filter: PHOTO_FILTER,
+                      background: "linear-gradient(135deg,#dcdad3,#e6e4de)",
                     }}
-                  >
-                    <span
-                      className="mkt-mono text-[8px] uppercase"
-                      style={{ color: "var(--mkt-ink-3)" }}
-                    >
-                      venue
-                    </span>
-                  </div>
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[13px] font-semibold sm:text-[15px]">
                       {row.title}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { allCredits } from "./photos";
 
 export default function MarketingFooter({ blurb }: { blurb: string }) {
   return (
@@ -44,6 +45,38 @@ export default function MarketingFooter({ blurb }: { blurb: string }) {
             { href: "/safety", label: "Safety" },
           ]}
         />
+      </div>
+
+      {/* Unsplash's guidelines ask for a visible photographer credit
+          wherever their photos are used. */}
+      <div
+        className="mx-auto mt-8 max-w-[1440px] text-[11px] leading-[1.6]"
+        style={{ color: "var(--mkt-ink-3)", opacity: 0.75 }}
+      >
+        Photography via{" "}
+        <a
+          href="https://unsplash.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:opacity-70"
+        >
+          Unsplash
+        </a>
+        :{" "}
+        {allCredits().map((c, i) => (
+          <span key={c.creditUrl}>
+            {i > 0 && ", "}
+            <a
+              href={c.creditUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:opacity-70"
+            >
+              {c.credit}
+            </a>
+          </span>
+        ))}
+        .
       </div>
     </footer>
   );

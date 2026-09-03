@@ -5,6 +5,7 @@ import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { SEED_POOL, type SeedCalendar } from "@/lib/aiCalendarSeed";
 import { coverFor } from "./covers";
+import { photoForTheme, PHOTO_FILTER } from "./photos";
 import { useDetectedCity } from "@/lib/useDetectedCity";
 import { focusHeroInput } from "./useGenerate";
 import { trackMarketingEvent } from "./analytics";
@@ -31,11 +32,33 @@ interface GridCalendar extends SeedCalendar {
 
 const seedRow = (c: SeedCalendar): GridCalendar => ({ ...c, fromServer: false });
 
-function CoverArt({ index }: { index: number }) {
+function CoverArt({
+  calendar,
+  index,
+}: {
+  calendar: GridCalendar;
+  index: number;
+}) {
+  // A theme-matched photo when we have one; otherwise the gradient wash.
+  // Never a stand-in from another subject — these cards link to real
+  // calendars, and a wrong photo misrepresents one.
+  const photo = photoForTheme(calendar.theme);
+  if (!photo) {
+    return (
+      <div
+        className="h-[120px] w-full sm:h-[190px]"
+        style={{ background: coverFor(index).gradient }}
+      />
+    );
+  }
   return (
-    <div
-      className="h-[120px] w-full sm:h-[190px]"
-      style={{ background: coverFor(index).gradient }}
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={photo.url}
+      alt={photo.alt}
+      loading={index < 4 ? "eager" : "lazy"}
+      className="h-[120px] w-full object-cover sm:h-[190px]"
+      style={{ filter: PHOTO_FILTER, background: coverFor(index).gradient }}
     />
   );
 }
@@ -77,7 +100,7 @@ function CalendarCard({
         e.currentTarget.style.boxShadow = "none";
       }}
     >
-      <CoverArt index={index} />
+      <CoverArt calendar={calendar} index={index} />
       <div className="flex flex-col gap-1.5 p-3 sm:gap-1.5 sm:p-[18px]">
         {/* Clamped to two lines so a long title can't push one card
             taller than its neighbours and break the grid's baseline. */}
