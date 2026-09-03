@@ -900,8 +900,10 @@ function PlanRow({
   const meta = [
     weekday(plan.date),
     timeLabel(plan),
-    plan.venueName || plan.venueAddress ||
-      (plan.attendeeCount > 0 ? `${plan.attendeeCount} going` : null),
+    plan.venueName || plan.venueAddress,
+    // Its own segment, never a fallback behind the venue — a plan almost always
+    // has a venue, so an `||` chain here silently hid every attendee count.
+    plan.attendeeCount > 0 ? `${plan.attendeeCount} going` : null,
     plan.capacity != null ? `${plan.capacity} max` : null,
   ].filter(Boolean).join(" · ");
   const hostHref = plan.calendarShareId
