@@ -99,19 +99,24 @@ export type PhotoKey = keyof typeof PHOTOS;
 // match on keywords rather than an exact table. A theme that matches nothing
 // deliberately gets no photo: the card falls back to its gradient wash, which
 // is better than putting a confidently wrong subject on a real calendar.
+// Ordered specific-to-generic, and every short token is \b-anchored.
+// Both matter: an unanchored /run/ matches "b-run-ch", which put a
+// photo of a runner on a brunch calendar, and /live/ would match
+// "olive". Anchoring alone isn't enough either — "brunch" has to be
+// tested before "run" can be, hence the ordering.
 const THEME_RULES: Array<[RegExp, PhotoKey]> = [
-  [/date|romantic|dinner|supper|restaurant|food/i, "dinner"],
-  [/happy.?hour|cocktail|wine|bar|drink|nightlife/i, "drinks"],
-  [/rooftop|summer|patio/i, "rooftop"],
-  [/weekend|getaway|escape|trip|explore|adventure|travel/i, "weekend"],
-  [/family|kid|parent|toddler|playground/i, "family"],
-  [/run|jog|marathon|race/i, "run"],
-  [/yoga|pilates|wellness|meditat/i, "yoga"],
-  [/bike|bicycle|cycl|ride/i, "cycling"],
-  [/skate|board/i, "skate"],
-  [/book|read|literar|writing/i, "books"],
-  [/music|concert|show|band|dj|live/i, "music"],
-  [/brunch|breakfast|coffee/i, "dinner"],
+  [/\bbrunch\b|\bbreakfast\b|\bcoffee\b/i, "dinner"],
+  [/happy.?hour|\bcocktails?\b|\bwine\b|\bbars?\b|\bdrinks?\b|nightlife/i, "drinks"],
+  [/\bdate\b|datenight|romantic|\bdinner\b|\bsupper\b|restaurant|\bfood\b/i, "dinner"],
+  [/rooftop|\bpatio\b|\bsummer\b/i, "rooftop"],
+  [/weekend|getaway|escape|\btrips?\b|explor|adventure|travel/i, "weekend"],
+  [/family|\bkids?\b|parent|toddler|playground/i, "family"],
+  [/\bruns?\b|\brunning\b|\bjog|marathon|\braces?\b/i, "run"],
+  [/\byoga\b|pilates|wellness|meditat/i, "yoga"],
+  [/\bbikes?\b|bicycle|\bcycl|\brides?\b/i, "cycling"],
+  [/\bskate|skateboard/i, "skate"],
+  [/\bbooks?\b|\breading\b|literar|\bwriting\b/i, "books"],
+  [/\bmusic\b|concert|\bbands?\b|\blive\b|\bshows?\b|\bdj\b/i, "music"],
 ];
 
 /** The photo for a calendar theme, or null when nothing matches. */
