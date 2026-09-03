@@ -16,10 +16,13 @@ import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
 import {
   zoneOffsetSuffix,
   featuredWallClockDate,
-  floatingIsoToInstant,
-  tzOffsetMs,
   planLifecycle,
 } from "@/lib/wall-clock";
+// resolveAIEventDate + FLOATING_EVENT_TZ used to live in this file. They moved
+// to @/lib so the dashboard's Suggested Plans rail renders starter dates
+// through the SAME resolver — its local copy had drifted and carried two bugs
+// this one had already fixed. See the module header.
+import { resolveAIEventDate, FLOATING_EVENT_TZ } from "@/lib/ai-event-date";
 import { AUDIENCE_COHORT_LABELS } from "@/lib/audience-cohorts";
 import { isVenueBlacklisted } from "@/lib/venue-blacklist";
 import { fetchVenuePhotoUrl } from "@/lib/google-places";
@@ -424,139 +427,6 @@ function isPlanIdeaLocallyInterested(ideaId: string): boolean {
   }
 }
 
-// Resolve an AI-adopted event's actual date on every render so weekly
-// suggestions ("Fri · 7:30 PM") roll forward as their target day
-// passes. Two shapes:
-//
-//   Fixed-date (Ticketmaster): time string contains a month name
-//   ("Sat, Sep 14 · 7:05 PM"). isoDatetime stays put. If the event has
-//   already passed, we return { date: null } so the caller can hide it.
-//
-//   Weekly (Places / Gemini): time string is weekday + time only
-//   ("Fri · 7:30 PM"). We recompute the next occurrence of that
-//   weekday/time from "now" so stale isoDatetimes stored server-side
-//   don't leak through.
-//
-// Returns { date: Date | null, isWeekly: boolean }.
-//
-const NO_AI_EVENT_DATE = { date: null, instant: null, isWeekly: false } as const;
-//
-// Returns TWO dates, and they are not interchangeable:
-//   `date`    — the FLOATING wall clock (see FLOATING_EVENT_TZ). Read it with
-//               UTC getters or format it in UTC; that yields the hour the
-//               generator wrote, for every viewer. This is the display value.
-//   `instant` — the real moment that wall clock names in the calendar's zone.
-//               This is the ONLY value that may be compared to `Date.now()`.
-// Conflating them is what hid an 8:30 PM Eastern card at 7:30 PM: the floating
-// value is 20:30Z, which as an instant is 4:30 PM, already past the 3h grace.
-function resolveAIEventDate(
-  ev: {
-    time?: string;
-    isoDatetime?: string | null;
-    dateISO?: string | null;
-  },
-  timeZone: string | null = null,
-): { date: Date | null; instant: Date | null; isWeekly: boolean } {
-  const timeStr = String(ev.time || "").trim();
-  const MONTH_RX = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i;
-  // A dateISO on the event means the server locked a specific calendar
-  // date for it — Shape B cadence (e.g. "4 times over 6 weeks"), or the
-  // month-named Ticketmaster branch. Trust it; do NOT re-resolve to
-  // "next Friday" from today.
-  const isFixedDate = MONTH_RX.test(timeStr) || !!(ev.dateISO && /^\d{4}-\d{2}-\d{2}$/.test(ev.dateISO));
-
-  if (isFixedDate) {
-    if (!ev.isoDatetime) return NO_AI_EVENT_DATE;
-    const d = new Date(ev.isoDatetime);
-    if (Number.isNaN(d.getTime())) return NO_AI_EVENT_DATE;
-    // A starter card is ALWAYS "Waiting on host" — nobody has committed to
-    // running it — so it retires at its own start time, not at the end of the
-    // local day the way a hosted plan does. A 9 AM suggestion still sitting
-    // there at 11 AM is advertising something that never happened.
-    // Anchored to the calendar's zone: the stored value is a floating wall
-    // clock, so comparing it raw retires the card early by the UTC offset.
-    const instant = floatingIsoToInstant(ev.isoDatetime, timeZone) ?? d;
-    if (instant.getTime() <= Date.now()) return NO_AI_EVENT_DATE;
-    return { date: d, instant, isWeekly: false };
-  }
-
-  // Weekly path — parse weekday + time from the display string and
-  // resolve to the next occurrence.
-  const WEEKDAYS: Record<string, number> = {
-    sun: 0, sunday: 0,
-    mon: 1, monday: 1,
-    tue: 2, tues: 2, tuesday: 2,
-    wed: 3, weds: 3, wednesday: 3,
-    thu: 4, thur: 4, thurs: 4, thursday: 4,
-    fri: 5, friday: 5,
-    sat: 6, saturday: 6,
-  };
-  const weekdayMatch = timeStr
-    .toLowerCase()
-    .match(/\b(sun|sunday|mon|monday|tue|tues|tuesday|wed|weds|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday)\b/);
-  if (!weekdayMatch) {
-    // No weekday in the string — fall back to the stored isoDatetime.
-    if (!ev.isoDatetime) return NO_AI_EVENT_DATE;
-    const d = new Date(ev.isoDatetime);
-    if (Number.isNaN(d.getTime())) return NO_AI_EVENT_DATE;
-    return {
-      date: d,
-      instant: floatingIsoToInstant(ev.isoDatetime, timeZone) ?? d,
-      isWeekly: true,
-    };
-  }
-  const targetDow = WEEKDAYS[weekdayMatch[1]];
-
-  const timeMatch = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*([ap]m)?/i);
-  if (!timeMatch) return NO_AI_EVENT_DATE;
-  let hour = parseInt(timeMatch[1], 10);
-  const minute = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-  const meridiem = timeMatch[3] ? timeMatch[3].toLowerCase() : null;
-  if (meridiem === "pm" && hour < 12) hour += 12;
-  if (meridiem === "am" && hour === 12) hour = 0;
-  if (Number.isNaN(hour) || Number.isNaN(minute) || hour > 23 || minute > 59)
-    return NO_AI_EVENT_DATE;
-
-  // "Which day is next Friday" is a question about the CALENDAR's clock, not
-  // the viewer's: a Pacific reader at 11 PM Tuesday is already Wednesday in
-  // Brooklyn and would otherwise resolve a week off. Shifting `now` by the
-  // zone offset lets the UTC getters read as that calendar's wall clock.
-  const now = new Date();
-  const offsetMs = timeZone
-    ? tzOffsetMs(now, timeZone)
-    : -now.getTimezoneOffset() * 60 * 1000;
-  const nowWall = new Date(now.getTime() + offsetMs);
-  const currentDow = nowWall.getUTCDay();
-  let daysUntil = (targetDow - currentDow + 7) % 7;
-  if (daysUntil === 0) {
-    const nowHour = nowWall.getUTCHours();
-    const nowMin = nowWall.getUTCMinutes();
-    if (hour < nowHour || (hour === nowHour && minute <= nowMin)) daysUntil = 7;
-  }
-  const targetWall = new Date(nowWall.getTime() + daysUntil * 24 * 60 * 60 * 1000);
-  // Built as a floating value (wall clock stamped UTC) so it renders through
-  // FLOATING_EVENT_TZ identically to the fixed-date branch. The old code
-  // returned a browser-local Date here, which the UTC formatter then shifted
-  // by the viewer's offset — weekly cards showed the wrong hour.
-  const date = new Date(
-    Date.UTC(
-      targetWall.getUTCFullYear(),
-      targetWall.getUTCMonth(),
-      targetWall.getUTCDate(),
-      hour,
-      minute,
-      0,
-      0,
-    ),
-  );
-  return {
-    date,
-    instant: floatingIsoToInstant(date.toISOString(), timeZone) ?? date,
-    isWeekly: true,
-  };
-}
-
-
 // Maps human-readable blacklist labels (set in the org dashboard) to Google
 // Loose substring match — `orgType` values aren't enum-locked, and many
 // legacy calendars were created before the picker existed (so `orgType` is
@@ -583,26 +453,6 @@ function isApartmentOrgType(
 // Format in the venue's IANA zone when known — a Bangkok viewer reading a
 // NYC plan should see NYC's wall-clock, not their own. Falls through to
 // viewer-local when no tz is supplied (legacy plans, missing venue data).
-/**
- * AI source events store a FLOATING wall-clock, not an instant: the server
- * builds isoDatetime as `${dateISO}T${hh}:${mm}:00Z` (ai-calendar-functions.js),
- * stamping the venue's wall-clock with a Z it never earned. "Wed 8:30 AM"
- * becomes 08:30Z.
- *
- * So these must be read back in UTC, which returns the exact wall-clock the
- * generator wrote — 8:30 AM to every viewer, anywhere. Localizing them instead
- * (the previous behavior) shifted the time by the VIEWER's offset: a Pacific
- * reader saw a Brooklyn 8:30 AM event as 1:30 AM. Formatting in the venue's
- * real zone is equally wrong here — that yields 4:30 AM — because the stored
- * instant is not a true instant.
- *
- * Floating is the right model for these: a template generated for one prompt
- * is cached and reused across cities, so "Wed 8:30 AM" has to mean 8:30 local
- * wherever it lands. Real plans are different — they carry a genuine instant
- * plus their venue's IANA zone, and go through formatDate/formatTime with it.
- */
-const FLOATING_EVENT_TZ = "UTC";
-
 function formatDate(isoDate: string, timezone: string | null = null): string {
   const date = new Date(isoDate);
   const opts: Intl.DateTimeFormatOptions = {

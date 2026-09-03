@@ -13,6 +13,10 @@ import NudgeModal from "@/components/dashboard/NudgeModal";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
 import { featuredWallClockDate } from "@/lib/wall-clock";
+// Shared with /org/[shareId], deliberately: this file used to carry its own
+// copy of the resolver, and the copy had drifted into showing weekly starter
+// cards at the wrong hour (and, near midnight, the wrong week).
+import { resolveAIEventDate, FLOATING_EVENT_TZ } from "@/lib/ai-event-date";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { Calendar, Camera, Check, ImagePlus, Link2, Lock, MessageCircle, Plus, RefreshCw, Repeat, Settings, Sparkles, UserCheck, Users, X } from "lucide-react";
 
@@ -48,72 +52,6 @@ function PlanImage({
       onError={() => setFailed(true)}
     />
   );
-}
-
-// Resolve an AI starter event's display date. Mirrors the logic in
-// /org/[shareId]/page.tsx — dateISO present ⇒ locked calendar date;
-// weekday-style time strings ("Sat · 7:00 PM") resolve to the next
-// occurrence of that weekday. Returns null if the event can't be dated
-// or its fixed date has already passed (keeps stale suggestions out of
-// the manager's Upcoming list).
-function resolveAIStarterDate(ev: {
-  time?: string;
-  isoDatetime?: string | null;
-  dateISO?: string | null;
-}): Date | null {
-  const timeStr = String(ev.time || "").trim();
-  const MONTH_RX = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i;
-  const isFixedDate = MONTH_RX.test(timeStr) || !!(ev.dateISO && /^\d{4}-\d{2}-\d{2}$/.test(ev.dateISO));
-
-  if (isFixedDate) {
-    if (!ev.isoDatetime) return null;
-    const d = new Date(ev.isoDatetime);
-    if (Number.isNaN(d.getTime())) return null;
-    // Past fixed-date starter → drop. The manager can't retro-host a
-    // date that already happened.
-    if (d.getTime() < Date.now() - 3 * 60 * 60 * 1000) return null;
-    return d;
-  }
-
-  // Weekly path — parse weekday + time and roll to next occurrence.
-  const WEEKDAYS: Record<string, number> = {
-    sun: 0, sunday: 0,
-    mon: 1, monday: 1,
-    tue: 2, tues: 2, tuesday: 2,
-    wed: 3, weds: 3, wednesday: 3,
-    thu: 4, thur: 4, thurs: 4, thursday: 4,
-    fri: 5, friday: 5,
-    sat: 6, saturday: 6,
-  };
-  const weekdayMatch = timeStr
-    .toLowerCase()
-    .match(/\b(sun|sunday|mon|monday|tue|tues|tuesday|wed|weds|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday)\b/);
-  if (!weekdayMatch) {
-    if (!ev.isoDatetime) return null;
-    const d = new Date(ev.isoDatetime);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-  const targetDow = WEEKDAYS[weekdayMatch[1]];
-  const timeMatch = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*([ap]m)?/i);
-  if (!timeMatch) return null;
-  let hour = parseInt(timeMatch[1], 10);
-  const minute = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-  const meridiem = timeMatch[3] ? timeMatch[3].toLowerCase() : null;
-  if (meridiem === "pm" && hour < 12) hour += 12;
-  if (meridiem === "am" && hour === 12) hour = 0;
-  if (Number.isNaN(hour) || Number.isNaN(minute) || hour > 23 || minute > 59) return null;
-  const now = new Date();
-  const currentDow = now.getDay();
-  let daysUntil = (targetDow - currentDow + 7) % 7;
-  if (daysUntil === 0) {
-    const nowH = now.getHours();
-    const nowM = now.getMinutes();
-    if (hour < nowH || (hour === nowH && minute <= nowM)) daysUntil = 7;
-  }
-  const target = new Date(now);
-  target.setDate(now.getDate() + daysUntil);
-  target.setHours(hour, minute, 0, 0);
-  return target;
 }
 
 // Ranked "who should host this suggestion" row from getSuggestionHostCandidates:
@@ -547,8 +485,17 @@ function AIStarterCard({
       </div>
       <div className="p-3">
         <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
+        {/* Formatted in FLOATING_EVENT_TZ, not viewer-local: `expiryDate` for
+            a starter is a floating wall clock stamped UTC, so localizing it
+            shifts the day by the viewer's offset — a 1 AM card read a day
+            early out west, an 8 PM one a day late out east. */}
         <p className="text-xs text-zinc-400 mb-1 truncate">
-          {new Date(plan.expiryDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+          {new Date(plan.expiryDate).toLocaleDateString("en-US", {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+            timeZone: FLOATING_EVENT_TZ,
+          })}
         </p>
         <p className="text-xs text-zinc-400">Waiting on host</p>
       </div>
@@ -912,8 +859,15 @@ export default function PlansManager({
       const dismissedAi = new Set<number>(
         Array.isArray(page.dismissedAiEventIndexes) ? page.dismissedAiEventIndexes : [],
       );
+      // `.date` is the FLOATING wall clock — the display value, read back in
+      // FLOATING_EVENT_TZ. The resolver's `.instant` is what it compared to
+      // Date.now() internally to retire past cards; nothing here needs it.
       const aiStarters: UpcomingPlan[] = aiEvents
-        .map((ev, index) => ({ ev, index, resolved: resolveAIStarterDate(ev) }))
+        .map((ev, index) => ({
+          ev,
+          index,
+          resolved: resolveAIEventDate(ev, page.orgTimezone ?? null).date,
+        }))
         .filter((r) => r.resolved !== null && !dismissedAi.has(r.index))
         .map(({ ev, index, resolved }) => ({
           objectId: `ai-${index}`,
