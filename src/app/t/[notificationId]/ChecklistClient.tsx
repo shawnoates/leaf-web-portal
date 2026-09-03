@@ -29,6 +29,13 @@ export type HostTask = {
   /** A group message drafted for the host. Inert until they send it. */
   draftMessage: string | null;
   draftSentAt: string | null;
+  /**
+   * People who've turned up to this host's plans before, most-shared first.
+   * Only ever set on the "you have nobody yet" task. Names only — this is the
+   * co-attendance graph, which is mutual by construction, so it discloses
+   * nothing either side doesn't already know.
+   */
+  suggestedInvites: { userId: string; name: string; shared: number }[] | null;
 };
 
 export type HostChecklist = {
@@ -287,6 +294,14 @@ function Row({
               by {formatShort(task.dueAt)}
             </span>
           )}
+
+          {!done && task.suggestedInvites?.length ? (
+            <span className="block text-[12px] text-zinc-500 mt-1.5 leading-relaxed">
+              {task.suggestedInvites.map((p) => p.name).join(", ")}{" "}
+              {task.suggestedInvites.length === 1 ? "has" : "have"} come to your
+              plans before.
+            </span>
+          ) : null}
         </span>
       </button>
 
