@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { SEED_POOL, type SeedCalendar } from "@/lib/aiCalendarSeed";
-import { getDefaultCoverForSeed } from "@/lib/default-covers";
+import { coverFor } from "./covers";
 import { useDetectedCity } from "@/lib/useDetectedCity";
 import { focusHeroInput } from "./useGenerate";
 import { trackMarketingEvent } from "./analytics";
@@ -31,31 +31,29 @@ interface GridCalendar extends SeedCalendar {
 
 const seedRow = (c: SeedCalendar): GridCalendar => ({ ...c, fromServer: false });
 
-function CoverArt({ calendar }: { calendar: GridCalendar }) {
-  const cover = getDefaultCoverForSeed(calendar.theme || calendar.slug);
+function CoverArt({ index }: { index: number }) {
   return (
     <div
-      className="relative h-[120px] w-full sm:h-[190px]"
-      style={{ background: cover.gradient }}
-    >
-      <div className="absolute inset-0 flex items-end p-3 sm:p-4">
-        <span
-          className="mkt-mono text-[10px] uppercase tracking-[0.12em] text-white"
-          style={{ opacity: 0.85, textShadow: "0 1px 3px rgba(0,0,0,.35)" }}
-        >
-          {calendar.theme?.replace(/-/g, " ") || "mix"}
-        </span>
-      </div>
-    </div>
+      className="h-[120px] w-full sm:h-[190px]"
+      style={{ background: coverFor(index).gradient }}
+    />
   );
 }
 
-function CalendarCard({ calendar }: { calendar: GridCalendar }) {
+function CalendarCard({
+  calendar,
+  index,
+}: {
+  calendar: GridCalendar;
+  index: number;
+}) {
   const stops = calendar.events?.length ?? 0;
   const meta = [
     calendar.area,
     stops ? `${stops} stop${stops === 1 ? "" : "s"}` : null,
-    calendar.fromServer && calendar.adoptionCount
+    // A count of 1 or 2 reads as "nobody uses this" — worse than saying
+    // nothing. Only surface adoption once it's actually social proof.
+    calendar.fromServer && calendar.adoptionCount >= 5
       ? `${calendar.adoptionCount} adopted`
       : null,
   ]
@@ -79,11 +77,20 @@ function CalendarCard({ calendar }: { calendar: GridCalendar }) {
         e.currentTarget.style.boxShadow = "none";
       }}
     >
-      <CoverArt calendar={calendar} />
+      <CoverArt index={index} />
       <div className="flex flex-col gap-1.5 p-3 sm:gap-1.5 sm:p-[18px]">
+        {/* Clamped to two lines so a long title can't push one card
+            taller than its neighbours and break the grid's baseline. */}
         <div
-          className="mkt-serif italic"
-          style={{ fontSize: "17px", lineHeight: 1.15 }}
+          className="mkt-serif overflow-hidden italic"
+          style={{
+            fontSize: "17px",
+            lineHeight: 1.15,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+          }}
+          title={calendar.title}
         >
           <span className="sm:hidden">{calendar.title}</span>
           <span className="hidden sm:inline" style={{ fontSize: "22px" }}>
@@ -210,14 +217,14 @@ export default function CalendarGrid() {
   return (
     <section className="px-5 pb-10 pt-4 sm:px-12 sm:pb-[88px] sm:pt-6">
       <div className="mx-auto grid max-w-[1440px] grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-[18px]">
-        {firstRow.map((c) => (
-          <CalendarCard key={c.slug} calendar={c} />
+        {firstRow.map((c, i) => (
+          <CalendarCard key={c.slug} calendar={c} index={i} />
         ))}
         <YourCalendarSlot />
         {/* Mobile shows the first 3 + slot only (spec §Mobile). */}
-        {rest.map((c) => (
+        {rest.map((c, i) => (
           <div key={c.slug} className="hidden md:block">
-            <CalendarCard calendar={c} />
+            <CalendarCard calendar={c} index={i + 3} />
           </div>
         ))}
       </div>

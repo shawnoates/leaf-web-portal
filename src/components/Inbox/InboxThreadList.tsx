@@ -7,8 +7,6 @@ export interface InboxThread {
   calendarName: string;
   planId: string | null;
   planTitle: string | null;
-  personaName: string | null;
-  personaAvatarUrl: string | null;
   lastMessageAt: string | null;
   lastMessagePreview: string;
   lastMessageAuthor: string | null;
@@ -59,7 +57,9 @@ export default function InboxThreadList({
     <div>
       {threads.map((t) => {
         const selected = t.threadKey === selectedKey;
-        const heading = t.personaName || t.calendarName;
+        // Threads are headed by the calendar they belong to. A persona name
+        // used to win here (2026-09-02) — that was the invariant breach.
+        const heading = t.calendarName;
         const context = t.planTitle || t.calendarName;
         const subtitle = context === heading ? null : context;
         return (
@@ -71,21 +71,12 @@ export default function InboxThreadList({
               selected ? "bg-zinc-100" : "hover:bg-zinc-50"
             }`}
           >
-            {t.personaAvatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={t.personaAvatarUrl}
-                alt=""
-                aria-hidden="true"
-                className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-zinc-200"
-              />
-            ) : (
-              // Initial beats a blank disc when a thread has no persona
-              // assigned yet — it still reads as "someone".
-              <div className="w-9 h-9 rounded-full bg-zinc-200 flex-shrink-0 flex items-center justify-center text-zinc-500 text-xs font-bold">
-                {heading.charAt(0).toUpperCase()}
-              </div>
-            )}
+            {/* A persona avatar rendered here until 2026-09-03. The calendar
+                initial is the honest stand-in: it identifies the thread
+                without implying a face on the other end. */}
+            <div className="w-9 h-9 rounded-full bg-zinc-200 flex-shrink-0 flex items-center justify-center text-zinc-500 text-xs font-bold">
+              {heading.charAt(0).toUpperCase()}
+            </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-sm font-semibold text-zinc-900 truncate">

@@ -33,12 +33,16 @@ function nextThursdays(count: number): string[] {
     d.setDate(d.getDate() + 1);
   } while (d.getDay() !== 4);
   for (let i = 0; i < count; i++) {
+    // "Thu Sep 4" — en-US would render "Thu, Sep 4"; the comma isn't in
+    // the spec's row format and reads heavy at 13px.
     out.push(
-      d.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      })
+      d
+        .toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        })
+        .replace(",", "")
     );
     d.setDate(d.getDate() + 7);
   }

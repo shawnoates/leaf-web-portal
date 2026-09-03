@@ -22,8 +22,6 @@ interface ThreadPayload {
   calendarName: string;
   planId: string | null;
   planTitle: string | null;
-  personaName: string | null;
-  personaAvatarUrl: string | null;
   plan: PlanContext | null;
   messages: ThreadMessage[];
 }
@@ -116,7 +114,10 @@ export default function InboxThreadView({
     }
   }
 
-  const counterpart = thread?.personaName || "Leaf Concierge";
+  // The other side of this thread is Leaf, openly. A persona name won here
+  // until 2026-09-03, which put a human name on a conversation with nobody
+  // behind it — the exact thing the human-identity invariant forbids.
+  const counterpart = "Leaf Concierge";
 
   return (
     <div className="flex h-full min-h-0">
@@ -132,19 +133,9 @@ export default function InboxThreadView({
             <ArrowLeft className="w-4 h-4" />
           </button>
         )}
-        {thread?.personaAvatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={thread.personaAvatarUrl}
-            alt=""
-            aria-hidden="true"
-            className="w-9 h-9 rounded-full object-cover ring-1 ring-zinc-200 shrink-0"
-          />
-        ) : (
-          <div className="w-9 h-9 rounded-full bg-zinc-200 shrink-0 flex items-center justify-center text-zinc-500 text-xs font-bold">
-            {counterpart.charAt(0).toUpperCase()}
-          </div>
-        )}
+        <div className="w-9 h-9 rounded-full bg-zinc-200 shrink-0 flex items-center justify-center text-zinc-500 text-xs font-bold">
+          {counterpart.charAt(0).toUpperCase()}
+        </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-zinc-900 truncate">
             {counterpart}

@@ -36,7 +36,7 @@ export default function HowItWorks({
           {steps.map((step) => (
             <div
               key={step.number}
-              className="flex gap-3.5 sm:block sm:overflow-hidden sm:rounded-2xl sm:p-[22px]"
+              className="flex gap-3.5 sm:block sm:overflow-hidden sm:rounded-2xl sm:border sm:p-[22px]"
               style={{ borderColor: "var(--mkt-line)" }}
             >
               <span

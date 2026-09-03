@@ -130,25 +130,16 @@ export default function OwnerInbox() {
                     href={threadHref(t)}
                     className="w-full flex items-start gap-3 px-4 py-2.5 text-left hover:bg-zinc-50 transition-colors border-b border-zinc-50 last:border-b-0"
                   >
-                    {t.personaAvatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={t.personaAvatarUrl}
-                        alt=""
-                        aria-hidden="true"
-                        className="w-8 h-8 rounded-full object-cover flex-shrink-0 ring-1 ring-zinc-200"
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-zinc-200 flex-shrink-0 flex items-center justify-center text-zinc-500 text-[11px] font-bold">
-                        {(t.personaName || t.calendarName || "?")
-                          .charAt(0)
-                          .toUpperCase()}
-                      </div>
-                    )}
+                    {/* Persona avatar/name rendered here until 2026-09-03 —
+                        see the human-identity invariant. The calendar is the
+                        thread's identity now. */}
+                    <div className="w-8 h-8 rounded-full bg-zinc-200 flex-shrink-0 flex items-center justify-center text-zinc-500 text-[11px] font-bold">
+                      {(t.calendarName || "?").charAt(0).toUpperCase()}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline justify-between gap-2">
                         <p className="text-xs font-semibold text-zinc-900 truncate">
-                          {t.personaName || t.calendarName}
+                          {t.calendarName}
                         </p>
                         <span className="text-[10px] text-zinc-400 flex-shrink-0">
                           {formatRelative(t.lastMessageAt)}

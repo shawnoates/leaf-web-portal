@@ -14,8 +14,6 @@ export interface PlanContext {
   locationName: string | null;
   locationAddress: string | null;
   attendeeCount: number | null;
-  personaName: string | null;
-  personaAvatarUrl: string | null;
 }
 
 function formatDate(iso: string | null): string | null {
