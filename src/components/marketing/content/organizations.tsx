@@ -26,6 +26,7 @@ export const organizationsContent: MarketingContent = {
   },
 
   audience: "Members",
+  gridEyebrow: "Real calendars from real organizers",
   stepsHeading: "A thriving community starts with a living calendar",
   steps: [
     {

@@ -143,7 +143,7 @@ function CalendarCard({
   );
 }
 
-export default function CalendarGrid() {
+export default function CalendarGrid({ eyebrow }: { eyebrow: string }) {
   const { city, ready } = useDetectedCity();
   const [calendars, setCalendars] = useState<GridCalendar[]>(() =>
     SEED_POOL.slice(0, 8).map(seedRow)
@@ -213,14 +213,20 @@ export default function CalendarGrid() {
 
   return (
     <section className="px-5 pb-10 pt-4 sm:px-12 sm:pb-[88px] sm:pt-6">
-      <div className="mx-auto grid max-w-[1440px] grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-[18px]">
-        {calendars.map((c, i) => (
-          // Mobile shows the first four; the rest would push the RSVP
-          // section too far down the fold on a phone.
-          <div key={c.slug} className={i > 3 ? "hidden md:block" : undefined}>
-            <CalendarCard calendar={c} index={i} photo={photos[i]} />
-          </div>
-        ))}
+      <div className="mx-auto max-w-[1440px]">
+        {/* Eyebrow only, no h2: every other section pairs one with a
+            serif heading, but the grid speaks for itself and a heading
+            here would push the cards off the fold. */}
+        <div className="mkt-eyebrow mb-3 sm:mb-4">{eyebrow}</div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-[18px]">
+          {calendars.map((c, i) => (
+            // Mobile shows the first four; the rest would push the RSVP
+            // section too far down the fold on a phone.
+            <div key={c.slug} className={i > 3 ? "hidden md:block" : undefined}>
+              <CalendarCard calendar={c} index={i} photo={photos[i]} />
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );

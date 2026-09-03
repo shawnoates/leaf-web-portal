@@ -41,7 +41,7 @@ export default function MarketingPage({
         chips={content.hero.chips}
       />
 
-      <CalendarGrid />
+      <CalendarGrid eyebrow={content.gridEyebrow} />
 
       <RsvpDemoSection audience={content.audience} />
 

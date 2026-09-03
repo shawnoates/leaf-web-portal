@@ -27,6 +27,7 @@ export const personalContent: MarketingContent = {
   },
 
   audience: "Friends",
+  gridEyebrow: "Real calendars from real planners",
   stepsHeading: 'From a vibe to "see you Saturday"',
   steps: [
     {

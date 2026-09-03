@@ -14,6 +14,10 @@ export interface MarketingContent {
   };
   /** What this page calls the people who RSVP — "Friends" vs "Members". */
   audience: string;
+  /** Sits above the calendar grid and introduces it. The hero lead used to
+   *  point at the grid ("...below"); it doesn't any more, so this carries
+   *  the framing instead. */
+  gridEyebrow: string;
   stepsHeading: string;
   steps: Step[];
   toolkitHeading: string;
