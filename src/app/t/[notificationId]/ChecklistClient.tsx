@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { CalendarDays, Check, Clock, Lock, Plus } from "lucide-react";
+import {
+  CalendarDays,
+  Check,
+  Clock,
+  Lock,
+  MessageSquare,
+  Plus,
+  Send,
+  Sparkles,
+} from "lucide-react";
 import Parse from "@/lib/parse-client";
 
 export type HostTask = {
@@ -17,6 +26,9 @@ export type HostTask = {
   /** The venue won't take this yet — not late, not actionable. */
   notYetPossible: boolean;
   overdue: boolean;
+  /** A group message drafted for the host. Inert until they send it. */
+  draftMessage: string | null;
+  draftSentAt: string | null;
 };
 
 export type HostChecklist = {
