@@ -1381,10 +1381,19 @@ function NeedsHostPopup({
                 {idea.interestedCount > 0 ? ` — ${idea.interestedCount} interested` : ""}.
                 Want to take it?
               </p>
-              <div className="hero-actions flat">
-                <button className="hostbtn" onClick={() => setHosting(true)}>Host this</button>
-                <button className="btn ghost" onClick={markInterested}>Interested</button>
-                <button className="btn ghost" onClick={onClose}>Skip</button>
+              <div className="hero-actions flat popup-actions">
+                <button className="hostbtn popup-host" onClick={() => setHosting(true)}>Host this</button>
+                <button
+                  type="button"
+                  className={`heart-toggle ${done ? "on" : ""}`}
+                  aria-label="Mark interest"
+                  aria-pressed={done === "interested"}
+                  disabled={done === "interested"}
+                  onClick={markInterested}
+                >
+                  <Heart className="w-3.5 h-3.5" fill={done === "interested" ? "currentColor" : "none"} />
+                </button>
+                <button className="linkbtn popup-skip" onClick={onClose}>Skip</button>
               </div>
             </>
           )}
@@ -1902,6 +1911,9 @@ const CSS = `
 .leafme .probe-pop{max-width:420px}
 .leafme .probe-thanks{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--green);
   padding:24px 0;text-align:center}
+.leafme .popup-actions{display:flex;gap:8px;align-items:center}
+.leafme .popup-host{flex:1 1 auto}
+.leafme .popup-skip{margin-top:0;font-weight:400;color:var(--body)}
 
 /* ---- Thread ---- */
 .leafme .thread{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
@@ -2018,6 +2030,8 @@ const CSS = `
   .leafme .probe-pop{border-radius:20px 20px 0 0}
   .leafme .probe-pop .modal-img{aspect-ratio:5/2;max-height:160px;border-radius:20px 20px 0 0}
   .leafme .modal-links .btn{flex:1 1 40%;padding:13px 12px}
+  .leafme .popup-host{padding:14px 0;border-radius:9px;font-size:12.5px}
+  .leafme .popup-skip{font-size:12px}
 }
 @media(prefers-reduced-motion:reduce){.leafme *{transition:none!important;animation:none!important}}
 `;
