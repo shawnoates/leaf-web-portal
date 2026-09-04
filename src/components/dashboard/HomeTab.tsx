@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Calendar, Lock, Plus } from "lucide-react";
 import type { OrgAnalytics } from "@/components/analytics/types";
 import { formatWallClockTime12h } from "@/lib/date-utils";
@@ -177,9 +177,6 @@ export default function HomeTab({
   eventApprovalsCount: number;
   eventApprovalsHref: string;
 }) {
-  // Spec: Home shows up to 3 Needs-you cards; the rest sit behind "See all".
-  const [showAllNeedsYou, setShowAllNeedsYou] = useState(false);
-
   const allPlans = useMemo(
     () =>
       dashboard.calendars
@@ -373,13 +370,13 @@ export default function HomeTab({
     needsYouRows.push(
       <div
         key={`host-candidate-${calendar.objectId}`}
-        className="flex flex-wrap items-center gap-3.5 p-3.5 border border-[#ECEFED] rounded-[18px] bg-white"
+        className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
       >
         <div className="flex-1 min-w-[180px]">
-          <p className="text-[16px] font-semibold leading-5 text-zinc-900">
+          <p className="text-[13px] font-medium text-zinc-900">
             {hc.candidate_user.name} could host {hc.idea.title}
           </p>
-          <p className="text-[13.5px] leading-[18px] text-[#6B716E] mt-[3px]">
+          <p className="text-[11px] text-zinc-500 mt-0.5">
             {hc.reason}
             {dashboard.calendars.length > 1 ? ` · ${calendar.name}` : ""}
           </p>
@@ -410,13 +407,13 @@ export default function HomeTab({
     needsYouRows.push(
       <div
         key={`reengagement-${calendar.objectId}`}
-        className="flex flex-wrap items-center gap-3.5 p-3.5 border border-[#ECEFED] rounded-[18px] bg-white"
+        className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
       >
         <div className="flex-1 min-w-[180px]">
-          <p className="text-[16px] font-semibold leading-5 text-zinc-900">
+          <p className="text-[13px] font-medium text-zinc-900">
             Invite {re.target_user.name} to {re.plan.title}
           </p>
-          <p className="text-[13.5px] leading-[18px] text-[#6B716E] mt-[3px]">
+          <p className="text-[11px] text-zinc-500 mt-0.5">
             {/* Server-computed off its own PAST_WINDOW_MS (365d) — a different,
                 wider window than the RSVP tallies elsewhere on the dashboard,
                 so this one says "past year", not "last 90 days". */}
@@ -442,13 +439,13 @@ export default function HomeTab({
     needsYouRows.push(
       <div
         key={`host-${req.planId}`}
-        className="flex flex-wrap items-center gap-3.5 p-3.5 border border-[#ECEFED] rounded-[18px] bg-white"
+        className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
       >
         <div className="flex-1 min-w-[180px]">
-          <p className="text-[16px] font-semibold leading-5 text-zinc-900">
-            {req.title} — <span className="text-[#B8741A]">host request</span>
+          <p className="text-[13px] font-medium text-zinc-900">
+            {req.title} — <span className="text-amber-700">host request</span>
           </p>
-          <p className="text-[13.5px] leading-[18px] text-[#6B716E] mt-[3px]">
+          <p className="text-[11px] text-zinc-500 mt-0.5">
             {req.requesterName}
             {req.requestedDate &&
               ` · ${new Date(req.requestedDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`}
@@ -458,7 +455,7 @@ export default function HomeTab({
               and it used to be invisible until the owner opened Edit. Keeping
               the suggested venue is the quiet case, so it stays unemphasized. */}
           {req.requestedVenue?.name && (
-            <p className="text-[13.5px] leading-[18px] text-[#6B716E] mt-[3px]">
+            <p className="text-[11px] text-zinc-500 mt-0.5">
               {req.requestedVenue.name}
               {/* The origin flag only exists on a server new enough to send it.
                   The portal auto-deploys while the server needs a manual
@@ -468,7 +465,7 @@ export default function HomeTab({
                   meant to surface. Undefined means "don't know", so say
                   nothing rather than something wrong. */}
               {req.requesterChoseVenue === true && (
-                <span className="text-[#B8741A]"> · their venue</span>
+                <span className="text-amber-700"> · their venue</span>
               )}
               {req.requesterChoseVenue === false && (
                 <span className="text-zinc-400"> · your suggested venue</span>
@@ -503,14 +500,14 @@ export default function HomeTab({
     needsYouRows.push(
       <div
         key={`rsvp-${req.notificationId}`}
-        className="flex flex-wrap items-center gap-3.5 p-3.5 border border-[#ECEFED] rounded-[18px] bg-white"
+        className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
       >
         <div className="flex-1 min-w-[180px]">
-          <p className="text-[16px] font-semibold leading-5 text-zinc-900">
+          <p className="text-[13px] font-medium text-zinc-900">
             {req.name} wants to attend {req.planTitle}
           </p>
           {req.rsvpNote && (
-            <p className="text-[13.5px] leading-[18px] text-[#6B716E] mt-[3px] italic truncate">
+            <p className="text-[11px] text-zinc-500 mt-0.5 italic truncate">
               &ldquo;{req.rsvpNote}&rdquo;
             </p>
           )}
@@ -536,14 +533,14 @@ export default function HomeTab({
     needsYouRows.push(
       <div
         key={`pf-${pf.membershipId}`}
-        className="flex flex-wrap items-center gap-3.5 p-3.5 border border-[#ECEFED] rounded-[18px] bg-white"
+        className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
       >
         <div className="flex-1 min-w-[180px]">
-          <p className="text-[16px] font-semibold leading-5 text-zinc-900">
+          <p className="text-[13px] font-medium text-zinc-900">
             {pf.name} asked to follow
             {pf.calendarName ? ` ${pf.calendarName}` : ""}
           </p>
-          <p className="text-[13.5px] leading-[18px] text-[#6B716E] mt-[3px]">
+          <p className="text-[11px] text-zinc-500 mt-0.5">
             Requested {new Date(pf.requestedAt).toLocaleDateString()}
           </p>
         </div>
@@ -568,14 +565,14 @@ export default function HomeTab({
     needsYouRows.push(
       <div
         key="event-approvals"
-        className="flex flex-wrap items-center gap-3.5 p-3.5 border border-[#ECEFED] rounded-[18px] bg-white"
+        className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
       >
         <div className="flex-1 min-w-[180px]">
-          <p className="text-[16px] font-semibold leading-5 text-zinc-900">
+          <p className="text-[13px] font-medium text-zinc-900">
             {eventApprovalsCount} business event{" "}
             {eventApprovalsCount === 1 ? "request" : "requests"} awaiting review
           </p>
-          <p className="text-[13.5px] leading-[18px] text-[#6B716E] mt-[3px]">
+          <p className="text-[11px] text-zinc-500 mt-0.5">
             From nearby businesses that want on your calendar
           </p>
         </div>
@@ -592,20 +589,20 @@ export default function HomeTab({
     needsYouRows.push(
       <div
         key="never-rsvpd"
-        className="flex flex-wrap items-center gap-3.5 p-3.5 border border-[#ECEFED] rounded-[18px] bg-white"
+        className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
       >
         <div className="flex-1 min-w-[180px]">
-          <p className="text-[16px] font-semibold leading-5 text-zinc-900">
+          <p className="text-[13px] font-medium text-zinc-900">
             {neverRsvpd} follower{neverRsvpd === 1 ? " hasn't " : "s haven't "}
             RSVP&apos;d in {rsvpWindowLabel(dashboard)}
           </p>
-          <p className="text-[13.5px] leading-[18px] text-[#6B716E] mt-[3px]">
+          <p className="text-[11px] text-zinc-500 mt-0.5">
             See who they are and reach out
           </p>
         </div>
         <button
           onClick={() => onGoCommunity("never")}
-          className="text-[14px] font-semibold text-[#2F7D5F] shrink-0 hover:opacity-80 transition-opacity"
+          className="px-3.5 py-1.5 min-h-[30px] border border-zinc-300 text-zinc-900 rounded-full text-xs font-medium hover:bg-zinc-50 transition-colors shrink-0"
         >
           See them
         </button>
@@ -619,19 +616,19 @@ export default function HomeTab({
     needsYouRows.push(
       <div
         key="pillar-prompt"
-        className="flex flex-wrap items-center gap-3.5 p-3.5 border border-[#ECEFED] rounded-[18px] bg-white"
+        className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
       >
         <div className="flex-1 min-w-[180px]">
-          <p className="text-[16px] font-semibold leading-5 text-zinc-900">
+          <p className="text-[13px] font-medium text-zinc-900">
             {pillarPrompt.title}
           </p>
-          <p className="text-[13.5px] leading-[18px] text-[#6B716E] mt-[3px]">
+          <p className="text-[11px] text-zinc-500 mt-0.5">
             {pillarPrompt.detail}
           </p>
         </div>
         <button
           onClick={pillarPrompt.onClick}
-          className="text-[14px] font-semibold text-[#2F7D5F] shrink-0 hover:opacity-80 transition-opacity"
+          className="px-3.5 py-1.5 min-h-[30px] border border-zinc-300 text-zinc-900 rounded-full text-xs font-medium hover:bg-zinc-50 transition-colors shrink-0"
         >
           {pillarPrompt.cta}
         </button>
@@ -895,30 +892,15 @@ export default function HomeTab({
               owner opens this page; the schedule is reference below it. */}
           <div className="min-w-0">
             {/* NEEDS YOU */}
-            <div className="mb-4 flex items-baseline gap-2">
-              <h2 className="text-[20px] font-bold tracking-[-0.3px] text-zinc-900">
-                Needs you
-              </h2>
-              <span className="text-[20px] font-medium text-[#A6ACA8]">
-                {needsYouCount}
-              </span>
-            </div>
+            <p className="text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase mb-2.5">
+              Needs you
+            </p>
             {needsYouRows.length > 0 ? (
-              <>
-                <div className="flex flex-col gap-2.5">
-                  {showAllNeedsYou ? needsYouRows : needsYouRows.slice(0, 3)}
-                </div>
-                {needsYouRows.length > 3 && !showAllNeedsYou && (
-                  <button
-                    onClick={() => setShowAllNeedsYou(true)}
-                    className="block w-full text-center pt-2.5 text-[14px] font-semibold text-[#6B716E] hover:text-zinc-900 transition-colors"
-                  >
-                    See all {needsYouRows.length}
-                  </button>
-                )}
-              </>
+              <div className="border border-zinc-200 rounded-xl overflow-hidden">
+                {needsYouRows}
+              </div>
             ) : (
-              <div className="border border-[#ECEFED] rounded-[18px] p-6 flex flex-wrap items-center gap-3">
+              <div className="border border-zinc-200 rounded-xl p-6 flex flex-wrap items-center gap-3">
                 <p className="flex-1 text-sm font-medium text-zinc-900 min-w-[180px]">
                   Nothing needs you right now
                 </p>
@@ -931,11 +913,9 @@ export default function HomeTab({
               </div>
             )}
 
-            <div className="mt-6 mb-3.5">
-              <h2 className="text-[20px] font-bold tracking-[-0.3px] text-zinc-900">
-                Next 14 days
-              </h2>
-            </div>
+            <p className="text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase mt-6 mb-3.5">
+              Next 14 days
+            </p>
             <div>{spineEntries}</div>
           </div>
 
