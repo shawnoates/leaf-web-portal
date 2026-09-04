@@ -1026,12 +1026,13 @@ function isPlanIdeaLocallyInterested(ideaId: string): boolean {
     return false;
   }
 }
-function markPlanIdeaLocallyInterested(ideaId: string) {
+function setPlanIdeaLocalInterest(ideaId: string, on: boolean) {
   if (typeof window === "undefined") return;
   try {
     const raw = localStorage.getItem(PLAN_IDEA_INTEREST_LOCAL_KEY);
     const set: Record<string, boolean> = raw ? JSON.parse(raw) : {};
-    set[ideaId] = true;
+    if (on) set[ideaId] = true;
+    else delete set[ideaId];
     localStorage.setItem(PLAN_IDEA_INTEREST_LOCAL_KEY, JSON.stringify(set));
   } catch {
     /* quota / storage disabled */
