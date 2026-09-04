@@ -1320,10 +1320,14 @@ function NeedsHostPopup({
 }) {
   const [done, setDone] = useState<"interested" | null>(null);
   const [hosting, setHosting] = useState(false);
+  const closeTimer = useRef<number | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    };
   }, [onClose]);
 
   const when = idea.date
@@ -1335,13 +1339,21 @@ function NeedsHostPopup({
   function markInterested() {
     if (done) return;
     setDone("interested");
-    markPlanIdeaLocallyInterested(idea.ideaId);
+    setPlanIdeaLocalInterest(idea.ideaId, true);
     const cookie = getOrCreateInterestCookie();
     Parse.Cloud.run("expressInterestOnPlanIdea", { ideaId: idea.ideaId, cookie }).catch(() => {});
     // Separate call on purpose: the queue write is a convenience for one
     // person and must never cost the calendar its interest count if it fails.
     Parse.Cloud.run("queuePlanIdeaVenue", { ideaId: idea.ideaId }).catch(() => {});
-    window.setTimeout(onClose, 1400);
+    closeTimer.current = window.setTimeout(onClose, 4000);
+  }
+
+  function undoInterested() {
+    if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    setDone(null);
+    setPlanIdeaLocalInterest(idea.ideaId, false);
+    const cookie = getOrCreateInterestCookie();
+    Parse.Cloud.run("removeInterestOnPlanIdea", { ideaId: idea.ideaId, cookie }).catch(() => {});
   }
 
   // The host flow replaces the popup rather than stacking on it — two modals
@@ -1381,7 +1393,12 @@ function NeedsHostPopup({
         )}
         <div className="modal-body">
           {done ? (
-            <div className="probe-thanks">Got it — saved to your queue</div>
+            <div className="probe-thanks">
+              Got it — saved to your queue
+              <button type="button" className="linkbtn probe-undo" onClick={undoInterested}>
+                Undo
+              </button>
+            </div>
           ) : (
             <>
               <div className="row-cal">{idea.calendarName}</div>
@@ -1924,6 +1941,7 @@ const CSS = `
 .leafme .probe-pop{max-width:420px}
 .leafme .probe-thanks{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--green);
   padding:24px 0;text-align:center}
+.leafme .probe-undo{display:block;margin:10px auto 0;font-family:var(--sans);font-style:normal}
 .leafme .popup-actions{display:flex;gap:8px;align-items:center}
 .leafme .popup-host{flex:1 1 auto}
 .leafme .popup-skip{margin-top:0;font-weight:400;color:var(--body)}
