@@ -1420,7 +1420,8 @@ function NeedsHostPopup({
                   disabled={done === "interested"}
                   onClick={markInterested}
                 >
-                  <Heart className="w-5 h-5" fill={done === "interested" ? "currentColor" : "none"} />
+                  <Heart className="w-4 h-4" fill={done === "interested" ? "currentColor" : "none"} />
+                  <span>Interested</span>
                 </button>
                 <button className="btn popup-host" onClick={() => setHosting(true)}>Host this</button>
               </div>
@@ -1941,8 +1942,8 @@ const CSS = `
 .leafme .probe-thanks{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--green);
   padding:24px 0;text-align:center}
 .leafme .probe-undo{display:block;margin:10px auto 0;font-family:var(--sans);font-style:normal}
-.leafme .popup-actions-grid{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:stretch}
-.leafme .popup-heart{flex:none;padding:0;width:48px;border:2px solid var(--line);background:#fff;border-radius:8px;color:var(--body)}
+.leafme .popup-actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch}
+.leafme .popup-heart{display:flex;align-items:center;justify-content:center;gap:6px;padding:0 13px;border:1.5px solid var(--line);background:#fff;border-radius:8px;color:var(--body);font-size:13px;font-weight:500}
 .leafme .popup-heart.on{background:var(--green);border-color:var(--green);color:#fff}
 .leafme .popup-host{background:#fff;color:var(--green);border:1.5px solid var(--green);flex:1 1 auto;font-weight:500}
 
@@ -2062,7 +2063,7 @@ const CSS = `
   .leafme .probe-pop .modal-img{aspect-ratio:5/2;max-height:160px;border-radius:20px 20px 0 0}
   .leafme .modal-links .btn{flex:1 1 40%;padding:13px 12px}
   .leafme .popup-actions-grid{gap:12px}
-  .leafme .popup-heart{width:52px}
+  .leafme .popup-heart{padding:0 12px;font-size:12.5px}
   .leafme .popup-host{padding:13px 0;border-radius:9px;font-size:12.5px}
 }
 @media(prefers-reduced-motion:reduce){.leafme *{transition:none!important;animation:none!important}}
