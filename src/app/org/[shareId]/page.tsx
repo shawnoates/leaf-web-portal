@@ -1495,6 +1495,12 @@ export default function OrgCalendarPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const ctaSectionRef = useRef<HTMLDivElement>(null);
   const [showFollowModal, setShowFollowModal] = useState(false);
+  // An interest tap a non-follower made before the follow gate interrupted it.
+  // Replayed by the FollowModal's onFollowed once the follow actually lands, so
+  // the tap costs one click, not two.
+  const [pendingInterest, setPendingInterest] = useState<
+    { kind: "ai"; eventIndex: number } | { kind: "idea"; ideaId: string } | null
+  >(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followRequestPending, setFollowRequestPending] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
@@ -1622,7 +1628,11 @@ export default function OrgCalendarPage() {
   // AI-event interest tap. Optimistic: bump count + mark local
   // immediately so the button state doesn't wait on the round-trip.
   // Rolls back on failure.
-  const handleAIEventInterest = useCallback(
+  //
+  // Ungated on purpose: the follow check lives in handleAIEventInterest below,
+  // so onFollowed can replay a gated tap without re-running the gate it just
+  // satisfied (isFollowing is still false in that closure).
+  const runAIEventInterest = useCallback(
     async (eventIndex: number) => {
       if (aiLocallyInterested.has(eventIndex)) return;
       if (aiInterestPending.has(eventIndex)) return;
@@ -1701,6 +1711,21 @@ export default function OrgCalendarPage() {
       // Read for the notify prompt's title.
       org?.aiSourceEvents,
     ]
+  );
+
+  // Interest implies following. A tap from someone who doesn't follow this
+  // calendar opens the follow modal instead of writing; the tap is held in
+  // pendingInterest and replayed on a completed follow.
+  const handleAIEventInterest = useCallback(
+    (eventIndex: number) => {
+      if (!isFollowing) {
+        setPendingInterest({ kind: "ai", eventIndex });
+        setShowFollowModal(true);
+        return;
+      }
+      void runAIEventInterest(eventIndex);
+    },
+    [isFollowing, runAIEventInterest]
   );
 
   // Opens the dashboard's New Plan drawer prefilled from an AI suggestion.
@@ -1829,9 +1854,9 @@ export default function OrgCalendarPage() {
   }, [org?.aiSourceEvents, shareId]);
 
   // Plan-idea interest tap. Same optimistic pattern as
-  // handleAIEventInterest, keyed by CalendarGeneratedPlan.objectId
-  // instead of aiSourceEvents index.
-  const handlePlanIdeaInterest = useCallback(
+  // runAIEventInterest, keyed by CalendarGeneratedPlan.objectId
+  // instead of aiSourceEvents index. Ungated for the same reason.
+  const runPlanIdeaInterest = useCallback(
     async (ideaId: string) => {
       if (planIdeaLocallyInterested.has(ideaId)) return;
       if (planIdeaInterestPending.has(ideaId)) return;
@@ -1893,6 +1918,19 @@ export default function OrgCalendarPage() {
       planIdeaInterestPending,
       org?.planIdeas,
     ],
+  );
+
+  // Follow gate, as on handleAIEventInterest.
+  const handlePlanIdeaInterest = useCallback(
+    (ideaId: string) => {
+      if (!isFollowing) {
+        setPendingInterest({ kind: "idea", ideaId });
+        setShowFollowModal(true);
+        return;
+      }
+      void runPlanIdeaInterest(ideaId);
+    },
+    [isFollowing, runPlanIdeaInterest],
   );
 
   // Featured ("Around the city") interest. Separate cloud function from the
@@ -2080,13 +2118,18 @@ export default function OrgCalendarPage() {
     }
   }
 
-  // Check cookie on mount
+  // Check cookie once the calendar is known. `leaf_follower` is a single slot
+  // overwritten on every follow, so it only proves anything about the calendar
+  // whose id it carries — trusting it unscoped made "followed one calendar"
+  // read as "follows every calendar", which silently opened the interest gate
+  // below for people who don't follow this one.
   useEffect(() => {
+    if (!org?.objectId) return;
     const cookie = getFollowerCookie();
-    if (cookie) {
+    if (cookie?.calendarId === org.objectId) {
       setIsFollowing(true);
     }
-  }, []);
+  }, [org?.objectId]);
 
   // Check for existing Parse session (returning owner/host from dashboard)
   useEffect(() => {
@@ -5879,13 +5922,29 @@ export default function OrgCalendarPage() {
           calendarName={org.name}
           brandColor={org.brandColor || undefined}
           isPrivate={org.isPrivate}
-          onClose={() => setShowFollowModal(false)}
+          onClose={() => {
+            setShowFollowModal(false);
+            // Dismissing the gate abandons the tap that opened it.
+            setPendingInterest(null);
+          }}
           onFollowed={(_name, _phone, pending) => {
             if (pending) {
               setFollowRequestPending(true);
+              // Private calendar: this is a request, not a follow, so the gate
+              // isn't satisfied yet and the held tap is dropped rather than
+              // recorded for a calendar the host may never admit them to.
+              setPendingInterest(null);
             } else {
               setIsFollowing(true);
               setFollowerCount((c) => c + 1);
+              // FollowModal writes leaf_follower_phone before calling this, so
+              // the replayed tap carries identity and skips the notify prompt.
+              if (pendingInterest?.kind === "ai") {
+                void runAIEventInterest(pendingInterest.eventIndex);
+              } else if (pendingInterest?.kind === "idea") {
+                void runPlanIdeaInterest(pendingInterest.ideaId);
+              }
+              setPendingInterest(null);
             }
             setShowFollowModal(false);
           }}
