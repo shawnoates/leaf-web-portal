@@ -1056,22 +1056,33 @@ function NeedsHostRail({ plans, onHosted }: { plans: HostPlan[]; onHosted: () =>
     if (seen.size > 0) setInterested(seen);
   }, [plans]);
 
-  async function markInterested(p: HostPlan) {
-    if (interested.has(p.ideaId) || pendingInterest.has(p.ideaId)) return;
+  async function toggleInterest(p: HostPlan) {
+    if (pendingInterest.has(p.ideaId)) return;
+    const wasOn = interested.has(p.ideaId);
     const prior = counts[p.ideaId] ?? p.interestedCount;
     setPendingInterest((s) => new Set(s).add(p.ideaId));
-    setInterested((s) => new Set(s).add(p.ideaId));
-    setCounts((c) => ({ ...c, [p.ideaId]: prior + 1 }));
-    markPlanIdeaLocallyInterested(p.ideaId);
+    setInterested((s) => {
+      const n = new Set(s);
+      if (wasOn) n.delete(p.ideaId); else n.add(p.ideaId);
+      return n;
+    });
+    setCounts((c) => ({ ...c, [p.ideaId]: Math.max(0, prior + (wasOn ? -1 : 1)) }));
+    setPlanIdeaLocalInterest(p.ideaId, !wasOn);
     try {
       const cookie = getOrCreateInterestCookie();
-      const result = (await Parse.Cloud.run("expressInterestOnPlanIdea", {
-        ideaId: p.ideaId, cookie,
-      })) as { count?: number };
+      const result = (await Parse.Cloud.run(
+        wasOn ? "removeInterestOnPlanIdea" : "expressInterestOnPlanIdea",
+        { ideaId: p.ideaId, cookie },
+      )) as { count?: number };
       if (typeof result?.count === "number") setCounts((c) => ({ ...c, [p.ideaId]: result.count! }));
     } catch {
-      setInterested((s) => { const n = new Set(s); n.delete(p.ideaId); return n; });
+      setInterested((s) => {
+        const n = new Set(s);
+        if (wasOn) n.add(p.ideaId); else n.delete(p.ideaId);
+        return n;
+      });
       setCounts((c) => ({ ...c, [p.ideaId]: prior }));
+      setPlanIdeaLocalInterest(p.ideaId, wasOn);
     } finally {
       setPendingInterest((s) => { const n = new Set(s); n.delete(p.ideaId); return n; });
     }
@@ -1113,10 +1124,10 @@ function NeedsHostRail({ plans, onHosted }: { plans: HostPlan[]; onHosted: () =>
                 <button
                   type="button"
                   className={`heart-toggle ${on ? "on" : ""}`}
-                  aria-label={on ? "You're interested" : "Mark interest"}
+                  aria-label={on ? "You're interested — tap to undo" : "Mark interest"}
                   aria-pressed={on}
-                  disabled={on || pendingInterest.has(p.ideaId)}
-                  onClick={() => markInterested(p)}
+                  disabled={pendingInterest.has(p.ideaId)}
+                  onClick={() => toggleInterest(p)}
                 >
                   <Heart className="w-3.5 h-3.5" fill={on ? "currentColor" : "none"} />
                 </button>
