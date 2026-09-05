@@ -1942,7 +1942,7 @@ const CSS = `
 .leafme .probe-thanks{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--green);
   padding:24px 0;text-align:center}
 .leafme .probe-undo{display:block;margin:10px auto 0;font-family:var(--sans);font-style:normal}
-.leafme .popup-actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch}
+.leafme .popup-actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch;margin-top:16px}
 .leafme .popup-heart{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:12px 13px;border:1.5px solid var(--green);background:var(--green);border-radius:8px;color:#fff;font-size:13px;font-weight:500;cursor:pointer;transition:background 120ms ease}
 .leafme .popup-heart:hover{background:#1a5a3a;border-color:#1a5a3a}
 .leafme .popup-heart:disabled{cursor:default}
