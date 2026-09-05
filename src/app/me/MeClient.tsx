@@ -1414,7 +1414,7 @@ function NeedsHostPopup({
               <div className="popup-actions-grid">
                 <button
                   type="button"
-                  className={`heart-toggle popup-heart ${done ? "on" : ""}`}
+                  className={`popup-heart ${done ? "on" : ""}`}
                   aria-label="Mark interest"
                   aria-pressed={done === "interested"}
                   disabled={done === "interested"}
@@ -1943,7 +1943,9 @@ const CSS = `
   padding:24px 0;text-align:center}
 .leafme .probe-undo{display:block;margin:10px auto 0;font-family:var(--sans);font-style:normal}
 .leafme .popup-actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch}
-.leafme .popup-heart{display:flex;align-items:center;justify-content:center;gap:6px;padding:0 13px;border:1.5px solid var(--green);background:var(--green);border-radius:8px;color:#fff;font-size:13px;font-weight:500}
+.leafme .popup-heart{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:12px 13px;border:1.5px solid var(--green);background:var(--green);border-radius:8px;color:#fff;font-size:13px;font-weight:500;cursor:pointer;transition:background 120ms ease}
+.leafme .popup-heart:hover{background:#1a5a3a;border-color:#1a5a3a}
+.leafme .popup-heart:disabled{cursor:default}
 .leafme .popup-host{background:#fff;color:var(--green);border:1.5px solid var(--green);flex:1 1 auto;font-weight:500}
 
 /* ---- Thread ---- */
@@ -2062,7 +2064,7 @@ const CSS = `
   .leafme .probe-pop .modal-img{aspect-ratio:5/2;max-height:160px;border-radius:20px 20px 0 0}
   .leafme .modal-links .btn{flex:1 1 40%;padding:13px 12px}
   .leafme .popup-actions-grid{gap:12px}
-  .leafme .popup-heart{padding:0 12px;font-size:12.5px}
+  .leafme .popup-heart{padding:13px 12px;border-radius:9px;font-size:12.5px}
   .leafme .popup-host{padding:13px 0;border-radius:9px;font-size:12.5px}
 }
 @media(prefers-reduced-motion:reduce){.leafme *{transition:none!important;animation:none!important}}
