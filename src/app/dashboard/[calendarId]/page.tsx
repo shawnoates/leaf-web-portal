@@ -254,7 +254,7 @@ export default function OrgDashboardPage() {
     loadEventApprovals();
   }, [loadEventApprovals]);
   const [settingsSaving, setSettingsSaving] = useState(false);
-  const [settingsSection, setSettingsSection] = useState<"general" | "subscription">("general");
+  const [settingsSection, setSettingsSection] = useState<"general" | "notifications" | "subscription">("general");
 
   // Dev helper — Leaf-admin-only concierge reset (see _resetConciergeForTesting).
   const [resettingConcierge, setResettingConcierge] = useState(false);
@@ -2126,6 +2126,16 @@ export default function OrgDashboardPage() {
                     General
                   </button>
                   <button
+                    onClick={() => setSettingsSection("notifications")}
+                    className={`px-4 py-2 text-xs font-medium uppercase tracking-widest border-b-2 transition-colors ${
+                      settingsSection === "notifications"
+                        ? "border-zinc-900 text-zinc-900"
+                        : "border-transparent text-zinc-400 hover:text-zinc-600"
+                    }`}
+                  >
+                    Notifications
+                  </button>
+                  <button
                     onClick={() => setSettingsSection("subscription")}
                     className={`px-4 py-2 text-xs font-medium uppercase tracking-widest border-b-2 transition-colors ${
                       settingsSection === "subscription"
@@ -2577,8 +2587,8 @@ export default function OrgDashboardPage() {
                 )}
 
                 {/* Notifications — per person, not per calendar */}
-                {(!dashboard.isOwner || settingsSection === "general") && (
-                <section className={`border border-zinc-200 rounded-xl p-6 ${dashboard.isOwner ? "mt-8" : ""}`}>
+                {(!dashboard.isOwner || settingsSection === "notifications") && (
+                <section className="border border-zinc-200 rounded-xl p-6">
                   <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 mb-1">
                     Email notifications
                   </h2>
