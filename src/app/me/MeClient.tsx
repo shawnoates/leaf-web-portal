@@ -1943,8 +1943,7 @@ const CSS = `
   padding:24px 0;text-align:center}
 .leafme .probe-undo{display:block;margin:10px auto 0;font-family:var(--sans);font-style:normal}
 .leafme .popup-actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch}
-.leafme .popup-heart{display:flex;align-items:center;justify-content:center;gap:6px;padding:0 13px;border:1.5px solid var(--line);background:#fff;border-radius:8px;color:var(--body);font-size:13px;font-weight:500}
-.leafme .popup-heart.on{background:var(--green);border-color:var(--green);color:#fff}
+.leafme .popup-heart{display:flex;align-items:center;justify-content:center;gap:6px;padding:0 13px;border:1.5px solid var(--green);background:var(--green);border-radius:8px;color:#fff;font-size:13px;font-weight:500}
 .leafme .popup-host{background:#fff;color:var(--green);border:1.5px solid var(--green);flex:1 1 auto;font-weight:500}
 
 /* ---- Thread ---- */
