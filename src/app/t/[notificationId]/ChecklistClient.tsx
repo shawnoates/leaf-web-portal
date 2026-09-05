@@ -9,7 +9,6 @@ import {
   MessageSquare,
   Plus,
   Send,
-  Sparkles,
 } from "lucide-react";
 import Parse from "@/lib/parse-client";
 
@@ -81,8 +80,6 @@ function DraftPanel({
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(task.draftMessage ?? "");
   const [sending, setSending] = useState(false);
-  const [suggesting, setSuggesting] = useState(false);
-  const [variants, setVariants] = useState<string[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   if (!task.draftMessage) return null;
@@ -131,22 +128,6 @@ function DraftPanel({
     }
   }
 
-  async function suggest() {
-    setSuggesting(true);
-    setErr(null);
-    try {
-      const res = (await Parse.Cloud.run("suggestHostMessage", {
-        notificationId,
-        taskId: task.id,
-      })) as { suggestions: string[] };
-      setVariants(res.suggestions?.length ? res.suggestions : []);
-    } catch {
-      setErr("Couldn't come up with anything else.");
-    } finally {
-      setSuggesting(false);
-    }
-  }
-
   return (
     <div
       className="mt-2.5 rounded-xl border border-zinc-200 bg-zinc-50/70 p-3"
@@ -162,26 +143,6 @@ function DraftPanel({
         className="w-full text-[14px] leading-relaxed text-zinc-900 bg-white border border-zinc-200 rounded-lg p-2.5 outline-none focus:border-zinc-400 resize-none"
       />
 
-      {variants && variants.length > 0 && (
-        <div className="mt-2 space-y-1.5">
-          {variants.map((v, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setText(v)}
-              className="block w-full text-left text-[13px] leading-relaxed text-zinc-700 bg-white border border-zinc-200 hover:border-zinc-400 rounded-lg p-2 transition-colors"
-            >
-              {v}
-            </button>
-          ))}
-        </div>
-      )}
-      {variants && variants.length === 0 && (
-        <p className="text-[12px] text-zinc-400 mt-2">
-          Nothing better to suggest — the draft above is the one.
-        </p>
-      )}
-
       {err && <p className="text-[12px] text-amber-700 mt-2">{err}</p>}
 
       <div className="flex items-center gap-2 mt-2.5">
@@ -193,15 +154,6 @@ function DraftPanel({
         >
           <Send className="w-3.5 h-3.5" />
           {sending ? "Sending…" : "Send"}
-        </button>
-        <button
-          type="button"
-          onClick={suggest}
-          disabled={suggesting}
-          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-zinc-600 hover:text-zinc-900 px-2 py-1.5"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          {suggesting ? "Thinking…" : "Reword"}
         </button>
         <button
           type="button"
