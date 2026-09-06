@@ -232,6 +232,44 @@ function directionsUrl(plan: Plan): string | null {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}`;
 }
 
+// Check if host requests were already fetched today.
+function shouldFetchHostRequests(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const stored = localStorage.getItem("leaf_host_requests_fetch_date");
+    if (!stored) return true;
+    const today = new Date().toISOString().split("T")[0];
+    return stored !== today;
+  } catch {
+    return true;
+  }
+}
+
+function markHostRequestsFetched() {
+  if (typeof window === "undefined") return;
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    localStorage.setItem("leaf_host_requests_fetch_date", today);
+  } catch { /* quota / storage disabled */ }
+}
+
+function getCachedDashboard(): Dashboard | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = localStorage.getItem("leaf_dashboard_cache");
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
+function cacheDashboard(data: Dashboard) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("leaf_dashboard_cache", JSON.stringify(data));
+  } catch { /* quota / storage disabled */ }
+}
+
 // Tile — Leaf's signature artifact: a colored square with a serif word. Stands
 // in for the spec's hatch placeholder, and carries more meaning than one.
 function tileFor(plan: Plan, i: number): { tone: "sage" | "cream"; word: string } {
@@ -335,6 +373,8 @@ export default function MeClient() {
     try {
       const res = (await Parse.Cloud.run("getMeDashboard", {})) as Dashboard;
       setData(res);
+      cacheDashboard(res);
+      markHostRequestsFetched();
     } catch (e: unknown) {
       setLoadError(e instanceof Error ? e.message : "Couldn't load your plans.");
     }
@@ -373,7 +413,13 @@ export default function MeClient() {
         if (cancelled) return;
         if (current) {
           fetchedRef.current = true;
-          await fetchDashboard();
+          if (shouldFetchHostRequests()) {
+            await fetchDashboard();
+          } else {
+            // Use cached dashboard from earlier today if available
+            const cached = getCachedDashboard();
+            if (cached && !cancelled) setData(cached);
+          }
           if (!cancelled) setAuthState("authed");
         } else {
           setAuthState("needs-otp");
