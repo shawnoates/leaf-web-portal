@@ -2028,7 +2028,7 @@ const CSS = `
   /* Spec 4a: the mobile scroll carries no map — the modal's mini map stays. */
   .leafme .railmap{display:none}
   .leafme .colL{border-right:0;padding:18px 22px 0}
-  .leafme .colR{width:100%;padding:8px 22px 32px;background:var(--paper)}
+  .leafme .colR{width:100%;padding:8px 22px 120px;background:var(--paper)}
   .leafme .colL.solo{padding-bottom:32px}
 }
 @media(max-width:760px){
