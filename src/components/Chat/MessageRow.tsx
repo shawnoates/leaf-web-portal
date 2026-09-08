@@ -56,6 +56,27 @@ export default function MessageRow({
   );
 }
 
+// Leaf's own mark, not an "L" initial — the initial read as a person whose
+// name starts with L, which is exactly the confusion Leaf messages must avoid.
+function LeafAvatar() {
+  return (
+    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="text-emerald-700"
+      >
+        <path
+          fill="currentColor"
+          d="M20 3C9 3 4 9.5 4 17c0 1.6.3 3 .8 4 .4-3.2 1.8-6 4.4-8.3 2.3-2 5-3.2 8-3.7-2.6 1.3-4.8 3.2-6.4 5.6-1 1.5-1.7 3.2-2 5.1C14 19.8 21 14.5 21 5c0-.7-.1-1.4-.3-2H20z"
+        />
+      </svg>
+    </div>
+  );
+}
+
 // --- Default text bubble (covers leafMessage and untyped messages) ---
 
 function TextBubbleRow({
@@ -78,9 +99,7 @@ function TextBubbleRow({
   // Server-posted messages wear Leaf's mark. This used to swap in a persona's
   // photograph, which is what made an assistant read as a person.
   const avatar = isLeafAI ? (
-    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold shrink-0">
-      L
-    </div>
+    <LeafAvatar />
   ) : user?.profilePictureUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -204,12 +223,15 @@ function LocationSuggestionRow({
   user?: UserLite;
   isFromCurrentUser: boolean;
 }) {
+  const isLeafAI = message.from === "leaf_ai";
   return (
     <div
-      className={`flex items-start gap-2 ${isFromCurrentUser ? "flex-row-reverse" : "flex-row"}`}
+      className={`flex items-start gap-2 ${isFromCurrentUser && !isLeafAI ? "flex-row-reverse" : "flex-row"}`}
     >
       <div className="w-8 shrink-0">
-        {user?.profilePictureUrl ? (
+        {isLeafAI ? (
+          <LeafAvatar />
+        ) : user?.profilePictureUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={user.profilePictureUrl}
