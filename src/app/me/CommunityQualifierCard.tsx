@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { detectCity } from "@/lib/detectCity";
+import { SITE_HOST, SITE_URL } from "@/lib/site";
 import { COPY, type Q1Key, type Q2Key, type Q3Key } from "./communityQualifierCopy";
 
 // ============================================================================
@@ -391,20 +392,24 @@ function ReadyScreen({
   );
 }
 
-// The plan exists. Three things a first-time host actually wants next: to see
-// it live, to get at the controls, and to send the link to someone.
+// The plan exists; the room is what still needs people. The calendar link is
+// the primary action for a reason — a follower sees every plan after this one,
+// where a plan link earns exactly one RSVP. The plan link stays available,
+// demoted to a text button.
 function DonePopup({ plan }: { plan: QualifierCreatedPlan }) {
   const [open, setOpen] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"calendar" | "plan" | null>(null);
   if (!open) return null;
 
-  async function copy() {
-    if (!plan.inviteUrl) return;
+  const calendarUrl = plan.calendarShareId ? `${SITE_URL}/org/${plan.calendarShareId}` : null;
+  const calendarLabel = plan.calendarShareId ? `${SITE_HOST}/org/${plan.calendarShareId}` : null;
+
+  async function copy(url: string, which: "calendar" | "plan") {
     try {
-      await navigator.clipboard.writeText(plan.inviteUrl);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch { /* clipboard blocked — the link is still on the plan page */ }
+      await navigator.clipboard.writeText(url);
+      setCopied(which);
+      window.setTimeout(() => setCopied(null), 2000);
+    } catch { /* clipboard blocked — the address is printed above */ }
   }
 
   return (
@@ -413,18 +418,28 @@ function DonePopup({ plan }: { plan: QualifierCreatedPlan }) {
         <button className="modal-x" onClick={() => setOpen(false)} aria-label={COPY.done.close}>×</button>
         <div className="modal-body">
           <h2 className="modal-title">{COPY.done.title(plan.title)}</h2>
-          <p className="modal-blurb">{COPY.done.closer}</p>
+          <p className="modal-blurb">{COPY.done.lead}</p>
+          {calendarLabel && <div className="cq-url">{calendarLabel}</div>}
           <div className="cq-done-acts">
-            {plan.calendarShareId && (
-              <Link className="btn primary" href={`/org/${plan.calendarShareId}`}>{COPY.done.viewCalendar}</Link>
-            )}
-            <Link className="btn ghost" href="/dashboard">{COPY.done.manage}</Link>
-            {plan.inviteUrl && (
-              <button className="btn ghost" onClick={copy}>
-                {copied ? COPY.done.copied : COPY.done.copy}
+            {calendarUrl && (
+              <button className="btn primary" onClick={() => copy(calendarUrl, "calendar")}>
+                {copied === "calendar" ? COPY.done.shared : COPY.done.share}
               </button>
             )}
+            {plan.calendarShareId && (
+              <Link className="btn ghost" href={`/org/${plan.calendarShareId}`}>{COPY.done.viewCalendar}</Link>
+            )}
+            <Link className="btn ghost" href="/dashboard">{COPY.done.manage}</Link>
           </div>
+          {plan.inviteUrl && (
+            <button
+              type="button"
+              className="linkbtn cq-planlink"
+              onClick={() => copy(plan.inviteUrl as string, "plan")}
+            >
+              {copied === "plan" ? COPY.done.planLinkCopied : COPY.done.planLink}
+            </button>
+          )}
         </div>
       </div>
     </div>

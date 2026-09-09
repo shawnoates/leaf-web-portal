@@ -2004,6 +2004,10 @@ const CSS = `
 .leafme .cq-pill.on{border-color:var(--ink);color:var(--ink);background:var(--recessed)}
 .leafme .cq-pill.skel{width:104px;height:33px;border-style:dashed;opacity:.5;cursor:default}
 .leafme .cq-done-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.leafme .cq-url{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:10px;
+  padding:9px 11px;border:1px solid var(--edge);border-radius:8px;background:var(--recessed);
+  overflow-wrap:anywhere}
+.leafme .cq-planlink{margin-top:12px;display:inline-block}
 @media (max-width:760px){
   .leafme .cq-bar{display:block}
   .leafme .cq-bar .btn{width:100%;margin-top:8px;padding:13px 0}

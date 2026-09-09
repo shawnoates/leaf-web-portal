@@ -266,22 +266,37 @@ export default function NewPlanModal({
   // the first calendar this account already owns, else create one now. This is
   // the whole no-org-setup promise — the author never sees this step.
   async function resolvePersonalCalendarId(): Promise<string> {
-    try {
-      const cached = localStorage.getItem(PERSONAL_CAL_KEY);
-      if (cached) return cached;
-    } catch { /* storage disabled */ }
+    const hinted = restore?.calendarNameHint?.trim();
 
+    // A hint means the author is starting a NAMED room (the community
+    // qualifier's first plan), not filing something on whatever calendar they
+    // happen to own. Reuse is by name only: the cached id and the first row of
+    // getMyOrganizations are both arbitrary for anyone who owns several, and
+    // landing a church's first plan on an unrelated calendar is the failure
+    // this avoids. Matching by name still keeps a second attempt idempotent.
     const mine = (await Parse.Cloud.run("getMyOrganizations")) as {
-      organizations?: { objectId: string }[];
+      organizations?: { objectId: string; name?: string }[];
     };
-    const existing = mine?.organizations?.[0]?.objectId;
-    if (existing) {
-      try { localStorage.setItem(PERSONAL_CAL_KEY, existing); } catch { /* ignore */ }
-      return existing;
+    const owned = mine?.organizations || [];
+
+    if (hinted) {
+      const match = owned.find(
+        (o) => (o.name || "").trim().toLowerCase() === hinted.toLowerCase(),
+      );
+      if (match) return match.objectId;
+    } else {
+      try {
+        const cached = localStorage.getItem(PERSONAL_CAL_KEY);
+        if (cached) return cached;
+      } catch { /* storage disabled */ }
+      const existing = owned[0]?.objectId;
+      if (existing) {
+        try { localStorage.setItem(PERSONAL_CAL_KEY, existing); } catch { /* ignore */ }
+        return existing;
+      }
     }
 
     const detected = detectCity();
-    const hinted = restore?.calendarNameHint?.trim();
     const created = (await Parse.Cloud.run("createOrganization", {
       name: hinted || (firstName ? `${firstName}'s Plans` : "My Plans"),
       orgType: "community",
@@ -297,7 +312,11 @@ export default function NewPlanModal({
       tier: "starter",
     })) as { calendarId?: string };
     if (!created?.calendarId) throw new Error("Couldn't set up your calendar. Try again.");
-    try { localStorage.setItem(PERSONAL_CAL_KEY, created.calendarId); } catch { /* ignore */ }
+    // Only cache the general-purpose personal calendar. A named room is found
+    // by its name, and caching it would hijack every later "My calendar" plan.
+    if (!hinted) {
+      try { localStorage.setItem(PERSONAL_CAL_KEY, created.calendarId); } catch { /* ignore */ }
+    }
 
     return created.calendarId;
   }

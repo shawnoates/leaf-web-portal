@@ -54,12 +54,17 @@ export const COPY = {
   },
   done: {
     title: (planTitle: string) => `${planTitle} is on the calendar.`,
-    closer: "Pick a day. Pick your people.",
-    viewCalendar: "See it on the calendar",
+    // The plan is done; the room is the thing that still needs people. Sharing
+    // the calendar earns every plan after this one, sharing the plan earns one.
+    lead: "Send people the calendar. They'll see this plan and everything you put up after it.",
+    share: "Copy the calendar link",
+    shared: "Copied",
+    viewCalendar: "See it live",
     manage: "Manage your plans",
-    copy: "Copy the invite link",
-    copied: "Copied",
+    planLink: "Or copy just this plan's link",
+    planLinkCopied: "Plan link copied",
     close: "Close",
+    closer: "Pick a day. Pick your people.",
   },
   error: "Something went wrong. Give it another go.",
 };
