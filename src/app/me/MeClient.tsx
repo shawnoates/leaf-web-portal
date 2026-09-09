@@ -11,6 +11,7 @@ import CommunityQualifierCard, {
   type FirstPlanRequest,
 } from "./CommunityQualifierCard";
 import RecapPopup from "@/components/recap/RecapPopup";
+import NamePrompt from "@/components/NamePrompt";
 import { setVerifiedUserCookie } from "@/lib/verified-user";
 import NewPlanModal, {
   LINK_ONLY,
@@ -474,10 +475,25 @@ export default function MeClient() {
     body = <DashboardView data={data} onRsvp={onRsvp} onRefresh={fetchDashboard} />;
   }
 
+  // firstName is the server's full_name/name/first_name chain, so empty means
+  // the account has no name at all — a phone-only user minted by verifyOTP.
+  const needsName = authState === "authed" && !!data && !(data.person.firstName || "").trim();
+
   return (
     <div className="leafme">
       <style>{CSS}</style>
       {body}
+      {needsName && (
+        <NamePrompt
+          onSave={async (name) => {
+            await Parse.Cloud.run("backfillWebVisitorName", { name });
+            // Keep the in-memory user current so bridgeIdentityToOrgPage
+            // stamps the new name into the /org cookie without a reload.
+            await Parse.User.current()?.fetch().catch(() => undefined);
+            setData((prev) => (prev ? { ...prev, person: { ...prev.person, firstName: name } } : prev));
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
 import LeafHostPlanThread from "@/components/LeafHostPlanThread";
+import NamePrompt from "@/components/NamePrompt";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
@@ -1505,6 +1506,7 @@ export default function OrgCalendarPage() {
   const [followRequestPending, setFollowRequestPending] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [showFollowPopup, setShowFollowPopup] = useState(false);
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [followPopupLoading, setFollowPopupLoading] = useState(false);
   const [showPlanIdeaPopup, setShowPlanIdeaPopup] = useState(false);
   const [popupIdea, setPopupIdea] = useState<PlanIdea | null>(null);
@@ -2511,6 +2513,22 @@ export default function OrgCalendarPage() {
             ? (result.leafHost as OrgData["leafHost"])
             : undefined,
       });
+
+      // Nameless account on file for this phone. The verified-user cookie
+      // usually still holds the name they typed at OTP time (the Verify
+      // button won't enable without one), so repair silently from that and
+      // only ask when the cookie can't answer — cleared cookies, new device.
+      if (result.viewerNeedsName === true && phoneNumber) {
+        const cookieName = cachedUser?.name?.trim();
+        if (cookieName) {
+          Parse.Cloud.run("backfillWebVisitorName", { phoneNumber, name: cookieName }).catch(() => {});
+          setShowNamePrompt(false);
+        } else {
+          setShowNamePrompt(true);
+        }
+      } else {
+        setShowNamePrompt(false);
+      }
 
       // Sync RSVP cookies with backend data (handles admin-removed RSVPs)
       if (result.userRsvpPlanIds && Array.isArray(result.userRsvpPlanIds)) {
@@ -6075,6 +6093,20 @@ export default function OrgCalendarPage() {
       )}
 
       {/* Follow Popup */}
+      {showNamePrompt && org && (
+        <NamePrompt
+          brandColor={org.brandColor}
+          onSave={async (name) => {
+            const storedPhone = localStorage.getItem("leaf_follower_phone");
+            const phone = storedPhone || getVerifiedUserCookie()?.phone?.replace(/\D/g, "") || "";
+            if (!phone) throw new Error("Couldn't find your phone on this device.");
+            await Parse.Cloud.run("backfillWebVisitorName", { phoneNumber: phone, name });
+            setVerifiedUserCookie(name, phone);
+            setShowNamePrompt(false);
+          }}
+        />
+      )}
+
       {showFollowPopup && org && (
         <div
           className="fixed bottom-6 right-6 left-6 md:left-auto md:w-80 z-40"
