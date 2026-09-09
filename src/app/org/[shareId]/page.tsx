@@ -4036,19 +4036,12 @@ export default function OrgCalendarPage() {
                                   return (
                                     <button
                                       onClick={() => {
-                                        // Prefill the follower's note with the
-                                        // attribution line the server used to
-                                        // stamp on silently, so it stays the
-                                        // default but is theirs to rewrite.
-                                        // Owners/co-hosts start blank — they
-                                        // never got an auto-note, and "hosted
-                                        // from a suggestion on your own
-                                        // calendar" reads as noise.
-                                        setHostThisNote(
-                                          canHostAsHost
-                                            ? ""
-                                            : `Hosted from an AI Suggestion on ${org.name}.`
-                                        );
+                                        // Blank, never prefilled: a canned
+                                        // attribution line used to sit here
+                                        // and most hosts confirmed it
+                                        // untouched, so plans shipped with a
+                                        // template as the "note from host".
+                                        setHostThisNote("");
                                         setHostThisEventIndex(originalIndex);
                                       }}
                                       className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 transition-opacity text-white hover:opacity-90"
@@ -6301,8 +6294,12 @@ export default function OrgCalendarPage() {
         const isAmber = ev.tagVariant === "amber";
         const venueLine = ev.venueLine || ev.address || null;
 
+        const hostNoteReady = hostThisNote.trim().length > 0;
+        const hostIdentityReady =
+          canHostAsHost || (hostVerify.isVerified && hostVerify.name.trim().length > 0);
+
         const confirmHostThis = async () => {
-          if (!canHostAsHost && !hostVerify.isVerified) return;
+          if (!hostIdentityReady || !hostNoteReady) return;
           setHostThisSubmitting(true);
           try {
             // Server owns venue resolution + role gating and auto-approves
@@ -6327,10 +6324,7 @@ export default function OrgCalendarPage() {
               hostPhone: hostVerify.isVerified
                 ? `+1${hostVerify.phone.replace(/\D/g, "")}`
                 : undefined,
-              // Omitting it (cleared field) makes the server fall back to its
-              // own attribution line for followers, which is what shipped
-              // before this field existed.
-              hostNote: hostThisNote.trim() || undefined,
+              hostNote: hostThisNote.trim(),
             })) as {
               pendingApproval?: boolean;
               eventGroupId?: string;
@@ -6564,10 +6558,8 @@ export default function OrgCalendarPage() {
                   )}
                 </div>
 
-                {/* Note from Host. Followers open with the attribution line
-                    prefilled; before this field existed the server stamped
-                    that same line on silently and the host had no way to say
-                    anything in their own voice. Editing it does NOT route the
+                {/* Note from Host — required and in the host's own words; the
+                    server rejects an empty note. Writing it does NOT route the
                     plan through the owner's approval queue — the note isn't
                     one of the plan details ("Edit details first") that does. */}
                 <div className="border-t border-zinc-100 pt-6 space-y-2">
@@ -6582,10 +6574,11 @@ export default function OrgCalendarPage() {
                     value={hostThisNote}
                     onChange={(e) => setHostThisNote(e.target.value)}
                     disabled={hostThisSubmitting}
+                    required
                     rows={3}
                     maxLength={500}
                     className="w-full border border-zinc-200 rounded-lg p-4 text-sm font-light focus:outline-none focus:border-zinc-900 transition-colors resize-none disabled:opacity-50"
-                    placeholder="Add a note for attendees (optional)"
+                    placeholder="Tell attendees what to expect, in your own words"
                   />
                   <p className="text-[11px] text-zinc-400 text-right">
                     {hostThisNote.length}/500
@@ -6609,8 +6602,7 @@ export default function OrgCalendarPage() {
                   <button
                     onClick={confirmHostThis}
                     disabled={
-                      hostThisSubmitting ||
-                      (!canHostAsHost && !hostVerify.isVerified)
+                      hostThisSubmitting || !hostIdentityReady || !hostNoteReady
                     }
                     className="w-full px-6 py-4 text-xs uppercase tracking-widest font-medium text-white flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity"
                     style={{ backgroundColor: org.brandColor || "#18181b" }}

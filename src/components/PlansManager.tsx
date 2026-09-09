@@ -281,6 +281,8 @@ function IdeaCard({
   date,
   onClick,
   onDelete,
+  onCopyLink,
+  linkCopied,
 }: {
   idea: PlanIdea;
   date: Date | null;
@@ -290,6 +292,9 @@ function IdeaCard({
   // removePlanIdea has nothing to delete. Same reasoning as the modal's
   // isFeatured gate on onEditSuggestion/onAssignHost/onDelete.
   onDelete?: () => void;
+  // Same featured gate: the ?idea= link needs a per-calendar row to land on.
+  onCopyLink?: () => void;
+  linkCopied?: boolean;
 }) {
   return (
     <div
@@ -361,9 +366,9 @@ function IdeaCard({
               ? date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
               : "Waiting on host"}
         </p>
-        <p className="text-xs">
+        <div className="flex items-center justify-between text-xs">
           {idea.interestCount > 0 ? (
-            <span className="text-emerald-600 font-medium">
+            <span className="text-emerald-600 font-medium truncate">
               {/* A featured suggestion's counter lives on the admin's row and is
                   shared by every calendar it surfaces on — these are people in
                   the area, not this calendar's followers. Say so, or the owner
@@ -371,9 +376,27 @@ function IdeaCard({
               {idea.interestCount} interested{idea.isFeatured ? " nearby" : ""}
             </span>
           ) : (
-            <span className="text-zinc-400">Waiting on host</span>
+            <span className="text-zinc-400 truncate">Waiting on host</span>
           )}
-        </p>
+          {onCopyLink && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCopyLink();
+              }}
+              title="Copy direct link to this suggestion"
+              aria-label="Copy direct link to this suggestion"
+              className="p-1 -m-1 ml-2 shrink-0 rounded text-zinc-300 hover:text-zinc-700 transition-colors"
+            >
+              {linkCopied ? (
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+              ) : (
+                <Link2 className="w-3.5 h-3.5" />
+              )}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -942,6 +965,20 @@ export default function PlansManager({
     } catch {
       // Clipboard blocked (permissions / insecure context) — silently no-op;
       // the owner can still open the plan and share from there.
+    }
+  }
+
+  // Suggestions have no /p/ page yet, so the link lands on the public
+  // calendar with ?idea= — the recipient can host it or mark interest there.
+  async function copyIdeaLink(objectId: string) {
+    if (!calendarShareId) return;
+    try {
+      const url = `${window.location.origin}/org/${calendarShareId}?idea=${objectId}`;
+      await navigator.clipboard.writeText(url);
+      setCopiedPlanId(objectId);
+      setTimeout(() => setCopiedPlanId((cur) => (cur === objectId ? null : cur)), 2000);
+    } catch {
+      // Clipboard blocked — silently no-op, same as copyPlanLink.
     }
   }
 
@@ -1668,6 +1705,12 @@ export default function PlansManager({
                           ? undefined
                           : () => handleRemoveIdea(item.idea.objectId)
                       }
+                      onCopyLink={
+                        item.idea.isFeatured || item.idea.sourceKind === "featured" || !calendarShareId
+                          ? undefined
+                          : () => copyIdeaLink(item.idea.objectId)
+                      }
+                      linkCopied={copiedPlanId === item.idea.objectId}
                     />
                   ) : (
                     // AI starter → open the New Plan drawer prefilled so the
