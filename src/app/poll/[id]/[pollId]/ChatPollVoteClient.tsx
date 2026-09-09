@@ -95,12 +95,14 @@ export default function ChatPollVoteClient({
   const [voting, setVoting] = useState(false);
   const [error, setError] = useState("");
   const [nameNeeded, setNameNeeded] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
 
   // Re-fetch with guestId so the server can mark which option this guest already picked.
   useEffect(() => {
     const id = getOrCreateGuestId();
     setGuestId(id);
     setName(readSavedName());
+    setIsIOS(/iPhone|iPad|iPod/.test(window.navigator.userAgent));
 
     let cancelled = false;
     (async () => {
@@ -338,7 +340,19 @@ export default function ChatPollVoteClient({
             {error || (voting ? "Saving…" : hasVoted && !poll.expired ? "Vote recorded." : "")}
           </p>
 
-          <div className="pt-4 border-t border-zinc-100 text-center">
+          <div className="pt-4 border-t border-zinc-100 text-center space-y-3">
+            {isIOS && !poll.expired && (
+              // Universal Link bouncer: with the app installed, iOS opens the
+              // chat and the vote happens in-app; otherwise the bouncer
+              // redirects straight back here.
+              <a
+                href={`/open/poll/${sessionId}/${pollId}`}
+                className="inline-flex items-center justify-center gap-2 w-full rounded-lg border border-zinc-900 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+              >
+                <Smartphone className="w-4 h-4" />
+                Have the Leaf app? Vote in the app
+              </a>
+            )}
             <a
               href={APP_STORE_URL}
               className="inline-flex items-center gap-1 text-[11px] uppercase tracking-widest font-bold text-zinc-400 hover:text-zinc-700"
