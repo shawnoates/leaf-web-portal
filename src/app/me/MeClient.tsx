@@ -490,7 +490,12 @@ export default function MeClient() {
             // Keep the in-memory user current so bridgeIdentityToOrgPage
             // stamps the new name into the /org cookie without a reload.
             await Parse.User.current()?.fetch().catch(() => undefined);
-            setData((prev) => (prev ? { ...prev, person: { ...prev.person, firstName: name } } : prev));
+            setData((prev) => {
+              if (!prev) return prev;
+              const next = { ...prev, person: { ...prev.person, firstName: name } };
+              cacheDashboard(next);
+              return next;
+            });
           }}
         />
       )}
