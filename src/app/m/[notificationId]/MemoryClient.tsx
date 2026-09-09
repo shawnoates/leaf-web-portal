@@ -432,7 +432,7 @@ export default function MemoryClient({
   );
 }
 
-function HostOtpModal({
+export function HostOtpModal({
   onClose,
   onVerified,
 }: {

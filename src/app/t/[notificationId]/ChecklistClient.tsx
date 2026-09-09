@@ -44,6 +44,7 @@ export type HostChecklist = {
   calendarName: string | null;
   dateISO: string | null;
   cancelled: boolean;
+  chatUrl?: string | null;
   tasks: HostTask[];
 };
 
@@ -408,6 +409,15 @@ export default function ChecklistClient({
                   : "All done. Nothing left before the day."
                 : `${actionable} thing${actionable === 1 ? "" : "s"} to sort.`}
             </p>
+          )}
+          {!data.cancelled && data.chatUrl && (
+            <a
+              href={data.chatUrl}
+              className="inline-flex items-center gap-1.5 mt-3 text-[13px] font-medium text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-full px-3 py-1.5 transition-colors"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Open the group chat
+            </a>
           )}
         </header>
 

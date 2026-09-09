@@ -71,6 +71,7 @@ type Offer = {
   plan: PlanFacts | null;
   counts: { interested: number; rsvpYes: number };
   checklistUrl: string | null;
+  chatUrl: string | null;
   planStarted: boolean;
   planEnded: boolean;
   completion: Completion | null;
@@ -486,6 +487,24 @@ export default function HostOfferClient({ token }: { token: string }) {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {offer.chatUrl && !offer.completion?.completedAt && (
+          <div className={`${card} mt-6`}>
+            <h2 className="text-[17px] font-semibold text-leaf-900">
+              The group chat
+            </h2>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-700">
+              People will ask you things there. We&rsquo;ll text or email you
+              when someone writes, at most once every couple of hours.
+            </p>
+            <a href={offer.chatUrl} className={`${btnQuiet} mt-4 block text-center`}>
+              Open the group chat
+            </a>
+            <p className="mt-2 text-[13px] text-zinc-500">
+              It may ask you to sign in with your phone number the first time.
+            </p>
           </div>
         )}
 

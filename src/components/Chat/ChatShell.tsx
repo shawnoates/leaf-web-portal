@@ -18,6 +18,7 @@ import {
 import { Loader2, Send, ArrowLeft, Calendar, MapPin, Users, X, Smartphone } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import MessageRow from "./MessageRow";
+import { HostOtpModal } from "@/app/m/[notificationId]/MemoryClient";
 import type { FirMessage, UserLite } from "./types";
 
 type AuthState = "checking" | "ready" | "denied" | "error";
@@ -82,6 +83,10 @@ export default function ChatShell({
   const [notificationId, setNotificationId] = useState<string | null>(null);
   const [device, setDevice] = useState<DeviceType>("desktop");
   const [showQrModal, setShowQrModal] = useState(false);
+  // Roster hosts arrive from an SMS/email with no account session. Their
+  // minted user carries the phone they applied with, so the /m/ phone-OTP
+  // sign-in lands them in the right account; a reload then re-runs init.
+  const [showHostOtp, setShowHostOtp] = useState(false);
   const [messages, setMessages] = useState<FirMessage[]>([]);
   const [users, setUsers] = useState<Map<string, UserLite>>(new Map());
   const [composeText, setComposeText] = useState(initialDraft ?? "");
@@ -342,7 +347,25 @@ export default function ChatShell({
           >
             Open in Leaf App
           </a>
+          <p className="text-sm text-zinc-500 pt-2">
+            Hosting this one for Leaf?{" "}
+            <button
+              type="button"
+              onClick={() => setShowHostOtp(true)}
+              className="underline text-zinc-800 hover:text-zinc-900"
+            >
+              Sign in with your phone number
+            </button>
+          </p>
         </div>
+        {showHostOtp && (
+          <HostOtpModal
+            onClose={() => setShowHostOtp(false)}
+            onVerified={() => {
+              window.location.reload();
+            }}
+          />
+        )}
       </div>
     );
   }
