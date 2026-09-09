@@ -44,6 +44,12 @@ type NeighborhoodOption = {
 
 type NeighborhoodGroup = {
   parentArea: string;
+  /**
+   * The metro this group rolls up into. Distinct from `parentArea`, which is
+   * the borough in NYC and the metro name everywhere else — five NYC boroughs
+   * share the metro "New York" and stay separate section headers beneath it.
+   */
+  metro: string;
   liveCount: number;
   neighborhoods: NeighborhoodOption[];
 };
@@ -179,21 +185,22 @@ export default function HostApplyForm() {
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [step]);
 
+  // Server order is already "metros we run in first", with a metro's groups
+  // adjacent, so dedupe in place rather than sorting again.
   const metros = useMemo(() => {
     if (!options) return [];
-    return [...new Set(options.neighborhoodGroups.map((g) => g.parentArea))];
+    return [
+      ...new Set(
+        options.neighborhoodGroups.map((g) => g.metro || g.parentArea)
+      ),
+    ];
   }, [options]);
 
   const filteredGroups = useMemo(() => {
-    if (!options) return [];
-    let groups = options.neighborhoodGroups;
-
-    // Filter by metro if one is selected
-    if (metro) {
-      groups = groups.filter((g) => g.parentArea === metro);
-    }
-
-    // Filter by neighborhood search text
+    if (!options || !metro) return [];
+    const groups = options.neighborhoodGroups.filter(
+      (g) => (g.metro || g.parentArea) === metro
+    );
     const q = hoodFilter.trim().toLowerCase();
     if (!q) return groups;
     return groups
@@ -243,8 +250,8 @@ export default function HostApplyForm() {
     }
     if (i === 1) {
       if (is21Plus === null) return "Let us know whether you're 21 or over.";
-      if (!metro && neighborhoods.length === 0 && !neighborhoodsOther.trim())
-        return "Pick a metro, then select neighborhoods you can get to, or tell us where else you can get to.";
+      if (neighborhoods.length === 0 && !neighborhoodsOther.trim())
+        return "Pick at least one neighborhood, or tell us where else you can get to.";
       if (availability.length === 0) return "Tell us when you're generally free.";
       return null;
     }
@@ -528,29 +535,31 @@ export default function HostApplyForm() {
               </div>
             </Field>
 
-            <Field label="Where do you want to host?">
-              {metros.length > 0 && (
+            {metros.length > 0 && (
+              <Field label="Which city are you in?">
                 <select
                   className={inputClass}
                   value={metro}
                   onChange={(e) => {
+                    // Selections from the old metro would be invisible under the
+                    // new one and still submitted, so they go with it.
                     setMetro(e.target.value);
                     setNeighborhoods([]);
                     setHoodFilter("");
                   }}
                 >
-                  <option value="">Select a metro area</option>
+                  <option value="">Select a city</option>
                   {metros.map((m) => (
                     <option key={m} value={m}>
                       {m}
                     </option>
                   ))}
                 </select>
-              )}
-            </Field>
+              </Field>
+            )}
 
             <Field label="Neighborhoods you can get to on a weeknight">
-              {options && options.neighborhoodGroups.length > 0 && metro && (
+              {metro && (
                 <>
                   <input
                     className={inputClass + " mb-3"}
@@ -561,9 +570,13 @@ export default function HostApplyForm() {
                   <div className="max-h-72 space-y-4 overflow-y-auto rounded-lg border border-zinc-200 p-3">
                     {filteredGroups.map((g) => (
                       <div key={g.parentArea}>
-                        <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-zinc-500">
-                          {g.parentArea}
-                        </p>
+                        {/* Only worth a header where it divides the metro —
+                            "Chicago" above Chicago's one group is noise. */}
+                        {filteredGroups.length > 1 && (
+                          <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-zinc-500">
+                            {g.parentArea}
+                          </p>
+                        )}
                         <div className="flex flex-wrap gap-2">
                           {g.neighborhoods.map((n) => (
                             <Chip
@@ -587,9 +600,9 @@ export default function HostApplyForm() {
                   </div>
                 </>
               )}
-              {!metro && (
+              {!metro && metros.length > 0 && (
                 <p className="text-[14px] text-zinc-500">
-                  Select a metro area above to see neighborhoods.
+                  Pick a city above to see neighborhoods.
                 </p>
               )}
               <input
