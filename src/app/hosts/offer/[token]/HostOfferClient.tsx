@@ -445,7 +445,7 @@ export default function HostOfferClient({ token }: { token: string }) {
                 </h2>
                 <p className="mt-1.5 text-[14px] leading-snug text-zinc-600">
                   Add a photo or two from the plan to confirm you hosted. That
-                  is what releases your {offer.rateLabel.replace(/ for the plan$/, "")}.
+                  is what releases your {offer.rateLabel.replace(/ for the (night|plan)$/, "")}.
                 </p>
                 <div className="mt-4 space-y-3">
                   {photos.length > 0 && (
