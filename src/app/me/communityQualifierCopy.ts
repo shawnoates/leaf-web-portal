@@ -42,8 +42,8 @@ export const COPY = {
   ready: {
     title: (name: string) => `${name} is ready.`,
     assurance:
-      "Let's get your community off the ground. As people join, we'll keep a short list of what's worth doing next — the table, the day-of details — so you're never guessing. Nothing goes out without you.",
-    selfServe: "Let's get your community off the ground. Put a date down and we'll take it from there.",
+      "Let's create your first plan and get your community off the ground. As people join, we'll keep a short list of what's worth doing next — the table, the day-of details — so you're never guessing. Nothing goes out without you.",
+    selfServe: "Let's create your first plan and get your community off the ground.",
     rename: "Rename",
     renameSave: "Save",
     renameCancel: "Cancel",

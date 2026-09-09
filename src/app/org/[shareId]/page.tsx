@@ -2185,6 +2185,9 @@ export default function OrgCalendarPage() {
     if (org.isOwner || org.isHost) return;
     if (org.planIdeas.length === 0 || org.hidePlanIdeas) return;
     if (org.rsvpLimitReached) return;
+    // A ?idea= arrival owns the popup; re-running here after a refetch would
+    // swap the linked suggestion for a random one mid-view.
+    if (new URLSearchParams(window.location.search).get("idea")) return;
     const dismissKey = `leaf_idea_popup_dismiss_${org.objectId}`;
     try {
       const dismissed = localStorage.getItem(dismissKey);
