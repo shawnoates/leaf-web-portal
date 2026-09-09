@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Heart } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import HostIdeaModal from "@/components/HostIdeaModal";
+import CommunityQualifierCard, { type QualifierCalendar } from "./CommunityQualifierCard";
 import RecapPopup from "@/components/recap/RecapPopup";
 import { setVerifiedUserCookie } from "@/lib/verified-user";
 import NewPlanModal, {
@@ -152,6 +153,8 @@ interface Dashboard {
   plans: Plan[];
   unreadMessageCount: number;
   ask: { kind: "pattern" | "generic"; copy: string; promptPrefill: string | null } | null;
+  // One prompt card at a time, chosen and flag-gated server-side.
+  prompt?: { key: "community_qualifier" } | null;
 }
 
 type AuthState = "resolving" | "authed" | "needs-otp" | "error";
@@ -550,6 +553,31 @@ function DashboardView({
 
   function openCreate() { setRestore(null); setCreateOpen(true); }
 
+  // ---- Community qualifier -----------------------------------------------
+  // Latched at mount: once the card is on the page it stays through the data
+  // refresh that follows plan creation, which would otherwise drop `prompt`
+  // (the person now owns a calendar) and erase the closing state mid-read.
+  const [qualifierActive] = useState(() => data.prompt?.key === "community_qualifier");
+  const addOwnedCalendar = useCallback((cal: QualifierCalendar) => {
+    setOwnedCalendars((prev) =>
+      prev.some((o) => o.id === cal.id) ? prev : [{ id: cal.id, name: cal.name, owned: true }, ...prev],
+    );
+  }, []);
+  function openCreateOnCalendar(cal: QualifierCalendar) {
+    addOwnedCalendar(cal);
+    setRestore({ postTo: cal.id });
+    setCreateOpen(true);
+  }
+  const nearby = useMemo(
+    () => data.plans.map((p) => ({
+      id: p.id,
+      title: p.title,
+      calendarName: p.calendarName,
+      when: [weekday(p.date), timeLabel(p)].filter(Boolean).join(" "),
+    })),
+    [data.plans],
+  );
+
   // ---- Recap: rate a plan you actually went to ---------------------------
   // Same one-shot contract as the probe popup below, and it outranks it: this
   // is about something that already happened and stops being askable, where a
@@ -709,7 +737,16 @@ function DashboardView({
             </section>
           )}
 
-          {!data.person.ownsCalendars && (
+          {qualifierActive && (
+            <CommunityQualifierCard
+              nearby={nearby}
+              createdPlan={justCreated}
+              onCalendarReady={addOwnedCalendar}
+              onCreatePlan={openCreateOnCalendar}
+            />
+          )}
+
+          {!qualifierActive && !data.person.ownsCalendars && (
             <div className="prompt-box">
               <div className="prompt-body">
                 <div className="prompt-h">Hosting an event soon?</div>
@@ -1900,6 +1937,24 @@ const CSS = `
 .leafme .prompt-h.sm{font-size:17px}
 .leafme .prompt-p{font-size:12px;line-height:1.5;color:var(--body);margin-top:4px}
 .leafme .prompt-box .btn{flex:none;font-size:12px;padding:11px 17px}
+.leafme .cq{border:1px dashed var(--dash);border-radius:12px;padding:20px 22px;margin-top:22px;background:var(--paper)}
+.leafme .cq-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.leafme .cq-back{border:0;background:none;padding:0 4px;cursor:pointer;font-size:16px;color:var(--muted);line-height:1}
+.leafme .cq-back:hover{color:var(--ink)}
+.leafme .cq-h{font-family:var(--serif);font-size:19px;line-height:1.25;color:var(--ink)}
+.leafme .cq-sub{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5}
+.leafme .cq-p,.leafme .cq-lead{font-size:12.5px;line-height:1.55;color:var(--body);margin-top:8px}
+.leafme .cq-opts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.leafme .cq-opt{font:inherit;font-size:12.5px;padding:10px 15px;border:1px solid var(--edge);border-radius:999px;background:var(--paper);color:var(--ink);cursor:pointer}
+.leafme .cq-opt:hover{border-color:var(--ink)}
+.leafme .cq-opt:disabled{opacity:.5;cursor:default}
+.leafme .cq-cta{margin-top:14px;display:inline-flex}
+.leafme .cq-rows{margin-top:12px;display:flex;flex-direction:column}
+.leafme .cq-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--edge)}
+.leafme .cq-row-t{font-size:13.5px;color:var(--ink)}
+.leafme .cq-row-s{font-size:11.5px;color:var(--muted);margin-top:2px}
+.leafme .cq-rename{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.leafme .cq-input{font:inherit;font-family:var(--serif);font-size:18px;padding:6px 10px;border:1px solid var(--edge);border-radius:8px;min-width:220px;flex:1}
 
 /* ---- Right rail ---- */
 .leafme .rail{margin-bottom:24px}
