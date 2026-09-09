@@ -663,7 +663,7 @@ export default function HostApplyForm() {
                 there&rsquo;s a night near you that fits. Sometimes that&rsquo;s
                 quick, sometimes it takes a little longer, depending what we
                 have running in your neighborhood. It&rsquo;s contract work,
-                paid the same night or the next morning. Your photo and your
+                paid within a day of the plan. Your photo and your
                 description are shown to the people attending that event.
                 Nothing else is shared with anyone.
               </p>
