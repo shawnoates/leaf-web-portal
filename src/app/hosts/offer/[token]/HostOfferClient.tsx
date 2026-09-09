@@ -60,6 +60,8 @@ type Offer = {
   state: OfferState;
   hostFirstName: string | null;
   hasPaymentDetails: boolean;
+  phoneLast4: string | null;
+  smsConsent: boolean;
   rateLabel: string;
   expiresAt: string | null;
   jobDescription: string;
@@ -135,6 +137,12 @@ export default function HostOfferClient({ token }: { token: string }) {
   const [agreed, setAgreed] = useState(false);
   const [showAgreement, setShowAgreement] = useState(false);
 
+  // Phone: required to accept. Missing → typed here; present → shown by its
+  // last four and confirmable, with a Change link.
+  const [phone, setPhone] = useState("");
+  const [changingPhone, setChangingPhone] = useState(false);
+  const [smsConsentTick, setSmsConsentTick] = useState(false);
+
   const [photos, setPhotos] = useState<{ preview: string; base64: string }[]>([]);
   const [photoNote, setPhotoNote] = useState("");
   const [confirmed, setConfirmed] = useState(false);
@@ -163,6 +171,12 @@ export default function HostOfferClient({ token }: { token: string }) {
       setError("Please read the hosting agreement and tick the box first.");
       return;
     }
+    const needsPhone = !offer?.phoneLast4 || changingPhone;
+    const digits = phone.replace(/\D/g, "");
+    if (needsPhone && digits.length < 10) {
+      setError("Add a mobile number so we can reach you on the night.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -170,6 +184,8 @@ export default function HostOfferClient({ token }: { token: string }) {
         token,
         agreed: true,
         agreementVersion: offer?.agreementVersion,
+        phone: needsPhone ? phone.trim() : undefined,
+        smsConsent: smsConsentTick || undefined,
       });
       setPaymentSaved(Boolean(r.hasPaymentDetails));
       setView("done");
@@ -742,6 +758,67 @@ export default function HostOfferClient({ token }: { token: string }) {
           </p>
         </div>
       )}
+
+      <div className="mt-4 rounded-xl border border-zinc-200 p-4">
+        <p className="text-[14px] font-medium text-leaf-900">Your mobile number</p>
+        {offer.phoneLast4 && !changingPhone ? (
+          <p className="mt-1.5 text-[14px] leading-snug text-zinc-700">
+            We&rsquo;ll text you about this night at the number ending in{" "}
+            <span className="font-medium">{offer.phoneLast4}</span>, and
+            you&rsquo;ll sign in to the group chat with it.{" "}
+            <button
+              type="button"
+              onClick={() => setChangingPhone(true)}
+              className="underline text-leaf-800"
+            >
+              Change
+            </button>
+          </p>
+        ) : (
+          <>
+            <p className="mt-1.5 text-[14px] leading-snug text-zinc-600">
+              It&rsquo;s how you sign in to the group chat and how we reach you
+              on the night.
+            </p>
+            <input
+              className={`${inputClass} mt-3`}
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="(347) 555-0110"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+            {offer.phoneLast4 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setChangingPhone(false);
+                  setPhone("");
+                }}
+                className="mt-2 text-[13px] underline text-zinc-500"
+              >
+                Keep the number ending in {offer.phoneLast4}
+              </button>
+            )}
+          </>
+        )}
+        {!offer.smsConsent && (
+          <label className="mt-3 flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={smsConsentTick}
+              onChange={(e) => setSmsConsentTick(e.target.checked)}
+              className="mt-1 h-4 w-4"
+            />
+            <span className="text-[14px] leading-snug text-zinc-700">
+              Text me about this night — reminders and when someone writes in
+              the chat. Standard rates apply, reply STOP to stop. Otherwise
+              we&rsquo;ll email.
+            </span>
+          </label>
+        )}
+      </div>
 
       <div className="mt-4 rounded-xl border border-zinc-200 p-4">
         <button

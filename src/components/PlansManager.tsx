@@ -259,6 +259,8 @@ interface UpcomingPlan {
   // so the manager sees what still needs claiming.
   isAIStarter?: boolean;
   aiEventIndex?: number;
+  // Share-link key; falls back to aiEventIndex on rows minted before uids.
+  aiEventUid?: string | null;
   aiVenueLine?: string;
   // Cover treatment inputs so the manager card matches the /org public
   // page — the tag rendered LARGE in serif on a green/amber gradient
@@ -411,10 +413,14 @@ function AIStarterCard({
   plan,
   onClick,
   onDelete,
+  onCopyLink,
+  linkCopied,
 }: {
   plan: UpcomingPlan;
   onClick: () => void;
   onDelete: () => void;
+  onCopyLink?: () => void;
+  linkCopied?: boolean;
 }) {
   const isAmber = plan.aiTagVariant === "amber";
   return (
@@ -520,7 +526,27 @@ function AIStarterCard({
             timeZone: FLOATING_EVENT_TZ,
           })}
         </p>
-        <p className="text-xs text-zinc-400">Waiting on host</p>
+        <div className="flex items-center justify-between text-xs text-zinc-400">
+          <span className="truncate">Waiting on host</span>
+          {onCopyLink && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCopyLink();
+              }}
+              title="Copy direct link to this suggestion"
+              aria-label="Copy direct link to this suggestion"
+              className="p-1 -m-1 ml-2 shrink-0 rounded text-zinc-300 hover:text-zinc-700 transition-colors"
+            >
+              {linkCopied ? (
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+              ) : (
+                <Link2 className="w-3.5 h-3.5" />
+              )}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -873,6 +899,7 @@ export default function PlansManager({
         dateISO?: string | null;
         imageUrl?: string | null;
         audienceTag?: string | null;
+        uid?: string | null;
       }>;
       // Suggestions the owner/co-host deleted via dismissAiSourceEvent. The
       // server ships positions rather than filtering the array, because the
@@ -905,6 +932,7 @@ export default function PlansManager({
           location: ev.venueLine ? { name: ev.name, address: ev.venueLine } : null,
           isAIStarter: true,
           aiEventIndex: index,
+          aiEventUid: typeof ev.uid === "string" && ev.uid ? ev.uid : null,
           aiVenueLine: ev.venueLine,
           aiTag: ev.tag || "Event",
           aiTagVariant: ev.tagVariant === "amber" ? "amber" : "default",
@@ -969,14 +997,15 @@ export default function PlansManager({
   }
 
   // Suggestions have no /p/ page yet, so the link lands on the public
-  // calendar with ?idea= — the recipient can host it or mark interest there.
-  async function copyIdeaLink(objectId: string) {
+  // calendar with ?idea= (plan-idea rows) or ?aiEvent= (starter cards) — the
+  // recipient can host it or mark interest there.
+  async function copySuggestionLink(copyKey: string, param: "idea" | "aiEvent", value: string) {
     if (!calendarShareId) return;
     try {
-      const url = `${window.location.origin}/org/${calendarShareId}?idea=${objectId}`;
+      const url = `${window.location.origin}/org/${calendarShareId}?${param}=${encodeURIComponent(value)}`;
       await navigator.clipboard.writeText(url);
-      setCopiedPlanId(objectId);
-      setTimeout(() => setCopiedPlanId((cur) => (cur === objectId ? null : cur)), 2000);
+      setCopiedPlanId(copyKey);
+      setTimeout(() => setCopiedPlanId((cur) => (cur === copyKey ? null : cur)), 2000);
     } catch {
       // Clipboard blocked — silently no-op, same as copyPlanLink.
     }
@@ -1708,7 +1737,7 @@ export default function PlansManager({
                       onCopyLink={
                         item.idea.isFeatured || item.idea.sourceKind === "featured" || !calendarShareId
                           ? undefined
-                          : () => copyIdeaLink(item.idea.objectId)
+                          : () => copySuggestionLink(item.idea.objectId, "idea", item.idea.objectId)
                       }
                       linkCopied={copiedPlanId === item.idea.objectId}
                     />
@@ -1719,6 +1748,17 @@ export default function PlansManager({
                       key={`ai-${item.plan.objectId}`}
                       plan={item.plan}
                       onDelete={() => handleDismissAiStarter(item.plan)}
+                      onCopyLink={
+                        calendarShareId && item.plan.aiEventIndex !== undefined
+                          ? () =>
+                              copySuggestionLink(
+                                item.plan.objectId,
+                                "aiEvent",
+                                item.plan.aiEventUid ?? String(item.plan.aiEventIndex),
+                              )
+                          : undefined
+                      }
+                      linkCopied={copiedPlanId === item.plan.objectId}
                       onClick={() => {
                         setCreatePlanPrefill({
                           title: item.plan.title,
