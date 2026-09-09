@@ -4334,10 +4334,10 @@ export default function OrgCalendarPage() {
                           <button
                             type="button"
                             onClick={() => handleShareIdea(idea.id, idea.title)}
-                            aria-label="Share this suggestion"
-                            className="w-12 h-12 self-center rounded-full border border-zinc-200 hover:border-zinc-300 flex items-center justify-center text-zinc-400 hover:text-zinc-700 transition-colors"
+                            className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
                           >
                             {copiedPlanId === idea.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                            <span className="text-xs font-bold uppercase tracking-widest">Share</span>
                           </button>
                         )}
                       </div>

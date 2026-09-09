@@ -1,24 +1,10 @@
 import type { Metadata } from "next";
 import { SITE_URL } from "@/lib/site";
-import Parse from "@/lib/parse";
-import ChatPollVoteClient, { type ChatPollInfo } from "./ChatPollVoteClient";
+import ChatPollVoteClient from "./ChatPollVoteClient";
+import { fetchPoll } from "./fetch-poll";
 
-async function fetchPoll(
-  sessionId: string,
-  pollId: string,
-): Promise<ChatPollInfo | null> {
-  try {
-    const result = (await Parse.Cloud.run("getPollForGuest", {
-      sessionId,
-      pollId,
-    })) as ChatPollInfo;
-    return result || null;
-  } catch (err) {
-    console.error("[/poll/:sid/:pid] getPollForGuest failed:", err);
-    return null;
-  }
-}
-
+// og:image / twitter:image come from the colocated opengraph-image.tsx —
+// file-based metadata merges over this object, so no `images` here.
 type PageProps = {
   params: Promise<{ id: string; pollId: string }>;
 };
@@ -52,7 +38,7 @@ export async function generateMetadata({
       siteName: "Leaf",
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title,
       description,
     },

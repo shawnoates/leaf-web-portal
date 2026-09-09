@@ -260,6 +260,9 @@ export default function ChatPollVoteClient({
                 totalVotes > 0 ? Math.round((opt.voteCount / totalVotes) * 100) : 0;
               const shownGuests = opt.guestNames.slice(0, 5);
               const extraGuests = opt.guestNames.length - shownGuests.length;
+              // Votes cast inside the app arrive as a count only (no names),
+              // so without this row they'd inflate the tally invisibly.
+              const appVotes = Math.max(0, opt.voteCount - opt.guestNames.length);
               return (
                 <button
                   key={opt.id}
@@ -295,7 +298,7 @@ export default function ChatPollVoteClient({
                       )}
                     </div>
                   </div>
-                  {shownGuests.length > 0 && (
+                  {(shownGuests.length > 0 || appVotes > 0) && (
                     <div className="relative flex items-center mt-2 pl-8">
                       {shownGuests.map((guestName, i) => (
                         <span
@@ -309,6 +312,15 @@ export default function ChatPollVoteClient({
                       {extraGuests > 0 && (
                         <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-zinc-200 text-zinc-600 text-[10px] font-semibold border-2 border-white -ml-1.5">
                           +{extraGuests}
+                        </span>
+                      )}
+                      {appVotes > 0 && (
+                        <span
+                          className={`text-[11px] text-zinc-400 ${
+                            shownGuests.length > 0 ? "ml-2" : ""
+                          }`}
+                        >
+                          {appVotes} in the app
                         </span>
                       )}
                     </div>
