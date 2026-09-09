@@ -10,7 +10,7 @@ export const COPY = {
   progress: (step: number) => `Quick question · ${step} of 3`,
   back: "Back",
   q1: {
-    prompt: "Do you have a community you're part of?",
+    prompt: "Do you have another community you're part of?",
     sub: "A church, a club, a team, a standing Thursday thing.",
     options: [
       { key: "yes", label: "Yes" },
@@ -42,8 +42,8 @@ export const COPY = {
   ready: {
     title: (name: string) => `${name} is ready.`,
     assurance:
-      "Put a date down and take it from there. As people join, we'll keep a short list of what's worth doing next — the table, the day-of details — so you're never guessing. Nothing goes out without you.",
-    selfServe: "Put a date down and take it from there.",
+      "Let's get your community off the ground. As people join, we'll keep a short list of what's worth doing next — the table, the day-of details — so you're never guessing. Nothing goes out without you.",
+    selfServe: "Let's get your community off the ground. Put a date down and we'll take it from there.",
     rename: "Rename",
     renameSave: "Save",
     renameCancel: "Cancel",

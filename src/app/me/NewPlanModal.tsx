@@ -136,7 +136,20 @@ export default function NewPlanModal({
   const [venueKey, setVenueKey] = useState(0);
   const [capacity, setCapacity] = useState(restore?.capacity ?? "");
   const [hostNote, setHostNote] = useState(restore?.hostNote ?? "");
-  const [postTo, setPostTo] = useState<string>(restore?.postTo ?? LINK_ONLY);
+  // The personal-calendar chip stands for a calendar that may not exist yet.
+  // Offering it alongside calendars they already own puts two pills on the row
+  // for one destination — "My calendar" resolves to an owned calendar that is
+  // usually sitting right next to it, by name. So it appears only when it
+  // names something the row doesn't already: a calendar about to be created
+  // (the qualifier's named room), or their first one.
+  const nameHint = restore?.calendarNameHint?.trim() || "";
+  const firstOwnedId = options.find((o) => o.owned)?.id;
+  const showPersonalChip = Boolean(nameHint) || !firstOwnedId;
+  const personalChipLabel = nameHint || "My calendar";
+
+  const [postTo, setPostTo] = useState<string>(
+    restore?.postTo ?? firstOwnedId ?? LINK_ONLY,
+  );
   const [hideVenue, setHideVenue] = useState(restore?.hideVenue ?? true);
   const [requireApproval, setRequireApproval] = useState(restore?.requireApproval ?? false);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -298,7 +311,7 @@ export default function NewPlanModal({
 
     const detected = detectCity();
     const created = (await Parse.Cloud.run("createOrganization", {
-      name: hinted || (firstName ? `${firstName}'s Plans` : "My Plans"),
+      name: hinted || (firstName ? `${firstName}'s Calendar` : "My Calendar"),
       orgType: "community",
       description: "Personal plans on Leaf.",
       primaryCity: detected.resolvedCity || detected.city || "New York, NY",
@@ -583,12 +596,14 @@ export default function NewPlanModal({
     <>
       <div className="np-label" style={{ marginBottom: 9 }}>POST TO</div>
       <div className="np-chips">
-        <button
-          className={`np-chip ${postTo === LINK_ONLY ? "on" : ""}`}
-          onClick={() => setPostTo(LINK_ONLY)}
-        >
-          My calendar
-        </button>
+        {showPersonalChip && (
+          <button
+            className={`np-chip ${postTo === LINK_ONLY ? "on" : ""}`}
+            onClick={() => setPostTo(LINK_ONLY)}
+          >
+            {personalChipLabel}
+          </button>
+        )}
         {options.map((o) => (
           <button
             key={o.id}
@@ -600,9 +615,11 @@ export default function NewPlanModal({
         ))}
       </div>
       <div className="np-hint">
-        {postTo === LINK_ONLY
-          ? "Lives on your own calendar. Share the link — guests RSVP by phone, no account."
-          : "Posts to that calendar. Its followers see it, and its rules apply."}
+        {postTo !== LINK_ONLY
+          ? "Posts to that calendar. Its followers see it, and its rules apply."
+          : nameHint
+            ? `Creates ${nameHint} and puts this plan on it. Share the link — guests RSVP by phone, no account.`
+            : "Lives on your own calendar. Share the link — guests RSVP by phone, no account."}
       </div>
     </>
   );

@@ -2021,6 +2021,23 @@ export default function OrgCalendarPage() {
     }
   }, []);
 
+  // Needs-a-host suggestions have no /p/ page (no EventGroup yet), so the
+  // link lands back on this calendar with ?idea= and the popup opens to
+  // "host this" / "I'm interested". SITE_URL, not APP_LINK_URL: the app only
+  // intercepts /p/*, and /org/* on the applinks host would open Safari anyway.
+  const handleShareIdea = useCallback(async (ideaId: string, ideaTitle: string) => {
+    const url = `${SITE_URL}/org/${shareId}?idea=${ideaId}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: ideaTitle, url });
+      } catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(url);
+      setCopiedPlanId(ideaId);
+      setTimeout(() => setCopiedPlanId(null), 2000);
+    }
+  }, [shareId]);
+
   async function loadHostNotificationId(eventGroupId: string) {
     // The attendee list itself is rendered on the dedicated /h/{id} page —
     // here we only need the host's notification id so the "Message Attendees"
@@ -2287,7 +2304,14 @@ export default function OrgCalendarPage() {
       const storedPhone = typeof window !== "undefined" ? localStorage.getItem("leaf_follower_phone") : null;
       const cachedUser = typeof window !== "undefined" ? getVerifiedUserCookie() : null;
       const phoneNumber = storedPhone || cachedUser?.phone?.replace(/\D/g, "") || undefined;
-      const result = await Parse.Cloud.run("getOrgCalendarPage", { shareId, phoneNumber });
+      // ?idea= is read here rather than from ideaQueryId state so the very
+      // first fetch already asks the server to pin that suggestion into the
+      // payload (it may sit past the per-tier cap otherwise).
+      const ideaId =
+        (typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("idea")
+          : null) || undefined;
+      const result = await Parse.Cloud.run("getOrgCalendarPage", { shareId, phoneNumber, ideaId });
 
       // Record page view (fire-and-forget)
       if (result.objectId) {
@@ -2632,25 +2656,24 @@ export default function OrgCalendarPage() {
   // ask someone to host, so routing the not-yet-following recipient into a
   // follow-first detour was pushing back exactly the person who had just said
   // yes. The follow now happens as part of hosting.
+  //
+  // Always the popup, never straight into the host form: the same link is
+  // now what a follower shares from a suggestion card, and that recipient
+  // gets to pick between hosting and marking interest. The popup carries
+  // both, gated by the same permission matrix as the card.
   const autoOpenedIdeaRef = useRef<string | null>(null);
   useEffect(() => {
     if (!org || !ideaQueryId) return;
     if (autoOpenedIdeaRef.current === ideaQueryId) return;
-    const match = org.planIdeas.find((i) => i.id === ideaQueryId);
-    if (!match) return;
     autoOpenedIdeaRef.current = ideaQueryId;
-    const canHostNow =
-      org.isOwner || org.isHost || !!org.allowFollowersToHost;
-    if (canHostNow && !org.rsvpLimitReached) {
-      setHostingIdea(match);
-      setHostSubmitting(false);
-      setHostSuccess(false);
-      setHostNote("");
-      setSelectedVenue(null);
-    } else {
-      setPopupIdea(match);
-      setShowPlanIdeaPopup(true);
+    const match = org.planIdeas.find((i) => i.id === ideaQueryId);
+    if (!match) {
+      setToast("That suggestion is no longer open — someone may have hosted it.");
+      setTimeout(() => setToast(null), 5000);
+      return;
     }
+    setPopupIdea(match);
+    setShowPlanIdeaPopup(true);
   }, [org, ideaQueryId]);
 
   // Keep the open detail modal in sync with the live plans list. `selectedEvent`
@@ -4304,6 +4327,16 @@ export default function OrgCalendarPage() {
                             </button>
                           );
                         })()}
+                        {!idea.isFeatured && (
+                          <button
+                            type="button"
+                            onClick={() => handleShareIdea(idea.id, idea.title)}
+                            aria-label="Share this suggestion"
+                            className="w-12 h-12 self-center rounded-full border border-zinc-200 hover:border-zinc-300 flex items-center justify-center text-zinc-400 hover:text-zinc-700 transition-colors"
+                          >
+                            {copiedPlanId === idea.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -6113,23 +6146,60 @@ export default function OrgCalendarPage() {
               <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold mb-1.5">
                 {popupIdea.category}
               </p>
-              <h4 className="text-sm font-medium tracking-tight text-zinc-900 mb-3 pr-6">
+              <h4 className="text-sm font-medium tracking-tight text-zinc-900 mb-1 pr-6">
                 {popupIdea.title}
               </h4>
-              <button
-                onClick={() => {
-                  dismissPlanIdeaPopup();
-                  setHostingIdea(popupIdea);
-                  setHostSubmitting(false);
-                  setHostSuccess(false);
-                  setHostNote("");
-                  setSelectedVenue(null);
-                }}
-                className="w-full py-2.5 text-xs font-bold uppercase tracking-widest text-white rounded-lg transition-opacity hover:opacity-90"
-                style={{ backgroundColor: org.brandColor || "#18181b" }}
-              >
-                Host This Plan
-              </button>
+              {popupIdea.description && (
+                <p className="text-xs text-zinc-500 font-light leading-relaxed mb-3 line-clamp-3">
+                  {popupIdea.description}
+                </p>
+              )}
+              {(() => {
+                const canHost =
+                  (org.isOwner || org.isHost || !!org.allowFollowersToHost) &&
+                  !org.rsvpLimitReached;
+                const count =
+                  planIdeaInterestCounts[popupIdea.id] ?? popupIdea.interestCount ?? 0;
+                const interested = planIdeaLocallyInterested.has(popupIdea.id);
+                const pending = planIdeaInterestPending.has(popupIdea.id);
+                return (
+                  <div className="space-y-2">
+                    {canHost && (
+                      <button
+                        onClick={() => {
+                          dismissPlanIdeaPopup();
+                          setHostingIdea(popupIdea);
+                          setHostSubmitting(false);
+                          setHostError(null);
+                          setHostSuccess(false);
+                          setHostNote("");
+                          setSelectedVenue(null);
+                        }}
+                        className="w-full py-2.5 text-xs font-bold uppercase tracking-widest text-white rounded-lg transition-opacity hover:opacity-90"
+                        style={{ backgroundColor: org.brandColor || "#18181b" }}
+                      >
+                        Host This Plan
+                      </button>
+                    )}
+                    {!popupIdea.isFeatured && (
+                      <button
+                        type="button"
+                        onClick={() => handlePlanIdeaInterest(popupIdea.id)}
+                        disabled={interested || pending}
+                        className={`w-full py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg border flex items-center justify-center gap-2 transition-colors disabled:cursor-default ${interested ? "bg-emerald-50 border-emerald-300 text-emerald-700" : "border-zinc-200 text-zinc-700 hover:border-zinc-300"}`}
+                      >
+                        {pending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Heart className="w-4 h-4" fill={interested ? "currentColor" : "none"} />
+                        )}
+                        {interested ? "You're interested" : "I'm interested"}
+                        {count > 0 && <span className="text-[11px] font-normal">· {count}</span>}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
               <button
                 onClick={dismissPlanIdeaPopup}
                 className="w-full mt-2 py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors"
