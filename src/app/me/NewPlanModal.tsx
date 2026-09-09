@@ -77,6 +77,14 @@ export interface CreatedPlan { eventGroupId: string | null; inviteUrl: string | 
 export interface NewPlanDraftSnapshot {
   prompt?: string;
   draftApplied?: boolean;
+  /** Draft `prompt` immediately on open, without waiting for a second tap.
+   *  Set by callers that already collected the sentence elsewhere (the
+   *  community qualifier's first-plan bar). */
+  autoDraft?: boolean;
+  /** Name to give the personal calendar if this plan is the thing that
+   *  creates it. The qualifier proposes (and lets the author edit) a name
+   *  before any calendar exists. */
+  calendarNameHint?: string;
   title?: string;
   description?: string;
   date?: string;
@@ -229,6 +237,19 @@ export default function NewPlanModal({
     }
   }
 
+  // Opened with a sentence already in hand — draft it now rather than making
+  // the author tap a button they didn't ask for. Guarded by a ref so a
+  // re-render never re-drafts and overwrites what they've since typed.
+  const autoDraftedRef = useRef(false);
+  useEffect(() => {
+    if (autoDraftedRef.current) return;
+    if (!restore?.autoDraft || !restore.prompt?.trim() || restore.draftApplied) return;
+    autoDraftedRef.current = true;
+    void runDraft();
+    // Mount-only: `runDraft` closes over state that changes as it runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function pickCover(file: File | undefined) {
     if (!file) return;
     try {
@@ -260,8 +281,9 @@ export default function NewPlanModal({
     }
 
     const detected = detectCity();
+    const hinted = restore?.calendarNameHint?.trim();
     const created = (await Parse.Cloud.run("createOrganization", {
-      name: firstName ? `${firstName}'s Plans` : "My Plans",
+      name: hinted || (firstName ? `${firstName}'s Plans` : "My Plans"),
       orgType: "community",
       description: "Personal plans on Leaf.",
       primaryCity: detected.resolvedCity || detected.city || "New York, NY",

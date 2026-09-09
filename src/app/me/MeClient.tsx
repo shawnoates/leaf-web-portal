@@ -5,10 +5,15 @@ import Link from "next/link";
 import { Heart } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import HostIdeaModal from "@/components/HostIdeaModal";
-import CommunityQualifierCard, { type QualifierCalendar } from "./CommunityQualifierCard";
+import CommunityQualifierCard, {
+  type QualifierCalendar,
+  type QualifierCreatedPlan,
+  type FirstPlanRequest,
+} from "./CommunityQualifierCard";
 import RecapPopup from "@/components/recap/RecapPopup";
 import { setVerifiedUserCookie } from "@/lib/verified-user";
 import NewPlanModal, {
+  LINK_ONLY,
   ME_PLAN_DRAFT_KEY,
   type CreatedPlan,
   type NewPlanDraftSnapshot,
@@ -573,11 +578,31 @@ function DashboardView({
       prev.some((o) => o.id === cal.id) ? prev : [{ id: cal.id, name: cal.name, owned: true }, ...prev],
     );
   }, []);
-  function openCreateOnCalendar(cal: QualifierCalendar) {
-    addOwnedCalendar(cal);
-    setRestore({ postTo: cal.id });
+  // The qualifier hands over a sentence and a proposed calendar name. No
+  // calendar exists yet unless they already owned one, so LINK_ONLY lets the
+  // composer create it on save — carrying the name they picked.
+  function openCreateForQualifier(req: FirstPlanRequest) {
+    if (req.calendar) addOwnedCalendar(req.calendar);
+    setRestore({
+      postTo: req.calendar ? req.calendar.id : LINK_ONLY,
+      prompt: req.prompt,
+      autoDraft: true,
+      calendarNameHint: req.calendarName,
+    });
     setCreateOpen(true);
   }
+  // The plan's calendar only becomes knowable after the refresh that follows
+  // creation — that's where the share link for the popup comes from.
+  const qualifierCreated = useMemo<QualifierCreatedPlan | null>(() => {
+    if (!justCreated?.eventGroupId) return null;
+    const row = data.plans.find((p) => p.id === justCreated.eventGroupId);
+    return {
+      eventGroupId: justCreated.eventGroupId,
+      title: justCreated.title,
+      inviteUrl: justCreated.inviteUrl,
+      calendarShareId: row?.calendarShareId ?? null,
+    };
+  }, [justCreated, data.plans]);
   const nearby = useMemo(
     () => data.plans.map((p) => ({
       id: p.id,
@@ -697,7 +722,7 @@ function DashboardView({
             </h1>
           </div>
 
-          {justCreated && (
+          {justCreated && !qualifierActive && (
             <div className="created" role="status">
               <div>
                 <b>{justCreated.title}</b> is live on your calendar.
@@ -750,10 +775,9 @@ function DashboardView({
           {qualifierActive && (
             <CommunityQualifierCard
               nearby={nearby}
-              createdPlan={justCreated}
+              createdPlan={qualifierCreated}
               preview={data.prompt?.preview === true}
-              onCalendarReady={addOwnedCalendar}
-              onCreatePlan={openCreateOnCalendar}
+              onCreatePlan={openCreateForQualifier}
             />
           )}
 
@@ -843,6 +867,9 @@ function DashboardView({
           onClose={() => { setCreateOpen(false); setRestore(null); }}
           onCreated={(plan) => {
             setJustCreated(plan);
+            // The qualifier owns the success surface on its path — leaving the
+            // composer's own confirmation up would stack two of them.
+            if (qualifierActive) { setCreateOpen(false); setRestore(null); }
             // The new plan belongs in the spine — pull the live payload again.
             onRefresh().catch(() => {});
           }}
@@ -1966,6 +1993,23 @@ const CSS = `
 .leafme .cq-row-s{font-size:11.5px;color:var(--muted);margin-top:2px}
 .leafme .cq-rename{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .leafme .cq-input{font:inherit;font-family:var(--serif);font-size:18px;padding:6px 10px;border:1px solid var(--edge);border-radius:8px;min-width:220px;flex:1}
+.leafme .cq-bar{display:flex;gap:8px;margin-top:14px}
+.leafme .cq-prompt{font:inherit;font-size:13px;padding:12px 14px;border:1px solid var(--edge);border-radius:10px;flex:1;min-width:0;background:var(--paper);color:var(--ink)}
+.leafme .cq-prompt:focus{outline:none;border-color:var(--ink)}
+.leafme .cq-bar .btn{flex:none;font-size:12px;padding:11px 17px}
+.leafme .cq-hint{font-size:11px;color:var(--muted);margin-top:12px;letter-spacing:.02em}
+.leafme .cq-pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+.leafme .cq-pill{font:inherit;font-size:12px;padding:8px 13px;border:1px solid var(--edge);border-radius:999px;background:var(--paper);color:var(--body);cursor:pointer;white-space:nowrap}
+.leafme .cq-pill:hover{border-color:var(--ink);color:var(--ink)}
+.leafme .cq-pill.on{border-color:var(--ink);color:var(--ink);background:var(--recessed)}
+.leafme .cq-pill.skel{width:104px;height:33px;border-style:dashed;opacity:.5;cursor:default}
+.leafme .cq-done-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+@media (max-width:760px){
+  .leafme .cq-bar{display:block}
+  .leafme .cq-bar .btn{width:100%;margin-top:8px;padding:13px 0}
+  .leafme .cq-prompt{width:100%}
+  .leafme .cq-done-acts .btn{width:100%}
+}
 
 /* ---- Right rail ---- */
 .leafme .rail{margin-bottom:24px}

@@ -18,6 +18,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
+import { IMAGE_ACCEPT, processImageFile } from "@/lib/image-utils";
 
 type OfferState =
   | "offered"
@@ -46,6 +47,15 @@ type PlanFacts = {
   planUrl: string;
 };
 
+type Completion = {
+  completedAt: string | null;
+  note: string | null;
+  photoCount: number;
+  photoUrls: string[];
+  payoutStatus: "pending" | "paid" | "held" | null;
+  paidAt: string | null;
+};
+
 type Offer = {
   state: OfferState;
   hostFirstName: string | null;
@@ -53,9 +63,17 @@ type Offer = {
   rateLabel: string;
   expiresAt: string | null;
   jobDescription: string;
+  instructions: string | null;
+  agreement: string;
+  agreementVersion: string;
+  agreedAt: string | null;
   contactEmail: string;
   plan: PlanFacts | null;
   counts: { interested: number; rsvpYes: number };
+  checklistUrl: string | null;
+  planStarted: boolean;
+  planEnded: boolean;
+  completion: Completion | null;
 };
 
 const card =
@@ -113,6 +131,13 @@ export default function HostOfferClient({ token }: { token: string }) {
   const [paypalHandle, setPaypalHandle] = useState("");
   const [paymentSaved, setPaymentSaved] = useState(false);
 
+  const [agreed, setAgreed] = useState(false);
+  const [showAgreement, setShowAgreement] = useState(false);
+
+  const [photos, setPhotos] = useState<{ preview: string; base64: string }[]>([]);
+  const [photoNote, setPhotoNote] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+
   const load = useCallback(async (): Promise<Offer | null> => {
     setLoading(true);
     try {
@@ -133,10 +158,18 @@ export default function HostOfferClient({ token }: { token: string }) {
   }, [load]);
 
   const accept = async () => {
+    if (!agreed) {
+      setError("Please read the hosting agreement and tick the box first.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const r = await Parse.Cloud.run("acceptHostOffer", { token });
+      const r = await Parse.Cloud.run("acceptHostOffer", {
+        token,
+        agreed: true,
+        agreementVersion: offer?.agreementVersion,
+      });
       setPaymentSaved(Boolean(r.hasPaymentDetails));
       setView("done");
       await load();
@@ -196,6 +229,42 @@ export default function HostOfferClient({ token }: { token: string }) {
       setPaymentSaved(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save that.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addPhotos = async (files: FileList | null) => {
+    if (!files) return;
+    setError(null);
+    const room = 5 - photos.length;
+    const picked = Array.from(files).slice(0, Math.max(0, room));
+    try {
+      const processed = await Promise.all(picked.map((f) => processImageFile(f)));
+      setPhotos((prev) => [...prev, ...processed].slice(0, 5));
+    } catch {
+      setError("Couldn't read one of those photos.");
+    }
+  };
+
+  const confirmAttendance = async () => {
+    if (photos.length === 0) {
+      setError("Add at least one photo from the night.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await Parse.Cloud.run("submitHostAttendance", {
+        token,
+        photosBase64: photos.map((p) => p.base64),
+        note: photoNote.trim() || undefined,
+      });
+      setConfirmed(true);
+      setPhotos([]);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't send that.");
     } finally {
       setBusy(false);
     }
@@ -332,6 +401,126 @@ export default function HostOfferClient({ token }: { token: string }) {
             </a>
           )}
         </div>
+
+        {/* After the night: confirm you were there. This is what releases pay. */}
+        {offer.planStarted && (
+          <div className={`${card} mt-6`}>
+            {offer.completion?.completedAt || confirmed ? (
+              <>
+                <h2 className="text-[17px] font-semibold text-leaf-900">
+                  Thanks for hosting.
+                </h2>
+                <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-700">
+                  {offer.completion?.payoutStatus === "paid"
+                    ? `${offer.rateLabel} has been sent${offer.completion?.paidAt ? ` (${new Date(offer.completion.paidAt).toLocaleDateString()})` : ""}.`
+                    : `You confirmed the night${offer.completion?.photoCount ? ` with ${offer.completion.photoCount} photo${offer.completion.photoCount === 1 ? "" : "s"}` : ""}. ${offer.rateLabel} goes out once we've looked it over, usually within a day.`}
+                </p>
+                {offer.completion?.payoutStatus !== "paid" && !paymentSaved && (
+                  <p className="mt-2 text-[14px] text-amber-800">
+                    We still need somewhere to send it — add your PayPal below.
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <h2 className="text-[17px] font-semibold text-leaf-900">
+                  {offer.planEnded ? "How did it go?" : "At the night?"}
+                </h2>
+                <p className="mt-1.5 text-[14px] leading-snug text-zinc-600">
+                  Add a photo or two from the night to confirm you hosted. That
+                  is what releases your {offer.rateLabel.replace(/ for the night$/, "")}.
+                </p>
+                <div className="mt-4 space-y-3">
+                  {photos.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {photos.map((ph, i) => (
+                        <div key={i} className="relative">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={ph.preview}
+                            alt=""
+                            className="h-20 w-20 rounded-lg object-cover border border-zinc-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}
+                            className="absolute -right-1.5 -top-1.5 h-6 w-6 rounded-full bg-zinc-800 text-white text-[12px] leading-6"
+                            aria-label="Remove photo"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {photos.length < 5 && (
+                    <label className={`${btnQuiet} block text-center cursor-pointer`}>
+                      {photos.length === 0 ? "Add a photo" : "Add another"}
+                      <input
+                        type="file"
+                        accept={IMAGE_ACCEPT}
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          addPhotos(e.target.files);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  )}
+                  <textarea
+                    className={inputClass}
+                    rows={2}
+                    placeholder="Anything we should know? (optional)"
+                    value={photoNote}
+                    onChange={(e) => setPhotoNote(e.target.value)}
+                  />
+                  {error && <p className="text-[14px] text-red-700">{error}</p>}
+                  <button
+                    onClick={confirmAttendance}
+                    disabled={busy || photos.length === 0}
+                    className={btnPrimary}
+                  >
+                    {busy ? "Sending…" : "I hosted this night"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {!offer.planStarted && (
+          <div className={`${card} mt-6`}>
+            <h2 className="text-[17px] font-semibold text-leaf-900">
+              Before the night
+            </h2>
+            {offer.checklistUrl && (
+              <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-700">
+                Your{" "}
+                <a href={offer.checklistUrl} className="font-medium text-leaf-800 underline">
+                  host checklist
+                </a>{" "}
+                has what to do before and during, and an assistant to help you
+                write to the group. We&rsquo;ll text you if something there is
+                about to be late.
+              </p>
+            )}
+            {offer.instructions && (
+              <>
+                <p className="mt-3 text-[14px] font-medium text-leaf-900">
+                  For this night
+                </p>
+                <p className="mt-1 whitespace-pre-line text-[14px] leading-relaxed text-zinc-700">
+                  {offer.instructions}
+                </p>
+              </>
+            )}
+            <p className="mt-3 text-[14px] text-zinc-500">
+              A couple of hours after it ends we&rsquo;ll send you a link back
+              here to confirm you hosted and add a photo. That releases your pay.
+            </p>
+          </div>
+        )}
 
         {/* Payment comes AFTER acceptance, never as a gate in front of it. */}
         {!paymentSaved ? (
@@ -524,6 +713,52 @@ export default function HostOfferClient({ token }: { token: string }) {
         </p>
       </div>
 
+      {offer.instructions && (
+        <div className="mt-4 rounded-xl bg-zinc-50 p-4">
+          <p className="text-[14px] font-medium text-leaf-900">
+            For this night
+          </p>
+          <p className="mt-1.5 whitespace-pre-line text-[14px] leading-relaxed text-zinc-700">
+            {offer.instructions}
+          </p>
+        </div>
+      )}
+
+      <div className="mt-4 rounded-xl border border-zinc-200 p-4">
+        <button
+          type="button"
+          onClick={() => setShowAgreement((v) => !v)}
+          className="flex w-full items-center justify-between text-left"
+        >
+          <span className="text-[14px] font-medium text-leaf-900">
+            Hosting agreement
+          </span>
+          <span className="text-[13px] text-zinc-500">
+            {showAgreement ? "Hide" : "Read"}
+          </span>
+        </button>
+        {showAgreement && (
+          <p className="mt-3 max-h-72 overflow-y-auto whitespace-pre-line text-[13px] leading-relaxed text-zinc-700">
+            {offer.agreement}
+          </p>
+        )}
+        <label className="mt-3 flex cursor-pointer items-start gap-3">
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => {
+              setAgreed(e.target.checked);
+              if (e.target.checked) setError(null);
+            }}
+            className="mt-1 h-4 w-4"
+          />
+          <span className="text-[14px] leading-snug text-zinc-700">
+            I&rsquo;ve read the hosting agreement, including the venue rules,
+            conduct and liability terms, and I agree to them.
+          </span>
+        </label>
+      </div>
+
       {error && (
         <div
           role="alert"
@@ -534,7 +769,7 @@ export default function HostOfferClient({ token }: { token: string }) {
       )}
 
       <div className="mt-7 space-y-3">
-        <button onClick={accept} disabled={busy} className={btnPrimary}>
+        <button onClick={accept} disabled={busy || !agreed} className={btnPrimary}>
           {busy ? "One moment…" : "Yes, I can host this"}
         </button>
         <button

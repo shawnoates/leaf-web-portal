@@ -39,14 +39,17 @@ async function fetchPoll(eventGroupId: string): Promise<PollInfo | null> {
   }
 }
 
+// The segment is named `id` (not `eventGroupId`) because the nested
+// /poll/[id]/[pollId] chat-poll route shares it and holds a Firebase
+// session id there — Next requires one slug name per dynamic level.
 type PageProps = {
-  params: Promise<{ eventGroupId: string }>;
+  params: Promise<{ id: string }>;
 };
 
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const { eventGroupId } = await params;
+  const { id: eventGroupId } = await params;
   const info = await fetchPoll(eventGroupId);
 
   if (!info) {
@@ -92,7 +95,7 @@ export async function generateMetadata({
 }
 
 export default async function PollVotePage({ params }: PageProps) {
-  const { eventGroupId } = await params;
+  const { id: eventGroupId } = await params;
   const initial = await fetchPoll(eventGroupId);
   return (
     <PollVoteClient eventGroupId={eventGroupId} initial={initial} />
