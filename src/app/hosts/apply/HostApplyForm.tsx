@@ -224,7 +224,7 @@ export default function HostApplyForm() {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim()))
         return "That email address doesn't look right.";
       if (phone.replace(/\D/g, "").length < 10)
-        return "We need a mobile number — it's how you sign in to the group chat and how we reach you on the night.";
+        return "We need a mobile number — it's how you sign in to the group chat and how we reach you on the day.";
       return null;
     }
     if (i === 1) {
@@ -473,7 +473,7 @@ export default function HostApplyForm() {
 
             <Field
               label="Mobile number"
-              hint="You'll sign in with it to read the group chat, and it's how we reach you on the night."
+              hint="You'll sign in with it to read the group chat, and it's how we reach you on the day."
             >
               <input
                 className={inputClass}

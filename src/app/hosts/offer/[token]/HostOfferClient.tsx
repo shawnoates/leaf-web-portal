@@ -174,7 +174,7 @@ export default function HostOfferClient({ token }: { token: string }) {
     const needsPhone = !offer?.phoneLast4 || changingPhone;
     const digits = phone.replace(/\D/g, "");
     if (needsPhone && digits.length < 10) {
-      setError("Add a mobile number so we can reach you on the night.");
+      setError("Add a mobile number so we can reach you on the day.");
       return;
     }
     setBusy(true);
@@ -266,7 +266,7 @@ export default function HostOfferClient({ token }: { token: string }) {
 
   const confirmAttendance = async () => {
     if (photos.length === 0) {
-      setError("Add at least one photo from the night.");
+      setError("Add at least one photo from the plan.");
       return;
     }
     setBusy(true);
@@ -319,7 +319,7 @@ export default function HostOfferClient({ token }: { token: string }) {
     return (
       <Closed
         title="This one's been filled."
-        body="Thanks for looking. You're still on the list, and we'll come back to you when there's another night near you."
+        body="Thanks for looking. You're still on the list, and we'll come back to you when there's another plan near you."
       />
     );
   }
@@ -334,7 +334,7 @@ export default function HostOfferClient({ token }: { token: string }) {
   if (offer.state === "plan_cancelled") {
     return (
       <Closed
-        title="This night was called off."
+        title="This plan was called off."
         body="Nothing you need to do. We'll be in touch when the next one comes up."
       />
     );
@@ -353,7 +353,7 @@ export default function HostOfferClient({ token }: { token: string }) {
     return (
       <Closed
         title="You're off this one."
-        body="Thanks for telling us early. You're still on the list for future nights."
+        body="Thanks for telling us early. You're still on the list for future plans."
       />
     );
   }
@@ -402,7 +402,7 @@ export default function HostOfferClient({ token }: { token: string }) {
               {p.venueName ? <><br />{p.venueName}</> : null}
               {p.venueAddress ? <><br />{p.venueAddress}</> : null}
               <br />
-              {offer.rateLabel}, paid the same night or the next morning.
+              {offer.rateLabel}, paid within a day of the plan.
             </p>
           )}
           <p className="mt-3 text-[15px] leading-relaxed text-leaf-800">
@@ -430,7 +430,7 @@ export default function HostOfferClient({ token }: { token: string }) {
                 <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-700">
                   {offer.completion?.payoutStatus === "paid"
                     ? `${offer.rateLabel} has been sent${offer.completion?.paidAt ? ` (${new Date(offer.completion.paidAt).toLocaleDateString()})` : ""}.`
-                    : `You confirmed the night${offer.completion?.photoCount ? ` with ${offer.completion.photoCount} photo${offer.completion.photoCount === 1 ? "" : "s"}` : ""}. ${offer.rateLabel} goes out once we've looked it over, usually within a day.`}
+                    : `You confirmed the plan${offer.completion?.photoCount ? ` with ${offer.completion.photoCount} photo${offer.completion.photoCount === 1 ? "" : "s"}` : ""}. ${offer.rateLabel} goes out once we've looked it over, usually within a day.`}
                 </p>
                 {offer.completion?.payoutStatus !== "paid" && !paymentSaved && (
                   <p className="mt-2 text-[14px] text-amber-800">
@@ -441,11 +441,11 @@ export default function HostOfferClient({ token }: { token: string }) {
             ) : (
               <>
                 <h2 className="text-[17px] font-semibold text-leaf-900">
-                  {offer.planEnded ? "How did it go?" : "At the night?"}
+                  {offer.planEnded ? "How did it go?" : "There now?"}
                 </h2>
                 <p className="mt-1.5 text-[14px] leading-snug text-zinc-600">
-                  Add a photo or two from the night to confirm you hosted. That
-                  is what releases your {offer.rateLabel.replace(/ for the night$/, "")}.
+                  Add a photo or two from the plan to confirm you hosted. That
+                  is what releases your {offer.rateLabel.replace(/ for the plan$/, "")}.
                 </p>
                 <div className="mt-4 space-y-3">
                   {photos.length > 0 && (
@@ -498,7 +498,7 @@ export default function HostOfferClient({ token }: { token: string }) {
                     disabled={busy || photos.length === 0}
                     className={btnPrimary}
                   >
-                    {busy ? "Sending…" : "I hosted this night"}
+                    {busy ? "Sending…" : "I hosted this"}
                   </button>
                 </div>
               </>
@@ -527,7 +527,7 @@ export default function HostOfferClient({ token }: { token: string }) {
         {!offer.planStarted && (
           <div className={`${card} mt-6`}>
             <h2 className="text-[17px] font-semibold text-leaf-900">
-              Before the night
+              Before the plan
             </h2>
             {offer.checklistUrl && (
               <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-700">
@@ -543,7 +543,7 @@ export default function HostOfferClient({ token }: { token: string }) {
             {offer.instructions && (
               <>
                 <p className="mt-3 text-[14px] font-medium text-leaf-900">
-                  For this night
+                  For this plan
                 </p>
                 <p className="mt-1 whitespace-pre-line text-[14px] leading-relaxed text-zinc-700">
                   {offer.instructions}
@@ -587,7 +587,7 @@ export default function HostOfferClient({ token }: { token: string }) {
               </button>
               <p className="text-[13px] text-zinc-500">
                 You can do this later if you&rsquo;d rather. It won&rsquo;t
-                affect the night.
+                affect the plan.
               </p>
             </div>
           </div>
@@ -732,7 +732,7 @@ export default function HostOfferClient({ token }: { token: string }) {
             <dd className="mt-0.5 text-[16px] font-medium text-leaf-900">
               {offer.rateLabel}
               <span className="block text-[15px] font-normal text-zinc-600">
-                Paid the same night or the next morning.
+                Paid within a day of the plan.
               </span>
             </dd>
           </div>
@@ -751,7 +751,7 @@ export default function HostOfferClient({ token }: { token: string }) {
       {offer.instructions && (
         <div className="mt-4 rounded-xl bg-zinc-50 p-4">
           <p className="text-[14px] font-medium text-leaf-900">
-            For this night
+            For this plan
           </p>
           <p className="mt-1.5 whitespace-pre-line text-[14px] leading-relaxed text-zinc-700">
             {offer.instructions}
@@ -763,7 +763,7 @@ export default function HostOfferClient({ token }: { token: string }) {
         <p className="text-[14px] font-medium text-leaf-900">Your mobile number</p>
         {offer.phoneLast4 && !changingPhone ? (
           <p className="mt-1.5 text-[14px] leading-snug text-zinc-700">
-            We&rsquo;ll text you about this night at the number ending in{" "}
+            We&rsquo;ll text you about this plan at the number ending in{" "}
             <span className="font-medium">{offer.phoneLast4}</span>, and
             you&rsquo;ll sign in to the group chat with it.{" "}
             <button
@@ -778,7 +778,7 @@ export default function HostOfferClient({ token }: { token: string }) {
           <>
             <p className="mt-1.5 text-[14px] leading-snug text-zinc-600">
               It&rsquo;s how you sign in to the group chat and how we reach you
-              on the night.
+              on the day.
             </p>
             <input
               className={`${inputClass} mt-3`}
@@ -812,7 +812,7 @@ export default function HostOfferClient({ token }: { token: string }) {
               className="mt-1 h-4 w-4"
             />
             <span className="text-[14px] leading-snug text-zinc-700">
-              Text me about this night — reminders and when someone writes in
+              Text me about this plan — reminders and when someone writes in
               the chat. Standard rates apply, reply STOP to stop. Otherwise
               we&rsquo;ll email.
             </span>
