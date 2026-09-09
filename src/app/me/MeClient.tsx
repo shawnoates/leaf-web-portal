@@ -154,7 +154,7 @@ interface Dashboard {
   unreadMessageCount: number;
   ask: { kind: "pattern" | "generic"; copy: string; promptPrefill: string | null } | null;
   // One prompt card at a time, chosen and flag-gated server-side.
-  prompt?: { key: "community_qualifier" } | null;
+  prompt?: { key: "community_qualifier"; preview?: boolean } | null;
 }
 
 type AuthState = "resolving" | "authed" | "needs-otp" | "error";
@@ -254,6 +254,15 @@ function markHostRequestsFetched() {
     const today = new Date().toISOString().split("T")[0];
     localStorage.setItem("leaf_host_requests_fetch_date", today);
   } catch { /* quota / storage disabled */ }
+}
+
+/** Admin design preview: /me?preview=qualifier forces the community qualifier
+ *  card. The server verifies is_admin and writes nothing in this mode. */
+function previewPrompt(): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("preview") === "qualifier"
+    ? "community_qualifier"
+    : null;
 }
 
 function getCachedDashboard(): Dashboard | null {
@@ -374,7 +383,8 @@ export default function MeClient() {
 
   const fetchDashboard = useCallback(async () => {
     try {
-      const res = (await Parse.Cloud.run("getMeDashboard", {})) as Dashboard;
+      const pp = previewPrompt();
+      const res = (await Parse.Cloud.run("getMeDashboard", pp ? { previewPrompt: pp } : {})) as Dashboard;
       setData(res);
       cacheDashboard(res);
       markHostRequestsFetched();
@@ -416,7 +426,7 @@ export default function MeClient() {
         if (cancelled) return;
         if (current) {
           fetchedRef.current = true;
-          if (shouldFetchHostRequests()) {
+          if (shouldFetchHostRequests() || previewPrompt()) {
             await fetchDashboard();
           } else {
             // Use cached dashboard from earlier today if available
@@ -741,6 +751,7 @@ function DashboardView({
             <CommunityQualifierCard
               nearby={nearby}
               createdPlan={justCreated}
+              preview={data.prompt?.preview === true}
               onCalendarReady={addOwnedCalendar}
               onCreatePlan={openCreateOnCalendar}
             />

@@ -37,8 +37,8 @@ function writeStored(s: Stored | null) {
   } catch { /* storage disabled */ }
 }
 
-function track(event: "rendered" | "step", step?: Step, answerKey?: string) {
-  Parse.Cloud.run("recordCommunityQualifierEvent", { event, step, answerKey }).catch(() => {});
+function track(event: "rendered" | "step", step?: Step, answerKey?: string, preview = false) {
+  Parse.Cloud.run("recordCommunityQualifierEvent", { event, step, answerKey, preview }).catch(() => {});
 }
 
 type Phase =
@@ -49,12 +49,14 @@ type Phase =
   | { kind: "error" };
 
 export default function CommunityQualifierCard({
-  nearby, createdPlan, onCalendarReady, onCreatePlan,
+  nearby, createdPlan, preview = false, onCalendarReady, onCreatePlan,
 }: {
   /** Upcoming plans on calendars this person follows — the 7.1 redirect. */
   nearby: NearbyPlan[];
   /** Set by the parent once the composer has created a plan. */
   createdPlan: QualifierCreatedPlan | null;
+  /** Admin design preview — the server records nothing and creates nothing. */
+  preview?: boolean;
   onCalendarReady: (cal: QualifierCalendar) => void;
   onCreatePlan: (cal: QualifierCalendar) => void;
 }) {
@@ -66,8 +68,8 @@ export default function CommunityQualifierCard({
   useEffect(() => {
     if (renderedRef.current) return;
     renderedRef.current = true;
-    track("rendered");
-  }, []);
+    track("rendered", undefined, undefined, preview);
+  }, [preview]);
 
   // First plan landed while we were on the ready screen. The done screen is
   // derived from `createdPlan` at render time; this only stamps the server.
@@ -75,8 +77,8 @@ export default function CommunityQualifierCard({
   useEffect(() => {
     if (!finishedPlan?.eventGroupId || firstPlanRef.current === finishedPlan.eventGroupId) return;
     firstPlanRef.current = finishedPlan.eventGroupId;
-    Parse.Cloud.run("recordCommunityQualifierFirstPlan", { eventGroupId: finishedPlan.eventGroupId }).catch(() => {});
-  }, [finishedPlan]);
+    Parse.Cloud.run("recordCommunityQualifierFirstPlan", { eventGroupId: finishedPlan.eventGroupId, preview }).catch(() => {});
+  }, [finishedPlan, preview]);
 
   function advance(next: Stored) {
     setStored(next);
@@ -92,7 +94,7 @@ export default function CommunityQualifierCard({
         lat: d.lat, lng: d.lng, fallback: d.fallback,
       };
       const res = (await Parse.Cloud.run("completeCommunityQualifier", {
-        q1: answers.q1, q2: answers.q2, q3: answers.q3, cityHint,
+        q1: answers.q1, q2: answers.q2, q3: answers.q3, cityHint, preview,
       })) as CompleteResult;
       writeStored(null);
       if (res.route === "unqualified" || !res.calendar) {
@@ -107,17 +109,17 @@ export default function CommunityQualifierCard({
   }
 
   function answer1(k: Q1Key) {
-    track("step", 1, k);
+    track("step", 1, k, preview);
     const next: Stored = { step: k === "yes" ? 2 : 1, q1: k };
     if (k === "not_really") { advance(next); complete(next); return; }
     advance(next);
   }
   function answer2(k: Q2Key) {
-    track("step", 2, k);
+    track("step", 2, k, preview);
     advance({ ...stored, step: 3, q2: k });
   }
   function answer3(k: Q3Key) {
-    track("step", 3, k);
+    track("step", 3, k, preview);
     const next: Stored = { ...stored, step: 3, q3: k };
     advance(next);
     complete(next);
