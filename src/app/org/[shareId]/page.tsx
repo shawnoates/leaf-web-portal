@@ -1536,6 +1536,8 @@ export default function OrgCalendarPage() {
   // Which AI event index (if any) the visitor tapped Host This on.
   // Non-null → confirmation modal is open for that event.
   const [hostThisEventIndex, setHostThisEventIndex] = useState<number | null>(null);
+  // ?aiEvent= landing popup — the starter-card twin of popupIdea.
+  const [popupAiEventIndex, setPopupAiEventIndex] = useState<number | null>(null);
   const [hostThisSubmitting, setHostThisSubmitting] = useState(false);
   // Note from Host for the Host This flow. Deliberately NOT the `hostNote`
   // state above — that one belongs to the custom-plan / plan-idea modals and
@@ -2040,6 +2042,27 @@ export default function OrgCalendarPage() {
     }
   }, [shareId]);
 
+  // Starter cards (aiSourceEvents) have no row id at all — the link carries
+  // the event's uid when it has one (stable across admin reorders), else its
+  // array index. The ?aiEvent= landing resolves either.
+  const handleShareAiEvent = useCallback(
+    async (ev: NonNullable<OrgData["aiSourceEvents"]>[number], originalIndex: number) => {
+      const key = typeof ev.uid === "string" && ev.uid ? ev.uid : String(originalIndex);
+      const url = `${SITE_URL}/org/${shareId}?aiEvent=${encodeURIComponent(key)}`;
+      const copyKey = `ai-${originalIndex}`;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: ev.title || ev.name, url });
+        } catch { /* user cancelled */ }
+      } else {
+        await navigator.clipboard.writeText(url);
+        setCopiedPlanId(copyKey);
+        setTimeout(() => setCopiedPlanId(null), 2000);
+      }
+    },
+    [shareId],
+  );
+
   async function loadHostNotificationId(eventGroupId: string) {
     // The attendee list itself is rendered on the dedicated /h/{id} page —
     // here we only need the host's notification id so the "Message Attendees"
@@ -2189,7 +2212,8 @@ export default function OrgCalendarPage() {
     if (org.rsvpLimitReached) return;
     // A ?idea= arrival owns the popup; re-running here after a refetch would
     // swap the linked suggestion for a random one mid-view.
-    if (new URLSearchParams(window.location.search).get("idea")) return;
+    const landing = new URLSearchParams(window.location.search);
+    if (landing.get("idea") || landing.get("aiEvent")) return;
     const dismissKey = `leaf_idea_popup_dismiss_${org.objectId}`;
     try {
       const dismissed = localStorage.getItem(dismissKey);
@@ -2586,6 +2610,8 @@ export default function OrgCalendarPage() {
   const [planQueryId, setPlanQueryId] = useState<string | null>(null);
   // ?idea= counterpart — set by the same param effect, consumed below.
   const [ideaQueryId, setIdeaQueryId] = useState<string | null>(null);
+  // ?aiEvent={uid | index} — starter-card share link.
+  const [aiEventQueryKey, setAiEventQueryKey] = useState<string | null>(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const search = new URLSearchParams(window.location.search);
@@ -2595,6 +2621,8 @@ export default function OrgCalendarPage() {
     // texts (PlansManager's "Ask" button), pointing at one suggestion.
     const ideaParam = search.get("idea");
     if (ideaParam) setIdeaQueryId(ideaParam);
+    const aiEventParam = search.get("aiEvent");
+    if (aiEventParam) setAiEventQueryKey(aiEventParam);
     if (search.get("welcome") === "1") setShowWelcomeInvite(true);
 
     // Auto-open the custom-plan ("Suggest the next one") form when arriving
@@ -2696,6 +2724,31 @@ export default function OrgCalendarPage() {
     setPopupIdea(match);
     setShowPlanIdeaPopup(true);
   }, [org, ideaQueryId]);
+
+  // Same landing for starter cards. uid first, then the positional fallback
+  // for rows minted before uids existed. Hosted/dismissed/undated rows are
+  // exactly what the stream hides, so they read as "no longer open" here too.
+  const autoOpenedAiEventRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!org || !aiEventQueryKey) return;
+    if (autoOpenedAiEventRef.current === aiEventQueryKey) return;
+    autoOpenedAiEventRef.current = aiEventQueryKey;
+    const events = org.aiSourceEvents || [];
+    let idx = events.findIndex((e) => e.uid === aiEventQueryKey);
+    if (idx < 0 && /^\d+$/.test(aiEventQueryKey)) idx = Number(aiEventQueryKey);
+    const ev = events[idx];
+    const open =
+      !!ev &&
+      !(org.hostedAiEventIndexes || []).includes(idx) &&
+      !(org.dismissedAiEventIndexes || []).includes(idx) &&
+      resolveAIEventDate(ev, org.orgTimezone ?? null).date !== null;
+    if (!open) {
+      setToast("That suggestion is no longer open — someone may have hosted it.");
+      setTimeout(() => setToast(null), 5000);
+      return;
+    }
+    setPopupAiEventIndex(idx);
+  }, [org, aiEventQueryKey]);
 
   // Keep the open detail modal in sync with the live plans list. `selectedEvent`
   // is a frozen snapshot taken when the card was clicked, so any later
@@ -4069,7 +4122,15 @@ export default function OrgCalendarPage() {
                                     </button>
                                   );
                                 })()}
-                                                              </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleShareAiEvent(ev, originalIndex)}
+                                  className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
+                                >
+                                  {copiedPlanId === `ai-${originalIndex}` ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                                  <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </article>
