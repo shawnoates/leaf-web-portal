@@ -6300,6 +6300,96 @@ export default function OrgCalendarPage() {
         </div>
       )}
 
+      {/* Starter-card landing popup (?aiEvent=). Same shell as the plan-idea
+          popup above; host and interest route through the starter-card
+          handlers since these rows have no CalendarGeneratedPlan behind them. */}
+      {popupAiEventIndex !== null && org && (() => {
+        const ev = org.aiSourceEvents?.[popupAiEventIndex];
+        if (!ev) return null;
+        const idx = popupAiEventIndex;
+        const canHost = org.isOwner || org.isHost || !!org.allowFollowersToHost;
+        const count =
+          aiInterestCounts[idx] ?? org.aiSourceEventInterests?.[idx] ?? 0;
+        const interested = aiLocallyInterested.has(idx);
+        const pending = aiInterestPending.has(idx);
+        const resolvedDate = resolveAIEventDate(ev, org.orgTimezone ?? null).date;
+        const kicker = resolvedDate
+          ? `${formatDate(resolvedDate.toISOString(), FLOATING_EVENT_TZ)} · ${formatTime(resolvedDate.toISOString(), FLOATING_EVENT_TZ)}`
+          : ev.time || null;
+        const close = () => setPopupAiEventIndex(null);
+        return (
+          <div
+            className="fixed bottom-6 right-6 left-6 md:left-auto md:w-80 z-40"
+            style={{ animation: "slideUp 0.3s ease-out" }}
+          >
+            <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 overflow-hidden">
+              <button
+                onClick={close}
+                className="absolute top-3 right-3 z-10 p-1 text-zinc-300 hover:text-zinc-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              {ev.imageUrl && (
+                <div className="h-28 w-full overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={ev.imageUrl} alt="" className="w-full h-full object-cover" />
+                </div>
+              )}
+              <div className="p-4">
+                {kicker && (
+                  <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold mb-1.5">
+                    {kicker}
+                  </p>
+                )}
+                <h4 className="text-sm font-medium tracking-tight text-zinc-900 mb-1 pr-6">
+                  {ev.title || ev.name}
+                </h4>
+                {(ev.description || ev.venueLine) && (
+                  <p className="text-xs text-zinc-500 font-light leading-relaxed mb-3 line-clamp-3">
+                    {ev.description || ev.venueLine}
+                  </p>
+                )}
+                <div className="space-y-2">
+                  {canHost && (
+                    <button
+                      onClick={() => {
+                        close();
+                        setHostThisNote("");
+                        setHostThisEventIndex(idx);
+                      }}
+                      className="w-full py-2.5 text-xs font-bold uppercase tracking-widest text-white rounded-lg transition-opacity hover:opacity-90"
+                      style={{ backgroundColor: org.brandColor || "#18181b" }}
+                    >
+                      Host This Plan
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleAIEventInterest(idx)}
+                    disabled={interested || pending}
+                    className={`w-full py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg border flex items-center justify-center gap-2 transition-colors disabled:cursor-default ${interested ? "bg-emerald-50 border-emerald-300 text-emerald-700" : "border-zinc-200 text-zinc-700 hover:border-zinc-300"}`}
+                  >
+                    {pending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Heart className="w-4 h-4" fill={interested ? "currentColor" : "none"} />
+                    )}
+                    {interested ? "You're interested" : "I'm interested"}
+                    {count > 0 && <span className="text-[11px] font-normal">· {count}</span>}
+                  </button>
+                </div>
+                <button
+                  onClick={close}
+                  className="w-full mt-2 py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors"
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Toast. z-[60] because the modals below are z-50 and render LATER in
           the DOM — at equal z-index they painted over the toast, so every
           error surfaced inside an open modal was invisible and the failure
