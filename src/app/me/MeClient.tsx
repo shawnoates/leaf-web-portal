@@ -241,27 +241,6 @@ function directionsUrl(plan: Plan): string | null {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}`;
 }
 
-// Check if host requests were already fetched today.
-function shouldFetchHostRequests(): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    const stored = localStorage.getItem("leaf_host_requests_fetch_date");
-    if (!stored) return true;
-    const today = new Date().toISOString().split("T")[0];
-    return stored !== today;
-  } catch {
-    return true;
-  }
-}
-
-function markHostRequestsFetched() {
-  if (typeof window === "undefined") return;
-  try {
-    const today = new Date().toISOString().split("T")[0];
-    localStorage.setItem("leaf_host_requests_fetch_date", today);
-  } catch { /* quota / storage disabled */ }
-}
-
 /** Admin design preview: /me?preview=qualifier forces the community qualifier
  *  card. The server verifies is_admin and writes nothing in this mode. */
 function previewPrompt(): string | null {
@@ -384,7 +363,6 @@ export default function MeClient() {
   const [authState, setAuthState] = useState<AuthState>("resolving");
   const [data, setData] = useState<Dashboard | null>(null);
   const [loadError, setLoadError] = useState("");
-  const fetchedRef = useRef(false);
   const trackedRef = useRef(false);
 
   const fetchDashboard = useCallback(async () => {
@@ -393,7 +371,6 @@ export default function MeClient() {
       const res = (await Parse.Cloud.run("getMeDashboard", pp ? { previewPrompt: pp } : {})) as Dashboard;
       setData(res);
       cacheDashboard(res);
-      markHostRequestsFetched();
     } catch (e: unknown) {
       setLoadError(e instanceof Error ? e.message : "Couldn't load your plans.");
     }
@@ -431,14 +408,12 @@ export default function MeClient() {
         const current = Parse.User.current();
         if (cancelled) return;
         if (current) {
-          fetchedRef.current = true;
-          if (shouldFetchHostRequests() || previewPrompt()) {
-            await fetchDashboard();
-          } else {
-            // Use cached dashboard from earlier today if available
-            const cached = getCachedDashboard();
-            if (cached && !cancelled) setData(cached);
-          }
+          // Stale-while-revalidate: paint the last payload instantly, then
+          // always replace it with the live one so plans removed elsewhere
+          // (admin delete, app cancel) never linger.
+          const cached = previewPrompt() ? null : getCachedDashboard();
+          if (cached && !cancelled) { setData(cached); setAuthState("authed"); }
+          await fetchDashboard();
           if (!cancelled) setAuthState("authed");
         } else {
           setAuthState("needs-otp");
@@ -468,11 +443,11 @@ export default function MeClient() {
   } else if (authState === "error") {
     body = <div className="lm-center"><p className="lm-muted">Something went wrong. Tap your link again.</p></div>;
   } else if (authState === "needs-otp") {
-    body = <OtpModal onVerified={async () => { fetchedRef.current = true; await fetchDashboard(); setAuthState("authed"); }} />;
-  } else if (loadError) {
-    body = <div className="lm-center"><p className="lm-muted">{loadError}</p></div>;
+    body = <OtpModal onVerified={async () => { await fetchDashboard(); setAuthState("authed"); }} />;
   } else if (data) {
     body = <DashboardView data={data} onRsvp={onRsvp} onRefresh={fetchDashboard} />;
+  } else if (loadError) {
+    body = <div className="lm-center"><p className="lm-muted">{loadError}</p></div>;
   }
 
   // firstName is the server's full_name/name/first_name chain, so empty means
