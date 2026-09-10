@@ -496,6 +496,36 @@ export default function HomeTab({
       </div>,
     );
   }
+  // Change requests from hosts who can't edit from the app. Opening the plan
+  // shows the note above the title with Edit / Dismiss.
+  for (const calendar of dashboard.calendars) {
+    for (const plan of calendar.activePlans ?? []) {
+      const cr = plan.changeRequest;
+      if (!cr) continue;
+      needsYouRows.push(
+        <div
+          key={`change-request-${plan.objectId}`}
+          className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
+        >
+          <div className="flex-1 min-w-[180px]">
+            <p className="text-[13px] font-medium text-zinc-900">
+              {plan.title} — <span className="text-amber-700">change requested</span>
+            </p>
+            <p className="text-[11px] text-zinc-500 mt-0.5 line-clamp-2">
+              {cr.requestedByName}: &ldquo;{cr.note}&rdquo;
+              {dashboard.calendars.length > 1 ? ` · ${calendar.name}` : ""}
+            </p>
+          </div>
+          <button
+            onClick={() => onOpenPlan(plan)}
+            className="px-3.5 py-1.5 min-h-[30px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0"
+          >
+            Open plan
+          </button>
+        </div>,
+      );
+    }
+  }
   for (const req of dashboard.pendingRsvpRequests) {
     needsYouRows.push(
       <div

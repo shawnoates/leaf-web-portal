@@ -5,7 +5,7 @@ export type BuildingIntroAnswer = "yes" | "declined" | "no" | "unsure";
 export type BuildingIntroChannel = "newsletter" | "chat_group" | "online_board" | "physical_board";
 
 export const COPY = {
-  prompt: "Does your apartment building have a resident newsletter, chat group or an online or physical bulletin board?",
+  prompt: "Do you live in a building with a resident newsletter, chat group or an online or physical bulletin board?",
   options: [
     { key: "yes", label: "Yes, at least one" },
     { key: "declined", label: "Yes, but I'd rather not ask" },

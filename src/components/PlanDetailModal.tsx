@@ -57,6 +57,12 @@ export type PlanDetailData = {
    *  modal exposes a "Cancel future occurrences" action that stops further
    *  materialization without touching already-created instances. */
   planSeriesId?: string | null;
+  /** Pending note from a host who can't edit from the app (requestPlanChange). */
+  changeRequest?: {
+    note: string;
+    requestedByName: string;
+    requestedAt: string;
+  } | null;
 };
 
 type PollOptionDetail = { date: string; time: string | null; count: number };
@@ -234,6 +240,23 @@ export default function PlanDetailModal({
     onDuplicate(plan, pollOptions);
   };
 
+  // Local copy so Dismiss hides the banner immediately; the parent refetch
+  // (onChanged) reconciles the row in Needs You.
+  const [changeRequest, setChangeRequest] = useState(plan.changeRequest ?? null);
+  const [dismissingChangeRequest, setDismissingChangeRequest] = useState(false);
+  const dismissChangeRequest = async () => {
+    setDismissingChangeRequest(true);
+    try {
+      await Parse.Cloud.run("resolvePlanChangeRequest", { eventGroupId: plan.objectId });
+      setChangeRequest(null);
+      onChanged();
+    } catch (err) {
+      console.error("resolvePlanChangeRequest failed", err);
+    } finally {
+      setDismissingChangeRequest(false);
+    }
+  };
+
   const handleEdit = () => {
     if (plan.isPoll) {
       const closesAtYmd = plan.pollClosesAt
@@ -376,6 +399,41 @@ export default function PlanDetailModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 md:p-16 space-y-12">
+          {changeRequest && (
+            <div className="border border-amber-200 bg-amber-50 rounded-xl p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <MessageCircle className="w-4 h-4 text-amber-700 mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-amber-800">
+                    Change requested by {changeRequest.requestedByName}
+                    <span className="font-normal normal-case tracking-normal text-amber-700">
+                      {" · "}
+                      {new Date(changeRequest.requestedAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </p>
+                  <p className="text-sm text-zinc-900 mt-1 whitespace-pre-wrap">{changeRequest.note}</p>
+                </div>
+              </div>
+              <div className="flex gap-2 pl-7">
+                <button
+                  onClick={handleEdit}
+                  className="px-3.5 py-1.5 min-h-[30px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
+                >
+                  Edit plan
+                </button>
+                <button
+                  onClick={dismissChangeRequest}
+                  disabled={dismissingChangeRequest}
+                  className="px-3.5 py-1.5 min-h-[30px] text-zinc-600 rounded-full text-xs font-medium hover:text-zinc-900 transition-colors disabled:opacity-50"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
           <div className="space-y-4">
             <h2 className="text-4xl md:text-5xl font-light tracking-tighter">
               {plan.title}

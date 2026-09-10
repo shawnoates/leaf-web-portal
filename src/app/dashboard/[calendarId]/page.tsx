@@ -1469,11 +1469,16 @@ export default function OrgDashboardPage() {
 
   // Mirrors HomeTab's NEEDS YOU rows: the four actionable queues plus the
   // never-RSVP'd nudge row, so the sidebar badge matches the section.
+  const changeRequestCount = dashboard.calendars.reduce(
+    (n, c) => n + (c.activePlans ?? []).filter((p) => p.changeRequest).length,
+    0,
+  );
   const needsYouCount =
     dashboard.hostRequests.length +
     dashboard.pendingRsvpRequests.length +
     dashboard.pendingFollowers.length +
     eventApprovals.length +
+    changeRequestCount +
     (neverRsvpdCount > 0 ? 1 : 0);
 
   // ── Shared fragments ──
@@ -2950,6 +2955,7 @@ export default function OrgDashboardPage() {
             hideVenueUntilRsvp: selectedActivePlan.hideVenueUntilRsvp,
             requireApproval: selectedActivePlan.requireApproval,
             planSeriesId: selectedActivePlan.planSeriesId,
+            changeRequest: selectedActivePlan.changeRequest ?? null,
           }}
           calendarId={selectedActivePlan.calendarId || calendarId}
           onClose={() => setSelectedActivePlan(null)}

@@ -28,6 +28,16 @@ export interface CalActivePlan {
   hideVenueUntilRsvp?: boolean;
   requireApproval?: boolean;
   planSeriesId?: string | null;
+  /** A host who can't edit from the app asked for a change (requestPlanChange).
+   *  Cleared when the owner edits the plan or dismisses it. */
+  changeRequest?: PlanChangeRequest | null;
+}
+
+export interface PlanChangeRequest {
+  note: string;
+  requestedBy: string;
+  requestedByName: string;
+  requestedAt: string;
 }
 
 export interface OrgDashboardCalendar {
