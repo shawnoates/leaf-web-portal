@@ -18,7 +18,7 @@ import { featuredWallClockDate } from "@/lib/wall-clock";
 // cards at the wrong hour (and, near midnight, the wrong week).
 import { resolveAIEventDate, FLOATING_EVENT_TZ } from "@/lib/ai-event-date";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
-import { Calendar, Camera, Check, ImagePlus, Link2, Lock, MessageCircle, Plus, RefreshCw, Repeat, Settings, Sparkles, UserCheck, Users, X } from "lucide-react";
+import { Calendar, Camera, Check, ImagePlus, Link2, Lock, MessageCircle, Pencil, Plus, RefreshCw, Repeat, Settings, Sparkles, UserCheck, Users, X } from "lucide-react";
 
 // Renders a plan cover image with a Calendar-icon placeholder fallback when
 // the src is missing OR 404s (attendee-uploaded / expired signed URLs go
@@ -412,12 +412,14 @@ function IdeaCard({
 function AIStarterCard({
   plan,
   onClick,
+  onEdit,
   onDelete,
   onCopyLink,
   linkCopied,
 }: {
   plan: UpcomingPlan;
   onClick: () => void;
+  onEdit: () => void;
   onDelete: () => void;
   onCopyLink?: () => void;
   linkCopied?: boolean;
@@ -510,6 +512,18 @@ function AIStarterCard({
           style={{ backdropFilter: "blur(4px)" }}
         >
           <X className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          aria-label={`Edit suggestion ${plan.title}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+          className="absolute top-2 right-9 p-1 rounded-full bg-white/85 text-zinc-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 hover:bg-white hover:text-zinc-900 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+          style={{ backdropFilter: "blur(4px)" }}
+        >
+          <Pencil className="w-3.5 h-3.5" />
         </button>
       </div>
       <div className="p-3">
@@ -661,6 +675,9 @@ export default function PlansManager({
   // Edit-the-suggestion modal (server: updatePlanIdea). Distinct from hosting —
   // this refines the suggestion in place; it never creates a live plan.
   const [editingIdea, setEditingIdea] = useState<PlanIdea | null>(null);
+  // Same editor, different backing row: a starter card (Groups.aiSourceEvents
+  // entry, server: updateAiSourceEvent). Only one of the two is ever set.
+  const [editingStarter, setEditingStarter] = useState<UpcomingPlan | null>(null);
   const [ideaEditForm, setIdeaEditForm] = useState<{ title: string; description: string; date: string; time: string; image: string | null }>({
     title: "",
     description: "",
@@ -1147,29 +1164,102 @@ export default function PlansManager({
 
   // Edit the SUGGESTION itself (server: updatePlanIdea). Unlike hosting, this
   // keeps it a "Needs a host" idea — no live plan is created.
-  function openIdeaEditor(idea: PlanIdea) {
-    const spread = spreadDateOf(idea);
-    setIdeaEditForm({
-      title: idea.title,
-      description: idea.description,
-      date: spread ? spread.toISOString().split("T")[0] : "",
-      time: idea.preferredTime ?? "",
-      image: idea.image,
-    });
+  function primeIdeaEditor(form: { title: string; description: string; date: string; time: string; image: string | null }) {
+    setIdeaEditForm(form);
     setIdeaImagePreview(null);
     setIdeaImageBase64(null);
     setIdeaEditError(null);
-    setEditingIdea(idea);
     // Alternative covers for this suggestion, keyed off its title — same
     // Unsplash source the create-plan modal uses.
     setIdeaUnsplashPhotos([]);
-    const query = idea.title.trim();
+    const query = form.title.trim();
     if (query.length >= 3) {
       setIdeaUnsplashLoading(true);
       Parse.Cloud.run("searchUnsplashPhotos", { query })
         .then((results: { id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]) => setIdeaUnsplashPhotos(results || []))
         .catch(() => setIdeaUnsplashPhotos([]))
         .finally(() => setIdeaUnsplashLoading(false));
+    }
+  }
+
+  function closeIdeaEditor() {
+    setEditingIdea(null);
+    setEditingStarter(null);
+  }
+
+  function openIdeaEditor(idea: PlanIdea) {
+    const spread = spreadDateOf(idea);
+    primeIdeaEditor({
+      title: idea.title,
+      description: idea.description,
+      date: spread ? spread.toISOString().split("T")[0] : "",
+      time: idea.preferredTime ?? "",
+      image: idea.image,
+    });
+    setEditingStarter(null);
+    setEditingIdea(idea);
+  }
+
+  // `expiryDate` on a starter is the FLOATING wall clock stamped Z, so its
+  // UTC date/time substrings are exactly the wall-clock the editor should show.
+  function openStarterEditor(plan: UpcomingPlan) {
+    primeIdeaEditor({
+      title: plan.title,
+      description: plan.description || "",
+      date: plan.expiryDate.slice(0, 10),
+      time: plan.expiryDate.slice(11, 16),
+      image: plan.image,
+    });
+    setEditingIdea(null);
+    setEditingStarter(plan);
+  }
+
+  async function handleSaveStarterEdit() {
+    if (!editingStarter || typeof editingStarter.aiEventIndex !== "number") return;
+    if (!ideaEditForm.title.trim()) {
+      setIdeaEditError("Title is required.");
+      return;
+    }
+    setIdeaEditBusy(true);
+    setIdeaEditError(null);
+    try {
+      const res = await Parse.Cloud.run("updateAiSourceEvent", {
+        calendarId,
+        eventIndex: editingStarter.aiEventIndex,
+        eventUid: editingStarter.aiEventUid || undefined,
+        title: ideaEditForm.title.trim(),
+        description: ideaEditForm.description.trim(),
+        date: ideaEditForm.date || undefined,
+        time: ideaEditForm.time || undefined,
+        imageBase64: ideaImageBase64 || undefined,
+        imageUrl: !ideaImageBase64 && ideaEditForm.image !== editingStarter.image
+          ? ideaEditForm.image || undefined
+          : undefined,
+      });
+      const ev = res?.event as { title?: string | null; name: string; description?: string | null; imageUrl?: string | null; isoDatetime?: string | null; time: string } | undefined;
+      if (ev) {
+        const index = editingStarter.aiEventIndex;
+        setAiStarterPlans((prev) =>
+          prev.map((p) =>
+            p.aiEventIndex === index
+              ? {
+                  ...p,
+                  title: ev.title || ev.name,
+                  description: ev.description || "",
+                  image: ev.imageUrl || null,
+                  expiryDate: ev.isoDatetime || p.expiryDate,
+                  time: ev.time,
+                }
+              : p,
+          ),
+        );
+      }
+      setEditingStarter(null);
+    } catch (err) {
+      console.error("Failed to update starter suggestion:", err);
+      setIdeaEditError(err instanceof Error ? err.message : "Failed to save changes.");
+    } finally {
+      setIdeaEditBusy(false);
     }
   }
 
@@ -1747,6 +1837,7 @@ export default function PlansManager({
                     <AIStarterCard
                       key={`ai-${item.plan.objectId}`}
                       plan={item.plan}
+                      onEdit={() => openStarterEditor(item.plan)}
                       onDelete={() => handleDismissAiStarter(item.plan)}
                       onCopyLink={
                         calendarShareId && item.plan.aiEventIndex !== undefined
@@ -1830,10 +1921,10 @@ export default function PlansManager({
 
       {/* Edit-the-suggestion modal — refines the CalendarGeneratedPlan idea in
           place (server: updatePlanIdea). Never publishes a live plan. */}
-      {editingIdea && (
+      {(editingIdea || editingStarter) && (
         <div
           className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4"
-          onClick={() => { if (!ideaEditBusy) setEditingIdea(null); }}
+          onClick={() => { if (!ideaEditBusy) closeIdeaEditor(); }}
         >
           <div
             className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto"
@@ -1843,7 +1934,7 @@ export default function PlansManager({
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-semibold">Edit suggestion</h3>
                 <button
-                  onClick={() => { if (!ideaEditBusy) setEditingIdea(null); }}
+                  onClick={() => { if (!ideaEditBusy) closeIdeaEditor(); }}
                   className="p-1 text-zinc-400 hover:text-zinc-700 transition-colors"
                   aria-label="Close"
                 >
@@ -1973,14 +2064,14 @@ export default function PlansManager({
               {ideaEditError && <p className="text-xs text-red-500">{ideaEditError}</p>}
               <div className="flex gap-2 pt-1">
                 <button
-                  onClick={() => setEditingIdea(null)}
+                  onClick={closeIdeaEditor}
                   disabled={ideaEditBusy}
                   className="flex-1 border border-zinc-200 rounded-lg py-2 text-sm font-medium text-zinc-600 hover:border-zinc-400 transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleSaveIdeaEdit}
+                  onClick={editingStarter ? handleSaveStarterEdit : handleSaveIdeaEdit}
                   disabled={ideaEditBusy}
                   className="flex-1 bg-zinc-900 text-white rounded-lg py-2 text-sm font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
