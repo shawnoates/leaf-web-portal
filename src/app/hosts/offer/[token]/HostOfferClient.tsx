@@ -409,6 +409,11 @@ export default function HostOfferClient({ token }: { token: string }) {
             Your photo and description are on the plan page now, so people know
             who to look for.
           </p>
+          {offer.checklistUrl && !offer.planStarted && (
+            <a href={offer.checklistUrl} className={`${btnPrimary} mt-4 block text-center`}>
+              Open your host checklist
+            </a>
+          )}
           {p && (
             <a
               href={p.planUrl}
