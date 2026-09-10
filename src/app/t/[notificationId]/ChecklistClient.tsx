@@ -11,6 +11,7 @@ import {
   Send,
 } from "lucide-react";
 import Parse from "@/lib/parse-client";
+import { renderLinkedText } from "@/lib/linkify";
 
 export type HostTask = {
   id: string;
@@ -224,7 +225,7 @@ function Row({
 
           {task.detail && !done && (
             <span className="block text-[13px] text-zinc-500 mt-0.5 leading-relaxed">
-              {task.detail}
+              {renderLinkedText(task.detail, { hostOnly: true })}
             </span>
           )}
 
