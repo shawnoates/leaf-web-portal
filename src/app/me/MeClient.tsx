@@ -10,6 +10,7 @@ import CommunityQualifierCard, {
   type QualifierCreatedPlan,
   type FirstPlanRequest,
 } from "./CommunityQualifierCard";
+import BuildingIntroCard, { type BuildingIntroPrompt } from "./BuildingIntroCard";
 import RecapPopup from "@/components/recap/RecapPopup";
 import NamePrompt from "@/components/NamePrompt";
 import { setVerifiedUserCookie } from "@/lib/verified-user";
@@ -160,7 +161,7 @@ interface Dashboard {
   unreadMessageCount: number;
   ask: { kind: "pattern" | "generic"; copy: string; promptPrefill: string | null } | null;
   // One prompt card at a time, chosen and flag-gated server-side.
-  prompt?: { key: "community_qualifier"; preview?: boolean } | null;
+  prompt?: { key: "community_qualifier"; preview?: boolean } | BuildingIntroPrompt | null;
 }
 
 type AuthState = "resolving" | "authed" | "needs-otp" | "error";
@@ -242,12 +243,14 @@ function directionsUrl(plan: Plan): string | null {
 }
 
 /** Admin design preview: /me?preview=qualifier forces the community qualifier
- *  card. The server verifies is_admin and writes nothing in this mode. */
+ *  card, /me?preview=building the building intro card. The server verifies
+ *  is_admin and writes nothing in this mode. */
 function previewPrompt(): string | null {
   if (typeof window === "undefined") return null;
-  return new URLSearchParams(window.location.search).get("preview") === "qualifier"
-    ? "community_qualifier"
-    : null;
+  const v = new URLSearchParams(window.location.search).get("preview");
+  if (v === "qualifier") return "community_qualifier";
+  if (v === "building") return "building_intro";
+  return null;
 }
 
 function getCachedDashboard(): Dashboard | null {
@@ -569,6 +572,9 @@ function DashboardView({
   // refresh that follows plan creation, which would otherwise drop `prompt`
   // (the person now owns a calendar) and erase the closing state mid-read.
   const [qualifierActive] = useState(() => data.prompt?.key === "community_qualifier");
+  // Same latch for the building intro: the thanks state must outlive a refresh.
+  const [buildingIntro] = useState<BuildingIntroPrompt | null>(() =>
+    data.prompt?.key === "building_intro" ? data.prompt : null);
   const addOwnedCalendar = useCallback((cal: QualifierCalendar) => {
     setOwnedCalendars((prev) =>
       prev.some((o) => o.id === cal.id) ? prev : [{ id: cal.id, name: cal.name, owned: true }, ...prev],
@@ -768,6 +774,8 @@ function DashboardView({
             </section>
           )}
 
+          {buildingIntro && <BuildingIntroCard prompt={buildingIntro} />}
+
           {qualifierActive && (
             <CommunityQualifierCard
               nearby={nearby}
@@ -777,7 +785,7 @@ function DashboardView({
             />
           )}
 
-          {!qualifierActive && !data.person.ownsCalendars && (
+          {!qualifierActive && !buildingIntro && !data.person.ownsCalendars && (
             <div className="prompt-box">
               <div className="prompt-body">
                 <div className="prompt-h">Hosting an event soon?</div>
