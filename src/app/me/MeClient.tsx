@@ -93,6 +93,13 @@ interface HostPlan {
   daysToDeadline: number;
   decayLevel: "soon" | "warn";
   interestedCount: number;
+  // "idea" = CalendarGeneratedPlan (ideaId is its objectId). "aiEvent" = a
+  // starter card on Groups.aiSourceEvents — no row of its own, so ideaId is
+  // the server's `ai:<calendarId>:<uid>` key and interest/host calls go
+  // through the AI-event functions, keyed by calendar shareId + index.
+  kind?: "idea" | "aiEvent";
+  aiEventUid?: string;
+  aiEventIndex?: number;
 }
 interface HostCalRow {
   calendarId: string;
@@ -100,6 +107,7 @@ interface HostCalRow {
   calendarShareId: string | null;
   calendarPhoto: string | null;
   count: number;
+  interestedCount?: number;
   soonestDeadline: string;
   soonestIsUrgent: boolean;
 }
@@ -1196,8 +1204,12 @@ function NeedsHostRail({ plans, onHosted }: { plans: HostPlan[]; onHosted: () =>
     try {
       const cookie = getOrCreateInterestCookie();
       const result = (await Parse.Cloud.run(
-        wasOn ? "removeInterestOnPlanIdea" : "expressInterestOnPlanIdea",
-        { ideaId: p.ideaId, cookie },
+        p.kind === "aiEvent"
+          ? (wasOn ? "removeInterestOnAIEvent" : "expressInterestOnAIEvent")
+          : (wasOn ? "removeInterestOnPlanIdea" : "expressInterestOnPlanIdea"),
+        p.kind === "aiEvent"
+          ? { groupShareId: p.calendarShareId, eventIndex: p.aiEventIndex, cookie }
+          : { ideaId: p.ideaId, cookie },
       )) as { count?: number };
       if (typeof result?.count === "number") setCounts((c) => ({ ...c, [p.ideaId]: result.count! }));
     } catch {
@@ -1245,7 +1257,15 @@ function NeedsHostRail({ plans, onHosted }: { plans: HostPlan[]; onHosted: () =>
                 </div>
               </div>
               <div className="hostact">
-                <button className="hostbtn" onClick={() => setHostingIdea(p)}>Host this</button>
+                {p.kind === "aiEvent" && p.calendarShareId ? (
+                  // A starter card is hosted on its own calendar page — the
+                  // ?aiEvent deep link opens that card's host/interest sheet.
+                  <Link className="hostbtn" href={`/org/${p.calendarShareId}?aiEvent=${encodeURIComponent(p.aiEventUid || "")}`}>
+                    Host this
+                  </Link>
+                ) : (
+                  <button className="hostbtn" onClick={() => setHostingIdea(p)}>Host this</button>
+                )}
                 <button
                   type="button"
                   className={`heart-toggle ${on ? "on" : ""}`}
@@ -1417,6 +1437,7 @@ function CalendarsRail({ rows }: { rows: HostCalRow[] }) {
               <div className={`cal-s ${c.soonestIsUrgent ? "urgent" : ""}`}>
                 {c.count} plan{c.count === 1 ? "" : "s"} need{c.count === 1 ? "s" : ""} a host
                 {c.soonestIsUrgent ? "" : ` · ${monthDay(c.soonestDeadline)}`}
+                {(c.interestedCount ?? 0) > 0 ? ` · ${c.interestedCount} interested` : ""}
               </div>
             </div>
             <span className="cal-cta">View</span>
@@ -1461,15 +1482,23 @@ function NeedsHostPopup({
     : "";
   const where = idea.venueName || idea.venueAddress;
 
+  const isStarterCard = idea.kind === "aiEvent";
+
   function markInterested() {
     if (done) return;
     setDone("interested");
     setPlanIdeaLocalInterest(idea.ideaId, true);
     const cookie = getOrCreateInterestCookie();
-    Parse.Cloud.run("expressInterestOnPlanIdea", { ideaId: idea.ideaId, cookie }).catch(() => {});
-    // Separate call on purpose: the queue write is a convenience for one
-    // person and must never cost the calendar its interest count if it fails.
-    Parse.Cloud.run("queuePlanIdeaVenue", { ideaId: idea.ideaId }).catch(() => {});
+    if (isStarterCard) {
+      Parse.Cloud.run("expressInterestOnAIEvent", {
+        groupShareId: idea.calendarShareId, eventIndex: idea.aiEventIndex, cookie,
+      }).catch(() => {});
+    } else {
+      Parse.Cloud.run("expressInterestOnPlanIdea", { ideaId: idea.ideaId, cookie }).catch(() => {});
+      // Separate call on purpose: the queue write is a convenience for one
+      // person and must never cost the calendar its interest count if it fails.
+      Parse.Cloud.run("queuePlanIdeaVenue", { ideaId: idea.ideaId }).catch(() => {});
+    }
     closeTimer.current = window.setTimeout(onClose, 4000);
   }
 
@@ -1478,12 +1507,26 @@ function NeedsHostPopup({
     setDone(null);
     setPlanIdeaLocalInterest(idea.ideaId, false);
     const cookie = getOrCreateInterestCookie();
-    Parse.Cloud.run("removeInterestOnPlanIdea", { ideaId: idea.ideaId, cookie }).catch(() => {});
+    if (isStarterCard) {
+      Parse.Cloud.run("removeInterestOnAIEvent", {
+        groupShareId: idea.calendarShareId, eventIndex: idea.aiEventIndex, cookie,
+      }).catch(() => {});
+    } else {
+      Parse.Cloud.run("removeInterestOnPlanIdea", { ideaId: idea.ideaId, cookie }).catch(() => {});
+    }
   }
+
+  // A starter card hosts on its calendar page (the ?aiEvent deep link opens
+  // its sheet there); only CalendarGeneratedPlan ideas host in place.
+  useEffect(() => {
+    if (hosting && isStarterCard && idea.calendarShareId) {
+      window.location.assign(`/org/${idea.calendarShareId}?aiEvent=${encodeURIComponent(idea.aiEventUid || "")}`);
+    }
+  }, [hosting, isStarterCard, idea.calendarShareId, idea.aiEventUid]);
 
   // The host flow replaces the popup rather than stacking on it — two modals
   // deep for one tap is a trap on mobile.
-  if (hosting) {
+  if (hosting && !isStarterCard) {
     return (
       <HostIdeaModal
         idea={{

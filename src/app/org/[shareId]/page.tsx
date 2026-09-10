@@ -11,6 +11,7 @@ import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
 import LeafHostPlanThread from "@/components/LeafHostPlanThread";
 import NamePrompt from "@/components/NamePrompt";
+import BuildingIntroPrompt, { type BuildingIntroPayload } from "@/components/BuildingIntroPrompt";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
@@ -1270,36 +1271,60 @@ function FollowModal({
   onFollowed,
   brandColor,
   isPrivate,
+  canAskIntro = true,
 }: {
   calendarId: string;
   calendarName: string;
   brandColor?: string;
   onClose: () => void;
-  onFollowed: (name: string, phone: string, pending?: boolean) => void;
+  /** `intro` is set when the building question will be shown in place; the
+   *  parent must then leave the modal mounted until onClose. */
+  onFollowed: (name: string, phone: string, pending?: boolean, intro?: BuildingIntroPayload | null) => void;
   isPrivate?: boolean;
+  /** False when this follow is gating a held tap — the tap replays on close,
+   *  and a question between the two would land on the wrong moment. */
+  canAskIntro?: boolean;
 }) {
   const verify = usePhoneVerify();
-  const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "pending" | "error">("form");
+  const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "pending" | "intro" | "error">("form");
   const [errorMsg, setErrorMsg] = useState("");
+  const [intro, setIntro] = useState<BuildingIntroPayload | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!verify.isVerified) return;
     setFormStep("submitting");
     try {
-      const followResult = await Parse.Cloud.run("followCalendarViaWeb", {
+      const followResult = (await Parse.Cloud.run("followCalendarViaWeb", {
         calendarId,
         name: verify.name,
         phoneNumber: verify.phone.replace(/\D/g, ""),
-      });
+      })) as { pending?: boolean; userId?: string; buildingIntro?: BuildingIntroPayload | null };
       setFollowerCookie(calendarId, verify.name, verify.phone);
       setVerifiedUserCookie(verify.name, verify.phone);
       localStorage.setItem("leaf_follower_phone", verify.phone.replace(/\D/g, ""));
       if (followResult.pending) {
         onFollowed(verify.name, verify.phone, true);
         setFormStep("pending");
+        return;
+      }
+      // The question's answer functions need a session for THIS person. A
+      // fresh OTP minted one; a cookie-verified repeat visitor may hold none,
+      // or a cached session for someone else — then the question waits for /me.
+      let ask: BuildingIntroPayload | null = null;
+      if (canAskIntro && followResult.buildingIntro) {
+        try {
+          if (verify.sessionToken) await Parse.User.become(verify.sessionToken);
+          if (Parse.User.current()?.id === followResult.userId) ask = followResult.buildingIntro;
+        } catch (sessionErr) {
+          console.warn("[Follow] could not adopt session for building intro:", sessionErr);
+        }
+      }
+      onFollowed(verify.name, verify.phone, false, ask);
+      if (ask) {
+        setIntro(ask);
+        setFormStep("intro");
       } else {
-        onFollowed(verify.name, verify.phone, false);
         setFormStep("success");
       }
     } catch (err: unknown) {
@@ -1348,6 +1373,8 @@ function FollowModal({
               </button>
             </form>
           </div>
+        ) : formStep === "intro" && intro ? (
+          <BuildingIntroPrompt intro={intro} brandColor={brandColor} onDone={onClose} />
         ) : formStep === "success" ? (
           <div className="text-center py-8 space-y-4">
             <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto">
@@ -6030,12 +6057,13 @@ export default function OrgCalendarPage() {
           calendarName={org.name}
           brandColor={org.brandColor || undefined}
           isPrivate={org.isPrivate}
+          canAskIntro={!pendingInterest}
           onClose={() => {
             setShowFollowModal(false);
             // Dismissing the gate abandons the tap that opened it.
             setPendingInterest(null);
           }}
-          onFollowed={(_name, _phone, pending) => {
+          onFollowed={(_name, _phone, pending, intro) => {
             if (pending) {
               setFollowRequestPending(true);
               // Private calendar: this is a request, not a follow, so the gate
@@ -6054,7 +6082,10 @@ export default function OrgCalendarPage() {
               }
               setPendingInterest(null);
             }
-            setShowFollowModal(false);
+            // The building question advances in place; the modal closes on
+            // its Done (onClose). Never over the calendar's plans — the follow
+            // has landed and the X is always there.
+            if (!intro) setShowFollowModal(false);
           }}
         />
       )}
