@@ -855,6 +855,7 @@ export default function PlansManager({
         timezone: string | null;
         time: string | null;
         hostName: string;
+        hostIsRoster?: boolean;
         rsvpCount: number;
         location: { name: string; address: string; placeId?: string | null } | null;
         locations?: {
@@ -881,7 +882,7 @@ export default function PlansManager({
         timezone: p.timezone ?? null,
         time: p.time,
         rsvpCount: p.rsvpCount,
-        host: p.hostName ? { name: p.hostName } : null,
+        host: p.hostName ? { name: p.hostName, isRoster: p.hostIsRoster === true } : null,
         location: p.location ? { name: p.location.name, address: p.location.address } : null,
         locations: p.locations,
         isPoll: p.isPoll,
@@ -2096,6 +2097,7 @@ export default function PlansManager({
             timezone: selectedPlan.timezone,
             time: selectedPlan.time,
             hostName: selectedPlan.host?.name || "You",
+            hostIsRoster: selectedPlan.host?.isRoster === true,
             rsvpCount: selectedPlan.rsvpCount,
             location: selectedPlan.location,
             locations: selectedPlan.locations,
