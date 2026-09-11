@@ -35,6 +35,8 @@ export type PlanDetailData = {
   timezone: string | null;
   time: string | null;
   hostName: string;
+  /** The named host is a paid Leaf roster host on `assignedHost`, not the owner. */
+  hostIsRoster?: boolean;
   rsvpCount: number;
   location: { name: string; address: string } | null;
   /** Full itinerary from the API (matches `getOrgCalendarPage.plans[i].locations`).
@@ -441,8 +443,15 @@ export default function PlanDetailModal({
             <div className="flex items-center gap-3 flex-wrap">
               <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
                 Hosted by {hostNameOverride || plan.hostName}
+                {plan.hostIsRoster && !hostNameOverride && (
+                  <span className="ml-2 normal-case tracking-normal font-medium text-xs text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5">
+                    Leaf host
+                  </span>
+                )}
               </p>
-              {!plan.isPoll && (
+              {/* A roster host is placed and replaced from the Leaf side (the
+                  needs-host queue), not by picking a follower here. */}
+              {!plan.isPoll && !plan.hostIsRoster && (
                 <button
                   onClick={openChangeHost}
                   className="text-xs font-medium text-zinc-500 hover:text-zinc-900 underline underline-offset-2 transition-colors"

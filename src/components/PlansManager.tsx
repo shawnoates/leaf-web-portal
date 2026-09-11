@@ -184,7 +184,7 @@ interface PastPlan {
   rsvpCount: number;
   attendanceCount: number;
   photoCount: number;
-  host: { name: string } | null;
+  host: { name: string; isRoster?: boolean } | null;
   location: { name: string; address: string; placeId?: string | null } | null;
   // ── Repeat inputs ────────────────────────────────────────────────────
   // Everything needed to re-host this plan on a new date. `category` is also
@@ -230,7 +230,7 @@ interface UpcomingPlan {
   timezone: string | null;
   time: string | null;
   rsvpCount: number;
-  host: { name: string } | null;
+  host: { name: string; isRoster?: boolean } | null;
   /** True when `host.name` is a virtual-host persona rather than a real person.
    *  Owner/co-host only (getOrgDashboard is management-scoped) — drives the
    *  small ring next to the byline so the manager can tell the two apart. */
