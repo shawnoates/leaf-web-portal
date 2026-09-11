@@ -65,6 +65,8 @@ interface Plan {
   image: string | null;
   hostState: HostState;
   viewerIsHost: boolean;
+  /** The paid Leaf roster host running this plan, when one has accepted. */
+  rosterHost?: { name: string; photoUrl: string | null } | null;
   rsvpState: RsvpState;
   attendeeCount: number;
   requireApproval?: boolean;
@@ -344,6 +346,11 @@ function statusFor(plan: Plan): { cls: string; text: string } | null {
   if (plan.rsvpState === "waitlisted") return { cls: "wait", text: "On the waitlist" };
   if (plan.viewerIsHost) {
     return { cls: "host", text: plan.attendeeCount > 0 ? `You're hosting · ${plan.attendeeCount} going` : "You're hosting" };
+  }
+  // A roster host has the plan; the calendar owner sees who, not "hosting".
+  if (plan.rosterHost?.name) {
+    const going = plan.rsvpState === "going" ? Math.max(0, plan.attendeeCount - 1) : plan.attendeeCount;
+    return { cls: "", text: `${plan.rosterHost.name} is hosting${going > 0 ? ` · ${going} going` : ""}` };
   }
   if (plan.hostState === "waiting_on_host") return { cls: "wait", text: "Waiting on host" };
   if (plan.rsvpState === "going") {
