@@ -23,7 +23,7 @@ export interface ShareKitOption {
 
 // Mirrors CC_EMAIL in leaflets-server/cloud/building-intro-functions.js — the
 // manager email copies the team so a reply lands somewhere.
-export const CC_EMAIL = "shawn@getleaflets.co";
+export const CC_EMAIL = "team@getleaflets.co";
 
 const signoff = ({ firstName }: ShareKitContext) => (firstName ? `\n\n${firstName}` : "");
 
