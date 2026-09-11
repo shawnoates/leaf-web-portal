@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { COPY, type BuildingIntroAnswer, type BuildingIntroChannel } from "./buildingIntroCopy";
+import BuildingIntroComposer, { type BuildingIntroComposerPayload } from "@/components/BuildingIntroComposer";
 
 export interface BuildingIntroPrompt {
   key: "building_intro";
@@ -10,23 +11,29 @@ export interface BuildingIntroPrompt {
   calendarName: string;
   shareId: string | null;
   preview?: boolean;
+  // A `yes` that never sent anything comes back once, straight into the composer.
+  stage?: "composer";
+  composer?: BuildingIntroComposerPayload;
 }
 
 type Phase =
   | { kind: "asking" }
   | { kind: "saving" }
   | { kind: "channels"; picked: BuildingIntroChannel[]; saving: boolean }
+  | { kind: "composer"; composer: BuildingIntroComposerPayload; resurfaced: boolean }
   | { kind: "done"; answer: BuildingIntroAnswer }
   | { kind: "error" };
 
 export default function BuildingIntroCard({ prompt }: { prompt: BuildingIntroPrompt }) {
-  const [phase, setPhase] = useState<Phase>({ kind: "asking" });
+  const resurfaced = prompt.stage === "composer" && !!prompt.composer;
+  const [phase, setPhase] = useState<Phase>(() =>
+    resurfaced ? { kind: "composer", composer: prompt.composer!, resurfaced: true } : { kind: "asking" });
   const renderedRef = useRef(false);
   const preview = prompt.preview === true;
   const base = { surface: "me_card", calendarId: prompt.calendarId, preview };
 
   useEffect(() => {
-    if (renderedRef.current) return;
+    if (resurfaced || renderedRef.current) return;
     renderedRef.current = true;
     Parse.Cloud.run("recordBuildingIntroEvent", { event: "rendered", ...base }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -54,11 +61,32 @@ export default function BuildingIntroCard({ prompt }: { prompt: BuildingIntroPro
     if (phase.kind !== "channels" || phase.picked.length === 0) return;
     setPhase({ ...phase, saving: true });
     try {
-      await Parse.Cloud.run("recordBuildingIntroChannels", { channels: phase.picked, ...base });
-      setPhase({ kind: "done", answer: "yes" });
+      const r: { composer?: BuildingIntroComposerPayload } = await Parse.Cloud.run("recordBuildingIntroChannels", {
+        channels: phase.picked,
+        ...base,
+      });
+      setPhase(r.composer ? { kind: "composer", composer: r.composer, resurfaced: false } : { kind: "done", answer: "yes" });
     } catch {
       setPhase({ kind: "error" });
     }
+  }
+
+  if (phase.kind === "composer") {
+    return (
+      <div className="cq">
+        <div className="cq-top">
+          <div className="eyebrow">{prompt.calendarName}</div>
+        </div>
+        <BuildingIntroComposer
+          composer={phase.composer}
+          calendarId={prompt.calendarId}
+          surface="me_card"
+          preview={preview}
+          resurfaced={phase.resurfaced}
+          onDone={() => setPhase({ kind: "done", answer: "yes" })}
+        />
+      </div>
+    );
   }
 
   if (phase.kind === "done") {

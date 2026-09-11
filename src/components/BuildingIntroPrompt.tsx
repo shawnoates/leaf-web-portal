@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { COPY, type BuildingIntroAnswer, type BuildingIntroChannel } from "@/app/me/buildingIntroCopy";
+import BuildingIntroComposer, { type BuildingIntroComposerPayload } from "@/components/BuildingIntroComposer";
 
 export interface BuildingIntroPayload {
   calendarId: string;
@@ -14,6 +15,7 @@ export interface BuildingIntroPayload {
 type Phase =
   | { kind: "asking"; saving: boolean }
   | { kind: "channels"; picked: BuildingIntroChannel[]; saving: boolean }
+  | { kind: "composer"; composer: BuildingIntroComposerPayload }
   | { kind: "done"; answer: BuildingIntroAnswer }
   | { kind: "error" };
 
@@ -63,8 +65,11 @@ export default function BuildingIntroPrompt({
     if (phase.kind !== "channels" || phase.picked.length === 0) return;
     setPhase({ ...phase, saving: true });
     try {
-      await Parse.Cloud.run("recordBuildingIntroChannels", { channels: phase.picked, ...base });
-      setPhase({ kind: "done", answer: "yes" });
+      const r: { composer?: BuildingIntroComposerPayload } = await Parse.Cloud.run("recordBuildingIntroChannels", {
+        channels: phase.picked,
+        ...base,
+      });
+      setPhase(r.composer ? { kind: "composer", composer: r.composer } : { kind: "done", answer: "yes" });
     } catch {
       setPhase({ kind: "error" });
     }
@@ -72,6 +77,18 @@ export default function BuildingIntroPrompt({
 
   const accent = brandColor || "#18181b";
   const doneBtn = "text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900";
+
+  if (phase.kind === "composer") {
+    return (
+      <BuildingIntroComposer
+        composer={phase.composer}
+        calendarId={intro.calendarId}
+        surface="post_follow"
+        accent={accent}
+        onDone={onDone}
+      />
+    );
+  }
 
   if (phase.kind === "done") {
     return (

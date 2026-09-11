@@ -23,6 +23,26 @@ export const COPY = {
     ] as { key: BuildingIntroChannel; label: string }[],
     done: "Done",
   },
+  composer: {
+    title: "Here's what to send.",
+    sub: "Edit anything you like. It goes out from you, not from us.",
+    email: {
+      label: "Email to the building manager",
+      hint: "Opens in your mail app with Shawn copied. Add the manager's address.",
+      open: "Open in Mail",
+    },
+    dm: {
+      label: "Message for the chat group or online board",
+    },
+    flyer: {
+      label: "Flyer for the bulletin board",
+      hint: "Letter size, with a code that opens the calendar.",
+      open: "Open the flyer",
+    },
+    copy: "Copy",
+    copied: "Copied",
+    done: "Done",
+  },
   thanks: {
     yes: "Thanks, good to know.",
     declined: "Understood, thanks.",

@@ -233,28 +233,54 @@ export default function PromotePage({
     );
   }
 
-  if (!isOwner) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="max-w-md text-center">
-          <h1 className="text-xl font-semibold">Owner only</h1>
-          <p className="mt-2 text-sm text-zinc-500">
-            Marketing materials are available to the calendar owner.
-          </p>
-          <Link
-            href={`/org/${shareId}`}
-            className="mt-4 inline-block text-sm text-emerald-700 underline"
-          >
-            View the calendar instead
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   const calendarUrl = `${SITE_URL}/org/${calendar.shareId}`;
 
   const handlePrint = () => window.print();
+
+  // Followers get the flyer alone: the building-intro composer sends
+  // residents here to print one for a lobby board. Social and the dashboard
+  // link stay with the owner.
+  if (!isOwner) {
+    return (
+      <>
+        <style jsx global>{`
+          @media print {
+            .no-print { display: none !important; }
+            .print-page { box-shadow: none !important; border: none !important; }
+          }
+          @page { margin: 0.4in; }
+        `}</style>
+        <div className="min-h-screen bg-zinc-50">
+          <div className="max-w-5xl mx-auto px-4 md:px-6 py-4 md:py-8 space-y-6">
+            <div className="no-print flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <Link
+                  href={`/org/${shareId}`}
+                  className="text-sm text-zinc-500 hover:text-zinc-900 inline-flex items-center gap-1"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Back to the calendar
+                </Link>
+                <h1 className="mt-3 text-2xl font-semibold tracking-tight">Flyer for {calendar.name}</h1>
+                <p className="text-sm text-zinc-500 mt-1">
+                  Letter size. Print it and pin it up; people scan the code to follow.
+                </p>
+              </div>
+              <button
+                onClick={handlePrint}
+                className="inline-flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-3 md:py-2 rounded-md"
+              >
+                <Printer className="w-4 h-4" />
+                Print / Save as PDF
+              </button>
+            </div>
+            <div className="flex justify-center">
+              <Flyer calendar={calendar} url={calendarUrl} />
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
