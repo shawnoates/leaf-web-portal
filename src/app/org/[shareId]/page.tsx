@@ -11,7 +11,7 @@ import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
 import LeafHostPlanThread from "@/components/LeafHostPlanThread";
 import NamePrompt from "@/components/NamePrompt";
-import BuildingIntroPrompt, { type BuildingIntroPayload } from "@/components/BuildingIntroPrompt";
+import ShareKitPrompt, { type ShareKitPayload } from "@/components/ShareKitPrompt";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
@@ -1277,18 +1277,18 @@ function FollowModal({
   calendarName: string;
   brandColor?: string;
   onClose: () => void;
-  /** `intro` is set when the building question will be shown in place; the
-   *  parent must then leave the modal mounted until onClose. */
-  onFollowed: (name: string, phone: string, pending?: boolean, intro?: BuildingIntroPayload | null) => void;
+  /** `intro` is set when the share kit will be shown in place; the parent
+   *  must then leave the modal mounted until onClose. */
+  onFollowed: (name: string, phone: string, pending?: boolean, intro?: ShareKitPayload | null) => void;
   isPrivate?: boolean;
   /** False when this follow is gating a held tap — the tap replays on close,
-   *  and a question between the two would land on the wrong moment. */
+   *  and a share kit between the two would land on the wrong moment. */
   canAskIntro?: boolean;
 }) {
   const verify = usePhoneVerify();
   const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "pending" | "intro" | "error">("form");
   const [errorMsg, setErrorMsg] = useState("");
-  const [intro, setIntro] = useState<BuildingIntroPayload | null>(null);
+  const [intro, setIntro] = useState<ShareKitPayload | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1299,7 +1299,7 @@ function FollowModal({
         calendarId,
         name: verify.name,
         phoneNumber: verify.phone.replace(/\D/g, ""),
-      })) as { pending?: boolean; userId?: string; buildingIntro?: BuildingIntroPayload | null };
+      })) as { pending?: boolean; userId?: string; buildingIntro?: ShareKitPayload | null };
       setFollowerCookie(calendarId, verify.name, verify.phone);
       setVerifiedUserCookie(verify.name, verify.phone);
       localStorage.setItem("leaf_follower_phone", verify.phone.replace(/\D/g, ""));
@@ -1308,10 +1308,10 @@ function FollowModal({
         setFormStep("pending");
         return;
       }
-      // The question's answer functions need a session for THIS person. A
-      // fresh OTP minted one; a cookie-verified repeat visitor may hold none,
-      // or a cached session for someone else — then the question waits for /me.
-      let ask: BuildingIntroPayload | null = null;
+      // The kit's event writes need a session for THIS person. A fresh OTP
+      // minted one; a cookie-verified repeat visitor may hold none, or a
+      // cached session for someone else — then the kit waits for /me.
+      let ask: ShareKitPayload | null = null;
       if (canAskIntro && followResult.buildingIntro) {
         try {
           if (verify.sessionToken) await Parse.User.become(verify.sessionToken);
@@ -1333,12 +1333,30 @@ function FollowModal({
     }
   };
 
+  // The share kit step swaps the card chrome: full-bleed header band, spec
+  // radii and scrim, and the scrim itself dismisses (never on the phone form,
+  // where a stray tap would drop a half-typed number).
+  const kitStep = formStep === "intro" && !!intro;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-none p-8 relative">
+    <div
+      className={`fixed inset-0 z-50 flex items-end md:items-center justify-center ${
+        kitStep ? "bg-[rgba(40,30,10,0.32)]" : "bg-zinc-900/60 backdrop-blur-sm"
+      }`}
+      onClick={kitStep ? onClose : undefined}
+    >
+      <div
+        className={
+          kitStep
+            ? "bg-white w-full md:max-w-[560px] rounded-t-3xl md:rounded-[20px] overflow-hidden relative flex flex-col max-h-[calc(100vh-72px)] md:max-h-[calc(100vh-64px)] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-[0_20px_60px_rgba(0,0,0,0.22)]"
+            : "bg-white w-full max-w-md rounded-t-2xl md:rounded-none p-8 relative"
+        }
+        onClick={kitStep ? (e) => e.stopPropagation() : undefined}
+      >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-900"
+          aria-label="Close"
+          className={`absolute top-4 right-4 p-2 z-10 ${kitStep ? "text-[#7a5a12]/60 hover:text-[#7a5a12]" : "text-zinc-400 hover:text-zinc-900"}`}
         >
           <X className="w-5 h-5" />
         </button>
@@ -1374,7 +1392,11 @@ function FollowModal({
             </form>
           </div>
         ) : formStep === "intro" && intro ? (
-          <BuildingIntroPrompt intro={intro} brandColor={brandColor} onDone={onClose} />
+          <ShareKitPrompt
+            payload={intro}
+            firstName={verify.name.trim().split(/\s+/)[0] || ""}
+            onDone={onClose}
+          />
         ) : formStep === "success" ? (
           <div className="text-center py-8 space-y-4">
             <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto">
@@ -6082,9 +6104,9 @@ export default function OrgCalendarPage() {
               }
               setPendingInterest(null);
             }
-            // The building question advances in place; the modal closes on
-            // its Done (onClose). Never over the calendar's plans — the follow
-            // has landed and the X is always there.
+            // The share kit advances in place; the modal closes on its
+            // "Maybe later" (onClose). Never over the calendar's plans — the
+            // follow has landed and the X is always there.
             if (!intro) setShowFollowModal(false);
           }}
         />

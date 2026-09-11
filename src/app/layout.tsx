@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Instrument_Serif, JetBrains_Mono, Manrope } from "next/font/google";
+import { Inter, Instrument_Serif, JetBrains_Mono, Manrope, Newsreader } from "next/font/google";
 import "./globals.css";
 import UserActivityBeacon from "@/components/UserActivityBeacon";
 import { SITE_URL } from "@/lib/site";
@@ -29,6 +29,14 @@ const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
+});
+
+// Share-kit headline (post-follow modal, /me card). Variable font; the
+// optical-size axis is what makes it read as a display face at 24–32px.
+const newsreader = Newsreader({
+  variable: "--font-newsreader",
+  subsets: ["latin"],
+  axes: ["opsz"],
 });
 
 const SITE_TITLE = "Leaf OS — Community Calendars";
@@ -89,7 +97,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${manrope.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${manrope.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable} ${newsreader.variable} h-full antialiased`}
     >
       <head>
         {/* OpenAI Ads conversion pixel */}
