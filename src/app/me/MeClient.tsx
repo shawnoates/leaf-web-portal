@@ -65,6 +65,8 @@ interface Plan {
   image: string | null;
   hostState: HostState;
   viewerIsHost: boolean;
+  /** Owns or co-hosts the calendar — may watch the chat without attending. */
+  viewerIsOwner?: boolean;
   /** The paid Leaf roster host running this plan, when one has accepted. */
   rosterHost?: { name: string; photoUrl: string | null } | null;
   rsvpState: RsvpState;
@@ -368,9 +370,14 @@ function planIsFull(plan: Plan) {
 function viewerHosts(plan: Plan) {
   return plan.viewerIsHost;
 }
-/** Chat is for people in the room: attendees and real hosts. */
+/** Chat is for people in the room: attendees and real hosts — plus the
+ *  calendar owner, who may watch a plan someone else is running. */
 function canChat(plan: Plan) {
-  return plan.rsvpState === "going" || viewerHosts(plan);
+  return plan.rsvpState === "going" || viewerHosts(plan) || plan.viewerIsOwner === true;
+}
+/** "Watch" when the viewer is in as the owner rather than as a participant. */
+function chatVerb(plan: Plan) {
+  return plan.rsvpState !== "going" && !viewerHosts(plan) && plan.viewerIsOwner ? "Watch chat" : "Chat";
 }
 function unreadCount(plan: Plan) {
   return plan.messages.filter((m) => m.unread).length;
@@ -1014,7 +1021,7 @@ function HeroActions({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: Rsv
       {canChat(plan) && (
         <Link className="btn ghost chat" href={`/chat/${plan.id}?from=me`} aria-label="Plan chat">
           <ChatIcon />
-          <span className="chat-label">Chat{unread > 0 ? ` · ${unread}` : ""}</span>
+          <span className="chat-label">{chatVerb(plan)}{unread > 0 ? ` · ${unread}` : ""}</span>
         </Link>
       )}
       {!hosting && plan.rsvpState !== "not_going" && (
@@ -1082,7 +1089,7 @@ function PlanRow({
         ) : canChat(plan) ? (
           <Link className="row-btn ghost" href={`/chat/${plan.id}?from=me`}>
             <ChatIcon />
-            <span>Chat{unread > 0 ? ` · ${unread}` : ""}</span>
+            <span>{chatVerb(plan)}{unread > 0 ? ` · ${unread}` : ""}</span>
           </Link>
         ) : (
           (() => {
@@ -1789,7 +1796,7 @@ function PlanModal({
             {canChat(plan) && (
               <Link href={`/chat/${plan.id}?from=me`} className="btn ghost chat">
                 <ChatIcon />
-                <span>Join plan chat{unread > 0 ? ` · ${unread}` : ""}</span>
+                <span>{chatVerb(plan) === "Watch chat" ? "Watch plan chat" : "Join plan chat"}{unread > 0 ? ` · ${unread}` : ""}</span>
               </Link>
             )}
             {plan.calendarShareId && (
