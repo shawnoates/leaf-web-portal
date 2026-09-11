@@ -259,16 +259,23 @@ export default function ChatShell({
         setUsers((prev) => {
           const next = new Map(prev);
           for (const u of found) {
-            const pic = u.get("profilePicture") as
-              | { url?: () => string }
-              | string
-              | undefined;
-            const profilePicUrl =
-              typeof pic === "string"
-                ? pic
-                : typeof pic?.url === "function"
-                  ? pic.url()
-                  : undefined;
+            // Extract profilePictureUrl, handling Parse.File and string cases
+            let profilePicUrl: string | undefined;
+            try {
+              const pic = u.get("profilePicture");
+              if (typeof pic === "string") {
+                profilePicUrl = pic;
+              } else if (pic && typeof pic === "object") {
+                // Handle Parse.File object: try url() method, then url property
+                if (typeof pic.url === "function") {
+                  profilePicUrl = pic.url();
+                } else if (typeof pic.url === "string") {
+                  profilePicUrl = pic.url;
+                }
+              }
+            } catch (e) {
+              // Silently skip if extraction fails
+            }
             next.set(u.id, {
               objectId: u.id,
               // Match iOS User.getFullName() preference order: `name` first
@@ -280,7 +287,7 @@ export default function ChatShell({
                 (u.get("full_name") as string) ||
                 (u.get("first_name") as string) ||
                 "",
-              profilePictureUrl: profilePicUrl,
+              profilePictureUrl,
             });
           }
           return next;
