@@ -62,20 +62,35 @@ function Shell({ children }: { children: React.ReactNode }) {
   return <main className="mx-auto max-w-lg px-5 py-10 pb-24">{children}</main>;
 }
 
-function Closed({ title, body, link }: { title: string; body: string; link?: { href: string; label: string } }) {
+type Link = { href: string; label: string };
+
+function Closed({ title, body, link, links }: { title: string; body: string; link?: Link; links?: Link[] }) {
+  const all = links ?? (link ? [link] : []);
   return (
     <Shell>
       <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-6">
         <h1 className="text-xl font-semibold text-leaf-900">{title}</h1>
         <p className="mt-3 text-[15px] leading-relaxed text-zinc-700">{body}</p>
-        {link ? (
-          <a href={link.href} className="mt-5 inline-block text-[15px] font-medium text-leaf-800 underline">
-            {link.label}
-          </a>
+        {all.length ? (
+          <div className="mt-5 space-y-3">
+            {all.map((l, i) => (
+              <a key={l.href} href={l.href} className={`${i === 0 ? btnPrimary : btnQuiet} block text-center`}>
+                {l.label}
+              </a>
+            ))}
+          </div>
         ) : null}
       </div>
     </Shell>
   );
+}
+
+function fmtWallClock(wallClock: string) {
+  // A venue wall clock rendered as-is: parse as local, format as local, so the
+  // digits the host typed are the digits they see.
+  const d = new Date(wallClock);
+  if (Number.isNaN(d.getTime())) return wallClock;
+  return d.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function fmtCallOff(iso: string | null, tz: string) {
@@ -89,6 +104,7 @@ export default function RescheduleClient({ planId, token }: { planId: string; to
   const [customDate, setCustomDate] = useState("");
   const [customTime, setCustomTime] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ wallClock: string; label: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [moved, setMoved] = useState<{ whenLabel: string; previousWhenLabel: string } | null>(null);
 
@@ -123,6 +139,7 @@ export default function RescheduleClient({ planId, token }: { planId: string; to
         setMoved({ whenLabel: r.whenLabel, previousWhenLabel: r.previousWhenLabel });
       } catch (e) {
         setError((e as Error).message || "That didn't go through. Try again.");
+        setPending(null);
       } finally {
         setBusy(null);
       }
@@ -158,8 +175,35 @@ export default function RescheduleClient({ planId, token }: { planId: string; to
           `Everyone who said they were interested hears about the new date, and your reminders start over from it.` +
           (kind === "roster" ? ` Your pay is unchanged${opts.rateLabel ? `: ${opts.rateLabel}` : ""}.` : "")
         }
-        link={{ href: opts.checklistUrl || opts.chatUrl, label: opts.checklistUrl ? "Open your checklist" : "Open the group chat" }}
+        links={[
+          { href: opts.shareUrl, label: "View the plan" },
+          ...(opts.checklistUrl ? [{ href: opts.checklistUrl, label: "Open your checklist" }] : []),
+        ]}
       />
+    );
+  }
+
+  if (pending) {
+    return (
+      <Shell>
+        <div className={card}>
+          <h1 className="text-xl font-semibold leading-snug text-leaf-900">
+            Move {plan.title} to {pending.label}?
+          </h1>
+          <p className="mt-3 text-[15px] leading-relaxed text-zinc-700">
+            It was {plan.whenLabel}. Everyone who said they were interested is told the new date straight away, and your reminders reset to it.
+            {kind === "roster" ? ` Your pay is unchanged${opts.rateLabel ? ` (${opts.rateLabel})` : ""}.` : ""}
+          </p>
+          <div className="mt-5 space-y-3">
+            <button type="button" className={btnPrimary} disabled={busy !== null} onClick={() => void move(pending.wallClock)}>
+              {busy ? "Moving…" : "Yes, move it"}
+            </button>
+            <button type="button" className={btnQuiet} disabled={busy !== null} onClick={() => setPending(null)}>
+              Not yet
+            </button>
+          </div>
+        </div>
+      </Shell>
     );
   }
 
@@ -222,12 +266,10 @@ export default function RescheduleClient({ planId, token }: { planId: string; to
                 key={s.wallClock}
                 type="button"
                 disabled={busy !== null}
-                onClick={() => void move(s.wallClock)}
+                onClick={() => setPending({ wallClock: s.wallClock, label: s.label })}
                 className="w-full rounded-xl border border-zinc-200 px-4 py-3.5 text-left transition-colors hover:border-leaf-600 hover:bg-leaf-50 disabled:opacity-50"
               >
-                <div className="text-[16px] font-medium text-leaf-900">
-                  {busy === s.wallClock ? "Moving…" : s.label}
-                </div>
+                <div className="text-[16px] font-medium text-leaf-900">{s.label}</div>
                 {s.reasons.length ? (
                   <div className="mt-1 text-[13px] leading-snug text-zinc-600">{s.reasons.join(" · ")}</div>
                 ) : null}
@@ -266,9 +308,9 @@ export default function RescheduleClient({ planId, token }: { planId: string; to
           type="button"
           className={`${btnPrimary} mt-3`}
           disabled={!custom || busy !== null}
-          onClick={() => void move(custom)}
+          onClick={() => setPending({ wallClock: custom, label: fmtWallClock(custom) })}
         >
-          {busy === custom && custom ? "Moving…" : "Move it here"}
+          Move it here
         </button>
       </section>
 
