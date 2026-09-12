@@ -29,7 +29,7 @@ export default function ShareKitCard({ prompt, firstName }: { prompt: ShareKitMe
   return (
     <section className="sk sk-card" aria-label={COPY.headline}>
       <ShareKitStyles />
-      <div className="eyebrow">{COPY.eyebrow}</div>
+      <div className="eyebrow">{prompt.calendarName || COPY.eyebrow}</div>
       <div className="sk-grid">
         <div>
           <h3 className="sk-h">{COPY.headline}</h3>
