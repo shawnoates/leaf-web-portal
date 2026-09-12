@@ -31,6 +31,7 @@ export const CC_EMAIL = "team@getleaflets.co";
 const signoff = ({ firstName }: ShareKitContext) => (firstName ? `\n\n${firstName}` : "");
 
 export const COPY = {
+  // /me card eyebrow is the calendar's name; this is the fallback only.
   eyebrow: "Your neighborhood calendar",
   headline: "Bring a few neighbors along",
   // Mobile sheet breaks the headline by hand so it never wraps mid-phrase.
