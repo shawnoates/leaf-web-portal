@@ -73,6 +73,9 @@ interface Plan {
   hostId: string | null;
   hostName: string;
   hostAvatar: string | null;
+  // True when `host*` describes an accepted roster host (EventGroup.assignedHost),
+  // not the owner in `hostUser`/`user`. The owner still owns the EventGroup.
+  hasRosterHost: boolean;
   attendeeCount: number;
   location: {
     name: string | null;
@@ -2416,6 +2419,7 @@ export default function OrgCalendarPage() {
         hostId: (p.host as Record<string, string>)?.objectId || null,
         hostName: (p.host as Record<string, string>)?.name || "Community Member",
         hostAvatar: (p.host as Record<string, string>)?.profilePictureUrl || null,
+        hasRosterHost: Boolean((p.host as Record<string, unknown>)?.isRosterHost),
         // rsvpCount tracks RSVPs only; a real host is always attending so add 1 —
         // but a virtual/AI host (or one Leaf hasn't confirmed yet) isn't a real
         // attendee, so don't pad the count for those.
@@ -2817,9 +2821,13 @@ export default function OrgCalendarPage() {
   // the public face of the plan even though the owner technically owns the
   // EventGroup — on this public page such a plan should read like any other
   // visitor's plan ("Organized by Marcus"), not "You're Hosting". The owner still
-  // manages it from the dashboard. Excludes those personas from the host view.
+  // manages it from the dashboard. Same for a roster host who accepted the plan:
+  // the server's hostedPlanIds is keyed on hostUser/user (the owner), but the
+  // public card names the roster host, so the owner must not read as hosting.
   const viewerHostsPlan = (plan: Plan) =>
-    hostedPlanIds.has(plan.id) && plan.leafHostState !== "leaf_hosted";
+    hostedPlanIds.has(plan.id) &&
+    plan.leafHostState !== "leaf_hosted" &&
+    !plan.hasRosterHost;
 
   // Auto-load the host notification id when a host opens their own plan
   // (powers the "Message Attendees" button → /h/{id}).
