@@ -18,7 +18,10 @@ export interface ShareKitOption {
   /** Underlined text link beside the primary button; null = none. */
   secondary: string | null;
   subject?: (ctx: ShareKitContext) => string;
-  body: (ctx: ShareKitContext) => string;
+  /** Editable note. Absent = the row opens to a `note` line instead (flyer:
+   *  the printed page has its own copy, so an editable box here would lie). */
+  body?: (ctx: ShareKitContext) => string;
+  note?: string;
 }
 
 // Mirrors CC_EMAIL in leaflets-server/cloud/building-intro-functions.js — the
@@ -72,8 +75,7 @@ export const COPY = {
       subtitle: "One page with a QR code",
       primary: "Print",
       secondary: "Download PDF",
-      body: ({ calendarName, url }) =>
-        `${calendarName}\nA neighborhood calendar. Things to do nearby, mostly small stuff, a walk, a table at a bar a few blocks away.\n\n${url.replace(/^https?:\/\/(www\.)?/, "")}\n\nFree. No app. Nobody has to sign anything.`,
+      note: "Letter size, with a QR code that opens the calendar. Tape it by the mailboxes.",
     },
   ] satisfies ShareKitOption[],
 };

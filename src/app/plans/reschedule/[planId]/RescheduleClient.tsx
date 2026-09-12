@@ -41,6 +41,7 @@ type Options = {
   slots: Slot[];
   callOffAt: string | null;
   chatUrl: string;
+  shareUrl: string;
   checklistUrl: string | null;
   minWallClock: string;
   maxWallClock: string;
@@ -85,7 +86,8 @@ function fmtCallOff(iso: string | null, tz: string) {
 export default function RescheduleClient({ planId, token }: { planId: string; token: string }) {
   const [opts, setOpts] = useState<Options | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [custom, setCustom] = useState("");
+  const [customDate, setCustomDate] = useState("");
+  const [customTime, setCustomTime] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [moved, setMoved] = useState<{ whenLabel: string; previousWhenLabel: string } | null>(null);
@@ -94,6 +96,8 @@ export default function RescheduleClient({ planId, token }: { planId: string; to
     try {
       const result = (await Parse.Cloud.run("getPlanRescheduleOptions", { planId, token })) as Options;
       setOpts(result);
+      // The time field starts on the plan's own time; only the date is the question.
+      if (result.plan.wallClock) setCustomTime(result.plan.wallClock.slice(11, 16));
     } catch (e) {
       setLoadError((e as Error).message || "Could not load this plan.");
     }
@@ -186,6 +190,7 @@ export default function RescheduleClient({ planId, token }: { planId: string; to
   }
 
   const callOff = fmtCallOff(opts.callOffAt, plan.timeZone);
+  const custom = customDate && customTime ? `${customDate}T${customTime}` : "";
 
   return (
     <Shell>
@@ -237,16 +242,26 @@ export default function RescheduleClient({ planId, token }: { planId: string; to
           {slots.length ? "Or pick any date" : "Pick a new date"}
         </h2>
         <p className="mt-2 text-[13px] text-zinc-500">
-          At least a week out, so it gets a full round in front of people. Times are in the venue&apos;s zone ({plan.timeZone.replace(/_/g, " ")}).
+          Pick a date at least a week out. Times are in the venue&apos;s zone ({plan.timeZone.replace(/_/g, " ")}).
         </p>
-        <input
-          type="datetime-local"
-          className={`${inputClass} mt-3`}
-          value={custom}
-          min={opts.minWallClock}
-          max={opts.maxWallClock}
-          onChange={(e) => setCustom(e.target.value)}
-        />
+        <div className="mt-3 grid grid-cols-[1fr_auto] gap-3">
+          <input
+            type="date"
+            aria-label="New date"
+            className={inputClass}
+            value={customDate}
+            min={opts.minWallClock.slice(0, 10)}
+            max={opts.maxWallClock.slice(0, 10)}
+            onChange={(e) => setCustomDate(e.target.value)}
+          />
+          <input
+            type="time"
+            aria-label="Start time"
+            className={inputClass}
+            value={customTime}
+            onChange={(e) => setCustomTime(e.target.value)}
+          />
+        </div>
         <button
           type="button"
           className={`${btnPrimary} mt-3`}
@@ -260,14 +275,20 @@ export default function RescheduleClient({ planId, token }: { planId: string; to
       {error ? <p className="mt-4 text-[14px] text-red-700">{error}</p> : null}
 
       <section className="mt-6">
-        <a href={opts.chatUrl} className={`${btnQuiet} block text-center`}>
-          Keep it and say hello in the chat
-        </a>
-        <p className="mt-3 text-[13px] leading-relaxed text-zinc-500">
-          {kind === "roster"
-            ? `If it's still empty at ${callOff || "three hours before"}, we'll call it off and text you - please don't go to an empty plan.`
-            : "Keeping it is fine too - it's your plan. A short hello in the group chat sometimes tips people in."}
-        </p>
+        {kind === "roster" ? (
+          <p className="text-[13px] leading-relaxed text-zinc-500">
+            If it&apos;s still empty at {callOff || "three hours before"}, we&apos;ll call it off and text you - please don&apos;t go to an empty plan.
+          </p>
+        ) : (
+          <>
+            <a href={opts.shareUrl} className={`${btnQuiet} block text-center`}>
+              Keep the date and invite people directly
+            </a>
+            <p className="mt-3 text-[13px] leading-relaxed text-zinc-500">
+              Keeping it is fine too - it&apos;s your plan. Nobody is in the chat yet, so what fills an empty plan is sending the link to a few people yourself.
+            </p>
+          </>
+        )}
       </section>
     </Shell>
   );

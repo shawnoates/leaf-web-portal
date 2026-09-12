@@ -37,7 +37,7 @@ export function calendarUrl(shareId: string | null) {
 
 export interface ShareKitItem extends Omit<ShareKitOption, "subject" | "body"> {
   subject: string | null;
-  body: string;
+  body: string | null;
 }
 
 export function useShareKit({
@@ -83,13 +83,14 @@ export function useShareKit({
   const items: ShareKitItem[] = COPY.options.map((o) => ({
     ...o,
     subject: o.subject ? o.subject(ctx) : null,
-    body: drafts[o.id] ?? o.body(ctx),
+    body: o.body ? drafts[o.id] ?? o.body(ctx) : null,
   }));
 
   const toggle = (id: ShareKitOptionId) => setOpenId((cur) => (cur === id ? null : id));
   const setDraft = (id: ShareKitOptionId, text: string) => setDrafts((d) => ({ ...d, [id]: text }));
 
   async function copy(item: ShareKitItem) {
+    if (item.body == null) return;
     const text = item.subject ? `${item.subject}\n\n${item.body}` : item.body;
     try {
       await navigator.clipboard.writeText(text);
@@ -104,8 +105,8 @@ export function useShareKit({
 
   const mailtoHref = (item: ShareKitItem) =>
     `mailto:?cc=${encodeURIComponent(CC_EMAIL)}` +
-    `&subject=${encodeURIComponent(item.subject || "")}&body=${encodeURIComponent(item.body)}`;
-  const smsHref = (item: ShareKitItem) => `sms:?&body=${encodeURIComponent(item.body)}`;
+    `&subject=${encodeURIComponent(item.subject || "")}&body=${encodeURIComponent(item.body || "")}`;
+  const smsHref = (item: ShareKitItem) => `sms:?&body=${encodeURIComponent(item.body || "")}`;
   // The follower view of /promote is a letter-size flyer with the QR code and
   // a Print / Save as PDF button — both flyer actions land there.
   const flyerHref = payload.shareId ? `/org/${payload.shareId}/promote` : null;
@@ -157,16 +158,20 @@ export function ShareKitRows({ kit, compact = false }: { kit: ShareKit; compact?
             </button>
             {open && (
               <div className="sk-body" id={bodyId}>
-                <div className="sk-paper">
-                  <textarea
-                    ref={grow}
-                    className="sk-ta"
-                    rows={1}
-                    value={item.body}
-                    aria-label={item.label}
-                    onChange={(e) => { kit.setDraft(item.id, e.target.value); grow(e.currentTarget); }}
-                  />
-                </div>
+                {item.body != null ? (
+                  <div className="sk-paper">
+                    <textarea
+                      ref={grow}
+                      className="sk-ta"
+                      rows={1}
+                      value={item.body}
+                      aria-label={item.label}
+                      onChange={(e) => { kit.setDraft(item.id, e.target.value); grow(e.currentTarget); }}
+                    />
+                  </div>
+                ) : (
+                  <p className="sk-note">{item.note}</p>
+                )}
                 <div className="sk-acts">
                   <Primary kit={kit} item={item} copied={copied} />
                   <Secondary kit={kit} item={item} copied={copied} />
@@ -266,6 +271,7 @@ const CSS = `
 .sk-paper{background:var(--sk-paper);border-radius:12px;padding:14px 16px 12px}
 .sk-ta{display:block;width:100%;border:0;padding:0;margin:0;resize:none;outline:none;background:transparent;
   font-size:14px;line-height:1.55;color:rgba(0,0,0,.8);overflow:hidden}
+.sk-note{margin:2px 0 0;padding:0 2px;font-size:14px;line-height:1.5;color:rgba(0,0,0,.6)}
 .sk-acts{display:flex;align-items:center;gap:18px;margin-top:12px;padding:0 2px;flex-wrap:wrap}
 .sk-btn{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 22px;border:0;
   border-radius:12px;background:var(--sk-accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;
