@@ -24,6 +24,7 @@ type Options = {
   state: "open" | "has_rsvps" | "started" | "cancelled" | "no_host";
   kind: "roster" | "owner" | null;
   hostFirstName: string | null;
+  rateLabel: string | null;
   rsvps: number;
   plan: {
     id: string;
@@ -151,7 +152,7 @@ export default function RescheduleClient({ planId, token }: { planId: string; to
         body={
           `${plan.title} now runs ${moved.whenLabel} (it was ${moved.previousWhenLabel}). ` +
           `Everyone who said they were interested hears about the new date, and your reminders start over from it.` +
-          (kind === "roster" ? " Same night, same rate." : "")
+          (kind === "roster" ? ` Your pay is unchanged${opts.rateLabel ? `: ${opts.rateLabel}` : ""}.` : "")
         }
         link={{ href: opts.checklistUrl || opts.chatUrl, label: opts.checklistUrl ? "Open your checklist" : "Open the group chat" }}
       />
@@ -194,9 +195,16 @@ export default function RescheduleClient({ planId, token }: { planId: string; to
       <p className="mt-3 text-[15px] leading-relaxed text-zinc-700">
         <span className="font-medium text-leaf-900">{plan.title}</span>
         {plan.calendarName ? ` on ${plan.calendarName}` : ""} is set for {plan.whenLabel}
-        {plan.venueName ? ` at ${plan.venueName}` : ""}. Nobody has signed up. A better slot usually fixes that
-        {kind === "roster" ? " - and you keep the night at the same rate." : "."}
+        {plan.venueName ? ` at ${plan.venueName}` : ""}. Nobody has signed up. A better slot usually fixes that.
       </p>
+      {kind === "roster" ? (
+        <p className="mt-3 rounded-lg bg-leaf-50 px-4 py-3 text-[15px] leading-relaxed text-leaf-900">
+          <span className="font-medium">Your pay doesn&apos;t change.</span>{" "}
+          {opts.rateLabel
+            ? `You're still paid ${opts.rateLabel} for hosting it on the new date, same as agreed.`
+            : "You're paid the same rate for hosting it on the new date, same as agreed."}
+        </p>
+      ) : null}
 
       {slots.length > 0 ? (
         <section className={`${card} mt-6`}>
