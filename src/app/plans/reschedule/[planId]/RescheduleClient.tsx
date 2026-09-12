@@ -228,7 +228,9 @@ export default function RescheduleClient({ planId, token }: { planId: string; to
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-zinc-500">
           {slots.length ? "Or pick any date" : "Pick a new date"}
         </h2>
-        <p className="mt-2 text-[13px] text-zinc-500">Times are in the venue&apos;s zone ({plan.timeZone.replace(/_/g, " ")}).</p>
+        <p className="mt-2 text-[13px] text-zinc-500">
+          At least a week out, so it gets a full round in front of people. Times are in the venue&apos;s zone ({plan.timeZone.replace(/_/g, " ")}).
+        </p>
         <input
           type="datetime-local"
           className={`${inputClass} mt-3`}
