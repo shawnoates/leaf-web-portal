@@ -5015,17 +5015,15 @@ export default function OrgCalendarPage() {
                   </div>
                 ) : (
                   <div className="flex gap-4">
-                    {/* RSVP closes when the plan ENDS, not when it starts — a
-                        plan that began 20 minutes ago is exactly the one
-                        someone wants to join. The card itself stays up until
+                    {/* RSVP closes at start time. The card itself stays up until
                         local midnight, so without a state of its own this
-                        button outlived its usefulness by hours. */}
-                    {planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "ended" ? (
+                        button would outlive its usefulness by hours. */}
+                    {planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) !== "upcoming" ? (
                       <div
                         aria-disabled="true"
                         className="flex-1 py-3 text-xs uppercase tracking-wider font-bold bg-zinc-100 text-zinc-400 flex items-center justify-center cursor-not-allowed select-none"
                       >
-                        This Plan Has Ended
+                        No Longer Accepting RSVPs
                       </div>
                     ) : (
                       <button
@@ -5036,11 +5034,7 @@ export default function OrgCalendarPage() {
                         className="flex-1 text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90"
                         style={{ backgroundColor: org.brandColor || "#18181b" }}
                       >
-                        {planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "live"
-                          ? "Happening Now · Join Them"
-                          : selectedEvent.requireApproval
-                            ? "Request to Attend"
-                            : "I\u0027m Attending"}
+                        {selectedEvent.requireApproval ? "Request to Attend" : "I\u0027m Attending"}
                       </button>
                     )}
                     <button

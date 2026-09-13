@@ -112,10 +112,9 @@ export function planEndInstant(
 /**
  * Lifecycle of a plan, for deciding what the RSVP button should say.
  *
- * "live" is a real state, not a rounding error: a neighborhood plan that
- * started 20 minutes ago is exactly the one someone wants to join. RSVP stays
- * open through it and closes at `ended`. An unknown/unparseable start reads as
- * "upcoming" — never refuse an RSVP because a date is missing.
+ * RSVP is open only while "upcoming" — it closes at start time. An
+ * unknown/unparseable start reads as "upcoming": never refuse an RSVP because
+ * a date is missing.
  */
 export function planLifecycle(
   startISO: string | null | undefined,
