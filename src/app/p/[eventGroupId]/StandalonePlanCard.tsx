@@ -36,6 +36,8 @@ type Props = {
   // "N going · M spots left" line and the full-plan state.
   rsvpCount: number;
   capacity: number | null;
+  // RSVP closes at start time; replaces the button with a disabled state.
+  rsvpClosed: boolean;
   // Set when /p/<id>?rsvp=1 — the visitor was bounced back from
   // /open/p/<id>?rsvp=1 after iOS failed to intercept (no app installed),
   // so the StandalonePlanRsvp child opens its RSVP modal on mount.
@@ -58,6 +60,7 @@ export default function StandalonePlanCard({
   requireApproval,
   rsvpCount,
   capacity,
+  rsvpClosed,
   autoOpenRsvp,
 }: Props) {
   const showWhen = variant !== "copy" && expiryDate !== null;
@@ -224,6 +227,7 @@ export default function StandalonePlanCard({
                 }
                 requireApproval={requireApproval}
                 isFull={isFull}
+                rsvpClosed={rsvpClosed}
                 autoOpenRsvp={autoOpenRsvp}
                 onLocationRevealed={(loc) => {
                   if (loc.name) setRevealedName(loc.name);

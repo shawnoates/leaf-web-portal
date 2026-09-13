@@ -57,6 +57,8 @@ type Props = {
   // Capacity reached — the CTA becomes "Join the Waitlist" and the server
   // queues the RSVP as a waitlisted request instead of confirming it.
   isFull: boolean;
+  // RSVP closes at start time; the CTA becomes a disabled state.
+  rsvpClosed: boolean;
   // True when the visitor was bounced back from /open/p/<id>?rsvp=1
   // because iOS didn't intercept the Universal Link (no app installed).
   // Opens the RSVP modal on mount so the tap that started the journey
@@ -107,6 +109,7 @@ export default function StandalonePlanRsvp({
   location,
   requireApproval,
   isFull,
+  rsvpClosed,
   autoOpenRsvp,
   onLocationRevealed,
 }: Props) {
@@ -133,13 +136,22 @@ export default function StandalonePlanRsvp({
           with autoOpenRsvp=true so the verify-via-web modal opens
           automatically. Plain <a> (not next Link) so the browser does a
           full navigation that Safari can hand off to iOS's UL machinery. */}
-      <a
-        href={`/open/p/${eventGroupId}?rsvp=1`}
-        className="block w-full text-center bg-zinc-900 text-white rounded-full py-3 text-sm font-medium hover:bg-zinc-800 transition"
-      >
-        {isFull ? "Join the Waitlist" : requireApproval ? "Request to Attend" : "Count me in"}
-      </a>
-      {open ? (
+      {rsvpClosed ? (
+        <div
+          aria-disabled="true"
+          className="block w-full text-center bg-zinc-100 text-zinc-400 rounded-full py-3 text-sm font-medium cursor-not-allowed select-none"
+        >
+          No longer accepting RSVPs
+        </div>
+      ) : (
+        <a
+          href={`/open/p/${eventGroupId}?rsvp=1`}
+          className="block w-full text-center bg-zinc-900 text-white rounded-full py-3 text-sm font-medium hover:bg-zinc-800 transition"
+        >
+          {isFull ? "Join the Waitlist" : requireApproval ? "Request to Attend" : "Count me in"}
+        </a>
+      )}
+      {open && !rsvpClosed ? (
         <RsvpModal
           eventGroupId={eventGroupId}
           planTitle={planTitle}

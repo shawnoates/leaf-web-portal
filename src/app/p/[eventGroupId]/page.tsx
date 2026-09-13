@@ -4,6 +4,7 @@ import Parse from "@/lib/parse";
 import { APP_LINK_URL, SITE_URL } from "@/lib/site";
 import PlanShareRedirect from "./PlanShareRedirect";
 import StandalonePlanCard from "./StandalonePlanCard";
+import { planLifecycle } from "@/lib/wall-clock";
 
 type ShareMode = "invite" | "copy";
 
@@ -234,6 +235,10 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
     );
   }
 
+  // Evaluated per request (cookies() makes this page dynamic), so the
+  // client never has to compare wall clocks and risk a hydration mismatch.
+  const rsvpClosed = planLifecycle(info.expiryDate) !== "upcoming";
+
   const variant: "standalone" | "copy" | "privateCalendar" =
     mode === "copy"
       ? "copy"
@@ -258,7 +263,8 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
       requireApproval={info.requireApproval}
       rsvpCount={info.rsvpCount ?? 0}
       capacity={info.capacity ?? null}
-      autoOpenRsvp={autoOpenRsvp}
+      rsvpClosed={rsvpClosed}
+      autoOpenRsvp={autoOpenRsvp && !rsvpClosed}
     />
   );
 }
