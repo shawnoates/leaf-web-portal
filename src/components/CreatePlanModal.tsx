@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Parse from "@/lib/parse-client";
+import { monthlyRuleOptionsForDate, NTH_LABELS, WEEKDAY_NAMES, type RuleOption } from "@/lib/series";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { getDefaultCoverForSeed } from "@/lib/default-covers";
 import VenueSearch from "@/components/VenueSearch";
@@ -35,6 +36,10 @@ type PlanMode = "plan" | "idea" | "poll";
 type PollOptionDraft = { date: string; time: string };
 
 type SeriesFreq = "weekly" | "biweekly" | "monthly";
+// Hosted-plan Repeats is rule-based (weekly · other week · monthly on the
+// 13th / 2nd Tuesday / last Tuesday · host picks). Ideas and poll
+// conversions keep the older three-value `SeriesFreq`.
+type HostedRuleKey = RuleOption["key"];
 type SeriesEndType = "occurrences" | "until";
 
 const MIN_POLL_OPTIONS = 2;
@@ -113,6 +118,9 @@ export interface CreatePlanPrefill {
 interface CreatePlanModalProps {
   calendarId: string;
   calendars?: { objectId: string; name: string }[];
+  /** Followers/members who can be picked as a recurring plan's host
+   *  (series host). Omit to hide the Host row. */
+  hostCandidates?: { id: string; name: string }[];
   tier: string;
   prefill?: CreatePlanPrefill | null;
   hideVenueDefault?: boolean;
@@ -238,7 +246,7 @@ function pillLabel(pill: { text: string; label?: string | null }): string {
   return `${(lastSpace > 12 ? cut.slice(0, lastSpace) : cut).replace(/[\s,]+$/, "")}…`;
 }
 
-export default function CreatePlanModal({ calendarId, calendars, tier, prefill, hideVenueDefault, requireApprovalDefault, editMode, eventGroupId, hostRequestMode, hostRequestId, pollConvertMode, pollEventGroupId, pollWinningDate, pollWinningTime, onClose, onCreated, onUpgrade, autoSyncOnMount }: CreatePlanModalProps) {
+export default function CreatePlanModal({ calendarId, calendars, hostCandidates, tier, prefill, hideVenueDefault, requireApprovalDefault, editMode, eventGroupId, hostRequestMode, hostRequestId, pollConvertMode, pollEventGroupId, pollWinningDate, pollWinningTime, onClose, onCreated, onUpgrade, autoSyncOnMount }: CreatePlanModalProps) {
   const [selectedCalendarId, setSelectedCalendarId] = useState(calendarId);
   const [hideVenue, setHideVenue] = useState(prefill?.hideVenueUntilRsvp ?? hideVenueDefault ?? true);
   const [title, setTitle] = useState(prefill?.title || "");
@@ -284,6 +292,34 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
   const [seriesEndType, setSeriesEndType] = useState<SeriesEndType>("occurrences");
   const [seriesOccurrences, setSeriesOccurrences] = useState<string>(String(SERIES_DEFAULT_OCCURRENCES));
   const [seriesEndsAt, setSeriesEndsAt] = useState<string>("");
+  // Series host: "me" or a follower's user id. With another host the first
+  // date is optional, weekly rules are hidden and the button sends an invite.
+  const [seriesHostId, setSeriesHostId] = useState("me");
+  const [hostSearch, setHostSearch] = useState("");
+  const [seriesRuleKey, setSeriesRuleKey] = useState<HostedRuleKey>("weekly");
+  const [genericNth, setGenericNth] = useState(2);
+  const [genericWeekday, setGenericWeekday] = useState(2);
+  const hostIsOther = isHosted && recurring && seriesHostId !== "me";
+  const hostedRuleOptions = useMemo<RuleOption[]>(() => {
+    const out: RuleOption[] = [];
+    if (!hostIsOther) {
+      out.push({ key: "weekly", label: "Every week", freq: "weekly" });
+      out.push({ key: "biweekly", label: "Every other week", freq: "biweekly" });
+    }
+    const monthly = monthlyRuleOptionsForDate(date);
+    if (monthly.length) out.push(...monthly);
+    else out.push({ key: "monthlyNth", label: "Monthly on a weekday", freq: "monthlyNthWeekday", nth: genericNth, weekday: genericWeekday });
+    if (hostIsOther) out.push({ key: "hostPicks", label: "Host picks each date", freq: "hostPicks" });
+    return out;
+  }, [hostIsOther, date, genericNth, genericWeekday]);
+  useEffect(() => {
+    if (!hostedRuleOptions.some((o) => o.key === seriesRuleKey)) {
+      setSeriesRuleKey(hostedRuleOptions.find((o) => o.key === "monthlyNth")?.key || hostedRuleOptions[0].key);
+    }
+  }, [hostedRuleOptions, seriesRuleKey]);
+  const selectedHostedRule = hostedRuleOptions.find((o) => o.key === seriesRuleKey) || hostedRuleOptions[0];
+  const seriesHostName = hostCandidates?.find((c) => c.id === seriesHostId)?.name || "";
+  const seriesHostFirstName = seriesHostName.trim().split(/\s+/)[0] || "They";
   const [creating, setCreating] = useState(false);
   const [success, setSuccess] = useState(false);
   const [loadingImage, setLoadingImage] = useState(false);
@@ -964,7 +1000,8 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
       return;
     }
 
-    if (!date) return;
+    // A follower-hosted series may leave the first date to its host.
+    if (!date && !hostIsOther) return;
     // Cover image is optional in the drawer — the plan renders a placeholder
     // gradient seeded from the title when none is provided.
     setCreating(true);
@@ -1099,7 +1136,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           title,
           description,
           venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
-          firstInstanceDate: `${date}T${time || "12:00"}:00${tzSuffix}`,
+          firstInstanceDate: date ? `${date}T${time || "12:00"}:00${tzSuffix}` : undefined,
           time: time || null,
           capacity: capacity ? parseInt(capacity) : null,
           imageBase64: imageBase64 || undefined,
@@ -1107,9 +1144,13 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
           hostNote: hostNote.trim() || undefined,
           hideVenueUntilRsvp: hideVenue,
           requireApproval,
-          freq: seriesFreq,
-          maxOccurrences: seriesEndType === "occurrences" ? occInt : undefined,
-          endsAt: seriesEndType === "until" && seriesEndsAt ? `${seriesEndsAt}T23:59:59${tzSuffix}` : undefined,
+          freq: selectedHostedRule.freq,
+          nth: selectedHostedRule.nth,
+          weekday: selectedHostedRule.weekday,
+          dayOfMonth: selectedHostedRule.dayOfMonth,
+          hostUserId: hostIsOther ? seriesHostId : undefined,
+          maxOccurrences: !hostIsOther && seriesEndType === "occurrences" ? occInt : undefined,
+          endsAt: !hostIsOther && seriesEndType === "until" && seriesEndsAt ? `${seriesEndsAt}T23:59:59${tzSuffix}` : undefined,
         });
       } else if (recurring && mode === "idea") {
         const occInt = Math.min(
@@ -2041,19 +2082,86 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
 
               {recurring && (
                 <div className="mt-3 space-y-3 pl-6">
-                  <div>
-                    <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Every</label>
-                    <select
-                      value={seriesFreq}
-                      onChange={(e) => setSeriesFreq(e.target.value as SeriesFreq)}
-                      className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 bg-transparent"
-                    >
-                      <option value="weekly">Week</option>
-                      <option value="biweekly">Other week</option>
-                      <option value="monthly">Month</option>
-                    </select>
-                  </div>
+                  {isHosted && hostCandidates && hostCandidates.length > 0 && (
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Host</label>
+                      {hostCandidates.length > 8 && (
+                        <input
+                          value={hostSearch}
+                          onChange={(e) => setHostSearch(e.target.value)}
+                          placeholder="Search followers"
+                          className="w-full border-b border-zinc-200 py-1.5 text-xs font-light focus:outline-none focus:border-zinc-900 bg-transparent mb-1"
+                        />
+                      )}
+                      <select
+                        value={seriesHostId}
+                        onChange={(e) => setSeriesHostId(e.target.value)}
+                        className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 bg-transparent"
+                      >
+                        <option value="me">Me</option>
+                        {hostCandidates
+                          .filter((c) => !hostSearch || c.name.toLowerCase().includes(hostSearch.toLowerCase()) || c.id === seriesHostId)
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                      </select>
+                      {hostIsOther && (
+                        <p className="text-xs text-zinc-400 mt-1">
+                          {seriesHostFirstName} gets a text to accept. We&apos;ll remind them 3 weeks before each date, and skip the month if they don&apos;t confirm. The first date is optional.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
+                  {isHosted ? (
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Repeats</label>
+                      <select
+                        value={seriesRuleKey}
+                        onChange={(e) => setSeriesRuleKey(e.target.value as HostedRuleKey)}
+                        className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 bg-transparent"
+                      >
+                        {hostedRuleOptions.map((o) => (
+                          <option key={o.key} value={o.key}>{o.label}</option>
+                        ))}
+                      </select>
+                      {seriesRuleKey === "monthlyNth" && !date && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <select
+                            value={genericNth}
+                            onChange={(e) => setGenericNth(parseInt(e.target.value, 10))}
+                            className="border-b border-zinc-300 py-1.5 text-sm font-light focus:outline-none focus:border-zinc-900 bg-transparent"
+                            aria-label="Which week"
+                          >
+                            {[1, 2, 3, 4, -1].map((n) => <option key={n} value={n}>{NTH_LABELS[n]}</option>)}
+                          </select>
+                          <select
+                            value={genericWeekday}
+                            onChange={(e) => setGenericWeekday(parseInt(e.target.value, 10))}
+                            className="border-b border-zinc-300 py-1.5 text-sm font-light focus:outline-none focus:border-zinc-900 bg-transparent"
+                            aria-label="Weekday"
+                          >
+                            {WEEKDAY_NAMES.map((d, i) => <option key={d} value={i}>{d}</option>)}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Every</label>
+                      <select
+                        value={seriesFreq}
+                        onChange={(e) => setSeriesFreq(e.target.value as SeriesFreq)}
+                        className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 bg-transparent"
+                      >
+                        <option value="weekly">Week</option>
+                        <option value="biweekly">Other week</option>
+                        <option value="monthly">Month</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {!hostIsOther && (
                   <div>
                     <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Ends</label>
                     <div className="flex items-center gap-2">
@@ -2089,6 +2197,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                     </div>
                     <p className="text-xs text-zinc-400 mt-1">Max {SERIES_MAX_OCCURRENCES} occurrences.</p>
                   </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2148,14 +2257,14 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
               creating ||
               (isPoll
                 ? (!editMode && validPollOptions().length < MIN_POLL_OPTIONS) || (!imageBase64 && !prefill?.imageUrl && !selectedImageUrl)
-                : !date) ||
+                : (!date && !hostIsOther)) ||
               (pollConvertMode && !selectedVenue) ||
-              (recurring && (isHosted || mode === "idea") && seriesEndType === "until" && !seriesEndsAt)
+              (recurring && !hostIsOther && (isHosted || mode === "idea") && seriesEndType === "until" && !seriesEndsAt)
             }
             className="bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
           >
             {creating
-              ? (pollConvertMode ? "Converting..." : hostRequestMode ? "Approving..." : editMode ? "Saving..." : recurring && (isHosted || mode === "idea") ? "Starting Series..." : "Creating...")
+              ? (pollConvertMode ? "Converting..." : hostRequestMode ? "Approving..." : editMode ? "Saving..." : hostIsOther ? "Sending invite..." : recurring && (isHosted || mode === "idea") ? "Starting Series..." : "Creating...")
               : pollConvertMode
                 ? (recurring ? "Convert & Start Series" : "Convert to Plan")
                 : hostRequestMode
@@ -2165,7 +2274,7 @@ export default function CreatePlanModal({ calendarId, calendars, tier, prefill, 
                     : isPoll
                       ? "Create Date Poll"
                       : isHosted
-                        ? (recurring ? "Start Recurring Plan" : "Create plan")
+                        ? (hostIsOther ? "Send invite" : recurring ? "Start Recurring Plan" : "Create plan")
                         : (recurring ? "Start Recurring Suggestion" : "Create plan suggestion")}
           </button>
         </div>

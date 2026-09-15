@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ChevronDown, MessageCircle, Search, UserMinus } from "lucide-react";
+import { Check, ChevronDown, MessageCircle, Repeat, Search, UserMinus } from "lucide-react";
 import type { OrgDashboard } from "./types";
 import {
   buildRsvpCountIndex,
@@ -73,6 +73,9 @@ export default function CommunityTab({
   onNudge,
   onNudgeAll,
   nudgedIds,
+  onHostSeries,
+  seriesInvitedIds,
+  canHostSeries = false,
 }: {
   dashboard: OrgDashboard;
   initialSegment?: CommunitySegment;
@@ -91,6 +94,12 @@ export default function CommunityTab({
   onNudgeAll: (fs: OrgDashboard["followers"][number][]) => void;
   /** Memberships nudged this session — their button collapses to "Nudged". */
   nudgedIds?: Set<string>;
+  /** Hand a follower a recurring plan to run (series host). Owners and
+   *  co-hosts only; the follower needs a phone and a bound user. */
+  onHostSeries?: (f: OrgDashboard["followers"][number]) => void;
+  /** User ids with a pending or running series — their button reads "Invited". */
+  seriesInvitedIds?: Set<string>;
+  canHostSeries?: boolean;
 }) {
   const [segment, setSegment] = useState<CommunitySegment>(
     initialSegment || "everyone",
@@ -557,7 +566,7 @@ export default function CommunityTab({
                 RSVPs {windowDays}d
               </span>
               <span className="w-[80px] text-right">Joined</span>
-              <span className="w-[130px]" />
+              <span className="w-[170px]" />
             </div>
             {filtered.map((p) => (
               <div
@@ -597,7 +606,25 @@ export default function CommunityTab({
                 <span className="hidden md:block w-[80px] text-right text-xs text-zinc-400 shrink-0">
                   {p.joinedAt ? new Date(p.joinedAt).toLocaleDateString() : "—"}
                 </span>
-                <div className="w-auto md:w-[130px] shrink-0 flex items-center justify-end gap-2 ml-auto">
+                <div className="w-auto md:w-[170px] shrink-0 flex items-center justify-end gap-2 ml-auto">
+                  {canHostSeries &&
+                    onHostSeries &&
+                    !p.pending &&
+                    p.follower &&
+                    p.follower.phone &&
+                    p.follower.objectId &&
+                    (seriesInvitedIds?.has(p.follower.objectId) ? (
+                      <span className="text-[11px] font-medium text-zinc-400">Invited</span>
+                    ) : (
+                      <button
+                        onClick={() => onHostSeries(p.follower!)}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
+                        title="Hand them a recurring plan to run"
+                      >
+                        <Repeat className="w-3.5 h-3.5" />
+                        <span className="hidden md:inline">Host a series</span>
+                      </button>
+                    ))}
                   {p.pending && p.pendingFollower && (
                     <>
                       <button

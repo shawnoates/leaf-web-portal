@@ -13,6 +13,7 @@ import NudgeModal from "@/components/dashboard/NudgeModal";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
 import { featuredWallClockDate } from "@/lib/wall-clock";
+import { isSeriesLimitError, seriesStatusChip, type SeriesSummary } from "@/lib/series";
 // Shared with /org/[shareId], deliberately: this file used to carry its own
 // copy of the resolver, and the copy had drifted into showing weekly starter
 // cards at the wrong hour (and, near midnight, the wrong week).
@@ -614,6 +615,22 @@ export default function PlansManager({
 
   // Upcoming plans (hosted)
   const [upcomingPlans, setUpcomingPlans] = useState<UpcomingPlan[]>([]);
+  // Recurring series on this calendar (getCalendarPlanSeries). Host-managed
+  // ones get a row with a status chip and owner actions; a month waiting on
+  // the host shows as a ghost card in the upcoming rail.
+  const [calendarSeries, setCalendarSeries] = useState<SeriesSummary[]>([]);
+  const [seriesBusy, setSeriesBusy] = useState<string | null>(null);
+  const [seriesError, setSeriesError] = useState<string | null>(null);
+  const [changingSeriesHostFor, setChangingSeriesHostFor] = useState<string | null>(null);
+  // ?series=<id> from the owner emails — highlight that row.
+  const [highlightSeriesId, setHighlightSeriesId] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      setHighlightSeriesId(new URLSearchParams(window.location.search).get("series"));
+    } catch {
+      /* SSR */
+    }
+  }, []);
   // AI-starter events from the adopted AICalendar's snapshot — rendered
   // in the Suggested Plans section, not merged into upcomingPlans.
   const [aiStarterPlans, setAiStarterPlans] = useState<UpcomingPlan[]>([]);
@@ -894,6 +911,9 @@ export default function PlansManager({
         planSeriesId: p.planSeriesId,
       }));
       setUpcomingPlans(realPlans);
+      Parse.Cloud.run("getCalendarPlanSeries", { calendarId })
+        .then((r: { series?: SeriesSummary[] }) => setCalendarSeries(r.series || []))
+        .catch((err: unknown) => console.warn("[PlansManager] getCalendarPlanSeries failed:", err));
       const page = await Parse.Cloud.run("getOrgCalendarPage", { shareId });
       // AI starter events (from the adopted AICalendar's snapshot) — shown
       // in Suggested Plans, not merged here. Never a host until the manager
@@ -1421,6 +1441,28 @@ export default function PlansManager({
     }
   }
 
+  // Owner controls on a host-managed series. Every call returns the fresh
+  // series row, so the chip and actions update without a full refetch.
+  async function runSeriesAction(seriesId: string, fn: string, params: Record<string, unknown>, confirmText?: string) {
+    if (confirmText && !confirm(confirmText)) return;
+    setSeriesBusy(seriesId);
+    setSeriesError(null);
+    try {
+      const r = (await Parse.Cloud.run(fn, params)) as { series?: SeriesSummary };
+      if (r?.series) {
+        setCalendarSeries((prev) => prev.map((s) => (s.id === seriesId ? r.series! : s)));
+      } else {
+        setCalendarSeries((prev) => prev.filter((s) => s.id !== seriesId));
+        fetchPlanIdeas();
+      }
+      setChangingSeriesHostFor(null);
+    } catch (err) {
+      setSeriesError(isSeriesLimitError(err) ? err.message : err instanceof Error ? err.message : "That didn't go through.");
+    } finally {
+      setSeriesBusy(null);
+    }
+  }
+
   async function handleEndSeries(ideaSeriesId: string) {
     if (!confirm("End this recurring idea? Future instances will stop being created. The current idea stays.")) return;
     try {
@@ -1590,9 +1632,135 @@ export default function PlansManager({
             </div>
           </div>
 
+          {/* Host-managed series: who runs it, where it stands, owner controls. */}
+          {planTense === "upcoming" && calendarSeries.some((s) => s.hostManaged) && (
+            <div className="mb-4 space-y-2">
+              {calendarSeries
+                .filter((s) => s.hostManaged)
+                .map((s) => {
+                  const chip = seriesStatusChip(s);
+                  const chipClass =
+                    chip.tone === "green"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : chip.tone === "amber"
+                        ? "bg-amber-100 text-amber-700"
+                        : chip.tone === "red"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-zinc-100 text-zinc-600";
+                  const busy = seriesBusy === s.id;
+                  return (
+                    <div
+                      key={s.id}
+                      className={`border rounded-lg px-3 py-2.5 transition-colors ${highlightSeriesId === s.id ? "border-zinc-900" : "border-zinc-100"}`}
+                    >
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <Repeat className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                        <span className="text-sm font-medium truncate">{s.title}</span>
+                        <span className="text-xs text-zinc-400 truncate">
+                          Hosted by {s.host?.name || "—"}
+                          {s.rule.label ? ` · ${s.rule.label}` : ""}
+                        </span>
+                        <span className={`inline-block px-2 py-[3px] rounded-[5px] text-[9px] font-semibold tracking-[0.08em] uppercase ${chipClass}`}>
+                          {chip.label}
+                        </span>
+                        <div className="ml-auto flex items-center gap-3 text-[11px] font-medium">
+                          <button
+                            disabled={busy}
+                            onClick={() => setChangingSeriesHostFor(changingSeriesHostFor === s.id ? null : s.id)}
+                            className="text-zinc-500 hover:text-zinc-900 transition-colors disabled:opacity-50"
+                          >
+                            Change host
+                          </button>
+                          {s.hostStatus === "invited" && !s.pausedReason && (
+                            <button
+                              disabled={busy}
+                              onClick={() => runSeriesAction(s.id, "resendSeriesInvite", { seriesId: s.id })}
+                              className="text-zinc-500 hover:text-zinc-900 transition-colors disabled:opacity-50"
+                            >
+                              Resend invite
+                            </button>
+                          )}
+                          {s.pausedReason && s.hostStatus !== "declined" && (
+                            <button
+                              disabled={busy}
+                              onClick={() => runSeriesAction(s.id, "resumePlanSeries", { seriesId: s.id })}
+                              className="text-zinc-500 hover:text-zinc-900 transition-colors disabled:opacity-50"
+                            >
+                              Resume
+                            </button>
+                          )}
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              runSeriesAction(
+                                s.id,
+                                "cancelPlanSeries",
+                                { planSeriesId: s.id },
+                                `End ${s.title}? Already-scheduled plans stay; nothing new is scheduled and ${s.host?.firstName || "the host"} stops getting reminders.`,
+                              )
+                            }
+                            className="text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
+                          >
+                            End series
+                          </button>
+                        </div>
+                      </div>
+                      {s.skippedCycles.length > 0 && (
+                        <p className="text-[11px] text-zinc-400 mt-1">
+                          Skipped: {s.skippedCycles.map((c) => c.monthLabel).filter(Boolean).join(", ")}
+                        </p>
+                      )}
+                      {changingSeriesHostFor === s.id && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          <span className="text-[11px] text-zinc-400 mr-1">Hand it to:</span>
+                          {members
+                            .filter((m) => m.id !== s.host?.id)
+                            .map((m) => (
+                              <button
+                                key={m.id}
+                                disabled={busy}
+                                onClick={() => runSeriesAction(s.id, "changeSeriesHost", { seriesId: s.id, hostUserId: m.id })}
+                                className="px-2.5 py-1 rounded-full border border-zinc-200 text-[11px] text-zinc-700 hover:border-zinc-400 transition-colors disabled:opacity-50"
+                              >
+                                {m.name}
+                              </button>
+                            ))}
+                          {members.length === 0 && (
+                            <span className="text-[11px] text-zinc-400">No followers with an account yet.</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              {seriesError && <p className="text-xs text-red-500">{seriesError}</p>}
+            </div>
+          )}
+
           {planTense === "upcoming" ? (
             upcomingPlans.length > 0 ? (
               <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                {/* A month waiting on its series host is not a plan yet — a
+                    ghost card so the owner sees what's pending. Not clickable. */}
+                {calendarSeries
+                  .filter((s) => s.hostManaged && s.isActive && !s.pausedReason && s.proposal?.proposedAt)
+                  .map((s) => (
+                    <div
+                      key={`ghost-${s.id}`}
+                      className="border border-dashed border-zinc-300 rounded-lg shrink-0 w-52 bg-zinc-50/60"
+                      aria-label={`${s.title}: waiting on ${s.host?.firstName || "the host"} to confirm ${s.proposal!.whenLabel}`}
+                    >
+                      <div className="w-full h-28 flex items-center justify-center">
+                        <Repeat className="w-6 h-6 text-zinc-300" />
+                      </div>
+                      <div className="p-3">
+                        <h4 className="font-medium text-sm mb-1 truncate text-zinc-500">{s.title}</h4>
+                        <p className="text-xs text-zinc-400">
+                          Waiting on {s.host?.firstName || "the host"} to confirm {s.proposal!.whenLabel}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 {upcomingPlans.map((plan) => (
                   <div
                     key={plan.objectId}
@@ -2121,6 +2289,7 @@ export default function PlansManager({
       {showCreateModal && (
         <CreatePlanModal
           calendarId={calendarId}
+          hostCandidates={members}
           tier={tier}
           prefill={createPlanPrefill}
           editMode={!!editingPlanId}

@@ -26,6 +26,8 @@ import DashboardBottomBar from "@/components/dashboard/DashboardBottomBar";
 import HomeTab from "@/components/dashboard/HomeTab";
 import CommunityTab, { type CommunitySegment } from "@/components/dashboard/CommunityTab";
 import NudgeModal from "@/components/dashboard/NudgeModal";
+import SeriesHostModal, { type SeriesLimit } from "@/components/dashboard/SeriesHostModal";
+import { seriesCountsTowardLimit, type SeriesSummary } from "@/lib/series";
 import GrowPerformance from "@/components/dashboard/GrowPerformance";
 import type {
   CalActivePlan,
@@ -1275,6 +1277,38 @@ export default function OrgDashboardPage() {
     [],
   );
 
+  // Series hosts — "Host a series" on a Community-tab follower row hands them
+  // a recurring plan (SERIES_HOST_DESIGN_SPEC.md). The series list drives the
+  // "Invited" collapse and the Starter one-series-host limit prompt.
+  const [seriesHostFor, setSeriesHostFor] =
+    useState<OrgDashboard["followers"][number] | null>(null);
+  const [calendarSeries, setCalendarSeries] = useState<SeriesSummary[]>([]);
+  const [seriesInvitedIds, setSeriesInvitedIds] = useState<Set<string>>(new Set());
+  const refreshCalendarSeries = useCallback(async () => {
+    try {
+      const r = (await Parse.Cloud.run("getCalendarPlanSeries", { calendarId })) as { series: SeriesSummary[] };
+      setCalendarSeries(r.series || []);
+      setSeriesInvitedIds((prev) => {
+        const next = new Set(prev);
+        for (const s of r.series || []) if (seriesCountsTowardLimit(s) && s.host) next.add(s.host.id);
+        return next;
+      });
+    } catch (err) {
+      console.warn("[Dashboard] getCalendarPlanSeries failed:", err);
+    }
+  }, [calendarId]);
+  useEffect(() => {
+    if (activeTab === "community" && dashboard) void refreshCalendarSeries();
+  }, [activeTab, dashboard, refreshCalendarSeries]);
+  const seriesLimit: SeriesLimit | null = (() => {
+    if (!dashboard || dashboard.tier !== "starter") return null;
+    const running = calendarSeries.find(seriesCountsTowardLimit);
+    return running ? { title: running.title, hostName: running.host?.name || "its host" } : null;
+  })();
+  const canHostSeries = Boolean(
+    dashboard && (dashboard.isOwner || dashboard.calendars.some((c) => c.role === "Host")),
+  );
+
   // Home NEEDS YOU prompt cards. Both open the same composer the Community
   // tab uses; the server addresses the send by the membership id it handed
   // back, so these are real followers, not synthesized rows.
@@ -1903,6 +1937,9 @@ export default function OrgDashboardPage() {
                 else setShowSubscription(true);
               }}
               nudgedIds={nudgedIds}
+              onHostSeries={(f) => setSeriesHostFor(f)}
+              seriesInvitedIds={seriesInvitedIds}
+              canHostSeries={canHostSeries}
             />
           )}
 
@@ -2894,6 +2931,24 @@ export default function OrgDashboardPage() {
         />
       )}
 
+      {/* Hand a follower a recurring plan (series host) */}
+      {seriesHostFor && (
+        <SeriesHostModal
+          follower={seriesHostFor}
+          calendarId={calendarId}
+          limit={seriesLimit}
+          onClose={() => setSeriesHostFor(null)}
+          onSent={(_seriesId, hostUserId) => {
+            setSeriesInvitedIds((prev) => new Set(prev).add(hostUserId));
+            void refreshCalendarSeries();
+          }}
+          onUpgrade={() => {
+            setSeriesHostFor(null);
+            setShowSubscription(true);
+          }}
+        />
+      )}
+
       {/* Concierge chat slide-over — opened from the serviced calendar's
           "Concierge" button. The calendar itself looks like any other. */}
       {showConciergeChat && (
@@ -3043,6 +3098,12 @@ export default function OrgDashboardPage() {
         <CreatePlanModal
           calendarId={editingHostRequestCalendarId || calendarId}
           calendars={dashboard.calendars.map((c) => ({ objectId: c.objectId, name: c.name }))}
+          hostCandidates={(() => {
+            const seen = new Map<string, string>();
+            for (const m of dashboard.members) if (m.objectId && !seen.has(m.objectId)) seen.set(m.objectId, m.name || "Member");
+            for (const f of dashboard.followers) if (f.objectId && !seen.has(f.objectId)) seen.set(f.objectId, f.name || "Follower");
+            return [...seen.entries()].map(([id, name]) => ({ id, name }));
+          })()}
           tier={dashboard.tier}
           prefill={createPlanPrefill}
           hideVenueDefault={dashboard.calendars.find((c) => c.objectId === calendarId)?.hideVenueUntilRsvp}

@@ -6,7 +6,11 @@
 > on the calendar without the owner running it for him.
 
 ## Overview
-A calendar owner (or co-host) creates a recurring plan and names a **follower** as its host. The host accepts by text. Before each occurrence Leaf texts the host to **keep the proposed date or pick another**; only then does the occurrence go live and followers hear about it. If the host doesn't answer, **that month is skipped**. The host can move, skip, edit or end the series at any time from a no-login page, with a one-time phone code for anything beyond confirming a date.
+A calendar owner (or co-host) hands a recurring plan to a **follower**. It can start in two places:
+- **From Plans:** the owner fills in everything and picks the follower as host.
+- **From the Community tab:** the owner sends the follower a title and an optional note, and the host fills in the details.
+
+The host accepts by text. Before each occurrence Leaf texts the host to **keep the proposed date or pick another**; only then does the occurrence go live and followers hear about it. If the host doesn't answer, **that month is skipped**. The host can move, skip, edit or end the series at any time from a no-login page, with a one-time phone code for anything beyond confirming a date.
 
 The host never becomes a co-host and gets no dashboard access. The owner keeps the calendar and can see, reassign or end any series.
 
@@ -20,6 +24,9 @@ The host never becomes a co-host and gets no dashboard access. The owner keeps t
 | Reminder timing (rule-based) | **21 / 10 / 7 days**: first text, final text, skip |
 | Attendees on the host page | **Names only**, never phone numbers |
 | Owner told about a skipped month | **Dashboard chip + email** |
+| Where setup starts | **Both:** Plans (owner fills details) and Community tab (host fills details) |
+| Host's own setup | **Goes live without owner approval.** The owner gets a "your series is live" email. |
+| Plan limits | **Starter: 1 active series host. Growth / Pro: unlimited.** Paused, ended and declined series don't count. |
 
 ## What exists today (and the gaps)
 - `PlanSeries` (`cloud/recurringPlans.js`) supports `weekly | biweekly | monthly`. Monthly repeats the same day of the month (`computeNextDate`, :38). There is no nth-weekday rule.
@@ -51,6 +58,9 @@ An unconfirmed month is **not** an EventGroup. The series stores the proposed da
 | `timeZone` | string | IANA zone. Taken from `calendarTimezone(calendar)`, then the venue zone, then `America/New_York`. |
 | `hostManaged` | boolean | `true` when the host confirms each date. Existing series stay `false` and keep auto-publishing. |
 | `hostStatus` | string | `invited` → `accepted` / `declined` |
+| `setupStatus` | string | `complete` (Plans path) or `needsDetails` (Community path, until the host publishes) |
+| `inviteNote` | string | Optional note from the owner, max 200 chars, shown in T1c and on the host page |
+| `invitedFrom` | string | `plans` / `community`, for analytics |
 | `hostInvitedAt`, `hostAcceptedAt` | date | |
 | `nextRuleAt` | date | The rule's next anchor date (e.g. 2nd Tue Oct, 7pm). Moves forward one month per cycle **no matter where the host actually puts the date**. |
 | `proposalStatus` | string | `none` / `awaitingHost` |
@@ -66,25 +76,38 @@ Existing ACL: the series and each occurrence are writable by `webOwner` only. Al
 ## Lifecycle
 
 ### 1. Create (owner or co-host, dashboard)
-`createPlanSeries` gets new params `hostUserId`, `freq`, `nth`, `weekday`.
-- Host eligibility is the check from `changePlanHost`: a follower/member of the calendar or its parent org, or the caller.
-- **Host is the caller:** works as today (auto-publish), plus the new rules.
+Both paths check host eligibility the way `changePlanHost` does: the host must be a follower/member of the calendar or its parent org, or the caller. Both also check the plan limit (see Plan limits). Both end with an invited series and a text to the host.
+
+**Path A: from Plans (owner fills details).** `createPlanSeries` gets new params `hostUserId`, `freq`, `nth`, `weekday`.
+- **Host is the caller:** works as today (auto-publish), plus the new rules. Doesn't count toward the plan limit.
 - **Host is someone else:**
-  - `hostManaged = true`, `hostStatus = invited`, series active.
+  - `hostManaged = true`, `hostStatus = invited`, `setupStatus = complete`, `invitedFrom = plans`.
   - If the owner picked a first date, it's stored as the first proposal. Nothing is created yet.
-  - The host gets the invite text (T1).
+  - The host gets T1.
+
+**Path B: from the Community tab (host fills details).** New `inviteSeriesHost({ calendarId, hostUserId, title, freq?, nth?, weekday?, note? })`.
+- Only `title` is required. The repeat rule is optional: "2nd Tuesday", "Host picks each date", or unset ("let them choose").
+- Creates the series with `hostManaged = true`, `hostStatus = invited`, `setupStatus = needsDetails`, `invitedFrom = community`, and `webOwner` = the inviting owner, so ownership and billing stay with the calendar.
+- The host gets T1c.
 
 ### 2. Accept or decline (host)
-`/series/[seriesId]?t=` shows the invite and asks for a one-time code, because accepting ties the host's identity to the series.
-- **Accept:**
+`/series/[seriesId]?t=` shows the invite and the owner's note, and asks for a one-time code, because accepting ties the host's identity to the series.
+- **Accept, Path A:**
   - `hostStatus = accepted`.
   - If a first date was set and is still at least 48 hours away, it goes live immediately; accepting counts as confirming it.
   - Otherwise the first proposal cycle opens now.
+- **Accept, Path B:** `hostStatus = accepted`, then straight into **Set it up**:
+  - Title (prefilled, editable), description, photo
+  - Repeats (prefilled if the owner chose one)
+  - First date + time: picking a date with "2nd Tuesday" set proposes the rule dates to choose from
+  - Venue, capacity, require approval
+  - **Publish:** `completeSeriesSetup({ seriesId, ... })` sets `setupStatus = complete` and creates the first occurrence. Followers get the normal new-plan notice, and the owner gets E4.
+  - The host can save and leave. The series stays `needsDetails`, with one nudge text (T1d) after 3 days. After 14 days without publishing, it pauses (`noHost`) and the owner gets E3.
 - **Decline:** the series pauses (`pausedReason = hostDeclined`) and the owner sees it on the dashboard with **Change host**.
 - **No answer after 7 days:** one resend (T1b). After 14 days, pause with `noHost`.
 
 ### 3. Proposal cycle (hourly sweep)
-New cron `sweepSeriesHostCycles` runs hourly through `/jobs/`, leader-gated (see Jobs). For each active series with `hostManaged`, `hostStatus = accepted`, no upcoming published occurrence, and `proposalStatus = none`:
+New cron `sweepSeriesHostCycles` runs hourly through `/jobs/`, leader-gated (see Jobs). For each active series with `hostManaged`, `hostStatus = accepted`, `setupStatus = complete`, no upcoming published occurrence, and `proposalStatus = none`:
 
 **Rule-based** (`monthly`, `monthlyNthWeekday`), where *R* = `nextRuleAt`:
 
@@ -135,6 +158,21 @@ All texts follow the calendar's 9am–9pm local window. The sweep runs hourly, s
   - The old host's links stop working because the token includes the host id.
 - **Resume** a paused series. **End series.** **Resend invite.**
 
+## Plan limits
+Series hosts are available on every plan, with a limit on Starter. Unlike Nudge and Ask, this isn't cold outreach: a single follower accepts, and only that person gets texts.
+
+| Tier | Active series hosts |
+|---|---|
+| Starter | **1** |
+| Growth / Pro | Unlimited |
+
+- **Tier:** `resolveCalendarTier(calendar)` (`functions.js:33494`) checks the calendar's own `orgSubscriptionTier`, then the parent org's, and defaults to `starter`. Export it for `recurringPlans.js`.
+- **What counts:** `PlanSeries` in the org family (the root org plus its child calendars) with `hostManaged = true`, `isActive = true`, `pausedReason` unset, and `hostStatus` of `invited` or `accepted`. Paused, ended and declined series don't count, and neither do series the owner hosts themselves.
+- **Checked by the server** in `createPlanSeries` (host ≠ caller), `inviteSeriesHost`, **Resume**, and `changeSeriesHost` when the series is paused. The error code `SERIES_HOST_LIMIT` lets the portal show the upgrade prompt.
+- **Portal:** the entry points stay visible. At the limit, **Host a series** (Community tab) and choosing a follower in the create modal's Host picker open the upgrade prompt:
+  - *"Starter includes one community-hosted series. {Title} is already running with {Host}. Upgrade to Growth for unlimited."* [Upgrade] [Not now]
+- **Downgrades:** series that already exist keep running. The limit only blocks new invites and resumes.
+
 ## Auth
 - **Token:** `hmacTokenSync(`${seriesId}:${hostUserId}:seriesHost`)`. It's tied to the current host, so reassigning invalidates old links.
 - **Link only:** read the host page (title, rule, next proposal or occurrence, RSVP count, upcoming dates) and one-tap confirm the proposed date.
@@ -152,6 +190,8 @@ Trigger names are for `SmsLog` via `sendSmsTracked`. These are transactional tex
 |---|---|---|
 | T1 | `seriesHostInvite` | {Owner} from {Calendar} asked you to host {Title} ({rule, e.g. "2nd Tuesday monthly"}). You set the dates; we'll remind you before each one. Accept: {link} |
 | T1b | `seriesHostInviteResend` | Still up for hosting {Title} on {Calendar}? {link} |
+| T1c | `seriesHostInviteCommunity` | {Owner} from {Calendar} wants you to run {Title} on the calendar. "{note}" You pick the date, place and details; we'll remind you before each one. Start: {link} |
+| T1d | `seriesHostSetupNudge` | {Title} is almost ready. Pick a first date and it goes out to {Calendar}: {link} |
 | T2 | `seriesProposal` | {Title}: next one is {Tue Oct 13, 7pm}. Keep it or pick another date: {link} |
 | T2b | `seriesProposalPick` | When's the next {Title}? Pick a date and we'll tell everyone: {link} |
 | T3 | `seriesProposalFinal` | Last call for {Month} {Title}: keep {Tue Oct 13} or pick a date by {Tue Oct 6}, or we'll skip this month. {link} |
@@ -166,7 +206,8 @@ Sent with the Mailgun client the co-host invite already uses (`inviteCoHost`, `f
 |---|---|---|
 | E1 | A month is skipped (no reply) | **{Title}: {October} skipped.** {Host} didn't confirm a date, so there's no {Title} in {October}. We'll check in with {Host} about {November}. [Open series] |
 | E2 | Series paused after 2 skips | **{Title} is paused.** {Host} hasn't confirmed the last two months. Change the host, resume, or end the series. [Open series] |
-| E3 | Host declines, can't be reached, or ends the series | **{Title}: {Host} {declined / can't be reached / ended the series}.** [Open series] |
+| E3 | Host declines, can't be reached, never finishes setup, or ends the series | **{Title}: {Host} {declined / can't be reached / didn't finish setting it up / ended the series}.** [Open series] |
+| E4 | Host publishes their setup (Path B) | **{Title} is live on {Calendar}.** {Host} set it for {Tue Oct 13, 7pm} at {Venue}, repeating {rule}. [View plan] [Open series] |
 
 If the host has `smsNotificationsDisabled`: send a push if they use the app, otherwise email if one is on file. If none of those work, pause with `noHost` and tell the owner. A host who can't be reached shouldn't turn into silent monthly skips.
 
@@ -186,6 +227,18 @@ If the host has `smsNotificationsDisabled`: send a push if they use the app, oth
   - The first date is optional. Helper text: *"{Name} gets a text to accept. We'll remind them 3 weeks before each date, and skip the month if they don't confirm."*
   - The primary button reads **Send invite**.
 
+### Community tab (`src/components/dashboard/CommunityTab.tsx`)
+- A **Host a series** button on each follower row, next to **Nudge** (~:647). Owners and co-hosts only, followers with a phone number only.
+- It opens a small sheet:
+  - Header: *"Hand {Name} a recurring plan"*
+  - **Title** (required): placeholder "Monthly Wine Club"
+  - **Repeats:** Let {Name} choose · Monthly on a weekday (pick nth + weekday) · Host picks each date
+  - **Note** (optional, 200 chars): placeholder "Love this idea — it's yours to run"
+  - Helper: *"{Name} gets a text to set the date, place and details. It goes live when they publish."*
+  - Button: **Send invite**
+- Once sent, the button collapses to **Invited** for that follower, like **Nudged** does.
+- At the plan limit, the button stays visible and opens the upgrade prompt instead of the sheet (see Plan limits).
+
 ### Dashboard (`src/components/PlansManager.tsx`, `PlanDetailModal.tsx`)
 - Series row: "Hosted by {Name}" and a status chip. Chips: `Invite sent` · `Active` · `Waiting on {Oct} date` · `Skipped {Oct}` · `Paused: {reason}`.
 - Series actions: **Change host**, **Resend invite** (only while `invited`), **Resume** (only while paused), **End series**.
@@ -194,7 +247,8 @@ If the host has `smsNotificationsDisabled`: send a push if they use the app, oth
 ### Host page: new route `src/app/series/[seriesId]/`
 Mobile-first and no login, following the `plans/reschedule/[planId]` pattern (server component + client).
 1. **Header:** series title, "on {Calendar}", rule label.
-2. **Invite state:** Accept / Decline, then the code step.
+2. **Invite state:** the owner's note, Accept / Decline, then the code step.
+   - **Set it up (Path B only, `needsDetails`):** a single scrolling form (title, description, photo, repeats, first date + time, venue, capacity, require approval), then **Publish**. It autosaves, so a host who leaves comes back to the same form.
 3. **Next up card:**
    - *Waiting on you:* the date in large type, **Keep this date** (one tap, no code), **Pick another date** (code, then the wall-clock picker from `RescheduleClient`).
    - *Live:* date, `{n} going · {capacity}`, **Move**, **Skip this one**, **Share link**.
@@ -218,13 +272,18 @@ No changes. Occurrences are normal plans, and all host actions happen by text an
    - New schema fields.
    - `/jobs` endpoints, cron entries, and the idempotency guard (fixes the existing duplicate risk on its own).
 2. **Server host flow:**
-   - `createPlanSeries` params
-   - invite / accept / decline
+   - `createPlanSeries` params (Path A) and `inviteSeriesHost` + `completeSeriesSetup` (Path B)
+   - plan-limit check (`SERIES_HOST_LIMIT`) and exporting `resolveCalendarTier`
+   - invite / accept / decline, and the setup nudge / timeout
    - token + host code
    - `sweepSeriesHostCycles` + texts
    - confirm / move / skip / update / end / change host
    - RSVP move text
-3. **Portal:** CreatePlanModal host + repeats, then PlansManager series state and actions, then `/series/[seriesId]` host page.
+3. **Portal:**
+   - CommunityTab **Host a series** sheet + upgrade prompt
+   - `/series/[seriesId]` host page (invite, set-up form, next-up card, settings)
+   - CreatePlanModal host picker + repeats
+   - PlansManager series state and actions
 4. **Pilot:** 11 Hoyt Hangouts wine club.
 
 ## Open questions
