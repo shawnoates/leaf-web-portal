@@ -54,8 +54,11 @@ export default function InterestPrompt({
   const reducedMotion = usePrefersReducedMotion();
 
   const count = items.reduce((n, it) => (marked.has(it.id) ? n + 1 : n), 0);
+  // Esc reads the live count without re-binding the listener on every tap.
   const countRef = useRef(count);
-  countRef.current = count;
+  useEffect(() => {
+    countRef.current = count;
+  }, [count]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -344,7 +347,7 @@ const INTEREST_PROMPT_CSS = `
 /* Lottie box: the heart occupies ~38% of the 600×600 composition (the burst
    needs the room), so the player is oversized around the 64px box and the
    heart's slightly-low centre is nudged back up. */
-.ip-lottie{display:none;position:absolute;inset:-80%;transform:translateY(-2.2%)}
+.ip-lottie{display:none;position:absolute;inset:-60%;transform:translateY(-2.2%)}
 .ip-lottie svg{display:block;width:100%;height:100%}
 .ip-heart.live .ip-heart-svg{display:none}
 .ip-heart.live .ip-lottie{display:block}

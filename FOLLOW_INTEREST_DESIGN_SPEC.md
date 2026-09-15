@@ -59,7 +59,7 @@ Heart: centered horizontally, vertically centered in the top **112px** (mobile) 
 Tapping an untapped card marks interest. Tapping a marked card **unmarks** it.
 
 On tap:
-1. Fire the heart fill-and-pop (~500ms, once, ending on the filled frame). Lottie `heart-fill.json` swaps into the same box once provided; until then the CSS fill transition + keyframe is the shipped fallback.
+1. Fire the heart fill-and-pop (~500ms, once, ending on the filled frame). `public/motion/heart-fill.json` is the iOS app's `Leaflet/Lotties/heart.json` recolored white, given a 12%-fill + outline base heart, and cut at frame 50 so it ends filled; played at 3.3× via `lottie-web` (light build, dynamically imported on first tap). If the player or asset fails to load, the CSS fill transition + keyframe is the fallback.
 2. The green ring fades in over 150ms.
 3. The status line updates.
 4. Write the interest record immediately — one independent request per tap, optimistic UI, no batching on Done. A failed write reverts that card only, with a toast.
@@ -94,6 +94,17 @@ Never chain the Share Kit for non-neighborhood calendars, and never show the int
 - Marked = the page's `planIdeaLocallyInterested` / `aiLocallyInterested` sets, so the calendar cards underneath agree the moment the modal closes.
 - Writes: `expressInterestOnPlanIdea` / `removeInterestOnPlanIdea`, `expressInterestOnAIEvent` / `removeInterestOnAIEvent`.
 - Seen flag: localStorage `leaf_interest_modal_seen_<calendarId>`, set when the modal opens.
+
+## Instrumentation (as built)
+`src/lib/track.ts` → `window.dataLayer` + cloud `recordWebEvent` (`WebEvent` class, `cloud/web-events.js`). Read in the admin portal at Analytics › Web events (`adminGetWebEventStats`).
+
+| Event | Props |
+|---|---|
+| `follow_interest_list_shown` | source (`follow_modal` / `follow_popup`), count, itemIds (ordered), preMarked |
+| `follow_interest_tap` | itemId, on (true = mark, false = unmark), title |
+| `follow_interest_list_closed` | via (`done` / `skip`), marked |
+
+Watch: share of shows with ≥1 mark, net marks per show, Done vs Skip, per-calendar breakdown, most-marked cards.
 
 ## Fallbacks
 - Plan with no image: solid `#3f3f46` (mobile) / `#e4e4e7` (desktop) card with the same scrim and text. No stock substitute.
