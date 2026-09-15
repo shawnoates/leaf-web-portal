@@ -18,6 +18,7 @@ import InterestPrompt, {
 } from "@/components/InterestPrompt";
 import { track } from "@/lib/track";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
+import CalendarPromoBanner from "@/components/CalendarPromoBanner";
 import { renderLinkedText } from "@/lib/linkify";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
 import {
@@ -4092,6 +4093,14 @@ export default function OrgCalendarPage() {
         </main>
       ) : (
       <>
+      {/* Partner thank-you — the server returns it only to followers and
+          past attendees of this calendar. */}
+      <CalendarPromoBanner
+        calendarId={org.objectId}
+        isFollowing={isFollowing}
+        brandColor={org.brandColor}
+      />
+
       {/* Stream Header — plans lead the page so the community-calendar
           pitch (residents host things for each other) drives the visual
           identity. Local deals appear below the plans stream as a
