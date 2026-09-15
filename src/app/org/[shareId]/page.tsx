@@ -126,6 +126,20 @@ interface Plan {
   leafHostChatUnread?: number;
   // Virtual host (VIRTUAL_HOST_SPEC) — persona-fronted paid host on this plan.
   // Owner-only: can the owner attach a virtual host to this (host-less) plan?
+  /**
+   * Live add-ons a guest can buy at RSVP, price ascending. Only `active` rows
+   * reach the client — an unresolved add-on has no price or copy yet, so the
+   * server never sends one. The source venue is deliberately withheld: where
+   * the host buys the coffee is checklist and payout data, not guest copy.
+   */
+  addons?: {
+    objectId: string;
+    frameworkSlug: string;
+    title: string | null;
+    description: string | null;
+    priceCents: number | null;
+    imageUrl: string | null;
+  }[];
 }
 
 interface PlanIdea {
@@ -2664,6 +2678,16 @@ export default function OrgCalendarPage() {
         hasLeafHostChat: Boolean(p.hasLeafHostChat),
         leafHostChatUnread:
           typeof p.leafHostChatUnread === "number" ? p.leafHostChatUnread : 0,
+        addons: Array.isArray(p.addons)
+          ? (p.addons as Record<string, unknown>[]).map((a) => ({
+              objectId: a.objectId as string,
+              frameworkSlug: a.frameworkSlug as string,
+              title: (a.title as string | null) ?? null,
+              description: (a.description as string | null) ?? null,
+              priceCents: typeof a.priceCents === "number" ? a.priceCents : null,
+              imageUrl: (a.imageUrl as string | null) ?? null,
+            }))
+          : undefined,
       }));
 
       const planIdeas: PlanIdea[] = (result.planIdeas || []).map((idea: Record<string, unknown>) => ({
@@ -4239,6 +4263,46 @@ export default function OrgCalendarPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Add-on hint chip (design §3). Sits directly under the
+                      "HOSTED BY …" eyebrow, before the description.
+
+                      It states that add-ons exist; it is not a link or a
+                      button, because RSVP is the only path to buying one.
+                      Withheld on polls — nothing to buy against an undecided
+                      date. The "not on plans you host" half of the rule is
+                      enforced on the server, which knows who is asking; the
+                      client never receives those rows. */}
+                  {(() => {
+                    const addons = plan.addons || [];
+                    if (addons.length === 0 || plan.isPoll) return null;
+
+                    const first = addons[0];
+                    const more = addons.length - 1;
+                    return (
+                      <div
+                        className="inline-flex self-start items-center gap-2.5 bg-zinc-100 rounded-lg px-3 py-2 flex-wrap"
+                      >
+                        {first.imageUrl && (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={first.imageUrl}
+                            alt=""
+                            aria-hidden="true"
+                            className="w-6 h-6 rounded-md object-cover bg-white flex-shrink-0"
+                          />
+                        )}
+                        <p className="text-sm leading-5 font-light text-zinc-600">
+                          {first.title}
+                          <span className="text-zinc-400">
+                            {more > 0
+                              ? ` + ${more} more add-on${more === 1 ? "" : "s"} available`
+                              : " add-on available"}
+                          </span>
+                        </p>
+                      </div>
+                    );
+                  })()}
 
                   <p className="text-zinc-500 leading-relaxed font-light text-lg line-clamp-3">
                     {plan.description}
