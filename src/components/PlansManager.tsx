@@ -13,7 +13,7 @@ import NudgeModal from "@/components/dashboard/NudgeModal";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
 import { featuredWallClockDate } from "@/lib/wall-clock";
-import { isSeriesLimitError, seriesStatusChip, type SeriesSummary } from "@/lib/series";
+import { hostCandidateLabel, isSeriesLimitError, seriesStatusChip, type SeriesHostCandidate, type SeriesSummary } from "@/lib/series";
 // Shared with /org/[shareId], deliberately: this file used to carry its own
 // copy of the resolver, and the copy had drifted into showing weekly starter
 // cards at the wrong hour (and, near midnight, the wrong week).
@@ -622,6 +622,23 @@ export default function PlansManager({
   const [seriesBusy, setSeriesBusy] = useState<string | null>(null);
   const [seriesError, setSeriesError] = useState<string | null>(null);
   const [changingSeriesHostFor, setChangingSeriesHostFor] = useState<string | null>(null);
+  // Followers + past RSVPers, loaded when a Change host row opens.
+  const [seriesHostCandidates, setSeriesHostCandidates] = useState<SeriesHostCandidate[] | null>(null);
+  function openChangeSeriesHost(seriesId: string) {
+    if (changingSeriesHostFor === seriesId) {
+      setChangingSeriesHostFor(null);
+      return;
+    }
+    setChangingSeriesHostFor(seriesId);
+    if (seriesHostCandidates === null) {
+      Parse.Cloud.run("getSeriesHostCandidates", { calendarId })
+        .then((r: { candidates?: SeriesHostCandidate[] }) => setSeriesHostCandidates(r.candidates || []))
+        .catch((err: unknown) => {
+          console.warn("[PlansManager] getSeriesHostCandidates failed:", err);
+          setSeriesHostCandidates([]);
+        });
+    }
+  }
   // ?series=<id> from the owner emails — highlight that row.
   const [highlightSeriesId, setHighlightSeriesId] = useState<string | null>(null);
   useEffect(() => {
@@ -1666,7 +1683,7 @@ export default function PlansManager({
                         <div className="ml-auto flex items-center gap-3 text-[11px] font-medium">
                           <button
                             disabled={busy}
-                            onClick={() => setChangingSeriesHostFor(changingSeriesHostFor === s.id ? null : s.id)}
+                            onClick={() => openChangeSeriesHost(s.id)}
                             className="text-zinc-500 hover:text-zinc-900 transition-colors disabled:opacity-50"
                           >
                             Change host
@@ -1713,20 +1730,24 @@ export default function PlansManager({
                       {changingSeriesHostFor === s.id && (
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
                           <span className="text-[11px] text-zinc-400 mr-1">Hand it to:</span>
-                          {members
+                          {seriesHostCandidates === null && (
+                            <RefreshCw className="w-3 h-3 animate-spin text-zinc-400" />
+                          )}
+                          {(seriesHostCandidates || [])
                             .filter((m) => m.id !== s.host?.id)
                             .map((m) => (
                               <button
                                 key={m.id}
-                                disabled={busy}
+                                disabled={busy || !m.hasPhone}
+                                title={m.hasPhone ? undefined : "No phone on file — can't be texted"}
                                 onClick={() => runSeriesAction(s.id, "changeSeriesHost", { seriesId: s.id, hostUserId: m.id })}
                                 className="px-2.5 py-1 rounded-full border border-zinc-200 text-[11px] text-zinc-700 hover:border-zinc-400 transition-colors disabled:opacity-50"
                               >
-                                {m.name}
+                                {hostCandidateLabel(m)}
                               </button>
                             ))}
-                          {members.length === 0 && (
-                            <span className="text-[11px] text-zinc-400">No followers with an account yet.</span>
+                          {seriesHostCandidates && seriesHostCandidates.length === 0 && (
+                            <span className="text-[11px] text-zinc-400">Nobody has followed or RSVP&apos;d yet.</span>
                           )}
                         </div>
                       )}

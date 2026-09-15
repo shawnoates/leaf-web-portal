@@ -72,6 +72,25 @@ export type SeriesSummary = {
   maxWallClock: string;
 };
 
+/** A person the owner can hand a series to (getSeriesHostCandidates). */
+export type SeriesHostCandidate = {
+  id: string;
+  name: string;
+  hasPhone: boolean;
+  follower: boolean;
+  attendee: boolean;
+  rsvps: number;
+  attended: boolean;
+};
+
+export function hostCandidateLabel(c: SeriesHostCandidate): string {
+  const bits: string[] = [];
+  if (c.attendee) bits.push(c.attended ? "attended" : `${c.rsvps} RSVP${c.rsvps === 1 ? "" : "s"}`);
+  else if (c.follower) bits.push("follower");
+  if (!c.hasPhone) bits.push("no phone");
+  return bits.length ? `${c.name} · ${bits.join(" · ")}` : c.name;
+}
+
 /** Parse.Error code the server throws when a Starter calendar is at its series-host limit. */
 export const SERIES_HOST_LIMIT_CODE = 9031;
 

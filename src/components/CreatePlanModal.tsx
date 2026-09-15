@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import Parse from "@/lib/parse-client";
-import { monthlyRuleOptionsForDate, NTH_LABELS, WEEKDAY_NAMES, type RuleOption } from "@/lib/series";
+import { hostCandidateLabel, monthlyRuleOptionsForDate, NTH_LABELS, WEEKDAY_NAMES, type RuleOption, type SeriesHostCandidate } from "@/lib/series";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { getDefaultCoverForSeed } from "@/lib/default-covers";
 import VenueSearch from "@/components/VenueSearch";
@@ -295,6 +295,24 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   // Series host: "me" or a follower's user id. With another host the first
   // date is optional, weekly rules are hidden and the button sends an invite.
   const [seriesHostId, setSeriesHostId] = useState("me");
+  // The owner is usually also a follower/member; "Me" already covers them,
+  // and picking their own row would silently mean self-hosted (no invite).
+  const currentUserId: string | undefined = Parse.User.current()?.id;
+  // Followers AND past RSVPers of the calendar, from the server — the person
+  // who wants to run a monthly club is often a regular who never tapped
+  // Follow. The `hostCandidates` prop stands in until this resolves.
+  const [fetchedHostCandidates, setFetchedHostCandidates] = useState<SeriesHostCandidate[] | null>(null);
+  useEffect(() => {
+    if (!recurring || !isHosted || editMode || hostRequestMode || pollConvertMode) return;
+    let cancelled = false;
+    Parse.Cloud.run("getSeriesHostCandidates", { calendarId: selectedCalendarId })
+      .then((r: { candidates?: SeriesHostCandidate[] }) => { if (!cancelled) setFetchedHostCandidates(r.candidates || []); })
+      .catch((err: unknown) => console.warn("[CreatePlanModal] getSeriesHostCandidates failed:", err));
+    return () => { cancelled = true; };
+  }, [recurring, isHosted, editMode, hostRequestMode, pollConvertMode, selectedCalendarId]);
+  const hostPool: SeriesHostCandidate[] =
+    fetchedHostCandidates ??
+    (hostCandidates || []).map((c) => ({ id: c.id, name: c.name, hasPhone: true, follower: true, attendee: false, rsvps: 0, attended: false }));
   const [hostSearch, setHostSearch] = useState("");
   const [seriesRuleKey, setSeriesRuleKey] = useState<HostedRuleKey>("weekly");
   const [genericNth, setGenericNth] = useState(2);
@@ -318,7 +336,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
     }
   }, [hostedRuleOptions, seriesRuleKey]);
   const selectedHostedRule = hostedRuleOptions.find((o) => o.key === seriesRuleKey) || hostedRuleOptions[0];
-  const seriesHostName = hostCandidates?.find((c) => c.id === seriesHostId)?.name || "";
+  const seriesHostName = hostPool.find((c) => c.id === seriesHostId)?.name || "";
   const seriesHostFirstName = seriesHostName.trim().split(/\s+/)[0] || "They";
   const [creating, setCreating] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -2082,10 +2100,10 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
 
               {recurring && (
                 <div className="mt-3 space-y-3 pl-6">
-                  {isHosted && hostCandidates && hostCandidates.length > 0 && (
+                  {isHosted && (
                     <div>
                       <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Host</label>
-                      {hostCandidates.length > 8 && (
+                      {hostPool.length > 8 && (
                         <input
                           value={hostSearch}
                           onChange={(e) => setHostSearch(e.target.value)}
@@ -2099,12 +2117,16 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
                         className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 bg-transparent"
                       >
                         <option value="me">Me</option>
-                        {hostCandidates
+                        {hostPool
+                          .filter((c) => c.id !== currentUserId)
                           .filter((c) => !hostSearch || c.name.toLowerCase().includes(hostSearch.toLowerCase()) || c.id === seriesHostId)
                           .map((c) => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
+                            <option key={c.id} value={c.id} disabled={!c.hasPhone}>{hostCandidateLabel(c)}</option>
                           ))}
                       </select>
+                      {fetchedHostCandidates === null && (
+                        <p className="text-xs text-zinc-400 mt-1">Loading followers and past attendees…</p>
+                      )}
                       {hostIsOther && (
                         <p className="text-xs text-zinc-400 mt-1">
                           {seriesHostFirstName} gets a text to accept. We&apos;ll remind them 3 weeks before each date, and skip the month if they don&apos;t confirm. The first date is optional.
