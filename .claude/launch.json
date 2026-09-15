@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "leaf-admin-portal",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/shawn/Developer/Projects/leaf-admin-portal", "run", "dev", "--", "-p", "3002"],
+      "port": 3002
+    }
+  ]
+}
