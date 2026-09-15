@@ -7,6 +7,7 @@ import { Loader2, X, Check, CalendarX } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import SurveyCard from "./SurveyCard";
 import PhotoUpload from "./PhotoUpload";
+import CalendarPromoBanner from "@/components/CalendarPromoBanner";
 import type { PhotoLimits, SurveyState } from "./types";
 
 // The post-event ask, shown over /me for a plan the viewer attended and hasn't
@@ -38,6 +39,9 @@ type MemoryInfo = {
   uploadsClosed?: boolean;
   limits: PhotoLimits;
   survey?: SurveyState;
+  /** The plan's calendar. Already in this payload, so the partner banner
+   *  doesn't need the dashboard to carry an id it otherwise wouldn't. */
+  calendar?: { objectId: string } | null;
 };
 
 function whenLabel(iso: string | null): string {
@@ -248,6 +252,15 @@ export default function RecapPopup({
                         onUploaded={() => setPhotoCount((n) => n + 1)}
                       />
                     </div>
+                  )}
+
+                  {/* The thank-you lands at the end of the flow, after they've
+                      been asked for a rating rather than instead of it. */}
+                  {info.calendar?.objectId && (
+                    <CalendarPromoBanner
+                      calendarId={info.calendar.objectId}
+                      className="mt-5 pt-5 border-t border-zinc-100"
+                    />
                   )}
 
                   <div className="mt-5 pt-4 border-t border-zinc-100 text-right">

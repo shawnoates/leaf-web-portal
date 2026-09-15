@@ -6,6 +6,7 @@ import { MapPin, Calendar, X, Check, ShieldCheck, UserCheck } from "lucide-react
 import HostTheNextOne from "@/components/HostTheNextOne";
 import SurveyCard from "@/components/recap/SurveyCard";
 import PhotoUpload from "@/components/recap/PhotoUpload";
+import CalendarPromoBanner from "@/components/CalendarPromoBanner";
 import type { Photo, SurveyState } from "@/components/recap/types";
 
 type Attendee = {
@@ -407,6 +408,10 @@ export default function MemoryClient({
         <p className="text-center text-sm text-zinc-400 py-8">
           No photos yet. Be the first to share one.
         </p>
+      )}
+
+      {info.calendar?.objectId && (
+        <CalendarPromoBanner calendarId={info.calendar.objectId} className="pt-8" />
       )}
 
       {/* Host the next one — prefers a real plan idea, falls back to a

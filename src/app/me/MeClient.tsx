@@ -12,6 +12,7 @@ import CommunityQualifierCard, {
 } from "./CommunityQualifierCard";
 import ShareKitCard, { type ShareKitMePrompt } from "./ShareKitCard";
 import RecapPopup from "@/components/recap/RecapPopup";
+import CalendarPromoBanner from "@/components/CalendarPromoBanner";
 import NamePrompt from "@/components/NamePrompt";
 import { setVerifiedUserCookie } from "@/lib/verified-user";
 import NewPlanModal, {
@@ -765,6 +766,11 @@ function DashboardView({
           ) : (
             <EmptyHero onCreate={openCreate} />
           )}
+
+          {/* Below the hero on purpose: a partner thank-you shouldn't outrank
+              this person's own next plan. Renders nothing unless the server
+              finds one they're eligible for. */}
+          <CalendarPromoBanner className="pb-5" />
 
           {spine.length > 0 && (
             <section className="sect">
