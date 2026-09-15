@@ -239,6 +239,7 @@ function Heart({ on, animate }: { on: boolean; animate: boolean }) {
   useEffect(() => {
     if (!animate || failed) return;
     let cancelled = false;
+    let guard: number | null = null;
     loadHeartLottie()
       .then(([lottie, data]) => {
         if (cancelled || !boxRef.current) return;
@@ -262,12 +263,21 @@ function Heart({ on, animate }: { on: boolean; animate: boolean }) {
           a.setDirection(-1);
           a.play();
         }
+        // Watchdog: the ~500ms play must land on its end frame no matter what
+        // (a throttled rAF, a frozen player while the tab is occluded, a
+        // second instance racing this one). If it hasn't completed by then,
+        // park it on the frame the state says it should show.
+        guard = window.setTimeout(() => {
+          if (animRef.current !== a) return;
+          a.goToAndStop(on ? a.totalFrames - 1 : 0, true);
+        }, 900);
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
       });
     return () => {
       cancelled = true;
+      if (guard) window.clearTimeout(guard);
     };
   }, [on, animate, failed]);
 
@@ -350,7 +360,7 @@ const INTEREST_PROMPT_CSS = `
 .ip-heart.live .ip-lottie{display:block}
 .ip-text{position:absolute;left:16px;right:16px;bottom:14px;display:block}
 .ip-meta{display:block;margin-bottom:5px;font-size:10px;font-weight:700;letter-spacing:.09em;
-  text-transform:uppercase;color:rgba(255,255,255,.8)}
+  text-transform:uppercase;color:rgba(255,255,255,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ip-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
   font-family:var(--ip-serif);font-weight:400;font-size:21px;line-height:1.18;color:#fff;text-wrap:pretty}
 

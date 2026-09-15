@@ -35,9 +35,9 @@ Sort suggested plans by **interest count, descending** (internal count — not d
 - Subline (desktop only): *One tap marks interest. Nothing is a commitment.*
 - Footnote (mobile, under the cards): *Nothing is a commitment. We'll text you if it happens.*
 - Status line (bottom left): `Tap any you'd go to` → `{n} marked` (mobile) / `Tap as many as you like.` → `{n} marked. We'll text you if it happens.` (desktop).
-- Primary button: **Done**. Desktop also has a **SKIP** text link to its left. Mobile has no Skip — the ✕ closes it.
+- Primary button: **Done**. No Skip link on either surface (dropped 2026-09-14) — the ✕, Esc and the scrim close it.
 
-The status line is text, not a control. Only Done, Skip, ✕ and the cards are tappable.
+The status line is text, not a control. Only Done, ✕ and the cards are tappable.
 
 ## Plan card
 Shared: `position:relative; border-radius:16–18px; overflow:hidden`, photo fills the card (`object-fit: cover`), gradient scrim above the photo, text bottom-left, heart centered in the upper area. Card is one tap target; everything layered on it is `pointer-events:none`.
@@ -77,7 +77,7 @@ Reduced motion: skip the animation, cross-fade the fill.
 - ✕ top-right, `#a1a1aa`.
 - Header: padding `40px 48px 0`, max-width 620. Eyebrow `#a1a1aa`. Headline Newsreader 33px/1.15 `#18181b`. Subline 14.5px `#71717a`.
 - Grid: padding `26px 48px 8px`, `repeat(3, minmax(0,1fr))`, gap 16, scrolls.
-- Footer: `16px 48px 24px`, `border-top: 1px solid rgba(0,0,0,.07)`, status `#71717a` 13.5px; right: SKIP (11.5px/700, letter-spacing .14em, uppercase, `#a1a1aa`) then Done — height 44, padding `0 26px`, radius 10, bg `#18181b`, text `#fff` 14px/600.
+- Footer: `16px 48px 24px`, `border-top: 1px solid rgba(0,0,0,.07)`, status `#71717a` 13.5px; right: Done — height 44, padding `0 26px`, radius 10, bg `#18181b`, text `#fff` 14px/600.
 
 Between breakpoints, the grid drops to 2 columns before switching to the mobile layout.
 
@@ -85,7 +85,7 @@ Between breakpoints, the grid drops to 2 columns before switching to the mobile 
 | Path | Neighborhood calendar | Other calendar |
 |---|---|---|
 | Done | Close, then open the Share Kit modal | Close (the public page is underneath) |
-| Skip / ✕ / Esc / scrim | Same as Done | Same as Done |
+| ✕ / Esc / scrim | Same as Done | Same as Done |
 
 Never chain the Share Kit for non-neighborhood calendars, and never show the interest modal twice in one follow.
 
@@ -104,7 +104,7 @@ Never chain the Share Kit for non-neighborhood calendars, and never show the int
 | `follow_interest_tap` | itemId, on (true = mark, false = unmark), title |
 | `follow_interest_list_closed` | via (`done` / `skip`), marked |
 
-Watch: share of shows with ≥1 mark, net marks per show, Done vs Skip, per-calendar breakdown, most-marked cards.
+Watch: share of shows with ≥1 mark, net marks per show, Done vs dismiss (✕/Esc/scrim, logged as `skip`), per-calendar breakdown, most-marked cards.
 
 ## Fallbacks
 - Plan with no image: solid `#3f3f46` (mobile) / `#e4e4e7` (desktop) card with the same scrim and text. No stock substitute.

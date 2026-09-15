@@ -3576,7 +3576,10 @@ export default function OrgCalendarPage() {
         id: `ai:${idx}`,
         title: ev.title || ev.name,
         dateLabel: interestDateLabel(d, true),
-        place: ev.venueLine || null,
+        // On rows with a `title`, `name` is the venue ("Central Park"). Older
+        // rows use `name` as the event name and carry no venue field — leave
+        // the place off rather than show `venueLine`, which is address + blurb.
+        place: ev.title ? ev.name || null : null,
         image: ev.imageUrl || null,
         count: aiInterestCounts[idx] ?? org.aiSourceEventInterests?.[idx] ?? 0,
         at: d.getTime(),
