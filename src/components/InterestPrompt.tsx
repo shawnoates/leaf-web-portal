@@ -179,8 +179,13 @@ function usePrefersReducedMotion() {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     const update = () => setReduced(mq.matches);
     update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
+    // Older iOS Safari only has the deprecated addListener.
+    if (typeof mq.addEventListener === "function") {
+      mq.addEventListener("change", update);
+      return () => mq.removeEventListener("change", update);
+    }
+    mq.addListener(update);
+    return () => mq.removeListener(update);
   }, []);
   return reduced;
 }
@@ -256,12 +261,17 @@ function Heart({ on, animate }: { on: boolean; animate: boolean }) {
           setLive(true);
         }
         const a = animRef.current;
-        if (on) {
-          a.setDirection(1);
-          a.goToAndPlay(0, true);
-        } else {
-          a.setDirection(-1);
-          a.play();
+        try {
+          if (on) {
+            a.setDirection(1);
+            a.goToAndPlay(0, true);
+          } else {
+            a.setDirection(-1);
+            a.play();
+          }
+        } catch {
+          setFailed(true);
+          return;
         }
         // Watchdog: the ~500ms play must land on its end frame no matter what
         // (a throttled rAF, a frozen player while the tab is occluded, a
@@ -309,17 +319,24 @@ function InterestPromptStyles() {
 }
 
 const INTEREST_PROMPT_CSS = `
-.ip-scrim{position:fixed;inset:0;z-index:50;display:flex;align-items:stretch;justify-content:center;
-  background:rgba(40,30,10,.32)}
+/* Mobile: full-screen, but sized to the SMALL viewport (100svh — the height
+   with Safari's toolbar expanded). With plain inset:0 the sheet grows under a
+   minimized iOS toolbar and the footer lands in the strip where a tap only
+   re-expands the toolbar; Done and ✕ then look dead. The scrim takes the
+   ground color so the strip below the sheet reads as part of it. */
+.ip-scrim{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-start;justify-content:center;
+  background:#18181b}
 .ip{--ip-serif:var(--font-newsreader),Georgia,serif;
   position:relative;display:flex;flex-direction:column;width:100%;min-height:0;
+  height:100vh;height:100svh;
   background:#18181b;color:#fff;overflow:hidden}
 .ip *{box-sizing:border-box}
-.ip button{font:inherit;cursor:pointer}
-.ip-x{position:absolute;top:18px;right:16px;z-index:2;display:flex;padding:8px;border:0;background:none;
+.ip button{font:inherit;cursor:pointer;touch-action:manipulation}
+.ip-x{position:absolute;top:calc(8px + env(safe-area-inset-top));right:6px;z-index:2;display:flex;
+  align-items:center;justify-content:center;width:44px;height:44px;padding:0;border:0;background:none;
   color:rgba(255,255,255,.5)}
 .ip-x:hover{color:#fff}
-.ip-head{flex:none;padding:26px 24px 16px}
+.ip-head{flex:none;padding:calc(26px + env(safe-area-inset-top)) 24px 16px}
 .ip-eyebrow{margin:0 0 10px;font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
   color:rgba(255,255,255,.45)}
 .ip-h{margin:0;font-family:var(--ip-serif);font-weight:400;font-size:27px;line-height:1.12;
@@ -333,7 +350,7 @@ const INTEREST_PROMPT_CSS = `
 .ip-note{margin:14px 0 4px;font-size:12.5px;line-height:1.4;color:rgba(255,255,255,.45)}
 
 .ip-card{position:relative;display:block;width:100%;height:176px;padding:0;border:0;border-radius:18px;
-  overflow:hidden;background:#3f3f46;color:#fff;text-align:left;
+  overflow:hidden;isolation:isolate;transform:translateZ(0);background:#3f3f46;color:#fff;text-align:left;
   box-shadow:0 0 0 0 rgba(16,185,129,0);transition:box-shadow .15s ease;-webkit-tap-highlight-color:transparent}
 .ip-card.on{box-shadow:0 0 0 2px #10b981}
 .ip-card:focus-visible{outline:2px solid #fff;outline-offset:2px}
@@ -354,7 +371,9 @@ const INTEREST_PROMPT_CSS = `
 /* Lottie box: the heart occupies ~38% of the 600×600 composition (the burst
    needs the room), so the player is oversized around the 64px box and the
    heart's slightly-low centre is nudged back up. */
-.ip-lottie{display:none;position:absolute;inset:-60%;transform:translateY(-2.2%)}
+.ip-lottie{display:none;position:absolute;inset:-60%;transform:translate3d(0,-2.2%,0);will-change:transform;
+  contain:paint}
+.ip-heart.live{filter:none}
 .ip-lottie svg{display:block;width:100%;height:100%}
 .ip-heart.live .ip-heart-svg{display:none}
 .ip-heart.live .ip-lottie{display:block}
@@ -376,10 +395,10 @@ const INTEREST_PROMPT_CSS = `
   .ip-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(min-width:768px){
-  .ip-scrim{align-items:center;padding:32px 24px}
-  .ip{width:100%;max-width:960px;max-height:min(640px,calc(100vh - 64px));border-radius:12px;
+  .ip-scrim{align-items:center;padding:32px 24px;background:rgba(40,30,10,.32)}
+  .ip{width:100%;max-width:960px;height:auto;max-height:min(640px,calc(100vh - 64px));border-radius:12px;
     background:#fbfaf7;color:#18181b;box-shadow:0 20px 60px rgba(0,0,0,.22)}
-  .ip-x{top:18px;right:18px;color:#a1a1aa}
+  .ip-x{top:10px;right:10px;color:#a1a1aa}
   .ip-x:hover{color:#18181b}
   .ip-head{padding:40px 48px 0;max-width:620px}
   .ip-eyebrow{color:#a1a1aa}
