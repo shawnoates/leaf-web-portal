@@ -295,6 +295,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   // Series host: "me" or a follower's user id. With another host the first
   // date is optional, weekly rules are hidden and the button sends an invite.
   const [seriesHostId, setSeriesHostId] = useState("me");
+  const [hostSearch, setHostSearch] = useState("");
   // The owner is usually also a follower/member; "Me" already covers them,
   // and picking their own row would silently mean self-hosted (no invite).
   const currentUserId: string | undefined = Parse.User.current()?.id;
@@ -316,7 +317,6 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   const visibleHostCandidates = hostPool
     .filter((c) => c.id !== currentUserId)
     .filter((c) => !hostSearch.trim() || c.name.toLowerCase().includes(hostSearch.trim().toLowerCase()));
-  const [hostSearch, setHostSearch] = useState("");
   const [seriesRuleKey, setSeriesRuleKey] = useState<HostedRuleKey>("weekly");
   const [genericNth, setGenericNth] = useState(2);
   const [genericWeekday, setGenericWeekday] = useState(2);
