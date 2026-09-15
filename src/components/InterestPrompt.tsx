@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
+import type { AnimationItem } from "lottie-web";
 
 // ============================================================================
 // Post-follow interest modal — "Which of these would you go to?" (handoff turn
@@ -27,36 +28,42 @@ export interface InterestPromptItem {
   image: string | null;
 }
 
+export type InterestPromptCloseVia = "done" | "skip";
+
 export default function InterestPrompt({
   calendarName,
   items,
   marked,
   pending,
   onToggle,
-  onDone,
-  onSkip,
+  onClose,
 }: {
   calendarName: string;
   items: InterestPromptItem[];
   marked: ReadonlySet<string>;
   pending: ReadonlySet<string>;
   onToggle: (id: string) => void;
-  onDone: () => void;
-  /** Skip, ✕, Esc and the scrim. Continues to the same next step as Done. */
-  onSkip: () => void;
+  /** Done → "done"; Skip, ✕, Esc and the scrim → "skip". Both continue to the
+   *  same next step; `marked` is how many cards were on at close. */
+  onClose: (via: InterestPromptCloseVia, marked: number) => void;
 }) {
   // Cards toggled during THIS mount get the fill-and-pop; cards that arrive
   // already marked (seeded from existing interest records) render filled with
   // no animation.
   const [animated, setAnimated] = useState<Set<string>>(() => new Set());
+  const reducedMotion = usePrefersReducedMotion();
+
+  const count = items.reduce((n, it) => (marked.has(it.id) ? n + 1 : n), 0);
+  const countRef = useRef(count);
+  countRef.current = count;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onSkip();
+      if (e.key === "Escape") onClose("skip", countRef.current);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onSkip]);
+  }, [onClose]);
 
   // The mobile surface is full-screen; the page under it must not scroll.
   useEffect(() => {
@@ -67,7 +74,8 @@ export default function InterestPrompt({
     };
   }, []);
 
-  const count = items.reduce((n, it) => (marked.has(it.id) ? n + 1 : n), 0);
+  const skip = () => onClose("skip", countRef.current);
+  const done = () => onClose("done", countRef.current);
 
   const tap = (id: string) => {
     if (pending.has(id)) return;
@@ -81,7 +89,7 @@ export default function InterestPrompt({
   };
 
   return (
-    <div className="ip-scrim" onClick={onSkip}>
+    <div className="ip-scrim" onClick={skip}>
       <InterestPromptStyles />
       <div
         className="ip"
@@ -90,7 +98,7 @@ export default function InterestPrompt({
         aria-labelledby="ip-headline"
         onClick={(e) => e.stopPropagation()}
       >
-        <button type="button" className="ip-x" aria-label="Close" onClick={onSkip}>
+        <button type="button" className="ip-x" aria-label="Close" onClick={skip}>
           <X size={18} strokeWidth={2} />
         </button>
 
@@ -109,20 +117,19 @@ export default function InterestPrompt({
           <div className="ip-grid">
             {items.map((item) => {
               const on = marked.has(item.id);
+              const anim = animated.has(item.id);
               return (
                 <button
                   key={item.id}
                   type="button"
-                  className={`ip-card${on ? " on" : ""}${animated.has(item.id) ? " anim" : ""}`}
+                  className={`ip-card${on ? " on" : ""}${anim ? " anim" : ""}`}
                   aria-pressed={on}
                   aria-label={`${item.title}${item.dateLabel ? `, ${item.dateLabel}` : ""}${item.place ? `, ${item.place}` : ""}`}
                   onClick={() => tap(item.id)}
                 >
                   {item.image && <CardImage src={item.image} />}
                   <span className="ip-shade" aria-hidden />
-                  <span className="ip-heart" aria-hidden>
-                    <HeartIcon />
-                  </span>
+                  <Heart on={on} animate={anim && !reducedMotion} />
                   <span className="ip-text" aria-hidden>
                     {(item.dateLabel || item.place) && (
                       <span className="ip-meta">
@@ -153,10 +160,10 @@ export default function InterestPrompt({
             )}
           </p>
           <div className="ip-actions">
-            <button type="button" className="ip-skip ip-d" onClick={onSkip}>
+            <button type="button" className="ip-skip ip-d" onClick={skip}>
               Skip
             </button>
-            <button type="button" className="ip-done" onClick={onDone}>
+            <button type="button" className="ip-done" onClick={done}>
               Done
             </button>
           </div>
@@ -164,6 +171,18 @@ export default function InterestPrompt({
       </div>
     </div>
   );
+}
+
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return reduced;
 }
 
 // Card background color paints first; the photo fades in once it has loaded
@@ -187,19 +206,91 @@ function CardImage({ src }: { src: string }) {
   );
 }
 
-// Static heart. The Lottie fill-and-pop (heart-fill.json) swaps into this same
-// box once the asset lands; until then the CSS transition + keyframe below is
-// the shipped fallback, and reduced-motion cross-fades the fill.
-function HeartIcon() {
+// ---- Heart ------------------------------------------------------------------
+// Static SVG until the first tap on a card; then the Lottie (heart-fill.json,
+// the iOS app's heart burst recolored white and cut to end on the filled
+// frame) mounts in the same box and plays once — forward on mark, reversed on
+// unmark — holding its last frame. If the player or the asset fails to load,
+// the CSS fill transition + pop keyframe below stays as the fallback. Reduced
+// motion never mounts the Lottie: the fill cross-fades.
+
+const HEART_LOTTIE_URL = "/motion/heart-fill.json";
+// 50 frames @ 30fps ≈ 1.67s in the file; ×3.3 lands the fill-and-pop at ~500ms.
+const HEART_LOTTIE_SPEED = 3.3;
+
+type LottiePlayer = typeof import("lottie-web/build/player/lottie_light").default;
+let lottiePlayer: Promise<LottiePlayer> | null = null;
+let heartData: Promise<unknown> | null = null;
+function loadHeartLottie(): Promise<[LottiePlayer, unknown]> {
+  lottiePlayer ??= import("lottie-web/build/player/lottie_light").then((m) => m.default);
+  heartData ??= fetch(HEART_LOTTIE_URL).then((r) => {
+    if (!r.ok) throw new Error(`heart-fill.json ${r.status}`);
+    return r.json();
+  });
+  return Promise.all([lottiePlayer, heartData]);
+}
+
+function Heart({ on, animate }: { on: boolean; animate: boolean }) {
+  const boxRef = useRef<HTMLSpanElement>(null);
+  const animRef = useRef<AnimationItem | null>(null);
+  const [live, setLive] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!animate || failed) return;
+    let cancelled = false;
+    loadHeartLottie()
+      .then(([lottie, data]) => {
+        if (cancelled || !boxRef.current) return;
+        if (!animRef.current) {
+          animRef.current = lottie.loadAnimation({
+            container: boxRef.current,
+            renderer: "svg",
+            loop: false,
+            autoplay: false,
+            animationData: data as object,
+            rendererSettings: { preserveAspectRatio: "xMidYMid meet", progressiveLoad: false },
+          });
+          animRef.current.setSpeed(HEART_LOTTIE_SPEED);
+          setLive(true);
+        }
+        const a = animRef.current;
+        if (on) {
+          a.setDirection(1);
+          a.goToAndPlay(0, true);
+        } else {
+          a.setDirection(-1);
+          a.play();
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [on, animate, failed]);
+
+  useEffect(
+    () => () => {
+      animRef.current?.destroy();
+      animRef.current = null;
+    },
+    [],
+  );
+
   return (
-    <svg viewBox="0 0 24 24" className="ip-heart-svg" focusable="false">
-      <path
-        d="M12 21s-6.7-4.3-9.3-8.2C.6 9.6 1.6 5.6 5 4.3c2.2-.8 4.5 0 7 2.6 2.5-2.6 4.8-3.4 7-2.6 3.4 1.3 4.4 5.3 2.3 8.5C18.7 16.7 12 21 12 21z"
-        stroke="#fff"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <span className={`ip-heart${live ? " live" : ""}`} aria-hidden>
+      <svg viewBox="0 0 24 24" className="ip-heart-svg" focusable="false">
+        <path
+          d="M12 21s-6.7-4.3-9.3-8.2C.6 9.6 1.6 5.6 5 4.3c2.2-.8 4.5 0 7 2.6 2.5-2.6 4.8-3.4 7-2.6 3.4 1.3 4.4 5.3 2.3 8.5C18.7 16.7 12 21 12 21z"
+          stroke="#fff"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span ref={boxRef} className="ip-lottie" />
+    </span>
   );
 }
 
@@ -246,10 +337,17 @@ const INTEREST_PROMPT_CSS = `
 .ip-heart-svg{display:block;width:100%;height:100%;overflow:visible;
   fill:rgba(255,255,255,.12);transition:fill .2s ease}
 .ip-card.on .ip-heart-svg{fill:#fff}
-.ip-card.on.anim .ip-heart{animation:ip-pop .5s cubic-bezier(.2,.8,.3,1.2) 1 both}
-.ip-card.anim:not(.on) .ip-heart{animation:ip-unpop .22s ease-out 1 both}
+.ip-card.on.anim .ip-heart:not(.live){animation:ip-pop .5s cubic-bezier(.2,.8,.3,1.2) 1 both}
+.ip-card.anim:not(.on) .ip-heart:not(.live){animation:ip-unpop .22s ease-out 1 both}
 @keyframes ip-pop{0%{transform:scale(1)}38%{transform:scale(1.3)}66%{transform:scale(.92)}100%{transform:scale(1)}}
 @keyframes ip-unpop{0%{transform:scale(1)}50%{transform:scale(.86)}100%{transform:scale(1)}}
+/* Lottie box: the heart occupies ~38% of the 600×600 composition (the burst
+   needs the room), so the player is oversized around the 64px box and the
+   heart's slightly-low centre is nudged back up. */
+.ip-lottie{display:none;position:absolute;inset:-80%;transform:translateY(-2.2%)}
+.ip-lottie svg{display:block;width:100%;height:100%}
+.ip-heart.live .ip-heart-svg{display:none}
+.ip-heart.live .ip-lottie{display:block}
 .ip-text{position:absolute;left:16px;right:16px;bottom:14px;display:block}
 .ip-meta{display:block;margin-bottom:5px;font-size:10px;font-weight:700;letter-spacing:.09em;
   text-transform:uppercase;color:rgba(255,255,255,.8)}

@@ -12,7 +12,11 @@ import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
 import LeafHostPlanThread from "@/components/LeafHostPlanThread";
 import NamePrompt from "@/components/NamePrompt";
 import ShareKitPrompt, { type ShareKitPayload } from "@/components/ShareKitPrompt";
-import InterestPrompt, { type InterestPromptItem } from "@/components/InterestPrompt";
+import InterestPrompt, {
+  type InterestPromptItem,
+  type InterestPromptCloseVia,
+} from "@/components/InterestPrompt";
+import { track } from "@/lib/track";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
@@ -1360,10 +1364,11 @@ function FollowModal({
    *  null means skip straight to the share kit / success. The sets and the
    *  toggle are live — the page owns the writes. */
   interest?: {
-    take: () => InterestPromptItem[] | null;
+    take: (source: "follow_modal" | "follow_popup") => InterestPromptItem[] | null;
     marked: ReadonlySet<string>;
     pending: ReadonlySet<string>;
     onToggle: (id: string) => void;
+    onClosed: (via: InterestPromptCloseVia, marked: number) => void;
   };
 }) {
   const verify = usePhoneVerify();
@@ -1378,10 +1383,14 @@ function FollowModal({
   // Done / Skip / ✕ / Esc / scrim all continue to the same next step: the
   // share kit on a neighborhood calendar, otherwise the calendar page itself
   // (which is already underneath — closing is the "navigate").
-  const finishInterest = useCallback(() => {
-    if (intro) setFormStep("intro");
-    else onClose();
-  }, [intro, onClose]);
+  const finishInterest = useCallback(
+    (via: InterestPromptCloseVia, marked: number) => {
+      interest?.onClosed(via, marked);
+      if (intro) setFormStep("intro");
+      else onClose();
+    },
+    [intro, onClose, interest],
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1417,7 +1426,7 @@ function FollowModal({
       // share kit if this is a neighborhood calendar. Snapshot before the
       // parent's onFollowed replays a held tap, so a bumped count can't
       // reorder the list it is about to show.
-      const items = interest?.take() ?? null;
+      const items = interest?.take("follow_modal") ?? null;
       onFollowed(verify.name, verify.phone, false, ask, !!items || !!ask);
       setIntro(ask);
       if (items) {
@@ -1449,8 +1458,7 @@ function FollowModal({
         marked={interest.marked}
         pending={interest.pending}
         onToggle={interest.onToggle}
-        onDone={finishInterest}
-        onSkip={finishInterest}
+        onClose={finishInterest}
       />
     );
   }
@@ -2537,7 +2545,7 @@ export default function OrgCalendarPage() {
           setShowFollowPopup(false);
           // The interest modal is the post-follow surface when there's
           // something to show; the toast covers the rest.
-          const items = takeInterestPrompt();
+          const items = takeInterestPrompt("follow_popup");
           if (items) {
             setInterestPrompt(items);
           } else {
@@ -3606,6 +3614,15 @@ export default function OrgCalendarPage() {
   const toggleInterest = useCallback(
     (id: string) => {
       const on = interestMarked.has(id);
+      track(
+        "follow_interest_tap",
+        {
+          itemId: id,
+          on: !on,
+          title: interestPromptItems.find((i) => i.id === id)?.title ?? null,
+        },
+        org?.objectId,
+      );
       if (id.startsWith("idea:")) {
         const ideaId = id.slice(5);
         void (on ? removePlanIdeaInterest(ideaId) : runPlanIdeaInterest(ideaId));
@@ -3615,19 +3632,47 @@ export default function OrgCalendarPage() {
         void (on ? removeAIEventInterest(idx) : runAIEventInterest(idx));
       }
     },
-    [interestMarked, removePlanIdeaInterest, runPlanIdeaInterest, removeAIEventInterest, runAIEventInterest],
+    [
+      interestMarked,
+      interestPromptItems,
+      org?.objectId,
+      removePlanIdeaInterest,
+      runPlanIdeaInterest,
+      removeAIEventInterest,
+      runAIEventInterest,
+    ],
   );
 
   // Gate + snapshot, called the moment a follow lands. Null skips the modal:
   // suggestions off / nothing to show, or already shown for this calendar in
   // this browser. Marks it seen on the way out so it never shows twice.
-  const takeInterestPrompt = useCallback((): InterestPromptItem[] | null => {
-    if (!org) return null;
-    if (interestPromptItems.length === 0) return null;
-    if (hasSeenInterestPrompt(org.objectId)) return null;
-    markInterestPromptSeen(org.objectId);
-    return interestPromptItems;
-  }, [org, interestPromptItems]);
+  const takeInterestPrompt = useCallback(
+    (source: "follow_modal" | "follow_popup"): InterestPromptItem[] | null => {
+      if (!org) return null;
+      if (interestPromptItems.length === 0) return null;
+      if (hasSeenInterestPrompt(org.objectId)) return null;
+      markInterestPromptSeen(org.objectId);
+      track(
+        "follow_interest_list_shown",
+        {
+          source,
+          count: interestPromptItems.length,
+          itemIds: interestPromptItems.map((i) => i.id),
+          preMarked: interestPromptItems.filter((i) => interestMarked.has(i.id)).length,
+        },
+        org.objectId,
+      );
+      return interestPromptItems;
+    },
+    [org, interestPromptItems, interestMarked],
+  );
+
+  const onInterestPromptClosed = useCallback(
+    (via: InterestPromptCloseVia, marked: number) => {
+      track("follow_interest_list_closed", { via, marked }, org?.objectId);
+    },
+    [org?.objectId],
+  );
 
   // Page-level mount for the one-tap follow popup, which doesn't go through
   // FollowModal (and never chains the share kit).
@@ -6414,6 +6459,7 @@ export default function OrgCalendarPage() {
             marked: interestMarked,
             pending: interestPending,
             onToggle: toggleInterest,
+            onClosed: onInterestPromptClosed,
           }}
           onClose={() => {
             setShowFollowModal(false);
@@ -6457,8 +6503,10 @@ export default function OrgCalendarPage() {
           marked={interestMarked}
           pending={interestPending}
           onToggle={toggleInterest}
-          onDone={() => setInterestPrompt(null)}
-          onSkip={() => setInterestPrompt(null)}
+          onClose={(via, marked) => {
+            onInterestPromptClosed(via, marked);
+            setInterestPrompt(null);
+          }}
         />
       )}
 
