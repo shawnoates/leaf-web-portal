@@ -16,10 +16,11 @@ This modal replaces nothing; it runs *before* the Share Kit and is the only post
 Two surfaces: **mobile** (9a) and **desktop** (9b).
 
 ## Gating
-Show when all are true:
+Show when both are true:
 1. Follow just succeeded (this session, this calendar).
 2. The calendar has suggestions enabled and ≥1 suggested plan available.
-3. The user has not already seen this modal for this calendar.
+
+It shows on **every** follow (no once-per-calendar flag — dropped 2026-09-14); a re-follow is a fresh moment. It still never shows twice within one follow.
 
 If suggestions are off or the list is empty: skip straight to the Share Kit (neighborhood) or the public page (everything else).
 
@@ -93,7 +94,6 @@ Never chain the Share Kit for non-neighborhood calendars, and never show the int
 - Card ids are `idea:<CalendarGeneratedPlan.objectId>` and `ai:<aiSourceEvents index>` — both suggestion sources feed one list; around-the-city (featured) rows are excluded.
 - Marked = the page's `planIdeaLocallyInterested` / `aiLocallyInterested` sets, so the calendar cards underneath agree the moment the modal closes.
 - Writes: `expressInterestOnPlanIdea` / `removeInterestOnPlanIdea`, `expressInterestOnAIEvent` / `removeInterestOnAIEvent`.
-- Seen flag: localStorage `leaf_interest_modal_seen_<calendarId>`, set when the modal opens.
 
 ## Instrumentation (as built)
 `src/lib/track.ts` → `window.dataLayer` + cloud `recordWebEvent` (`WebEvent` class, `cloud/web-events.js`). Read in the admin portal at Analytics › Web events (`adminGetWebEventStats`).

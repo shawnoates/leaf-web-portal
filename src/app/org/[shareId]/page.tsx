@@ -462,27 +462,6 @@ function unmarkPlanIdeaLocallyInterested(ideaId: string) {
   }
 }
 
-// Post-follow interest modal ("Which of these would you go to?") — shown once
-// per calendar per browser. The key is set the moment the modal opens, so a
-// second follow (or a refresh mid-modal) never shows it again.
-const INTEREST_PROMPT_SEEN_PREFIX = "leaf_interest_modal_seen_";
-function hasSeenInterestPrompt(calendarId: string): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    return !!localStorage.getItem(`${INTEREST_PROMPT_SEEN_PREFIX}${calendarId}`);
-  } catch {
-    return false;
-  }
-}
-function markInterestPromptSeen(calendarId: string) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(`${INTEREST_PROMPT_SEEN_PREFIX}${calendarId}`, String(Date.now()));
-  } catch {
-    /* quota / storage disabled */
-  }
-}
-
 // Short date for the interest modal's meta line: "Sun, Sep 21". Starter
 // (AI-event) dates are floating wall clocks stored on the UTC face, so those
 // format in UTC; plan-idea spread dates are real instants and format locally.
@@ -3651,14 +3630,13 @@ export default function OrgCalendarPage() {
   );
 
   // Gate + snapshot, called the moment a follow lands. Null skips the modal:
-  // suggestions off / nothing to show, or already shown for this calendar in
-  // this browser. Marks it seen on the way out so it never shows twice.
+  // suggestions off or nothing to show. Deliberately NOT once-per-calendar —
+  // it shows on every follow (a re-follow is a fresh moment), and the caller
+  // snapshots the list so it can't show twice within one follow.
   const takeInterestPrompt = useCallback(
     (source: "follow_modal" | "follow_popup"): InterestPromptItem[] | null => {
       if (!org) return null;
       if (interestPromptItems.length === 0) return null;
-      if (hasSeenInterestPrompt(org.objectId)) return null;
-      markInterestPromptSeen(org.objectId);
       track(
         "follow_interest_list_shown",
         {
