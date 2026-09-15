@@ -5,11 +5,15 @@ import Parse from "@/lib/parse-client";
 import { getVerifiedUserCookie } from "@/lib/verified-user";
 import { Check, Copy, ExternalLink, Gift, Loader2, X } from "lucide-react";
 
-// Partner thank-you banner on /org/<shareId>. The server only returns a banner
-// to people who follow the calendar or attended one of its plans, and it
-// withholds the promo code until "Show code" is tapped, so this component
-// never has to decide eligibility itself.
-
+// Partner thank-you banner. The server only returns a banner to people who
+// follow the calendar or attended one of its plans, and it withholds the promo
+// code until "Show code" is tapped, so this component never has to decide
+// eligibility itself.
+//
+// Two modes, because two kinds of surface show it:
+//   - a calendar is in context (/org/<shareId>, a recap) → that calendar's banner
+//   - no calendar is in context (/me) → the server picks the best one across
+//     every calendar this viewer follows or attended, and names it
 interface ViewerBanner {
   objectId: string;
   brandName: string | null;
@@ -20,6 +24,8 @@ interface ViewerBanner {
   ctaUrl: string | null;
   expiresAt: string | null;
   reason: "following" | "attended";
+  /** Only set by getBannerForMe, where the calendar isn't already on screen. */
+  calendarName?: string | null;
 }
 
 const DISMISS_PREFIX = "leaf_banner_dismissed_";
@@ -51,14 +57,18 @@ function formatEnds(isoString: string | null) {
 
 export default function CalendarPromoBanner({
   calendarId,
-  isFollowing,
+  isFollowing = false,
   brandColor,
+  className = "max-w-6xl mx-auto px-6 pt-6",
 }: {
-  calendarId: string;
+  /** Omit to let the server pick across all of this viewer's calendars. */
+  calendarId?: string | null;
   // Re-checked when it flips, so a visitor who follows from this page sees the
   // banner without a reload.
-  isFollowing: boolean;
+  isFollowing?: boolean;
   brandColor?: string | null;
+  /** Outer spacing, which differs per surface. */
+  className?: string;
 }) {
   const [banner, setBanner] = useState<ViewerBanner | null>(null);
   const [code, setCode] = useState<string | null>(null);
@@ -68,7 +78,11 @@ export default function CalendarPromoBanner({
 
   useEffect(() => {
     let cancelled = false;
-    Parse.Cloud.run("getCalendarBannerForViewer", { calendarId, phoneNumber: viewerPhone() })
+    const phoneNumber = viewerPhone();
+    const request = calendarId
+      ? Parse.Cloud.run("getCalendarBannerForViewer", { calendarId, phoneNumber })
+      : Parse.Cloud.run("getBannerForMe", { phoneNumber });
+    request
       .then((r: { banner: ViewerBanner | null }) => {
         if (cancelled) return;
         setBanner(r.banner && !isDismissed(r.banner.objectId) ? r.banner : null);
@@ -123,7 +137,7 @@ export default function CalendarPromoBanner({
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-6 pt-6">
+    <div className={className}>
       <section
         aria-label={banner.brandName ? `Offer from ${banner.brandName}` : "Partner offer"}
         className="relative border border-zinc-200 bg-white rounded-xl px-5 py-4 sm:px-6 sm:py-5 flex flex-col sm:flex-row sm:items-center gap-4"
@@ -137,15 +151,24 @@ export default function CalendarPromoBanner({
           <X className="w-3.5 h-3.5" />
         </button>
 
-        <div className="flex-1 min-w-0 pr-6 sm:pr-0">
+        {/* Spacing is gap, not margin: /me scopes a `.leafme p { margin: 0 }`
+            reset that outranks Tailwind's mt-* utilities and would flatten
+            this block. */}
+        <div className="flex-1 min-w-0 pr-6 sm:pr-0 flex flex-col gap-1">
           <p className="flex items-center gap-1.5 text-[10px] tracking-wider uppercase font-bold text-zinc-500">
             <Gift className="w-3.5 h-3.5" />
             {banner.brandName ? `A thank-you from ${banner.brandName}` : "A thank-you for our community"}
           </p>
-          <p className="text-base font-medium text-zinc-900 mt-1">{banner.headline}</p>
-          {banner.body && <p className="text-sm text-zinc-600 mt-1">{banner.body}</p>}
-          <p className="text-[11px] text-zinc-400 mt-2">
-            {banner.reason === "attended" ? "For people who came out" : "For followers of this calendar"}
+          <p className="text-base font-medium text-zinc-900">{banner.headline}</p>
+          {banner.body && <p className="text-sm text-zinc-600">{banner.body}</p>}
+          <p className="text-[11px] text-zinc-400 pt-1">
+            {banner.reason === "attended"
+              ? banner.calendarName
+                ? `Because you came out with ${banner.calendarName}`
+                : "For people who came out"
+              : banner.calendarName
+                ? `Because you follow ${banner.calendarName}`
+                : "For followers of this calendar"}
             {ends && ` · Ends ${ends}`}
           </p>
         </div>
