@@ -16,6 +16,10 @@ The host never becomes a co-host and gets no dashboard access. The owner keeps t
 | Host doesn't confirm by the final reminder | **Skip that month** |
 | What the host can change | **Everything**, including ending the series. Owner can still override. |
 | Host page security | **Signed link + one-time phone code**. Confirming the proposed date works with the link alone; everything else asks for a code sent to the host's phone on file. |
+| Repeated no-reply skips | **Pause after 2 in a row** and tell the owner |
+| Reminder timing (rule-based) | **21 / 10 / 7 days**: first text, final text, skip |
+| Attendees on the host page | **Names only**, never phone numbers |
+| Owner told about a skipped month | **Dashboard chip + email** |
 
 ## What exists today (and the gaps)
 - `PlanSeries` (`cloud/recurringPlans.js`) supports `weekly | biweekly | monthly`. Monthly repeats the same day of the month (`computeNextDate`, :38). There is no nth-weekday rule.
@@ -88,7 +92,7 @@ New cron `sweepSeriesHostCycles` runs hourly through `/jobs/`, leader-gated (see
 |---|---|
 | R − 21d | Open the proposal (`awaitingHost`) and send T2: "keep it or pick another date" |
 | R − 10d | Send T3, the final reminder, which states the skip deadline |
-| R − 7d, no answer | **Skip:** push a `skippedCycles` entry, `consecutiveSkips += 1`, move `nextRuleAt` forward one month, close the proposal. Send T4 to the host. Followers get nothing. |
+| R − 7d, no answer | **Skip:** push a `skippedCycles` entry, `consecutiveSkips += 1`, move `nextRuleAt` forward one month, close the proposal. Send T4 to the host and E1 to the owner. Followers get nothing. |
 
 **`hostPicks`**, where *E* = end of the last occurrence (or accept time):
 
@@ -96,9 +100,9 @@ New cron `sweepSeriesHostCycles` runs hourly through `/jobs/`, leader-gated (see
 |---|---|
 | E + 1d | Open the proposal and send T2b: "when's the next one?" |
 | + 11d | Send T3b |
-| + 21d, no date | Skip the cycle; the next one opens 30 days later |
+| + 21d, no date | Skip the cycle and send E1 to the owner; the next one opens 30 days later |
 
-**Repeated skips:** after **2 consecutive skips** the series pauses (`repeatedSkips`) and the owner is told (dashboard badge + inbox item). This stops a silent series from texting the host forever. *(Open question 1.)*
+**Repeated skips:** after **2 consecutive skips** the series pauses (`repeatedSkips`). The owner gets E2 and a dashboard badge. This stops a silent series from texting the host forever.
 
 All texts follow the calendar's 9am–9pm local window. The sweep runs hourly, so an out-of-window text goes out on the first run after 9am.
 
@@ -139,7 +143,7 @@ All texts follow the calendar's 9am–9pm local window. The sweep runs hourly, s
   - `verifySeriesHostCode({ seriesId, token, code })` returns a session token.
   - Every mutation other than one-tap confirm checks that `request.user.id === series.host.id`, or that the caller is the owner, a co-host or an admin.
 - Rate-limit the public token endpoints the same way `host-offer-functions.js:177` does.
-- Attendee **names** only appear on the host page, never phone numbers. *(Open question 2.)*
+- Attendee **names** only appear on the host page, never phone numbers.
 
 ## Texts
 Trigger names are for `SmsLog` via `sendSmsTracked`. These are transactional texts the host signed up for, so they **don't count** against the shared 2/week extra-SMS limit (`extraSmsSlotUsed`); that limit is for promos and nudges. They do respect quiet hours.
@@ -154,6 +158,15 @@ Trigger names are for `SmsLog` via `sendSmsTracked`. These are transactional tex
 | T3b | `seriesProposalPickFinal` | Pick a date for the next {Title} by {Tue Oct 6}, or we'll check back next month. {link} |
 | T4 | `seriesCycleSkipped` | No {Title} in {October}. We'll check in about {November}. {link} |
 | T5 | `seriesOccurrenceMoved` | {Title} moved to {Thu Oct 15, 7pm}. Still coming? {plan link} |
+
+### Owner emails
+Sent with the Mailgun client the co-host invite already uses (`inviteCoHost`, `functions.js:33258`), to the calendar owner's email. Quiet hours don't apply.
+
+| # | When | Subject / body |
+|---|---|---|
+| E1 | A month is skipped (no reply) | **{Title}: {October} skipped.** {Host} didn't confirm a date, so there's no {Title} in {October}. We'll check in with {Host} about {November}. [Open series] |
+| E2 | Series paused after 2 skips | **{Title} is paused.** {Host} hasn't confirmed the last two months. Change the host, resume, or end the series. [Open series] |
+| E3 | Host declines, can't be reached, or ends the series | **{Title}: {Host} {declined / can't be reached / ended the series}.** [Open series] |
 
 If the host has `smsNotificationsDisabled`: send a push if they use the app, otherwise email if one is on file. If none of those work, pause with `noHost` and tell the owner. A host who can't be reached shouldn't turn into silent monthly skips.
 
@@ -215,11 +228,7 @@ No changes. Occurrences are normal plans, and all host actions happen by text an
 4. **Pilot:** 11 Hoyt Hangouts wine club.
 
 ## Open questions
-1. Pause after **2** consecutive no-reply skips and tell the owner, or keep skipping indefinitely?
-2. Does the host page show attendee names, or only counts?
-3. Are the 21 / 10 / 7-day timings right for a monthly club, or do you want less lead time (e.g. 14 / 7 / 5)?
-4. Should the owner get a heads-up when a month is skipped, or only see it on the dashboard?
-5. Can a series host invite a co-host for their series? (Proposed: not in v1.)
+1. Can a series host invite a co-host for their series? (Proposed: not in v1.)
 
 ## Out of scope (v1)
 Guest payments or cost splitting, several hosts or rotating hosts, host confirmation for weekly/biweekly series, iOS host UI, and host-managed IdeaSeries.

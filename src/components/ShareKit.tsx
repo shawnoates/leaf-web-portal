@@ -280,7 +280,7 @@ const CSS = `
 .sk-link{border:0;background:none;padding:0;font-size:14px;color:rgba(0,0,0,.55);text-decoration:underline;cursor:pointer}
 .sk-link:hover{color:var(--sk-ink)}
 .sk [aria-disabled="true"]{opacity:.5;cursor:default;pointer-events:none}
-.sk-btn:focus-visible,.sk-link:focus-visible,.sk-row-head:focus-visible,.sk-later:focus-visible{
+.sk-btn:focus-visible,.sk-link:focus-visible,.sk-row-head:focus-visible{
   outline:2px solid var(--sk-accent);outline-offset:2px}
 
 /* Post-follow: bottom sheet under 768px, centered modal above */
@@ -294,23 +294,17 @@ const CSS = `
 .sk-title .sk-h{font-size:30px;line-height:1.1}
 .sk-title .sk-intro{font-size:14px}
 .sk-h-d{display:none}
-.sk-later{border:0;background:none;padding:0;font-size:14px;color:rgba(0,0,0,.5);cursor:pointer}
-.sk-later:hover{color:var(--sk-ink)}
-.sk-later.top{display:none}
 .sk-post .sk-rows{overflow:auto;min-height:0;padding:0 14px}
-.sk-foot{flex:none;text-align:center;padding-top:16px}
 @media(min-width:768px){
   .sk-post{padding-bottom:18px}
   .sk-band{height:84px}
   .sk-sky-m{display:none}.sk-sky-d{display:block}
   .sk-grip{display:none}
-  .sk-title{padding:24px 30px 22px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+  .sk-title{padding:24px 30px 22px}
   .sk-title .sk-h{font-size:32px}
   .sk-h-m{display:none}.sk-h-d{display:inline}
-  .sk-later.top{display:block;white-space:nowrap;padding:4px 0 0 12px;color:rgba(0,0,0,.45)}
   .sk-post .sk-rows{padding:0 20px}
   .sk-post .sk-btn{height:42px}
-  .sk-foot{display:none}
 }
 
 /* /me card: compact rows in a 2×2 grid beside the headline */

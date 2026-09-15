@@ -43,8 +43,8 @@ export default function InterestPrompt({
   marked: ReadonlySet<string>;
   pending: ReadonlySet<string>;
   onToggle: (id: string) => void;
-  /** Done → "done"; Skip, ✕, Esc and the scrim → "skip". Both continue to the
-   *  same next step; `marked` is how many cards were on at close. */
+  /** Done → "done"; ✕, Esc and the scrim → "skip". Both continue to the same
+   *  next step; `marked` is how many cards were on at close. */
   onClose: (via: InterestPromptCloseVia, marked: number) => void;
 }) {
   // Cards toggled during THIS mount get the fill-and-pop; cards that arrive
@@ -163,9 +163,6 @@ export default function InterestPrompt({
             )}
           </p>
           <div className="ip-actions">
-            <button type="button" className="ip-skip ip-d" onClick={skip}>
-              Skip
-            </button>
             <button type="button" className="ip-done" onClick={done}>
               Done
             </button>
@@ -361,9 +358,6 @@ const INTEREST_PROMPT_CSS = `
   padding:16px 24px calc(26px + env(safe-area-inset-bottom))}
 .ip-status{margin:0;font-size:13.5px;line-height:1.35;color:rgba(255,255,255,.5)}
 .ip-actions{display:flex;align-items:center;gap:22px;flex:none}
-.ip-skip{border:0;background:none;padding:6px 0;font-size:11.5px;font-weight:700;letter-spacing:.14em;
-  text-transform:uppercase;color:#a1a1aa}
-.ip-skip:hover{color:#71717a}
 .ip-done{height:48px;padding:0 30px;border:0;border-radius:14px;background:#fff;color:#18181b;
   font-size:15px;font-weight:600}
 .ip-done:hover{opacity:.92}
@@ -392,7 +386,6 @@ const INTEREST_PROMPT_CSS = `
   .ip-title{font-size:19px;line-height:1.2}
   .ip-foot{padding:16px 48px 24px;border-top:1px solid rgba(0,0,0,.07)}
   .ip-status{color:#71717a}
-  .ip-skip.ip-d{display:inline-block}
   .ip-done{height:44px;padding:0 26px;border-radius:10px;background:#18181b;color:#fff;font-size:14px}
 }
 @media(min-width:768px) and (max-width:899px){

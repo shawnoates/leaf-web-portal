@@ -9,9 +9,9 @@ export type { ShareKitPayload };
 /**
  * Post-follow share kit (handoff turn 4): the modal / bottom sheet body shown
  * inside FollowModal once a public follow has landed. Requires a Parse
- * session — the caller adopts the OTP session before mounting this. "Maybe
- * later", the scrim, and Esc all close without recording an answer; the kit
- * resurfaces on /me.
+ * session — the caller adopts the OTP session before mounting this. There is
+ * no dismiss button on this step: the scrim and Esc close it without
+ * recording an answer, and the kit resurfaces on /me.
  */
 export default function ShareKitPrompt({
   payload,
@@ -45,12 +45,8 @@ export default function ShareKitPrompt({
           </h3>
           <p className="sk-intro">{COPY.introPostFollow}</p>
         </div>
-        <button type="button" className="sk-later top" onClick={onDone}>{COPY.maybeLater}</button>
       </div>
       <ShareKitRows kit={kit} />
-      <div className="sk-foot">
-        <button type="button" className="sk-later" onClick={onDone}>{COPY.maybeLater}</button>
-      </div>
     </div>
   );
 }

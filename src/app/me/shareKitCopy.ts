@@ -38,7 +38,6 @@ export const COPY = {
   headlineLines: ["Bring a few", "neighbors along"],
   introPostFollow: "You're following. Know anyone else who'd want in? We wrote the notes, you just send them.",
   introMe: "Know anyone who'd want in? We wrote the notes, you just send them.",
-  maybeLater: "Maybe later",
   copied: "Copied",
 
   options: [

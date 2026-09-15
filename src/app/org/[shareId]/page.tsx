@@ -1478,13 +1478,17 @@ function FollowModal({
         }
         onClick={kitStep ? (e) => e.stopPropagation() : undefined}
       >
-        <button
-          onClick={onClose}
-          aria-label="Close"
-          className={`absolute top-4 right-4 p-2 z-10 ${kitStep ? "text-[#7a5a12]/60 hover:text-[#7a5a12]" : "text-zinc-400 hover:text-zinc-900"}`}
-        >
-          <X className="w-5 h-5" />
-        </button>
+        {/* No close button on the share kit step — the scrim and Esc dismiss it
+            there. Every other step keeps the X as its only way out. */}
+        {!kitStep && (
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute top-4 right-4 p-2 z-10 text-zinc-400 hover:text-zinc-900"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
 
         {formStep === "form" || formStep === "submitting" ? (
           <div className="space-y-6">
