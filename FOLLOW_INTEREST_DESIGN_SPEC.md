@@ -1,132 +1,108 @@
-# Interest nudge after following — design spec
+# Handoff: Post-follow interest modal ("Which of these would you go to?")
 
-Web only. One surface: the FollowModal success step on `/org/[shareId]`. A short list of open plan ideas with a heart each, under the existing "You're following!". Purpose: more real interest markers on ideas, so the needs-host queue has better signal for assigning hosts.
+> Supersedes the earlier "interest nudge inside the FollowModal success step"
+> direction (2026-09-13). Implemented 2026-09-14 as a standalone modal:
+> `src/components/InterestPrompt.tsx`, wired in `src/app/org/[shareId]/page.tsx`
+> (FollowModal `interest` prop + the one-tap follow popup).
 
----
+## Overview
+After a user follows **any** calendar that has suggestions enabled (starter ideas / suggested plans), Leaf shows a standalone modal with that calendar's suggested plans. Each plan is a photo card with the date, place and title over the image and a large heart in the middle. One tap marks interest — no confirmation, no second step. When the user is done:
 
-## 1. Why this moment
+- **Neighborhood calendar** → the Share Kit modal opens next.
+- **Any other calendar** → dismiss and land on the calendar's public page.
 
-- The follower just verified a phone. `expressInterestOnPlanIdea` resolves identity from session or phone (`_resolveInterestIdentity`, `leaflets-server/cloud/ai-calendar-functions.js:412`), so a tap here writes a `PlanIdeaInterest` with `user`/`phone`, not just a cookie.
-- The queue's `followerInterestCount` counts distinct people by user → phone → cookie with the calendar owner excluded (`host-roster-functions.js:1535-1559`). A phone-resolved tap can't be double-counted across browsers.
-- `interest-notify.js` texts interested people when their idea is hosted, exempt from the 2-per-week SMS ceiling — so "we'll text you" is a true promise.
-- The owner is most of the raw taps in prod (comment at `host-roster-functions.js:1530`). Non-owner markers are the scarce thing.
+This modal replaces nothing; it runs *before* the Share Kit and is the only post-follow surface for non-neighborhood calendars.
 
----
+Two surfaces: **mobile** (9a) and **desktop** (9b).
 
-## 2. Placement
+## Gating
+Show when all are true:
+1. Follow just succeeded (this session, this calendar).
+2. The calendar has suggestions enabled and ≥1 suggested plan available.
+3. The user has not already seen this modal for this calendar.
 
-`src/app/org/[shareId]/page.tsx` → `FollowModal`, `formStep === "success"` (currently ~line 1403).
+If suggestions are off or the list is empty: skip straight to the Share Kit (neighborhood) or the public page (everything else).
 
-```
-[✓ circle]
-You're following!
-You'll be notified about new plans from {calendarName}.
+Copy never mentions hosts, hosting, or that a plan is unhosted. Do not surface how many other people are interested.
 
-──────────────────────────────────────  ← border-t zinc-100, mt-7 pt-6
-WAITING ON A HOST
-Tap any you'd go to. If one gets a host, we'll text you.
+## Ordering
+Sort suggested plans by **interest count, descending** (internal count — not displayed), then by soonest date, then by plan id for stability. Cap the list at 6; the list scrolls. Order is fixed when the modal opens — a tap must not re-sort the cards under the user's finger.
 
-──────────────────────────────────────
-Sunday Pancake Breakfast           (♡)³
-Sun, Sep 21 · Upper West Side
-──────────────────────────────────────
-Picnic on the Riverside lawn       (♡)²
-Sat, Sep 27 · Riverside Park
-──────────────────────────────────────
-Board games at Hex & Co.           (♡)
-Thu, Oct 2 · Upper West Side
-──────────────────────────────────────
+## Content
+- Eyebrow (mobile): `IDEAS FOR THE GROUP` — 10.5px, 700, letter-spacing .1em, uppercase.
+- Eyebrow (desktop): the calendar name, same treatment.
+- Headline: **Which of these would you go to?**
+- Subline (desktop only): *One tap marks interest. Nothing is a commitment.*
+- Footnote (mobile, under the cards): *Nothing is a commitment. We'll text you if it happens.*
+- Status line (bottom left): `Tap any you'd go to` → `{n} marked` (mobile) / `Tap as many as you like.` → `{n} marked. We'll text you if it happens.` (desktop).
+- Primary button: **Done**. Desktop also has a **SKIP** text link to its left. Mobile has no Skip — the ✕ closes it.
 
-               DONE
-```
+The status line is text, not a control. Only Done, Skip, ✕ and the cards are tappable.
 
-The header block and Done button are unchanged from today.
+## Plan card
+Shared: `position:relative; border-radius:16–18px; overflow:hidden`, photo fills the card (`object-fit: cover`), gradient scrim above the photo, text bottom-left, heart centered in the upper area. Card is one tap target; everything layered on it is `pointer-events:none`.
 
----
+- Mobile (9a): full column width, height **176**, radius 18, gap 14.
+- Desktop (9b): 3-up grid, `gap:16`, height **196**, radius 16.
 
-## 3. Tokens (from the existing modal and idea card)
+Scrim: `linear-gradient(180deg, rgba(10,10,12,.05) 0%, rgba(10,10,12,.32) 45%, rgba(10,10,12,.81) 100%)`.
 
-Modal container: `bg-white w-full max-w-md p-8`, `rounded-t-2xl` mobile, **`md:rounded-none`** desktop. Backdrop `bg-zinc-900/60 backdrop-blur-sm`. Close X `top-4 right-4 p-2`, zinc-400.
+Text block, bottom-left (mobile `left/right:16px; bottom:14px`; desktop `left/right:14px; bottom:13px`):
+- Meta line: `{weekday, date} · {place}` — 10px (9.5 desktop) / 700 / letter-spacing .09em / uppercase / `rgba(255,255,255,.8)`, margin-bottom 5.
+- Title: Newsreader 400, 21px/1.18 (mobile) or 19px/1.2 (desktop), `#fff`, `text-wrap: pretty`, max 2 lines then ellipsis.
 
-| Element | Spec |
-|---|---|
-| Success circle | 64px, `bg-emerald-50` `#ecfdf5`, check 32px `emerald-600` `#059669` |
-| Title | `text-xl font-light` 20/28, zinc-900 |
-| Sub | `text-sm` 14/20, zinc-500 `#71717a` |
-| Section divider | `border-t` zinc-100 `#f4f4f5`, 28px above, 24px padding below (20 on mobile) |
-| Kicker | `text-[11px] tracking-wider uppercase font-bold` zinc-400 `#a1a1aa` — same as calendar card kickers |
-| Explainer | 14/20 zinc-500 |
-| Row | min-height 68, padding 12px 0, `border-t` zinc-100, last row also `border-b`; gap 16 |
-| Row title | 15/22, weight 400, zinc-900 |
-| Row meta | 12/16 zinc-500 — `{Short weekday}, {Mon} {d} · {neighborhood or venue}` |
-| Heart button | 44×44 round, `border` zinc-200, heart 18px zinc-400 stroke 2 |
-| Heart, tapped | `bg-emerald-50 border-emerald-300`, heart filled `emerald-700` `#047857` |
-| Count badge | `-top-1.5 -right-1.5`, min-w 20, h 20, `bg-emerald-700` white 11px bold; hidden at 0 |
-| Done | `text-xs font-bold uppercase tracking-widest` zinc-500, centered, 24px above |
+Heart: centered horizontally, vertically centered in the top **112px** (mobile) / **124px** (desktop) of the card. **64×64** mobile, **58×58** desktop. Outline stroke `#fff` 1.5px, `filter: drop-shadow(0 1px 3px rgba(0,0,0,.45))`.
+- Untapped fill: `rgba(255,255,255,.12)`.
+- Tapped fill: `#fff`, plus a `2px` ring on the card: `box-shadow: 0 0 0 2px #10b981`.
 
-These are the calendar idea card's heart and badge exactly (`renderPlanIdeaCard`), at 44px instead of 48px to fit the row.
+## Tap behavior + Lottie
+Tapping an untapped card marks interest. Tapping a marked card **unmarks** it.
 
----
+On tap:
+1. Fire the heart fill-and-pop (~500ms, once, ending on the filled frame). Lottie `heart-fill.json` swaps into the same box once provided; until then the CSS fill transition + keyframe is the shipped fallback.
+2. The green ring fades in over 150ms.
+3. The status line updates.
+4. Write the interest record immediately — one independent request per tap, optimistic UI, no batching on Done. A failed write reverts that card only, with a toast.
 
-## 4. Behaviour
+On unmark: short scale-back and the ring drops.
+Reduced motion: skip the animation, cross-fade the fill.
 
-- **Tap** calls the existing `runPlanIdeaInterest(ideaId)` path — optimistic fill, count +1, server count reconciles. Revert on failure, silently.
-- A tapped heart is disabled (no un-tap here; same as the calendar card).
-- No toast, no "thanks", no animation beyond the fill. The count moving is the feedback.
-- No submit. Taps are independent writes. **Done** and the X close the modal as today.
-- Do not trigger the `notifyPromptFor` phone prompt — the follower already has a verified phone, so `interestIdentityParams()` carries it.
-- The calendar page underneath reflects taps immediately (shared `planIdeaLocallyInterested` / `planIdeaInterestCounts` state) so the cards match when the modal closes.
+## Layout
+**Mobile (9a)** — 390×760 reference. Full-screen modal (not a sheet), bg `#18181b`.
+- Header: padding `26px 24px 16px`. ✕ top-right (`rgba(255,255,255,.5)`). Eyebrow `rgba(255,255,255,.45)`. Headline Newsreader 27px/1.12, `#fff`, max-width 270.
+- Cards: scrolling column, padding `4px 24px 0`, gap 14. Footnote 12.5px `rgba(255,255,255,.45)` after the last card.
+- Footer: padding `16px 24px 26px` (+ safe area), status `rgba(255,255,255,.5)` 13.5px, Done — height 48, padding `0 30px`, radius 14, bg `#fff`, text `#18181b` 15px/600.
 
----
+**Desktop (9b)** — 960×640 reference, centered over a `rgba(40,30,10,.32)` scrim. bg `#fbfaf7`, radius 12.
+- ✕ top-right, `#a1a1aa`.
+- Header: padding `40px 48px 0`, max-width 620. Eyebrow `#a1a1aa`. Headline Newsreader 33px/1.15 `#18181b`. Subline 14.5px `#71717a`.
+- Grid: padding `26px 48px 8px`, `repeat(3, minmax(0,1fr))`, gap 16, scrolls.
+- Footer: `16px 48px 24px`, `border-top: 1px solid rgba(0,0,0,.07)`, status `#71717a` 13.5px; right: SKIP (11.5px/700, letter-spacing .14em, uppercase, `#a1a1aa`) then Done — height 44, padding `0 26px`, radius 10, bg `#18181b`, text `#fff` 14px/600.
 
-## 5. Which ideas
+Between breakpoints, the grid drops to 2 columns before switching to the mobile layout.
 
-- From `org.planIdeas`: not `isFeatured`, `sourceKind !== "featured"`, not already in `planIdeaLocallyInterested`, start not passed.
-- Sort by interest count descending, then soonest — the needs-host queue's order, so a marker lands where it moves an idea nearest the auto-flag threshold (`interestThreshold`, default 5).
-- Maximum 3. No "see more".
-- Meta place: `location.neighborhood` when the venue is gated, otherwise venue name. Never the address.
-- FollowModal will need the filtered list passed in as a prop (it currently receives only calendar id/name/brand).
+## Exit
+| Path | Neighborhood calendar | Other calendar |
+|---|---|---|
+| Done | Close, then open the Share Kit modal | Close (the public page is underneath) |
+| Skip / ✕ / Esc / scrim | Same as Done | Same as Done |
 
----
+Never chain the Share Kit for non-neighborhood calendars, and never show the interest modal twice in one follow.
 
-## 6. When it does not render
+## State (as built)
+- Card ids are `idea:<CalendarGeneratedPlan.objectId>` and `ai:<aiSourceEvents index>` — both suggestion sources feed one list; around-the-city (featured) rows are excluded.
+- Marked = the page's `planIdeaLocallyInterested` / `aiLocallyInterested` sets, so the calendar cards underneath agree the moment the modal closes.
+- Writes: `expressInterestOnPlanIdea` / `removeInterestOnPlanIdea`, `expressInterestOnAIEvent` / `removeInterestOnAIEvent`.
+- Seen flag: localStorage `leaf_interest_modal_seen_<calendarId>`, set when the modal opens.
 
-Render today's success screen unchanged when any of these hold:
+## Fallbacks
+- Plan with no image: solid `#3f3f46` (mobile) / `#e4e4e7` (desktop) card with the same scrim and text. No stock substitute.
+- 1–2 plans only: same card size, fewer rows. Do not stretch cards to fill.
+- Slow images: card background color first, image fades in on load.
 
-| Condition | Why |
-|---|---|
-| Zero qualifying ideas | Nothing to show |
-| `followResult.pending` (private calendar) | A request, not a follow; wrong order to ask |
-| `formStep === "intro"` (building share kit) | One ask per follow; the kit owns the moment |
-| `canAskIntro === false` (follow gating a held heart tap) | The held tap replays on close; a list in between lands on the wrong moment |
-
----
-
-## 7. Copy
-
-- Kicker: **Waiting on a host** — matches the "Waiting on host" line on idea cards.
-- Explainer: **Tap any you'd go to. If one gets a host, we'll text you.**
-- No threshold numbers, no "help this happen", no urgency, no exclamation marks beyond the existing "You're following!".
-- Titles and dates as they render on the calendar page.
-
-### Rejected alternate
-
-Replacing the meta line with progress — *"One more and we start finding a host"*. Stronger pull, but it exposes an admin-tunable threshold, promises queue motion that may not happen that week, and turns a light ask into a campaign. Shown on the canvas for the record.
-
----
-
-## 8. Instrumentation
-
-| Event | Properties |
-|---|---|
-| `follow_interest_list_shown` | calendarId, ideaIds (ordered), count |
-| `plan_idea_interest` (existing call) | add `surface: "follow_success"` |
-| `follow_interest_list_closed` | calendarId, tappedCount |
-
-Watch: share of follows with ≥1 tap; change in `followerInterestCount` per idea on calendars with the list vs. before; how many listed ideas cross the threshold within 7 days.
-
----
-
-## 9. Out of scope
-
-Anything after the modal closes: no banner on the calendar page, no follow-up SMS asking for interest, no `/me` surface, no iOS.
+## Tokens (this surface)
+- Mobile ground `#18181b`; desktop ground `#fbfaf7`; scrim `rgba(40,30,10,.32)`
+- Card placeholder `#3f3f46` / `#e4e4e7`; photo scrim per above
+- Confirm green `#10b981`; muted ink `#71717a` / `#a1a1aa`; ink `#18181b`
+- Radii: 18 / 16 (cards), 14 / 10 (buttons)
+- Headline + card title font: Newsreader 400; everything else the portal's default sans
