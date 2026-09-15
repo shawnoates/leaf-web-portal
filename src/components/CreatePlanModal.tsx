@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import Parse from "@/lib/parse-client";
-import { hostCandidateLabel, monthlyRuleOptionsForDate, NTH_LABELS, WEEKDAY_NAMES, type RuleOption, type SeriesHostCandidate } from "@/lib/series";
+import { hostCandidateNote, monthlyRuleOptionsForDate, NTH_LABELS, WEEKDAY_NAMES, type RuleOption, type SeriesHostCandidate } from "@/lib/series";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { getDefaultCoverForSeed } from "@/lib/default-covers";
 import VenueSearch from "@/components/VenueSearch";
@@ -313,6 +313,9 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   const hostPool: SeriesHostCandidate[] =
     fetchedHostCandidates ??
     (hostCandidates || []).map((c) => ({ id: c.id, name: c.name, hasPhone: true, follower: true, attendee: false, rsvps: 0, attended: false }));
+  const visibleHostCandidates = hostPool
+    .filter((c) => c.id !== currentUserId)
+    .filter((c) => !hostSearch.trim() || c.name.toLowerCase().includes(hostSearch.trim().toLowerCase()));
   const [hostSearch, setHostSearch] = useState("");
   const [seriesRuleKey, setSeriesRuleKey] = useState<HostedRuleKey>("weekly");
   const [genericNth, setGenericNth] = useState(2);
@@ -2103,33 +2106,53 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
                   {isHosted && (
                     <div>
                       <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Host</label>
-                      {hostPool.length > 8 && (
+                      {hostPool.length > 6 && (
                         <input
                           value={hostSearch}
                           onChange={(e) => setHostSearch(e.target.value)}
-                          placeholder="Search followers"
-                          className="w-full border-b border-zinc-200 py-1.5 text-xs font-light focus:outline-none focus:border-zinc-900 bg-transparent mb-1"
+                          placeholder="Search followers and past guests"
+                          className="w-full border-b border-zinc-200 py-1.5 text-xs font-light focus:outline-none focus:border-zinc-900 bg-transparent mb-2"
                         />
                       )}
-                      <select
-                        value={seriesHostId}
-                        onChange={(e) => setSeriesHostId(e.target.value)}
-                        className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900 bg-transparent"
-                      >
-                        <option value="me">Me</option>
-                        {hostPool
-                          .filter((c) => c.id !== currentUserId)
-                          .filter((c) => !hostSearch || c.name.toLowerCase().includes(hostSearch.toLowerCase()) || c.id === seriesHostId)
-                          .map((c) => (
-                            <option key={c.id} value={c.id} disabled={!c.hasPhone}>{hostCandidateLabel(c)}</option>
-                          ))}
-                      </select>
-                      {fetchedHostCandidates === null && (
-                        <p className="text-xs text-zinc-400 mt-1">Loading followers and past attendees…</p>
-                      )}
+                      {/* A list rather than a <select>: filtering a native
+                          dropdown's options is invisible until it's open, so
+                          the search box looked broken. */}
+                      <div className="max-h-44 overflow-y-auto border border-zinc-100 rounded-lg">
+                        <button
+                          type="button"
+                          onClick={() => setSeriesHostId("me")}
+                          className={`w-full text-left px-3 py-2 text-sm transition-colors ${seriesHostId === "me" ? "bg-zinc-900 text-white" : "hover:bg-zinc-50"}`}
+                        >
+                          Me
+                        </button>
+                        {visibleHostCandidates.map((c) => {
+                          const note = hostCandidateNote(c);
+                          const selected = seriesHostId === c.id;
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              disabled={!c.hasPhone}
+                              title={c.hasPhone ? undefined : "No phone on file — they can't be texted"}
+                              onClick={() => setSeriesHostId(c.id)}
+                              className={`w-full text-left px-3 py-2 text-sm border-t border-zinc-50 transition-colors disabled:opacity-40 ${selected ? "bg-zinc-900 text-white" : "hover:bg-zinc-50"}`}
+                            >
+                              {c.name}
+                              {note && <span className={selected ? "text-zinc-300" : "text-zinc-400"}>{` · ${note}`}</span>}
+                            </button>
+                          );
+                        })}
+                        {fetchedHostCandidates === null ? (
+                          <p className="px-3 py-2 text-xs text-zinc-400 border-t border-zinc-50">Loading followers and past guests…</p>
+                        ) : visibleHostCandidates.length === 0 ? (
+                          <p className="px-3 py-2 text-xs text-zinc-400 border-t border-zinc-50">
+                            {hostSearch.trim() ? "Nobody matches that name." : "Nobody has followed or RSVP'd yet."}
+                          </p>
+                        ) : null}
+                      </div>
                       {hostIsOther && (
                         <p className="text-xs text-zinc-400 mt-1">
-                          {seriesHostFirstName} gets a text to accept. We&apos;ll remind them 3 weeks before each date, and skip the month if they don&apos;t confirm. The first date is optional.
+                          {`${seriesHostFirstName} gets a text to accept. We'll remind them 3 weeks before each date, and skip the month if they don't confirm. The first date is optional.`}
                         </p>
                       )}
                     </div>

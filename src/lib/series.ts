@@ -83,12 +83,18 @@ export type SeriesHostCandidate = {
   attended: boolean;
 };
 
-export function hostCandidateLabel(c: SeriesHostCandidate): string {
+/** How this person knows the calendar — "attended", "3 RSVPs", "follower" — plus a no-phone warning. */
+export function hostCandidateNote(c: SeriesHostCandidate): string {
   const bits: string[] = [];
   if (c.attendee) bits.push(c.attended ? "attended" : `${c.rsvps} RSVP${c.rsvps === 1 ? "" : "s"}`);
   else if (c.follower) bits.push("follower");
   if (!c.hasPhone) bits.push("no phone");
-  return bits.length ? `${c.name} · ${bits.join(" · ")}` : c.name;
+  return bits.join(" · ");
+}
+
+export function hostCandidateLabel(c: SeriesHostCandidate): string {
+  const note = hostCandidateNote(c);
+  return note ? `${c.name} · ${note}` : c.name;
 }
 
 /** Parse.Error code the server throws when a Starter calendar is at its series-host limit. */
