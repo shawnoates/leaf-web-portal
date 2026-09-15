@@ -6668,7 +6668,11 @@ export default function OrgCalendarPage() {
         />
       )}
 
-      {showFollowPopup && org && (
+      {/* Follow state is checked here, not at each setIsFollowing site: nine
+          paths can land a follow (header modal, RSVP, host-this, cookie,
+          server hydration) and only this popup's own button closes itself.
+          Gating the render retires the popup from all of them at once. */}
+      {showFollowPopup && org && !isFollowing && !followRequestPending && (
         <div
           className="fixed bottom-6 right-6 left-6 md:left-auto md:w-80 z-40"
           style={{ animation: "slideUp 0.3s ease-out" }}
