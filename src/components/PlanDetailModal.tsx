@@ -145,8 +145,12 @@ export default function PlanDetailModal({
   // reflects the new host name immediately without waiting for a parent refetch.
   const [showChangeHost, setShowChangeHost] = useState(false);
   const [hostCandidates, setHostCandidates] = useState<
-    { id: string; name: string; isCurrentHost: boolean; isSelf: boolean }[] | null
+    { id: string; name: string; isCurrentHost: boolean; isSelf: boolean; suffix?: string; hasPhone?: boolean }[] | null
   >(null);
+  // For a series occurrence, default to handing over the whole series: the
+  // new host then confirms each month from a texted link. Off = this
+  // occurrence only (next month reverts to the series host).
+  const [applyToSeries, setApplyToSeries] = useState(true);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [changingHostId, setChangingHostId] = useState<string | null>(null);
   const [changeHostError, setChangeHostError] = useState<string | null>(null);
@@ -277,8 +281,29 @@ export default function PlanDetailModal({
     if (hostCandidates) return; // already loaded
     setLoadingCandidates(true);
     try {
-      const res = await Parse.Cloud.run("getPlanHostCandidates", { eventGroupId: plan.objectId });
-      setHostCandidates(res?.candidates || []);
+      if (plan.planSeriesId) {
+        // Series: followers AND past RSVPers of the calendar — the person who
+        // wants to run a monthly club is often a regular who never followed.
+        const res = (await Parse.Cloud.run("getSeriesHostCandidates", { calendarId })) as {
+          candidates?: { id: string; name: string; hasPhone: boolean; follower: boolean; attendee: boolean; rsvps: number; attended: boolean }[];
+        };
+        setHostCandidates(
+          (res?.candidates || []).map((c) => ({
+            id: c.id,
+            name: c.name,
+            isCurrentHost: c.name === (hostNameOverride || plan.hostName),
+            isSelf: false,
+            hasPhone: c.hasPhone,
+            suffix: [
+              c.attendee ? (c.attended ? "attended" : `${c.rsvps} RSVP${c.rsvps === 1 ? "" : "s"}`) : c.follower ? "follower" : null,
+              c.hasPhone ? null : "no phone",
+            ].filter(Boolean).join(" · "),
+          })),
+        );
+      } else {
+        const res = await Parse.Cloud.run("getPlanHostCandidates", { eventGroupId: plan.objectId });
+        setHostCandidates(res?.candidates || []);
+      }
     } catch (err) {
       setChangeHostError(err instanceof Error ? err.message : "Couldn't load people to assign");
       setHostCandidates([]);
@@ -291,10 +316,11 @@ export default function PlanDetailModal({
     setChangingHostId(candidate.id);
     setChangeHostError(null);
     try {
-      const res = await Parse.Cloud.run("changePlanHost", {
-        eventGroupId: plan.objectId,
-        newHostUserId: candidate.id,
-      });
+      // Whole-series handover reassigns every future occurrence (this one
+      // included) and texts the new host their invite link.
+      const res = plan.planSeriesId && applyToSeries
+        ? await Parse.Cloud.run("changeSeriesHost", { seriesId: plan.planSeriesId, hostUserId: candidate.id })
+        : await Parse.Cloud.run("changePlanHost", { eventGroupId: plan.objectId, newHostUserId: candidate.id });
       setHostNameOverride(res?.hostName || candidate.name);
       // Reflect the new current-host flag in the loaded candidate list.
       setHostCandidates((prev) =>
@@ -480,6 +506,21 @@ export default function PlanDetailModal({
                 {changeHostError && (
                   <p className="text-xs text-red-500 px-4 pt-3">{changeHostError}</p>
                 )}
+                {plan.planSeriesId && (
+                  <label className="flex items-start gap-2.5 px-4 py-3 border-b border-zinc-100 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={applyToSeries}
+                      onChange={(e) => setApplyToSeries(e.target.checked)}
+                      className="mt-0.5 accent-zinc-900"
+                    />
+                    <span className="text-xs text-zinc-700 leading-snug">
+                      <span className="font-medium text-zinc-900">Whole series.</span>{" "}
+                      They get a text to accept, then confirm each month&apos;s date from a link.
+                      Unchecked, only this occurrence changes and next month reverts to you.
+                    </span>
+                  </label>
+                )}
                 <div className="max-h-64 overflow-y-auto p-1">
                   {loadingCandidates ? (
                     <div className="flex items-center justify-center py-6">
@@ -490,7 +531,8 @@ export default function PlanDetailModal({
                       <button
                         key={c.id}
                         onClick={() => { if (!c.isCurrentHost) handleChangeHost(c); }}
-                        disabled={!!changingHostId || c.isCurrentHost}
+                        disabled={!!changingHostId || c.isCurrentHost || Boolean(plan.planSeriesId && applyToSeries && c.hasPhone === false)}
+                        title={c.hasPhone === false ? "No phone on file — can't be texted" : undefined}
                         className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-50 transition-colors text-left disabled:cursor-default disabled:hover:bg-transparent"
                       >
                         <span className="flex items-center gap-2.5 min-w-0">
@@ -499,6 +541,7 @@ export default function PlanDetailModal({
                           </span>
                           <span className="text-sm font-medium text-zinc-900 truncate">
                             {c.name}{c.isSelf ? " (you)" : ""}
+                            {c.suffix ? <span className="font-normal text-zinc-400"> · {c.suffix}</span> : null}
                           </span>
                         </span>
                         {c.isCurrentHost ? (
@@ -512,7 +555,7 @@ export default function PlanDetailModal({
                     ))
                   ) : (
                     <p className="text-sm text-zinc-400 text-center py-6 px-4">
-                      No followers or members to assign yet.
+                      {plan.planSeriesId ? "Nobody has followed or RSVP'd yet." : "No followers or members to assign yet."}
                     </p>
                   )}
                 </div>
