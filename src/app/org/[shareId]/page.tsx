@@ -12,6 +12,7 @@ import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
 import LeafHostPlanThread from "@/components/LeafHostPlanThread";
 import NamePrompt from "@/components/NamePrompt";
 import ShareKitPrompt, { type ShareKitPayload } from "@/components/ShareKitPrompt";
+import InterestPrompt, { type InterestPromptItem } from "@/components/InterestPrompt";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { renderLinkedText } from "@/lib/linkify";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
@@ -405,6 +406,19 @@ function isAIEventLocallyInterested(shareId: string, eventIndex: number): boolea
   }
 }
 
+function unmarkAIEventLocallyInterested(shareId: string, eventIndex: number) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(AI_INTEREST_LOCAL_KEY);
+    if (!raw) return;
+    const set: Record<string, boolean> = JSON.parse(raw);
+    delete set[`${shareId}::${eventIndex}`];
+    localStorage.setItem(AI_INTEREST_LOCAL_KEY, JSON.stringify(set));
+  } catch {
+    /* quota / storage disabled */
+  }
+}
+
 // Sibling helpers for plan-idea interest (CalendarGeneratedPlan rows,
 // not aiSourceEvents). Same shape as the AI helpers; different storage
 // key so a shared browser doesn't cross-contaminate the two flows.
@@ -430,6 +444,52 @@ function isPlanIdeaLocallyInterested(ideaId: string): boolean {
   } catch {
     return false;
   }
+}
+function unmarkPlanIdeaLocallyInterested(ideaId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(PLAN_IDEA_INTEREST_LOCAL_KEY);
+    if (!raw) return;
+    const set: Record<string, boolean> = JSON.parse(raw);
+    delete set[ideaId];
+    localStorage.setItem(PLAN_IDEA_INTEREST_LOCAL_KEY, JSON.stringify(set));
+  } catch {
+    /* quota / storage disabled */
+  }
+}
+
+// Post-follow interest modal ("Which of these would you go to?") — shown once
+// per calendar per browser. The key is set the moment the modal opens, so a
+// second follow (or a refresh mid-modal) never shows it again.
+const INTEREST_PROMPT_SEEN_PREFIX = "leaf_interest_modal_seen_";
+function hasSeenInterestPrompt(calendarId: string): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return !!localStorage.getItem(`${INTEREST_PROMPT_SEEN_PREFIX}${calendarId}`);
+  } catch {
+    return false;
+  }
+}
+function markInterestPromptSeen(calendarId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(`${INTEREST_PROMPT_SEEN_PREFIX}${calendarId}`, String(Date.now()));
+  } catch {
+    /* quota / storage disabled */
+  }
+}
+
+// Short date for the interest modal's meta line: "Sun, Sep 21". Starter
+// (AI-event) dates are floating wall clocks stored on the UTC face, so those
+// format in UTC; plan-idea spread dates are real instants and format locally.
+function interestDateLabel(d: Date | null, floating: boolean): string | null {
+  if (!d || Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    ...(floating ? { timeZone: FLOATING_EVENT_TZ } : {}),
+  });
 }
 
 // Maps human-readable blacklist labels (set in the org dashboard) to Google
@@ -1275,23 +1335,53 @@ function FollowModal({
   brandColor,
   isPrivate,
   canAskIntro = true,
+  interest,
 }: {
   calendarId: string;
   calendarName: string;
   brandColor?: string;
   onClose: () => void;
-  /** `intro` is set when the share kit will be shown in place; the parent
-   *  must then leave the modal mounted until onClose. */
-  onFollowed: (name: string, phone: string, pending?: boolean, intro?: ShareKitPayload | null) => void;
+  /** `keepOpen` is true when a follow-up step (interest modal and/or share
+   *  kit) renders in place; the parent must then leave the modal mounted
+   *  until onClose. */
+  onFollowed: (
+    name: string,
+    phone: string,
+    pending?: boolean,
+    intro?: ShareKitPayload | null,
+    keepOpen?: boolean,
+  ) => void;
   isPrivate?: boolean;
   /** False when this follow is gating a held tap — the tap replays on close,
    *  and a share kit between the two would land on the wrong moment. */
   canAskIntro?: boolean;
+  /** Post-follow interest modal. `take` snapshots the eligible, sorted
+   *  suggestions at the moment the follow lands (and marks the modal seen);
+   *  null means skip straight to the share kit / success. The sets and the
+   *  toggle are live — the page owns the writes. */
+  interest?: {
+    take: () => InterestPromptItem[] | null;
+    marked: ReadonlySet<string>;
+    pending: ReadonlySet<string>;
+    onToggle: (id: string) => void;
+  };
 }) {
   const verify = usePhoneVerify();
-  const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "pending" | "intro" | "error">("form");
+  const [formStep, setFormStep] = useState<
+    "form" | "submitting" | "success" | "pending" | "interest" | "intro" | "error"
+  >("form");
   const [errorMsg, setErrorMsg] = useState("");
   const [intro, setIntro] = useState<ShareKitPayload | null>(null);
+  // Fixed at open — a tap must not re-sort the cards under the user's finger.
+  const [interestItems, setInterestItems] = useState<InterestPromptItem[] | null>(null);
+
+  // Done / Skip / ✕ / Esc / scrim all continue to the same next step: the
+  // share kit on a neighborhood calendar, otherwise the calendar page itself
+  // (which is already underneath — closing is the "navigate").
+  const finishInterest = useCallback(() => {
+    if (intro) setFormStep("intro");
+    else onClose();
+  }, [intro, onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1323,9 +1413,17 @@ function FollowModal({
           console.warn("[Follow] could not adopt session for building intro:", sessionErr);
         }
       }
-      onFollowed(verify.name, verify.phone, false, ask);
-      if (ask) {
-        setIntro(ask);
+      // Interest modal first (any calendar with suggestions on), then the
+      // share kit if this is a neighborhood calendar. Snapshot before the
+      // parent's onFollowed replays a held tap, so a bumped count can't
+      // reorder the list it is about to show.
+      const items = interest?.take() ?? null;
+      onFollowed(verify.name, verify.phone, false, ask, !!items || !!ask);
+      setIntro(ask);
+      if (items) {
+        setInterestItems(items);
+        setFormStep("interest");
+      } else if (ask) {
         setFormStep("intro");
       } else {
         setFormStep("success");
@@ -1340,6 +1438,22 @@ function FollowModal({
   // radii and scrim, and the scrim itself dismisses (never on the phone form,
   // where a stray tap would drop a half-typed number).
   const kitStep = formStep === "intro" && !!intro;
+
+  // Standalone surface with its own chrome (full-screen dark on mobile, wide
+  // light grid on desktop) — not the follow card.
+  if (formStep === "interest" && interestItems && interest) {
+    return (
+      <InterestPrompt
+        calendarName={calendarName}
+        items={interestItems}
+        marked={interest.marked}
+        pending={interest.pending}
+        onToggle={interest.onToggle}
+        onDone={finishInterest}
+        onSkip={finishInterest}
+      />
+    );
+  }
 
   return (
     <div
@@ -1740,6 +1854,8 @@ export default function OrgCalendarPage() {
         }
       } catch (err) {
         console.error("[org] expressInterestOnAIEvent failed:", err);
+        setToast("Couldn’t save that — try again.");
+        setTimeout(() => setToast(null), 4000);
         // Roll back optimistic UI on failure.
         setAILocallyInterested((prev) => {
           const next = new Set(prev);
@@ -1954,6 +2070,8 @@ export default function OrgCalendarPage() {
         }
       } catch (err) {
         console.error("[org] expressInterestOnPlanIdea failed:", err);
+        setToast("Couldn’t save that — try again.");
+        setTimeout(() => setToast(null), 4000);
         setPlanIdeaLocallyInterested((prev) => {
           const next = new Set(prev);
           next.delete(ideaId);
@@ -1987,6 +2105,100 @@ export default function OrgCalendarPage() {
       void runPlanIdeaInterest(ideaId);
     },
     [isFollowing, runPlanIdeaInterest],
+  );
+
+  // Undo halves of the two interest taps above — the post-follow interest
+  // modal lets a marked card be unmarked. Same cookie + identity params, so
+  // the server destroys whichever row this person's tap created. Optimistic;
+  // a failed write puts the mark back, with a toast.
+  const removeAIEventInterest = useCallback(
+    async (eventIndex: number) => {
+      if (!aiLocallyInterested.has(eventIndex)) return;
+      if (aiInterestPending.has(eventIndex)) return;
+      const cookie = getOrCreateAIInterestCookie();
+      const priorCount =
+        aiInterestCounts[eventIndex] ?? org?.aiSourceEventInterests?.[eventIndex] ?? 0;
+
+      setAIInterestPending((prev) => new Set(prev).add(eventIndex));
+      setAILocallyInterested((prev) => {
+        const next = new Set(prev);
+        next.delete(eventIndex);
+        return next;
+      });
+      setAIInterestCounts((prev) => ({ ...prev, [eventIndex]: Math.max(0, priorCount - 1) }));
+      unmarkAIEventLocallyInterested(shareId, eventIndex);
+
+      try {
+        const result = (await Parse.Cloud.run("removeInterestOnAIEvent", {
+          groupShareId: shareId,
+          eventIndex,
+          cookie,
+          ...interestIdentityParams(),
+        })) as { count?: number; removed?: boolean };
+        if (typeof result?.count === "number") {
+          setAIInterestCounts((prev) => ({ ...prev, [eventIndex]: result.count! }));
+        }
+      } catch (err) {
+        console.error("[org] removeInterestOnAIEvent failed:", err);
+        setToast("Couldn’t undo that — try again.");
+        setTimeout(() => setToast(null), 4000);
+        setAILocallyInterested((prev) => new Set(prev).add(eventIndex));
+        setAIInterestCounts((prev) => ({ ...prev, [eventIndex]: priorCount }));
+        markAIEventLocallyInterested(shareId, eventIndex);
+      } finally {
+        setAIInterestPending((prev) => {
+          const next = new Set(prev);
+          next.delete(eventIndex);
+          return next;
+        });
+      }
+    },
+    [aiInterestCounts, aiLocallyInterested, aiInterestPending, org?.aiSourceEventInterests, shareId],
+  );
+
+  const removePlanIdeaInterest = useCallback(
+    async (ideaId: string) => {
+      if (!planIdeaLocallyInterested.has(ideaId)) return;
+      if (planIdeaInterestPending.has(ideaId)) return;
+      const cookie = getOrCreateAIInterestCookie();
+      const priorCount =
+        planIdeaInterestCounts[ideaId] ??
+        (org?.planIdeas.find((i) => i.id === ideaId)?.interestCount ?? 0);
+
+      setPlanIdeaInterestPending((prev) => new Set(prev).add(ideaId));
+      setPlanIdeaLocallyInterested((prev) => {
+        const next = new Set(prev);
+        next.delete(ideaId);
+        return next;
+      });
+      setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: Math.max(0, priorCount - 1) }));
+      unmarkPlanIdeaLocallyInterested(ideaId);
+
+      try {
+        const result = (await Parse.Cloud.run("removeInterestOnPlanIdea", {
+          ideaId,
+          cookie,
+          ...interestIdentityParams(),
+        })) as { count?: number; removed?: boolean };
+        if (typeof result?.count === "number") {
+          setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: result.count! }));
+        }
+      } catch (err) {
+        console.error("[org] removeInterestOnPlanIdea failed:", err);
+        setToast("Couldn’t undo that — try again.");
+        setTimeout(() => setToast(null), 4000);
+        setPlanIdeaLocallyInterested((prev) => new Set(prev).add(ideaId));
+        setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: priorCount }));
+        markPlanIdeaLocallyInterested(ideaId);
+      } finally {
+        setPlanIdeaInterestPending((prev) => {
+          const next = new Set(prev);
+          next.delete(ideaId);
+          return next;
+        });
+      }
+    },
+    [planIdeaInterestCounts, planIdeaLocallyInterested, planIdeaInterestPending, org?.planIdeas],
   );
 
   // Featured ("Around the city") interest. Separate cloud function from the
@@ -2323,8 +2535,15 @@ export default function OrgCalendarPage() {
           setIsFollowing(true);
           setFollowerCount((c) => c + 1);
           setShowFollowPopup(false);
-          setToast(`You're now following ${org.name}`);
-          setTimeout(() => setToast(null), 3000);
+          // The interest modal is the post-follow surface when there's
+          // something to show; the toast covers the rest.
+          const items = takeInterestPrompt();
+          if (items) {
+            setInterestPrompt(items);
+          } else {
+            setToast(`You're now following ${org.name}`);
+            setTimeout(() => setToast(null), 3000);
+          }
         }
       } catch {
         // Fallback to full modal if one-tap fails
@@ -3305,6 +3524,114 @@ export default function OrgCalendarPage() {
       nowBucket * 60 * 60 * 1000
     );
   }, [org, nowBucket]);
+
+  // ---- Post-follow interest modal ("Which of these would you go to?") -------
+  // One list over both suggestion sources — recurring plan ideas
+  // (CalendarGeneratedPlan) and the starter cards (aiSourceEvents) — since they
+  // are the same surface to a follower: a suggested plan nobody has run yet.
+  // Around-the-city rows are left out: they are citywide admin suggestions,
+  // not this calendar's, and their interest write is a different function.
+  // Ordered by the internal interest count (never shown), then soonest, then
+  // id; capped at 6. FollowModal snapshots this at open so a tap can't
+  // re-sort the cards.
+  const interestPromptItems = useMemo<InterestPromptItem[]>(() => {
+    if (!org || org.hidePlanIdeas) return [];
+    const now = Date.now();
+    const rows: (InterestPromptItem & { count: number; at: number })[] = [];
+
+    for (const idea of org.planIdeas) {
+      if (idea.isFeatured || idea.sourceKind === "featured") continue;
+      const d = spreadIdeaDates.get(idea.id) ?? (idea.date ? new Date(idea.date) : null);
+      if (d && d.getTime() < now) continue;
+      rows.push({
+        id: `idea:${idea.id}`,
+        title: idea.title,
+        dateLabel: interestDateLabel(d, false),
+        place: idea.location?.name || idea.location?.neighborhood || null,
+        image: idea.image || null,
+        count: planIdeaInterestCounts[idea.id] ?? idea.interestCount ?? 0,
+        at: d ? d.getTime() : Number.POSITIVE_INFINITY,
+      });
+    }
+
+    const hosted = new Set(org.hostedAiEventIndexes || []);
+    const dismissed = new Set(org.dismissedAiEventIndexes || []);
+    (org.aiSourceEvents || []).forEach((ev, idx) => {
+      if (hosted.has(idx) || dismissed.has(idx)) return;
+      const d = resolveAIEventDate(ev, org.orgTimezone ?? null).date;
+      if (!d) return;
+      rows.push({
+        id: `ai:${idx}`,
+        title: ev.title || ev.name,
+        dateLabel: interestDateLabel(d, true),
+        place: ev.venueLine || null,
+        image: ev.imageUrl || null,
+        count: aiInterestCounts[idx] ?? org.aiSourceEventInterests?.[idx] ?? 0,
+        at: d.getTime(),
+      });
+    });
+
+    rows.sort(
+      (a, b) =>
+        b.count - a.count ||
+        a.at - b.at ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
+    return rows.slice(0, 6).map(({ id, title, dateLabel, place, image }) => ({
+      id,
+      title,
+      dateLabel,
+      place,
+      image,
+    }));
+  }, [org, spreadIdeaDates, planIdeaInterestCounts, aiInterestCounts]);
+
+  // Live marked / in-flight sets in the modal's id space, so the cards agree
+  // with the calendar page underneath the moment the modal closes.
+  const interestMarked = useMemo(() => {
+    const s = new Set<string>();
+    planIdeaLocallyInterested.forEach((id) => s.add(`idea:${id}`));
+    aiLocallyInterested.forEach((idx) => s.add(`ai:${idx}`));
+    return s;
+  }, [planIdeaLocallyInterested, aiLocallyInterested]);
+  const interestPending = useMemo(() => {
+    const s = new Set<string>();
+    planIdeaInterestPending.forEach((id) => s.add(`idea:${id}`));
+    aiInterestPending.forEach((idx) => s.add(`ai:${idx}`));
+    return s;
+  }, [planIdeaInterestPending, aiInterestPending]);
+
+  // Each tap is one independent write — mark or unmark, no batching on Done.
+  // Ungated: the modal only ever opens after a follow has landed.
+  const toggleInterest = useCallback(
+    (id: string) => {
+      const on = interestMarked.has(id);
+      if (id.startsWith("idea:")) {
+        const ideaId = id.slice(5);
+        void (on ? removePlanIdeaInterest(ideaId) : runPlanIdeaInterest(ideaId));
+      } else if (id.startsWith("ai:")) {
+        const idx = Number(id.slice(3));
+        if (!Number.isInteger(idx)) return;
+        void (on ? removeAIEventInterest(idx) : runAIEventInterest(idx));
+      }
+    },
+    [interestMarked, removePlanIdeaInterest, runPlanIdeaInterest, removeAIEventInterest, runAIEventInterest],
+  );
+
+  // Gate + snapshot, called the moment a follow lands. Null skips the modal:
+  // suggestions off / nothing to show, or already shown for this calendar in
+  // this browser. Marks it seen on the way out so it never shows twice.
+  const takeInterestPrompt = useCallback((): InterestPromptItem[] | null => {
+    if (!org) return null;
+    if (interestPromptItems.length === 0) return null;
+    if (hasSeenInterestPrompt(org.objectId)) return null;
+    markInterestPromptSeen(org.objectId);
+    return interestPromptItems;
+  }, [org, interestPromptItems]);
+
+  // Page-level mount for the one-tap follow popup, which doesn't go through
+  // FollowModal (and never chains the share kit).
+  const [interestPrompt, setInterestPrompt] = useState<InterestPromptItem[] | null>(null);
 
   // 2a — "Around the city": a slim 122px full-width band. These are citywide
   // happenings looking for a host, not this calendar's own upcoming plans, so
@@ -6082,12 +6409,18 @@ export default function OrgCalendarPage() {
           brandColor={org.brandColor || undefined}
           isPrivate={org.isPrivate}
           canAskIntro={!pendingInterest}
+          interest={{
+            take: takeInterestPrompt,
+            marked: interestMarked,
+            pending: interestPending,
+            onToggle: toggleInterest,
+          }}
           onClose={() => {
             setShowFollowModal(false);
             // Dismissing the gate abandons the tap that opened it.
             setPendingInterest(null);
           }}
-          onFollowed={(_name, _phone, pending, intro) => {
+          onFollowed={(_name, _phone, pending, _intro, keepOpen) => {
             if (pending) {
               setFollowRequestPending(true);
               // Private calendar: this is a request, not a follow, so the gate
@@ -6106,11 +6439,26 @@ export default function OrgCalendarPage() {
               }
               setPendingInterest(null);
             }
-            // The share kit advances in place; the modal closes on its
-            // "Maybe later" (onClose). Never over the calendar's plans — the
-            // follow has landed and the X is always there.
-            if (!intro) setShowFollowModal(false);
+            // The interest modal and share kit advance in place; the modal
+            // closes on their Done / "Maybe later" (onClose). Never over the
+            // calendar's plans — the follow has landed and the X is always
+            // there.
+            if (!keepOpen) setShowFollowModal(false);
           }}
+        />
+      )}
+
+      {/* Post-follow interest modal for the one-tap popup follow. Done and
+          Skip both just close — this path never chains the share kit. */}
+      {interestPrompt && org && (
+        <InterestPrompt
+          calendarName={org.name}
+          items={interestPrompt}
+          marked={interestMarked}
+          pending={interestPending}
+          onToggle={toggleInterest}
+          onDone={() => setInterestPrompt(null)}
+          onSkip={() => setInterestPrompt(null)}
         />
       )}
 
