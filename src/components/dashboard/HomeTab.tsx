@@ -139,6 +139,8 @@ export default function HomeTab({
   onRejectFollower,
   onNudgeToHost,
   onReengagementEdit,
+  onDecidePromotion,
+  onSharePlan,
   nudgedIds,
   isPaidTier,
   eventApprovalsCount,
@@ -168,6 +170,11 @@ export default function HomeTab({
     reengagement: NonNullable<OrgDashboardCalendar["reengagement"]>,
     calendarId: string,
   ) => void;
+  /** Cross-promotion: another community wants to share a plan with one of
+   *  ours — Add / Skip. */
+  onDecidePromotion?: (promo: PlanPromotionRow, accept: boolean) => void;
+  /** Cross-promotion: open the share sheet for an under-attended plan. */
+  onSharePlan?: (plan: PromotionPlanSummary, calendarId: string) => void;
   /** Membership ids already nudged this session — their prompt card drops out. */
   nudgedIds?: Set<string>;
   /** Both nudge cards send an SMS, which is paid-only. The handlers already

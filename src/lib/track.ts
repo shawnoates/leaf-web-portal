@@ -21,7 +21,9 @@ export type WebEvent =
   | "follow_interest_list_shown"
   | "follow_interest_tap"
   | "follow_interest_list_closed"
-  | "plan_share_arrival";
+  | "plan_share_arrival"
+  | "cross_promo_share_sent"
+  | "cross_promo_decided";
 
 const ANON_COOKIE = "leaf_anon_id";
 

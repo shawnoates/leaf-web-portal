@@ -93,6 +93,52 @@ export interface OrgDashboardCalendar {
     };
     never_rsvpd: boolean;
   } | null;
+  /** Home NEEDS YOU card (cross-promotion): the soonest under-attended plan
+   *  worth sharing with other communities, plus how many there are to share
+   *  with. Optional — only a server that has the feature sends it. */
+  promotion_candidate?: {
+    plan: PromotionPlanSummary;
+    nearby_count: number;
+    partner_count: number;
+    sibling_count: number;
+  } | null;
+  /** Owner opted this calendar out of receiving share requests. */
+  crossPromoOptOut?: boolean;
+}
+
+/** Card-sized plan summary the cross-promotion payloads carry. */
+export interface PromotionPlanSummary {
+  objectId: string;
+  title: string;
+  date: string | null;
+  timezone: string | null;
+  venue_name?: string | null;
+  image?: string | null;
+  rsvp_count: number;
+  require_approval?: boolean;
+}
+
+export interface PromotionCalendarSummary {
+  objectId: string;
+  name: string;
+  share_id: string | null;
+  photo_url: string | null;
+  follower_count: number;
+}
+
+/** One PlanPromotion row as the server serializes it (snake_case). */
+export interface PlanPromotionRow {
+  promotion_id: string;
+  status: "pending" | "accepted" | "declined" | "withdrawn";
+  auto_accepted: boolean;
+  requested_at: string | null;
+  decided_at: string | null;
+  withdraw_reason: string | null;
+  plan: PromotionPlanSummary;
+  source_calendar: PromotionCalendarSummary | null;
+  target_calendar: PromotionCalendarSummary | null;
+  /** Only on outgoing rows: Accepted RSVPs that came through the target. */
+  attributed_rsvps?: number;
 }
 
 export interface OrgDashboard {
@@ -239,6 +285,11 @@ export interface OrgDashboard {
     eventGroupId: string | null;
     eventTitle: string;
   }[];
+  /** Cross-promotion: share requests from other communities waiting on this
+   *  owner (Home NEEDS YOU: Add / Skip). Optional until the server ships. */
+  incoming_promotions?: PlanPromotionRow[];
+  /** Cross-promotion feature flag as the server sees it. */
+  cross_promo_enabled?: boolean;
 }
 
 export type DashboardTab =

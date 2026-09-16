@@ -1,6 +1,7 @@
 "use client";
 
 import GenerateInput, { SuggestionChips } from "./GenerateInput";
+import TrustPill from "./TrustPill";
 
 // Hero — headline, lead, the generate input (the only button on the
 // fold) and the suggestion chips.
@@ -39,8 +40,9 @@ export default function MarketingHero({ headline, lead, chips }: Props) {
         {lead}
       </p>
 
-      <div className="mt-2 flex w-full justify-center">
+      <div className="mt-2 flex w-full flex-col items-center">
         <GenerateInput source="hero" isHero />
+        <TrustPill />
       </div>
 
       <SuggestionChips chips={chips} />

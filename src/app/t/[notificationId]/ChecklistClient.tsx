@@ -491,14 +491,11 @@ export default function ChecklistClient({
           ))}
         </ul>
 
+        {/* No header: the row's own copy says it's optional, and a section
+            title on top of that read as a second announcement. The divider
+            is enough to keep it out of the list of things owed. */}
         {!data.cancelled && optional.length > 0 && (
           <section className="border-t border-zinc-100">
-            <h2 className="px-5 pt-5 pb-0.5 text-[11px] font-bold uppercase tracking-widest text-zinc-400">
-              If you feel like it
-            </h2>
-            <p className="px-5 pb-1 text-[12px] text-zinc-400">
-              Not counted, never chased.
-            </p>
             <ul>
               {optional.map((t) => (
                 <Row

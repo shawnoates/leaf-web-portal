@@ -17,6 +17,7 @@ import {
   Pencil,
   Plus,
   Repeat,
+  Share2,
   Trash2,
   Users,
   Vote,
@@ -108,6 +109,9 @@ type Props = {
   /** Optional callback when a pending RSVP is approved/declined — lets the parent reconcile its
    *  pendingRsvpRequests list without a full refetch. */
   onPendingRsvpResolved?: (notificationId: string) => void;
+  /** Cross-promotion: open the "Share with communities" sheet for this plan.
+   *  Hidden for polls and past plans. Absent = no share action. */
+  onShare?: (plan: PlanDetailData) => void;
 };
 
 export default function PlanDetailModal({
@@ -121,6 +125,7 @@ export default function PlanDetailModal({
   leafAppConnected = true,
   onConnectApp,
   onPendingRsvpResolved,
+  onShare,
 }: Props) {
   // Flashes "Copied" on the Copy Link action after the direct /p/<id> URL is
   // written to the clipboard.
@@ -935,6 +940,15 @@ export default function PlanDetailModal({
                 <Pencil className="w-4 h-4" />
                 Edit
               </button>
+              {onShare && !plan.isPoll && new Date(plan.date).getTime() > Date.now() && (
+                <button
+                  onClick={() => onShare(plan)}
+                  className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share with communities
+                </button>
+              )}
             </div>
             <div className="flex justify-center gap-6 flex-wrap">
               <button
