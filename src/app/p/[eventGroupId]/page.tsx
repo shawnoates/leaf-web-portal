@@ -36,19 +36,26 @@ type PlanShareInfo = {
   requireApproval: boolean;
   rsvpCount: number;
   capacity: number | null;
+  // Cross-promotion (only when the link carried a valid ?via=): the shared-
+  // with calendar to bounce into, and its id for RSVP attribution.
+  viaShareId?: string | null;
+  viaCalendarId?: string | null;
+  viaCalendarName?: string | null;
 };
 
 async function fetchPlanShareInfo(
   eventGroupId: string,
   mode: ShareMode,
-  phoneNumber: string | null
+  phoneNumber: string | null,
+  via?: string | null,
 ): Promise<PlanShareInfo | null> {
   try {
-    const params: { eventGroupId: string; mode: ShareMode; phoneNumber?: string } = {
+    const params: { eventGroupId: string; mode: ShareMode; phoneNumber?: string; via?: string } = {
       eventGroupId,
       mode,
     };
     if (phoneNumber) params.phoneNumber = phoneNumber;
+    if (via) params.via = via;
     const result = (await Parse.Cloud.run("getPlanShareInfo", params)) as PlanShareInfo;
     return result || null;
   } catch (err) {
@@ -88,7 +95,9 @@ type PageProps = {
   params: Promise<{ eventGroupId: string }>;
   // `src` is share attribution (e.g. host_share from the host share kit). It
   // is recorded as a web event and otherwise ignored.
-  searchParams: Promise<{ copy?: string; rsvp?: string; src?: string }>;
+  // `via` is cross-promotion: the calendar whose page the link was copied
+  // from. When an accepted promotion backs it, the redirect lands there.
+  searchParams: Promise<{ copy?: string; rsvp?: string; src?: string; via?: string }>;
 };
 
 function resolveMode(copyParam: string | undefined): ShareMode {
@@ -175,11 +184,11 @@ export async function generateMetadata({
 
 export default async function PlanSharePage({ params, searchParams }: PageProps) {
   const { eventGroupId } = await params;
-  const { copy, rsvp, src } = await searchParams;
+  const { copy, rsvp, src, via } = await searchParams;
   const mode = resolveMode(copy);
   const autoOpenRsvp = rsvp === "1";
   const phoneNumber = await readViewerPhone();
-  const info = await fetchPlanShareInfo(eventGroupId, mode, phoneNumber);
+  const info = await fetchPlanShareInfo(eventGroupId, mode, phoneNumber, via ?? null);
 
   // Resolution: how should this page present?
   //  - invite + public calendar OR known follower → redirect into
@@ -199,6 +208,38 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
 
   const isPrivateForViewer =
     info.calendarIsPrivate && !info.viewerIsFollower;
+  // Cross-promotion: the viewer found this plan on another calendar's page;
+  // send them back there. Only public calendars can receive shares, so the
+  // private-calendar scrim never applies on this branch.
+  if (mode === "invite" && info.viaShareId) {
+    const destination = `/org/${info.viaShareId}?plan=${eventGroupId}`;
+    return (
+      <div
+        style={{
+          minHeight: "60vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "60px 20px",
+          textAlign: "center",
+          color: "#52525b",
+          fontFamily:
+            "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        }}
+      >
+        <ArrivalTracker src={src ?? `via:${info.viaCalendarId ?? ""}`} planId={eventGroupId} />
+        <PlanShareRedirect destination={destination} />
+        <p style={{ fontSize: 14 }}>
+          Opening{" "}
+          <a href={destination} style={{ color: "#18181b", textDecoration: "underline" }}>
+            {info.title || "the plan"}
+          </a>
+          …
+        </p>
+      </div>
+    );
+  }
   if (mode === "invite" && info.shareId && !isPrivateForViewer) {
     const destination = `/org/${info.shareId}?plan=${eventGroupId}`;
     return (

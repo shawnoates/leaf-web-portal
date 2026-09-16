@@ -10,6 +10,7 @@ import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailMod
 import HostIdeaModal from "@/components/HostIdeaModal";
 import PlanChatDrawer from "@/components/PlanChatDrawer";
 import NudgeModal from "@/components/dashboard/NudgeModal";
+import SharePlanSheet from "@/components/dashboard/SharePlanSheet";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
 import { featuredWallClockDate } from "@/lib/wall-clock";
@@ -601,6 +602,8 @@ export default function PlansManager({
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<UpcomingPlan | null>(null);
+  // Cross-promotion: "Share with communities" sheet for one plan.
+  const [sharePlan, setSharePlan] = useState<{ eventGroupId: string; title: string } | null>(null);
   // Per-plan chat drawer state. Non-null = eventGroupId of the plan
   // whose chat should render as a slide-over. Set from the plan-card
   // hover overlay's "Chat" button so the owner never leaves the
@@ -2303,6 +2306,16 @@ export default function PlansManager({
           onChanged={() => { fetchPlanIdeas(); }}
           onDuplicate={handleDuplicatePlan}
           onEdit={handleEditPlan}
+          onShare={(p) => setSharePlan({ eventGroupId: p.objectId, title: p.title })}
+        />
+      )}
+
+      {sharePlan && (
+        <SharePlanSheet
+          eventGroupId={sharePlan.eventGroupId}
+          planTitle={sharePlan.title}
+          calendarId={calendarId}
+          onClose={() => setSharePlan(null)}
         />
       )}
 

@@ -126,6 +126,17 @@ interface Plan {
   hasLeafHostChat?: boolean;
   // Owner-only: unread concierge messages in the plan-scoped thread.
   leafHostChatUnread?: number;
+  // Cross-promotion: this plan is hosted on ANOTHER calendar and was shared
+  // with this one. `name`/`shareId` are the host calendar ("Shared by A");
+  // `viaCalendarId` is this calendar, stamped on RSVPs for attribution.
+  promotedFrom?: {
+    promotionId: string;
+    calendarId: string | null;
+    name: string | null;
+    shareId: string | null;
+    viaCalendarId: string | null;
+    viaCalendarName: string | null;
+  } | null;
   // Virtual host (VIRTUAL_HOST_SPEC) — persona-fronted paid host on this plan.
   // Owner-only: can the owner attach a virtual host to this (host-less) plan?
   /**
@@ -681,6 +692,9 @@ function RsvpModal({
         eventGroupId: plan.id,
         rsvpNote: plan.requireApproval && rsvpNote.trim() ? rsvpNote.trim() : undefined,
         sharePhoneWithHost: sharePhone,
+        // Cross-promotion attribution: this RSVP came through the calendar
+        // the plan was shared with, not the one that hosts it.
+        viaCalendarId: plan.promotedFrom && calendarId ? calendarId : undefined,
       }) as { eventNotificationId?: string; alreadyRsvpd?: boolean; pendingApproval?: boolean; waitlisted?: boolean } | null | undefined;
       console.log("[RSVP] result:", result);
       setVerifiedUserCookie(verify.name, verify.phone);
@@ -2694,6 +2708,7 @@ export default function OrgCalendarPage() {
         hasLeafHostChat: Boolean(p.hasLeafHostChat),
         leafHostChatUnread:
           typeof p.leafHostChatUnread === "number" ? p.leafHostChatUnread : 0,
+        promotedFrom: (p.promotedFrom as Plan["promotedFrom"]) ?? null,
         addons: Array.isArray(p.addons)
           ? (p.addons as Record<string, unknown>[]).map((a) => ({
               objectId: a.objectId as string,
@@ -4253,6 +4268,20 @@ export default function OrgCalendarPage() {
                           Hosted by {plan.hostName}
                         </p>
                       )}
+                      {/* Cross-promotion: hosted elsewhere, shared with this
+                          calendar. Links to the host calendar. */}
+                      {plan.promotedFrom?.name && (
+                        <p className="mt-1 text-[11px] tracking-wider uppercase text-zinc-500 font-semibold">
+                          Shared by{" "}
+                          {plan.promotedFrom.shareId ? (
+                            <Link href={`/org/${plan.promotedFrom.shareId}`} className="underline underline-offset-2 hover:text-zinc-900">
+                              {plan.promotedFrom.name}
+                            </Link>
+                          ) : (
+                            plan.promotedFrom.name
+                          )}
+                        </p>
+                      )}
                       {/* Per-plan leaf-host chat pill — owner-only.
                           Server strips these fields for non-owners so
                           the button never surfaces publicly. Unread
@@ -5242,6 +5271,11 @@ export default function OrgCalendarPage() {
                 ) : (
                   <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
                     Hosted by {selectedEvent.hostName}
+                  </p>
+                )}
+                {selectedEvent.promotedFrom?.name && (
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
+                    Shared by {selectedEvent.promotedFrom.name}
                   </p>
                 )}
                 <div className="flex gap-6 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">

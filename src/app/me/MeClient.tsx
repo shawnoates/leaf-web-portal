@@ -63,6 +63,16 @@ interface Plan {
   calendarId: string | null;
   calendarName: string;
   calendarShareId: string | null;
+  /** Cross-promotion: `calendarName` above is the HOST calendar; this names
+   *  the followed calendar it was shared with, and the id to credit RSVPs to. */
+  promotedFrom?: {
+    promotionId: string;
+    calendarId: string | null;
+    name: string | null;
+    shareId: string | null;
+    viaCalendarId: string | null;
+    viaCalendarName: string | null;
+  } | null;
   image: string | null;
   hostState: HostState;
   viewerIsHost: boolean;
@@ -995,7 +1005,7 @@ function HeroActions({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: Rsv
       : "going";
     onRsvp(plan.id, target);
     try {
-      const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: next });
+      const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: next, viaCalendarId: plan.promotedFrom?.viaCalendarId || undefined });
       if (res?.rsvpState && res.rsvpState !== target) onRsvp(plan.id, res.rsvpState as RsvpState);
     } catch {
       onRsvp(plan.id, prev);
@@ -1079,6 +1089,7 @@ function PlanRow({
       <div className="row-text">
         <div className="row-cal">
           {plan.calendarName}
+          {plan.promotedFrom?.viaCalendarName ? ` · shared with ${plan.promotedFrom.viaCalendarName}` : ""}
           {hosting && (
             <span className="hostmark"><span className="hostdot" />You&rsquo;re hosting</span>
           )}
@@ -1689,7 +1700,7 @@ function AttendButtons({
       : "going";
     onRsvp(plan.id, target);
     try {
-      const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: next });
+      const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: next, viaCalendarId: plan.promotedFrom?.viaCalendarId || undefined });
       if (res?.rsvpState && res.rsvpState !== target) onRsvp(plan.id, res.rsvpState as RsvpState);
     } catch {
       onRsvp(plan.id, prev);

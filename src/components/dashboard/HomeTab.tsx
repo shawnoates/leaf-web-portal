@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Calendar, Lock, Plus } from "lucide-react";
+import { Calendar, Lock, Plus, Share2 } from "lucide-react";
 import type { OrgAnalytics } from "@/components/analytics/types";
 import { formatWallClockTime12h } from "@/lib/date-utils";
 import {
@@ -13,6 +13,8 @@ import type {
   CalActivePlan,
   OrgDashboard,
   OrgDashboardCalendar,
+  PlanPromotionRow,
+  PromotionPlanSummary,
 } from "./types";
 import {
   buildRsvpCountIndex,
@@ -88,6 +90,23 @@ function computeBestDay(
   const sharePct = Math.round((counts[best] / total) * 100);
   if (sharePct < 25) return null;
   return { dayIndex: best, sharePct };
+}
+
+/** "Sat, Sep 20" in the plan's own zone; null when the date is missing. */
+function promoDay(date: string | null, timezone: string | null): string | null {
+  if (!date) return null;
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return null;
+  try {
+    return d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      ...(timezone ? { timeZone: timezone } : {}),
+    });
+  } catch {
+    return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  }
 }
 
 function hostLine(plan: CalActivePlan): string {
@@ -437,6 +456,80 @@ export default function HomeTab({
         >
           {!isPaidTier && <Lock className="w-3.5 h-3.5" />}
           Draft invite
+        </button>
+      </div>,
+    );
+  }
+
+  // Cross-promotion — incoming: another community wants to share a plan with
+  // one of ours. One tap adds it to our page and digest; their host runs it.
+  for (const promo of dashboard.incoming_promotions ?? []) {
+    const day = promoDay(promo.plan.date, promo.plan.timezone);
+    const src = promo.source_calendar;
+    needsYouRows.push(
+      <div
+        key={`promo-in-${promo.promotion_id}`}
+        className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
+      >
+        <div className="flex-1 min-w-[180px]">
+          <p className="text-[13px] font-medium text-zinc-900">
+            {src?.name || "A nearby community"} wants to share {promo.plan.title}
+            {dashboard.calendars.length > 1 && promo.target_calendar?.name ? ` with ${promo.target_calendar.name}` : ""}
+          </p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">
+            {[
+              day,
+              promo.plan.venue_name,
+              src ? `${src.follower_count} follower${src.follower_count === 1 ? "" : "s"} on ${src.name}` : null,
+            ].filter(Boolean).join(" · ")}
+          </p>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <button
+            onClick={() => onDecidePromotion?.(promo, true)}
+            className="px-3.5 py-1.5 min-h-[30px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
+          >
+            Add
+          </button>
+          <button
+            onClick={() => onDecidePromotion?.(promo, false)}
+            className="px-3.5 py-1.5 min-h-[30px] text-zinc-500 rounded-full text-xs font-medium hover:text-red-700 transition-colors"
+          >
+            Skip
+          </button>
+        </div>
+      </div>,
+    );
+  }
+
+  // Cross-promotion — outgoing candidate: an under-attended plan with room to
+  // grow and communities to grow into.
+  for (const calendar of dashboard.calendars) {
+    const pc = calendar.promotion_candidate;
+    if (!pc || !onSharePlan) continue;
+    const reach = pc.nearby_count + pc.partner_count + pc.sibling_count;
+    if (reach <= 0) continue;
+    needsYouRows.push(
+      <div
+        key={`promo-out-${pc.plan.objectId}`}
+        className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-[18px] border-b border-zinc-100 last:border-b-0"
+      >
+        <div className="flex-1 min-w-[180px]">
+          <p className="text-[13px] font-medium text-zinc-900">
+            {pc.plan.title} has {pc.plan.rsvp_count} RSVP{pc.plan.rsvp_count === 1 ? "" : "s"}
+          </p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">
+            Share it with {reach} {reach === 1 ? "community" : "communities"} nearby
+            {promoDay(pc.plan.date, pc.plan.timezone) ? ` · ${promoDay(pc.plan.date, pc.plan.timezone)}` : ""}
+            {dashboard.calendars.length > 1 ? ` · ${calendar.name}` : ""}
+          </p>
+        </div>
+        <button
+          onClick={() => onSharePlan(pc.plan, calendar.objectId)}
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 min-h-[30px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0"
+        >
+          <Share2 className="w-3.5 h-3.5" />
+          Share
         </button>
       </div>,
     );

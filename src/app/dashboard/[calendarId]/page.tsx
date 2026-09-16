@@ -29,12 +29,16 @@ import NudgeModal from "@/components/dashboard/NudgeModal";
 import SeriesHostModal, { type SeriesLimit } from "@/components/dashboard/SeriesHostModal";
 import { seriesCountsTowardLimit, type SeriesSummary } from "@/lib/series";
 import GrowPerformance from "@/components/dashboard/GrowPerformance";
+import SharePlanSheet from "@/components/dashboard/SharePlanSheet";
+import CollabsSection from "@/components/dashboard/CollabsSection";
+import { track } from "@/lib/track";
 import type {
   CalActivePlan,
   DashboardTab,
   GrowSection,
   OrgDashboard,
   OrgDashboardCalendar,
+  PlanPromotionRow,
 } from "@/components/dashboard/types";
 import {
   buildRsvpCountIndex,
@@ -296,6 +300,10 @@ export default function OrgDashboardPage() {
 
   // Toast
   const [toast, setToast] = useState<string | null>(null);
+  // Cross-promotion: the "Share with communities" sheet for one plan, and the
+  // "Always accept from {A}?" follow-up after an incoming share is added.
+  const [sharePlan, setSharePlan] = useState<{ eventGroupId: string; title: string } | null>(null);
+  const [partnerPrompt, setPartnerPrompt] = useState<{ promotionId: string; sourceName: string } | null>(null);
   const [embedCalId, setEmbedCalId] = useState<string | null>(null);
 
   // Analytics — powers Grow › Performance AND Home's deltas / best-day prompts.
@@ -1384,6 +1392,38 @@ export default function OrgDashboardPage() {
     [dashboard, isPaidTier, hostFirstName, promptFollower],
   );
 
+  // Cross-promotion: Add / Skip an incoming share. The row leaves the list
+  // optimistically; an Add offers the one-tap partnership next.
+  const handleDecidePromotion = useCallback(
+    async (promo: PlanPromotionRow, accept: boolean) => {
+      setDashboard((d) =>
+        d
+          ? { ...d, incoming_promotions: (d.incoming_promotions ?? []).filter((p) => p.promotion_id !== promo.promotion_id) }
+          : d,
+      );
+      try {
+        await Parse.Cloud.run("decidePlanPromotion", { promotionId: promo.promotion_id, accept });
+        track("cross_promo_decided", { promotionId: promo.promotion_id, accept }, calendarId);
+        setToast(
+          accept
+            ? `Added ${promo.plan.title} to ${promo.target_calendar?.name ?? "your calendar"}`
+            : `Skipped ${promo.plan.title}`,
+        );
+        setTimeout(() => setToast(null), 3000);
+        if (accept && promo.source_calendar) {
+          setPartnerPrompt({ promotionId: promo.promotion_id, sourceName: promo.source_calendar.name });
+        }
+      } catch (err) {
+        setToast(err instanceof Error ? err.message : "Something went wrong");
+        setTimeout(() => setToast(null), 3000);
+        setDashboard((d) =>
+          d ? { ...d, incoming_promotions: [promo, ...(d.incoming_promotions ?? [])] } : d,
+        );
+      }
+    },
+    [calendarId],
+  );
+
   const removeFollower = useCallback(
     async (f: OrgDashboard["followers"][number]) => {
       if (!confirm(`Remove ${f.name} as a follower?`)) return;
@@ -1513,6 +1553,7 @@ export default function OrgDashboardPage() {
     dashboard.pendingFollowers.length +
     eventApprovals.length +
     changeRequestCount +
+    (dashboard.incoming_promotions?.length ?? 0) +
     (neverRsvpdCount > 0 ? 1 : 0);
 
   // ── Shared fragments ──
@@ -1731,6 +1772,8 @@ export default function OrgDashboardPage() {
               onRejectFollower={rejectFollower}
               onNudgeToHost={handleNudgeToHost}
               onReengagementEdit={handleReengagementEdit}
+              onDecidePromotion={handleDecidePromotion}
+              onSharePlan={(plan) => setSharePlan({ eventGroupId: plan.objectId, title: plan.title })}
               nudgedIds={nudgedIds}
               isPaidTier={isPaidTier}
               eventApprovalsCount={eventApprovals.length}
@@ -2068,21 +2111,20 @@ export default function OrgDashboardPage() {
                   ))}
 
                 {growSection === "collabs" && (
-                  <div className="border border-zinc-200 rounded-xl p-6 max-w-2xl">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-base font-medium text-zinc-900">Cross-org collabs</h3>
-                      <span className="bg-zinc-900 text-white text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full">Coming soon</span>
-                    </div>
-                    <p className="text-sm text-zinc-500 leading-relaxed mb-4">
-                      Co-host a plan with a nearby org and it lands on both
-                      calendars — shared audiences, doubled reach.
-                    </p>
-                    <ul className="space-y-2 list-disc list-inside">
-                      <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Joint plans</strong> — one plan, posted to several calendars at once.</li>
-                      <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Collab invites</strong> — nearby orgs can propose co-hosting; you accept or message back.</li>
-                      <li className="text-xs text-zinc-500 leading-relaxed"><strong className="text-zinc-700">Shared audiences</strong> — tap into followers from communities that complement yours.</li>
-                    </ul>
-                  </div>
+                  <CollabsSection
+                    calendarId={calendarId}
+                    onToast={(m) => { setToast(m); setTimeout(() => setToast(null), 3000); }}
+                    onPartnerPrompt={(promotionId, sourceName) => setPartnerPrompt({ promotionId, sourceName })}
+                    onSharePlan={() => {
+                      // Soonest upcoming real plan across the org, else make one.
+                      const next = dashboard.calendars
+                        .flatMap((c) => c.activePlans ?? [])
+                        .filter((p) => !p.isPoll && new Date(p.date).getTime() > Date.now())
+                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+                      if (next) setSharePlan({ eventGroupId: next.objectId, title: next.title });
+                      else openNewPlan();
+                    }}
+                  />
                 )}
 
                 {growSection === "concierge" && (
@@ -3015,6 +3057,7 @@ export default function OrgDashboardPage() {
           calendarId={selectedActivePlan.calendarId || calendarId}
           onClose={() => setSelectedActivePlan(null)}
           onChanged={fetchDashboard}
+          onShare={(p) => setSharePlan({ eventGroupId: p.objectId, title: p.title })}
           leafAppConnected={leafAppConnected}
           onConnectApp={() => setShowPhoneModal(true)}
           onDuplicate={(plan, pollOptions) => {
@@ -3162,6 +3205,59 @@ export default function OrgDashboardPage() {
           onVerified={() => { setLeafAppConnected(true); setShowPhoneModal(false); setPhoneJustVerified(true); }}
           onClose={() => setShowPhoneModal(false)}
         />
+      )}
+
+      {/* Cross-promotion: share sheet */}
+      {sharePlan && (
+        <SharePlanSheet
+          eventGroupId={sharePlan.eventGroupId}
+          planTitle={sharePlan.title}
+          calendarId={calendarId}
+          onClose={() => setSharePlan(null)}
+          onSent={() => { fetchDashboard(); }}
+        />
+      )}
+
+      {/* Cross-promotion: one-tap partnership after an Add */}
+      {partnerPrompt && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/45 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.25)]">
+            <div className="px-6 py-5 space-y-2">
+              <h2 className="text-base font-semibold text-zinc-900">
+                Always accept plans from {partnerPrompt.sourceName}?
+              </h2>
+              <p className="text-xs text-zinc-500 leading-relaxed">
+                Their future shares land on your calendar instantly, no approval step.
+                You can undo this any time under Grow › Collabs.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-zinc-100 bg-zinc-50 rounded-b-2xl">
+              <button
+                onClick={() => setPartnerPrompt(null)}
+                className="text-sm text-zinc-500 px-3 py-2 hover:text-zinc-900 transition-colors"
+              >
+                Not now
+              </button>
+              <button
+                onClick={async () => {
+                  const { promotionId, sourceName } = partnerPrompt;
+                  setPartnerPrompt(null);
+                  try {
+                    await Parse.Cloud.run("decidePlanPromotion", { promotionId, accept: true, alwaysAcceptFromSource: true });
+                    track("cross_promo_decided", { promotionId, accept: true, partnered: true }, calendarId);
+                    setToast(`Plans from ${sourceName} will be added automatically`);
+                  } catch (err) {
+                    setToast(err instanceof Error ? err.message : "Couldn't save that");
+                  }
+                  setTimeout(() => setToast(null), 3000);
+                }}
+                className="bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium px-4 py-2.5 rounded-full transition-colors"
+              >
+                Always accept
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Toast */}
