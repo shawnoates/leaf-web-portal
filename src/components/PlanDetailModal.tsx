@@ -940,7 +940,7 @@ export default function PlanDetailModal({
                 <Pencil className="w-4 h-4" />
                 Edit
               </button>
-              {onShare && !plan.isPoll && new Date(plan.date).getTime() > Date.now() && (
+              {onShare && !plan.isPoll && (!plan.date || new Date(plan.date).getTime() > Date.now()) && (
                 <button
                   onClick={() => onShare(plan)}
                   className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
