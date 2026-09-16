@@ -1,14 +1,17 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   Check,
   Clock,
+  Copy,
+  Image as ImageIcon,
   Lock,
   MessageSquare,
   Plus,
   Send,
+  Share2,
 } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { renderLinkedText } from "@/lib/linkify";
@@ -36,6 +39,23 @@ export type HostTask = {
    * nothing either side doesn't already know.
    */
   suggestedInvites: { userId: string; name: string; shared: number }[] | null;
+  /**
+   * Work the host may ignore forever without it reading as unfinished. Rendered
+   * apart from the list and kept out of the counter — the server already keeps
+   * these out of the progress ring, and the page must agree with it or the two
+   * surfaces disagree about whether the host is behind.
+   */
+  optional: boolean;
+  /**
+   * Image, caption and link for the share row. Note there is no venue anywhere
+   * in here on purpose (see the server's shareCaption and /api/og/plan-share).
+   */
+  sharePack: {
+    storyImageUrl: string;
+    squareImageUrl: string;
+    caption: string;
+    shareUrl: string;
+  } | null;
 };
 
 export type HostChecklist = {
@@ -169,6 +189,141 @@ function DraftPanel({
   );
 }
 
+/**
+ * The share pack: an image, a caption, and a link, ready to post.
+ *
+ * Nothing here posts anything. Every button hands the host material and gets
+ * out of the way — copy to clipboard, open the image to save it, or the OS
+ * share sheet. Leaf has no account of theirs to post to and does not want one.
+ *
+ * Which also means we cannot see whether they posted, only that they took the
+ * material; recordHostTaskShare stamps that and nothing more.
+ */
+function SharePanel({
+  task,
+  notificationId,
+}: {
+  task: HostTask;
+  notificationId: string;
+}) {
+  const pack = task.sharePack;
+  const [text, setText] = useState(pack?.caption ?? "");
+  const [copied, setCopied] = useState(false);
+  const [canShare, setCanShare] = useState(false);
+
+  // Feature-detected after mount: navigator doesn't exist during SSR, and
+  // rendering the button on the server would mismatch on hydration.
+  useEffect(() => {
+    setCanShare(typeof navigator !== "undefined" && typeof navigator.share === "function");
+  }, []);
+
+  const stamp = useCallback(
+    (action: "copy" | "image" | "share") => {
+      // Fire and forget. A dropped analytics write must never take the copy
+      // button down with it.
+      Parse.Cloud.run("recordHostTaskShare", {
+        taskId: task.id,
+        notificationId,
+        action,
+      }).catch(() => {});
+    },
+    [task.id, notificationId],
+  );
+
+  if (!pack) return null;
+
+  async function copyCaption() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      stamp("copy");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked (http, old browser). The textarea is right there and
+      // selectable, so there is nothing useful to say.
+    }
+  }
+
+  async function nativeShare() {
+    try {
+      await navigator.share({ text, url: pack!.shareUrl });
+      stamp("share");
+    } catch {
+      // Cancelled, or unsupported at the last moment. Not an error.
+    }
+  }
+
+  return (
+    <div
+      className="mt-2.5 rounded-xl border border-zinc-200 bg-zinc-50/70 p-3"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
+        Yours to post — nothing is sent from Leaf
+      </p>
+
+      <div className="flex gap-2">
+        <a
+          href={pack.storyImageUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => stamp("image")}
+          className="flex-1 inline-flex items-center justify-center gap-1.5 text-[13px] font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 rounded-lg px-3 py-2 transition-colors"
+        >
+          <ImageIcon className="w-3.5 h-3.5" />
+          Story image
+        </a>
+        <a
+          href={pack.squareImageUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => stamp("image")}
+          className="flex-1 inline-flex items-center justify-center gap-1.5 text-[13px] font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 rounded-lg px-3 py-2 transition-colors"
+        >
+          <ImageIcon className="w-3.5 h-3.5" />
+          Square
+        </a>
+      </div>
+      <p className="text-[11px] text-zinc-400 mt-1.5">
+        Opens the image — press and hold to save it to your photos.
+      </p>
+
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={Math.min(9, Math.max(4, Math.ceil(text.length / 38)))}
+        aria-label="Caption"
+        className="w-full text-[14px] leading-relaxed text-zinc-900 bg-white border border-zinc-200 rounded-lg p-2.5 mt-3 outline-none focus:border-zinc-400 resize-none"
+      />
+
+      <div className="flex items-center gap-2 mt-2.5">
+        <button
+          type="button"
+          onClick={copyCaption}
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-white bg-zinc-900 rounded-lg px-3 py-1.5 transition-colors"
+        >
+          {copied ? (
+            <Check className="w-3.5 h-3.5" strokeWidth={3} />
+          ) : (
+            <Copy className="w-3.5 h-3.5" />
+          )}
+          {copied ? "Copied" : "Copy caption"}
+        </button>
+        {canShare && (
+          <button
+            type="button"
+            onClick={nativeShare}
+            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-zinc-600 bg-zinc-100 hover:bg-zinc-200 rounded-lg px-3 py-1.5 transition-colors"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            Share
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Row({
   task,
   busy,
@@ -271,6 +426,12 @@ function Row({
           />
         </div>
       )}
+
+      {task.sharePack && !done && (
+        <div className="pl-12 pr-4 pb-3 -mt-1">
+          <SharePanel task={task} notificationId={notificationId} />
+        </div>
+      )}
     </li>
   );
 }
@@ -291,9 +452,15 @@ export default function ChecklistClient({
   const [draft, setDraft] = useState("");
 
   const tasks = data?.tasks ?? [];
-  const { open, done } = useMemo(
+  // Three lists, not two. An optional row sits outside the main list entirely
+  // so it can never make the count at the top read as work outstanding — the
+  // server keeps these out of the progress ring for the same reason, and the
+  // two surfaces have to agree about whether the host is behind. Ticking one
+  // still sends it to Done, which is the whole reward for doing it.
+  const { open, optional, done } = useMemo(
     () => ({
-      open: tasks.filter((t) => t.status !== "done"),
+      open: tasks.filter((t) => t.status !== "done" && !t.optional),
+      optional: tasks.filter((t) => t.status !== "done" && t.optional),
       done: tasks.filter((t) => t.status === "done"),
     }),
     [tasks],
@@ -446,6 +613,29 @@ export default function ChecklistClient({
             />
           ))}
         </ul>
+
+        {!data.cancelled && optional.length > 0 && (
+          <section className="border-t border-zinc-100">
+            <h2 className="px-5 pt-5 pb-0.5 text-[11px] font-bold uppercase tracking-widest text-zinc-400">
+              If you feel like it
+            </h2>
+            <p className="px-5 pb-1 text-[12px] text-zinc-400">
+              Not counted, never chased.
+            </p>
+            <ul>
+              {optional.map((t) => (
+                <Row
+                  key={t.id}
+                  task={t}
+                  busy={busyId === t.id}
+                  notificationId={notificationId}
+                  onToggle={toggle}
+                  onSent={markSent}
+                />
+              ))}
+            </ul>
+          </section>
+        )}
 
         <div className="px-4 py-3 border-t border-zinc-100">
           <div className="flex items-center gap-2">
