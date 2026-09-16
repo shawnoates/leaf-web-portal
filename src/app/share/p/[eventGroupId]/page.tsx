@@ -13,15 +13,19 @@ import { redirect } from "next/navigation";
 
 type PageProps = {
   params: Promise<{ eventGroupId: string }>;
-  searchParams: Promise<{ copy?: string; rsvp?: string }>;
+  searchParams: Promise<{ copy?: string; rsvp?: string; src?: string }>;
 };
 
 export default async function ShareRedirectPage({ params, searchParams }: PageProps) {
   const { eventGroupId } = await params;
-  const { copy, rsvp } = await searchParams;
+  const { copy, rsvp, src } = await searchParams;
   const query = new URLSearchParams();
   if (copy) query.set("copy", copy);
   if (rsvp) query.set("rsvp", rsvp);
+  // Attribution survives the hop. The host share kit links here with
+  // ?src=host_share, and /p/ records the arrival; dropping it at this redirect
+  // is how the first version silently measured nothing.
+  if (src) query.set("src", src);
   const qs = query.toString();
   redirect(`/p/${eventGroupId}${qs ? `?${qs}` : ""}`);
 }

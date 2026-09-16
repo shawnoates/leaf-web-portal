@@ -2,96 +2,167 @@ import { ImageResponse } from "next/og";
 import Parse from "@/lib/parse";
 import { SITE_HOST } from "@/lib/site";
 
-// The card a host posts to a story.
+// The card a host posts.
 //
-// Unlike its siblings in /api/og/*, this one is not an unfurl card — nothing
-// scrapes it. A host opens it from their checklist, saves it, and posts it
-// themselves, which is why it comes in a 9:16 story size as well as a square.
+// Unlike its siblings in /api/og/*, nothing scrapes this one. A host opens it
+// from their share kit, saves it, and posts it themselves — which is why it
+// comes as a 4:5 feed post and a 9:16 story rather than a 1200x630 unfurl.
 //
-// Same dark-green ground and system type as the rest of /api/og/*. next/og
-// rasterizes with Satori, which supports neither external stylesheets nor the
-// app's font loader, and every multi-child element must be display:flex.
+// Design: the plan's own photo, full bleed, under a dark gradient; a heavy
+// grotesk headline with the neighborhood in a highlighter block; the plan
+// title; the URL big enough to read off a screenshot. When the plan has no
+// photo the same layout sits on the house green.
 //
 // Params:
 //   planId  required, EventGroup objectId
-//   format  story (1080x1920, default) | square (1080x1080)
+//   format  post (1080x1350, default) | story (1080x1920) | square (1080x1080)
+//   phase   before (default: "join me") | after ("we did it")
 //
 // WHAT IS DELIBERATELY NOT ON THIS CARD: the venue. getPlanShareInfo gates the
 // venue name and the street address together and gives an anonymous caller
 // neither, because a name like "Home" or "My Apt" leaks the same residential
 // signal the address does. We call it anonymously — no phoneNumber — so that
 // redaction happens by construction rather than by remembering to strip fields
-// here. A card destined for a public story is the most anonymous audience
-// there is, and plenty of these plans are at somebody's flat. The link shows
-// the spot to whoever qualifies to see it.
+// here. The NEIGHBORHOOD is the coarse "where" a stranger can safely have, and
+// it is what the card leads with.
+//
+// Satori (what next/og rasterizes with) supports neither external stylesheets
+// nor the app's font loader, and every multi-child element must be
+// display:flex. The headline font is fetched once from this deployment's own
+// /fonts/ and cached; if that fails the card falls back to system type rather
+// than failing to render.
 export const dynamic = "force-dynamic";
 
 const SIZES = {
+  post: { width: 1080, height: 1350 },
   story: { width: 1080, height: 1920 },
   square: { width: 1080, height: 1080 },
 } as const;
+type Format = keyof typeof SIZES;
+
+const HIGHLIGHT = "#F5C518";
+const INK = "#0f1f1a";
 
 type PlanShareInfo = {
   title: string;
+  image: string | null;
   expiryDate: string | null;
   location: { timezone: string | null } | null;
   calendarName: string | null;
   calendarIsPrivate: boolean;
+  neighborhood?: string | null;
   rsvpCount: number;
   capacity: number | null;
 };
 
-function clip(text: string, max: number): string {
-  return text.length > max ? text.slice(0, max - 1).trimEnd() + "…" : text;
+// ---------------------------------------------------------------------------
+// Assets
+// ---------------------------------------------------------------------------
+
+let fontCache: Promise<ArrayBuffer | null> | null = null;
+function loadHeadlineFont(origin: string): Promise<ArrayBuffer | null> {
+  if (!fontCache) {
+    fontCache = fetch(new URL("/fonts/Inter-ExtraBold.ttf", origin))
+      .then((r) => (r.ok ? r.arrayBuffer() : null))
+      .catch(() => null)
+      .then((buf) => {
+        // Don't pin a failure: the next request tries again.
+        if (!buf) fontCache = null;
+        return buf;
+      });
+  }
+  return fontCache;
 }
 
-function titleFontSize(title: string, story: boolean): number {
-  const base = story ? 1 : 0.82;
-  if (title.length <= 28) return Math.round(112 * base);
-  if (title.length <= 55) return Math.round(88 * base);
-  if (title.length <= 90) return Math.round(68 * base);
-  return Math.round(54 * base);
-}
-
-// "Thursday, Sep 18" + "7:00 PM", in the VENUE's timezone. A plan's wall clock
-// belongs to where it happens, not to where this server runs.
-function whenParts(iso: string | null, tz: string | null): { day: string; time: string } | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const opts = tz ? { timeZone: tz } : {};
+// The photo is fetched here rather than handed to Satori as a URL, so a dead
+// link (Google Places photo URLs perish) degrades to the plain card instead of
+// failing the whole render. Capped so a giant original can't stall the route.
+const PHOTO_MAX_BYTES = 6 * 1024 * 1024;
+async function loadPhoto(url: string | null): Promise<string | null> {
+  if (!url || !/^https?:\/\//.test(url)) return null;
   try {
-    return {
-      day: new Intl.DateTimeFormat("en-US", {
-        ...opts,
-        weekday: "long",
-        month: "short",
-        day: "numeric",
-      }).format(d),
-      time: new Intl.DateTimeFormat("en-US", {
-        ...opts,
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      }).format(d),
-    };
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 4000);
+    const res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (!res.ok) return null;
+    const type = res.headers.get("content-type") || "";
+    if (!type.startsWith("image/")) return null;
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > PHOTO_MAX_BYTES) return null;
+    return `data:${type};base64,${Buffer.from(buf).toString("base64")}`;
   } catch {
     return null;
   }
 }
 
-function goingLine(rsvpCount: number, capacity: number | null): string {
-  if (rsvpCount <= 0) return "Be the first to say you're coming";
-  const left = capacity && capacity > rsvpCount ? capacity - rsvpCount : null;
-  const going = `${rsvpCount} ${rsvpCount === 1 ? "person is" : "people are"} coming`;
-  return left ? `${going} · ${left} ${left === 1 ? "spot" : "spots"} left` : going;
+// ---------------------------------------------------------------------------
+// Copy
+// ---------------------------------------------------------------------------
+
+function clip(text: string, max: number): string {
+  return text.length > max ? text.slice(0, max - 1).trimEnd() + "…" : text;
 }
 
+// "Sun, Sep 20 · 2:30 PM", in the VENUE's timezone.
+function whenLabel(iso: string | null, tz: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const opts = tz ? { timeZone: tz } : {};
+  try {
+    const day = new Intl.DateTimeFormat("en-US", {
+      ...opts,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    }).format(d);
+    const time = new Intl.DateTimeFormat("en-US", {
+      ...opts,
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(d);
+    return `${day} · ${time}`;
+  } catch {
+    return null;
+  }
+}
+
+// The headline as a list of words, some highlighted. Satori has no inline
+// background on a text run, so each word is its own flex box.
+type Word = { text: string; hi: boolean };
+function headline(phase: "before" | "after", hood: string | null): Word[] {
+  const plain = (s: string) => s.split(" ").map((text) => ({ text, hi: false }));
+  const hi = (s: string) => s.split(" ").map((text) => ({ text, hi: true }));
+  if (phase === "after") {
+    return hood ? [...hi(hood), ...plain("came out.")] : [...hi("We did it.")];
+  }
+  return hood ? [...plain("Join me in"), ...hi(hood)] : [...hi("Join me.")];
+}
+
+function bodyLine(phase: "before" | "after", going: number): string {
+  if (phase === "after") {
+    return going >= 2
+      ? `${going} of us made it. The next one's on the calendar.`
+      : "The next one's already on the calendar.";
+  }
+  if (going >= 2) return `${going} people are in already. Small thing, no pressure.`;
+  return "Small thing, no pressure, just turn up.";
+}
+
+// ---------------------------------------------------------------------------
+// Route
+// ---------------------------------------------------------------------------
+
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const planId = searchParams.get("planId");
-  const story = searchParams.get("format") !== "square";
-  const size = story ? SIZES.story : SIZES.square;
+  const url = new URL(request.url);
+  const planId = url.searchParams.get("planId");
+  const formatParam = url.searchParams.get("format");
+  const format: Format = formatParam && formatParam in SIZES ? (formatParam as Format) : "post";
+  const phase: "before" | "after" = url.searchParams.get("phase") === "after" ? "after" : "before";
+  const size = SIZES[format];
+  const story = format === "story";
 
   let plan: PlanShareInfo | null = null;
   if (planId) {
@@ -106,19 +177,34 @@ export async function GET(request: Request) {
     }
   }
 
-  // A private calendar's plans are seen after you're let in. The checklist
-  // already withholds the share pack for one, but this route is reachable by
-  // plan id alone, so it refuses on its own account too.
+  // A private calendar's plans are seen after you're let in. The share kit
+  // already refuses for one, but this route is reachable by plan id alone, so
+  // it refuses on its own account too.
   if (plan?.calendarIsPrivate) {
     return new Response("Not available", { status: 404 });
   }
 
-  const title = clip(plan?.title || "A plan on Leaf", 110);
-  const eyebrow = clip(plan?.calendarName || "Leaf", 38);
-  const when = whenParts(plan?.expiryDate ?? null, plan?.location?.timezone ?? null);
-  const going = plan ? goingLine(plan.rsvpCount, plan.capacity) : "";
+  const [font, photo] = await Promise.all([
+    loadHeadlineFont(url.origin),
+    loadPhoto(plan?.image ?? null),
+  ]);
 
-  const pad = story ? "110px 84px" : "84px 76px";
+  const hood = plan?.neighborhood ? clip(plan.neighborhood, 26) : null;
+  const words = headline(phase, hood);
+  const title = clip(plan?.title || "A plan on Leaf", 70);
+  const when = phase === "before" ? whenLabel(plan?.expiryDate ?? null, plan?.location?.timezone ?? null) : null;
+  const body = bodyLine(phase, plan?.rsvpCount ?? 0);
+  const shownUrl = planId ? `${SITE_HOST}/p/${planId}` : SITE_HOST;
+
+  // Type scale per format. Story has the height to go bigger.
+  const s = story ? 1.18 : 1;
+  const headSize = Math.round((words.map((w) => w.text).join(" ").length > 18 ? 84 : 100) * s);
+  const titleSize = Math.round(46 * s);
+  const bodySize = Math.round(32 * s);
+  const urlSize = Math.round(34 * s);
+  const pad = story ? 84 : 72;
+
+  const fontFamily = font ? "Inter, system-ui, sans-serif" : "system-ui, -apple-system, sans-serif";
 
   return new ImageResponse(
     (
@@ -128,110 +214,177 @@ export async function GET(request: Request) {
           width: "100%",
           display: "flex",
           flexDirection: "column",
-          justifyContent: "space-between",
-          padding: pad,
-          background:
-            "linear-gradient(150deg, #253A33 0%, #1a2d27 55%, #0f1f1a 100%)",
-          color: "#f4f6f5",
-          fontFamily: "system-ui, -apple-system, sans-serif",
+          position: "relative",
+          background: "linear-gradient(150deg, #253A33 0%, #1a2d27 55%, #0f1f1a 100%)",
+          color: "#ffffff",
+          fontFamily,
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        {photo && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={photo}
+            alt=""
+            width={size.width}
+            height={size.height}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
+        )}
+        {/* The gradient that makes white type legible on any photo. */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            background: photo
+              ? "linear-gradient(to bottom, rgba(15,31,26,0.10) 0%, rgba(15,31,26,0.35) 40%, rgba(15,31,26,0.92) 68%, rgba(15,31,26,0.98) 100%)"
+              : "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.25) 100%)",
+          }}
+        />
+
+        {/* Top row: calendar name and the wordmark. */}
+        <div
+          style={{
+            position: "absolute",
+            top: pad,
+            left: pad,
+            right: pad,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <div
             style={{
               display: "flex",
-              fontSize: story ? "30px" : "26px",
-              fontWeight: 600,
+              fontSize: Math.round(26 * s),
+              fontWeight: 800,
               letterSpacing: "4px",
               textTransform: "uppercase",
-              color: "#a7bfa9",
+              color: "rgba(255,255,255,0.85)",
             }}
           >
-            {eyebrow}
+            {clip(plan?.calendarName || "Leaf", 34)}
           </div>
-          <div style={{ display: "flex", fontSize: story ? "34px" : "28px", color: "#cfe0d2" }}>
-            You&apos;re invited
+          <div style={{ display: "flex", fontSize: Math.round(40 * s), fontWeight: 800, letterSpacing: "-1px" }}>
+            <span>leaf</span>
+            <span style={{ color: HIGHLIGHT }}>.</span>
           </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: story ? "48px" : "36px" }}>
+        {/* Bottom block: headline, title, when, body, url. */}
+        <div
+          style={{
+            position: "absolute",
+            left: pad,
+            right: pad,
+            bottom: pad,
+            display: "flex",
+            flexDirection: "column",
+            gap: Math.round(22 * s),
+          }}
+        >
           <div
             style={{
               display: "flex",
-              fontSize: `${titleFontSize(title, story)}px`,
-              fontWeight: 700,
-              lineHeight: 1.05,
-              letterSpacing: "-2px",
+              flexWrap: "wrap",
+              alignItems: "center",
+              rowGap: 6,
+              fontSize: headSize,
+              fontWeight: 800,
+              lineHeight: 1.08,
+              letterSpacing: "-3px",
+            }}
+          >
+            {words.map((w, i) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  padding: w.hi ? "0 18px" : "0 8px 0 0",
+                  marginRight: w.hi ? 10 : 0,
+                  backgroundColor: w.hi ? HIGHLIGHT : "transparent",
+                  color: w.hi ? INK : "#ffffff",
+                }}
+              >
+                {w.text}
+              </div>
+            ))}
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              fontSize: titleSize,
+              fontWeight: 800,
+              lineHeight: 1.15,
+              letterSpacing: "-1px",
+              color: "#ffffff",
             }}
           >
             {title}
           </div>
 
           {when && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  fontSize: story ? "46px" : "38px",
-                  fontWeight: 600,
-                  color: "#f4f6f5",
-                }}
-              >
-                {when.day}
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  fontSize: story ? "42px" : "34px",
-                  color: "#a7bfa9",
-                }}
-              >
-                {when.time}
-              </div>
-            </div>
-          )}
-
-          {going && (
             <div
               style={{
                 display: "flex",
-                alignSelf: "flex-start",
-                padding: story ? "18px 34px" : "14px 28px",
-                borderRadius: "999px",
-                border: "2px solid rgba(255,255,255,0.28)",
-                fontSize: story ? "32px" : "27px",
-                fontWeight: 500,
+                fontSize: Math.round(34 * s),
+                fontWeight: 800,
+                color: HIGHLIGHT,
               }}
             >
-              {going}
+              {when}
             </div>
           )}
-        </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
           <div
             style={{
               display: "flex",
-              fontSize: story ? "38px" : "31px",
-              fontWeight: 600,
-              color: "#f4f6f5",
+              fontSize: bodySize,
+              lineHeight: 1.35,
+              color: "rgba(255,255,255,0.86)",
             }}
           >
-            Tap the link to join
+            {body}
           </div>
+
           <div
             style={{
               display: "flex",
-              fontSize: story ? "32px" : "27px",
-              fontWeight: 600,
-              color: "#6f7c76",
+              alignItems: "baseline",
+              gap: 14,
+              marginTop: Math.round(10 * s),
+              fontSize: urlSize,
+              fontWeight: 800,
             }}
           >
-            {SITE_HOST}
+            <div style={{ display: "flex", color: HIGHLIGHT }}>{shownUrl}</div>
+            <div style={{ display: "flex", color: "rgba(255,255,255,0.6)", fontSize: Math.round(24 * s) }}>
+              ·
+            </div>
+            <div style={{ display: "flex", color: "rgba(255,255,255,0.9)", fontSize: Math.round(26 * s) }}>
+              Link in bio
+            </div>
           </div>
         </div>
       </div>
     ),
-    size,
+    {
+      ...size,
+      ...(font
+        ? { fonts: [{ name: "Inter", data: font, weight: 800 as const, style: "normal" as const }] }
+        : {}),
+    },
   );
 }

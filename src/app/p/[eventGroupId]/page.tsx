@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import Parse from "@/lib/parse";
 import { APP_LINK_URL, SITE_URL } from "@/lib/site";
 import PlanShareRedirect from "./PlanShareRedirect";
+import ArrivalTracker from "./ArrivalTracker";
 import StandalonePlanCard from "./StandalonePlanCard";
 import { planLifecycle } from "@/lib/wall-clock";
 
@@ -85,7 +86,9 @@ async function readViewerPhone(): Promise<string | null> {
 
 type PageProps = {
   params: Promise<{ eventGroupId: string }>;
-  searchParams: Promise<{ copy?: string; rsvp?: string }>;
+  // `src` is share attribution (e.g. host_share from the host share kit). It
+  // is recorded as a web event and otherwise ignored.
+  searchParams: Promise<{ copy?: string; rsvp?: string; src?: string }>;
 };
 
 function resolveMode(copyParam: string | undefined): ShareMode {
@@ -172,7 +175,7 @@ export async function generateMetadata({
 
 export default async function PlanSharePage({ params, searchParams }: PageProps) {
   const { eventGroupId } = await params;
-  const { copy, rsvp } = await searchParams;
+  const { copy, rsvp, src } = await searchParams;
   const mode = resolveMode(copy);
   const autoOpenRsvp = rsvp === "1";
   const phoneNumber = await readViewerPhone();
@@ -213,6 +216,8 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
             "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
         }}
       >
+        {/* Before the redirect in tree order so its effect fires first. */}
+        <ArrivalTracker src={src} planId={eventGroupId} />
         <PlanShareRedirect destination={destination} />
         <p style={{ fontSize: 14 }}>
           Opening{" "}
@@ -247,6 +252,8 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
         : "standalone";
 
   return (
+    <>
+    <ArrivalTracker src={src} planId={eventGroupId} />
     <StandalonePlanCard
       variant={variant}
       eventGroupId={eventGroupId}
@@ -266,5 +273,6 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
       rsvpClosed={rsvpClosed}
       autoOpenRsvp={autoOpenRsvp && !rsvpClosed}
     />
+    </>
   );
 }

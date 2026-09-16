@@ -73,6 +73,8 @@ type Offer = {
   plan: PlanFacts | null;
   counts: { interested: number; rsvpYes: number };
   checklistUrl: string | null;
+  /** Image + caption + link before the night; the host's own photos after. Optional. */
+  shareKitUrl?: string | null;
   chatUrl: string | null;
   planStarted: boolean;
   planEnded: boolean;
@@ -414,6 +416,14 @@ export default function HostOfferClient({ token }: { token: string }) {
               Open your host checklist
             </a>
           )}
+          {offer.shareKitUrl && !offer.planStarted && (
+            <a
+              href={offer.shareKitUrl}
+              className="mt-3 inline-block text-[15px] font-medium text-leaf-800 underline"
+            >
+              Post about it — optional, image and caption ready
+            </a>
+          )}
           {p && (
             <a
               href={p.planUrl}
@@ -441,6 +451,16 @@ export default function HostOfferClient({ token }: { token: string }) {
                   <p className="mt-2 text-[14px] text-amber-800">
                     We still need somewhere to send it — add your PayPal below.
                   </p>
+                )}
+                {/* Optional, and after the ask for photos, never before it. The
+                    photos they just uploaded are the obvious thing to post. */}
+                {offer.shareKitUrl && ((offer.completion?.photoCount ?? 0) > 0 || confirmed) && (
+                  <a
+                    href={offer.shareKitUrl}
+                    className="mt-3 inline-flex items-center gap-1.5 text-[14px] font-medium text-leaf-800 underline"
+                  >
+                    Share a photo from the night (optional) →
+                  </a>
                 )}
               </>
             ) : (

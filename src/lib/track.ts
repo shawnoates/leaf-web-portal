@@ -20,7 +20,8 @@ type Props = Record<string, string | number | boolean | null | string[]>;
 export type WebEvent =
   | "follow_interest_list_shown"
   | "follow_interest_tap"
-  | "follow_interest_list_closed";
+  | "follow_interest_list_closed"
+  | "plan_share_arrival";
 
 const ANON_COOKIE = "leaf_anon_id";
 
