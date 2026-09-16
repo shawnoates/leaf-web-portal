@@ -1135,7 +1135,7 @@ function AttendCta({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: RsvpS
     const target: RsvpState = full ? "waitlisted" : plan.requireApproval ? "pending" : "going";
     onRsvp(plan.id, target);
     try {
-      const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: "going" });
+      const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: "going", viaCalendarId: plan.promotedFrom?.viaCalendarId || undefined });
       if (res?.rsvpState && res.rsvpState !== target) onRsvp(plan.id, res.rsvpState as RsvpState);
     } catch {
       onRsvp(plan.id, prev);
