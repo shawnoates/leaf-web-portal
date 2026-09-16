@@ -22,6 +22,8 @@ interface Props {
 export default function MarketingHero({ headline, lead, chips }: Props) {
   return (
     <section className="flex flex-col items-center gap-4 px-5 pb-9 pt-9 text-center sm:gap-[22px] sm:px-12 sm:pb-9 sm:pt-[72px]">
+      <TrustPill />
+
       <h1
         className="mkt-serif m-0"
         style={{
@@ -45,8 +47,6 @@ export default function MarketingHero({ headline, lead, chips }: Props) {
       </div>
 
       <SuggestionChips chips={chips} />
-
-      <TrustPill />
     </section>
   );
 }

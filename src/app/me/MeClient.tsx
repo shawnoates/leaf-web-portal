@@ -838,7 +838,7 @@ function DashboardView({
             </div>
           )}
 
-          {data.person.ownsCalendars && (
+          {data.person.ownsCalendars && !qualifierActive && !shareKit && (
             <div className="prompt-box tight">
               <div className="prompt-body">
                 <div className="prompt-h sm">Manage your calendars</div>
