@@ -83,6 +83,9 @@ export default function PlanAddonStack({
   const [publishableKey, setPublishableKey] = useState<string | null>(null);
   const [totalCents, setTotalCents] = useState(0);
   const [taxCents, setTaxCents] = useState(0);
+  const [breakdown, setBreakdown] = useState<
+    { itemsCents: number; serviceCents: number; hostShareCents: number } | null
+  >(null);
   const stripeRef = useRef<Stripe | null>(null);
   const elementsRef = useRef<StripeElements | null>(null);
   const cardMountRef = useRef<HTMLDivElement | null>(null);
@@ -155,6 +158,7 @@ export default function PlanAddonStack({
       setPublishableKey(r.publishableKey || null);
       setTotalCents(r.totalCents);
       setTaxCents(r.taxCents || 0);
+      setBreakdown(r.breakdown || null);
       setStep("card");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start that");
@@ -308,6 +312,21 @@ export default function PlanAddonStack({
                 </div>
               );
             })}
+            {/* Item / service / tax, shown only here — never on the option
+                card, which carries one price by design. Suppressed entirely
+                when the server could not reconcile it. */}
+            {breakdown && (
+              <>
+                <div className="flex justify-between text-[13px] leading-[19px] text-zinc-600 border-t border-zinc-100 pt-2">
+                  <span>Items</span>
+                  <span>{money(breakdown.itemsCents)}</span>
+                </div>
+                <div className="flex justify-between text-[13px] leading-[19px] text-zinc-600">
+                  <span>Service fee</span>
+                  <span>{money(breakdown.serviceCents)}</span>
+                </div>
+              </>
+            )}
             {taxCents > 0 && (
               <div className="flex justify-between text-[13px] leading-[19px] text-zinc-600">
                 <span>Tax</span>
@@ -318,6 +337,11 @@ export default function PlanAddonStack({
               <span>Total</span>
               <span>{money(totalCents)}</span>
             </div>
+            {breakdown && breakdown.hostShareCents > 0 && (
+              <p className="text-[11px] leading-4 text-zinc-400">
+                {money(breakdown.hostShareCents)} of the service fee goes to your host.
+              </p>
+            )}
           </div>
 
           <div ref={cardMountRef} className="border border-zinc-200 rounded-lg p-3" />
