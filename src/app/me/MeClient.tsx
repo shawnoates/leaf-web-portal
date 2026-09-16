@@ -10,7 +10,6 @@ import CommunityQualifierCard, {
   type QualifierCreatedPlan,
   type FirstPlanRequest,
 } from "./CommunityQualifierCard";
-import ShareKitCard, { type ShareKitMePrompt } from "./ShareKitCard";
 import RecapPopup from "@/components/recap/RecapPopup";
 import CalendarPromoBanner from "@/components/CalendarPromoBanner";
 import NamePrompt from "@/components/NamePrompt";
@@ -183,8 +182,9 @@ interface Dashboard {
   plans: Plan[];
   unreadMessageCount: number;
   ask: { kind: "pattern" | "generic"; copy: string; promptPrefill: string | null } | null;
-  // One prompt card at a time, chosen and flag-gated server-side.
-  prompt?: { key: "community_qualifier"; preview?: boolean } | ShareKitMePrompt | null;
+  // One prompt card at a time, chosen and flag-gated server-side. Only
+  // community_qualifier renders here; other keys are ignored.
+  prompt?: { key: string; preview?: boolean } | null;
 }
 
 type AuthState = "resolving" | "authed" | "needs-otp" | "error";
@@ -266,13 +266,11 @@ function directionsUrl(plan: Plan): string | null {
 }
 
 /** Admin design preview: /me?preview=qualifier forces the community qualifier
- *  card, /me?preview=building the share kit card. The server verifies
- *  is_admin and writes nothing in this mode. */
+ *  card. The server verifies is_admin and writes nothing in this mode. */
 function previewPrompt(): string | null {
   if (typeof window === "undefined") return null;
   const v = new URLSearchParams(window.location.search).get("preview");
   if (v === "qualifier") return "community_qualifier";
-  if (v === "building") return "building_intro";
   return null;
 }
 
@@ -605,10 +603,6 @@ function DashboardView({
   // refresh that follows plan creation, which would otherwise drop `prompt`
   // (the person now owns a calendar) and erase the closing state mid-read.
   const [qualifierActive] = useState(() => data.prompt?.key === "community_qualifier");
-  // Same latch for the share kit: an open row and its edited text must
-  // outlive a refresh.
-  const [shareKit] = useState<ShareKitMePrompt | null>(() =>
-    data.prompt?.key === "building_intro" ? data.prompt : null);
   const addOwnedCalendar = useCallback((cal: QualifierCalendar) => {
     setOwnedCalendars((prev) =>
       prev.some((o) => o.id === cal.id) ? prev : [{ id: cal.id, name: cal.name, owned: true }, ...prev],
@@ -813,8 +807,6 @@ function DashboardView({
             </section>
           )}
 
-          {shareKit && <ShareKitCard prompt={shareKit} firstName={firstName} />}
-
           {qualifierActive && (
             <CommunityQualifierCard
               nearby={nearby}
@@ -824,7 +816,7 @@ function DashboardView({
             />
           )}
 
-          {!qualifierActive && !shareKit && !data.person.ownsCalendars && (
+          {!qualifierActive && !data.person.ownsCalendars && (
             <div className="prompt-box">
               <div className="prompt-body">
                 <div className="prompt-h">Hosting an event soon?</div>
@@ -838,7 +830,7 @@ function DashboardView({
             </div>
           )}
 
-          {data.person.ownsCalendars && !qualifierActive && !shareKit && (
+          {data.person.ownsCalendars && !qualifierActive && (
             <div className="prompt-box tight">
               <div className="prompt-body">
                 <div className="prompt-h sm">Manage your calendars</div>
