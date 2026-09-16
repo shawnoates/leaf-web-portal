@@ -40,12 +40,13 @@ export default function MarketingHero({ headline, lead, chips }: Props) {
         {lead}
       </p>
 
-      <div className="mt-2 flex w-full flex-col items-center">
+      <div className="mt-2 flex w-full justify-center">
         <GenerateInput source="hero" isHero />
-        <TrustPill />
       </div>
 
       <SuggestionChips chips={chips} />
+
+      <TrustPill />
     </section>
   );
 }

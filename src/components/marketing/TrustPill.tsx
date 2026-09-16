@@ -50,12 +50,12 @@ export default function TrustPill() {
           display: inline-flex;
           align-items: center;
           gap: 20px;
-          margin-top: 26px;
+          margin-top: 4px;
           padding: 12px 22px;
           max-width: 1120px;
           border: 1px solid #e3e3df;
           border-radius: 999px;
-          background: #fafaf8;
+          background: #fff;
           font-size: 13px;
           line-height: 1;
           color: #141413;
@@ -103,7 +103,7 @@ export default function TrustPill() {
             border-radius: 16px;
             white-space: normal;
             text-align: center;
-            margin-top: 16px;
+            margin-top: 0;
           }
           .trust-pill__divider {
             display: none;
