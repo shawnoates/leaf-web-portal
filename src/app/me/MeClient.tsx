@@ -8,6 +8,7 @@ import HostIdeaModal from "@/components/HostIdeaModal";
 import CommunityQualifierCard, {
   type QualifierCalendar,
   type QualifierCreatedPlan,
+  type QualifierResume,
   type FirstPlanRequest,
 } from "./CommunityQualifierCard";
 import RecapPopup from "@/components/recap/RecapPopup";
@@ -184,7 +185,7 @@ interface Dashboard {
   ask: { kind: "pattern" | "generic"; copy: string; promptPrefill: string | null } | null;
   // One prompt card at a time, chosen and flag-gated server-side. Only
   // community_qualifier renders here; other keys are ignored.
-  prompt?: { key: string; preview?: boolean } | null;
+  prompt?: { key: string; preview?: boolean; resume?: QualifierResume | null } | null;
 }
 
 type AuthState = "resolving" | "authed" | "needs-otp" | "error";
@@ -603,6 +604,8 @@ function DashboardView({
   // refresh that follows plan creation, which would otherwise drop `prompt`
   // (the person now owns a calendar) and erase the closing state mid-read.
   const [qualifierActive] = useState(() => data.prompt?.key === "community_qualifier");
+  const [qualifierResume] = useState<QualifierResume | null>(() =>
+    data.prompt?.key === "community_qualifier" ? data.prompt.resume ?? null : null);
   const addOwnedCalendar = useCallback((cal: QualifierCalendar) => {
     setOwnedCalendars((prev) =>
       prev.some((o) => o.id === cal.id) ? prev : [{ id: cal.id, name: cal.name, owned: true }, ...prev],
@@ -812,6 +815,7 @@ function DashboardView({
               nearby={nearby}
               createdPlan={qualifierCreated}
               preview={data.prompt?.preview === true}
+              resume={qualifierResume}
               onCreatePlan={openCreateForQualifier}
             />
           )}

@@ -36,6 +36,12 @@ export interface FirstPlanRequest {
 }
 
 type Route = "unqualified" | "calendar_created" | "qualified";
+/** Server-side resume: answers already recorded, calendar not yet created. */
+export interface QualifierResume {
+  route: Exclude<Route, "unqualified">;
+  calendarName: string;
+  knownByName: Q2Key | null;
+}
 interface CompleteResult {
   route: Route;
   calendar: QualifierCalendar | null;
@@ -72,7 +78,7 @@ type Phase =
   | { kind: "error" };
 
 export default function CommunityQualifierCard({
-  nearby, createdPlan, preview = false, onCreatePlan,
+  nearby, createdPlan, preview = false, resume = null, onCreatePlan,
 }: {
   /** Upcoming plans on calendars this person follows — the 7.1 redirect. */
   nearby: NearbyPlan[];
@@ -80,18 +86,26 @@ export default function CommunityQualifierCard({
   createdPlan: QualifierCreatedPlan | null;
   /** Admin design preview — the server records nothing and creates nothing. */
   preview?: boolean;
+  /** Questions already answered on a prior visit — open on the ready screen. */
+  resume?: QualifierResume | null;
   onCreatePlan: (req: FirstPlanRequest) => void;
 }) {
-  const [stored, setStored] = useState<Stored>(() => readStored() || { step: 1 });
-  const [phase, setPhase] = useState<Phase>({ kind: "asking" });
+  const [stored, setStored] = useState<Stored>(() =>
+    resume ? { step: 3, q1: "yes", q2: resume.knownByName ?? undefined } : readStored() || { step: 1 });
+  const [phase, setPhase] = useState<Phase>(() =>
+    resume
+      ? { kind: "ready", calendar: null, calendarName: resume.calendarName, assurance: resume.route === "qualified" }
+      : { kind: "asking" });
   const renderedRef = useRef(false);
   const firstPlanRef = useRef<string | null>(null);
 
+  // A resumed card never re-stamps `rendered`: the completed row is closed,
+  // and the event would open a fresh empty one that restarts the questions.
   useEffect(() => {
-    if (renderedRef.current) return;
+    if (renderedRef.current || resume) return;
     renderedRef.current = true;
     track("rendered", undefined, undefined, preview);
-  }, [preview]);
+  }, [preview, resume]);
 
   // First plan landed while we were on the ready screen. The popup is derived
   // from `createdPlan` at render time; this only stamps the server.
