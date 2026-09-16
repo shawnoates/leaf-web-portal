@@ -83,7 +83,15 @@ export default function SharePlanSheet({
         }
         setChecked(initial);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Couldn't load communities");
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : "";
+        // A server without the feature (or with it switched off) — say so
+        // plainly instead of surfacing "Invalid function".
+        setError(
+          /invalid function|not enabled/i.test(msg)
+            ? "Sharing with communities isn't switched on for your account yet."
+            : msg || "Couldn't load communities",
+        );
       } finally {
         if (!cancelled) setLoading(false);
       }

@@ -128,14 +128,9 @@ export default function CollabsSection({
       </div>
     );
   }
-  if (error || !data) {
-    return (
-      <div className="border border-zinc-200 rounded-xl p-6 max-w-2xl text-sm text-zinc-500">
-        {error || "Couldn't load collabs"}
-      </div>
-    );
-  }
-  if (!data.enabled) {
+  // The portal auto-deploys ahead of the server, so a missing cloud function
+  // reads as "not on yet", not as a broken page.
+  if (error || !data || !data.enabled) {
     return (
       <div className="border border-zinc-200 rounded-xl p-6 max-w-2xl">
         <h3 className="text-base font-medium text-zinc-900 mb-2">Cross-community sharing</h3>
