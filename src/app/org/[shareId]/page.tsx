@@ -34,6 +34,7 @@ import { resolveAIEventDate, FLOATING_EVENT_TZ } from "@/lib/ai-event-date";
 import { AUDIENCE_COHORT_LABELS } from "@/lib/audience-cohorts";
 import { isVenueBlacklisted } from "@/lib/venue-blacklist";
 import { fetchVenuePhotoUrl } from "@/lib/google-places";
+import PlanAddonStack from "@/components/PlanAddonStack";
 import {
   Plus,
   Users,
@@ -836,6 +837,20 @@ function RsvpModal({
                     : "Coordinate with the group. Join the Plan Chat."}
               </p>
             </div>
+
+            {/* Add-ons (design §1): between the "You're in!" block and the
+                chat button. Only for a confirmed RSVP — a pending request or a
+                waitlist place has nothing to attach a purchase to yet, and
+                charging for a coffee at a plan you may not get into is the one
+                version of this that would be indefensible. */}
+            {!isPendingResult && !isWaitlistResult && (
+              <PlanAddonStack
+                eventGroupId={plan.id}
+                phoneNumber={verify.phone.replace(/\D/g, "")}
+                name={verify.name}
+                startIso={plan.dateISO || null}
+              />
+            )}
 
             {!isPendingResult && notificationId && (
               <div className="pt-2">
