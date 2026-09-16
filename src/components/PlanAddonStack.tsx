@@ -82,6 +82,7 @@ export default function PlanAddonStack({
   // secret key that created the intent.
   const [publishableKey, setPublishableKey] = useState<string | null>(null);
   const [totalCents, setTotalCents] = useState(0);
+  const [taxCents, setTaxCents] = useState(0);
   const stripeRef = useRef<Stripe | null>(null);
   const elementsRef = useRef<StripeElements | null>(null);
   const cardMountRef = useRef<HTMLDivElement | null>(null);
@@ -153,6 +154,7 @@ export default function PlanAddonStack({
       setClientSecret(r.clientSecret);
       setPublishableKey(r.publishableKey || null);
       setTotalCents(r.totalCents);
+      setTaxCents(r.taxCents || 0);
       setStep("card");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start that");
@@ -196,7 +198,7 @@ export default function PlanAddonStack({
           <div className="flex flex-col gap-1">
             <p className="text-[15px] leading-5 font-medium text-zinc-900">{heading}</p>
             <p className="text-xs leading-[18px] text-zinc-500">
-              Prices include tax. One charge for whatever&apos;s ticked.
+              Tax added at checkout. One charge for whatever&apos;s ticked.
             </p>
           </div>
 
@@ -276,7 +278,7 @@ export default function PlanAddonStack({
             </button>
             <div className="flex items-center justify-between gap-3">
               <span className="text-[11px] leading-4 text-zinc-400">
-                Card entry next. Nothing&apos;s charged yet.
+                Tax and card entry next. Nothing&apos;s charged yet.
               </span>
               <button
                 onClick={() => {
@@ -306,6 +308,12 @@ export default function PlanAddonStack({
                 </div>
               );
             })}
+            {taxCents > 0 && (
+              <div className="flex justify-between text-[13px] leading-[19px] text-zinc-600">
+                <span>Tax</span>
+                <span>{money(taxCents)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-[15px] leading-5 font-medium text-zinc-900 border-t border-zinc-100 pt-2">
               <span>Total</span>
               <span>{money(totalCents)}</span>
