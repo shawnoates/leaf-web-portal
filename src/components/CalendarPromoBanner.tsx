@@ -60,6 +60,7 @@ export default function CalendarPromoBanner({
   isFollowing = false,
   brandColor,
   className = "max-w-6xl mx-auto px-6 pt-6",
+  stacked = false,
 }: {
   /** Omit to let the server pick across all of this viewer's calendars. */
   calendarId?: string | null;
@@ -69,6 +70,10 @@ export default function CalendarPromoBanner({
   brandColor?: string | null;
   /** Outer spacing, which differs per surface. */
   className?: string;
+  /** Keep the buttons under the copy at every width. /me renders this inside a
+   *  narrow content column, where the wide-screen side-by-side row squeezes the
+   *  headline into a ragged two or three lines. */
+  stacked?: boolean;
 }) {
   const [banner, setBanner] = useState<ViewerBanner | null>(null);
   const [code, setCode] = useState<string | null>(null);
@@ -140,7 +145,7 @@ export default function CalendarPromoBanner({
     <div className={className}>
       <section
         aria-label={banner.brandName ? `Offer from ${banner.brandName}` : "Partner offer"}
-        className="relative border border-zinc-200 bg-white rounded-xl px-5 py-4 sm:px-6 sm:py-5 flex flex-col sm:flex-row sm:items-center gap-4"
+        className={`relative border border-zinc-200 bg-white rounded-xl px-5 py-4 sm:px-6 sm:py-5 flex flex-col gap-4 ${stacked ? "" : "sm:flex-row sm:items-center"}`}
         style={{ borderLeft: `4px solid ${accent}` }}
       >
         <button
@@ -154,7 +159,9 @@ export default function CalendarPromoBanner({
         {/* Spacing is gap, not margin: /me scopes a `.leafme p { margin: 0 }`
             reset that outranks Tailwind's mt-* utilities and would flatten
             this block. */}
-        <div className="flex-1 min-w-0 pr-6 sm:pr-0 flex flex-col gap-1">
+        <div
+          className={`min-w-0 pr-6 flex flex-col gap-1 ${stacked ? "" : "flex-1 sm:pr-0"}`}
+        >
           <p className="flex items-center gap-1.5 text-[10px] tracking-wider uppercase font-bold text-zinc-500">
             <Gift className="w-3.5 h-3.5" />
             {banner.brandName ? `A thank-you from ${banner.brandName}` : "A thank-you for our community"}
@@ -173,7 +180,9 @@ export default function CalendarPromoBanner({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end sm:pr-6">
+        <div
+          className={`flex flex-wrap items-center gap-2 ${stacked ? "" : "sm:justify-end sm:pr-6"}`}
+        >
           {banner.hasPromoCode &&
             (code ? (
               <button

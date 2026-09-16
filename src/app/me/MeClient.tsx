@@ -770,7 +770,7 @@ function DashboardView({
           {/* Below the hero on purpose: a partner thank-you shouldn't outrank
               this person's own next plan. Renders nothing unless the server
               finds one they're eligible for. */}
-          <CalendarPromoBanner className="pb-5" />
+          <CalendarPromoBanner className="pb-5" stacked />
 
           {spine.length > 0 && (
             <section className="sect">
