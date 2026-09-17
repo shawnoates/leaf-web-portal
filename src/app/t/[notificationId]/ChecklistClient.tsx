@@ -303,10 +303,6 @@ function Row({
             <Share2 className="w-3.5 h-3.5" />
             Open the share kit
           </a>
-          <p className="text-[11px] text-zinc-400 mt-1.5">
-            Image, caption and link, ready to post. One tap to a story or the
-            share sheet.
-          </p>
         </div>
       )}
     </li>
