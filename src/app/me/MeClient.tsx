@@ -222,7 +222,13 @@ interface Dashboard {
   prompt?: { key: string; preview?: boolean; resume?: QualifierResume | null } | null;
 }
 
-type AuthState = "resolving" | "authed" | "needs-otp" | "error";
+type AuthState = "resolving" | "authed" | "needs-otp" | "switch-prompt" | "error";
+
+/** Same flag the admin portal authorizes on: `is_admin` is `true` or "yes". */
+function isAdminFlag(u: { get: (k: string) => unknown } | null | undefined): boolean {
+  const v = u?.get("is_admin");
+  return v === true || v === "yes";
+}
 
 /** Rows shown in "Your plans" before the expander. */
 const PLAN_PAGE = 5;
@@ -445,6 +451,56 @@ export default function MeClient() {
     }
   }, []);
 
+  // An admin who opens a member's magic link in their own browser gets asked
+  // before the link signs them in as that member. Digest recipients never see
+  // this: it needs an admin session already in the browser AND a link for
+  // someone else. The same person's bridged rows (phone row vs app row) aren't
+  // admins, so a bridged self-link still just works.
+  const [switchPrompt, setSwitchPrompt] = useState<{ uid: string; token: string; name: string } | null>(null);
+
+  /** Strip the magic-link credentials but keep any other params (the
+   *  Google-Calendar return flag rides on this same URL). */
+  const stripLinkParams = useCallback(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("t");
+    url.searchParams.delete("u");
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }, []);
+
+  /** Become the link's user. The dashboard cache belongs to whoever was signed
+   *  in before, so a change of user drops it rather than painting their plans
+   *  under the new name for a beat. */
+  const enterViaLink = useCallback(async (uid: string, token: string) => {
+    const before = Parse.User.current()?.id || null;
+    try {
+      const r = (await Parse.Cloud.run("getDashboardSession", { userId: uid, token })) as {
+        sessionToken?: string;
+      };
+      if (r?.sessionToken?.startsWith("r:")) await Parse.User.become(r.sessionToken);
+    } catch { /* fall through */ }
+    if ((Parse.User.current()?.id || null) !== before) {
+      try { localStorage.removeItem("leaf_dashboard_cache"); } catch { /* ignore */ }
+    }
+    stripLinkParams();
+  }, [stripLinkParams]);
+
+  /** Load for whoever is signed in now, or fall to the OTP screen. */
+  const loadOwn = useCallback(async (isCancelled: () => boolean = () => false) => {
+    const current = Parse.User.current();
+    if (isCancelled()) return;
+    if (current) {
+      // Stale-while-revalidate: paint the last payload instantly, then
+      // always replace it with the live one so plans removed elsewhere
+      // (admin delete, app cancel) never linger.
+      const cached = previewPrompt() ? null : getCachedDashboard();
+      if (cached && !isCancelled()) { setData(cached); setAuthState("authed"); }
+      await fetchDashboard();
+      if (!isCancelled()) setAuthState("authed");
+    } else {
+      setAuthState("needs-otp");
+    }
+  }, [fetchDashboard]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -461,38 +517,24 @@ export default function MeClient() {
           }).catch(() => {});
         }
         if (token && uid) {
-          try {
-            const r = (await Parse.Cloud.run("getDashboardSession", { userId: uid, token })) as {
-              sessionToken?: string;
-            };
-            if (r?.sessionToken?.startsWith("r:")) await Parse.User.become(r.sessionToken);
-          } catch { /* fall through */ }
-          // Strip the magic-link credentials but keep any other params (the
-          // Google-Calendar return flag rides on this same URL).
-          const url = new URL(window.location.href);
-          url.searchParams.delete("t");
-          url.searchParams.delete("u");
-          window.history.replaceState(null, "", url.pathname + url.search);
+          const current = Parse.User.current();
+          if (current && current.id !== uid && isAdminFlag(current)) {
+            setSwitchPrompt({
+              uid, token,
+              name: String(current.get("full_name") || current.get("first_name") || current.get("name") || "your account"),
+            });
+            setAuthState("switch-prompt");
+            return;
+          }
+          await enterViaLink(uid, token);
         }
-        const current = Parse.User.current();
-        if (cancelled) return;
-        if (current) {
-          // Stale-while-revalidate: paint the last payload instantly, then
-          // always replace it with the live one so plans removed elsewhere
-          // (admin delete, app cancel) never linger.
-          const cached = previewPrompt() ? null : getCachedDashboard();
-          if (cached && !cancelled) { setData(cached); setAuthState("authed"); }
-          await fetchDashboard();
-          if (!cancelled) setAuthState("authed");
-        } else {
-          setAuthState("needs-otp");
-        }
+        await loadOwn(() => cancelled);
       } catch {
         if (!cancelled) setAuthState("error");
       }
     })();
     return () => { cancelled = true; };
-  }, [fetchDashboard]);
+  }, [enterViaLink, loadOwn]);
 
   const patchPlan = useCallback((planId: string, patch: (p: Plan) => Plan) => {
     setData((prev) => {
@@ -513,6 +555,39 @@ export default function MeClient() {
     body = <div className="lm-center"><p className="lm-muted">Something went wrong. Tap your link again.</p></div>;
   } else if (authState === "needs-otp") {
     body = <OtpModal onVerified={async () => { await fetchDashboard(); setAuthState("authed"); }} />;
+  } else if (authState === "switch-prompt" && switchPrompt) {
+    const go = async (asLink: boolean) => {
+      setSwitchPrompt(null);
+      setAuthState("resolving");
+      try {
+        if (asLink) await enterViaLink(switchPrompt.uid, switchPrompt.token);
+        else stripLinkParams();
+        await loadOwn();
+      } catch {
+        setAuthState("error");
+      }
+    };
+    body = (
+      <div className="modal-overlay">
+        <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="switch-h">
+          <div className="modal-body">
+            <h2 className="modal-title" id="switch-h">You&rsquo;re signed in as {switchPrompt.name}</h2>
+            <p className="modal-blurb">
+              This link opens another member&rsquo;s plans. Viewing it here signs you out of
+              your own account in this browser — every Leaf page in this tab, including the
+              dashboard, would run as them until you sign back in.
+            </p>
+            <div className="hero-actions flat">
+              <button className="btn primary" onClick={() => go(false)}>Stay as {switchPrompt.name.split(/\s+/)[0]}</button>
+              <button className="btn ghost" onClick={() => go(true)}>View as them</button>
+            </div>
+            <p className="modal-blurb" style={{ marginTop: 12, fontSize: 12 }}>
+              To look at a member&rsquo;s page without switching, open the link in a private window.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   } else if (data) {
     body = <DashboardView data={data} onRsvp={onRsvp} onRefresh={fetchDashboard} />;
   } else if (loadError) {
