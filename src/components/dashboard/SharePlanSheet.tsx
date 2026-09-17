@@ -203,7 +203,7 @@ export default function SharePlanSheet({
         if (cancelled) return;
         setData(res);
         // Owned calendars that fit start checked; nothing else does.
-        const cap = res.limits?.maxSelect ?? res.maxTargets ?? DEFAULT_MAX_SELECT;
+        const cap = res.limits?.maxSelect ?? Math.min(res.maxTargets ?? DEFAULT_MAX_SELECT, DEFAULT_MAX_SELECT);
         const initial = new Set<string>();
         for (const t of res.targets) {
           if (initial.size >= cap) break;
@@ -229,7 +229,8 @@ export default function SharePlanSheet({
   }, [eventGroupId]);
 
   // ---- Limits & window -------------------------------------------------
-  const maxSelect = data?.limits?.maxSelect ?? data?.maxTargets ?? DEFAULT_MAX_SELECT;
+  // An older server advertises 10 targets; the redesign caps at 5 regardless.
+  const maxSelect = data?.limits?.maxSelect ?? Math.min(data?.maxTargets ?? DEFAULT_MAX_SELECT, DEFAULT_MAX_SELECT);
   const maxRequests = data?.limits?.maxRequests ?? DEFAULT_MAX_REQUESTS;
   const windowHours = data?.limits?.requestWindowHours ?? DEFAULT_WINDOW_HOURS;
   const hoursToStart = data?.hoursToStart ?? null;
@@ -680,6 +681,14 @@ export default function SharePlanSheet({
                       {/* The owner's other calendars */}
                       {others.length > 0 && (
                         <div className="flex flex-col gap-2">
+                          {fits.length === 0 && (
+                            // Nothing scored as a fit — list the owner's
+                            // calendars plainly rather than behind a disclosure.
+                            <div className="flex items-baseline justify-between">
+                              <Eyebrow>Your calendars</Eyebrow>
+                              <span className="text-[11px] text-zinc-400">Adds instantly</span>
+                            </div>
+                          )}
                           {fits.length > 0 && (
                             <button
                               type="button"
