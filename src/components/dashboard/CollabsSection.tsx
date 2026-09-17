@@ -148,7 +148,10 @@ export default function CollabsSection({
 
   // Outgoing grouped by plan.
   const byPlan = new Map<string, { plan: PlanPromotionRow["plan"]; from: string | null; rows: PlanPromotionRow[] }>();
+  // A withdrawn chip is noise — the owner pulled it, nothing is left to act on.
+  // Skipped stays: it tells the owner that calendar said no.
   for (const r of data.outgoing) {
+    if (r.status === "withdrawn") continue;
     const k = r.plan.objectId;
     if (!byPlan.has(k)) byPlan.set(k, { plan: r.plan, from: r.source_calendar?.name ?? null, rows: [] });
     byPlan.get(k)!.rows.push(r);
