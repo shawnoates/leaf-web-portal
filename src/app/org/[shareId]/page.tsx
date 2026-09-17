@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import { APP_LINK_URL, SITE_URL } from "@/lib/site";
 import Link from "next/link";
-import { CrossPromoPhotoBadge, CrossPromoEyebrow } from "@/components/CrossPromoBadge";
+import { CrossPromoEyebrow } from "@/components/CrossPromoBadge";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
@@ -2311,10 +2311,12 @@ export default function OrgCalendarPage() {
     if (seen.size > 0) setPlanIdeaLocallyInterested(seen);
   }, [org?.planIdeas]);
 
-  const handleSharePlan = useCallback(async (planId: string, planTitle: string) => {
+  const handleSharePlan = useCallback(async (planId: string, planTitle: string, viaCalendarId?: string | null) => {
     // APP_LINK_URL: a shared plan link has to land on the host installed
     // iOS builds intercept, or recipients get Safari instead of the app.
-    const url = `${APP_LINK_URL}/p/${planId}`;
+    // A cross-promoted plan carries ?via=<this calendar> so the link lands
+    // back HERE — never on the host calendar's page and its follow prompts.
+    const url = `${APP_LINK_URL}/p/${planId}${viaCalendarId ? `?via=${viaCalendarId}` : ""}`;
     if (navigator.share) {
       try {
         await navigator.share({ title: planTitle, url });
@@ -4211,12 +4213,16 @@ export default function OrgCalendarPage() {
                       <Calendar className="w-16 h-16 text-zinc-300" />
                     </div>
                   )}
-                  {/* Cross-promotion: which calendar this plan came from. */}
-                  {plan.promotedFrom && <CrossPromoPhotoBadge source={plan.promotedFrom} />}
                 </div>
 
                 <div className="w-full md:w-2/5 space-y-6">
                   <div className="space-y-2">
+                    {/* Cross-promotion provenance sits with the text, not on
+                        the photo: rows alternate direction on desktop, so a
+                        photo-corner badge lands beside the copy on one row
+                        and across the page from it on the next. Same
+                        treatment as the detail modal. */}
+                    {plan.promotedFrom && <CrossPromoEyebrow source={plan.promotedFrom} />}
                     <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
                       {plan.isPoll ? (
                         <>
