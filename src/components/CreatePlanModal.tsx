@@ -394,6 +394,12 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   // new query (tier-1 fallback: single strong Places match → pre-fill).
   const [venueResolveKey, setVenueResolveKey] = useState(0);
   const [coverExpanded, setCoverExpanded] = useState(false);
+  // Auto-expand the cover section the moment Unsplash suggestions arrive.
+  // The collapsed "Add cover image" chip gives no hint that photo picks are
+  // waiting behind it, so managers assumed the Unsplash picker was gone.
+  useEffect(() => {
+    if (unsplashPhotos.length > 0) setCoverExpanded(true);
+  }, [unsplashPhotos]);
   // Sync to calendar — carousel of ranked slots (past-behavior + Google
   // Cal busy) optionally filtered to the selected venue's opening hours.
   const [syncSlots, setSyncSlots] = useState<{ iso: string; label: string; reason: string }[]>([]);
