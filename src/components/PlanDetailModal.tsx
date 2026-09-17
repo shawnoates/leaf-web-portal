@@ -58,6 +58,11 @@ export type PlanDetailData = {
   pollVoteCount?: number;
   hideVenueUntilRsvp?: boolean;
   requireApproval?: boolean;
+  /** Max attendees; null/undefined = no limit. Threaded into the edit
+   *  pre-fill — updatePlanDetails treats a missing capacity as "clear it". */
+  capacity?: number | null;
+  /** Host's note to attendees. Same round-trip rule as `capacity`. */
+  hostNote?: string | null;
   /** When set, this plan was materialized from a recurring PlanSeries. The
    *  modal exposes a "Cancel future occurrences" action that stops further
    *  materialization without touching already-created instances. */
@@ -178,6 +183,12 @@ export default function PlanDetailModal({
   // replaces whoever is currently hosting this plan, live RSVPs included.
   // Attaching a persona mid-session flips this on without a parent refetch.
 
+  // Cross-promoted onto this calendar: someone else's plan. No edit, cancel,
+  // host change or re-promotion from here — only removal from this calendar.
+  // The guest list stays with the host calendar too: getPlanRsvps authorizes
+  // against the plan's own calendar and would 403 here, so we never ask.
+  const isPromoted = Boolean(plan.promotedFrom);
+
   // Load attendees for non-poll plans. Re-fires when the parent triggers a
   // refresh (planRsvpsRefreshTick) so RSVPs that land after the modal
   // opened get picked up. Errors used to be swallowed silently, which
@@ -185,7 +196,7 @@ export default function PlanDetailModal({
   // them and surface a short message so the "Attendees (1)" state has an
   // explanation when it doesn't match reality.
   useEffect(() => {
-    if (plan.isPoll) {
+    if (plan.isPoll || isPromoted) {
       setPlanRsvps([]);
       return;
     }
@@ -212,7 +223,7 @@ export default function PlanDetailModal({
         );
       })
       .finally(() => setPlanRsvpsLoading(false));
-  }, [plan.objectId, plan.isPoll, planRsvpsRefreshTick]);
+  }, [plan.objectId, plan.isPoll, isPromoted, planRsvpsRefreshTick]);
 
   // Load poll detail for poll plans.
   useEffect(() => {
@@ -453,9 +464,6 @@ export default function PlanDetailModal({
     }
   };
 
-  // Cross-promoted onto this calendar: someone else's plan. No edit, cancel,
-  // host change or re-promotion from here — only removal from this calendar.
-  const isPromoted = Boolean(plan.promotedFrom);
   const [removingPromotion, setRemovingPromotion] = useState(false);
   const handleRemovePromotion = async () => {
     if (!plan.promotedFrom) return;
@@ -682,7 +690,7 @@ export default function PlanDetailModal({
                   )}
                   <span className="flex items-center gap-2">
                     <Users className="w-4 h-4" />{" "}
-                    {planRsvpsLoading ? plan.rsvpCount : goingCount} going
+                    {isPromoted || planRsvpsLoading ? plan.rsvpCount : goingCount} going
                   </span>
                 </>
               )}
@@ -709,7 +717,12 @@ export default function PlanDetailModal({
           )}
 
           {/* Poll branch — vote results, voter list, "Pick this date" */}
-          {plan.isPoll ? (
+          {isPromoted ? (
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+              <span className="font-medium text-zinc-900">{plan.rsvpCount} going.</span>{" "}
+              The guest list stays with {plan.promotedFrom?.name || "the host calendar"}.
+            </div>
+          ) : plan.isPoll ? (
             <div className="space-y-3">
               <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
                 Vote Results

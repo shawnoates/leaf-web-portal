@@ -27,6 +27,10 @@ export interface CalActivePlan {
   pollClosesAt?: string | null;
   hideVenueUntilRsvp?: boolean;
   requireApproval?: boolean;
+  /** Max attendees (EventGroup.capacity); null = no limit. */
+  capacity?: number | null;
+  /** Host's note to attendees (EventGroup.hostNote). */
+  hostNote?: string | null;
   planSeriesId?: string | null;
   /** A host who can't edit from the app asked for a change (requestPlanChange).
    *  Cleared when the owner edits the plan or dismisses it. */

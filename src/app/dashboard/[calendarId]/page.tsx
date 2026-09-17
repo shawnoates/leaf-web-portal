@@ -3051,6 +3051,8 @@ export default function OrgDashboardPage() {
             pollClosesAt: selectedActivePlan.pollClosesAt,
             hideVenueUntilRsvp: selectedActivePlan.hideVenueUntilRsvp,
             requireApproval: selectedActivePlan.requireApproval,
+            capacity: selectedActivePlan.capacity ?? null,
+            hostNote: selectedActivePlan.hostNote ?? null,
             planSeriesId: selectedActivePlan.planSeriesId,
             changeRequest: selectedActivePlan.changeRequest ?? null,
             promotedFrom: selectedActivePlan.promotedFrom ?? null,
@@ -3067,6 +3069,8 @@ export default function OrgDashboardPage() {
               description: plan.description,
               venue: plan.location,
               imageUrl: plan.image,
+              capacity: plan.capacity != null ? String(plan.capacity) : undefined,
+              hostNote: plan.hostNote || undefined,
               // The plan being copied IS the subject — no "describe it" bar.
               hidePromptBar: true,
               ...(plan.isPoll
@@ -3103,6 +3107,10 @@ export default function OrgDashboardPage() {
               date: planDate,
               time: plan.time || "",
               imageUrl: plan.image,
+              // Both must round-trip: updatePlanDetails clears whatever the
+              // form doesn't send back.
+              capacity: plan.capacity != null ? String(plan.capacity) : undefined,
+              hostNote: plan.hostNote || undefined,
               hideVenueUntilRsvp: plan.hideVenueUntilRsvp,
               requireApproval: plan.requireApproval,
             });

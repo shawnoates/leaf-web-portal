@@ -77,6 +77,8 @@ export interface CreatePlanPrefill {
   date?: string;
   time?: string;
   capacity?: string;
+  /** Plan's current host note (used when editing an existing plan). */
+  hostNote?: string;
   imageUrl?: string | null;
   /** Why this plan is being suggested (shown as a banner at top of the modal). */
   justification?: string;
@@ -272,7 +274,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   const [capacity, setCapacity] = useState(prefill?.capacity || "");
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(prefill?.imageUrl || null);
-  const [hostNote, setHostNote] = useState("");
+  const [hostNote, setHostNote] = useState(prefill?.hostNote || "");
   const [mode, setMode] = useState<PlanMode>(prefill?.mode || "plan");
   const isHosted = mode === "plan";
   const isPoll = mode === "poll";

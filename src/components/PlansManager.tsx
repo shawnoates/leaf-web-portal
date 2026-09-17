@@ -254,6 +254,8 @@ interface UpcomingPlan {
   pollClosesAt?: string | null;
   hideVenueUntilRsvp?: boolean;
   requireApproval?: boolean;
+  capacity?: number | null;
+  hostNote?: string | null;
   planSeriesId?: string | null;
   /** Cross-promoted onto this calendar from another one — read-only here. */
   promotedFrom?: {
@@ -917,6 +919,8 @@ export default function PlansManager({
         pollClosesAt?: string | null;
         hideVenueUntilRsvp?: boolean;
         requireApproval?: boolean;
+        capacity?: number | null;
+        hostNote?: string | null;
         planSeriesId?: string | null;
         promotedFrom?: UpcomingPlan["promotedFrom"];
       }[];
@@ -938,6 +942,8 @@ export default function PlansManager({
         pollClosesAt: p.pollClosesAt,
         hideVenueUntilRsvp: p.hideVenueUntilRsvp,
         requireApproval: p.requireApproval,
+        capacity: p.capacity ?? null,
+        hostNote: p.hostNote ?? null,
         planSeriesId: p.planSeriesId,
         promotedFrom: p.promotedFrom ?? null,
       }));
@@ -1515,6 +1521,8 @@ export default function PlansManager({
       description: plan.description,
       venue: plan.location,
       imageUrl: plan.image,
+      capacity: plan.capacity != null ? String(plan.capacity) : undefined,
+      hostNote: plan.hostNote || undefined,
       // The plan being copied IS the subject — no "describe it" prompt bar.
       hidePromptBar: true,
       ...(plan.isPoll ? { mode: "poll" as const, pollOptions } : {}),
@@ -1560,6 +1568,10 @@ export default function PlansManager({
       date: planDate,
       time: plan.time || "",
       imageUrl: plan.image,
+      // Both must round-trip: updatePlanDetails clears whatever the form
+      // doesn't send back.
+      capacity: plan.capacity != null ? String(plan.capacity) : undefined,
+      hostNote: plan.hostNote || undefined,
       hideVenueUntilRsvp: plan.hideVenueUntilRsvp,
       requireApproval: plan.requireApproval,
       additionalStops: extraStops.length > 0 ? extraStops : undefined,
@@ -2315,6 +2327,8 @@ export default function PlansManager({
             pollClosesAt: selectedPlan.pollClosesAt,
             hideVenueUntilRsvp: selectedPlan.hideVenueUntilRsvp,
             requireApproval: selectedPlan.requireApproval,
+            capacity: selectedPlan.capacity ?? null,
+            hostNote: selectedPlan.hostNote ?? null,
             planSeriesId: selectedPlan.planSeriesId,
             promotedFrom: selectedPlan.promotedFrom ?? null,
           }}
