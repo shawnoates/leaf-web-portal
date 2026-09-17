@@ -147,13 +147,21 @@ export default function SeriesHostClient({ seriesId, token }: { seriesId: string
     }
   }, [seriesId, token]);
 
+  // A signed-in host can arrive without the texted link — accepting the invite
+  // on /me lands here to finish setup. getSeriesHostPage takes that session in
+  // place of the token, and refuses anyone who is neither. Resolved in an
+  // effect, not during render: Parse.User.current() is null on the server pass
+  // and truthy after hydration, which would swap the rendered branch under us.
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  useEffect(() => { setSignedIn(Boolean(Parse.User.current())); }, []);
   useEffect(() => {
-    if (!token) {
+    if (signedIn === null) return;
+    if (!token && !signedIn) {
       setLoadError("This link is missing its key.");
       return;
     }
     void load();
-  }, [load, token]);
+  }, [load, token, signedIn]);
 
   const requestCode = useCallback(async () => {
     setCodeError(null);
@@ -169,12 +177,16 @@ export default function SeriesHostClient({ seriesId, token }: { seriesId: string
   /** Run `action` with a host session, asking for the code first if needed. */
   const withSession = useCallback(
     async (action: () => Promise<void>) => {
-      if (sessionRef.current) {
+      // Arrived from /me with no link: the signed-in session IS the credential,
+      // and the code step can't run anyway — requestSeriesHostCode is gated on
+      // the token. Let the server's own 403 speak if they aren't the host.
+      const ambient = !token && signedIn === true;
+      if (sessionRef.current || ambient) {
         try {
           await action();
           return;
         } catch (e) {
-          if ((e as { code?: number }).code !== INVALID_SESSION) throw e;
+          if ((e as { code?: number }).code !== INVALID_SESSION || ambient) throw e;
           storeSession(null);
         }
       }
@@ -182,7 +194,7 @@ export default function SeriesHostClient({ seriesId, token }: { seriesId: string
       setCodeSheet({ phase: "sending", after: action });
       void requestCode();
     },
-    [requestCode, storeSession],
+    [requestCode, storeSession, token, signedIn],
   );
 
   const verifyCode = async () => {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Heart } from "lucide-react";
+import { Heart, Repeat } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import HostIdeaModal from "@/components/HostIdeaModal";
 import CommunityQualifierCard, {
@@ -725,6 +725,7 @@ function DashboardView({
 
   const shown = showAll ? spine : spine.slice(0, PLAN_PAGE);
   const moreCount = spine.length - shown.length;
+  const seriesInvites = data.seriesInvites || [];
   const firstName = (data.person.firstName || "").trim().split(/\s+/)[0] || "";
   const rail = data.needsHost;
 
@@ -798,6 +799,13 @@ function DashboardView({
             <Hero plan={hero} onRsvp={onRsvp} onOpen={() => setOpenPlanId(hero.id)} />
           ) : (
             <EmptyHero onCreate={openCreate} />
+          )}
+
+          {/* Directly under the hero and above the promo strip: someone is
+              waiting on this person's answer, which outranks a thank-you but
+              not their own next plan. */}
+          {seriesInvites.length > 0 && (
+            <SeriesInviteCard invites={seriesInvites} onAnswered={onRefresh} />
           )}
 
           {/* Below the hero on purpose: a partner thank-you shouldn't outrank
@@ -2166,6 +2174,38 @@ const CSS = `
 .leafme .hero-actions.flat{padding:0;border-top:0;background:none;margin-top:18px}
 .leafme .chat-label{white-space:nowrap}
 
+/* ---- Series host invitation ---- */
+.leafme .sinv{display:flex;flex-direction:column;gap:14px;background:#fff;
+  border:1px solid #e5e7eb;border-radius:12px;padding:20px 24px;margin:-10px 0 18px}
+.leafme .sinv-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.leafme .sinv-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:10px;color:#7a7a78}
+.leafme .sinv-icon{width:12px;height:12px;flex:none;stroke:#7a7a78}
+.leafme .sinv-count{font-size:10px;color:#7a7a78;white-space:nowrap}
+.leafme .sinv-body{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center}
+.leafme .sinv-text{min-width:0;display:flex;flex-direction:column;gap:6px}
+.leafme .sinv-title{font-family:var(--sans);font-size:22px;line-height:1.2;font-weight:400;
+  letter-spacing:-.01em;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.leafme .sinv-title a:hover{text-decoration:underline}
+.leafme .sinv-meta{font-size:15px;color:#7a7a78}
+.leafme .sinv-from{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:#7a7a78}
+.leafme .sinv-ava{width:20px;height:20px;flex:none;border-radius:999px;object-fit:cover;
+  background:var(--fill)}
+.leafme .sinv-ava.ph{display:grid;place-items:center;font-size:10px;color:var(--body)}
+.leafme .sinv-err{font-size:13px;color:var(--orange)}
+.leafme .sinv-act{flex:none;display:flex;gap:8px}
+.leafme .sinv-btn{font-size:14px;font-weight:500;border-radius:8px;cursor:pointer;
+  white-space:nowrap;transition:opacity 120ms ease,border-color 120ms ease}
+.leafme .sinv-btn.primary{background:#111;color:#fff;border:1px solid #111;padding:10px 18px}
+.leafme .sinv-btn.primary:hover{opacity:.92}
+.leafme .sinv-btn.ghost{background:#fff;color:#111;border:1px solid #d9d9d6;padding:9px 16px}
+.leafme .sinv-btn.ghost:hover{border-color:#b6b6b2}
+.leafme .sinv-btn.ghost.asking{color:#7a7a78}
+.leafme .sinv-btn:disabled{opacity:.55;cursor:default}
+.leafme .sinv-btn:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.leafme .sinv-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:60;
+  max-width:min(92vw,420px);background:#111;color:#fff;font-size:13px;line-height:1.4;
+  padding:12px 16px;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.24)}
+
 /* ---- Tiles ---- */
 .leafme .tile{border-radius:10px;display:grid;place-items:center;font-family:var(--serif);
   background:var(--hatch);color:#9a9488}
@@ -2480,6 +2520,19 @@ const CSS = `
   .leafme .popup-actions-grid{gap:12px}
   .leafme .popup-heart{padding:13px 12px;border-radius:9px;font-size:12.5px}
   .leafme .popup-host{padding:13px 0;border-radius:9px;font-size:12.5px}
+}
+/* Series invite: below ~600px the answer moves under the text and the two
+   buttons split the width, so neither is a corner tap. */
+@media(max-width:600px){
+  .leafme .sinv{padding:16px;gap:12px;margin:-14px 0 16px}
+  .leafme .sinv-body{grid-template-columns:1fr;gap:14px}
+  .leafme .sinv-title{font-size:20px}
+  .leafme .sinv-meta{font-size:13.5px}
+  .leafme .sinv-from{font-size:13px}
+  .leafme .sinv-act{display:flex;gap:8px}
+  .leafme .sinv-btn{flex:1 1 0;padding:13px 0;text-align:center}
+  .leafme .sinv-btn.ghost{padding:12px 0}
+  .leafme .sinv-toast{bottom:calc(16px + env(safe-area-inset-bottom))}
 }
 @media(prefers-reduced-motion:reduce){.leafme *{transition:none!important;animation:none!important}}
 `;
