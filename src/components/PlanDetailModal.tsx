@@ -8,21 +8,22 @@ import { formatWallClockTime12h } from "@/lib/date-utils";
 import {
   Calendar,
   Check,
-  CheckCircle2,
   Clock,
   Copy,
-  EyeOff,
   Link2,
   MessageCircle,
   Pencil,
   Plus,
-  Repeat,
+  RefreshCw,
   Share2,
-  Trash2,
   Users,
   Vote,
   X,
 } from "lucide-react";
+import PlanAttendeeList, { isPendingStatus } from "./PlanAttendeeList";
+
+const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2";
 
 export type PlanDetailData = {
   objectId: string;
@@ -397,6 +398,50 @@ export default function PlanDetailModal({
     }
   };
 
+  const goingCount = planRsvps.filter((r) => r.status === "Accepted").length;
+  const pendingCount = planRsvps.filter((r) => isPendingStatus(r.status)).length;
+  // iOS Safari treats `+` in `sms:` URLs as a space and is inconsistent
+  // with comma-separated multi-recipient links. The `&addresses=` query
+  // form is the documented way to populate multiple recipients on iOS;
+  // Android handles either format fine.
+  const sharingPhones = planRsvps
+    .filter((r) => r.status === "Accepted" && r.sharePhoneWithHost && r.phone)
+    .map((r) => r.phone as string);
+  const messageAllHref = `sms:&addresses=${sharingPhones.map((p) => encodeURIComponent(p)).join(",")}`;
+
+  const approveRsvp = async (r: Rsvp) => {
+    try {
+      await Parse.Cloud.run("approveRsvpRequest", { notificationId: r.notificationId });
+      setPlanRsvps((prev) => prev.map((rsvp) => rsvp.notificationId === r.notificationId ? { ...rsvp, status: "Accepted" } : rsvp));
+      onPendingRsvpResolved?.(r.notificationId);
+    } catch (err) {
+      console.error("Failed to approve:", err);
+    }
+  };
+  const declineRsvp = async (r: Rsvp) => {
+    try {
+      await Parse.Cloud.run("declineRsvpRequest", { notificationId: r.notificationId });
+      setPlanRsvps((prev) => prev.filter((rsvp) => rsvp.notificationId !== r.notificationId));
+      onPendingRsvpResolved?.(r.notificationId);
+    } catch (err) {
+      console.error("Failed to decline:", err);
+    }
+  };
+  const removeRsvp = async (r: Rsvp) => {
+    const snapshot = planRsvps;
+    setPlanRsvps((prev) => prev.filter((rsvp) => rsvp.notificationId !== r.notificationId));
+    try {
+      await Parse.Cloud.run("removeAttendeeFromPlan", { notificationId: r.notificationId });
+    } catch (err) {
+      console.error("Failed to remove attendee:", err);
+      setPlanRsvps(snapshot);
+      alert("Failed to remove attendee.");
+    }
+  };
+
+  const canShare = !!onShare && !plan.isPoll && (!plan.date || new Date(plan.date).getTime() > Date.now());
+  const primaryActionCount = (plan.isPoll ? 0 : 1) + (canShare ? 1 : 0);
+
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm">
       <div className="bg-white w-full max-w-5xl max-h-[90vh] md:h-[85vh] md:max-h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl rounded-t-3xl md:rounded-none relative">
@@ -598,7 +643,7 @@ export default function PlanDetailModal({
                   )}
                   <span className="flex items-center gap-2">
                     <Users className="w-4 h-4" />{" "}
-                    {planRsvpsLoading ? plan.rsvpCount : planRsvps.length} RSVP{planRsvps.length === 1 ? "" : "s"}
+                    {planRsvpsLoading ? plan.rsvpCount : goingCount} going
                   </span>
                 </>
               )}
@@ -743,232 +788,135 @@ export default function PlanDetailModal({
               )}
             </div>
           ) : (
-            // Non-poll branch — attendees table
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400 flex items-center gap-2">
-                  Attendees{!planRsvpsLoading && ` (${planRsvps.filter((r) => r.status === "Accepted").length})`}
-                  {!planRsvpsLoading && planRsvps.some((r) => (r.status === "pendingRsvp" || r.status === "Requested")) && (
-                    <span className="text-amber-500">
-                      {planRsvps.filter((r) => (r.status === "pendingRsvp" || r.status === "Requested")).length} pending
+            // Non-poll branch — attendees list
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-baseline min-w-0">
+                  <h4 className="text-[15px] font-semibold text-zinc-900">Attendees</h4>
+                  {!planRsvpsLoading && (
+                    <span className="text-xs font-medium text-zinc-500 ml-2 whitespace-nowrap">
+                      {goingCount} going
+                      {pendingCount > 0 && (
+                        <span className="text-amber-600"> · {pendingCount} pending</span>
+                      )}
                     </span>
                   )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => setPlanRsvpsRefreshTick((n) => n + 1)}
                     disabled={planRsvpsLoading}
-                    className="text-[10px] font-medium text-zinc-400 hover:text-zinc-700 underline disabled:opacity-40"
-                    title="Reload attendees"
+                    aria-label="Refresh attendees"
+                    className={`h-8 w-8 rounded-lg border border-zinc-200 text-zinc-600 grid place-items-center hover:bg-zinc-50 disabled:opacity-60 ${FOCUS_RING}`}
                   >
-                    Refresh
+                    <RefreshCw className={`w-4 h-4 ${planRsvpsLoading ? "animate-spin" : ""}`} />
                   </button>
-                </h4>
-                {(() => {
-                  // iOS Safari treats `+` in `sms:` URLs as a space and is inconsistent
-                  // with comma-separated multi-recipient links. The `&addresses=` query
-                  // form is the documented way to populate multiple recipients on iOS;
-                  // Android handles either format fine.
-                  const sharingPhones = planRsvps
-                    .filter((r) => r.status === "Accepted" && r.sharePhoneWithHost && r.phone)
-                    .map((r) => r.phone as string);
-                  if (sharingPhones.length === 0) return null;
-                  const smsHref = `sms:&addresses=${sharingPhones.map((p) => encodeURIComponent(p)).join(",")}`;
-                  return (
-                    <a
-                      href={smsHref}
-                      className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5" />
-                      Message All ({sharingPhones.length})
-                    </a>
-                  );
-                })()}
+                  <a
+                    href={sharingPhones.length > 0 ? messageAllHref : undefined}
+                    aria-disabled={sharingPhones.length === 0 || undefined}
+                    className={`h-8 px-3 rounded-lg bg-zinc-900 text-white text-[13px] font-medium inline-flex items-center gap-1.5 no-underline hover:bg-zinc-800 ${sharingPhones.length === 0 ? "opacity-40 pointer-events-none" : ""} ${FOCUS_RING}`}
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Message all
+                  </a>
+                </div>
               </div>
               {planRsvpsError && (
-                <div className="border border-red-200 bg-red-50 text-red-700 rounded-lg px-3 py-2 text-xs">
+                <div className="mt-3 border border-red-200 bg-red-50 text-red-700 rounded-lg px-3 py-2 text-xs">
                   Couldn&apos;t load attendees: {planRsvpsError}
                 </div>
               )}
               {planRsvpsLoading ? (
-                <p className="text-sm text-zinc-400">Loading...</p>
+                <p className="mt-3 text-sm text-zinc-400">Loading...</p>
               ) : planRsvps.length > 0 ? (
-                <div className="border border-zinc-200 rounded-xl">
-                  <table className="w-full text-sm table-fixed">
-                    <thead className="bg-zinc-50 text-left">
-                      <tr>
-                        <th className="px-3 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400">Name</th>
-                        <th className="px-3 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400 w-[40%]">Phone</th>
-                        <th className="px-3 py-2 text-xs font-bold uppercase tracking-widest text-zinc-400 text-center w-14">Status</th>
-                        <th className="px-3 py-2 w-16"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100">
-                      {planRsvps.map((r, i) => {
-                        const isPending = r.status === "pendingRsvp" || r.status === "Requested";
-                        return (
-                        <tr key={i}>
-                          <td className="px-3 py-2.5">
-                            <div className="truncate" title={r.name}>{r.name}</div>
-                            {r.rsvpNote && (
-                              <p
-                                className="text-[11px] text-zinc-400 italic line-clamp-3 whitespace-pre-wrap break-words"
-                                title={r.rsvpNote}
-                              >
-                                &ldquo;{r.rsvpNote}&rdquo;
-                              </p>
-                            )}
-                          </td>
-                          <td className="px-3 py-2.5 text-zinc-400">
-                            {r.phone
-                              ? <span className="truncate block" title={r.phone}>{r.phone}</span>
-                              : r.sharePhoneWithHost
-                                ? "—"
-                                : <span className="inline-flex items-center gap-1 text-zinc-300" title="Hidden"><EyeOff className="w-3 h-3" /></span>}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            {isPending ? (
-                              <span
-                                className="flex items-center justify-center text-amber-500"
-                                title="Pending approval"
-                                aria-label="Pending approval"
-                              >
-                                <Clock className="w-4 h-4" />
-                              </span>
-                            ) : (
-                              <span
-                                className="flex items-center justify-center text-emerald-600"
-                                title="Confirmed"
-                                aria-label="Confirmed"
-                              >
-                                <CheckCircle2 className="w-4 h-4" />
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            {isPending ? (
-                              <div className="flex gap-1 justify-end">
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      await Parse.Cloud.run("approveRsvpRequest", { notificationId: r.notificationId });
-                                      setPlanRsvps((prev) => prev.map((rsvp) => rsvp.notificationId === r.notificationId ? { ...rsvp, status: "Accepted" } : rsvp));
-                                      onPendingRsvpResolved?.(r.notificationId);
-                                    } catch (err) {
-                                      console.error("Failed to approve:", err);
-                                    }
-                                  }}
-                                  className="p-1 rounded text-emerald-600 hover:bg-emerald-50 transition-colors"
-                                  title="Approve"
-                                  aria-label={`Approve ${r.name}`}
-                                >
-                                  <Check className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      await Parse.Cloud.run("declineRsvpRequest", { notificationId: r.notificationId });
-                                      setPlanRsvps((prev) => prev.filter((rsvp) => rsvp.notificationId !== r.notificationId));
-                                      onPendingRsvpResolved?.(r.notificationId);
-                                    } catch (err) {
-                                      console.error("Failed to decline:", err);
-                                    }
-                                  }}
-                                  className="p-1 rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
-                                  title="Decline"
-                                  aria-label={`Decline ${r.name}`}
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex justify-end">
-                                <button
-                                  onClick={async () => {
-                                    if (!confirm(`Remove ${r.name} from this plan?`)) return;
-                                    try {
-                                      await Parse.Cloud.run("removeAttendeeFromPlan", { notificationId: r.notificationId });
-                                      setPlanRsvps((prev) => prev.filter((rsvp) => rsvp.notificationId !== r.notificationId));
-                                    } catch (err) {
-                                      console.error("Failed to remove attendee:", err);
-                                      alert("Failed to remove attendee.");
-                                    }
-                                  }}
-                                  className="p-1 rounded text-zinc-300 hover:bg-red-50 hover:text-red-600 transition-colors"
-                                  title="Remove attendee"
-                                  aria-label={`Remove ${r.name}`}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <PlanAttendeeList
+                  attendees={planRsvps}
+                  onApprove={approveRsvp}
+                  onDecline={declineRsvp}
+                  onRemove={removeRsvp}
+                />
               ) : (
-                <p className="text-sm text-zinc-400">No RSVPs yet.</p>
+                <div className="mt-3 rounded-xl border border-dashed border-zinc-200 px-4 py-6 text-center text-sm text-zinc-500">
+                  <p>No one&apos;s RSVP&apos;d yet. Share the plan to get it moving.</p>
+                  {canShare && (
+                    <button
+                      type="button"
+                      onClick={() => onShare?.(plan)}
+                      className={`mt-2 text-sm font-medium text-zinc-900 underline underline-offset-2 rounded ${FOCUS_RING}`}
+                    >
+                      Share with communities
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )}
 
-          {/* Action bar — Plan Chat / Duplicate / Edit on top, Cancel below */}
-          <div className="pt-8 border-t border-zinc-100 space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-              {!plan.isPoll && (
-                <Link
-                  href={`/chat/${plan.objectId}`}
-                  className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  Plan Chat
-                </Link>
-              )}
+          {/* Action bar — sticky so Plan chat / Share stay reachable while a
+              long attendee list scrolls. Negative margins undo the column
+              padding so the bar runs edge to edge. */}
+          <div className="sticky bottom-0 -mx-8 md:-mx-16 -mb-8 md:-mb-16 px-8 md:px-16 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur border-t border-zinc-100 flex flex-col gap-2.5">
+            {primaryActionCount > 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                {!plan.isPoll && (
+                  <Link
+                    href={`/chat/${plan.objectId}`}
+                    className={`h-11 rounded-[10px] bg-zinc-900 text-white text-sm font-medium inline-flex items-center justify-center gap-2 no-underline hover:bg-zinc-800 transition-colors ${primaryActionCount === 1 ? "col-span-2" : ""} ${FOCUS_RING}`}
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Plan chat
+                  </Link>
+                )}
+                {canShare && (
+                  <button
+                    type="button"
+                    onClick={() => onShare?.(plan)}
+                    className={`h-11 rounded-[10px] border border-zinc-300 bg-white text-zinc-900 text-sm font-medium inline-flex items-center justify-center gap-2 hover:bg-zinc-50 transition-colors ${primaryActionCount === 1 ? "col-span-2" : ""} ${FOCUS_RING}`}
+                  >
+                    <Share2 className="w-4 h-4" />
+                    <span className="hidden min-[380px]:inline">Share with communities</span>
+                    <span className="min-[380px]:hidden">Share</span>
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="flex flex-wrap items-center justify-center gap-1">
               <button
-                onClick={handleDuplicate}
-                className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
-              >
-                <Copy className="w-4 h-4" />
-                Duplicate
-              </button>
-              <button
+                type="button"
                 onClick={handleEdit}
-                className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
+                className={`h-9 px-3 rounded-lg text-[13px] font-medium text-zinc-600 hover:bg-zinc-100 inline-flex items-center gap-1.5 transition-colors ${FOCUS_RING}`}
               >
-                <Pencil className="w-4 h-4" />
+                <Pencil className="w-[15px] h-[15px]" />
                 Edit
               </button>
-              {onShare && !plan.isPoll && (!plan.date || new Date(plan.date).getTime() > Date.now()) && (
-                <button
-                  onClick={() => onShare(plan)}
-                  className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors"
-                >
-                  <Share2 className="w-4 h-4" />
-                  Share with communities
-                </button>
-              )}
-            </div>
-            <div className="flex justify-center gap-6 flex-wrap">
               <button
-                onClick={handleCancel}
-                className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
+                type="button"
+                onClick={handleDuplicate}
+                className={`h-9 px-3 rounded-lg text-[13px] font-medium text-zinc-600 hover:bg-zinc-100 inline-flex items-center gap-1.5 transition-colors ${FOCUS_RING}`}
               >
-                <Trash2 className="w-4 h-4" />
+                <Copy className="w-[15px] h-[15px]" />
+                Duplicate
+              </button>
+              <span aria-hidden="true" className="w-px h-5 bg-zinc-200 mx-1.5" />
+              <button
+                type="button"
+                onClick={handleCancel}
+                className={`h-9 px-3 rounded-lg text-[13px] font-medium text-red-600 hover:bg-red-50 inline-flex items-center transition-colors ${FOCUS_RING}`}
+              >
                 {plan.isPoll
-                  ? "Cancel Poll"
+                  ? "Cancel poll"
                   : plan.planSeriesId
-                    ? "Cancel This Occurrence"
-                    : "Cancel Plan"}
+                    ? "Cancel this occurrence"
+                    : "Cancel plan"}
               </button>
               {plan.planSeriesId && (
                 <button
+                  type="button"
                   onClick={handleCancelSeries}
-                  className="flex items-center gap-2 whitespace-nowrap text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
+                  className={`h-9 px-3 rounded-lg text-[13px] font-medium text-red-600 hover:bg-red-50 inline-flex items-center transition-colors ${FOCUS_RING}`}
                 >
-                  <Repeat className="w-4 h-4" />
-                  End Recurring Series
+                  End recurring series
                 </button>
               )}
             </div>
