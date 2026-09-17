@@ -193,6 +193,12 @@ interface SeriesInvite {
   takeover: boolean;
   /** "Nov 6". Null for hostPicks / not-yet-scheduled series. */
   startDateLabel: string | null;
+  /** The same first date as "YYYY-MM-DDTHH:mm" in the series zone — seeds the
+   *  "different day or time?" picker. min/max are the window the server will
+   *  accept (24h–60d out), so the picker never offers a date accept refuses. */
+  startWallClock: string | null;
+  minWallClock: string | null;
+  maxWallClock: string | null;
   /** Accepting still leaves the series needing its details (Path B setup). */
   needsDetails: boolean;
   inviteNote: string | null;
@@ -1031,6 +1037,12 @@ function SeriesInviteCard({
   const [confirmDecline, setConfirmDecline] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
+  // "Different day or time?" — changes only the FIRST occurrence. The rule is
+  // the owner's ask to their community; the host can change it on the series
+  // page after saying yes, where the owner is in the loop.
+  const [picking, setPicking] = useState(false);
+  const [pickDate, setPickDate] = useState("");
+  const [pickTime, setPickTime] = useState("");
   const toastTimer = useRef<number | null>(null);
   useEffect(() => () => { if (toastTimer.current) window.clearTimeout(toastTimer.current); }, []);
 
@@ -1041,16 +1053,40 @@ function SeriesInviteCard({
   const position = answered.size + 1;
   const total = answered.size + queue.length;
 
+  // Only a fresh series with a proposed date has a first date to move. A
+  // takeover inherits a live occurrence (that's a Move on the series page) and
+  // a needsDetails series has no date yet.
+  const canPick = !!invite && !invite.takeover && !invite.needsDetails && !!invite.startWallClock;
+  const pickedWallClock = pickDate && pickTime ? `${pickDate}T${pickTime}` : "";
+  const pickChanged = picking && !!pickedWallClock
+    && pickedWallClock !== (invite?.startWallClock || "").slice(0, 16);
+  function openPicker() {
+    const wc = invite?.startWallClock || "";
+    setPickDate(wc.slice(0, 10));
+    setPickTime(wc.slice(11, 16));
+    setPicking(true);
+  }
+  // Label only — the wall clock is in the series zone, and parsing it as
+  // local and printing local keeps the digits the host typed.
+  function pickedLabel() {
+    const d = new Date(pickedWallClock);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  }
+
   async function respond(accept: boolean) {
     if (busy || !invite) return;
+    if (accept && picking && !pickedWallClock) { setError("Pick a date and a time."); return; }
     setBusy(true);
     setError("");
     try {
       const res = (await Parse.Cloud.run("respondToSeriesInvite", {
         seriesId: invite.seriesId, accept,
+        wallClock: accept && pickChanged ? pickedWallClock : undefined,
       })) as { needsDetails?: boolean };
       setAnswered((prev) => new Set(prev).add(invite.seriesId));
       setConfirmDecline(false);
+      setPicking(false);
       // Saying yes to a series that was invited without its details schedules
       // nothing — hand them straight to setup rather than leaving an accepted,
       // empty series behind on someone else's calendar.
@@ -1108,6 +1144,39 @@ function SeriesInviteCard({
               )}
               <span>{inviterLine}</span>
             </div>
+            {canPick && !picking && (
+              <button type="button" className="linkbtn sinv-alt" onClick={openPicker}>
+                Different day or time?
+              </button>
+            )}
+            {picking && (
+              <div className="sinv-pick">
+                <div className="sinv-pick-row">
+                  <input
+                    type="date"
+                    className="sinv-input"
+                    aria-label="First date"
+                    value={pickDate}
+                    min={(invite.minWallClock || "").slice(0, 10) || undefined}
+                    max={(invite.maxWallClock || "").slice(0, 10) || undefined}
+                    onChange={(e) => setPickDate(e.target.value)}
+                  />
+                  <input
+                    type="time"
+                    className="sinv-input"
+                    aria-label="Time"
+                    value={pickTime}
+                    onChange={(e) => setPickTime(e.target.value)}
+                  />
+                  <button type="button" className="linkbtn" onClick={() => setPicking(false)}>
+                    Never mind
+                  </button>
+                </div>
+                <div className="sinv-hint">
+                  Just the first one — the repeat schedule can be changed after you accept.
+                </div>
+              </div>
+            )}
             {error && <div className="sinv-err">{error}</div>}
           </div>
           {/* Declining confirms in place: the Decline button becomes the
@@ -1141,10 +1210,12 @@ function SeriesInviteCard({
                   type="button"
                   className="sinv-btn primary"
                   disabled={busy}
-                  aria-label={`Accept hosting ${invite.title}`}
+                  aria-label={pickChanged
+                    ? `Accept hosting ${invite.title}, first one ${pickedLabel()}`
+                    : `Accept hosting ${invite.title}`}
                   onClick={() => respond(true)}
                 >
-                  Accept
+                  {pickChanged ? `Accept for ${pickedLabel()}` : "Accept"}
                 </button>
                 <button
                   type="button"
@@ -2192,6 +2263,13 @@ const CSS = `
   background:var(--fill)}
 .leafme .sinv-ava.ph{display:grid;place-items:center;font-size:10px;color:var(--body)}
 .leafme .sinv-err{font-size:13px;color:var(--orange)}
+.leafme .sinv-alt{align-self:flex-start;font-size:13px;color:#7a7a78;margin-top:2px}
+.leafme .sinv-pick{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.leafme .sinv-pick-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.leafme .sinv-input{font-family:var(--sans);font-size:14px;color:#111;background:#fff;
+  border:1px solid #d9d9d6;border-radius:8px;padding:8px 10px;min-height:38px}
+.leafme .sinv-input:focus-visible{outline:2px solid var(--green);outline-offset:1px}
+.leafme .sinv-hint{font-size:12.5px;color:#7a7a78}
 .leafme .sinv-act{flex:none;display:flex;gap:8px}
 .leafme .sinv-btn{font-size:14px;font-weight:500;border-radius:8px;cursor:pointer;
   white-space:nowrap;transition:opacity 120ms ease,border-color 120ms ease}
