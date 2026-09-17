@@ -327,15 +327,16 @@ export default function ChecklistClient({
   const [draft, setDraft] = useState("");
 
   const tasks = data?.tasks ?? [];
-  // Three lists, not two. An optional row sits outside the main list entirely
-  // so it can never make the count at the top read as work outstanding — the
-  // server keeps these out of the progress ring for the same reason, and the
-  // two surfaces have to agree about whether the host is behind. Ticking one
-  // still sends it to Done, which is the whole reward for doing it.
-  const { open, optional, done } = useMemo(
+  // `open` is the count; `listed` is what renders. An optional row is in the
+  // list where the server ordered it (the share row sits second, order 0.5)
+  // but never in the count at the top, which would read as work outstanding
+  // — the server keeps these out of the progress ring for the same reason,
+  // and the two surfaces have to agree about whether the host is behind.
+  // Ticking one still sends it to Done, which is the whole reward.
+  const { open, listed, done } = useMemo(
     () => ({
       open: tasks.filter((t) => t.status !== "done" && !t.optional),
-      optional: tasks.filter((t) => t.status !== "done" && t.optional),
+      listed: tasks.filter((t) => t.status !== "done"),
       done: tasks.filter((t) => t.status === "done"),
     }),
     [tasks],
@@ -477,7 +478,7 @@ export default function ChecklistClient({
         )}
 
         <ul className="mt-1">
-          {open.map((t) => (
+          {listed.map((t) => (
             <Row
               key={t.id}
               task={t}
@@ -488,26 +489,6 @@ export default function ChecklistClient({
             />
           ))}
         </ul>
-
-        {/* No header: the row's own copy says it's optional, and a section
-            title on top of that read as a second announcement. The divider
-            is enough to keep it out of the list of things owed. */}
-        {!data.cancelled && optional.length > 0 && (
-          <section className="border-t border-zinc-100">
-            <ul>
-              {optional.map((t) => (
-                <Row
-                  key={t.id}
-                  task={t}
-                  busy={busyId === t.id}
-                  notificationId={notificationId}
-                  onToggle={toggle}
-                  onSent={markSent}
-                />
-              ))}
-            </ul>
-          </section>
-        )}
 
         <div className="px-4 py-3 border-t border-zinc-100">
           <div className="flex items-center gap-2">
