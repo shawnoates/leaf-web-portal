@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Loader2, Share2, X, Zap } from "lucide-react";
+import { Check, Loader2, Send, X, Zap } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { track } from "@/lib/track";
 
-// "Share with communities" — the owner picks other calendars to share one
-// plan with, in one tap. Siblings, calendars they also own, and partners add
+// "Cross-promote" — the owner picks other calendars to put one plan on, in
+// one tap. (Deliberately not "share": that word is taken by link sharing.) Siblings, calendars they also own, and partners add
 // instantly; nearby communities get a request their owner can Add or Skip.
 // Everything eligible starts checked: the receiving owner is the gate, and
 // the server caps how much can land on any one calendar.
@@ -95,7 +95,7 @@ export default function SharePlanSheet({
         // plainly instead of surfacing "Invalid function".
         setError(
           /invalid function|not enabled/i.test(msg)
-            ? "Sharing with communities isn't switched on for your account yet."
+            ? "Cross-promotion isn't switched on for your account yet."
             : msg || "Couldn't load communities",
         );
       } finally {
@@ -210,8 +210,8 @@ export default function SharePlanSheet({
       <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.25)] max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
           <h2 className="text-base font-semibold inline-flex items-center gap-2 text-zinc-900">
-            <Share2 className="w-4 h-4 text-zinc-500" />
-            Share with communities
+            <Send className="w-4 h-4 text-zinc-500" />
+            Cross-promote this plan
           </h2>
           <button onClick={onClose} className="p-1 text-zinc-400 hover:text-zinc-900 transition-colors" aria-label="Close">
             <X className="w-5 h-5" />
@@ -300,7 +300,7 @@ export default function SharePlanSheet({
                   className="inline-flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 disabled:pointer-events-none text-white text-xs font-medium px-4 py-2.5 rounded-full transition-colors"
                 >
                   {sending && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Share with {selectedCount} communit{selectedCount === 1 ? "y" : "ies"}
+                  Cross-promote to {selectedCount} communit{selectedCount === 1 ? "y" : "ies"}
                 </button>
               </div>
             </div>

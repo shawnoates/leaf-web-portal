@@ -15,7 +15,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  Share2,
+  Send,
   Users,
   Vote,
   X,
@@ -110,7 +110,7 @@ type Props = {
   /** Optional callback when a pending RSVP is approved/declined — lets the parent reconcile its
    *  pendingRsvpRequests list without a full refetch. */
   onPendingRsvpResolved?: (notificationId: string) => void;
-  /** Cross-promotion: open the "Share with communities" sheet for this plan.
+  /** Cross-promotion: open the "Cross-promote" sheet for this plan.
    *  Hidden for polls and past plans. Absent = no share action. */
   onShare?: (plan: PlanDetailData) => void;
 };
@@ -838,14 +838,14 @@ export default function PlanDetailModal({
                 />
               ) : (
                 <div className="mt-3 rounded-xl border border-dashed border-zinc-200 px-4 py-6 text-center text-sm text-zinc-500">
-                  <p>No one&apos;s RSVP&apos;d yet. Share the plan to get it moving.</p>
+                  <p>No one&apos;s RSVP&apos;d yet. Cross-promote it to nearby communities to get it moving.</p>
                   {canShare && (
                     <button
                       type="button"
                       onClick={() => onShare?.(plan)}
                       className={`mt-2 text-sm font-medium text-zinc-900 underline underline-offset-2 rounded ${FOCUS_RING}`}
                     >
-                      Share with communities
+                      Cross-promote
                     </button>
                   )}
                 </div>
@@ -853,10 +853,7 @@ export default function PlanDetailModal({
             </div>
           )}
 
-          {/* Action bar — sticky so Plan chat / Share stay reachable while a
-              long attendee list scrolls. Negative margins undo the column
-              padding so the bar runs edge to edge. */}
-          <div className="sticky bottom-0 -mx-8 md:-mx-16 -mb-8 md:-mb-16 px-8 md:px-16 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur border-t border-zinc-100 flex flex-col gap-2.5">
+          <div className="pt-4 border-t border-zinc-100 flex flex-col gap-2.5">
             {primaryActionCount > 0 && (
               <div className="grid grid-cols-2 gap-2">
                 {!plan.isPoll && (
@@ -874,9 +871,8 @@ export default function PlanDetailModal({
                     onClick={() => onShare?.(plan)}
                     className={`h-11 rounded-[10px] border border-zinc-300 bg-white text-zinc-900 text-sm font-medium inline-flex items-center justify-center gap-2 hover:bg-zinc-50 transition-colors ${primaryActionCount === 1 ? "col-span-2" : ""} ${FOCUS_RING}`}
                   >
-                    <Share2 className="w-4 h-4" />
-                    <span className="hidden min-[380px]:inline">Share with communities</span>
-                    <span className="min-[380px]:hidden">Share</span>
+                    <Send className="w-4 h-4" />
+                    Cross-promote
                   </button>
                 )}
               </div>

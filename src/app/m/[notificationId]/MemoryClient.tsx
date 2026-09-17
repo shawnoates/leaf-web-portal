@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { MapPin, Calendar, X, Check, ShieldCheck, UserCheck } from "lucide-react";
 import HostTheNextOne from "@/components/HostTheNextOne";
@@ -39,6 +40,9 @@ type AttendeeMemoryInfo = {
   // staff_host = the assigned roster host's seat: attendance + photos,
   // no rating card (server sends survey: null), no "host the next one".
   viewerRole?: "owner" | "host" | "attendee" | "staff_host";
+  // This link's seat is one /t/<id>/share will serve (Owned or StaffHost).
+  // Absent from older server builds.
+  hostSeat?: boolean;
   canMarkAttendance?: boolean;
   attendanceClosed?: boolean;
   nextPlanIdea?: {
@@ -408,6 +412,31 @@ export default function MemoryClient({
         <p className="text-center text-sm text-zinc-400 py-8">
           No photos yet. Be the first to share one.
         </p>
+      )}
+
+      {/* The after-night share kit. This is the page the host already lands on
+          from the recap SMS, and the kit's "pick a photo" reads the photos
+          uploaded here — so this is where the door to it belongs. The kit
+          itself stays on /t/<id>/share. Gated on the SEAT, not the role: an
+          owner who merely attended would get a 403 from the kit. */}
+      {(info.hostSeat ?? (info.viewerRole === "staff_host" || info.viewerRole === "host")) && (
+        <div className="border-t border-zinc-100 mt-10 pt-8">
+          <div className="rounded-2xl border border-zinc-200 p-6">
+            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">
+              Show them how it went
+            </p>
+            <p className="text-sm text-zinc-500 mb-5 font-light">
+              A photo or card from the night, a caption and the link to the next
+              one, ready to post. Optional, as always.
+            </p>
+            <Link
+              href={`/t/${notificationId}/share`}
+              className="inline-flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
+            >
+              Open the share kit
+            </Link>
+          </div>
+        </div>
       )}
 
       {info.calendar?.objectId && (

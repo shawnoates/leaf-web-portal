@@ -1,6 +1,8 @@
 import { ImageResponse } from "next/og";
+import { renderToStaticMarkup } from "react-dom/server";
+import { QRCodeSVG } from "qrcode.react";
 import Parse from "@/lib/parse";
-import { SITE_HOST } from "@/lib/site";
+import { SITE_HOST, SITE_URL } from "@/lib/site";
 
 // The card a host posts.
 //
@@ -10,8 +12,14 @@ import { SITE_HOST } from "@/lib/site";
 //
 // Design: the plan's own photo, full bleed, under a dark gradient; a heavy
 // grotesk headline with the neighborhood in a highlighter block; the plan
-// title; the URL big enough to read off a screenshot. When the plan has no
-// photo the same layout sits on the house green.
+// title; the URL big enough to read off a screenshot; a QR code for everyone
+// who won't type it. When the plan has no photo the same layout sits on the
+// house green.
+//
+// The QR is the only link a feed post has: Instagram doesn't linkify captions
+// and only stories take a link sticker. It encodes the measured share URL with
+// its own src, so scans and sticker taps are separate lines in
+// plan_share_arrival.
 //
 // Params:
 //   planId  required, EventGroup objectId
@@ -198,7 +206,22 @@ export async function GET(request: Request) {
 
   // Type scale per format. Story has the height to go bigger.
   const s = story ? 1.18 : 1;
-  const headSize = Math.round((words.map((w) => w.text).join(" ").length > 18 ? 84 : 100) * s);
+  // The text column shares the bottom row with the QR tile, and a highlighted
+  // word can't wrap, so a long neighborhood drops the headline a step.
+  const longestWord = Math.max(...words.map((w) => w.text.length));
+  const headSize = Math.round(
+    (longestWord > 9 ? 72 : words.map((w) => w.text).join(" ").length > 18 ? 84 : 100) * s,
+  );
+
+  // Satori can't run a component with hooks, so the QR is rendered to static
+  // SVG here and handed over as an image. /share/p keeps a scan in Safari the
+  // way a sticker tap is, and forwards src.
+  const qrUrl = planId ? `${SITE_URL}/share/p/${planId}?src=host_share_qr` : SITE_URL;
+  const qrSize = Math.round(190 * s);
+  const qrSvg = renderToStaticMarkup(
+    <QRCodeSVG value={qrUrl} size={qrSize} level="M" marginSize={0} fgColor={INK} bgColor="#ffffff" />,
+  );
+  const qrSrc = `data:image/svg+xml;base64,${Buffer.from(qrSvg).toString("base64")}`;
   const titleSize = Math.round(46 * s);
   const bodySize = Math.round(32 * s);
   const urlSize = Math.round(34 * s);
@@ -282,7 +305,7 @@ export async function GET(request: Request) {
           </div>
         </div>
 
-        {/* Bottom block: headline, title, when, body, url. */}
+        {/* Bottom row: the text column, then the QR tile. */}
         <div
           style={{
             position: "absolute",
@@ -290,8 +313,19 @@ export async function GET(request: Request) {
             right: pad,
             bottom: pad,
             display: "flex",
+            flexDirection: "row",
+            alignItems: "flex-end",
+            gap: Math.round(36 * s),
+          }}
+        >
+        <div
+          style={{
+            display: "flex",
             flexDirection: "column",
             gap: Math.round(22 * s),
+            flexGrow: 1,
+            flexShrink: 1,
+            flexBasis: 0,
           }}
         >
           <div
@@ -362,21 +396,51 @@ export async function GET(request: Request) {
           <div
             style={{
               display: "flex",
-              alignItems: "baseline",
-              gap: 14,
               marginTop: Math.round(10 * s),
               fontSize: urlSize,
               fontWeight: 800,
+              color: HIGHLIGHT,
             }}
           >
-            <div style={{ display: "flex", color: HIGHLIGHT }}>{shownUrl}</div>
-            <div style={{ display: "flex", color: "rgba(255,255,255,0.6)", fontSize: Math.round(24 * s) }}>
-              ·
-            </div>
-            <div style={{ display: "flex", color: "rgba(255,255,255,0.9)", fontSize: Math.round(26 * s) }}>
-              Link in bio
-            </div>
+            {shownUrl}
           </div>
+        </div>
+
+        {/* QR tile. White quiet zone around the code so it scans off a photo
+            background; the label says what scanning does. */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: Math.round(10 * s),
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              padding: Math.round(14 * s),
+              backgroundColor: "#ffffff",
+              borderRadius: Math.round(16 * s),
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={qrSrc} alt="" width={qrSize} height={qrSize} />
+          </div>
+          <div
+            style={{
+              display: "flex",
+              fontSize: Math.round(20 * s),
+              fontWeight: 800,
+              letterSpacing: "2px",
+              textTransform: "uppercase",
+              color: "rgba(255,255,255,0.85)",
+            }}
+          >
+            Scan to join
+          </div>
+        </div>
         </div>
       </div>
     ),

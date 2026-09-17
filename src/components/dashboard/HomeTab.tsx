@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Calendar, Lock, Plus, Share2 } from "lucide-react";
+import { Calendar, Lock, Plus, Send } from "lucide-react";
 import type { OrgAnalytics } from "@/components/analytics/types";
 import { formatWallClockTime12h } from "@/lib/date-utils";
 import {
@@ -473,8 +473,8 @@ export default function HomeTab({
       >
         <div className="flex-1 min-w-[180px]">
           <p className="text-[13px] font-medium text-zinc-900">
-            {src?.name || "A nearby community"} wants to share {promo.plan.title}
-            {dashboard.calendars.length > 1 && promo.target_calendar?.name ? ` with ${promo.target_calendar.name}` : ""}
+            {src?.name || "A nearby community"} wants to cross-promote {promo.plan.title}
+            {dashboard.calendars.length > 1 && promo.target_calendar?.name ? ` to ${promo.target_calendar.name}` : ""}
           </p>
           <p className="text-[11px] text-zinc-500 mt-0.5">
             {[
@@ -519,7 +519,7 @@ export default function HomeTab({
             {pc.plan.title} has {pc.plan.rsvp_count} RSVP{pc.plan.rsvp_count === 1 ? "" : "s"}
           </p>
           <p className="text-[11px] text-zinc-500 mt-0.5">
-            Share it with {reach} {reach === 1 ? "community" : "communities"} nearby
+            Cross-promote it to {reach} {reach === 1 ? "community" : "communities"} nearby
             {promoDay(pc.plan.date, pc.plan.timezone) ? ` · ${promoDay(pc.plan.date, pc.plan.timezone)}` : ""}
             {dashboard.calendars.length > 1 ? ` · ${calendar.name}` : ""}
           </p>
@@ -528,8 +528,8 @@ export default function HomeTab({
           onClick={() => onSharePlan(pc.plan, calendar.objectId)}
           className="inline-flex items-center gap-1.5 px-3.5 py-1.5 min-h-[30px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors shrink-0"
         >
-          <Share2 className="w-3.5 h-3.5" />
-          Share
+          <Send className="w-3.5 h-3.5" />
+          Cross-promote
         </button>
       </div>,
     );

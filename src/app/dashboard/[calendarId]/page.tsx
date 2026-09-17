@@ -3227,7 +3227,7 @@ export default function OrgDashboardPage() {
                 Always accept plans from {partnerPrompt.sourceName}?
               </h2>
               <p className="text-xs text-zinc-500 leading-relaxed">
-                Their future shares land on your calendar instantly, no approval step.
+                Their future cross-promotions land on your calendar instantly, no approval step.
                 You can undo this any time under Grow › Collabs.
               </p>
             </div>

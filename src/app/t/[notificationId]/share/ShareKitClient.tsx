@@ -150,9 +150,9 @@ export default function ShareKitClient({
     return format === "story" ? pack.storyImageUrl : pack.postImageUrl;
   }, [pack, usingRecapPhoto, photoIdx, format]);
 
-  async function copyCaption(quiet = false): Promise<boolean> {
+  async function copyText(text: string, quiet = false): Promise<boolean> {
     try {
-      await navigator.clipboard.writeText(caption);
+      await navigator.clipboard.writeText(text);
       if (!quiet) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
@@ -165,21 +165,31 @@ export default function ShareKitClient({
   }
 
   // The one-tap path for Instagram and TikTok: fetch the image, hand it to
-  // the OS share sheet as a file. The caption goes to the clipboard first
-  // because most targets ignore `text` when files are present.
+  // the OS share sheet as a file. Something goes to the clipboard first
+  // because most targets ignore `text` when files are present — and WHAT goes
+  // follows the format tab. A story's link has to be a link sticker, and the
+  // sticker takes a URL and nothing else, so pasting the caption into it
+  // fails (which is exactly what the first version told hosts to do). A post
+  // has no sticker; there the caption, link included, is the thing to paste.
+  // A recap photo has no tab and goes out with the caption.
   async function shareWithImage(targetId: string) {
     if (!pack || !imageUrl) return;
+    const linkOnly = format === "story" && !usingRecapPhoto;
     setBusy(targetId);
     setNotice(null);
     try {
-      await copyCaption(true);
+      await copyText(linkOnly ? pack.shareUrl : caption, true);
       const res = await fetch(imageUrl);
       if (!res.ok) throw new Error("image");
       const blob = await res.blob();
       const file = new File([blob], fileNameFor(format, pack.phase), { type: blob.type || "image/png" });
       await navigator.share({ files: [file], text: caption });
       stamp("share");
-      setNotice("Caption's on your clipboard — paste it in, and add a link sticker on a story.");
+      setNotice(
+        linkOnly
+          ? "Link copied — add a link sticker and paste. The caption's above if you want it too."
+          : "Caption copied — paste it in.",
+      );
     } catch (e) {
       // Cancelled is not an error. A blocked fetch (a photo host without CORS)
       // falls back to opening the image so they can save it by hand.
@@ -193,7 +203,7 @@ export default function ShareKitClient({
 
   async function openIntent(t: Target) {
     if (!pack || !t.href) return;
-    await copyCaption(true);
+    await copyText(caption, true);
     stamp("share");
     window.open(t.href(caption, pack.shareUrl), "_blank", "noopener");
   }
@@ -319,7 +329,7 @@ export default function ShareKitClient({
           <div className="flex items-center gap-2 mt-2">
             <button
               type="button"
-              onClick={() => copyCaption()}
+              onClick={() => copyText(caption)}
               className="inline-flex items-center gap-1.5 text-[13px] font-medium text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-lg px-3 py-1.5 transition-colors"
             >
               {copied ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : <Copy className="w-3.5 h-3.5" />}
@@ -382,9 +392,10 @@ export default function ShareKitClient({
           )}
           {!after && (
             <p className="text-[12px] text-zinc-400 mt-3 leading-relaxed">
-              On a story, a link has to be a sticker — the link is copied with the
-              caption, so add a link sticker and paste. The card shows the address
-              too, for anyone who&rsquo;d rather type it.
+              On a story, a link has to be a sticker — with Story selected, the
+              link alone is copied, so add a link sticker and paste. With Post
+              selected, the caption is copied. The card carries a QR code too,
+              for anyone who&rsquo;d rather scan.
             </p>
           )}
         </section>

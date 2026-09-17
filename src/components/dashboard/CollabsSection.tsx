@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Share2, Users, X } from "lucide-react";
+import { Loader2, Send, Users, X } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import SettingsSwitch from "@/components/SettingsSwitch";
 import { track } from "@/lib/track";
@@ -133,9 +133,9 @@ export default function CollabsSection({
   if (error || !data || !data.enabled) {
     return (
       <div className="border border-zinc-200 rounded-xl p-6 max-w-2xl">
-        <h3 className="text-base font-medium text-zinc-900 mb-2">Cross-community sharing</h3>
+        <h3 className="text-base font-medium text-zinc-900 mb-2">Cross-promotion</h3>
         <p className="text-sm text-zinc-500 leading-relaxed">
-          Share a plan with nearby communities and their followers can RSVP straight to you.
+          Cross-promote a plan to nearby communities and their followers can RSVP straight to you.
           It isn&apos;t switched on for your account yet.
         </p>
       </div>
@@ -163,23 +163,23 @@ export default function CollabsSection({
   return (
     <div className="space-y-8 max-w-3xl">
       <div>
-        <h3 className="text-base font-medium text-zinc-900">Cross-community sharing</h3>
+        <h3 className="text-base font-medium text-zinc-900">Cross-promotion</h3>
         <p className="text-sm text-zinc-500 leading-relaxed mt-1">
           One plan, one guest list, more calendars. Open any upcoming plan and tap
-          <span className="font-medium text-zinc-700"> Share with communities</span>.
+          <span className="font-medium text-zinc-700"> Cross-promote</span>.
         </p>
       </div>
 
       {/* Incoming */}
       <section className="border border-zinc-200 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
-          <h4 className="text-[11px] font-semibold tracking-[0.12em] uppercase text-zinc-500">Shared with you</h4>
+          <h4 className="text-[11px] font-semibold tracking-[0.12em] uppercase text-zinc-500">Cross-promoted to you</h4>
           {pendingIn.length > 0 && (
             <span className="text-[11px] text-amber-700 font-medium">{pendingIn.length} waiting</span>
           )}
         </div>
         {pendingIn.length === 0 && acceptedIn.length === 0 ? (
-          <p className="px-4 py-5 text-sm text-zinc-400">Nothing shared with you yet.</p>
+          <p className="px-4 py-5 text-sm text-zinc-400">Nothing cross-promoted to you yet.</p>
         ) : (
           <ul>
             {[...pendingIn, ...acceptedIn].map((p) => (
@@ -234,17 +234,17 @@ export default function CollabsSection({
       {/* Outgoing */}
       <section className="border border-zinc-200 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-zinc-100">
-          <h4 className="text-[11px] font-semibold tracking-[0.12em] uppercase text-zinc-500">Your plans, shared</h4>
+          <h4 className="text-[11px] font-semibold tracking-[0.12em] uppercase text-zinc-500">Your cross-promotions</h4>
         </div>
         {byPlan.size === 0 ? (
           <div className="px-4 py-5 flex flex-wrap items-center gap-3">
-            <p className="text-sm text-zinc-400 flex-1 min-w-[200px]">You haven&apos;t shared a plan yet.</p>
+            <p className="text-sm text-zinc-400 flex-1 min-w-[200px]">You haven&apos;t cross-promoted a plan yet.</p>
             {onSharePlan && (
               <button
                 onClick={onSharePlan}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 min-h-[30px] bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
               >
-                <Share2 className="w-3.5 h-3.5" /> Share a plan
+                <Send className="w-3.5 h-3.5" /> Cross-promote a plan
               </button>
             )}
           </div>
@@ -263,7 +263,7 @@ export default function CollabsSection({
                     </div>
                     {rsvps > 0 && (
                       <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-medium shrink-0">
-                        <Users className="w-3.5 h-3.5" /> {rsvps} via sharing
+                        <Users className="w-3.5 h-3.5" /> {rsvps} via cross-promotion
                       </span>
                     )}
                   </div>
@@ -305,13 +305,13 @@ export default function CollabsSection({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[13px] font-medium text-zinc-900">{cal.name}</p>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">Accept share requests from other communities</p>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">Accept cross-promotion requests from other communities</p>
                 </div>
                 <SettingsSwitch
                   checked={!cal.opt_out}
                   disabled={busy === cal.objectId}
                   onChange={(v) => setPolicy(cal, { optOut: !v })}
-                  label={`Accept share requests on ${cal.name}`}
+                  label={`Accept cross-promotion requests on ${cal.name}`}
                 />
               </div>
               {cal.accepts_from.length > 0 && (
