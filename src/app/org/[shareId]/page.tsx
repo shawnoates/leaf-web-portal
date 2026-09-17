@@ -388,6 +388,9 @@ const AI_INTEREST_LOCAL_KEY = "leaf_ai_event_interests";
  * Same precedence the page-load call uses: the follow phone in localStorage
  * first, then the verified-user cookie.
  */
+// Which follow surface opened the post-follow interest modal (analytics only).
+type InterestPromptSource = "follow_modal" | "follow_popup" | "rsvp_modal";
+
 function interestIdentityParams(): { name?: string; phone?: string } {
   if (typeof window === "undefined") return {};
   const cached = getVerifiedUserCookie();
@@ -674,6 +677,12 @@ function RsvpModal({
         phoneNumber: verify.phone.replace(/\D/g, ""),
       }) as { alreadyFollowing?: boolean; pending?: boolean } | null | undefined;
       setFollowerCookie(calendarId, verify.name, verify.phone);
+      setVerifiedUserCookie(verify.name, verify.phone);
+      // Same identity the other follow paths leave behind, so the interest
+      // taps that follow this (see onFollowedCalendar) carry a phone.
+      try {
+        localStorage.setItem("leaf_follower_phone", verify.phone.replace(/\D/g, ""));
+      } catch { /* localStorage unavailable */ }
       const pending = result?.pending === true;
       setFollowState(pending ? "pending" : "done");
       onFollowedCalendar?.(pending);
@@ -1389,7 +1398,7 @@ function FollowModal({
    *  null means skip straight to the share kit / success. The sets and the
    *  toggle are live — the page owns the writes. */
   interest?: {
-    take: (source: "follow_modal" | "follow_popup") => InterestPromptItem[] | null;
+    take: (source: InterestPromptSource) => InterestPromptItem[] | null;
     marked: ReadonlySet<string>;
     pending: ReadonlySet<string>;
     onToggle: (id: string) => void;
@@ -1611,6 +1620,18 @@ export default function OrgCalendarPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Plan | null>(null);
   const [rsvpPlan, setRsvpPlan] = useState<Plan | null>(null);
+  // A follow that landed inside the RSVP modal (inline checkbox or the
+  // post-success button) shows the interest prompt for THIS page's calendar
+  // once the modal is dismissed — so the "You're in!" screen stays intact.
+  // For a cross-promoted plan this page is the receiving calendar, which is
+  // the one they followed. The open-ref lets a late follow (modal already
+  // closed) show the prompt straight away instead of waiting for a close
+  // that never comes.
+  const interestAfterRsvpRef = useRef(false);
+  const rsvpModalOpenRef = useRef(false);
+  useEffect(() => {
+    rsvpModalOpenRef.current = rsvpPlan !== null;
+  }, [rsvpPlan]);
   const [hostingIdea, setHostingIdea] = useState<PlanIdea | null>(null);
   // "needs a host" ideas are capped in-line so they never bury confirmed
   // plans; the rest expand behind a show-more toggle.
@@ -3693,7 +3714,7 @@ export default function OrgCalendarPage() {
   // it shows on every follow (a re-follow is a fresh moment), and the caller
   // snapshots the list so it can't show twice within one follow.
   const takeInterestPrompt = useCallback(
-    (source: "follow_modal" | "follow_popup"): InterestPromptItem[] | null => {
+    (source: InterestPromptSource): InterestPromptItem[] | null => {
       if (!org) return null;
       if (interestPromptItems.length === 0) return null;
       track(
@@ -5593,7 +5614,14 @@ export default function OrgCalendarPage() {
       {rsvpPlan && (
         <RsvpModal
           plan={rsvpPlan}
-          onClose={() => setRsvpPlan(null)}
+          onClose={() => {
+            setRsvpPlan(null);
+            if (interestAfterRsvpRef.current) {
+              interestAfterRsvpRef.current = false;
+              const items = takeInterestPrompt("rsvp_modal");
+              if (items) setInterestPrompt(items);
+            }
+          }}
           brandColor={org.brandColor || undefined}
           existingNotificationId={rsvpNotificationIds.get(rsvpPlan.id) || null}
           calendarId={org.objectId}
@@ -5604,9 +5632,16 @@ export default function OrgCalendarPage() {
           onFollowedCalendar={(pending) => {
             if (pending) {
               setFollowRequestPending(true);
+              return;
+            }
+            setIsFollowing(true);
+            setFollowerCount((c) => c + 1);
+            if (rsvpModalOpenRef.current) {
+              // Deferred to the modal's onClose.
+              interestAfterRsvpRef.current = true;
             } else {
-              setIsFollowing(true);
-              setFollowerCount((c) => c + 1);
+              const items = takeInterestPrompt("rsvp_modal");
+              if (items) setInterestPrompt(items);
             }
           }}
           onRsvpSuccess={(planId, alreadyRsvpd, pendingApproval) => {

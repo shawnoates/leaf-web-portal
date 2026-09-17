@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Heart, Repeat } from "lucide-react";
+import { CalendarPlus, Heart, Repeat } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import HostIdeaModal from "@/components/HostIdeaModal";
 import CommunityQualifierCard, {
@@ -206,6 +206,28 @@ interface SeriesInvite {
   inviteNote: string | null;
   invitedAt: string | null;
 }
+// An owner's ask to host one specific plan idea (dashboard Needs You card).
+// Labels arrive pre-formatted in the VENUE's zone for the same reason the
+// series invite's do — a "Nov 6" re-derived in the reader's browser can land on
+// the 5th. The server retires these ~3h before the suggested start.
+interface HostInvite {
+  ideaId: string;
+  title: string;
+  calendarId: string | null;
+  calendarName: string;
+  calendarShareId: string | null;
+  inviterName: string;
+  inviterPhoto: string | null;
+  /** "Nov 6" in the venue's zone. */
+  dateLabel: string | null;
+  /** "7:00 PM" in the venue's zone. */
+  timeLabel: string | null;
+  /** "YYYY-MM-DDTHH:mm" in the venue's zone — sent back on accept so the plan
+   *  is created at the time the card showed, not one re-derived in the browser. */
+  startWallClock: string | null;
+  timezone: string | null;
+  invitedAt: string | null;
+}
 interface Dashboard {
   person: { firstName: string; ownsCalendars: boolean; pendingReviewCount: number };
   greeting?: { weather: Weather | null };
@@ -217,6 +239,7 @@ interface Dashboard {
   unreadMessageCount: number;
   ask: { kind: "pattern" | "generic"; copy: string; promptPrefill: string | null } | null;
   seriesInvites?: SeriesInvite[]; // may be absent while the server side ships
+  hostInvites?: HostInvite[]; // may be absent while the server side ships
   // One prompt card at a time, chosen and flag-gated server-side. Only
   // community_qualifier renders here; other keys are ignored.
   prompt?: { key: string; preview?: boolean; resume?: QualifierResume | null } | null;
@@ -809,6 +832,7 @@ function DashboardView({
   const shown = showAll ? spine : spine.slice(0, PLAN_PAGE);
   const moreCount = spine.length - shown.length;
   const seriesInvites = data.seriesInvites || [];
+  const hostInvites = data.hostInvites || [];
   const firstName = (data.person.firstName || "").trim().split(/\s+/)[0] || "";
   const rail = data.needsHost;
 
@@ -889,6 +913,13 @@ function DashboardView({
               not their own next plan. */}
           {seriesInvites.length > 0 && (
             <SeriesInviteCard invites={seriesInvites} onAnswered={onRefresh} />
+          )}
+
+          {/* Same treatment, one rung down: a one-off ask is a smaller
+              commitment than taking on a whole series, so it yields when both
+              land in the same week. */}
+          {hostInvites.length > 0 && (
+            <HostInviteCard invites={hostInvites} onAnswered={onRefresh} />
           )}
 
           {/* Below the hero on purpose: a partner thank-you shouldn't outrank
@@ -1293,6 +1324,153 @@ function SeriesInviteCard({
                   onClick={() => respond(true)}
                 >
                   {pickChanged ? `Accept for ${pickedLabel()}` : "Accept"}
+                </button>
+                <button
+                  type="button"
+                  className="sinv-btn ghost"
+                  disabled={busy}
+                  aria-label={`Decline hosting ${invite.title}`}
+                  onClick={() => setConfirmDecline(true)}
+                >
+                  Decline
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+      {toast && <div className="sinv-toast" role="status">{toast}</div>}
+    </>
+  );
+}
+
+// ---- One-off host invitation ----------------------------------------------
+// Deliberately shares the series card's `sinv-*` styles rather than cloning
+// them: the two are the same object to the reader — someone asked you to host
+// something — and a second stylesheet would drift from the first.
+function HostInviteCard({
+  invites, onAnswered,
+}: {
+  invites: HostInvite[];
+  onAnswered: () => Promise<void>;
+}) {
+  const [answered, setAnswered] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [confirmDecline, setConfirmDecline] = useState(false);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
+  const toastTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (toastTimer.current) window.clearTimeout(toastTimer.current); }, []);
+
+  const queue = invites.filter((i) => i && i.ideaId && !answered.has(i.ideaId));
+  const invite = queue[0] || null;
+  // Counted off the local tally for the same reason as the series card: the
+  // server's list shrinks as they answer, and "1 of 2" must not become "1 of 1"
+  // under the reader.
+  const position = answered.size + 1;
+  const total = answered.size + queue.length;
+
+  async function respond(accept: boolean) {
+    if (busy || !invite) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = (await Parse.Cloud.run("respondToIdeaHostInvite", {
+        ideaId: invite.ideaId,
+        accept,
+        wallClock: accept ? invite.startWallClock || undefined : undefined,
+      })) as { eventGroupId?: string | null };
+      setAnswered((prev) => new Set(prev).add(invite.ideaId));
+      setConfirmDecline(false);
+      if (accept) {
+        // Straight to the plan they now host — it needs a venue and a nudge to
+        // their people, and neither happens from this card.
+        if (res?.eventGroupId) {
+          window.location.assign(`/p/${res.eventGroupId}`);
+          return;
+        }
+        setToast(`You're hosting ${invite.title}`);
+        if (toastTimer.current) window.clearTimeout(toastTimer.current);
+        toastTimer.current = window.setTimeout(() => setToast(""), 5000);
+      }
+      onAnswered().catch(() => {});
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : "That didn't go through. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!invite) {
+    return toast ? <div className="sinv-toast" role="status">{toast}</div> : null;
+  }
+
+  const meta = [invite.dateLabel, invite.timeLabel, invite.calendarName]
+    .filter(Boolean).join(" · ");
+
+  return (
+    <>
+      <section className="sinv" role="region" aria-label="Host invitation">
+        <div className="sinv-head">
+          <div className="eyebrow sinv-eyebrow">
+            <CalendarPlus className="sinv-icon" aria-hidden />
+            You&rsquo;re invited to host
+          </div>
+          {total > 1 && <div className="eyebrow sinv-count">{position} of {total}</div>}
+        </div>
+        <div className="sinv-body">
+          <div className="sinv-text">
+            <h2 className="sinv-title">
+              {invite.calendarShareId ? (
+                <Link href={`/org/${invite.calendarShareId}?idea=${invite.ideaId}`}>{invite.title}</Link>
+              ) : invite.title}
+            </h2>
+            {meta && <div className="sinv-meta">{meta}</div>}
+            <div className="sinv-from">
+              {invite.inviterPhoto ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="sinv-ava" src={invite.inviterPhoto} alt="" />
+              ) : (
+                <span className="sinv-ava ph">{initial(invite.inviterName)}</span>
+              )}
+              <span>{invite.inviterName} asked you to host this one</span>
+            </div>
+            {error && <div className="sinv-err">{error}</div>}
+          </div>
+          {/* Decline confirms in place, same as the series card: the button
+              becomes the question and tapping it again backs out. */}
+          <div className="sinv-act">
+            {confirmDecline ? (
+              <>
+                <button
+                  type="button"
+                  className="sinv-btn ghost asking"
+                  disabled={busy}
+                  aria-label={`Keep the invitation to host ${invite.title}`}
+                  onClick={() => setConfirmDecline(false)}
+                >
+                  Decline?
+                </button>
+                <button
+                  type="button"
+                  className="sinv-btn primary"
+                  disabled={busy}
+                  aria-label={`Yes, decline hosting ${invite.title}`}
+                  onClick={() => respond(false)}
+                >
+                  Yes
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="sinv-btn primary"
+                  disabled={busy}
+                  aria-label={`Accept hosting ${invite.title}`}
+                  onClick={() => respond(true)}
+                >
+                  Accept
                 </button>
                 <button
                   type="button"

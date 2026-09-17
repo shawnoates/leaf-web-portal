@@ -78,6 +78,7 @@ export default function NudgeModal({
   followers,
   hostFirstName,
   draft,
+  hostInviteIdeaId,
   onClose,
   onSent,
 }: {
@@ -88,6 +89,11 @@ export default function NudgeModal({
   /** Caller-authored default message (e.g. a host-ask); skips the built-in
    *  re-engagement draft entirely. */
   draft?: string;
+  /** Set on a host-ask: records a durable invite on that idea, which surfaces
+   *  as a card on the follower's /me page. Written BEFORE the text and kept
+   *  independent of it, so quiet hours or a spent weekly budget delay the
+   *  text without losing the ask. Single-recipient only. */
+  hostInviteIdeaId?: string;
   onClose: () => void;
   /** Fired once the server confirms: membership ids actually texted + a
    *  ready-made toast line. */
@@ -133,12 +139,33 @@ export default function NudgeModal({
         setDoneText(summary);
         onSent(result.sentMembershipIds, summary);
       } else {
-        await Parse.Cloud.run("nudgeFollower", {
-          membershipId: followers[0].membershipId,
-          message: message.trim(),
-        });
-        setDoneText(`Text sent to ${firstName}.`);
-        onSent([followers[0].membershipId], `Nudge sent to ${firstName}`);
+        // The invite is the ask; the text only carries it. Record it first and
+        // let it stand on its own, so a guard that blocks the text (quiet
+        // hours, the weekly budget, an opt-out) delays the message instead of
+        // dropping the request on the floor.
+        if (hostInviteIdeaId) {
+          await Parse.Cloud.run("inviteIdeaHost", {
+            ideaId: hostInviteIdeaId,
+            membershipId: followers[0].membershipId,
+          });
+        }
+        let smsError: string | null = null;
+        try {
+          await Parse.Cloud.run("nudgeFollower", {
+            membershipId: followers[0].membershipId,
+            message: message.trim(),
+          });
+        } catch (e) {
+          if (!hostInviteIdeaId) throw e;
+          smsError = e instanceof Error ? e.message : "the text didn't go through";
+        }
+        if (smsError) {
+          setDoneText(`Asked ${firstName} — it's waiting on their Leaf page. We couldn't text them: ${smsError}`);
+          onSent([], `Asked ${firstName}`);
+        } else {
+          setDoneText(hostInviteIdeaId ? `Asked ${firstName}.` : `Text sent to ${firstName}.`);
+          onSent([followers[0].membershipId], hostInviteIdeaId ? `Asked ${firstName}` : `Nudge sent to ${firstName}`);
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't send the nudge");

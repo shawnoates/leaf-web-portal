@@ -1271,6 +1271,9 @@ export default function OrgDashboardPage() {
   // Caller-authored default message. Set by the Home prompt cards (host ask /
   // re-engagement invite); null means NudgeModal writes its own draft.
   const [nudgeDraft, setNudgeDraft] = useState<string | null>(null);
+  // Set only by the host-ask card: the idea the ask is about, so the send also
+  // records a durable invite on the follower's /me page.
+  const [nudgeIdeaId, setNudgeIdeaId] = useState<string | null>(null);
   const [nudgedIds, setNudgedIds] = useState<Set<string>>(new Set());
   const handleNudgeSent = useCallback(
     (membershipIds: string[], toastText: string) => {
@@ -1363,6 +1366,7 @@ export default function OrgDashboardPage() {
       setNudgeDraft(
         `Hey ${first}, ${from}. Would you host "${tidyTitle(hc.idea.title)}"? It's really easy, for most plans you just show up and keep the group chat going.${link}`,
       );
+      setNudgeIdeaId(hc.idea.objectId);
       setNudgeFor([promptFollower(hc.candidate_user, calId)]);
     },
     [dashboard, isPaidTier, hostFirstName, promptFollower],
@@ -1387,6 +1391,7 @@ export default function OrgDashboardPage() {
       setNudgeDraft(
         `Hey ${first}, ${from}. We've got ${tidyTitle(re.plan.title)}${day ? ` on ${day}` : ""} and I'd love for you to come to this one.${link}`,
       );
+      setNudgeIdeaId(null);
       setNudgeFor([promptFollower(re.target_user, calId)]);
     },
     [dashboard, isPaidTier, hostFirstName, promptFollower],
@@ -1972,11 +1977,11 @@ export default function OrgDashboardPage() {
               onInviteCoHost={handleInviteCoHost}
               onNudge={(f) => {
                 // Pro feature — server enforces the same gate in nudgeFollower.
-                if (isPaidTier) setNudgeFor([f]);
+                if (isPaidTier) { setNudgeIdeaId(null); setNudgeFor([f]); }
                 else setShowSubscription(true);
               }}
               onNudgeAll={(fs) => {
-                if (isPaidTier) setNudgeFor(fs);
+                if (isPaidTier) { setNudgeIdeaId(null); setNudgeFor(fs); }
                 else setShowSubscription(true);
               }}
               nudgedIds={nudgedIds}
@@ -2965,9 +2970,11 @@ export default function OrgDashboardPage() {
               .split(/\s+/)[0] || ""
           }
           draft={nudgeDraft ?? undefined}
+          hostInviteIdeaId={nudgeIdeaId ?? undefined}
           onClose={() => {
             setNudgeFor(null);
             setNudgeDraft(null);
+            setNudgeIdeaId(null);
           }}
           onSent={handleNudgeSent}
         />
