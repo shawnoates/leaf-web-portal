@@ -1,6 +1,5 @@
 import { ImageResponse } from "next/og";
-import { renderToStaticMarkup } from "react-dom/server";
-import { QRCodeSVG } from "qrcode.react";
+import qrcode from "qrcode-generator";
 import Parse from "@/lib/parse";
 import { SITE_HOST, SITE_URL } from "@/lib/site";
 
@@ -213,14 +212,16 @@ export async function GET(request: Request) {
     (longestWord > 9 ? 72 : words.map((w) => w.text).join(" ").length > 18 ? 84 : 100) * s,
   );
 
-  // Satori can't run a component with hooks, so the QR is rendered to static
-  // SVG here and handed over as an image. /share/p keeps a scan in Safari the
-  // way a sticker tap is, and forwards src.
+  // Not qrcode.react: Satori can't run a component with hooks, and Next
+  // refuses react-dom/server in a route handler, so the code comes from a
+  // plain encoder as an SVG string and goes in as an image. /share/p keeps a
+  // scan in Safari the way a sticker tap is, and forwards src.
   const qrUrl = planId ? `${SITE_URL}/share/p/${planId}?src=host_share_qr` : SITE_URL;
   const qrSize = Math.round(190 * s);
-  const qrSvg = renderToStaticMarkup(
-    <QRCodeSVG value={qrUrl} size={qrSize} level="M" marginSize={0} fgColor={INK} bgColor="#ffffff" />,
-  );
+  const qr = qrcode(0, "M");
+  qr.addData(qrUrl);
+  qr.make();
+  const qrSvg = qr.createSvgTag({ cellSize: 4, margin: 0 });
   const qrSrc = `data:image/svg+xml;base64,${Buffer.from(qrSvg).toString("base64")}`;
   const titleSize = Math.round(46 * s);
   const bodySize = Math.round(32 * s);
@@ -345,7 +346,7 @@ export async function GET(request: Request) {
                 key={i}
                 style={{
                   display: "flex",
-                  padding: w.hi ? "0 18px" : "0 8px 0 0",
+                  padding: w.hi ? "0 18px" : "0 22px 0 0",
                   marginRight: w.hi ? 10 : 0,
                   backgroundColor: w.hi ? HIGHLIGHT : "transparent",
                   color: w.hi ? INK : "#ffffff",
