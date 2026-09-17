@@ -409,7 +409,7 @@ export default function PlanDetailModal({
     .map((r) => r.phone as string);
   const messageAllHref = `sms:&addresses=${sharingPhones.map((p) => encodeURIComponent(p)).join(",")}`;
 
-  const approveRsvp = async (r: Rsvp) => {
+  const approveRsvp = async (r: { notificationId: string }) => {
     try {
       await Parse.Cloud.run("approveRsvpRequest", { notificationId: r.notificationId });
       setPlanRsvps((prev) => prev.map((rsvp) => rsvp.notificationId === r.notificationId ? { ...rsvp, status: "Accepted" } : rsvp));
@@ -418,7 +418,7 @@ export default function PlanDetailModal({
       console.error("Failed to approve:", err);
     }
   };
-  const declineRsvp = async (r: Rsvp) => {
+  const declineRsvp = async (r: { notificationId: string }) => {
     try {
       await Parse.Cloud.run("declineRsvpRequest", { notificationId: r.notificationId });
       setPlanRsvps((prev) => prev.filter((rsvp) => rsvp.notificationId !== r.notificationId));
@@ -427,7 +427,7 @@ export default function PlanDetailModal({
       console.error("Failed to decline:", err);
     }
   };
-  const removeRsvp = async (r: Rsvp) => {
+  const removeRsvp = async (r: { notificationId: string }) => {
     const snapshot = planRsvps;
     setPlanRsvps((prev) => prev.filter((rsvp) => rsvp.notificationId !== r.notificationId));
     try {
