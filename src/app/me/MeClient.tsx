@@ -72,6 +72,8 @@ interface Plan {
     shareId: string | null;
     viaCalendarId: string | null;
     viaCalendarName: string | null;
+    /** Further followed calendars it was also shared with — the "+ N more". */
+    alsoVia?: { calendarId: string | null; name: string | null; shareId: string | null }[];
   } | null;
   image: string | null;
   hostState: HostState;
@@ -1341,9 +1343,23 @@ function PlanRow({
       </div>
       <PlanTile plan={plan} index={index} variant="row" onOpen={onOpen} />
       <div className="row-text">
+        {/* Attribution lives in the eyebrow (cross-promo spec 2A): the plan's
+            home calendar, "+" the calendar that shared it into this feed, then
+            "+ N more" naming the rest on hover, then the hosting badge. */}
         <div className="row-cal">
           {plan.calendarName}
-          {plan.promotedFrom?.viaCalendarName ? ` · shared with ${plan.promotedFrom.viaCalendarName}` : ""}
+          {plan.promotedFrom?.viaCalendarName ? ` + ${plan.promotedFrom.viaCalendarName}` : ""}
+          {(plan.promotedFrom?.alsoVia?.length ?? 0) > 0 && (
+            <>
+              {" + "}
+              <span
+                className="row-more"
+                title={(plan.promotedFrom?.alsoVia || []).map((v) => v.name).filter(Boolean).join(", ")}
+              >
+                {plan.promotedFrom!.alsoVia!.length} more
+              </span>
+            </>
+          )}
           {hosting && (
             <span className="hostmark"><span className="hostdot" />You&rsquo;re hosting</span>
           )}
@@ -2312,6 +2328,7 @@ const CSS = `
 .leafme .row-date .m{font-family:var(--mono);font-size:8.5px;font-weight:500;letter-spacing:.09em;
   text-transform:uppercase;color:var(--muted);margin-top:3px}
 .leafme .row-text{flex:1 1 auto;min-width:0}
+.leafme .row-more{text-decoration:underline;text-underline-offset:2px;cursor:help}
 .leafme .row-cal{font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:.1em;
   text-transform:uppercase;color:var(--muted)}
 .leafme .hostmark{display:inline-flex;align-items:center;gap:5px;margin-left:8px;color:var(--green)}
