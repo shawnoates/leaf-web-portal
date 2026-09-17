@@ -18,7 +18,7 @@ export default function TrustPill() {
         >
           <path d="M10 1.5l2.6 5.6 6.1.7-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6L1.3 7.8l6.1-.7z" />
         </svg>
-        Rated 4.8 by Leaf users
+        Rated 4.8
       </span>
       <span className="trust-pill__divider" />
       <span className="trust-pill__reach">
