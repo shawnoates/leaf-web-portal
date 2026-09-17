@@ -128,6 +128,24 @@ function fileNameFor(format: Format, phase: SharePack["phase"]): string {
   return `leaf-${phase === "after" ? "recap" : "plan"}-${format}.png`;
 }
 
+// The same-origin form of one of our own URLs. The kit is linked as
+// os.joinleaf.com, which 302s to www.os.joinleaf.com, so the page ends up on
+// www while the pack's image URLs still name the bare host. An <img> doesn't
+// care; fetch() follows the redirect cross-origin, finds no CORS header, and
+// throws — which is how "Getting the image ready…" never finished. Only the
+// www/bare pair is rewritten; a photo host is left alone.
+function sameOriginUrl(url: string): string {
+  try {
+    const target = new URL(url, window.location.href);
+    const here = window.location.host;
+    const bare = (host: string) => host.replace(/^www\./, "");
+    if (target.host !== here && bare(target.host) === bare(here)) target.host = here;
+    return target.toString();
+  } catch {
+    return url;
+  }
+}
+
 export default function ShareKitClient({
   notificationId,
   initial,
@@ -204,25 +222,42 @@ export default function ShareKitClient({
   // a fetch (plus the clipboard) in the handler blew through it — the share
   // threw, and every Instagram tap landed on the "save it by hand" fallback.
   // With the file in hand, the tap goes straight to the sheet.
-  // Keyed by URL so a tap right after switching tabs can't share the previous
-  // format's card.
-  const [fetched, setFetched] = useState<{ url: string; file: File } | null>(null);
+  // One request serves both the preview and the share: the card takes the
+  // server several seconds to rasterize, and an <img> plus a fetch was two
+  // renders of it. Keyed by URL so a tap right after switching tabs can't
+  // share the previous format's card. A failed fetch (a photo host without
+  // CORS) puts the plain <img> back for the preview; the tap then falls back
+  // to opening the image.
+  const [fetched, setFetched] = useState<{ url: string; file: File; objectUrl: string } | null>(null);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const imageFile = fetched && fetched.url === imageUrl ? fetched.file : null;
+  const imageFailed = failedUrl === imageUrl;
+  const previewSrc = imageFile && fetched ? fetched.objectUrl : imageFailed ? imageUrl : null;
   useEffect(() => {
     if (!pack || !imageUrl) return;
+    const url = imageUrl;
     const controller = new AbortController();
+    let objectUrl: string | null = null;
     (async () => {
       try {
-        const res = await fetch(imageUrl, { signal: controller.signal });
-        if (!res.ok) return;
+        const res = await fetch(sameOriginUrl(url), { signal: controller.signal });
+        if (!res.ok) throw new Error(String(res.status));
         const blob = await res.blob();
         const file = new File([blob], fileNameFor(format, pack.phase), { type: blob.type || "image/png" });
-        setFetched({ url: imageUrl, file });
-      } catch {
-        // A photo host without CORS: the tap falls back to opening the image.
+        objectUrl = URL.createObjectURL(blob);
+        setFetched({ url, file, objectUrl });
+      } catch (e) {
+        if (e instanceof Error && e.name === "AbortError") return;
+        setFailedUrl(url);
       }
     })();
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        setFetched((prev) => (prev?.url === url ? null : prev));
+      }
+    };
   }, [pack, imageUrl, format]);
 
   // The one-tap path for Instagram and TikTok: hand the OS share sheet the
@@ -364,13 +399,23 @@ export default function ShareKitClient({
                 usingRecapPhoto ? "max-w-[320px]" : format === "story" ? "max-w-[240px]" : "max-w-[300px]"
               }`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                key={imageUrl}
-                src={imageUrl}
-                alt="Preview of what you'll post"
-                className="w-full h-auto block"
-              />
+              {previewSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={previewSrc}
+                  src={previewSrc}
+                  alt="Preview of what you'll post"
+                  className="w-full h-auto block"
+                />
+              ) : (
+                <div
+                  className={`w-full flex items-center justify-center animate-pulse ${
+                    usingRecapPhoto ? "aspect-square" : format === "story" ? "aspect-[9/16]" : "aspect-[4/5]"
+                  }`}
+                >
+                  <span className="text-[12px] text-zinc-400">Rendering your card…</span>
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -432,7 +477,7 @@ export default function ShareKitClient({
                     <span className="block text-[12px] text-zinc-500">
                       {disabled
                         ? "On your phone: save the image, copy the caption, post from the app"
-                        : sheet && !imageFile
+                        : sheet && !imageFile && !imageFailed
                           ? "Getting the image ready…"
                           : t.hint}
                     </span>

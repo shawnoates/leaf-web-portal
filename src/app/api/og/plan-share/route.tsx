@@ -447,6 +447,10 @@ export async function GET(request: Request) {
     ),
     {
       ...size,
+      // ~4s to rasterize. The share kit fetches it once and holds the file, but
+      // a tab switch and back, or a reload, shouldn't pay again; the copy on
+      // the card (going count) can be ten minutes stale without harm.
+      headers: { "Cache-Control": "private, max-age=600" },
       ...(font
         ? { fonts: [{ name: "Inter", data: font, weight: 800 as const, style: "normal" as const }] }
         : {}),
