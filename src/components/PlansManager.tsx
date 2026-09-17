@@ -20,7 +20,7 @@ import { hostCandidateLabel, isSeriesLimitError, seriesStatusChip, type SeriesHo
 // cards at the wrong hour (and, near midnight, the wrong week).
 import { resolveAIEventDate, FLOATING_EVENT_TZ } from "@/lib/ai-event-date";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
-import { Calendar, Camera, Check, ImagePlus, Link2, Lock, MessageCircle, Pencil, Plus, RefreshCw, Repeat, Settings, Sparkles, UserCheck, Users, X } from "lucide-react";
+import { Calendar, Camera, Check, ImagePlus, Link2, Lock, MessageCircle, Pencil, Plus, RefreshCw, Repeat, Send, Settings, Sparkles, UserCheck, Users, X } from "lucide-react";
 
 // Renders a plan cover image with a Calendar-icon placeholder fallback when
 // the src is missing OR 404s (attendee-uploaded / expired signed URLs go
@@ -254,6 +254,13 @@ interface UpcomingPlan {
   hideVenueUntilRsvp?: boolean;
   requireApproval?: boolean;
   planSeriesId?: string | null;
+  /** Cross-promoted onto this calendar from another one — read-only here. */
+  promotedFrom?: {
+    promotionId: string;
+    calendarId: string | null;
+    name: string | null;
+    shareId: string | null;
+  } | null;
   // AI starter plans surfaced alongside real EventGroups. These come from
   // the parent AICalendar's aiSourceEvents; they never gain a host until a
   // manager promotes them via "Plan This" (which creates a real EventGroup
@@ -909,6 +916,7 @@ export default function PlansManager({
         hideVenueUntilRsvp?: boolean;
         requireApproval?: boolean;
         planSeriesId?: string | null;
+        promotedFrom?: UpcomingPlan["promotedFrom"];
       }[];
       const realPlans: UpcomingPlan[] = activePlans.map((p) => ({
         objectId: p.objectId,
@@ -929,6 +937,7 @@ export default function PlansManager({
         hideVenueUntilRsvp: p.hideVenueUntilRsvp,
         requireApproval: p.requireApproval,
         planSeriesId: p.planSeriesId,
+        promotedFrom: p.promotedFrom ?? null,
       }));
       setUpcomingPlans(realPlans);
       Parse.Cloud.run("getCalendarPlanSeries", { calendarId })
@@ -1805,7 +1814,14 @@ export default function PlansManager({
                             on every card, survives name truncation, and costs
                             no width against the RSVP count. */}
                         <span className="flex items-center gap-1.5 min-w-0">
-                          <span className="truncate">{plan.host?.name || "You"}</span>
+                          {plan.promotedFrom ? (
+                            <span className="truncate inline-flex items-center gap-1 text-zinc-500" title={`Cross-promoted from ${plan.promotedFrom.name || "another calendar"}`}>
+                              <Send className="w-3 h-3 shrink-0" />
+                              <span className="truncate">From {plan.promotedFrom.name || "another calendar"}</span>
+                            </span>
+                          ) : (
+                            <span className="truncate">{plan.host?.name || "You"}</span>
+                          )}
                         </span>
                         <div className="flex items-center gap-2 shrink-0 ml-2">
                           <span>{plan.rsvpCount} RSVPs</span>
@@ -2300,6 +2316,7 @@ export default function PlansManager({
             hideVenueUntilRsvp: selectedPlan.hideVenueUntilRsvp,
             requireApproval: selectedPlan.requireApproval,
             planSeriesId: selectedPlan.planSeriesId,
+            promotedFrom: selectedPlan.promotedFrom ?? null,
           }}
           calendarId={calendarId}
           onClose={() => setSelectedPlan(null)}

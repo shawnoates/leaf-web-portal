@@ -203,13 +203,16 @@ export default function HomeTab({
   eventApprovalsCount: number;
   eventApprovalsHref: string;
 }) {
-  const allPlans = useMemo(
-    () =>
-      dashboard.calendars
-        .flatMap((c) => c.activePlans || [])
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
-    [dashboard.calendars],
-  );
+  const allPlans = useMemo(() => {
+    // A plan cross-promoted to a sibling calendar appears under both; the
+    // timeline shows it once, preferring the row that isn't the promoted copy.
+    const byId = new Map<string, CalActivePlan>();
+    for (const p of dashboard.calendars.flatMap((c) => c.activePlans || [])) {
+      const prev = byId.get(p.objectId);
+      if (!prev || (prev.promotedFrom && !p.promotedFrom)) byId.set(p.objectId, p);
+    }
+    return [...byId.values()].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [dashboard.calendars]);
 
   const days: DayBucket[] = useMemo(() => {
     const byDay = new Map<string, CalActivePlan[]>();

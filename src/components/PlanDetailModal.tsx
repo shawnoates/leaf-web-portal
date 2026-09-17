@@ -67,6 +67,15 @@ export type PlanDetailData = {
     requestedByName: string;
     requestedAt: string;
   } | null;
+  /** Cross-promotion: hosted on another calendar, accepted onto this one.
+   *  The modal goes read-only — edit/cancel/host belong to the other owner —
+   *  and offers "Remove from this calendar" instead. */
+  promotedFrom?: {
+    promotionId: string;
+    calendarId: string | null;
+    name: string | null;
+    shareId: string | null;
+  } | null;
 };
 
 type PollOptionDetail = { date: string; time: string | null; count: number };
@@ -439,7 +448,27 @@ export default function PlanDetailModal({
     }
   };
 
-  const canShare = !!onShare && !plan.isPoll && (!plan.date || new Date(plan.date).getTime() > Date.now());
+  // Cross-promoted onto this calendar: someone else's plan. No edit, cancel,
+  // host change or re-promotion from here — only removal from this calendar.
+  const isPromoted = Boolean(plan.promotedFrom);
+  const [removingPromotion, setRemovingPromotion] = useState(false);
+  const handleRemovePromotion = async () => {
+    if (!plan.promotedFrom) return;
+    if (!confirm(`Remove "${plan.title}" from this calendar? ${plan.promotedFrom.name || "The host calendar"} keeps the plan and its RSVPs.`)) return;
+    setRemovingPromotion(true);
+    try {
+      await Parse.Cloud.run("withdrawPlanPromotion", { promotionId: plan.promotedFrom.promotionId });
+      onChanged();
+      onClose();
+    } catch (err) {
+      console.error("Failed to remove cross-promoted plan:", err);
+      alert("Couldn't remove it. Please try again.");
+    } finally {
+      setRemovingPromotion(false);
+    }
+  };
+
+  const canShare = !!onShare && !plan.isPoll && !isPromoted && (!plan.date || new Date(plan.date).getTime() > Date.now());
   const primaryActionCount = (plan.isPoll ? 0 : 1) + (canShare ? 1 : 0);
 
   return (
@@ -527,13 +556,19 @@ export default function PlanDetailModal({
               </p>
               {/* A roster host is placed and replaced from the Leaf side (the
                   needs-host queue), not by picking a follower here. */}
-              {!plan.isPoll && !plan.hostIsRoster && (
+              {!plan.isPoll && !plan.hostIsRoster && !isPromoted && (
                 <button
                   onClick={openChangeHost}
                   className="text-xs font-medium text-zinc-500 hover:text-zinc-900 underline underline-offset-2 transition-colors"
                 >
                   Change host
                 </button>
+              )}
+              {isPromoted && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 bg-zinc-100 rounded-full px-2.5 py-1">
+                  <Send className="w-3 h-3" />
+                  Cross-promoted from {plan.promotedFrom?.name || "another calendar"}
+                </span>
               )}
             </div>
 
@@ -877,6 +912,21 @@ export default function PlanDetailModal({
                 )}
               </div>
             )}
+            {isPromoted ? (
+              <div className="flex flex-wrap items-center justify-center gap-3 text-[13px]">
+                <span className="text-zinc-500">
+                  {plan.promotedFrom?.name || "The host calendar"} runs this plan and manages its RSVPs.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleRemovePromotion}
+                  disabled={removingPromotion}
+                  className={`h-9 px-3 rounded-lg font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 inline-flex items-center transition-colors ${FOCUS_RING}`}
+                >
+                  Remove from this calendar
+                </button>
+              </div>
+            ) : (
             <div className="flex flex-wrap items-center justify-center gap-1">
               <button
                 type="button"
@@ -916,6 +966,7 @@ export default function PlanDetailModal({
                 </button>
               )}
             </div>
+            )}
           </div>
         </div>
       </div>

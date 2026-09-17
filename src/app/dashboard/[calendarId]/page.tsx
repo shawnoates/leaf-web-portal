@@ -3053,6 +3053,7 @@ export default function OrgDashboardPage() {
             requireApproval: selectedActivePlan.requireApproval,
             planSeriesId: selectedActivePlan.planSeriesId,
             changeRequest: selectedActivePlan.changeRequest ?? null,
+            promotedFrom: selectedActivePlan.promotedFrom ?? null,
           }}
           calendarId={selectedActivePlan.calendarId || calendarId}
           onClose={() => setSelectedActivePlan(null)}

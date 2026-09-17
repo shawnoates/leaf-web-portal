@@ -31,6 +31,19 @@ export interface CalActivePlan {
   /** A host who can't edit from the app asked for a change (requestPlanChange).
    *  Cleared when the owner edits the plan or dismisses it. */
   changeRequest?: PlanChangeRequest | null;
+  /** Cross-promotion: this plan is hosted on ANOTHER calendar and was
+   *  accepted onto this one. Read-only here — not this owner's plan. */
+  promotedFrom?: PromotedFromTag | null;
+}
+
+/** Provenance tag on a cross-promoted plan (see cross-promo-helpers.js). */
+export interface PromotedFromTag {
+  promotionId: string;
+  calendarId: string | null;
+  name: string | null;
+  shareId: string | null;
+  viaCalendarId: string | null;
+  viaCalendarName: string | null;
 }
 
 export interface PlanChangeRequest {
