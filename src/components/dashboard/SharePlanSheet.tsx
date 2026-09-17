@@ -71,6 +71,10 @@ const SUGGESTED_COUNT = 3;
 // Fallback when the server sends no fit score: a far-away owned calendar
 // shouldn't receive a Brooklyn plan by default.
 const PRECHECK_MAX_MILES = 25;
+// Mirrors the server's FIT_FAR_MILES. Past this there is no plausible reason to
+// cross-promote, so the calendar stays behind the disclosure however the rest
+// of the list scored.
+const FAR_MILES = 50;
 
 const HINT_CHIP: Record<Fit, string> = {
   2: "bg-[#e0ebe7] text-[#325348]",
@@ -95,6 +99,8 @@ const hintOf = (t: Target): string => {
   }
   return t.autoAccept ? "Your calendar" : "Nearby";
 };
+
+const isFar = (t: Target): boolean => t.distanceMiles != null && t.distanceMiles >= FAR_MILES;
 
 const metaOf = (t: Target): string =>
   [
@@ -265,10 +271,17 @@ export default function SharePlanSheet({
 
   const q = query.trim().toLowerCase();
   const matches = (t: Target) => !q || t.name.toLowerCase().includes(q);
-  const fits = owned.filter((t) => fitOf(t) === 2 && matches(t));
-  const others = owned.filter((t) => fitOf(t) < 2 && matches(t));
-  const othersListOpen = othersOpen || Boolean(q) || fits.length === 0;
-  const noOwnedMatch = Boolean(q) && owned.length > 0 && fits.length === 0 && others.length === 0;
+  const shown = owned.filter(matches);
+  const fits = shown.filter((t) => fitOf(t) === 2);
+  const far = shown.filter((t) => fitOf(t) < 2 && isFar(t));
+  const near = shown.filter((t) => fitOf(t) < 2 && !isFar(t));
+  // Nothing scored as a fit: the in-range calendars take the top slot rather
+  // than the whole list spilling out, which would put a 1,000-mile calendar
+  // alongside the ones actually worth picking.
+  const upFront = fits.length > 0 ? fits : near;
+  const others = fits.length > 0 ? [...near, ...far] : far;
+  const othersListOpen = othersOpen || Boolean(q) || upFront.length === 0;
+  const noOwnedMatch = Boolean(q) && owned.length > 0 && shown.length === 0;
 
   const checkedTargets = [...checked].map((id) => byId.get(id)).filter((t): t is Target => Boolean(t));
   const instant = checkedTargets.filter((t) => t.autoAccept);
@@ -668,31 +681,36 @@ export default function SharePlanSheet({
                     <p className="m-0 text-xs text-zinc-500">No calendars match</p>
                   ) : (
                     <>
-                      {fits.length > 0 && (
+                      {upFront.length > 0 && (
                         <div className="flex flex-col gap-2">
                           <div className="flex items-baseline justify-between">
                             <Eyebrow>
-                              <Zap className="w-[11px] h-[11px]" strokeWidth={2.4} />
-                              Fits this plan · pre-selected
+                              {fits.length > 0 ? (
+                                <>
+                                  <Zap className="w-[11px] h-[11px]" strokeWidth={2.4} />
+                                  Fits this plan · pre-selected
+                                </>
+                              ) : (
+                                "Your calendars"
+                              )}
                             </Eyebrow>
                             <span className="text-[11px] text-zinc-400">Adds instantly</span>
                           </div>
-                          {fits.map(ownedRow)}
+                          {upFront.map(ownedRow)}
                         </div>
                       )}
 
                       {/* The owner's other calendars */}
                       {others.length > 0 && (
                         <div className="flex flex-col gap-2">
-                          {fits.length === 0 && (
-                            // Nothing scored as a fit — list the owner's
-                            // calendars plainly rather than behind a disclosure.
+                          {upFront.length === 0 ? (
+                            // Every calendar is out of range — list them plainly
+                            // rather than behind a disclosure with nothing above it.
                             <div className="flex items-baseline justify-between">
                               <Eyebrow>Your calendars</Eyebrow>
                               <span className="text-[11px] text-zinc-400">Adds instantly</span>
                             </div>
-                          )}
-                          {fits.length > 0 && (
+                          ) : (
                             <button
                               type="button"
                               onClick={() => setOthersOpen((v) => !v)}
