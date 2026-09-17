@@ -150,10 +150,13 @@ export default function ShareKitClient({
   notificationId,
   initial,
   initialError,
+  embedded = false,
 }: {
   notificationId: string;
   initial: SharePack | null;
   initialError: string | null;
+  /** Opened from the app's checklist in an in-app browser; see page.tsx. */
+  embedded?: boolean;
 }) {
   const pack = initial;
   const [format, setFormat] = useState<Format>("story");
@@ -321,14 +324,16 @@ export default function ShareKitClient({
     <main className="min-h-dvh bg-zinc-50">
       <div className="mx-auto w-full max-w-lg bg-white min-h-dvh sm:min-h-0 sm:my-8 sm:rounded-2xl sm:shadow-sm sm:border sm:border-zinc-200 overflow-hidden">
         <header className="px-5 pt-5 pb-4 border-b border-zinc-100">
-          <a
-            href={pack.checklistUrl}
-            className="inline-flex items-center gap-1 text-[12px] font-medium text-zinc-500 hover:text-zinc-800"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Your checklist
-          </a>
-          <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 mt-3">
+          {!embedded && (
+            <a
+              href={pack.checklistUrl}
+              className="inline-flex items-center gap-1 text-[12px] font-medium text-zinc-500 hover:text-zinc-800"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Your checklist
+            </a>
+          )}
+          <p className={`text-[11px] font-bold uppercase tracking-widest text-zinc-400 ${embedded ? "" : "mt-3"}`}>
             {after ? "After the night" : "Share kit"}
           </p>
           <h1 className="text-xl font-semibold text-zinc-900 mt-1 leading-snug text-balance">

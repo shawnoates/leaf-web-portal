@@ -153,6 +153,8 @@ export interface PlanPromotionRow {
   requested_at: string | null;
   decided_at: string | null;
   withdraw_reason: string | null;
+  /** The sender's "why this fits your community" — requests only. */
+  note?: string | null;
   plan: PromotionPlanSummary;
   source_calendar: PromotionCalendarSummary | null;
   target_calendar: PromotionCalendarSummary | null;

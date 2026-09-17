@@ -12,6 +12,10 @@ import ShareKitClient, { type SharePack } from "./ShareKitClient";
 
 type PageProps = {
   params: Promise<{ notificationId: string }>;
+  // `?from=app`: the iOS checklist opened this in an in-app browser. Its own
+  // Done button is the way back, so the page drops the "Your checklist" link
+  // — following that would land on the WEB checklist inside the browser.
+  searchParams: Promise<{ from?: string }>;
 };
 
 async function fetchPack(
@@ -38,8 +42,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function ShareKitPage({ params }: PageProps) {
-  const { notificationId } = await params;
+export default async function ShareKitPage({ params, searchParams }: PageProps) {
+  const [{ notificationId }, { from }] = await Promise.all([params, searchParams]);
   const { pack, error } = await fetchPack(notificationId);
-  return <ShareKitClient notificationId={notificationId} initial={pack} initialError={error} />;
+  return (
+    <ShareKitClient
+      notificationId={notificationId}
+      initial={pack}
+      initialError={error}
+      embedded={from === "app"}
+    />
+  );
 }

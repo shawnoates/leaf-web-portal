@@ -85,6 +85,12 @@ interface Plan {
   // not the owner in `hostUser`/`user`. The owner still owns the EventGroup.
   hasRosterHost: boolean;
   attendeeCount: number;
+  /** Accepted RSVPs only (host excluded) — the number the server compares
+   *  against `capacity` when deciding to waitlist. `attendeeCount` pads +1
+   *  for the host, so never use it for the full check. */
+  rsvpCount: number;
+  /** Host-set cap on accepted RSVPs; null when uncapped. */
+  capacity: number | null;
   location: {
     name: string | null;
     address: string | null;
@@ -155,6 +161,13 @@ interface Plan {
     priceCents: number | null;
     imageUrl: string | null;
   }[];
+}
+
+// Capacity reached — rsvpToPlanViaWeb will waitlist the next RSVP instead of
+// confirming it (same `rsvpCount >= capacity` test the server runs), so every
+// CTA that would read "Request to Attend" / "I'm Attending" has to say so.
+function planIsFull(plan: Pick<Plan, "capacity" | "rsvpCount">) {
+  return plan.capacity != null && plan.rsvpCount >= plan.capacity;
 }
 
 interface PlanIdea {
@@ -771,7 +784,7 @@ function RsvpModal({
           <div className="space-y-6">
             <div>
               <h3 className="text-2xl font-light tracking-tight">
-                {plan.requireApproval ? "Request to Attend" : "RSVP for"} {plan.title}
+                {planIsFull(plan) ? "Join the waitlist for" : plan.requireApproval ? "Request to Attend" : "RSVP for"} {plan.title}
               </h3>
               <p className="text-sm text-zinc-500 mt-1">
                 {plan.date}{plan.time ? ` at ${plan.time}` : ""}
@@ -827,6 +840,8 @@ function RsvpModal({
               >
                 {formStep === "submitting" ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
+                ) : planIsFull(plan) ? (
+                  <>Join Waitlist <ArrowRight className="w-4 h-4" /></>
                 ) : plan.requireApproval ? (
                   <>Submit Request <ArrowRight className="w-4 h-4" /></>
                 ) : (
@@ -2455,11 +2470,11 @@ export default function OrgCalendarPage() {
     setOrg((prev) => prev ? {
       ...prev,
       plans: prev.plans.map((p) =>
-        p.id === planId ? { ...p, attendeeCount: Math.max(0, p.attendeeCount - 1) } : p
+        p.id === planId ? { ...p, attendeeCount: Math.max(0, p.attendeeCount - 1), rsvpCount: Math.max(0, p.rsvpCount - 1) } : p
       ),
     } : prev);
     setSelectedEvent((prev) =>
-      prev && prev.id === planId ? { ...prev, attendeeCount: Math.max(0, prev.attendeeCount - 1) } : prev
+      prev && prev.id === planId ? { ...prev, attendeeCount: Math.max(0, prev.attendeeCount - 1), rsvpCount: Math.max(0, prev.rsvpCount - 1) } : prev
     );
     setToast(message || "RSVP cancelled");
     setTimeout(() => setToast(null), 3000);
@@ -2705,6 +2720,8 @@ export default function OrgCalendarPage() {
         attendeeCount:
           ((p.rsvpCount as number) || 0) +
           (p.leafHostState === "leaf_arranging" ? 0 : 1),
+        rsvpCount: (p.rsvpCount as number) || 0,
+        capacity: typeof p.capacity === "number" && p.capacity > 0 ? p.capacity : null,
         location: p.location ? {
           name: (p.location as Record<string, unknown>).name as string | null,
           address: (p.location as Record<string, unknown>).address as string | null,
@@ -5319,6 +5336,9 @@ export default function OrgCalendarPage() {
                       </span>
                       <span className="flex items-center gap-2">
                         <Users className="w-4 h-4" /> {selectedEvent.attendeeCount} attending
+                        {planIsFull(selectedEvent) && (
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600">· Full</span>
+                        )}
                       </span>
                     </>
                   )}
@@ -5480,6 +5500,30 @@ export default function OrgCalendarPage() {
                       <Check className="w-4 h-4 text-emerald-600" />
                       <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">You&apos;re Attending</span>
                     </div>
+                    {/* Add-ons for someone who is already in. The RSVP success
+                        step is the first offer; this is the way back for a guest
+                        who RSVP'd before the add-on existed or said "No thanks".
+                        `selectedEvent.addons` is server-filtered (active only,
+                        never on a plan the viewer hosts), so the same rule that
+                        governs the card chip governs this. The stack itself
+                        renders the "Added" state when a purchase already exists,
+                        and disappears on its own past cutoff or sell-out. */}
+                    {!selectedEvent.isPoll
+                      && (selectedEvent.addons?.length ?? 0) > 0
+                      && planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "upcoming"
+                      && (() => {
+                        const cached = getVerifiedUserCookie();
+                        const phone = cached?.phone?.replace(/\D/g, "") || "";
+                        if (!phone) return null;
+                        return (
+                          <PlanAddonStack
+                            eventGroupId={selectedEvent.id}
+                            phoneNumber={phone}
+                            name={cached?.name}
+                            startIso={selectedEvent.dateISO || null}
+                          />
+                        );
+                      })()}
                     {rsvpNotificationIds.get(selectedEvent.id) ? (
                       <div className="flex gap-4">
                         <a
@@ -5530,7 +5574,7 @@ export default function OrgCalendarPage() {
                         className="flex-1 text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90"
                         style={{ backgroundColor: org.brandColor || "#18181b" }}
                       >
-                        {selectedEvent.requireApproval ? "Request to Attend" : "I\u0027m Attending"}
+                        {planIsFull(selectedEvent) ? "Join Waitlist" : selectedEvent.requireApproval ? "Request to Attend" : "I\u0027m Attending"}
                       </button>
                     )}
                     <button
@@ -5656,11 +5700,11 @@ export default function OrgCalendarPage() {
             setOrg((prev) => prev ? {
               ...prev,
               plans: prev.plans.map((p) =>
-                p.id === planId ? { ...p, attendeeCount: p.attendeeCount + 1 } : p
+                p.id === planId ? { ...p, attendeeCount: p.attendeeCount + 1, rsvpCount: p.rsvpCount + 1 } : p
               ),
             } : prev);
             setSelectedEvent((prev) =>
-              prev && prev.id === planId ? { ...prev, attendeeCount: prev.attendeeCount + 1 } : prev
+              prev && prev.id === planId ? { ...prev, attendeeCount: prev.attendeeCount + 1, rsvpCount: prev.rsvpCount + 1 } : prev
             );
           }}
         />

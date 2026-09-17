@@ -148,14 +148,14 @@ function headline(phase: "before" | "after", hood: string | null): Word[] {
   return hood ? [...plain("Join me in"), ...hi(hood)] : [...hi("Join me.")];
 }
 
-function bodyLine(phase: "before" | "after", going: number): string {
-  if (phase === "after") {
-    return going >= 2
-      ? `${going} of us made it. The next one's on the calendar.`
-      : "The next one's already on the calendar.";
-  }
-  if (going >= 2) return `${going} people are in already. Small thing, no pressure.`;
-  return "Small thing, no pressure, just turn up.";
+// The "before" card carries no body line: headline, title, when, URL. The
+// going count and the "no pressure" reassurance read as filler under the
+// headline, and the caption already says both.
+function bodyLine(phase: "before" | "after", going: number): string | null {
+  if (phase !== "after") return null;
+  return going >= 2
+    ? `${going} of us made it. The next one's on the calendar.`
+    : "The next one's already on the calendar.";
 }
 
 // ---------------------------------------------------------------------------
@@ -383,16 +383,18 @@ export async function GET(request: Request) {
             </div>
           )}
 
-          <div
-            style={{
-              display: "flex",
-              fontSize: bodySize,
-              lineHeight: 1.35,
-              color: "rgba(255,255,255,0.86)",
-            }}
-          >
-            {body}
-          </div>
+          {body && (
+            <div
+              style={{
+                display: "flex",
+                fontSize: bodySize,
+                lineHeight: 1.35,
+                color: "rgba(255,255,255,0.86)",
+              }}
+            >
+              {body}
+            </div>
+          )}
 
           <div
             style={{
