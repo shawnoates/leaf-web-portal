@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Check, Copy, Download, Share2 } from "lucide-react";
+import { ArrowLeft, Check, Copy, Download } from "lucide-react";
+import { siFacebook, siInstagram, siThreads, siTiktok, siX } from "simple-icons";
 import Parse from "@/lib/parse-client";
 
 export type SharePack = {
@@ -31,35 +32,52 @@ type Action = "copy" | "image" | "share";
 
 // What each network can actually take from a web page. This table is the
 // honest part of the feature: Instagram and TikTok expose no web intent at
-// all, so the only one-tap path is the OS share sheet with the image attached.
-// X, Threads, LinkedIn and Facebook do have intents — text and a link, never
-// an image, which is why those buttons copy the caption first and the image
-// travels via the link's own preview.
+// all, so the only one-tap path is the OS share sheet with the image attached
+// — the host picks the app from the sheet and it opens with the image in the
+// composer. X, Threads, LinkedIn and Facebook do have intents — text and a
+// link, never an image, which is why those buttons copy the caption first and
+// the image travels via the link's own preview. The intents are universal
+// links rendered as plain anchors in the same tab: that is the form iOS
+// hands to the installed app instead of a browser tab. Nothing about the
+// hand-off works from window.open.
+type Brand = { path: string; hex: string };
+
 type Target = {
   id: string;
   label: string;
   hint: string;
+  brand: Brand;
   kind: "sheet" | "intent";
   href?: (caption: string, url: string) => string;
+};
+
+// simple-icons dropped LinkedIn under its brand guidelines; the "in" mark on
+// a 24-grid, as the older releases shipped it.
+const LINKEDIN: Brand = {
+  hex: "0A66C2",
+  path: "M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z",
 };
 
 const TARGETS: Target[] = [
   {
     id: "instagram",
     label: "Instagram",
-    hint: "Story or post · opens the share sheet with the image",
+    hint: "Story or post · pick Instagram on the share sheet and it opens with the image",
+    brand: siInstagram,
     kind: "sheet",
   },
   {
     id: "tiktok",
     label: "TikTok",
-    hint: "Opens the share sheet with the image",
+    hint: "Pick TikTok on the share sheet and it opens with the image",
+    brand: siTiktok,
     kind: "sheet",
   },
   {
     id: "x",
     label: "X",
-    hint: "Opens a post with the caption and link",
+    hint: "Opens the X app with the caption and link",
+    brand: siX,
     kind: "intent",
     href: (caption, url) =>
       `https://x.com/intent/post?text=${encodeURIComponent(caption.replace(url, "").trim())}&url=${encodeURIComponent(url)}`,
@@ -67,14 +85,16 @@ const TARGETS: Target[] = [
   {
     id: "threads",
     label: "Threads",
-    hint: "Opens a post with the caption and link",
+    hint: "Opens the Threads app with the caption and link",
+    brand: siThreads,
     kind: "intent",
-    href: (caption) => `https://www.threads.net/intent/post?text=${encodeURIComponent(caption)}`,
+    href: (caption) => `https://www.threads.com/intent/post?text=${encodeURIComponent(caption)}`,
   },
   {
     id: "linkedin",
     label: "LinkedIn",
-    hint: "Opens a post with the link · caption is on your clipboard",
+    hint: "Opens the LinkedIn app with the link · caption is on your clipboard",
+    brand: LINKEDIN,
     kind: "intent",
     href: (_caption, url) =>
       `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
@@ -82,12 +102,27 @@ const TARGETS: Target[] = [
   {
     id: "facebook",
     label: "Facebook",
-    hint: "Opens a post with the link · caption is on your clipboard",
+    hint: "Opens the Facebook app with the link · caption is on your clipboard",
+    brand: siFacebook,
     kind: "intent",
     href: (_caption, url) =>
       `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
   },
 ];
+
+function BrandMark({ brand }: { brand: Brand }) {
+  return (
+    <span
+      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+      style={{ backgroundColor: `#${brand.hex}` }}
+      aria-hidden="true"
+    >
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="#fff">
+        <path d={brand.path} />
+      </svg>
+    </span>
+  );
+}
 
 function fileNameFor(format: Format, phase: SharePack["phase"]): string {
   return `leaf-${phase === "after" ? "recap" : "plan"}-${format}.png`;
@@ -164,26 +199,51 @@ export default function ShareKitClient({
     }
   }
 
-  // The one-tap path for Instagram and TikTok: fetch the image, hand it to
-  // the OS share sheet as a file. Something goes to the clipboard first
-  // because most targets ignore `text` when files are present — and WHAT goes
-  // follows the format tab. A story's link has to be a link sticker, and the
-  // sticker takes a URL and nothing else, so pasting the caption into it
-  // fails (which is exactly what the first version told hosts to do). A post
-  // has no sticker; there the caption, link included, is the thing to paste.
-  // A recap photo has no tab and goes out with the caption.
+  // The image as a File, fetched ahead of the tap. Safari only lets
+  // navigator.share run inside the tap's own activation window, and awaiting
+  // a fetch (plus the clipboard) in the handler blew through it — the share
+  // threw, and every Instagram tap landed on the "save it by hand" fallback.
+  // With the file in hand, the tap goes straight to the sheet.
+  // Keyed by URL so a tap right after switching tabs can't share the previous
+  // format's card.
+  const [fetched, setFetched] = useState<{ url: string; file: File } | null>(null);
+  const imageFile = fetched && fetched.url === imageUrl ? fetched.file : null;
+  useEffect(() => {
+    if (!pack || !imageUrl) return;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(imageUrl, { signal: controller.signal });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        const file = new File([blob], fileNameFor(format, pack.phase), { type: blob.type || "image/png" });
+        setFetched({ url: imageUrl, file });
+      } catch {
+        // A photo host without CORS: the tap falls back to opening the image.
+      }
+    })();
+    return () => controller.abort();
+  }, [pack, imageUrl, format]);
+
+  // The one-tap path for Instagram and TikTok: hand the OS share sheet the
+  // image as a file; the host picks the app and it opens in the composer.
+  // Something goes to the clipboard as well, because most targets ignore
+  // `text` when files are present — and WHAT goes follows the format tab. A
+  // story's link has to be a link sticker, and the sticker takes a URL and
+  // nothing else, so pasting the caption into it fails (which is exactly what
+  // the first version told hosts to do). A post has no sticker; there the
+  // caption, link included, is the thing to paste. A recap photo has no tab
+  // and goes out with the caption. The clipboard write is started, not
+  // awaited, so the share call is still the tap's.
   async function shareWithImage(targetId: string) {
     if (!pack || !imageUrl) return;
     const linkOnly = format === "story" && !usingRecapPhoto;
     setBusy(targetId);
     setNotice(null);
+    const clipboard = copyText(linkOnly ? pack.shareUrl : caption, true);
     try {
-      await copyText(linkOnly ? pack.shareUrl : caption, true);
-      const res = await fetch(imageUrl);
-      if (!res.ok) throw new Error("image");
-      const blob = await res.blob();
-      const file = new File([blob], fileNameFor(format, pack.phase), { type: blob.type || "image/png" });
-      await navigator.share({ files: [file], text: caption });
+      if (!imageFile) throw new Error("image");
+      await navigator.share({ files: [imageFile], text: caption });
       stamp("share");
       setNotice(
         linkOnly
@@ -191,21 +251,22 @@ export default function ShareKitClient({
           : "Caption copied — paste it in.",
       );
     } catch (e) {
-      // Cancelled is not an error. A blocked fetch (a photo host without CORS)
-      // falls back to opening the image so they can save it by hand.
+      // Cancelled is not an error. No file (a photo host without CORS) or a
+      // refused share falls back to opening the image so they can save it.
       if (e instanceof Error && e.name === "AbortError") return;
-      if (imageUrl) window.open(imageUrl, "_blank", "noopener");
+      window.open(imageUrl, "_blank", "noopener");
       setNotice("Couldn't attach the image directly — it's open in a new tab. Press and hold to save it, then post.");
     } finally {
+      await clipboard;
       setBusy(null);
     }
   }
 
-  async function openIntent(t: Target) {
-    if (!pack || !t.href) return;
-    await copyText(caption, true);
+  // Intents navigate as anchors (see TARGETS); this just seeds the clipboard
+  // on the way out. Not awaited, or the navigation would leave first.
+  function noteIntent() {
+    void copyText(caption, true);
     stamp("share");
-    window.open(t.href(caption, pack.shareUrl), "_blank", "noopener");
   }
 
   if (!pack) {
@@ -359,28 +420,41 @@ export default function ShareKitClient({
             {TARGETS.map((t) => {
               const sheet = t.kind === "sheet";
               const disabled = sheet && !canShareFiles;
+              const rowClass =
+                "w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-zinc-50 disabled:hover:bg-white disabled:opacity-60";
+              const body = (
+                <>
+                  <BrandMark brand={t.brand} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-medium text-zinc-900">
+                      {busy === t.id ? "Opening…" : t.label}
+                    </span>
+                    <span className="block text-[12px] text-zinc-500">
+                      {disabled
+                        ? "On your phone: save the image, copy the caption, post from the app"
+                        : sheet && !imageFile
+                          ? "Getting the image ready…"
+                          : t.hint}
+                    </span>
+                  </span>
+                </>
+              );
               return (
                 <li key={t.id}>
-                  <button
-                    type="button"
-                    disabled={disabled || busy !== null}
-                    onClick={() => (sheet ? shareWithImage(t.id) : openIntent(t))}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-zinc-50 disabled:hover:bg-white disabled:opacity-60"
-                  >
-                    <span className="w-8 h-8 rounded-full bg-zinc-900 text-white flex items-center justify-center shrink-0">
-                      <Share2 className="w-4 h-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[15px] font-medium text-zinc-900">
-                        {busy === t.id ? "Opening…" : t.label}
-                      </span>
-                      <span className="block text-[12px] text-zinc-500">
-                        {disabled
-                          ? "On your phone: save the image, copy the caption, post from the app"
-                          : t.hint}
-                      </span>
-                    </span>
-                  </button>
+                  {sheet || !t.href ? (
+                    <button
+                      type="button"
+                      disabled={disabled || busy !== null}
+                      onClick={() => shareWithImage(t.id)}
+                      className={rowClass}
+                    >
+                      {body}
+                    </button>
+                  ) : (
+                    <a href={t.href(caption, pack.shareUrl)} onClick={noteIntent} className={rowClass}>
+                      {body}
+                    </a>
+                  )}
                 </li>
               );
             })}

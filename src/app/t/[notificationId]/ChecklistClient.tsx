@@ -45,9 +45,9 @@ export type HostTask = {
    */
   optional: boolean;
   /**
-   * Present on the share row only. The row links out to the share kit page
-   * (/t/<id>/share), which does the actual work; the rest is there for iOS,
-   * which renders `detail` and nothing else.
+   * Present on the share row and the invite row. The row links out to the
+   * share kit page (/t/<id>/share), which does the actual work; the rest is
+   * there for iOS, which renders `detail` and nothing else.
    */
   sharePack: {
     shareKitUrl: string | null;
@@ -66,6 +66,8 @@ export type HostChecklist = {
   dateISO: string | null;
   cancelled: boolean;
   chatUrl?: string | null;
+  /** The seat's share kit, independent of any row. */
+  shareKitUrl?: string | null;
   tasks: HostTask[];
 };
 
