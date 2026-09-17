@@ -173,6 +173,31 @@ interface PendingRecap {
   // not.
   promptSeenAt: string | null;
 }
+// A pending invitation to host a recurring series (PlanSeries.hostStatus
+// "invited"). The server sends the wall time and the start DATE LABEL already
+// formatted in the series' own timezone — re-deriving either from an instant in
+// the reader's browser renders the host's 7 PM as somebody else's 4 PM.
+interface SeriesInvite {
+  seriesId: string;
+  title: string;
+  /** "1st Thursday monthly" — null on a series whose rule isn't set yet. */
+  cadence: string | null;
+  /** "19:00" in the series' timezone; fmtTime turns it into "7:00 PM". */
+  wallTime: string | null;
+  calendarId: string | null;
+  calendarName: string;
+  calendarShareId: string | null;
+  inviterName: string;
+  inviterPhoto: string | null;
+  /** True when the series already ran under someone else — "take over" copy. */
+  takeover: boolean;
+  /** "Nov 6". Null for hostPicks / not-yet-scheduled series. */
+  startDateLabel: string | null;
+  /** Accepting still leaves the series needing its details (Path B setup). */
+  needsDetails: boolean;
+  inviteNote: string | null;
+  invitedAt: string | null;
+}
 interface Dashboard {
   person: { firstName: string; ownsCalendars: boolean; pendingReviewCount: number };
   greeting?: { weather: Weather | null };
@@ -183,6 +208,7 @@ interface Dashboard {
   plans: Plan[];
   unreadMessageCount: number;
   ask: { kind: "pattern" | "generic"; copy: string; promptPrefill: string | null } | null;
+  seriesInvites?: SeriesInvite[]; // may be absent while the server side ships
   // One prompt card at a time, chosen and flag-gated server-side. Only
   // community_qualifier renders here; other keys are ignored.
   prompt?: { key: string; preview?: boolean; resume?: QualifierResume | null } | null;
@@ -975,6 +1001,159 @@ function EmptyHero({ onCreate }: { onCreate: () => void }) {
         <button className="btn primary" onClick={onCreate}>Make a plan</button>
       </div>
     </section>
+  );
+}
+
+// ---- Series host invitation ------------------------------------------------
+// One card for every pending invite, paged rather than stacked: each one is the
+// same yes/no and N of them down the hero would bury the rest of the page.
+// Oldest first, because that's the one closest to going stale.
+//
+// Answered invites are tracked locally as well as dropped server-side — the
+// refresh that follows an answer is a round trip, and the card must not still
+// be offering a decision that's already been made while it's in flight.
+function SeriesInviteCard({
+  invites, onAnswered,
+}: {
+  invites: SeriesInvite[];
+  onAnswered: () => Promise<void>;
+}) {
+  const [answered, setAnswered] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [confirmDecline, setConfirmDecline] = useState(false);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
+  const toastTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (toastTimer.current) window.clearTimeout(toastTimer.current); }, []);
+
+  const queue = invites.filter((i) => i && i.seriesId && !answered.has(i.seriesId));
+  const invite = queue[0] || null;
+  // Counted off the local tally, not the payload: answering one shrinks the
+  // server's list too, and "1 OF 2" must not become "1 OF 1" under the reader.
+  const position = answered.size + 1;
+  const total = answered.size + queue.length;
+
+  async function respond(accept: boolean) {
+    if (busy || !invite) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = (await Parse.Cloud.run("respondToSeriesInvite", {
+        seriesId: invite.seriesId, accept,
+      })) as { needsDetails?: boolean };
+      setAnswered((prev) => new Set(prev).add(invite.seriesId));
+      setConfirmDecline(false);
+      // Saying yes to a series that was invited without its details schedules
+      // nothing — hand them straight to setup rather than leaving an accepted,
+      // empty series behind on someone else's calendar.
+      if (accept && res?.needsDetails) {
+        window.location.assign(`/series/${invite.seriesId}`);
+        return;
+      }
+      if (accept) {
+        setToast(`You're hosting ${invite.title}`);
+        if (toastTimer.current) window.clearTimeout(toastTimer.current);
+        toastTimer.current = window.setTimeout(() => setToast(""), 5000);
+      }
+      // The accepted series arrives in "Your plans" with the hosting badge on
+      // the next payload; a decline just takes the card away.
+      onAnswered().catch(() => {});
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : "That didn't go through. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!invite) {
+    return toast ? <div className="sinv-toast" role="status">{toast}</div> : null;
+  }
+
+  const meta = [invite.cadence, fmtTime(invite.wallTime, null), invite.calendarName]
+    .filter(Boolean).join(" · ");
+  const inviterLine = invite.takeover
+    ? `${invite.inviterName} asked you to take over hosting${invite.startDateLabel ? ` from ${invite.startDateLabel}` : ""}`
+    : `${invite.inviterName} asked you to host${invite.startDateLabel ? `, starting ${invite.startDateLabel}` : " this series"}`;
+
+  return (
+    <>
+      <section className="sinv" role="region" aria-label="Series host invitation">
+        <div className="sinv-head">
+          <div className="eyebrow sinv-eyebrow">
+            <Repeat className="sinv-icon" aria-hidden />
+            You&rsquo;re invited to host a series
+          </div>
+          {total > 1 && <div className="eyebrow sinv-count">{position} of {total}</div>}
+        </div>
+        <div className="sinv-body">
+          <div className="sinv-text">
+            <h2 className="sinv-title">
+              <Link href={`/series/${invite.seriesId}`}>{invite.title}</Link>
+            </h2>
+            {meta && <div className="sinv-meta">{meta}</div>}
+            <div className="sinv-from">
+              {invite.inviterPhoto ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="sinv-ava" src={invite.inviterPhoto} alt="" />
+              ) : (
+                <span className="sinv-ava ph">{initial(invite.inviterName)}</span>
+              )}
+              <span>{inviterLine}</span>
+            </div>
+            {error && <div className="sinv-err">{error}</div>}
+          </div>
+          {/* Declining confirms in place: the Decline button becomes the
+              question and a Yes appears beside it. Tapping "Decline?" again
+              backs out, so there's no way to be trapped in the confirm. */}
+          <div className="sinv-act">
+            {confirmDecline ? (
+              <>
+                <button
+                  type="button"
+                  className="sinv-btn ghost asking"
+                  disabled={busy}
+                  aria-label={`Keep the invitation to host ${invite.title}`}
+                  onClick={() => setConfirmDecline(false)}
+                >
+                  Decline?
+                </button>
+                <button
+                  type="button"
+                  className="sinv-btn primary"
+                  disabled={busy}
+                  aria-label={`Yes, decline hosting ${invite.title}`}
+                  onClick={() => respond(false)}
+                >
+                  Yes
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="sinv-btn primary"
+                  disabled={busy}
+                  aria-label={`Accept hosting ${invite.title}`}
+                  onClick={() => respond(true)}
+                >
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  className="sinv-btn ghost"
+                  disabled={busy}
+                  aria-label={`Decline hosting ${invite.title}`}
+                  onClick={() => setConfirmDecline(true)}
+                >
+                  Decline
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+      {toast && <div className="sinv-toast" role="status">{toast}</div>}
+    </>
   );
 }
 
