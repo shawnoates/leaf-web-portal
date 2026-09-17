@@ -38,6 +38,8 @@ interface RequestResult {
   pendingCount: number;
 }
 
+const PRECHECK_MAX_MILES = 25;
+
 const KIND_LABEL: Record<Kind, string> = {
   sibling: "Your calendar",
   owned: "Your calendar",
@@ -77,6 +79,10 @@ export default function SharePlanSheet({
         let n = 0;
         for (const t of res.targets) {
           if (t.status) continue; // already pending/added
+          // An owner with calendars in other cities shouldn't ship a Brooklyn
+          // plan to Miami by default — far-away instant targets stay
+          // unchecked (still one tap to add).
+          if (t.distanceMiles != null && t.distanceMiles > PRECHECK_MAX_MILES) continue;
           if (n >= res.maxTargets) break;
           initial.add(t.calendarId);
           n++;
