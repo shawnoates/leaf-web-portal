@@ -83,6 +83,9 @@ interface Plan {
   /** The paid Leaf roster host running this plan, when one has accepted. */
   rosterHost?: { name: string; photoUrl: string | null } | null;
   rsvpState: RsvpState;
+  /** Accepted RSVPs only — the server emits EventGroup.rsvpCount here, which
+   *  excludes the host. Unlike /org's attendeeCount there is NO +1 host pad,
+   *  so comparing it against `capacity` matches the server's waitlist gate. */
   attendeeCount: number;
   requireApproval?: boolean;
   capacity?: number | null;
