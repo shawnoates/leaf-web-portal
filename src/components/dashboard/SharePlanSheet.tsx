@@ -80,12 +80,15 @@ const HINT_CHIP: Record<Fit, string> = {
 const AMBER_CHIP = HINT_CHIP[0];
 
 const fitOf = (t: Target): Fit => {
+  // Nobody to reach — never a fit, whatever the server scored.
+  if (t.followerCount <= 0) return 0;
   if (t.fit === 0 || t.fit === 1 || t.fit === 2) return t.fit;
   if (t.distanceMiles != null && t.distanceMiles > PRECHECK_MAX_MILES) return 0;
   return t.autoAccept ? 2 : 1;
 };
 
 const hintOf = (t: Target): string => {
+  if (t.followerCount <= 0) return "No followers yet";
   if (t.hint) return t.hint;
   if (t.distanceMiles != null && t.distanceMiles > PRECHECK_MAX_MILES) {
     return `${Math.round(t.distanceMiles).toLocaleString()} mi away`;
@@ -422,7 +425,7 @@ export default function SharePlanSheet({
       : !on && requestCapHit && !t.status
         ? "Request limit"
         : hintOf(t);
-    const chipCls = !requestsOpen || (!on && requestCapHit) ? AMBER_CHIP : HINT_CHIP[2];
+    const chipCls = !requestsOpen || (!on && requestCapHit) ? AMBER_CHIP : HINT_CHIP[fitOf(t)];
     const calendarHref = t.shareId ? `/org/${t.shareId}` : null;
     return (
       <div
