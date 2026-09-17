@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import PlanAttendeeList, { isPendingStatus } from "./PlanAttendeeList";
+import { CrossPromoEyebrow } from "./CrossPromoBadge";
 
 const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2";
@@ -75,6 +76,7 @@ export type PlanDetailData = {
     calendarId: string | null;
     name: string | null;
     shareId: string | null;
+    photoUrl?: string | null;
   } | null;
 };
 
@@ -542,6 +544,11 @@ export default function PlanDetailModal({
             </div>
           )}
           <div className="space-y-4">
+            {plan.promotedFrom && (
+              <div className="flex">
+                <CrossPromoEyebrow source={plan.promotedFrom} />
+              </div>
+            )}
             <h2 className="text-4xl md:text-5xl font-light tracking-tighter">
               {plan.title}
             </h2>
@@ -563,12 +570,6 @@ export default function PlanDetailModal({
                 >
                   Change host
                 </button>
-              )}
-              {isPromoted && (
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 bg-zinc-100 rounded-full px-2.5 py-1">
-                  <Send className="w-3 h-3" />
-                  Cross-promoted from {plan.promotedFrom?.name || "another calendar"}
-                </span>
               )}
             </div>
 

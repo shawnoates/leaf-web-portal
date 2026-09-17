@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import { APP_LINK_URL, SITE_URL } from "@/lib/site";
 import Link from "next/link";
+import { CrossPromoPhotoBadge, CrossPromoEyebrow } from "@/components/CrossPromoBadge";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
@@ -134,6 +135,7 @@ interface Plan {
     calendarId: string | null;
     name: string | null;
     shareId: string | null;
+    photoUrl?: string | null;
     viaCalendarId: string | null;
     viaCalendarName: string | null;
   } | null;
@@ -4195,7 +4197,7 @@ export default function OrgCalendarPage() {
                 }`}
               >
                 <div
-                  className="w-full md:w-3/5 aspect-[16/10] overflow-hidden cursor-pointer bg-zinc-100 shadow-sm"
+                  className="relative w-full md:w-3/5 aspect-[16/10] overflow-hidden cursor-pointer bg-zinc-100 shadow-sm"
                   onClick={() => setSelectedEvent(plan)}
                 >
                   {plan.image ? (
@@ -4209,6 +4211,8 @@ export default function OrgCalendarPage() {
                       <Calendar className="w-16 h-16 text-zinc-300" />
                     </div>
                   )}
+                  {/* Cross-promotion: which calendar this plan came from. */}
+                  {plan.promotedFrom && <CrossPromoPhotoBadge source={plan.promotedFrom} />}
                 </div>
 
                 <div className="w-full md:w-2/5 space-y-6">
@@ -4266,20 +4270,6 @@ export default function OrgCalendarPage() {
                         <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: org.brandColor || "#18181b" }} />
                           Hosted by {plan.hostName}
-                        </p>
-                      )}
-                      {/* Cross-promotion: hosted elsewhere, shared with this
-                          calendar. Links to the host calendar. */}
-                      {plan.promotedFrom?.name && (
-                        <p className="mt-1 text-[11px] tracking-wider uppercase text-zinc-500 font-semibold">
-                          Shared by{" "}
-                          {plan.promotedFrom.shareId ? (
-                            <Link href={`/org/${plan.promotedFrom.shareId}`} className="underline underline-offset-2 hover:text-zinc-900">
-                              {plan.promotedFrom.name}
-                            </Link>
-                          ) : (
-                            plan.promotedFrom.name
-                          )}
                         </p>
                       )}
                       {/* Per-plan leaf-host chat pill — owner-only.
@@ -5240,6 +5230,11 @@ export default function OrgCalendarPage() {
 
             <div className="flex-1 overflow-y-auto p-8 md:p-16 space-y-12">
               <div className="space-y-4">
+                {selectedEvent.promotedFrom && (
+                  <div className="flex">
+                    <CrossPromoEyebrow source={selectedEvent.promotedFrom} />
+                  </div>
+                )}
                 <h2 className="text-4xl md:text-5xl font-light tracking-tighter">
                   {selectedEvent.title}
                 </h2>
@@ -5271,11 +5266,6 @@ export default function OrgCalendarPage() {
                 ) : (
                   <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
                     Hosted by {selectedEvent.hostName}
-                  </p>
-                )}
-                {selectedEvent.promotedFrom?.name && (
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
-                    Shared by {selectedEvent.promotedFrom.name}
                   </p>
                 )}
                 <div className="flex gap-6 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">

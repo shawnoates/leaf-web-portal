@@ -42,6 +42,8 @@ export interface PromotedFromTag {
   calendarId: string | null;
   name: string | null;
   shareId: string | null;
+  /** The source calendar's public avatar (same image its own page shows). */
+  photoUrl?: string | null;
   viaCalendarId: string | null;
   viaCalendarName: string | null;
 }

@@ -11,6 +11,7 @@ import HostIdeaModal from "@/components/HostIdeaModal";
 import PlanChatDrawer from "@/components/PlanChatDrawer";
 import NudgeModal from "@/components/dashboard/NudgeModal";
 import SharePlanSheet from "@/components/dashboard/SharePlanSheet";
+import { CrossPromoPhotoBadge } from "@/components/CrossPromoBadge";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
 import { featuredWallClockDate } from "@/lib/wall-clock";
@@ -20,7 +21,7 @@ import { hostCandidateLabel, isSeriesLimitError, seriesStatusChip, type SeriesHo
 // cards at the wrong hour (and, near midnight, the wrong week).
 import { resolveAIEventDate, FLOATING_EVENT_TZ } from "@/lib/ai-event-date";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
-import { Calendar, Camera, Check, ImagePlus, Link2, Lock, MessageCircle, Pencil, Plus, RefreshCw, Repeat, Send, Settings, Sparkles, UserCheck, Users, X } from "lucide-react";
+import { Calendar, Camera, Check, ImagePlus, Link2, Lock, MessageCircle, Pencil, Plus, RefreshCw, Repeat, Settings, Sparkles, UserCheck, Users, X } from "lucide-react";
 
 // Renders a plan cover image with a Calendar-icon placeholder fallback when
 // the src is missing OR 404s (attendee-uploaded / expired signed URLs go
@@ -260,6 +261,7 @@ interface UpcomingPlan {
     calendarId: string | null;
     name: string | null;
     shareId: string | null;
+    photoUrl?: string | null;
   } | null;
   // AI starter plans surfaced alongside real EventGroups. These come from
   // the parent AICalendar's aiSourceEvents; they never gain a host until a
@@ -1800,7 +1802,10 @@ export default function PlansManager({
                     onClick={() => setSelectedPlan(plan)}
                     className="group relative border rounded-lg overflow-hidden hover:border-zinc-200 transition-colors shrink-0 w-52 cursor-pointer border-zinc-100"
                   >
-                    <PlanImage src={plan.image} alt={plan.title} className="w-full h-28" />
+                    <div className="relative">
+                      <PlanImage src={plan.image} alt={plan.title} className="w-full h-28" />
+                      {plan.promotedFrom && <CrossPromoPhotoBadge source={plan.promotedFrom} />}
+                    </div>
                     <div className="p-3">
                       <h4 className="font-medium text-sm mb-1 truncate">{plan.title}</h4>
                       <p className="text-xs text-zinc-400 mb-1">
@@ -1814,14 +1819,7 @@ export default function PlansManager({
                             on every card, survives name truncation, and costs
                             no width against the RSVP count. */}
                         <span className="flex items-center gap-1.5 min-w-0">
-                          {plan.promotedFrom ? (
-                            <span className="truncate inline-flex items-center gap-1 text-zinc-500" title={`Cross-promoted from ${plan.promotedFrom.name || "another calendar"}`}>
-                              <Send className="w-3 h-3 shrink-0" />
-                              <span className="truncate">From {plan.promotedFrom.name || "another calendar"}</span>
-                            </span>
-                          ) : (
-                            <span className="truncate">{plan.host?.name || "You"}</span>
-                          )}
+                          <span className="truncate">{plan.host?.name || "You"}</span>
                         </span>
                         <div className="flex items-center gap-2 shrink-0 ml-2">
                           <span>{plan.rsvpCount} RSVPs</span>
