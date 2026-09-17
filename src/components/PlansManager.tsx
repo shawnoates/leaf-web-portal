@@ -1053,9 +1053,11 @@ export default function PlansManager({
   // Copy the plan's public direct link (/p/<eventGroupId>) to the clipboard so
   // the owner can share a single event without routing people through the whole
   // calendar page. Same canonical URL the SMS/share flows use.
-  async function copyPlanLink(objectId: string) {
+  async function copyPlanLink(objectId: string, viaCalendarId?: string | null) {
     try {
-      const url = `${window.location.origin}/p/${objectId}`;
+      // A cross-promoted plan's link keeps recipients on THIS calendar
+      // (?via=), not the host calendar's page with its follow prompts.
+      const url = `${window.location.origin}/p/${objectId}${viaCalendarId ? `?via=${viaCalendarId}` : ""}`;
       await navigator.clipboard.writeText(url);
       setCopiedPlanId(objectId);
       setTimeout(() => setCopiedPlanId((cur) => (cur === objectId ? null : cur)), 2000);
@@ -1831,7 +1833,7 @@ export default function PlansManager({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              copyPlanLink(plan.objectId);
+                              copyPlanLink(plan.objectId, plan.promotedFrom ? calendarId : null);
                             }}
                             title="Copy direct link to this plan"
                             aria-label="Copy direct link to this plan"

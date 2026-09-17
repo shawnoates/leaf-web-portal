@@ -244,7 +244,10 @@ export default function PlanDetailModal({
   // single event without sending them to the whole calendar page.
   const copyPlanLink = async () => {
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/p/${plan.objectId}`);
+      // Cross-promoted: the link keeps recipients on this calendar (?via=),
+      // not the host calendar's page and its follow prompts.
+      const via = plan.promotedFrom ? `?via=${calendarId}` : "";
+      await navigator.clipboard.writeText(`${window.location.origin}/p/${plan.objectId}${via}`);
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     } catch {

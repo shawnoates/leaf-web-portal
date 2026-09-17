@@ -898,7 +898,7 @@ function RsvpModal({
                 description: plan.description,
                 locationName: plan.location?.isPrivate ? null : plan.location?.name,
                 locationAddress: plan.location?.isPrivate ? null : plan.location?.address,
-                url: typeof window !== "undefined" ? `${window.location.origin}/p/${plan.id}` : undefined,
+                url: typeof window !== "undefined" ? `${window.location.origin}/p/${plan.id}${plan.promotedFrom ? `?via=${calendarId}` : ""}` : undefined,
               });
               if (!icsUrl) return null;
               return (
@@ -4372,7 +4372,7 @@ export default function OrgCalendarPage() {
                             Vote on a Date <ArrowUpRight className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleSharePlan(plan.id, plan.title)}
+                            onClick={() => handleSharePlan(plan.id, plan.title, plan.promotedFrom ? org.objectId : null)}
                             className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
                           >
                             {copiedPlanId === plan.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
@@ -4410,7 +4410,7 @@ export default function OrgCalendarPage() {
                             View Details <ArrowUpRight className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleSharePlan(plan.id, plan.title)}
+                            onClick={() => handleSharePlan(plan.id, plan.title, plan.promotedFrom ? org.objectId : null)}
                             className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
                           >
                             {copiedPlanId === plan.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
@@ -5395,7 +5395,7 @@ export default function OrgCalendarPage() {
                       brandColor={org.brandColor || "#18181b"}
                     />
                     <button
-                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
+                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title, selectedEvent.promotedFrom ? org.objectId : null)}
                       className="w-full border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2"
                     >
                       {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
@@ -5421,7 +5421,7 @@ export default function OrgCalendarPage() {
                       <span className="text-xs font-bold uppercase tracking-widest text-amber-500">Request Pending</span>
                     </div>
                     <button
-                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
+                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title, selectedEvent.promotedFrom ? org.objectId : null)}
                       className="border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2"
                     >
                       {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
@@ -5446,7 +5446,7 @@ export default function OrgCalendarPage() {
                       </a>
                     )}
                     <button
-                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
+                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title, selectedEvent.promotedFrom ? org.objectId : null)}
                       className="border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2"
                     >
                       {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
@@ -5471,7 +5471,7 @@ export default function OrgCalendarPage() {
                           <MessageCircle className="w-4 h-4" /> Join Plan Chat
                         </a>
                         <button
-                          onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
+                          onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title, selectedEvent.promotedFrom ? org.objectId : null)}
                           className="border border-zinc-200 px-5 hover:bg-zinc-50 transition-colors flex items-center gap-2 rounded-lg"
                         >
                           {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
@@ -5480,7 +5480,7 @@ export default function OrgCalendarPage() {
                       </div>
                     ) : (
                       <button
-                        onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
+                        onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title, selectedEvent.promotedFrom ? org.objectId : null)}
                         className="border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2 rounded-lg"
                       >
                         {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
@@ -5513,7 +5513,7 @@ export default function OrgCalendarPage() {
                       </button>
                     )}
                     <button
-                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title)}
+                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title, selectedEvent.promotedFrom ? org.objectId : null)}
                       className="border border-zinc-200 px-5 hover:bg-zinc-50 transition-colors flex items-center gap-2"
                     >
                       {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
@@ -5541,7 +5541,7 @@ export default function OrgCalendarPage() {
                     description: selectedEvent.description,
                     locationName: venueGated ? selectedEvent.location?.neighborhood ?? null : selectedEvent.location?.name,
                     locationAddress: venueGated ? null : selectedEvent.location?.address,
-                    url: typeof window !== "undefined" ? `${window.location.origin}/p/${selectedEvent.id}` : undefined,
+                    url: typeof window !== "undefined" ? `${window.location.origin}/p/${selectedEvent.id}${selectedEvent.promotedFrom ? `?via=${org.objectId}` : ""}` : undefined,
                   });
                   if (!icsUrl) return null;
                   return (
