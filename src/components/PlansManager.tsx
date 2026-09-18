@@ -264,6 +264,7 @@ interface UpcomingPlan {
     name: string | null;
     shareId: string | null;
     photoUrl?: string | null;
+    description?: string | null;
   } | null;
   // AI starter plans surfaced alongside real EventGroups. These come from
   // the parent AICalendar's aiSourceEvents; they never gain a host until a

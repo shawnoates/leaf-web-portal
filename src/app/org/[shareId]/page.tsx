@@ -142,6 +142,8 @@ interface Plan {
     name: string | null;
     shareId: string | null;
     photoUrl?: string | null;
+    /** Source calendar's descriptionString — shown in the "Shared from" popover. */
+    description?: string | null;
     viaCalendarId: string | null;
     viaCalendarName: string | null;
   } | null;
