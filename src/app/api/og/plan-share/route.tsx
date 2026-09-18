@@ -53,6 +53,8 @@ const INK = "#0f1f1a";
 type PlanShareInfo = {
   title: string;
   image: string | null;
+  /** The Home plan card's image: video frame → event image → venue photo. */
+  heroImage?: string | null;
   expiryDate: string | null;
   location: { timezone: string | null } | null;
   calendarName: string | null;
@@ -85,6 +87,23 @@ function loadHeadlineFont(origin: string): Promise<ArrayBuffer | null> {
 // link (Google Places photo URLs perish) degrades to the plain card instead of
 // failing the whole render. Capped so a giant original can't stall the route.
 const PHOTO_MAX_BYTES = 6 * 1024 * 1024;
+
+// A Mux frame arrives sized for the app's 16:9 card. The story is 9:16 and
+// the post 4:5, so ask Mux for the card's own size rather than upscaling a
+// 720-tall frame to 1920. Same frame, cropped by Mux's smartcrop.
+function sizedForCard(url: string, size: { width: number; height: number }): string {
+  try {
+    const u = new URL(url);
+    if (u.hostname !== "image.mux.com") return url;
+    u.searchParams.set("width", String(size.width));
+    u.searchParams.set("height", String(size.height));
+    u.searchParams.set("fit_mode", "smartcrop");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 async function loadPhoto(url: string | null): Promise<string | null> {
   if (!url || !/^https?:\/\//.test(url)) return null;
   try {
@@ -191,9 +210,12 @@ export async function GET(request: Request) {
     return new Response("Not available", { status: 404 });
   }
 
+  // The Home card's image, so the post looks like the plan the host knows.
+  // `image` alone is the fallback for a server that predates `heroImage`.
+  const hero = plan?.heroImage ?? plan?.image ?? null;
   const [font, photo] = await Promise.all([
     loadHeadlineFont(url.origin),
-    loadPhoto(plan?.image ?? null),
+    loadPhoto(hero ? sizedForCard(hero, size) : null),
   ]);
 
   const hood = plan?.neighborhood ? clip(plan.neighborhood, 26) : null;
