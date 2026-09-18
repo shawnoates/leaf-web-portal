@@ -110,6 +110,8 @@ interface PlanIdea {
   venueTimeZone?: string | null;
   localWallClock?: string | null;
   venueName?: string | null;
+  // Member-shared suggestion (sourceKind "memberShare"): who shared the link.
+  suggestedByName?: string | null;
 }
 
 // Raw `planIdeas` entry as getOrgCalendarPage ships it. Two shapes arrive on
@@ -139,6 +141,7 @@ interface RawPlanIdea {
   venueTimeZone?: string | null;
   localWallClock?: string | null;
   venueName?: string | null;
+  suggestedByName?: string | null;
 }
 
 /**
@@ -174,6 +177,7 @@ function mapPlanIdea(idea: RawPlanIdea): PlanIdea {
     venueTimeZone: idea.venueTimeZone ?? null,
     localWallClock: idea.localWallClock ?? null,
     venueName: idea.venueName ?? null,
+    suggestedByName: idea.suggestedByName ?? null,
   };
 }
 
@@ -265,6 +269,7 @@ interface UpcomingPlan {
     shareId: string | null;
     photoUrl?: string | null;
     description?: string | null;
+    followerCount?: number | null;
   } | null;
   // AI starter plans surfaced alongside real EventGroups. These come from
   // the parent AICalendar's aiSourceEvents; they never gain a host until a
@@ -382,6 +387,11 @@ function IdeaCard({
               ? date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
               : "Waiting on host"}
         </p>
+        {idea.sourceKind === "memberShare" && idea.suggestedByName && (
+          <p className="text-[11px] text-zinc-500 mb-1 truncate">
+            Suggested by {idea.suggestedByName}
+          </p>
+        )}
         <div className="flex items-center justify-between text-xs">
           {idea.interestCount > 0 ? (
             <span className="text-emerald-600 font-medium truncate">

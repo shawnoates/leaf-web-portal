@@ -144,6 +144,8 @@ interface Plan {
     photoUrl?: string | null;
     /** Source calendar's descriptionString — shown in the "Shared from" popover. */
     description?: string | null;
+    /** Source calendar's hook-maintained memberCount. */
+    followerCount?: number | null;
     viaCalendarId: string | null;
     viaCalendarName: string | null;
   } | null;
@@ -233,6 +235,9 @@ interface PlanIdea {
   venueTimeZone?: string | null;
   localWallClock?: string | null;
   venueName?: string | null;
+  // Set on member-shared suggestions (sourceKind "memberShare"): the
+  // follower/host who shared the link. AI and featured rows have no author.
+  suggestedByName?: string | null;
 }
 
 interface NearbyVenue {
@@ -2810,6 +2815,7 @@ export default function OrgCalendarPage() {
         venueTimeZone: (idea.venueTimeZone as string) ?? null,
         localWallClock: (idea.localWallClock as string) ?? null,
         venueName: (idea.venueName as string) ?? null,
+        suggestedByName: (idea.suggestedByName as string) ?? null,
       }));
 
       // "Show suggested and featured plans" covers the AI starter cards too —
@@ -4825,7 +4831,11 @@ export default function OrgCalendarPage() {
                             }
                       }
                     >
-                      {isAroundTheCity ? "Around the city" : "Suggested"}
+                      {isAroundTheCity
+                        ? "Around the city"
+                        : idea.sourceKind === "memberShare" && idea.suggestedByName
+                          ? `Suggested by ${idea.suggestedByName}`
+                          : "Suggested"}
                     </span>
                   </div>
                   <div className="w-full md:w-2/5 space-y-6">
@@ -6877,6 +6887,11 @@ export default function OrgCalendarPage() {
               <h4 className="text-sm font-medium tracking-tight text-zinc-900 mb-1 pr-6">
                 {popupIdea.title}
               </h4>
+              {popupIdea.sourceKind === "memberShare" && popupIdea.suggestedByName && (
+                <p className="text-[11px] text-zinc-500 mb-1.5">
+                  Suggested by {popupIdea.suggestedByName}
+                </p>
+              )}
               {popupIdea.description && (
                 <p className="text-xs text-zinc-500 font-light leading-relaxed mb-3 line-clamp-3">
                   {popupIdea.description}

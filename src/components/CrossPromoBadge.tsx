@@ -26,7 +26,12 @@ export interface CrossPromoSource {
   description?: string | null;
   /** Needed for the Follow action; the popover hides Follow without it. */
   calendarId?: string | null;
+  /** Groups.memberCount (hook-maintained). Shown only once it reads as social proof. */
+  followerCount?: number | null;
 }
+
+/** Below this a count reads as a warning ("2 followers"), so the line is omitted. */
+const FOLLOWER_COUNT_FLOOR = 10;
 
 function Avatar({ name, photoUrl, size = 18 }: Pick<CrossPromoSource, "name" | "photoUrl"> & { size?: number }) {
   const radius = Math.round(size * 0.28);
@@ -68,6 +73,8 @@ type FollowState = "idle" | "busy" | "following" | "pending" | "error";
 function CrossPromoPopover({ source, onClose }: { source: CrossPromoSource; onClose: () => void }) {
   const name = source.name || "Another calendar";
   const description = (source.description || "").trim();
+  const followerCount = Number(source.followerCount) || 0;
+  const showFollowers = followerCount >= FOLLOWER_COUNT_FLOOR;
   const [verified] = useState(() => getVerifiedUserCookie());
   const [follow, setFollow] = useState<FollowState>("idle");
   const [followError, setFollowError] = useState("");
@@ -126,6 +133,9 @@ function CrossPromoPopover({ source, onClose }: { source: CrossPromoSource; onCl
             <h2 id="xp-popover-title" className="text-lg font-semibold text-zinc-900 leading-snug break-words">
               {name}
             </h2>
+            {showFollowers && (
+              <p className="text-xs text-zinc-500">{followerCount.toLocaleString()} followers</p>
+            )}
           </div>
           <button
             type="button"

@@ -83,6 +83,7 @@ export type PlanDetailData = {
     shareId: string | null;
     photoUrl?: string | null;
     description?: string | null;
+    followerCount?: number | null;
   } | null;
 };
 
