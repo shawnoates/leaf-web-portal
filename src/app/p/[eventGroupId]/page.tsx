@@ -15,6 +15,12 @@ type PlanShareInfo = {
   title: string;
   description: string;
   image: string | null;
+  // What the Home plan card shows: video frame → event image → venue photo.
+  // Preferred over `image`, which for imported plans is a thumbnail with a
+  // play button burned in. Optional until the server ships it.
+  heroImage?: string | null;
+  // The invitation video's HLS stream, when the plan has one.
+  videoUrl?: string | null;
   expiryDate: string | null;
   // Both `name` and `address` are null when the viewer hasn't proven
   // they belong on the guest list — `getPlanShareInfo` redacts the whole
@@ -141,7 +147,7 @@ export async function generateMetadata({
   // which renders a Leaf-branded card. Without an explicit og:image,
   // iMessage falls through to apple-touch-icon at the wrong dimensions and
   // renders a giant empty grey preview bubble.
-  const ogImageUrl = info.image ?? `${SITE_URL}/api/og/plan-fallback`;
+  const ogImageUrl = unfurlSized(info.heroImage ?? info.image) ?? `${SITE_URL}/api/og/plan-fallback`;
 
   // APP_LINK_URL, not SITE_URL: this is the one route shipped iOS builds
   // intercept as a Universal Link, and they only claim os.joinleaf.com. An
@@ -180,6 +186,23 @@ export async function generateMetadata({
       images: [ogImageUrl],
     },
   };
+}
+
+// A Mux frame comes sized for the app's card; ask for the 1200x630 the
+// unfurlers expect instead of letting them squash a 16:9 frame. Other hosts
+// are passed through as they are.
+function unfurlSized(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (u.hostname !== "image.mux.com") return url;
+    u.searchParams.set("width", "1200");
+    u.searchParams.set("height", "630");
+    u.searchParams.set("fit_mode", "smartcrop");
+    return u.toString();
+  } catch {
+    return url;
+  }
 }
 
 export default async function PlanSharePage({ params, searchParams }: PageProps) {
@@ -300,7 +323,8 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
       eventGroupId={eventGroupId}
       title={info.title}
       description={info.description}
-      image={info.image}
+      image={info.heroImage ?? info.image}
+      videoUrl={info.videoUrl ?? null}
       expiryDate={info.expiryDate}
       location={info.location}
       hostName={info.host?.name ?? null}

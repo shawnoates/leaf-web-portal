@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Lock, MapPin } from "lucide-react";
+import PlanHeroMedia from "./PlanHeroMedia";
 import PlanWhen from "./PlanWhen";
 import StandalonePlanRsvp from "./StandalonePlanRsvp";
 
@@ -14,6 +15,8 @@ type Props = {
   title: string;
   description: string;
   image: string | null;
+  // The invitation video's HLS stream; plays inline over `image` as poster.
+  videoUrl: string | null;
   expiryDate: string | null;
   // Both `name` and `address` are null when the viewer hasn't proven they
   // belong on the guest list — server-side gating in getPlanShareInfo
@@ -50,6 +53,7 @@ export default function StandalonePlanCard({
   title,
   description,
   image,
+  videoUrl,
   expiryDate,
   location,
   hostName,
@@ -82,14 +86,7 @@ export default function StandalonePlanCard({
   return (
     <div className="min-h-dvh bg-zinc-50 px-4 py-6 md:py-10 flex flex-col justify-center items-center gap-5">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm overflow-hidden">
-        {image ? (
-          <div
-            className="w-full aspect-[4/3] bg-zinc-200 bg-cover bg-center"
-            style={{ backgroundImage: `url(${image})` }}
-          />
-        ) : (
-          <div className="w-full aspect-[4/3] bg-zinc-200" />
-        )}
+        <PlanHeroMedia image={image} videoUrl={videoUrl} />
         <div className={`p-6 space-y-4 ${blurDetails ? "blur-[2px] select-none pointer-events-none" : ""}`}>
           <div className="space-y-1">
             <h1 className="text-xl font-semibold text-zinc-900">{title}</h1>
