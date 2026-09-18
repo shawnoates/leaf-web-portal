@@ -1,5 +1,6 @@
 import UnsubscribeClient from "./UnsubscribeClient";
 import HostOptOutClient from "./HostOptOutClient";
+import HostEmailOptOutClient from "./HostEmailOptOutClient";
 
 export default async function UnsubscribePage({
   searchParams,
@@ -17,6 +18,10 @@ export default async function UnsubscribePage({
   // see what it did.
   if (params.k === "host-offers") {
     return <HostOptOutClient hostId={params.h || ""} token={params.t || ""} />;
+  }
+  // Admin-sent host updates. Also a button, not on load; see the component.
+  if (params.k === "host-emails") {
+    return <HostEmailOptOutClient hostId={params.h || ""} token={params.t || ""} />;
   }
 
   return (
