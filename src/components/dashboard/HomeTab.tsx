@@ -823,6 +823,9 @@ export default function HomeTab({
                         {plan.isPoll
                           ? `${plan.pollVoteCount ?? 0} votes`
                           : `${plan.rsvpCount} going`}
+                        {!plan.isPoll && (plan.waitlistCount ?? 0) > 0 && (
+                          <span className="text-zinc-700"> · {plan.waitlistCount} waiting</span>
+                        )}
                       </p>
                     </div>
                   </button>

@@ -101,6 +101,8 @@ type Rsvp = {
   sharePhoneWithHost: boolean;
   source: string;
   status: string;
+  /** Requested row queued for a spot on a full plan, not awaiting approval. */
+  waitlisted?: boolean;
   rsvpNote: string | null;
 };
 
@@ -426,7 +428,8 @@ export default function PlanDetailModal({
   };
 
   const goingCount = planRsvps.filter((r) => r.status === "Accepted").length;
-  const pendingCount = planRsvps.filter((r) => isPendingStatus(r.status)).length;
+  const pendingCount = planRsvps.filter((r) => isPendingStatus(r.status) && !r.waitlisted).length;
+  const waitlistCount = planRsvps.filter((r) => isPendingStatus(r.status) && r.waitlisted).length;
   // iOS Safari treats `+` in `sms:` URLs as a space and is inconsistent
   // with comma-separated multi-recipient links. The `&addresses=` query
   // form is the documented way to populate multiple recipients on iOS;
@@ -439,10 +442,13 @@ export default function PlanDetailModal({
   const approveRsvp = async (r: { notificationId: string }) => {
     try {
       await Parse.Cloud.run("approveRsvpRequest", { notificationId: r.notificationId });
-      setPlanRsvps((prev) => prev.map((rsvp) => rsvp.notificationId === r.notificationId ? { ...rsvp, status: "Accepted" } : rsvp));
+      setPlanRsvps((prev) => prev.map((rsvp) => rsvp.notificationId === r.notificationId ? { ...rsvp, status: "Accepted", waitlisted: false } : rsvp));
       onPendingRsvpResolved?.(r.notificationId);
     } catch (err) {
       console.error("Failed to approve:", err);
+      // The server refuses to approve past capacity — the host has to raise
+      // it first, and the message says so.
+      alert(err instanceof Error ? err.message : "Couldn't approve this request.");
     }
   };
   const declineRsvp = async (r: { notificationId: string }) => {
@@ -852,6 +858,9 @@ export default function PlanDetailModal({
                       {goingCount} going
                       {pendingCount > 0 && (
                         <span className="text-amber-600"> · {pendingCount} pending</span>
+                      )}
+                      {waitlistCount > 0 && (
+                        <span className="text-zinc-700"> · {waitlistCount} on waitlist</span>
                       )}
                     </span>
                   )}

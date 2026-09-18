@@ -9,6 +9,7 @@ export type Attendee = {
   phone: string | null;
   sharePhoneWithHost: boolean;
   status: string;
+  waitlisted?: boolean;
   rsvpNote: string | null;
 };
 
@@ -49,13 +50,15 @@ function paletteFor(id: string) {
   return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
 }
 
-function statusPill(status: string) {
+function statusPill(status: string, waitlisted: boolean) {
   const s = status.toLowerCase();
   if (s === "accepted" || s === "going") {
     return { label: "Going", cls: "bg-emerald-50 text-emerald-800", dot: "bg-emerald-700" };
   }
   if (s === "maybe") return { label: "Maybe", cls: "bg-amber-50 text-amber-800", dot: "bg-amber-600" };
-  if (s === "waitlist") return { label: "Waitlist", cls: "bg-zinc-100 text-zinc-600", dot: "bg-zinc-500" };
+  if (waitlisted || s === "waitlist") {
+    return { label: "Waitlist", cls: "bg-zinc-100 text-zinc-600", dot: "bg-zinc-500" };
+  }
   if (isPendingStatus(status)) {
     return { label: "Pending", cls: "bg-amber-50 text-amber-800", dot: "bg-amber-600" };
   }
@@ -162,10 +165,11 @@ function AttendeeRow({
   onDecline,
   onRemove,
 }: RowProps) {
-  const pill = statusPill(a.status);
+  const waitlisted = isPendingStatus(a.status) && a.waitlisted === true;
+  const pill = statusPill(a.status, waitlisted);
   const hasNote = !!a.rsvpNote;
   const firstName = a.name.trim().split(/\s+/)[0] || a.name;
-  const pending = isPendingStatus(a.status);
+  const pending = isPendingStatus(a.status) && !waitlisted;
 
   return (
     <li
@@ -243,7 +247,12 @@ function AttendeeRow({
                 { label: "Approve", onSelect: () => void onApprove(a) },
                 { label: "Decline", onSelect: () => void onDecline(a), danger: true },
               ]
-            : [{ label: "Remove from plan", onSelect: () => onRemove(a), danger: true }]),
+            : waitlisted
+              ? [
+                  { label: "Give them a spot", onSelect: () => void onApprove(a) },
+                  { label: "Remove from waitlist", onSelect: () => void onDecline(a), danger: true },
+                ]
+              : [{ label: "Remove from plan", onSelect: () => onRemove(a), danger: true }]),
         ]}
       />
     </li>

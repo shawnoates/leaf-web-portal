@@ -19,6 +19,9 @@ export interface CalActivePlan {
   leafHostState?: "leaf_hosted" | "leaf_arranging" | null;
   leafHostPersona?: { name: string; avatarUrl: string | null } | null;
   rsvpCount: number;
+  /** Guests queued for a spot on a full plan. Optional until the
+   *  getOrgDashboard deploy that sends it is live. */
+  waitlistCount?: number;
   location: { name: string; address: string; placeId?: string | null } | null;
   isPoll?: boolean;
   pollPostId?: string | null;
