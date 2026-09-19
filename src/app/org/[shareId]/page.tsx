@@ -3821,6 +3821,7 @@ export default function OrgCalendarPage() {
             <img
               src={idea.image}
               alt={idea.title}
+              referrerPolicy="no-referrer"
               className="w-full h-full object-cover"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = "none";
@@ -4801,10 +4802,14 @@ export default function OrgCalendarPage() {
                     className="w-full md:w-3/5 aspect-[16/10] overflow-hidden shadow-sm relative bg-zinc-100"
                   >
                     {idea.image ? (
+                      // no-referrer: member-shared suggestions carry the source
+                      // site's og:image, and hotlink-protected hosts 403 when
+                      // joinleaf.com is the referrer.
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={idea.image}
                         alt={idea.title}
+                        referrerPolicy="no-referrer"
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           (e.currentTarget as HTMLImageElement).style.display = "none";
@@ -6174,6 +6179,7 @@ export default function OrgCalendarPage() {
                                 <img
                                   src={idea.image}
                                   alt={idea.title}
+                                  referrerPolicy="no-referrer"
                                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                 />
                               ) : (
@@ -6861,6 +6867,13 @@ export default function OrgCalendarPage() {
       {/* Plan Idea Popup for Followers */}
       {showPlanIdeaPopup && popupIdea && org && (
         <div
+          className="fixed inset-0 z-30 bg-black/45"
+          onClick={dismissPlanIdeaPopup}
+          aria-hidden="true"
+        />
+      )}
+      {showPlanIdeaPopup && popupIdea && org && (
+        <div
           className="fixed bottom-6 right-6 left-6 md:left-auto md:w-80 z-40"
           style={{ animation: "slideUp 0.3s ease-out" }}
         >
@@ -6876,6 +6889,7 @@ export default function OrgCalendarPage() {
                 <img
                   src={popupIdea.image}
                   alt={popupIdea.title}
+                  referrerPolicy="no-referrer"
                   className="w-full h-full object-cover"
                 />
               </div>

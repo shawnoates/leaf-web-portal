@@ -51,6 +51,7 @@ function PlanImage({
     <img
       src={src}
       alt={alt}
+      referrerPolicy="no-referrer"
       className={`${className} object-cover`}
       onError={() => setFailed(true)}
     />
