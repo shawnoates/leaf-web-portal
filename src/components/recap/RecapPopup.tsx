@@ -12,8 +12,8 @@ import type { PhotoLimits, SurveyState } from "./types";
 
 // The post-event ask, shown over /me for a plan the viewer attended and hasn't
 // rated. Same three actions as the /m memory page — rate the plan, rate the
-// virtual host, add photos — plus the one thing /m has never had: "I didn't
-// attend".
+// staff host (when the plan had one), add photos — plus the one thing /m has
+// never had: "I didn't attend".
 //
 // It loads getAttendeeMemoryInfo on open rather than taking the survey state
 // from the dashboard payload. That's one extra round trip, only when the popup
@@ -38,7 +38,8 @@ type MemoryInfo = {
   photoCount: number;
   uploadsClosed?: boolean;
   limits: PhotoLimits;
-  survey?: SurveyState;
+  // null when the viewer ran the plan; the server hides the card for them.
+  survey?: SurveyState | null;
   /** The plan's calendar. Already in this payload, so the partner banner
    *  doesn't need the dashboard to carry an id it otherwise wouldn't. */
   calendar?: { objectId: string } | null;

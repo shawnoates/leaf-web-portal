@@ -81,7 +81,16 @@ type AttendeeMemoryInfo = {
     ratingMin: number;
     ratingMax: number;
     commentMaxLen: number;
-  };
+    hostFeedback?: { enabled: boolean; hostName: string | null; hostPhotoUrl?: string | null } | null;
+  } | null;
+  comments?: {
+    objectId: string;
+    name: string;
+    rating: number | null;
+    comment: string;
+    createdAt: string;
+    mine: boolean;
+  }[];
 };
 
 async function fetchInfo(

@@ -29,6 +29,24 @@ export type SurveyState = {
   ratingMin: number;
   ratingMax: number;
   commentMaxLen: number;
+  /** Present only on plans staffed with a roster host. The host rating and
+   *  private note go to the Leaf team, never to the host or the group.
+   *  Absent from older server builds. */
+  hostFeedback?: {
+    enabled: boolean;
+    hostName: string | null;
+    hostPhotoUrl?: string | null;
+  } | null;
+};
+
+/** One attendee's public comment on a plan, visible to everyone with a link. */
+export type PublicComment = {
+  objectId: string;
+  name: string;
+  rating: number | null;
+  comment: string;
+  createdAt: string;
+  mine: boolean;
 };
 
 export type PhotoLimits = {

@@ -3,12 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
-import { MapPin, Calendar, X, Check, ShieldCheck, UserCheck } from "lucide-react";
+import { MapPin, Calendar, X, Check, ShieldCheck, UserCheck, Star } from "lucide-react";
 import HostTheNextOne from "@/components/HostTheNextOne";
 import SurveyCard from "@/components/recap/SurveyCard";
 import PhotoUpload from "@/components/recap/PhotoUpload";
 import CalendarPromoBanner from "@/components/CalendarPromoBanner";
-import type { Photo, SurveyState } from "@/components/recap/types";
+import type { Photo, SurveyState, SurveyResult, PublicComment } from "@/components/recap/types";
 
 type Attendee = {
   notificationId: string;
@@ -72,9 +72,11 @@ type AttendeeMemoryInfo = {
   photoCount: number;
   uploadsClosed?: boolean;
   limits: { maxBytes: number; maxPerAttendee: number; maxPerEvent: number };
-  survey?: SurveyState;
-  // Present only on virtual-hosted plans — gates the private host-feedback
-  // section of the survey card.
+  // null for anyone who ran the plan (staff seat, plan host, linked twins):
+  // the server hides the card and refuses the write.
+  survey?: SurveyState | null;
+  // Public plan comments from everyone who rated. Absent from older builds.
+  comments?: PublicComment[];
 };
 
 function formatEventDate(iso: string | null): string {
@@ -101,6 +103,24 @@ export default function MemoryClient({
   const [error, setError] = useState<string | null>(null);
   const [showHostOtp, setShowHostOtp] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
+
+  // A saved survey lands in the public list at once. The private host half
+  // is deliberately not mirrored anywhere on the page.
+  function mergeOwnComment(prev: AttendeeMemoryInfo, result: SurveyResult): PublicComment[] {
+    const others = (prev.comments || []).filter((c) => !c.mine);
+    if (!result.comment) return others;
+    return [
+      {
+        objectId: result.objectId,
+        name: prev.attendee.name,
+        rating: result.rating,
+        comment: result.comment,
+        createdAt: result.updatedAt || result.submittedAt,
+        mine: true,
+      },
+      ...others,
+    ];
+  }
 
   async function refreshInfo() {
     try {
@@ -217,9 +237,10 @@ export default function MemoryClient({
         }
       />
 
-      {/* Post-event rating — single 1-5 stars + optional comment, plus the
-          private virtual-host half. Only shown once the event has actually
-          ended (server gates with acceptingResponses). */}
+      {/* Post-event rating — 1-5 stars + public comment on the plan, plus the
+          staff-host half (stars + private note to the Leaf team) on plans
+          that had one. Only shown once the event has actually ended (server
+          gates with acceptingResponses) and never to whoever ran it. */}
       {info.survey?.acceptingResponses && (
         <SurveyCard
           notificationId={notificationId}
@@ -228,11 +249,45 @@ export default function MemoryClient({
           onSaved={(result) =>
             setInfo((prev) =>
               prev && prev.survey
-                ? { ...prev, survey: { ...prev.survey, existing: result } }
+                ? {
+                    ...prev,
+                    survey: { ...prev.survey, existing: result },
+                    comments: mergeOwnComment(prev, result),
+                  }
                 : prev
             )
           }
         />
+      )}
+
+      {/* What people said — the public half of every survey on this plan.
+          Rendered for every link holder, including the host and staff seat,
+          since that's the whole point of a public comment. */}
+      {info.comments && info.comments.length > 0 && (
+        <div className="border border-zinc-200 rounded-xl p-5 mb-6">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-3">
+            What people said ({info.comments.length})
+          </h2>
+          <ul className="divide-y divide-zinc-100">
+            {info.comments.map((c) => (
+              <li key={c.objectId} className="py-3 first:pt-0 last:pb-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-medium text-zinc-900">
+                    {c.name}
+                    {c.mine && <span className="text-zinc-400 font-normal"> (you)</span>}
+                  </span>
+                  {c.rating != null && (
+                    <span className="inline-flex items-center gap-0.5 text-xs text-zinc-500">
+                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      {c.rating}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-zinc-700 whitespace-pre-wrap">{c.comment}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {/* Mark Attendance — host-only. Visible when the link belongs to the host
