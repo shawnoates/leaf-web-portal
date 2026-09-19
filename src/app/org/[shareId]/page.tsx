@@ -1860,7 +1860,7 @@ export default function OrgCalendarPage() {
           });
         }
         setNotifyPromptFor(null);
-        setToast("Got it — we’ll text you when someone hosts this.");
+        setToast("Got it — we’ll text you when this gets a host, or once a few others are in.");
         setTimeout(() => setToast(null), 5000);
       } catch (err) {
         console.error("[org] attaching identity to interest failed:", err);
@@ -7074,11 +7074,13 @@ export default function OrgCalendarPage() {
                 You&rsquo;re interested
               </p>
               <h3 className="text-2xl font-light tracking-tight">
-                Want a text if someone hosts{" "}
-                <span className="font-medium">{notifyPromptFor.title}</span>?
+                Want a text when{" "}
+                <span className="font-medium">{notifyPromptFor.title}</span>{" "}
+                gets a host?
               </h3>
               <p className="text-sm text-zinc-500 font-light leading-relaxed">
-                We&rsquo;ll only text you about this plan. Your interest is
+                We&rsquo;ll also let you know once a few others are in, in case
+                you want to run it. Only about this plan. Your interest is
                 already counted either way.
               </p>
             </div>
