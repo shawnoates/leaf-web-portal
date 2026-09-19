@@ -94,6 +94,44 @@ const inputClass =
   "text-leaf-900 placeholder:text-zinc-400 outline-none " +
   "focus:border-leaf-600 focus:ring-2 focus:ring-leaf-600/20";
 
+// One method per host. Paying is manual, so a host offering three
+// destinations just makes whoever sends it choose every time.
+type PayoutMethodKey = "paypal" | "venmo" | "zelle";
+
+const PAYOUT_METHODS: {
+  key: PayoutMethodKey;
+  label: string;
+  placeholder: string;
+  hint: string;
+  inputType: "text" | "email";
+  inputMode: "text" | "email";
+}[] = [
+  {
+    key: "paypal",
+    label: "PayPal",
+    placeholder: "PayPal email or PayPal.me handle",
+    hint: "Whichever you have. A paypal.me link works too.",
+    inputType: "text",
+    inputMode: "text",
+  },
+  {
+    key: "venmo",
+    label: "Venmo",
+    placeholder: "@your-venmo",
+    hint: "The @name on your Venmo profile, not your legal name.",
+    inputType: "text",
+    inputMode: "text",
+  },
+  {
+    key: "zelle",
+    label: "Zelle",
+    placeholder: "Email or mobile number",
+    hint: "Whichever your bank has enrolled with Zelle.",
+    inputType: "text",
+    inputMode: "text",
+  },
+];
+
 function Shell({ children }: { children: React.ReactNode }) {
   return <main className="mx-auto max-w-lg px-5 py-10 pb-24">{children}</main>;
 }
@@ -132,8 +170,11 @@ export default function HostOfferClient({ token }: { token: string }) {
   const [declineReason, setDeclineReason] = useState("");
   const [cancelReason, setCancelReason] = useState("");
 
-  const [paypalEmail, setPaypalEmail] = useState("");
-  const [paypalHandle, setPaypalHandle] = useState("");
+  const [payMethod, setPayMethod] = useState<PayoutMethodKey>("paypal");
+  const [payHandle, setPayHandle] = useState("");
+  const [payLegalName, setPayLegalName] = useState("");
+  const activeMethod =
+    PAYOUT_METHODS.find((m) => m.key === payMethod) ?? PAYOUT_METHODS[0];
   const [paymentSaved, setPaymentSaved] = useState(false);
 
   const [agreed, setAgreed] = useState(false);
@@ -242,8 +283,9 @@ export default function HostOfferClient({ token }: { token: string }) {
     try {
       await Parse.Cloud.run("submitHostPaymentDetails", {
         token,
-        paypalEmail: paypalEmail.trim() || undefined,
-        paypalMeHandle: paypalHandle.trim() || undefined,
+        method: payMethod,
+        handle: payHandle.trim(),
+        legalName: payMethod === "zelle" ? payLegalName.trim() : undefined,
       });
       setPaymentSaved(true);
     } catch (e) {
@@ -449,7 +491,7 @@ export default function HostOfferClient({ token }: { token: string }) {
                 </p>
                 {offer.completion?.payoutStatus !== "paid" && !paymentSaved && (
                   <p className="mt-2 text-[14px] text-amber-800">
-                    We still need somewhere to send it — add your PayPal below.
+                    We still need somewhere to send it — add your details below.
                   </p>
                 )}
                 {/* Optional, and after the ask for photos, never before it. The
@@ -589,23 +631,51 @@ export default function HostOfferClient({ token }: { token: string }) {
               Where should we send the money?
             </h2>
             <p className="mt-1.5 text-[14px] leading-snug text-zinc-500">
-              Either one is fine. You only have to do this once.
+              Pick one. You only have to do this once.
             </p>
             <div className="mt-4 space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                {PAYOUT_METHODS.map((m) => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => {
+                      setPayMethod(m.key);
+                      setPayHandle("");
+                      setPayLegalName("");
+                    }}
+                    className={`rounded-lg border px-3 py-2.5 text-[15px] font-medium ${
+                      payMethod === m.key
+                        ? "border-leaf-600 bg-leaf-50 text-leaf-900"
+                        : "border-zinc-300 bg-white text-zinc-600"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
               <input
                 className={inputClass}
-                type="email"
-                inputMode="email"
-                placeholder="PayPal email"
-                value={paypalEmail}
-                onChange={(e) => setPaypalEmail(e.target.value)}
+                type={activeMethod.inputType}
+                inputMode={activeMethod.inputMode}
+                placeholder={activeMethod.placeholder}
+                value={payHandle}
+                onChange={(e) => setPayHandle(e.target.value)}
               />
-              <input
-                className={inputClass}
-                placeholder="or PayPal.me handle"
-                value={paypalHandle}
-                onChange={(e) => setPaypalHandle(e.target.value)}
-              />
+              {/* Zelle only. The bank shows the payer a name at confirmation and
+                  nothing else, so this is the last checkable thing before an
+                  irreversible transfer. */}
+              {payMethod === "zelle" && (
+                <input
+                  className={inputClass}
+                  placeholder="Full name on your bank account"
+                  value={payLegalName}
+                  onChange={(e) => setPayLegalName(e.target.value)}
+                />
+              )}
+              <p className="text-[13px] leading-snug text-zinc-500">
+                {activeMethod.hint}
+              </p>
               {error && <p className="text-[14px] text-red-700">{error}</p>}
               <button onClick={savePayment} disabled={busy} className={btnPrimary}>
                 {busy ? "Saving…" : "Save"}
