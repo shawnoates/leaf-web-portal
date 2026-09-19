@@ -146,6 +146,8 @@ export default function HostApplyForm() {
   const [availabilityNotes, setAvailabilityNotes] = useState("");
   const [bio, setBio] = useState("");
   const [fitNotes, setFitNotes] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [linkedin, setLinkedin] = useState("");
   const [languages, setLanguages] = useState<string[]>(["English"]);
   const [languagesOther, setLanguagesOther] = useState("");
   const [experience, setExperience] = useState("");
@@ -322,6 +324,8 @@ export default function HostApplyForm() {
         availabilityNotes: availabilityNotes.trim() || undefined,
         bio: bio.trim(),
         fitNotes: fitNotes.trim() || undefined,
+        instagram: instagram.trim() || undefined,
+        linkedin: linkedin.trim() || undefined,
         languages: allLanguages,
         experience: experience.trim(),
         extraNotes: extraNotes.trim() || undefined,
@@ -683,6 +687,29 @@ export default function HostApplyForm() {
                 placeholder="Another language? Separate with commas."
                 value={languagesOther}
                 onChange={(e) => setLanguagesOther(e.target.value)}
+              />
+            </Field>
+
+            <Field
+              label="Instagram or LinkedIn"
+              optional
+              hint="Either one, or both. It just gives us a second look at who you are before we get in touch — we don't post anything or follow you."
+            >
+              <input
+                className={inputClass}
+                placeholder="@instagram"
+                autoCapitalize="none"
+                autoCorrect="off"
+                value={instagram}
+                onChange={(e) => setInstagram(e.target.value)}
+              />
+              <input
+                className={inputClass + " mt-3"}
+                placeholder="linkedin.com/in/you"
+                autoCapitalize="none"
+                autoCorrect="off"
+                value={linkedin}
+                onChange={(e) => setLinkedin(e.target.value)}
               />
             </Field>
           </>
