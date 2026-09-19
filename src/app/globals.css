@@ -33,6 +33,12 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Skeleton sweep — pair with a 200%-wide horizontal gradient. */
+@keyframes leafShimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
 /* ── Marketing pages (/personal, /organizations) ─────────────────────
    Design tokens from the "Real calendars first" homepage v2 spec.
    Scoped under .mkt so the rest of the app keeps its zinc palette. */

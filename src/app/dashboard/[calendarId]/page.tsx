@@ -6,8 +6,6 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import Parse from "@/lib/parse-client";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
-import CityAutocomplete from "@/components/CityAutocomplete";
-import { ORG_TYPES } from "@/lib/orgTypes";
 import SubscriptionModal from "@/components/SubscriptionModal";
 import ConciergeDashboardBanner from "@/components/ConciergeDashboardBanner";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
@@ -26,6 +24,7 @@ import DashboardBottomBar from "@/components/dashboard/DashboardBottomBar";
 import HomeTab from "@/components/dashboard/HomeTab";
 import CommunityTab, { type CommunitySegment } from "@/components/dashboard/CommunityTab";
 import NudgeModal from "@/components/dashboard/NudgeModal";
+import CreateCalendarModal from "@/components/dashboard/CreateCalendarModal";
 import SeriesHostModal, { type SeriesLimit } from "@/components/dashboard/SeriesHostModal";
 import { seriesCountsTowardLimit, type SeriesSummary } from "@/lib/series";
 import GrowPerformance from "@/components/dashboard/GrowPerformance";
@@ -339,31 +338,6 @@ export default function OrgDashboardPage() {
   const [showSubscription, setShowSubscription] = useState(false);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [cancelAt, setCancelAt] = useState<number | null>(null);
-
-  // Add calendar form
-  const [newCalName, setNewCalName] = useState("");
-  const [newCalDesc, setNewCalDesc] = useState("");
-  const [newCalCity, setNewCalCity] = useState("");
-  const [newCalCitySelected, setNewCalCitySelected] = useState(false);
-  // Captured for apartment_complex orgs so each sub-calendar has its own
-  // geo (different building = different radius matching for deals).
-  const [newCalLat, setNewCalLat] = useState<number | null>(null);
-  // Defaults to ON (show deals). Owner can flip off in the create form for
-  // calendars where deals aren't relevant (e.g., a remote book club).
-  const [newCalHideDeals, setNewCalHideDeals] = useState(false);
-  const [newCalLng, setNewCalLng] = useState<number | null>(null);
-  const [addingCalendar, setAddingCalendar] = useState(false);
-  // Defaults to ON — pipes the description as a prompt through
-  // generateAICalendar server-side after the Groups row lands, so the
-  // /org page renders "Suggested" starter cards from the first visit.
-  // Owner flips off for calendars that don't map to AI ideation (soccer
-  // team schedule, private book club with a fixed cadence, etc.).
-  const [newCalSuggestStarters, setNewCalSuggestStarters] = useState(true);
-  // Empty = "inherit from the parent org", which is what every calendar
-  // created before this dropdown existed did (createCalendarUnderOrg copies
-  // the parent's orgType). Only a non-empty value is sent, so leaving this
-  // alone preserves the old behaviour exactly.
-  const [newCalOrgType, setNewCalOrgType] = useState("");
 
   // Plan detail modal
   const [selectedActivePlan, setSelectedActivePlan] = useState<CalActivePlan | null>(null);
@@ -933,63 +907,26 @@ export default function OrgDashboardPage() {
     }
   }
 
-  async function handleAddCalendar() {
-    if (!newCalName || !newCalCity || !newCalCitySelected) return;
-    setAddingCalendar(true);
-    try {
-      const params: Record<string, string | number | boolean> = {
-        organizationId: calendarId,
-        name: newCalName,
-        description: newCalDesc,
-        city: newCalCity,
-      };
-      if (newCalLat != null && newCalLng != null) {
-        params.lat = newCalLat;
-        params.lng = newCalLng;
-      }
-      if (newCalHideDeals) params.hideDeals = true;
-      // Only send suggestStarters when toggled off — server defaults to
-      // true, so the wire stays minimal on the happy path.
-      if (!newCalSuggestStarters) params.suggestStarters = false;
-      // Omitted when blank so the server falls back to inheriting the parent
-      // org's type rather than writing an untyped calendar — every type-aware
-      // rule downstream keys off orgType.
-      if (newCalOrgType) params.orgType = newCalOrgType;
-      const created = (await Parse.Cloud.run("createCalendarUnderOrg", params)) as
-        | { calendarId?: string }
-        | undefined;
-      if (created?.calendarId) setCalendarsSelectedId(created.calendarId);
-      setShowAddCalendar(false);
-      setNewCalName("");
-      setNewCalDesc("");
-      setNewCalCity("");
-      setNewCalCitySelected(false);
-      setNewCalLat(null);
-      setNewCalLng(null);
-      setNewCalHideDeals(false);
-      setNewCalSuggestStarters(true);
-      setNewCalOrgType("");
-      // Land the owner on the calendar they just made. The modal opens from
-      // Home/Grow/Settings too, where selecting it in state alone left them
-      // on the old tab looking at an unchanged screen. Done as one replace
-      // rather than setTab(...) + a second write so `tab` and `cal` land
-      // together; `cal` is what makes the selection survive a refresh
-      // (activeTab is seeded from the URL only at mount, so the state write
-      // is still required — the URL alone would not switch the pane).
-      if (created?.calendarId) {
-        setActiveTab("calendars");
-        const next = new URLSearchParams(searchParams.toString());
-        next.set("tab", "calendars");
-        next.set("cal", created.calendarId);
-        router.replace(`/dashboard/${calendarId}?${next.toString()}`, { scroll: false });
-      }
-      fetchDashboard();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to add calendar";
-      alert(message);
-    } finally {
-      setAddingCalendar(false);
+  // The form, generation preview and createCalendarUnderOrg call live in
+  // CreateCalendarModal; this is what the dashboard does once a calendar exists.
+  function handleCalendarCreated(createdId?: string) {
+    if (createdId) setCalendarsSelectedId(createdId);
+    setShowAddCalendar(false);
+    // Land the owner on the calendar they just made. The modal opens from
+    // Home/Grow/Settings too, where selecting it in state alone left them
+    // on the old tab looking at an unchanged screen. Done as one replace
+    // rather than setTab(...) + a second write so `tab` and `cal` land
+    // together; `cal` is what makes the selection survive a refresh
+    // (activeTab is seeded from the URL only at mount, so the state write
+    // is still required — the URL alone would not switch the pane).
+    if (createdId) {
+      setActiveTab("calendars");
+      const next = new URLSearchParams(searchParams.toString());
+      next.set("tab", "calendars");
+      next.set("cal", createdId);
+      router.replace(`/dashboard/${calendarId}?${next.toString()}`, { scroll: false });
     }
+    fetchDashboard();
   }
 
   async function handleSubscriptionChange(tier: string, billingPeriod: "monthly" | "yearly" = "monthly") {
@@ -2765,118 +2702,12 @@ export default function OrgDashboardPage() {
 
       {/* Add Calendar Modal */}
       {showAddCalendar && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/45 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-t-[20px] md:rounded-[14px] p-8 relative shadow-[0_20px_50px_rgba(0,0,0,0.25)]">
-            <button
-              onClick={() => setShowAddCalendar(false)}
-              className="absolute top-4 right-4 p-2 rounded-full hover:bg-zinc-100"
-            >
-              <Plus className="w-5 h-5 rotate-45" />
-            </button>
-            <h2 className="text-[19px] font-semibold tracking-tight mb-6">Create calendar</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-400 block mb-1.5">Name</label>
-                <input
-                  value={newCalName}
-                  onChange={(e) => setNewCalName(e.target.value)}
-                  className="w-full border border-zinc-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-zinc-900"
-                  placeholder="Calendar name"
-                />
-              </div>
-              <div>
-                <label className="text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-400 block mb-1.5">Description</label>
-                <textarea
-                  value={newCalDesc}
-                  onChange={(e) => setNewCalDesc(e.target.value)}
-                  rows={2}
-                  className="w-full border border-zinc-200 rounded-lg p-3 text-sm focus:outline-none focus:border-zinc-900 resize-y"
-                  placeholder={newCalSuggestStarters
-                    ? "Describe the vibe — e.g., date night ideas in Fort Greene"
-                    : "What is this calendar about?"}
-                />
-                {newCalSuggestStarters && (
-                  <p className="text-[11px] text-zinc-400 mt-1">
-                    We&rsquo;ll use this to suggest a few starter plans.
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-400 block mb-1.5">
-                  Location
-                </label>
-                <CityAutocomplete
-                  value={newCalCity}
-                  onChange={(v) => { setNewCalCity(v); setNewCalCitySelected(false); setNewCalLat(null); setNewCalLng(null); }}
-                  onSelect={(place) => {
-                    setNewCalCity(place.description);
-                    setNewCalCitySelected(true);
-                    if (place.lat != null && place.lng != null) {
-                      setNewCalLat(place.lat);
-                      setNewCalLng(place.lng);
-                    }
-                  }}
-                  placeholder="City, neighborhood, or building address"
-                  className="w-full border border-zinc-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-zinc-900"
-                />
-                <p className="text-[11px] text-zinc-400 mt-1">
-                  More specific = more accurate nearby-deal matching.
-                </p>
-              </div>
-              <div>
-                <label className="text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-400 block mb-1.5">Category</label>
-                <select
-                  value={newCalOrgType}
-                  onChange={(e) => setNewCalOrgType(e.target.value)}
-                  className="w-full border border-zinc-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-zinc-900"
-                >
-                  <option value="">Same as organization</option>
-                  {ORG_TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.emoji} {type.label}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-zinc-400 mt-1">
-                  Shapes the plan suggestions. Leave as-is to match your organization.
-                </p>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <p className="text-xs font-medium text-zinc-700">Suggest starter plans</p>
-                  <p className="text-xs text-zinc-400">Seed the calendar with a few AI-suggested plans your members can host. Off hides suggested and featured plans on this calendar.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setNewCalSuggestStarters(!newCalSuggestStarters)}
-                  className={`relative w-[38px] h-[22px] rounded-full transition-colors shrink-0 ${newCalSuggestStarters ? "bg-zinc-900" : "bg-zinc-200"}`}
-                >
-                  <div className={`absolute top-[3px] w-4 h-4 bg-white rounded-full shadow transition-transform ${newCalSuggestStarters ? "left-[19px]" : "left-[3px]"}`} />
-                </button>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <p className="text-xs font-medium text-zinc-700">Show local deals</p>
-                  <p className="text-xs text-zinc-400">Surface a strip of deals from nearby businesses</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setNewCalHideDeals(!newCalHideDeals)}
-                  className={`relative w-[38px] h-[22px] rounded-full transition-colors shrink-0 ${!newCalHideDeals ? "bg-zinc-900" : "bg-zinc-200"}`}
-                >
-                  <div className={`absolute top-[3px] w-4 h-4 bg-white rounded-full shadow transition-transform ${!newCalHideDeals ? "left-[19px]" : "left-[3px]"}`} />
-                </button>
-              </div>
-              <button
-                onClick={handleAddCalendar}
-                disabled={!newCalName || !newCalCitySelected || addingCalendar}
-                className="w-full h-11 bg-zinc-900 text-white rounded-full text-[13px] font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50 mt-2"
-              >
-                {addingCalendar ? "Creating..." : "Create calendar"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <CreateCalendarModal
+          organizationId={calendarId}
+          parentOrgType={dashboard.orgType}
+          onClose={() => setShowAddCalendar(false)}
+          onCreated={handleCalendarCreated}
+        />
       )}
 
       {/* Subscription Modal */}

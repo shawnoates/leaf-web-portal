@@ -4,8 +4,28 @@
     {
       "name": "leaf-admin-portal",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "/Users/shawn/Developer/Projects/leaf-admin-portal", "run", "dev", "--", "-p", "3002"],
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/shawn/Developer/Projects/leaf-admin-portal",
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3002"
+      ],
       "port": 3002
+    },
+    {
+      "name": "leaf-web-portal",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3000"
+      ],
+      "port": 3000
     }
   ]
 }
