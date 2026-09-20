@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Check, Copy, Download } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, Check, Copy, Download, ImagePlus } from "lucide-react";
 import { siFacebook, siInstagram, siThreads, siTiktok, siX } from "simple-icons";
 import Parse from "@/lib/parse-client";
 
@@ -21,14 +21,24 @@ export type SharePack = {
   postImageUrl: string;
   storyImageUrl: string;
   caption: string;
+  /** Before the night: the plan. After it: the calendar. */
   shareUrl: string;
   shareKitUrl: string | null;
-  /** The host's own attendance photos, after the night, staff seats only. */
+  /** Photos from the night — the plan's gallery plus a roster host's own — after the night only. */
   recapPhotos: string[];
 };
 
 type Format = "post" | "story";
 type Action = "copy" | "image" | "share";
+
+// What goes out as the image. The composited card in the chosen format, one
+// of the photos the server knows about, or a photo straight off the camera
+// roll — that last one never leaves the browser except through the share
+// sheet, so it has no URL and is held as the File itself.
+type Source =
+  | { kind: "card" }
+  | { kind: "photo"; url: string }
+  | { kind: "upload"; file: File; objectUrl: string };
 
 // What each network can actually take from a web page. This table is the
 // honest part of the feature: Instagram and TikTok expose no web intent at
@@ -57,6 +67,13 @@ const LINKEDIN: Brand = {
   hex: "0A66C2",
   path: "M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z",
 };
+
+// The caption may or may not contain the link (the after-night one doesn't),
+// so intents that take text alone get the link appended rather than relying
+// on it being in there.
+function withLink(caption: string, url: string): string {
+  return caption.includes(url) ? caption : `${caption}\n${url}`;
+}
 
 const TARGETS: Target[] = [
   {
@@ -88,7 +105,7 @@ const TARGETS: Target[] = [
     hint: "Opens the Threads app with the caption and link",
     brand: siThreads,
     kind: "intent",
-    href: (caption) => `https://www.threads.com/intent/post?text=${encodeURIComponent(caption)}`,
+    href: (caption, url) => `https://www.threads.com/intent/post?text=${encodeURIComponent(withLink(caption, url))}`,
   },
   {
     id: "linkedin",
@@ -124,8 +141,8 @@ function BrandMark({ brand }: { brand: Brand }) {
   );
 }
 
-function fileNameFor(format: Format, phase: SharePack["phase"]): string {
-  return `leaf-${phase === "after" ? "recap" : "plan"}-${format}.png`;
+function fileNameFor(format: Format, phase: SharePack["phase"], photo: boolean): string {
+  return `leaf-${phase === "after" ? "recap" : "plan"}-${photo ? "photo" : format}.png`;
 }
 
 // The same-origin form of one of our own URLs. The kit is linked as
@@ -165,8 +182,14 @@ export default function ShareKitClient({
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [canShareFiles, setCanShareFiles] = useState(false);
-  // After the night, a roster host picks one of the photos they uploaded.
-  const [photoIdx, setPhotoIdx] = useState(0);
+  // After the night a real photo beats the card, so the first one is the
+  // default when there is one. Otherwise the card.
+  const [source, setSource] = useState<Source>(() =>
+    pack && pack.phase === "after" && pack.recapPhotos.length > 0
+      ? { kind: "photo", url: pack.recapPhotos[0] }
+      : { kind: "card" },
+  );
+  const fileInput = useRef<HTMLInputElement>(null);
 
   // Feature-detected after mount: navigator doesn't exist during SSR and
   // rendering by it on the server would mismatch on hydration.
@@ -197,14 +220,15 @@ export default function ShareKitClient({
     [pack?.taskId, notificationId],
   );
 
-  // The image being shared right now: after the night with photos, the chosen
-  // photo; otherwise the composited card in the chosen format.
-  const usingRecapPhoto = Boolean(pack && pack.phase === "after" && pack.recapPhotos.length > 0);
+  const usingPhoto = source.kind !== "card";
+  // The URL of the image being shared right now, when it has one. An upload
+  // has none — it's already a File.
   const imageUrl = useMemo(() => {
     if (!pack) return null;
-    if (usingRecapPhoto) return pack.recapPhotos[Math.min(photoIdx, pack.recapPhotos.length - 1)];
+    if (source.kind === "photo") return source.url;
+    if (source.kind === "upload") return null;
     return format === "story" ? pack.storyImageUrl : pack.postImageUrl;
-  }, [pack, usingRecapPhoto, photoIdx, format]);
+  }, [pack, source, format]);
 
   async function copyText(text: string, quiet = false): Promise<boolean> {
     try {
@@ -233,9 +257,20 @@ export default function ShareKitClient({
   // to opening the image.
   const [fetched, setFetched] = useState<{ url: string; file: File; objectUrl: string } | null>(null);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const imageFile = fetched && fetched.url === imageUrl ? fetched.file : null;
+  const imageFile =
+    source.kind === "upload" ? source.file : fetched && fetched.url === imageUrl ? fetched.file : null;
   const imageFailed = failedUrl === imageUrl;
-  const previewSrc = imageFile && fetched ? fetched.objectUrl : imageFailed ? imageUrl : null;
+  const previewSrc =
+    source.kind === "upload"
+      ? source.objectUrl
+      : imageFile && fetched
+        ? fetched.objectUrl
+        : imageFailed
+          ? imageUrl
+          : null;
+  // What "Save image" hands over: the fetched object URL when there is one,
+  // the upload's own, else the remote URL.
+  const saveHref = source.kind === "upload" ? source.objectUrl : previewSrc ?? imageUrl;
   useEffect(() => {
     if (!pack || !imageUrl) return;
     const url = imageUrl;
@@ -246,7 +281,9 @@ export default function ShareKitClient({
         const res = await fetch(sameOriginUrl(url), { signal: controller.signal });
         if (!res.ok) throw new Error(String(res.status));
         const blob = await res.blob();
-        const file = new File([blob], fileNameFor(format, pack.phase), { type: blob.type || "image/png" });
+        const file = new File([blob], fileNameFor(format, pack.phase, source.kind === "photo"), {
+          type: blob.type || "image/png",
+        });
         objectUrl = URL.createObjectURL(blob);
         setFetched({ url, file, objectUrl });
       } catch (e) {
@@ -261,7 +298,26 @@ export default function ShareKitClient({
         setFetched((prev) => (prev?.url === url ? null : prev));
       }
     };
-  }, [pack, imageUrl, format]);
+  }, [pack, imageUrl, format, source.kind]);
+
+  // A photo off the camera roll. Held in memory only; nothing is uploaded.
+  function pickUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !file.type.startsWith("image/")) return;
+    setSource((prev) => {
+      if (prev.kind === "upload") URL.revokeObjectURL(prev.objectUrl);
+      return { kind: "upload", file, objectUrl: URL.createObjectURL(file) };
+    });
+    setNotice(null);
+  }
+  function choose(next: Source) {
+    setSource((prev) => {
+      if (prev.kind === "upload" && next.kind !== "upload") URL.revokeObjectURL(prev.objectUrl);
+      return next;
+    });
+    setNotice(null);
+  }
 
   // The one-tap path for Instagram and TikTok: hand the OS share sheet the
   // image as a file; the host picks the app and it opens in the composer.
@@ -270,12 +326,12 @@ export default function ShareKitClient({
   // story's link has to be a link sticker, and the sticker takes a URL and
   // nothing else, so pasting the caption into it fails (which is exactly what
   // the first version told hosts to do). A post has no sticker; there the
-  // caption, link included, is the thing to paste. A recap photo has no tab
-  // and goes out with the caption. The clipboard write is started, not
-  // awaited, so the share call is still the tap's.
+  // caption is the thing to paste. The tab applies to a photo too — it
+  // doesn't change the photo, only what's on the clipboard. The clipboard
+  // write is started, not awaited, so the share call is still the tap's.
   async function shareWithImage(targetId: string) {
-    if (!pack || !imageUrl) return;
-    const linkOnly = format === "story" && !usingRecapPhoto;
+    if (!pack) return;
+    const linkOnly = format === "story";
     setBusy(targetId);
     setNotice(null);
     const clipboard = copyText(linkOnly ? pack.shareUrl : caption, true);
@@ -292,7 +348,7 @@ export default function ShareKitClient({
       // Cancelled is not an error. No file (a photo host without CORS) or a
       // refused share falls back to opening the image so they can save it.
       if (e instanceof Error && e.name === "AbortError") return;
-      window.open(imageUrl, "_blank", "noopener");
+      if (imageUrl) window.open(imageUrl, "_blank", "noopener");
       setNotice("Couldn't attach the image directly — it's open in a new tab. Press and hold to save it, then post.");
     } finally {
       await clipboard;
@@ -319,6 +375,7 @@ export default function ShareKitClient({
   }
 
   const after = pack.phase === "after";
+  const imageReady = Boolean(imageFile) || imageFailed;
 
   return (
     <main className="min-h-dvh bg-zinc-50">
@@ -341,7 +398,7 @@ export default function ShareKitClient({
           </h1>
           <p className="text-sm text-zinc-600 mt-2">
             {after
-              ? "Post a photo from the night with the link to the next one. Optional, as always."
+              ? "A photo from the night, or the card, with a link to your calendar so they can see what's next. Optional, as always."
               : "An image, a caption and the link, ready to post. Optional, and it works: a plan with nobody on it gets called off."}
           </p>
           {pack.staff && (
@@ -352,77 +409,116 @@ export default function ShareKitClient({
           )}
         </header>
 
-        {/* Preview */}
+        {/* What to post: the card, a photo we have, or one off the camera roll. */}
         <section className="px-5 pt-5">
-          {usingRecapPhoto ? (
-            <>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
-                Pick a photo
-              </p>
-              <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                {pack.recapPhotos.map((url, i) => (
-                  <button
-                    key={url}
-                    type="button"
-                    onClick={() => setPhotoIdx(i)}
-                    aria-pressed={i === photoIdx}
-                    className={`shrink-0 rounded-lg overflow-hidden border-2 ${
-                      i === photoIdx ? "border-zinc-900" : "border-transparent"
-                    }`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt="" className="h-20 w-20 object-cover" />
-                  </button>
-                ))}
-              </div>
-              <p className="text-[12px] text-amber-800 bg-amber-50 rounded-lg px-3 py-2 mt-3">
-                Only post a photo of people who said it&rsquo;s fine. Faces are theirs, not ours.
-              </p>
-            </>
-          ) : (
-            <div className="flex items-center gap-1 mb-3" role="tablist" aria-label="Format">
-              {(["story", "post"] as Format[]).map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  role="tab"
-                  aria-selected={format === f}
-                  onClick={() => setFormat(f)}
-                  className={`text-[13px] font-medium rounded-full px-3 py-1.5 transition-colors ${
-                    format === f ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                  }`}
-                >
-                  {f === "story" ? "Story · 9:16" : "Post · 4:5"}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {imageUrl && (
-            <div
-              className={`mx-auto rounded-xl overflow-hidden bg-zinc-100 border border-zinc-200 ${
-                usingRecapPhoto ? "max-w-[320px]" : format === "story" ? "max-w-[240px]" : "max-w-[300px]"
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
+            Image
+          </p>
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            <button
+              type="button"
+              onClick={() => choose({ kind: "card" })}
+              aria-pressed={source.kind === "card"}
+              className={`shrink-0 h-20 w-20 rounded-lg border-2 flex flex-col items-center justify-center gap-1 bg-[#1a2d27] text-white ${
+                source.kind === "card" ? "border-zinc-900" : "border-transparent"
               }`}
             >
-              {previewSrc ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={previewSrc}
-                  src={previewSrc}
-                  alt="Preview of what you'll post"
-                  className="w-full h-auto block"
-                />
-              ) : (
-                <div
-                  className={`w-full flex items-center justify-center animate-pulse ${
-                    usingRecapPhoto ? "aspect-square" : format === "story" ? "aspect-[9/16]" : "aspect-[4/5]"
-                  }`}
-                >
-                  <span className="text-[12px] text-zinc-400">Rendering your card…</span>
-                </div>
-              )}
-            </div>
+              <span className="text-[15px] font-extrabold tracking-tight">
+                leaf<span className="text-[#F5C518]">.</span>
+              </span>
+              <span className="text-[10px] font-medium text-white/80">Card</span>
+            </button>
+            {pack.recapPhotos.map((url) => (
+              <button
+                key={url}
+                type="button"
+                onClick={() => choose({ kind: "photo", url })}
+                aria-pressed={source.kind === "photo" && source.url === url}
+                className={`shrink-0 rounded-lg overflow-hidden border-2 ${
+                  source.kind === "photo" && source.url === url ? "border-zinc-900" : "border-transparent"
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="" className="h-20 w-20 object-cover" />
+              </button>
+            ))}
+            {source.kind === "upload" && (
+              <button
+                type="button"
+                onClick={() => fileInput.current?.click()}
+                aria-pressed
+                className="shrink-0 rounded-lg overflow-hidden border-2 border-zinc-900"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={source.objectUrl} alt="" className="h-20 w-20 object-cover" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              className="shrink-0 h-20 w-20 rounded-lg border-2 border-dashed border-zinc-300 text-zinc-500 hover:border-zinc-400 hover:text-zinc-700 flex flex-col items-center justify-center gap-1"
+            >
+              <ImagePlus className="w-5 h-5" />
+              <span className="text-[10px] font-medium">Your photo</span>
+            </button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*"
+              onChange={pickUpload}
+              className="hidden"
+              aria-label="Choose a photo"
+            />
+          </div>
+          {usingPhoto && (
+            <p className="text-[12px] text-amber-800 bg-amber-50 rounded-lg px-3 py-2 mt-3">
+              Only post a photo of people who said it&rsquo;s fine. Faces are theirs, not ours.
+            </p>
           )}
+        </section>
+
+        {/* Preview */}
+        <section className="px-5 pt-5">
+          <div className="flex items-center gap-1 mb-3" role="tablist" aria-label="Format">
+            {(["story", "post"] as Format[]).map((f) => (
+              <button
+                key={f}
+                type="button"
+                role="tab"
+                aria-selected={format === f}
+                onClick={() => setFormat(f)}
+                className={`text-[13px] font-medium rounded-full px-3 py-1.5 transition-colors ${
+                  format === f ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                }`}
+              >
+                {usingPhoto ? (f === "story" ? "Story" : "Post") : f === "story" ? "Story · 9:16" : "Post · 4:5"}
+              </button>
+            ))}
+          </div>
+
+          <div
+            className={`mx-auto rounded-xl overflow-hidden bg-zinc-100 border border-zinc-200 ${
+              usingPhoto ? "max-w-[320px]" : format === "story" ? "max-w-[240px]" : "max-w-[300px]"
+            }`}
+          >
+            {previewSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={previewSrc}
+                src={previewSrc}
+                alt="Preview of what you'll post"
+                className="w-full h-auto block"
+              />
+            ) : (
+              <div
+                className={`w-full flex items-center justify-center animate-pulse ${
+                  usingPhoto ? "aspect-square" : format === "story" ? "aspect-[9/16]" : "aspect-[4/5]"
+                }`}
+              >
+                <span className="text-[12px] text-zinc-400">Rendering your card…</span>
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Caption */}
@@ -446,9 +542,10 @@ export default function ShareKitClient({
               {copied ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : <Copy className="w-3.5 h-3.5" />}
               {copied ? "Copied" : "Copy caption"}
             </button>
-            {imageUrl && (
+            {saveHref && (
               <a
-                href={imageUrl}
+                href={saveHref}
+                download={source.kind === "upload" ? source.file.name : fileNameFor(format, pack.phase, usingPhoto)}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => stamp("image")}
@@ -482,7 +579,7 @@ export default function ShareKitClient({
                     <span className="block text-[12px] text-zinc-500">
                       {disabled
                         ? "On your phone: save the image, copy the caption, post from the app"
-                        : sheet && !imageFile && !imageFailed
+                        : sheet && !imageReady
                           ? "Getting the image ready…"
                           : t.hint}
                     </span>
@@ -514,14 +611,14 @@ export default function ShareKitClient({
               {notice}
             </p>
           )}
-          {!after && (
-            <p className="text-[12px] text-zinc-400 mt-3 leading-relaxed">
-              On a story, a link has to be a sticker — with Story selected, the
-              link alone is copied, so add a link sticker and paste. With Post
-              selected, the caption is copied. The card carries a QR code too,
-              for anyone who&rsquo;d rather scan.
-            </p>
-          )}
+          <p className="text-[12px] text-zinc-400 mt-3 leading-relaxed">
+            On a story, a link has to be a sticker — with Story selected, the
+            link alone is copied, so add a link sticker and paste. With Post
+            selected, the caption is copied.
+            {usingPhoto
+              ? " A feed post can't carry a link, so the card is the one to use if the link matters."
+              : " The card carries a QR code too, for anyone who'd rather scan."}
+          </p>
         </section>
 
         <footer className="px-5 py-6 text-center">

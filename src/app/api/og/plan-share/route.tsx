@@ -16,9 +16,10 @@ import { SITE_HOST, SITE_URL } from "@/lib/site";
 // house green.
 //
 // The QR is the only link a feed post has: Instagram doesn't linkify captions
-// and only stories take a link sticker. It encodes the measured share URL with
-// its own src, so scans and sticker taps are separate lines in
-// plan_share_arrival.
+// and only stories take a link sticker. Before the night it encodes the
+// measured plan share URL with its own src, so scans and sticker taps are
+// separate lines in plan_share_arrival. After the night it encodes the
+// calendar page instead — the plan is over, and "join" would be a lie.
 //
 // Params:
 //   planId  required, EventGroup objectId
@@ -59,6 +60,8 @@ type PlanShareInfo = {
   location: { timezone: string | null } | null;
   calendarName: string | null;
   calendarIsPrivate: boolean;
+  /** The calendar's public id, for /org/<shareId>. Null off-calendar. */
+  shareId?: string | null;
   neighborhood?: string | null;
   rsvpCount: number;
   capacity: number | null;
@@ -169,12 +172,12 @@ function headline(phase: "before" | "after", hood: string | null): Word[] {
 
 // The "before" card carries no body line: headline, title, when, URL. The
 // going count and the "no pressure" reassurance read as filler under the
-// headline, and the caption already says both.
-function bodyLine(phase: "before" | "after", going: number): string | null {
+// headline, and the caption already says both. The "after" card carries no
+// headcount either: rsvpCount is who said yes, not who came, and a number
+// the host didn't write is a claim they'd have to stand behind.
+function bodyLine(phase: "before" | "after"): string | null {
   if (phase !== "after") return null;
-  return going >= 2
-    ? `${going} of us made it. The next one's on the calendar.`
-    : "The next one's already on the calendar.";
+  return "The next one's already on the calendar.";
 }
 
 // ---------------------------------------------------------------------------
@@ -222,8 +225,19 @@ export async function GET(request: Request) {
   const words = headline(phase, hood);
   const title = clip(plan?.title || "A plan on Leaf", 70);
   const when = phase === "before" ? whenLabel(plan?.expiryDate ?? null, plan?.location?.timezone ?? null) : null;
-  const body = bodyLine(phase, plan?.rsvpCount ?? 0);
-  const shownUrl = planId ? `${SITE_HOST}/p/${planId}` : SITE_HOST;
+  const body = bodyLine(phase);
+
+  // Where the card sends people. Before the night, the plan. After it, the
+  // CALENDAR: the plan has ended, so a link that lands on it offers a join
+  // for something nobody can join, and what the post is actually saying is
+  // "there's a next one". A plan with no calendar keeps the plan link.
+  const after = phase === "after";
+  const calendarPath = after && plan?.shareId ? `/org/${encodeURIComponent(plan.shareId)}` : null;
+  const shownUrl = calendarPath
+    ? `${SITE_HOST}${calendarPath}`
+    : planId
+      ? `${SITE_HOST}/p/${planId}`
+      : SITE_HOST;
 
   // Type scale per format. Story has the height to go bigger.
   const s = story ? 1.18 : 1;
@@ -238,7 +252,12 @@ export async function GET(request: Request) {
   // refuses react-dom/server in a route handler, so the code comes from a
   // plain encoder as an SVG string and goes in as an image. /share/p keeps a
   // scan in Safari the way a sticker tap is, and forwards src.
-  const qrUrl = planId ? `${SITE_URL}/share/p/${planId}?src=host_share_qr` : SITE_URL;
+  const qrUrl = calendarPath
+    ? `${SITE_URL}${calendarPath}?src=host_share_qr`
+    : planId
+      ? `${SITE_URL}/share/p/${planId}?src=host_share_qr`
+      : SITE_URL;
+  const qrLabel = after ? "Scan for what's next" : "Scan to join";
   const qrSize = Math.round(190 * s);
   const qr = qrcode(0, "M");
   qr.addData(qrUrl);
@@ -463,7 +482,7 @@ export async function GET(request: Request) {
               color: "rgba(255,255,255,0.85)",
             }}
           >
-            Scan to join
+            {qrLabel}
           </div>
         </div>
         </div>

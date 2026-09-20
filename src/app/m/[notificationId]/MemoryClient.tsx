@@ -481,8 +481,8 @@ export default function MemoryClient({
               Show them how it went
             </p>
             <p className="text-sm text-zinc-500 mb-5 font-light">
-              A photo or card from the night, a caption and the link to the next
-              one, ready to post. Optional, as always.
+              A photo from the night, or the card, with a caption and the link
+              to your calendar, ready to post. Optional, as always.
             </p>
             <Link
               href={`/t/${notificationId}/share`}
