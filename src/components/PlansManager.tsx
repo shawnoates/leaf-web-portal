@@ -1018,6 +1018,14 @@ export default function PlansManager({
       const dismissedAi = new Set<number>(
         Array.isArray(page.dismissedAiEventIndexes) ? page.dismissedAiEventIndexes : [],
       );
+      // Starters already materialized into a live plan — the server resolves
+      // these from the EventGroup's aiSourceEventUid stamp. The public /org
+      // page has always skipped them; this rail did not, so a suggestion
+      // someone hosted kept sitting in Suggested Plans as "Needs a host",
+      // directly above the plan it had turned into.
+      const hostedAi = new Set<number>(
+        Array.isArray(page.hostedAiEventIndexes) ? page.hostedAiEventIndexes : [],
+      );
       // `.date` is the FLOATING wall clock — the display value, read back in
       // FLOATING_EVENT_TZ. The resolver's `.instant` is what it compared to
       // Date.now() internally to retire past cards; nothing here needs it.
@@ -1027,7 +1035,7 @@ export default function PlansManager({
           index,
           resolved: resolveAIEventDate(ev, page.orgTimezone ?? null).date,
         }))
-        .filter((r) => r.resolved !== null && !dismissedAi.has(r.index))
+        .filter((r) => r.resolved !== null && !dismissedAi.has(r.index) && !hostedAi.has(r.index))
         .map(({ ev, index, resolved }) => ({
           objectId: `ai-${index}`,
           title: ev.title || ev.name,
@@ -2116,6 +2124,12 @@ export default function PlansManager({
                       linkCopied={copiedPlanId === item.plan.objectId}
                       onClick={() => {
                         setCreatePlanPrefill({
+                          // Identity of the card, not just its contents: the
+                          // drawer used to pass title/venue/date only, so the
+                          // plan it created had no link back and this card
+                          // stayed up as "Needs a host" beside it.
+                          aiSourceEventUid: item.plan.aiEventUid,
+                          aiSourceEventIndex: item.plan.aiEventIndex,
                           title: item.plan.title,
                           description: item.plan.description || "",
                           venue: item.plan.location

@@ -122,6 +122,13 @@ export interface CreatePlanPrefill {
     placeId?: string | null;
     time?: string | null;
   }[];
+  /** The starter card (Groups.aiSourceEvents) this drawer was opened from, when
+   *  it was. Carried through to `createManualPlan`, which stamps the link onto
+   *  the new plan (and texts whoever tapped Interested) — without it the card
+   *  keeps rendering as "Needs a host" next to the plan it became. `uid` is the
+   *  real key; `index` is the fallback for calendars minted before uids. */
+  aiSourceEventUid?: string | null;
+  aiSourceEventIndex?: number;
 }
 
 interface CreatePlanModalProps {
@@ -985,6 +992,26 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
       return;
     }
 
+    // Retire the starter card this drawer was opened from, on the branches
+    // that never reach createManualPlan. That call does it server-side and
+    // properly — it stamps the source link onto the new EventGroup, which is
+    // what fires the interest fan-out — but a poll or a series has no single
+    // EventGroup to stamp, so dismissal is the honest retire there. Either
+    // way the card stops rendering beside the thing it became. Fire-and-
+    // forget: the plan is saved already, and a stale card is not worth an
+    // error dialog over.
+    const dismissStarterCard = () => {
+      if (!prefill?.aiSourceEventUid && typeof prefill?.aiSourceEventIndex !== "number") return;
+      Parse.Cloud.run("dismissAiSourceEvent", {
+        calendarId: selectedCalendarId,
+        eventUid: prefill?.aiSourceEventUid || undefined,
+        eventIndex: prefill?.aiSourceEventIndex,
+      }).catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn("[dismissAiSourceEvent] starter retire failed:", msg);
+      });
+    };
+
     if (isPoll) {
       // Edit-mode polls only update safe fields (title/description/image/venue) —
       // dates and close-date stay locked to avoid orphaning votes.
@@ -1026,6 +1053,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
             imageBase64: imageBase64 || undefined,
             imageUrl: !imageBase64 ? (selectedImageUrl || prefill?.imageUrl || undefined) : undefined,
           });
+          dismissStarterCard();
         }
         setSuccess(true);
         onCreated({ kind: isPollEdit ? "edited" : "poll", eventGroupId: isPollEdit ? eventGroupId : undefined });
@@ -1198,6 +1226,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           maxOccurrences: !hostIsOther && seriesEndType === "occurrences" ? occInt : undefined,
           endsAt: !hostIsOther && seriesEndType === "until" && seriesEndsAt ? `${seriesEndsAt}T23:59:59${tzSuffix}` : undefined,
         });
+        dismissStarterCard();
         result = { kind: "hosted-series" };
       } else if (recurring && mode === "idea") {
         const occInt = Math.min(
@@ -1218,6 +1247,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           maxOccurrences: seriesEndType === "occurrences" ? occInt : undefined,
           endsAt: seriesEndType === "until" && seriesEndsAt ? `${seriesEndsAt}T23:59:59${tzSuffix}` : undefined,
         });
+        dismissStarterCard();
         result = { kind: "idea-series" };
       } else {
         const created = (await Parse.Cloud.run("createManualPlan", {
@@ -1235,6 +1265,10 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           hideVenueUntilRsvp: hideVenue,
           requireApproval: isHosted ? requireApproval : undefined,
           clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          // Retires the starter card server-side — stamped onto the EventGroup
+          // when hosted, dismissed when this saves as a suggestion instead.
+          aiSourceEventUid: prefill?.aiSourceEventUid || undefined,
+          aiSourceEventIndex: prefill?.aiSourceEventIndex,
         })) as { success?: boolean; type?: string; eventGroupId?: string };
         // Trust the server's `type` over local `isHosted` — it's what got written.
         result = created?.type === "idea" || !isHosted
