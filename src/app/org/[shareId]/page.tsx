@@ -84,6 +84,10 @@ interface Plan {
   // True when `host*` describes an accepted roster host (EventGroup.assignedHost),
   // not the owner in `hostUser`/`user`. The owner still owns the EventGroup.
   hasRosterHost: boolean;
+  // The roster host's self-introduction from /hosts/apply, verbatim. Only ever
+  // set when `hasRosterHost` — follower hosts have no bio field; their own
+  // words are `hostNote`. Never merged into hostNote on either side.
+  hostBio: string | null;
   attendeeCount: number;
   /** Accepted RSVPs only (host excluded) — the number the server compares
    *  against `capacity` when deciding to waitlist. `attendeeCount` pads +1
@@ -2721,6 +2725,7 @@ export default function OrgCalendarPage() {
         hostName: (p.host as Record<string, string>)?.name || "Community Member",
         hostAvatar: (p.host as Record<string, string>)?.profilePictureUrl || null,
         hasRosterHost: Boolean((p.host as Record<string, unknown>)?.isRosterHost),
+        hostBio: ((p.host as Record<string, unknown>)?.bio as string) || null,
         // rsvpCount tracks RSVPs only; a real host is always attending so add 1 —
         // but a virtual/AI host (or one Leaf hasn't confirmed yet) isn't a real
         // attendee, so don't pad the count for those.
@@ -4321,7 +4326,21 @@ export default function OrgCalendarPage() {
                         </p>
                       ) : (
                         <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: org.brandColor || "#18181b" }} />
+                          {/* A face beats a dot: the host's photo when they
+                              have one (roster hosts always do; followers only
+                              if they set a profile picture), else the brand
+                              dot that used to sit here. */}
+                          {plan.hostAvatar ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={plan.hostAvatar}
+                              alt=""
+                              aria-hidden="true"
+                              className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200 flex-shrink-0"
+                            />
+                          ) : (
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: org.brandColor || "#18181b" }} />
+                          )}
                           Hosted by {plan.hostName}
                         </p>
                       )}
@@ -5325,9 +5344,20 @@ export default function OrgCalendarPage() {
                     Leaf is arranging this
                   </p>
                 ) : (
-                  <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
-                    Hosted by {selectedEvent.hostName}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    {selectedEvent.hostAvatar && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={selectedEvent.hostAvatar}
+                        alt=""
+                        aria-hidden="true"
+                        className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200 flex-shrink-0"
+                      />
+                    )}
+                    <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
+                      Hosted by {selectedEvent.hostName}
+                    </p>
+                  </div>
                 )}
                 <div className="flex gap-6 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">
                   {selectedEvent.isPoll ? (
@@ -5366,6 +5396,33 @@ export default function OrgCalendarPage() {
                 <p className="text-xl font-light leading-relaxed text-zinc-600 whitespace-pre-wrap">
                   {renderLinkedText(selectedEvent.description)}
                 </p>
+                {/* The assigned roster host, introduced in their own words —
+                    the same block /p/<id> renders (StandalonePlanCard), and
+                    the promise /hosts/apply makes: photo + description shown
+                    to the people attending. Deliberately its own block, not
+                    poured into "Note from Host" below: that quote is about
+                    the plan, this is about the person, and a follower host
+                    has no bio to show here (their words ARE the note). */}
+                {selectedEvent.hasRosterHost && selectedEvent.hostBio && (
+                  <div className="flex gap-3 rounded-lg bg-zinc-50 p-3">
+                    {selectedEvent.hostAvatar && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={selectedEvent.hostAvatar}
+                        alt={selectedEvent.hostName}
+                        className="h-12 w-12 shrink-0 rounded-full object-cover"
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-zinc-900">
+                        Your host, {selectedEvent.hostName}
+                      </p>
+                      <p className="mt-0.5 text-sm text-zinc-600 whitespace-pre-wrap">
+                        {selectedEvent.hostBio}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 {selectedEvent.hostNote && (
                   <div className="space-y-2">
                     <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
