@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, ChevronDown, Loader2, MapPin, Pencil, RefreshCw, Sparkles, Square, X } from "lucide-react";
 import Parse from "@/lib/parse-client";
-import CityAutocomplete from "@/components/CityAutocomplete";
+import CityAutocomplete, { resolvePlaceFromText } from "@/components/CityAutocomplete";
 import { ORG_TYPES } from "@/lib/orgTypes";
 
 // Create-calendar modal with two ways in: describe it (prompt → form is
@@ -62,6 +62,23 @@ const REVEAL_INTERVAL_MS = 260;
 const LABEL = "text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-500 block";
 const FIELD = "w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-zinc-900";
 const SHIMMER = "rounded-md bg-[linear-gradient(90deg,#f0f0f1_0%,#e2e2e5_40%,#f0f0f1_80%)] bg-[length:200%_100%] animate-[leafShimmer_1.4s_ease-in-out_infinite] motion-reduce:animate-none";
+
+// Pulls the place phrase out of a prompt: what follows the LAST "in / at /
+// near / around", cut at the first clause that stops being a place. So
+// "Toddler fun this Monday in downtown Brooklyn" → "downtown Brooklyn" and
+// "Sunday runs in Prospect Park for new parents" → "Prospect Park". Returns
+// null when the prompt names no place — the caller asks rather than guesses,
+// because a wrong location means real venues in the wrong city.
+function placePhraseFrom(prompt: string): string | null {
+  const matches = [...prompt.matchAll(/\b(?:in|at|near|around)\s+/gi)];
+  const last = matches[matches.length - 1];
+  if (!last || last.index === undefined) return null;
+  const phrase = prompt
+    .slice(last.index + last[0].length)
+    .split(/[,.;!?]|\s+(?:for|with|on|every|each|this|next|and|after|before)\b/i)[0]
+    .trim();
+  return phrase.length >= 3 ? phrase : null;
+}
 
 function failureCopy(reason: string | undefined): string {
   switch (reason) {
@@ -128,6 +145,10 @@ export default function CreateCalendarModal({ organizationId, parentOrgType, onC
   const [nameFromPrompt, setNameFromPrompt] = useState(false);
   const [descFromPrompt, setDescFromPrompt] = useState(false);
   const [locationNeeded, setLocationNeeded] = useState(false);
+  // Location was read out of the prompt rather than picked — tagged so the
+  // owner checks it, since it decides where the starter venues are.
+  const [cityFromPrompt, setCityFromPrompt] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [creating, setCreating] = useState(false);
 
   // Bumped on Stop / Regenerate / unmount so a late response is dropped.
@@ -151,7 +172,7 @@ export default function CreateCalendarModal({ organizationId, parentOrgType, onC
   }, [revealing, revealed, events.length]);
 
   const generating = phase === "generating";
-  const busy = generating || revealing;
+  const busy = locating || generating || revealing;
   const hasPreview = phase === "done" && events.length > 0;
   const previewStale = hasPreview && !!preview && city !== preview.city;
   const canCreate = !!name && citySelected && !creating && !busy;
@@ -167,15 +188,32 @@ export default function CreateCalendarModal({ organizationId, parentOrgType, onC
 
   async function handleGenerate() {
     const text = prompt.trim();
-    if (text.length < MIN_PROMPT_LENGTH || generating) return;
-    // Real venues need a real place, and creation requires one anyway — ask
-    // for it up front instead of failing after the wait.
-    if (!citySelected) {
-      setLocationNeeded(true);
-      focusLocation();
-      return;
-    }
+    if (text.length < MIN_PROMPT_LENGTH || generating || locating) return;
     const run = ++runRef.current;
+    // Real venues need a real place, and creation requires one anyway. Read
+    // it from the prompt when the owner hasn't picked one; ask only when the
+    // prompt doesn't name a place Places can resolve. State writes don't land
+    // until the next render, so the resolved place rides along in `origin`.
+    let origin = { city, lat, lng };
+    if (!citySelected) {
+      const phrase = placePhraseFrom(text);
+      setLocating(true);
+      const place = phrase ? await resolvePlaceFromText(phrase) : null;
+      if (run !== runRef.current) return;
+      setLocating(false);
+      if (!place) {
+        setLocationNeeded(true);
+        focusLocation();
+        return;
+      }
+      origin = { city: place.description, lat: place.lat ?? null, lng: place.lng ?? null };
+      setCity(origin.city);
+      setCitySelected(true);
+      setCityFromPrompt(true);
+      setLocationNeeded(false);
+      setLat(origin.lat);
+      setLng(origin.lng);
+    }
     setPhase("generating");
     setError(null);
     setEvents([]);
@@ -190,9 +228,9 @@ export default function CreateCalendarModal({ organizationId, parentOrgType, onC
       const effectiveOrgType = (orgType || parentOrgType || "").trim().toLowerCase();
       const result = (await Parse.Cloud.run("generateAICalendar", {
         prompt: text,
-        originCity: city,
-        originLat: lat ?? undefined,
-        originLng: lng ?? undefined,
+        originCity: origin.city,
+        originLat: origin.lat ?? undefined,
+        originLng: origin.lng ?? undefined,
         cohortSpread: !NO_COHORT_ORG_TYPES.includes(effectiveOrgType),
       })) as GenerateResponse;
       if (run !== runRef.current) return;
@@ -214,7 +252,7 @@ export default function CreateCalendarModal({ organizationId, parentOrgType, onC
         setDescFromPrompt(true);
       }
       setEvents(result.calendar.events || []);
-      setPreview({ calendarId: result.calendar.objectId, city });
+      setPreview({ calendarId: result.calendar.objectId, city: origin.city });
       setPhase("done");
     } catch (err: unknown) {
       if (run !== runRef.current) return;
@@ -225,6 +263,7 @@ export default function CreateCalendarModal({ organizationId, parentOrgType, onC
 
   function handleStop() {
     runRef.current += 1;
+    setLocating(false);
     setPhase("idle");
   }
 
@@ -357,7 +396,7 @@ export default function CreateCalendarModal({ organizationId, parentOrgType, onC
                     <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
                   </div>
                 </div>
-                {generating ? (
+                {generating || locating ? (
                   <button
                     type="button"
                     onClick={handleStop}
@@ -403,24 +442,26 @@ export default function CreateCalendarModal({ organizationId, parentOrgType, onC
           </div>
 
           {/* Generation status */}
-          {phase !== "idle" && (
+          {(phase !== "idle" || locating) && (
             <div
               role="status"
               aria-live="polite"
-              className={`rounded-xl px-3.5 py-3 ${phase === "error" ? "bg-amber-50 text-amber-900" : "bg-leaf-50 text-leaf-800"}`}
+              className={`rounded-xl px-3.5 py-3 ${phase === "error" && !locating ? "bg-amber-50 text-amber-900" : "bg-leaf-50 text-leaf-800"}`}
             >
               <div className="flex items-center gap-2.5 text-[13px]">
-                {phase === "error" ? null : busy ? (
+                {busy ? (
                   <Loader2 className="w-4 h-4 shrink-0 animate-spin text-leaf-700" />
-                ) : (
+                ) : phase === "error" ? null : (
                   <Sparkles className="w-4 h-4 shrink-0 text-leaf-700" />
                 )}
                 <span className="flex-1">
-                  {phase === "error"
-                    ? error
-                    : busy
-                      ? `Drafting starter plans for ${city.split(",")[0]}…`
-                      : "Filled in from your prompt. Review and edit anything, then create."}
+                  {locating
+                    ? "Finding the location in your prompt…"
+                    : phase === "error"
+                      ? error
+                      : busy
+                        ? `Drafting starter plans for ${city.split(",")[0]}…`
+                        : "Filled in from your prompt. Review and edit anything, then create."}
                 </span>
                 {revealing && (
                   <span className="shrink-0 text-xs font-medium text-leaf-700">
@@ -434,7 +475,7 @@ export default function CreateCalendarModal({ organizationId, parentOrgType, onC
                     className="h-full rounded-full bg-[linear-gradient(90deg,#426c5e_0%,#74a494_50%,#426c5e_100%)] bg-[length:200%_100%] animate-[leafShimmer_1.6s_linear_infinite] motion-reduce:animate-none transition-[width] duration-500"
                     // The request gives no progress signal, so the bar holds
                     // at a third while waiting and only counts real rows.
-                    style={{ width: generating ? "33%" : `${33 + (shownCount / Math.max(events.length, 1)) * 67}%` }}
+                    style={{ width: locating ? "12%" : generating ? "33%" : `${33 + (shownCount / Math.max(events.length, 1)) * 67}%` }}
                   />
                 </div>
               )}
@@ -506,15 +547,22 @@ export default function CreateCalendarModal({ organizationId, parentOrgType, onC
                 )}
               </div>
               <div ref={locationRef}>
-                <label className={`${LABEL} mb-1.5`}>
-                  Location <span className="text-red-700">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className={LABEL}>
+                    Location <span className="text-red-700">*</span>
+                  </label>
+                  {cityFromPrompt && <FromPromptTag />}
+                </div>
                 <CityAutocomplete
                   value={city}
-                  onChange={(v) => { setCity(v); setCitySelected(false); setLat(null); setLng(null); }}
+                  // A place resolved from the prompt never went through the
+                  // picker, so tell it the value is already a real selection.
+                  valueIsVerified={citySelected}
+                  onChange={(v) => { setCity(v); setCitySelected(false); setCityFromPrompt(false); setLat(null); setLng(null); }}
                   onSelect={(place) => {
                     setCity(place.description);
                     setCitySelected(true);
+                    setCityFromPrompt(false);
                     setLocationNeeded(false);
                     if (place.lat != null && place.lng != null) {
                       setLat(place.lat);
@@ -522,7 +570,7 @@ export default function CreateCalendarModal({ organizationId, parentOrgType, onC
                     }
                   }}
                   placeholder="City, neighborhood, or building address"
-                  className={`${FIELD} ${locationNeeded && !citySelected ? "border-red-300" : "border-zinc-200"}`}
+                  className={`${FIELD} ${locationNeeded && !citySelected ? "border-red-300" : cityFromPrompt ? "border-leaf-200 bg-leaf-50" : "border-zinc-200"}`}
                 />
                 {/* CityAutocomplete shows its own "select from the suggestions"
                     warning once there is text, so ours only covers the empty field. */}

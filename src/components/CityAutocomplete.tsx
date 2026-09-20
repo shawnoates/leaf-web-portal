@@ -255,3 +255,39 @@ export default function CityAutocomplete({
     </div>
   );
 }
+
+/**
+ * Resolves free text ("downtown Brooklyn") to the top Places prediction, with
+ * coordinates — the same result the owner would get by typing it into the
+ * field and picking the first suggestion. For callers that already hold a
+ * place phrase (e.g. one lifted from a prompt) and want to skip the picker.
+ * Resolves null when Maps is unavailable or nothing matches; never rejects.
+ */
+export async function resolvePlaceFromText(
+  input: string,
+  types: string[] = ["geocode"],
+): Promise<{ description: string; placeId: string; lat?: number; lng?: number } | null> {
+  const query = input.trim();
+  if (query.length < 2) return null;
+  await loadGoogleMaps();
+  if (typeof window === "undefined" || !window.google?.maps?.places) return null;
+  const places = window.google.maps.places;
+
+  const prediction = await new Promise<google.maps.places.AutocompletePrediction | null>((resolve) => {
+    new places.AutocompleteService().getPlacePredictions({ input: query, types }, (predictions, status) => {
+      resolve(status === places.PlacesServiceStatus.OK && predictions?.length ? predictions[0] : null);
+    });
+  });
+  if (!prediction) return null;
+
+  const base = { description: prediction.description, placeId: prediction.place_id };
+  return new Promise((resolve) => {
+    new places.PlacesService(document.createElement("div")).getDetails(
+      { placeId: prediction.place_id, fields: ["geometry"] },
+      (result, status) => {
+        const location = status === places.PlacesServiceStatus.OK ? result?.geometry?.location : null;
+        resolve(location ? { ...base, lat: location.lat(), lng: location.lng() } : base);
+      },
+    );
+  });
+}
