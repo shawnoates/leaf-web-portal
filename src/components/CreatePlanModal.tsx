@@ -33,6 +33,13 @@ export const NEW_PLAN_DRAFT_SESSION_KEY = "leaf.newPlanDraftBeforeGoogleAuth";
 
 type PlanMode = "plan" | "idea" | "poll";
 
+/** What a successful save produced. `edited` covers every update path
+ *  (plan edit, poll edit, host-request approval, poll → plan conversion). */
+export type CreatePlanResult = {
+  kind: "hosted" | "hosted-series" | "idea" | "idea-series" | "poll" | "edited";
+  eventGroupId?: string;
+};
+
 type PollOptionDraft = { date: string; time: string };
 
 type SeriesFreq = "weekly" | "biweekly" | "monthly";
@@ -142,7 +149,13 @@ interface CreatePlanModalProps {
   pollWinningDate?: string; // YYYY-MM-DD
   pollWinningTime?: string | null; // HH:MM
   onClose: () => void;
-  onCreated: () => void;
+  /**
+   * Fires after any successful save. `kind` says what the server actually
+   * wrote so the parent can word its confirmation honestly — a suggestion
+   * (CalendarGeneratedPlan idea) notifies nobody, while a hosted plan only
+   * reaches followers via push / the weekly digest.
+   */
+  onCreated: (result: CreatePlanResult) => void;
   /** Optional — called when a starter-tier user clicks the locked Date Poll button. */
   onUpgrade?: () => void;
   /** When the drawer opens as a return from the Google Cal OAuth flow,
@@ -1015,7 +1028,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           });
         }
         setSuccess(true);
-        onCreated();
+        onCreated({ kind: isPollEdit ? "edited" : "poll", eventGroupId: isPollEdit ? eventGroupId : undefined });
         setTimeout(() => {
           setSuccess(false);
           onClose();
@@ -1042,6 +1055,10 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
       const absH = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
       const absM = String(Math.abs(offset) % 60).padStart(2, "0");
       const tzSuffix = `${sign}${absH}:${absM}`;
+
+      // Every update path (poll convert, host-request approval, plan edit)
+      // reports `edited`; the create branches below overwrite this.
+      let result: CreatePlanResult = { kind: "edited", eventGroupId: pollEventGroupId || eventGroupId };
 
       if (pollConvertMode && pollEventGroupId && pollWinningDate) {
         // The winning date is locked at the moment the owner picked the option;
@@ -1181,6 +1198,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           maxOccurrences: !hostIsOther && seriesEndType === "occurrences" ? occInt : undefined,
           endsAt: !hostIsOther && seriesEndType === "until" && seriesEndsAt ? `${seriesEndsAt}T23:59:59${tzSuffix}` : undefined,
         });
+        result = { kind: "hosted-series" };
       } else if (recurring && mode === "idea") {
         const occInt = Math.min(
           Math.max(parseInt(seriesOccurrences, 10) || SERIES_DEFAULT_OCCURRENCES, 1),
@@ -1200,6 +1218,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           maxOccurrences: seriesEndType === "occurrences" ? occInt : undefined,
           endsAt: seriesEndType === "until" && seriesEndsAt ? `${seriesEndsAt}T23:59:59${tzSuffix}` : undefined,
         });
+        result = { kind: "idea-series" };
       } else {
         const created = (await Parse.Cloud.run("createManualPlan", {
           calendarId: selectedCalendarId,
@@ -1217,6 +1236,10 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           requireApproval: isHosted ? requireApproval : undefined,
           clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         })) as { success?: boolean; type?: string; eventGroupId?: string };
+        // Trust the server's `type` over local `isHosted` — it's what got written.
+        result = created?.type === "idea" || !isHosted
+          ? { kind: "idea" }
+          : { kind: "hosted", eventGroupId: created?.eventGroupId };
         // Only sync HOSTED plans — ideas don't have a fixed schedule to
         // put on the manager's calendar. Fire-and-forget: a 403 from
         // Google (token granted only freebusy pre-scope-upgrade) is
@@ -1233,7 +1256,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
         }
       }
       setSuccess(true);
-      onCreated();
+      onCreated(result);
       setTimeout(() => {
         setSuccess(false);
         onClose();

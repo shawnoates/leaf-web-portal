@@ -3008,7 +3008,7 @@ export default function OrgDashboardPage() {
           pollWinningTime={pollConvertWinningTime}
           autoSyncOnMount={autoSyncNewPlanOnMount}
           onClose={() => { setShowCreatePlanModal(false); setCreatePlanPrefill(null); setEditingPlanId(null); setEditingHostRequestId(null); setEditingHostRequestCalendarId(null); setPollConvertEventGroupId(null); setPollConvertWinningDate(null); setPollConvertWinningTime(null); setAutoSyncNewPlanOnMount(false); }}
-          onCreated={async () => {
+          onCreated={async (result) => {
             if (!editingPlanId) {
               // Check if this was the first plan created on this calendar.
               // Fetch fresh to see activePlanCount before the UI state updates.
@@ -3029,15 +3029,26 @@ export default function OrgDashboardPage() {
             }
 
             fetchDashboard();
-            // Publish confirmation on Home. `onCreated` fires for edits too —
-            // only banner-worthy when it wasn't an edit of an existing plan.
-            if (!editingPlanId) {
-              const followers = dashboardRef.current?.followerCount ?? 0;
-              setPublishBanner(
-                followers > 0
-                  ? `Plan published · ${followers} follower${followers === 1 ? "" : "s"} will be notified`
-                  : "Plan published",
-              );
+            // Publish confirmation on Home, worded by what the server actually
+            // does. This used to say "N followers will be notified" for every
+            // non-edit save, including suggestions — which create a
+            // CalendarGeneratedPlan idea and notify nobody. What really fires:
+            //  - hosted: EventGroup afterSave pushes followers who have the app;
+            //    per-plan follower SMS is gated OFF (`perPlanFollowerSmsEnabled`)
+            //    in favor of the Sunday digest. Same note on the /org confirm sheet.
+            //  - poll: createCalendarDatePoll texts web followers right away.
+            //  - idea / idea-series: nothing goes out.
+            const banner: Record<typeof result.kind, string | null> = {
+              hosted: "Plan published · app followers get a push, everyone else sees it in the weekly roundup",
+              "hosted-series": "Series published · app followers get a push, everyone else sees it in the weekly roundup",
+              idea: "Suggestion added · it waits for a host, no one has been notified",
+              "idea-series": "Recurring suggestion added · each cycle waits for a host, no one has been notified",
+              poll: "Poll published · followers are being texted to vote",
+              edited: null,
+            };
+            const copy = banner[result.kind];
+            if (copy) {
+              setPublishBanner(copy);
               if (publishBannerTimer.current) clearTimeout(publishBannerTimer.current);
               publishBannerTimer.current = setTimeout(() => setPublishBanner(null), 12_000);
             }

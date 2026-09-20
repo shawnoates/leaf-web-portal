@@ -18,7 +18,12 @@
 //
 // Shared by the public /org calendar page and the owner dashboard's
 // suggested-plans list so both surfaces show the same fanned-out dates.
-const SPREAD_MIN_LEAD_MS = 14 * 24 * 60 * 60 * 1000; // match server's 2-week floor
+// Must match PLAN_IDEA_MIN_LEAD_MS in leaflets-server/cloud/calendarPlanGenerator.js.
+// Dropped from 14 days to 3 alongside the server: the two-week floor made
+// near-term intent impossible ("toddler fun this Monday" could only be dated
+// weeks out) and pushed every idea past the 14-day horizon where a forecast
+// exists, so weather could never steer indoor vs outdoor.
+const SPREAD_MIN_LEAD_MS = 3 * 24 * 60 * 60 * 1000; // match server's floor
 
 function deriveCadenceSlots(
   planDates: Date[]
@@ -91,7 +96,11 @@ export function computeSpreadIdeaDates(
   // *today's* season, but an unbounded round-robin will happily hand the 13th
   // idea a slot 14 weeks out — which is how a September-authored outdoor
   // playground plan surfaced as a December afternoon in NYC.
-  const MAX_WEEKS = 6;
+  // Matches PLAN_IDEA_MAX_LEAD_DAYS (21) on the server. It was 6 weeks, which
+  // let the fan-out re-date an idea a month past the day its copy — and now
+  // its forecast — was written for. Overflow beyond this horizon doubles up on
+  // days in later passes rather than drifting further out.
+  const MAX_WEEKS = 3;
   // Backlogged calendars carry far more ideas than a 6-week window has days
   // (some hold hundreds). Rather than strand the overflow — which would drop
   // it back to the server's single fallback date, restacking the very pile

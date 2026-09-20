@@ -289,6 +289,25 @@ interface UpcomingPlan {
   aiTagVariant?: "default" | "amber";
 }
 
+// Placeholder for an idea still being generated. Deliberately the same
+// width (w-48) and image height (h-28) as IdeaCard/AIStarterCard so the rail
+// doesn't reflow when the real card replaces it.
+function SuggestedPlanSkeleton() {
+  return (
+    <div
+      className="border border-zinc-100 rounded-lg overflow-hidden shrink-0 w-48"
+      aria-hidden="true"
+    >
+      <div className="w-full h-28 bg-zinc-100 animate-pulse" />
+      <div className="p-2.5 space-y-2">
+        <div className="h-3.5 bg-zinc-100 rounded animate-pulse" />
+        <div className="h-3.5 w-2/3 bg-zinc-100 rounded animate-pulse" />
+        <div className="h-3 w-1/2 bg-zinc-100 rounded animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
 // Suggested Plans card for a real, persisted PlanIdea — image-top cover,
 // "Needs a host" badge, recurring badge, interest count. Tapping opens the
 // detail + self-host modal (host/edit/assign all live there); delete is also
@@ -697,6 +716,9 @@ export default function PlansManager({
   const [calendarShareId, setCalendarShareId] = useState<string | null>(null);
   const [loadingIdeas, setLoadingIdeas] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
+  // How many ideas we're still waiting on, so the rail can hold a placeholder
+  // for each instead of appearing complete and then growing under the cursor.
+  const [pendingIdeaCount, setPendingIdeaCount] = useState(0);
   const [hidePlanIdeas, setHidePlanIdeas] = useState(false);
 
   // Assign-a-host: members eligible to be assigned as a suggestion's host,
@@ -1119,10 +1141,12 @@ export default function PlansManager({
       setShowUpgradeModal(true);
       return;
     }
+    const REQUESTED = 3;
     setRegenerating(true);
+    setPendingIdeaCount(REQUESTED);
     const startCount = planIdeas.length;
     try {
-      await Parse.Cloud.run("generateCalendarPlansForOne", { calendarId, count: 3 });
+      await Parse.Cloud.run("generateCalendarPlansForOne", { calendarId, count: REQUESTED });
       const maxAttempts = 20;
       for (let i = 0; i < maxAttempts; i++) {
         await new Promise((r) => setTimeout(r, 3000));
@@ -1136,9 +1160,15 @@ export default function PlansManager({
             seenIds.add(idea.objectId);
             return true;
           });
-          if (ideas.length > startCount) {
+          // Show each idea the moment it lands and retire one placeholder,
+          // rather than holding the whole batch back until the last one is
+          // written. The poll used to break on the first idea it saw, so
+          // ideas 2 and 3 appeared later with no indication they were coming.
+          const arrived = ideas.length - startCount;
+          if (arrived > 0) {
             setPlanIdeas(ideas);
-            break;
+            setPendingIdeaCount(Math.max(0, REQUESTED - arrived));
+            if (arrived >= REQUESTED) break;
           }
         } catch {
           // Keep polling
@@ -1148,6 +1178,7 @@ export default function PlansManager({
       console.error("Regenerate failed:", err);
     } finally {
       setRegenerating(false);
+      setPendingIdeaCount(0);
     }
   }
 
@@ -2098,6 +2129,16 @@ export default function PlansManager({
                     />
                   )
                 )}
+
+              {/* Ideas arrive one at a time: the AI-starter cards ship with
+                  the first payload while each PlanIdea is a separate
+                  generation the poll below picks up seconds apart. Without
+                  these the rail renders two cards and looks finished, then
+                  silently grows. One placeholder per idea still expected. */}
+              {regenerating &&
+                Array.from({ length: pendingIdeaCount }).map((_, i) => (
+                  <SuggestedPlanSkeleton key={`idea-pending-${i}`} />
+                ))}
             </div>
           )}
         </section>

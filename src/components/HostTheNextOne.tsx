@@ -20,6 +20,8 @@ type CalendarInfo = {
   name: string | null;
   hidePlanIdeas?: boolean;
   hideCustomPlans?: boolean;
+  /** The calendar the attendee came through (cross-promotion), not the plan's own. */
+  isVia?: boolean;
 };
 
 type Event = {
@@ -163,9 +165,12 @@ export default function HostTheNextOne({
   const headline =
     source === "idea" ? "Host the next one" : "Host another like this";
   const ctaLabel = "Host This";
+  // When the idea is from the calendar they came through rather than this
+  // plan's own, name it — otherwise the card reads as the host's next plan.
+  const onCalendar = calendar.isVia && calendar.name ? ` on ${calendar.name}` : "";
   const subhead =
     source === "idea"
-      ? "Pick this up — it's pre-loaded with details. Choose a date and confirm."
+      ? `Pick this up${onCalendar} — it's pre-loaded with details. Choose a date and confirm.`
       : isHost
       ? "Pre-filled with what worked. Pick a new date."
       : `Send ${calendar.name || "the host"} a date for the next one. They approve, it goes live.`;
