@@ -241,6 +241,8 @@ interface PlanIdea {
   venueName?: string | null;
   // Set on member-shared suggestions (sourceKind "memberShare"): the
   // follower/host who shared the link. AI and featured rows have no author.
+  // Null for public viewers — the server only ships the name to the
+  // owner/co-hosts, and this page credits the role instead.
   suggestedByName?: string | null;
 }
 
@@ -4855,10 +4857,15 @@ export default function OrgCalendarPage() {
                             }
                       }
                     >
+                      {/* A member-shared idea is credited by ROLE, not by
+                          name: this pill sits on the public calendar, and the
+                          person who shared it from the app was posting to a
+                          calendar, not publishing under their own byline. The
+                          owner still sees the name on the dashboard rail. */}
                       {isAroundTheCity
                         ? "Around the city"
-                        : idea.sourceKind === "memberShare" && idea.suggestedByName
-                          ? `Suggested by ${idea.suggestedByName}`
+                        : idea.sourceKind === "memberShare"
+                          ? "Suggested by follower"
                           : "Suggested"}
                     </span>
                   </div>
@@ -6958,9 +6965,10 @@ export default function OrgCalendarPage() {
               <h4 className="text-sm font-medium tracking-tight text-zinc-900 mb-1 pr-6">
                 {popupIdea.title}
               </h4>
-              {popupIdea.sourceKind === "memberShare" && popupIdea.suggestedByName && (
+              {/* Same public-surface rule as the card pill — role, not name. */}
+              {popupIdea.sourceKind === "memberShare" && (
                 <p className="text-[11px] text-zinc-500 mb-1.5">
-                  Suggested by {popupIdea.suggestedByName}
+                  Suggested by follower
                 </p>
               )}
               {popupIdea.description && (
