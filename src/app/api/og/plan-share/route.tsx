@@ -281,12 +281,24 @@ export async function GET(request: Request) {
 
   // Type scale per format. Story has the height to go bigger.
   const s = story ? 1.18 : 1;
-  // The text column shares the bottom row with the QR tile, and a highlighted
-  // word can't wrap, so a long neighborhood drops the headline a step.
+  const pad = story ? 84 : 72;
+  const qrSize = Math.round(190 * s);
+  // The QR tile fixes the width of its column, so the text column's width is
+  // known here — without it the label under the code ("SCAN FOR WHAT'S NEXT")
+  // sets that column's width instead, and the headline loses ~90px it doesn't
+  // know it has lost. Flex then shrinks the widest word's box and Satori cuts
+  // the word off inside its highlight ("Downtow[n]").
+  const qrColumn = qrSize + Math.round(14 * s) * 2;
+  const textColumn = size.width - pad * 2 - Math.round(36 * s) - qrColumn;
+
+  // The headline steps down for a long neighborhood, then again if the widest
+  // word still wouldn't fit the column. Inter ExtraBold runs about 0.6em per
+  // character at this size and a highlighted word carries 18px of padding each
+  // side; the estimate only ever shrinks the type, and a word that fits keeps
+  // the size it had.
   const longestWord = Math.max(...words.map((w) => w.text.length));
-  const headSize = Math.round(
-    (longestWord > 9 ? 72 : words.map((w) => w.text).join(" ").length > 18 ? 84 : 100) * s,
-  );
+  const stepped = (longestWord > 9 ? 72 : words.map((w) => w.text).join(" ").length > 18 ? 84 : 100) * s;
+  const headSize = Math.round(Math.min(stepped, (textColumn - 40) / (longestWord * 0.6)));
 
   // Not qrcode.react: Satori can't run a component with hooks, and Next
   // refuses react-dom/server in a route handler, so the code comes from a
@@ -298,7 +310,6 @@ export async function GET(request: Request) {
       ? `${SITE_URL}/share/p/${planId}?src=host_share_qr`
       : SITE_URL;
   const qrLabel = after ? "Scan for what's next" : "Scan to join";
-  const qrSize = Math.round(190 * s);
   const qr = qrcode(0, "M");
   qr.addData(qrUrl);
   qr.make();
@@ -307,7 +318,6 @@ export async function GET(request: Request) {
   const titleSize = Math.round(46 * s);
   const bodySize = Math.round(32 * s);
   const urlSize = Math.round(34 * s);
-  const pad = story ? 84 : 72;
 
   const fontFamily = font ? "Inter, system-ui, sans-serif" : "system-ui, -apple-system, sans-serif";
 
@@ -493,7 +503,9 @@ export async function GET(request: Request) {
         </div>
 
         {/* QR tile. White quiet zone around the code so it scans off a photo
-            background; the label says what scanning does. */}
+            background; the label says what scanning does. Width is the tile's,
+            so the label wraps under it rather than widening this column at the
+            headline's expense. */}
         <div
           style={{
             display: "flex",
@@ -501,6 +513,7 @@ export async function GET(request: Request) {
             alignItems: "center",
             gap: Math.round(10 * s),
             flexShrink: 0,
+            width: qrColumn,
           }}
         >
           <div
@@ -517,6 +530,8 @@ export async function GET(request: Request) {
           <div
             style={{
               display: "flex",
+              textAlign: "center",
+              lineHeight: 1.3,
               fontSize: Math.round(20 * s),
               fontWeight: 800,
               letterSpacing: "2px",
