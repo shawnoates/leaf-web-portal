@@ -59,6 +59,9 @@ import {
   Heart,
   AlertTriangle,
   MessageCircle,
+  Sun,
+  Cloud,
+  CloudRain,
 } from "lucide-react";
 
 
@@ -176,6 +179,58 @@ interface Plan {
 // CTA that would read "Request to Attend" / "I'm Attending" has to say so.
 function planIsFull(plan: Pick<Plan, "capacity" | "rsvpCount">) {
   return plan.capacity != null && plan.rsvpCount >= plan.capacity;
+}
+
+// Forecast for one plan, from getCalendarPlanWeather. The server resolves this
+// against the venue's coordinates and sends back only the reading — no coords,
+// no venue — so a chip on a hideVenueUntilRsvp calendar can't give away the
+// place the page is deliberately withholding.
+interface PlanWeather {
+  temp: string;           // bare °F integer, already rounded by the server
+  text: string;           // WeatherAPI condition string, e.g. "Partly cloudy"
+  chanceOfRain: number | null;
+  kind: "nice" | "mild" | "wet";
+}
+
+/** Forecasts only exist 14 days out, and polls have no single date to read. */
+const WEATHER_HORIZON_DAYS = 14;
+
+/**
+ * Cheap client-side prefilter so the request carries the handful of ids that
+ * could plausibly have a forecast rather than every plan on the page. The
+ * server re-derives visibility and re-checks every gate, including the outdoor
+ * test it alone can make — this is bandwidth, not trust.
+ */
+function eligibleForWeather(plan: Pick<Plan, "isPoll" | "dateISO">): boolean {
+  if (plan.isPoll) return false;
+  if (!plan.dateISO) return false;
+  const ms = new Date(plan.dateISO).getTime() - Date.now();
+  if (!Number.isFinite(ms) || ms < 0) return false;
+  return ms <= WEATHER_HORIZON_DAYS * 24 * 60 * 60 * 1000;
+}
+
+/**
+ * The forecast chip in a plan row's eyebrow: `SEP 24 • 7:00 PM • ☀ 72°`.
+ *
+ * Renders a local lucide glyph rather than `weather.icon` from the payload.
+ * That field is a 64px WeatherAPI raster — soft on retina, needs a
+ * next.config remotePatterns entry, and can't inherit the eyebrow's color.
+ *
+ * Deliberately not color-coded. The eyebrow is uppercase 11px zinc-400; a
+ * green-or-blue chip inside it would outshout the plan title two lines down.
+ */
+function WeatherChip({ weather }: { weather: PlanWeather }) {
+  const Icon = weather.kind === "wet" ? CloudRain : weather.kind === "nice" ? Sun : Cloud;
+  const label = weather.chanceOfRain != null && weather.kind === "wet"
+    ? `${weather.text}, ${weather.chanceOfRain}% chance of rain`
+    : weather.text;
+  return (
+    <span className="inline-flex items-center gap-1 align-baseline" title={label}>
+      <Icon className="w-3 h-3 shrink-0" aria-hidden="true" />
+      <span>{weather.temp}&deg;</span>
+      <span className="sr-only">, {label}</span>
+    </span>
+  );
 }
 
 interface PlanIdea {

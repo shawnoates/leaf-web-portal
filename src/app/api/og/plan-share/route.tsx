@@ -25,6 +25,17 @@ import { SITE_HOST, SITE_URL } from "@/lib/site";
 //   planId  required, EventGroup objectId
 //   format  post (1080x1350, default) | story (1080x1920) | square (1080x1080)
 //   phase   before (default: "join me") | after ("we did it")
+//   photo   optional, an image URL to sit behind the type instead of the
+//           plan's own — the share kit passes a photo from the night here so
+//           a recap post still carries the headline, the link and the QR.
+//           Host-allowlisted: this route fetches whatever it's handed, and an
+//           open fetcher on our origin is an SSRF, so only our own file hosts
+//           are honoured. Anything else falls back to the plan's photo.
+//   bg      photo (default) | none — `none` renders the type, the scrim and
+//           the QR on a TRANSPARENT background, for the kit to composite a
+//           camera-roll photo under in the browser. That photo is never
+//           uploaded, which is the whole reason the compositing happens
+//           there and not here.
 //
 // WHAT IS DELIBERATELY NOT ON THIS CARD: the venue. getPlanShareInfo gates the
 // venue name and the street address together and gives an anonymous caller
@@ -88,8 +99,31 @@ function loadHeadlineFont(origin: string): Promise<ArrayBuffer | null> {
 
 // The photo is fetched here rather than handed to Satori as a URL, so a dead
 // link (Google Places photo URLs perish) degrades to the plain card instead of
-// failing the whole render. Capped so a giant original can't stall the route.
-const PHOTO_MAX_BYTES = 6 * 1024 * 1024;
+// failing the whole render. Capped so a giant original can't stall the route —
+// generously, because a `photo` handed in by the kit is a phone photo straight
+// off a camera roll and dropping it would silently show the green card instead.
+const PHOTO_MAX_BYTES = 12 * 1024 * 1024;
+
+// Where a `photo` may come from. Parse files live in our S3 bucket
+// (directAccess), so that host plus the Parse mount covers every photo the
+// share pack hands out; Mux is here because a plan's hero can be a video
+// frame. Nothing else is fetched, whoever asks.
+const PHOTO_HOSTS = ["leaf-storage.s3.us-west-2.amazonaws.com", "image.mux.com"];
+
+function allowedPhoto(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "https:") return null;
+    if (PHOTO_HOSTS.includes(u.hostname)) return u.toString();
+    // A Parse file served by the API itself rather than straight from S3.
+    const parse = new URL(process.env.NEXT_PUBLIC_PARSE_SERVER_URL || "https://api.getleaflets.co/parse");
+    if (u.hostname === parse.hostname && u.pathname.includes("/files/")) return u.toString();
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 // A Mux frame arrives sized for the app's 16:9 card. The story is 9:16 and
 // the post 4:5, so ask Mux for the card's own size rather than upscaling a
@@ -213,13 +247,19 @@ export async function GET(request: Request) {
     return new Response("Not available", { status: 404 });
   }
 
-  // The Home card's image, so the post looks like the plan the host knows.
-  // `image` alone is the fallback for a server that predates `heroImage`.
-  const hero = plan?.heroImage ?? plan?.image ?? null;
+  // What sits behind the type. A `photo` from the kit wins — the host picked
+  // it. Otherwise the Home card's image, so the post looks like the plan the
+  // host knows (`image` alone is the fallback for a server that predates
+  // `heroImage`). `bg=none` fetches nothing: the browser supplies the photo.
+  const transparent = url.searchParams.get("bg") === "none";
+  const hero = allowedPhoto(url.searchParams.get("photo")) ?? plan?.heroImage ?? plan?.image ?? null;
   const [font, photo] = await Promise.all([
     loadHeadlineFont(url.origin),
-    loadPhoto(hero ? sizedForCard(hero, size) : null),
+    transparent ? null : loadPhoto(hero ? sizedForCard(hero, size) : null),
   ]);
+  // A transparent card is about to have a photo drawn under it, so it takes
+  // the scrim that keeps white type legible on one.
+  const overPhoto = Boolean(photo) || transparent;
 
   const hood = plan?.neighborhood ? clip(plan.neighborhood, 26) : null;
   const words = headline(phase, hood);
@@ -280,7 +320,9 @@ export async function GET(request: Request) {
           display: "flex",
           flexDirection: "column",
           position: "relative",
-          background: "linear-gradient(150deg, #253A33 0%, #1a2d27 55%, #0f1f1a 100%)",
+          background: transparent
+            ? "transparent"
+            : "linear-gradient(150deg, #253A33 0%, #1a2d27 55%, #0f1f1a 100%)",
           color: "#ffffff",
           fontFamily,
         }}
@@ -311,7 +353,7 @@ export async function GET(request: Request) {
             width: "100%",
             height: "100%",
             display: "flex",
-            background: photo
+            background: overPhoto
               ? "linear-gradient(to bottom, rgba(15,31,26,0.10) 0%, rgba(15,31,26,0.35) 40%, rgba(15,31,26,0.92) 68%, rgba(15,31,26,0.98) 100%)"
               : "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.25) 100%)",
           }}
