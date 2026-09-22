@@ -31,10 +31,16 @@ export type SharePack = {
 type Format = "post" | "story";
 type Action = "copy" | "image" | "share";
 
-// What goes out as the image. The composited card in the chosen format, one
-// of the photos the server knows about, or a photo straight off the camera
-// roll — that last one never leaves the browser except through the share
-// sheet, so it has no URL and is held as the File itself.
+// What goes BEHIND the card. Every option posts the same card — the headline,
+// the plan, the link and the QR — so picking a photo changes the background
+// and nothing else. A bare photo would be the one thing a host can post that
+// carries no way back to the calendar, which is the whole point of posting it.
+//
+// `card` leaves the card's own background alone (the plan's photo, or the
+// house green). `photo` is one the server knows about, so the card is
+// rendered over it server-side. `upload` came off the camera roll and never
+// leaves the browser: there the card is fetched with a transparent
+// background and the photo is drawn under it on a canvas.
 type Source =
   | { kind: "card" }
   | { kind: "photo"; url: string }
@@ -141,8 +147,52 @@ function BrandMark({ brand }: { brand: Brand }) {
   );
 }
 
-function fileNameFor(format: Format, phase: SharePack["phase"], photo: boolean): string {
-  return `leaf-${phase === "after" ? "recap" : "plan"}-${photo ? "photo" : format}.png`;
+function fileNameFor(format: Format, phase: SharePack["phase"], ext: "png" | "jpg"): string {
+  return `leaf-${phase === "after" ? "recap" : "plan"}-${format}.${ext}`;
+}
+
+// One of our own URLs with a parameter added. The card URLs arrive from the
+// server already carrying planId, phase and format.
+function withParam(url: string, key: string, value: string): string {
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}${key}=${encodeURIComponent(value)}`;
+}
+
+// The host's own photo, drawn under the card. The card is fetched with a
+// transparent background (`bg=none`) and composited here, in the browser,
+// where the photo already is — uploading it so the server could draw the same
+// two layers would put someone's camera roll on our disks for nothing.
+//
+// The canvas takes the card's size, and the photo is drawn object-fit: cover
+// into it. `from-image` honours the EXIF rotation every phone photo carries;
+// without it a portrait shot lands on its side.
+async function compositeUnder(card: Blob, photo: File): Promise<Blob> {
+  const [over, under] = await Promise.all([
+    createImageBitmap(card),
+    createImageBitmap(photo, { imageOrientation: "from-image" }),
+  ]);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = over.width;
+    canvas.height = over.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("no 2d context");
+    const scale = Math.max(canvas.width / under.width, canvas.height / under.height);
+    const w = under.width * scale;
+    const h = under.height * scale;
+    ctx.drawImage(under, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+    ctx.drawImage(over, 0, 0);
+    // JPEG, not PNG: a 1080x1920 photo as PNG is several megabytes, and the
+    // share sheet has to carry it.
+    const out = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.92),
+    );
+    if (!out) throw new Error("encode failed");
+    return out;
+  } finally {
+    over.close();
+    under.close();
+  }
 }
 
 // The same-origin form of one of our own URLs. The kit is linked as
@@ -221,13 +271,15 @@ export default function ShareKitClient({
   );
 
   const usingPhoto = source.kind !== "card";
-  // The URL of the image being shared right now, when it has one. An upload
-  // has none — it's already a File.
+  // The card to fetch: this format's, told which background to use. A picked
+  // photo is one the server can reach, so it renders the whole thing; an
+  // upload gets the transparent card and is composited below.
   const imageUrl = useMemo(() => {
     if (!pack) return null;
-    if (source.kind === "photo") return source.url;
-    if (source.kind === "upload") return null;
-    return format === "story" ? pack.storyImageUrl : pack.postImageUrl;
+    const base = format === "story" ? pack.storyImageUrl : pack.postImageUrl;
+    if (source.kind === "photo") return withParam(base, "photo", source.url);
+    if (source.kind === "upload") return withParam(base, "bg", "none");
+    return base;
   }, [pack, source, format]);
 
   async function copyText(text: string, quiet = false): Promise<boolean> {
@@ -251,54 +303,61 @@ export default function ShareKitClient({
   // With the file in hand, the tap goes straight to the sheet.
   // One request serves both the preview and the share: the card takes the
   // server several seconds to rasterize, and an <img> plus a fetch was two
-  // renders of it. Keyed by URL so a tap right after switching tabs can't
-  // share the previous format's card. A failed fetch (a photo host without
-  // CORS) puts the plain <img> back for the preview; the tap then falls back
-  // to opening the image.
-  const [fetched, setFetched] = useState<{ url: string; file: File; objectUrl: string } | null>(null);
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const imageFile =
-    source.kind === "upload" ? source.file : fetched && fetched.url === imageUrl ? fetched.file : null;
-  const imageFailed = failedUrl === imageUrl;
-  const previewSrc =
-    source.kind === "upload"
-      ? source.objectUrl
-      : imageFile && fetched
-        ? fetched.objectUrl
-        : imageFailed
-          ? imageUrl
-          : null;
-  // What "Save image" hands over: the fetched object URL when there is one,
-  // the upload's own, else the remote URL.
-  const saveHref = source.kind === "upload" ? source.objectUrl : previewSrc ?? imageUrl;
+  // renders of it. Keyed so a tap right after switching tabs or photos can't
+  // share the previous one — the key carries the upload's identity too, since
+  // every upload asks the server for the same transparent card. A failure
+  // falls back to something postable: the card's own URL in an <img>, or, for
+  // an upload we couldn't composite, the bare photo.
+  const renderKey = imageUrl && source.kind === "upload" ? `${imageUrl}#${source.objectUrl}` : imageUrl;
+  const [fetched, setFetched] = useState<{ key: string; file: File; objectUrl: string } | null>(null);
+  const [failedKey, setFailedKey] = useState<string | null>(null);
+  const ready = fetched && fetched.key === renderKey ? fetched : null;
+  const imageFailed = failedKey !== null && failedKey === renderKey;
+  const imageFile = ready ? ready.file : imageFailed && source.kind === "upload" ? source.file : null;
+  const previewSrc = ready
+    ? ready.objectUrl
+    : imageFailed
+      ? source.kind === "upload"
+        ? source.objectUrl
+        : imageUrl
+      : null;
+  // What "Save image" hands over: the rendered object URL when there is one,
+  // else the card's own URL.
+  const saveHref = previewSrc ?? imageUrl;
   useEffect(() => {
-    if (!pack || !imageUrl) return;
-    const url = imageUrl;
+    if (!pack || !imageUrl || !renderKey) return;
+    const key = renderKey;
+    const upload = source.kind === "upload" ? source.file : null;
     const controller = new AbortController();
     let objectUrl: string | null = null;
     (async () => {
       try {
-        const res = await fetch(sameOriginUrl(url), { signal: controller.signal });
+        const res = await fetch(sameOriginUrl(imageUrl), { signal: controller.signal });
         if (!res.ok) throw new Error(String(res.status));
-        const blob = await res.blob();
-        const file = new File([blob], fileNameFor(format, pack.phase, source.kind === "photo"), {
+        const card = await res.blob();
+        const blob = upload ? await compositeUnder(card, upload) : card;
+        if (controller.signal.aborted) return;
+        const file = new File([blob], fileNameFor(format, pack.phase, upload ? "jpg" : "png"), {
           type: blob.type || "image/png",
         });
         objectUrl = URL.createObjectURL(blob);
-        setFetched({ url, file, objectUrl });
+        setFetched({ key, file, objectUrl });
       } catch (e) {
         if (e instanceof Error && e.name === "AbortError") return;
-        setFailedUrl(url);
+        setFailedKey(key);
       }
     })();
     return () => {
       controller.abort();
       if (objectUrl) {
         URL.revokeObjectURL(objectUrl);
-        setFetched((prev) => (prev?.url === url ? null : prev));
+        setFetched((prev) => (prev?.key === key ? null : prev));
       }
     };
-  }, [pack, imageUrl, format, source.kind]);
+    // `source` is read only for the upload's file, which `renderKey` already
+    // distinguishes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pack, imageUrl, renderKey, format]);
 
   // A photo off the camera roll. Held in memory only; nothing is uploaded.
   function pickUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -345,10 +404,11 @@ export default function ShareKitClient({
           : "Caption copied — paste it in.",
       );
     } catch (e) {
-      // Cancelled is not an error. No file (a photo host without CORS) or a
-      // refused share falls back to opening the image so they can save it.
+      // Cancelled is not an error. No file (a card that wouldn't render, a
+      // canvas that wouldn't encode) or a refused share falls back to opening
+      // the image so they can save it.
       if (e instanceof Error && e.name === "AbortError") return;
-      if (imageUrl) window.open(imageUrl, "_blank", "noopener");
+      if (saveHref) window.open(saveHref, "_blank", "noopener");
       setNotice("Couldn't attach the image directly — it's open in a new tab. Press and hold to save it, then post.");
     } finally {
       await clipboard;
@@ -398,7 +458,7 @@ export default function ShareKitClient({
           </h1>
           <p className="text-sm text-zinc-600 mt-2">
             {after
-              ? "A photo from the night, or the card, with a link to your calendar so they can see what's next. Optional, as always."
+              ? "A photo from the night on the card, with a link to your calendar so they can see what's next. Optional, as always."
               : "An image, a caption and the link, ready to post. Optional, and it works: a plan with nobody on it gets called off."}
           </p>
           {pack.staff && (
@@ -409,10 +469,11 @@ export default function ShareKitClient({
           )}
         </header>
 
-        {/* What to post: the card, a photo we have, or one off the camera roll. */}
+        {/* What goes behind the card: its own photo, one we have, or one off
+            the camera roll. The card itself is the same either way. */}
         <section className="px-5 pt-5">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
-            Image
+            Background
           </p>
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
             <button
@@ -426,7 +487,7 @@ export default function ShareKitClient({
               <span className="text-[15px] font-extrabold tracking-tight">
                 leaf<span className="text-[#F5C518]">.</span>
               </span>
-              <span className="text-[10px] font-medium text-white/80">Card</span>
+              <span className="text-[10px] font-medium text-white/80">Default</span>
             </button>
             {pack.recapPhotos.map((url) => (
               <button
@@ -470,8 +531,11 @@ export default function ShareKitClient({
               aria-label="Choose a photo"
             />
           </div>
+          <p className="text-[12px] text-zinc-500 mt-3">
+            The headline, the plan, the link and the QR code sit on top of whichever you pick.
+          </p>
           {usingPhoto && (
-            <p className="text-[12px] text-amber-800 bg-amber-50 rounded-lg px-3 py-2 mt-3">
+            <p className="text-[12px] text-amber-800 bg-amber-50 rounded-lg px-3 py-2 mt-2">
               Only post a photo of people who said it&rsquo;s fine. Faces are theirs, not ours.
             </p>
           )}
@@ -491,14 +555,14 @@ export default function ShareKitClient({
                   format === f ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                 }`}
               >
-                {usingPhoto ? (f === "story" ? "Story" : "Post") : f === "story" ? "Story · 9:16" : "Post · 4:5"}
+                {f === "story" ? "Story · 9:16" : "Post · 4:5"}
               </button>
             ))}
           </div>
 
           <div
             className={`mx-auto rounded-xl overflow-hidden bg-zinc-100 border border-zinc-200 ${
-              usingPhoto ? "max-w-[320px]" : format === "story" ? "max-w-[240px]" : "max-w-[300px]"
+              format === "story" ? "max-w-[240px]" : "max-w-[300px]"
             }`}
           >
             {previewSrc ? (
@@ -512,7 +576,7 @@ export default function ShareKitClient({
             ) : (
               <div
                 className={`w-full flex items-center justify-center animate-pulse ${
-                  usingPhoto ? "aspect-square" : format === "story" ? "aspect-[9/16]" : "aspect-[4/5]"
+                  format === "story" ? "aspect-[9/16]" : "aspect-[4/5]"
                 }`}
               >
                 <span className="text-[12px] text-zinc-400">Rendering your card…</span>
@@ -545,7 +609,7 @@ export default function ShareKitClient({
             {saveHref && (
               <a
                 href={saveHref}
-                download={source.kind === "upload" ? source.file.name : fileNameFor(format, pack.phase, usingPhoto)}
+                download={fileNameFor(format, pack.phase, source.kind === "upload" ? "jpg" : "png")}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => stamp("image")}
@@ -614,10 +678,8 @@ export default function ShareKitClient({
           <p className="text-[12px] text-zinc-400 mt-3 leading-relaxed">
             On a story, a link has to be a sticker — with Story selected, the
             link alone is copied, so add a link sticker and paste. With Post
-            selected, the caption is copied.
-            {usingPhoto
-              ? " A feed post can't carry a link, so the card is the one to use if the link matters."
-              : " The card carries a QR code too, for anyone who'd rather scan."}
+            selected, the caption is copied. A feed post can&rsquo;t carry a
+            link at all — the QR code on the card is the way back from one.
           </p>
         </section>
 

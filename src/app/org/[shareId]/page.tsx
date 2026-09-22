@@ -1857,6 +1857,10 @@ export default function OrgCalendarPage() {
   // the "Join Plan Chat" button (linked to /c/{notificationId}).
   const [rsvpNotificationIds, setRsvpNotificationIds] = useState<Map<string, string>>(new Map());
   const [hostedPlanIds, setHostedPlanIds] = useState<Set<string>>(new Set());
+  // Forecast chips, keyed by plan id. Empty until the secondary fetch lands,
+  // and permanently empty when it fails — there is no loading state on purpose
+  // (see the fetch below).
+  const [planWeather, setPlanWeather] = useState<Record<string, PlanWeather>>({});
   const [hostNotificationId, setHostNotificationId] = useState<string | null>(null);
   const [cancellingRsvp, setCancellingRsvp] = useState<string | null>(null);
   const [cancelRsvpModalPlan, setCancelRsvpModalPlan] = useState<{ id: string; title: string } | null>(null);
@@ -3013,6 +3017,21 @@ export default function OrgCalendarPage() {
 
       if (result.userHostedPlanIds && Array.isArray(result.userHostedPlanIds)) {
         setHostedPlanIds(new Set(result.userHostedPlanIds));
+      }
+
+      // Forecast chips — deliberately a second, non-blocking call. Weather is
+      // decorative, so it must not be able to delay the hero, the plan list or
+      // the follow CTA the way a field on getOrgCalendarPage would.
+      //
+      // No loading state and no error state: the chip appears or it doesn't.
+      // Every failure path on the server (no API key, beyond the 14-day
+      // horizon, upstream outage, indoor venue) already resolves to "absent",
+      // so silence here is the same outcome the user would see anyway.
+      const weatherIds = plans.filter(eligibleForWeather).map((p) => p.id);
+      if (weatherIds.length > 0) {
+        Parse.Cloud.run("getCalendarPlanWeather", { shareId, planIds: weatherIds })
+          .then((w: unknown) => setPlanWeather((w || {}) as Record<string, PlanWeather>))
+          .catch(() => { /* decorative — silence is the correct failure mode */ });
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -4344,7 +4363,17 @@ export default function OrgCalendarPage() {
                           })()}
                         </>
                       ) : (
-                        <>{plan.date}{plan.time ? <> &bull; {plan.time}</> : ""}</>
+                        <>
+                          {plan.date}{plan.time ? <> &bull; {plan.time}</> : ""}
+                          {/* Absent for most rows — the forecast only reaches
+                              14 days out and only covers outdoor venues — so
+                              it appends rather than occupying a reserved slot.
+                              A placeholder here would read as broken on the
+                              majority of the list. */}
+                          {planWeather[plan.id] && (
+                            <> &bull; <WeatherChip weather={planWeather[plan.id]} /></>
+                          )}
+                        </>
                       )}
                     </p>
                     <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
