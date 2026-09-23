@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
-import { setVerifiedUserCookie } from "@/lib/verified-user";
+import { getVerifiedUserCookie, setVerifiedUserCookie } from "@/lib/verified-user";
 import { trackMarketingEvent } from "@/components/marketing/analytics";
 import { Button } from "@/components/crew/CrewShell";
 import { RHYTHM_LABELS } from "@/lib/crew";
@@ -51,8 +51,10 @@ export default function StartCrewFlow({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
   const [rhythm, setRhythm] = useState(28);
-  const [myName, setMyName] = useState("");
-  const [myPhone, setMyPhone] = useState("");
+  // Prefill from the phone-verified cookie other flows set (name + phone only;
+  // the consent boxes below are never prefilled).
+  const [myName, setMyName] = useState(() => getVerifiedUserCookie()?.name || "");
+  const [myPhone, setMyPhone] = useState(() => getVerifiedUserCookie()?.phone || "");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
