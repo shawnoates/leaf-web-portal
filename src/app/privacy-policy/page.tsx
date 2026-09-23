@@ -1738,6 +1738,28 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="space-y-4">
+            <h2 className="text-xl font-normal text-zinc-900">SMS / Text Messaging</h2>
+            <p>
+              Leaf by One Common LLC (&ldquo;Leaf&rdquo;) sends text messages only to people who have opted in:
+              by agreeing to receive texts on a Leaf form, by replying IN to an invitation sent at a friend&apos;s
+              request, or by texting a keyword to a Leaf number. Messages concern plans, RSVPs, reminders and, for
+              Friend Mode, the nights Leaf plans for a small group of friends. Frequency varies; Friend Mode sends
+              up to 5 messages per week. Message and data rates may apply.
+            </p>
+            <p>
+              When you opt in we collect your mobile number, your name, the date and method of consent, and the
+              messages you send us, and we use them only to run the service you opted into. We do not sell or share
+              your SMS opt-in data or personal information with third parties for marketing purposes. Text
+              messaging originator opt-in data and consent are not shared with any third parties, except providers
+              that deliver messages on our behalf.
+            </p>
+            <p>
+              Reply STOP at any time to stop receiving messages, or HELP for help. You can also email{" "}
+              <a href="mailto:support@getleaflets.co" className="underline hover:text-zinc-900">support@getleaflets.co</a>.
+            </p>
+          </section>
+
+          <section className="space-y-4">
             <h2 className="text-xl font-normal text-zinc-900">Contact Us</h2>
             <p>
               If you have any questions about this Privacy Policy, You can
