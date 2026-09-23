@@ -33,6 +33,10 @@ export type SeriesOccurrence = {
   rsvps: number;
   capacity: number | null;
   shareUrl: string;
+  /** This occurrence's own place, which a host can point elsewhere for one date. */
+  venue: { id: string; name: string | null; address: string | null } | null;
+  /** True when that place isn't the series' default — "just this one". */
+  venueDiffersFromSeries: boolean;
   attendeeFirstNames?: string[];
 };
 

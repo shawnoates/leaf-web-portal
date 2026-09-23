@@ -24,6 +24,10 @@ import {
 
 type Venue = { name: string; address: string; placeId?: string | null };
 
+// "confirm"/"schedule" publish a date (and may put it somewhere else just this
+// once), "move" changes a published date, "venue" only changes its place.
+type PickerMode = "confirm" | "move" | "schedule" | "venue";
+
 const card = "rounded-2xl border border-zinc-200 bg-white p-6";
 const btnPrimary =
   "w-full rounded-lg bg-leaf-800 px-5 py-3.5 text-[16px] font-medium text-white " +
@@ -237,20 +241,40 @@ export default function SeriesHostClient({ seriesId, token }: { seriesId: string
   );
 
   // Date picker (confirm a different date / move / schedule).
-  const [picker, setPicker] = useState<{ mode: "confirm" | "move" | "schedule" } | null>(null);
+  const [picker, setPicker] = useState<{ mode: PickerMode } | null>(null);
   const [pickDate, setPickDate] = useState("");
   const [pickTime, setPickTime] = useState("");
+  // A place for this one date only. Left null, the occurrence takes the
+  // series' own venue and the series keeps it for the months after.
+  const [pickVenue, setPickVenue] = useState<Venue | null>(null);
+  const [pickVenueQuery, setPickVenueQuery] = useState("");
   const pickWallClock = pickDate && pickTime ? `${pickDate}T${pickTime}` : "";
 
-  const openPicker = (mode: "confirm" | "move" | "schedule") => {
+  const openPicker = (mode: PickerMode) => {
     setPickDate("");
     setPickTime(data?.nextOccurrence && mode === "move" ? data.nextOccurrence.wallClock.slice(11, 16) : data?.rule.wallTime || "19:00");
+    setPickVenue(null);
+    setPickVenueQuery(mode === "venue" ? data?.nextOccurrence?.venue?.name || "" : "");
     setPicker({ mode });
   };
 
   const submitPicker = async () => {
-    if (!picker || !pickWallClock || !data) return;
+    if (!picker || !data) return;
     const mode = picker.mode;
+    if (mode === "venue") {
+      if (!pickVenue || !data.nextOccurrence) return;
+      const id = data.nextOccurrence.id;
+      const venue = pickVenue;
+      await withSession(
+        mutate(
+          "picker",
+          async () => (await run("setSeriesOccurrenceVenue", { eventGroupId: id, venue })) as { series: SeriesSummary },
+          `Now at ${venue.name}. Everyone going gets a text.`,
+        ),
+      ).then(() => setPicker(null)).catch(() => {});
+      return;
+    }
+    if (!pickWallClock) return;
     await withSession(
       mutate(
         "picker",
@@ -259,7 +283,12 @@ export default function SeriesHostClient({ seriesId, token }: { seriesId: string
             await run("moveSeriesOccurrence", { eventGroupId: data.nextOccurrence.id, wallClock: pickWallClock });
             return undefined;
           }
-          return (await run("confirmSeriesOccurrence", { seriesId, token, wallClock: pickWallClock })) as { series: SeriesSummary };
+          return (await run("confirmSeriesOccurrence", {
+            seriesId,
+            token,
+            wallClock: pickWallClock,
+            venue: pickVenue || undefined,
+          })) as { series: SeriesSummary };
         },
         mode === "move" ? `Moved to ${fmtWallClock(pickWallClock)}. Everyone going gets a text.` : `${fmtWallClock(pickWallClock)} is on. Followers hear about it now.`,
       ),
@@ -493,6 +522,12 @@ export default function SeriesHostClient({ seriesId, token }: { seriesId: string
             <p className="mt-1 text-[15px] text-zinc-600">
               {next.rsvps} going{next.capacity ? ` · ${next.capacity} spots` : ""}
             </p>
+            {next.venue?.name ? (
+              <p className="mt-1 text-[15px] text-zinc-600">
+                at {next.venue.name}
+                {next.venueDiffersFromSeries ? <span className="text-[13px] text-zinc-500"> · just this one</span> : null}
+              </p>
+            ) : null}
             {next.attendeeFirstNames && next.attendeeFirstNames.length ? (
               <p className="mt-1 text-[13px] text-zinc-500">{next.attendeeFirstNames.join(", ")}</p>
             ) : null}
@@ -502,6 +537,9 @@ export default function SeriesHostClient({ seriesId, token }: { seriesId: string
               </button>
               <button type="button" className={btnQuiet} disabled={busy !== null} onClick={() => void withSession(async () => openPicker("move"))}>
                 Move
+              </button>
+              <button type="button" className={btnQuiet} disabled={busy !== null} onClick={() => void withSession(async () => openPicker("venue"))}>
+                Change place
               </button>
               <button type="button" className={btnQuiet} disabled={busy !== null} onClick={skipNext}>
                 Skip this one
@@ -527,18 +565,55 @@ export default function SeriesHostClient({ seriesId, token }: { seriesId: string
       {picker ? (
         <section className={`${card} mt-4`}>
           <h2 className="text-[13px] font-semibold uppercase tracking-wide text-zinc-500">
-            {picker.mode === "move" ? "Move it to" : "Pick a date"}
+            {picker.mode === "venue" ? "Where is this one?" : picker.mode === "move" ? "Move it to" : "Pick a date"}
           </h2>
-          <p className="mt-2 text-[13px] text-zinc-500">
-            At least a day out and within 60 days. Times are in {data.rule.timeZone.replace(/_/g, " ")}.
-          </p>
-          <div className="mt-3 grid grid-cols-[1fr_auto] gap-3">
-            <input type="date" aria-label="Date" className={inputClass} value={pickDate} min={data.minWallClock.slice(0, 10)} max={data.maxWallClock.slice(0, 10)} onChange={(e) => setPickDate(e.target.value)} />
-            <input type="time" aria-label="Start time" className={inputClass} value={pickTime} onChange={(e) => setPickTime(e.target.value)} />
-          </div>
-          <button type="button" className={`${btnPrimary} mt-3`} disabled={!pickWallClock || busy !== null} onClick={() => void submitPicker()}>
-            {busy === "picker" ? "Saving…" : pickWallClock ? `${picker.mode === "move" ? "Move to" : "Set for"} ${fmtWallClock(pickWallClock)}` : "Choose a date"}
-          </button>
+          {picker.mode === "venue" ? (
+            <>
+              <p className="mt-2 text-[13px] text-zinc-500">
+                Just this one. {data.venue?.name ? `${data.venue.name} stays` : "The usual place stays"} the default for the others.
+              </p>
+              <div className="mt-3">
+                <VenueSearch
+                  value={pickVenueQuery}
+                  onChange={setPickVenueQuery}
+                  onSelect={(v) => { setPickVenueQuery(v.name); setPickVenue({ name: v.name, address: v.address, placeId: v.placeId }); }}
+                  className={inputClass}
+                  placeholder="Search for a place"
+                />
+              </div>
+              <button type="button" className={`${btnPrimary} mt-3`} disabled={!pickVenue || busy !== null} onClick={() => void submitPicker()}>
+                {busy === "picker" ? "Saving…" : pickVenue ? `Move it to ${pickVenue.name}` : "Pick a place"}
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="mt-2 text-[13px] text-zinc-500">
+                At least a day out and within 60 days. Times are in {data.rule.timeZone.replace(/_/g, " ")}.
+              </p>
+              <div className="mt-3 grid grid-cols-[1fr_auto] gap-3">
+                <input type="date" aria-label="Date" className={inputClass} value={pickDate} min={data.minWallClock.slice(0, 10)} max={data.maxWallClock.slice(0, 10)} onChange={(e) => setPickDate(e.target.value)} />
+                <input type="time" aria-label="Start time" className={inputClass} value={pickTime} onChange={(e) => setPickTime(e.target.value)} />
+              </div>
+              {picker.mode === "move" ? null : (
+                <div className="mt-3">
+                  <label className={labelClass}>Place (optional)</label>
+                  <VenueSearch
+                    value={pickVenueQuery}
+                    onChange={(v) => { setPickVenueQuery(v); if (!v) setPickVenue(null); }}
+                    onSelect={(v) => { setPickVenueQuery(v.name); setPickVenue({ name: v.name, address: v.address, placeId: v.placeId }); }}
+                    className={inputClass}
+                    placeholder={data.venue?.name ? `${data.venue.name} — search to change just this one` : "Search for a place"}
+                  />
+                  <p className="mt-1 text-[13px] text-zinc-500">
+                    Leave it be and this one is at {data.venue?.name || "the usual place"}. Changing it here moves this date only.
+                  </p>
+                </div>
+              )}
+              <button type="button" className={`${btnPrimary} mt-3`} disabled={!pickWallClock || busy !== null} onClick={() => void submitPicker()}>
+                {busy === "picker" ? "Saving…" : pickWallClock ? `${picker.mode === "move" ? "Move to" : "Set for"} ${fmtWallClock(pickWallClock)}` : "Choose a date"}
+              </button>
+            </>
+          )}
           <button type="button" className={`${btnQuiet} mt-3`} onClick={() => setPicker(null)}>
             Cancel
           </button>
