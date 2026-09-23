@@ -25,7 +25,8 @@ export type WebEvent =
   | "cross_promo_share_sent"
   | "cross_promo_decided"
   | "rsvp_full_alternatives_shown"
-  | "rsvp_full_alternative_tap";
+  | "rsvp_full_alternative_tap"
+  | "plan_detail_full_alternative_tap";
 
 const ANON_COOKIE = "leaf_anon_id";
 

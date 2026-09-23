@@ -225,7 +225,10 @@ function WeatherChip({ weather }: { weather: PlanWeather }) {
     ? `${weather.text}, ${weather.chanceOfRain}% chance of rain`
     : weather.text;
   return (
-    <span className="inline-flex items-center gap-1 align-baseline" title={label}>
+    // shrink-0 + whitespace-nowrap: this is the right-hand item in a
+    // justify-between eyebrow, so it must hold its width and never wrap when a
+    // long weekday pushes against it.
+    <span className="inline-flex items-center gap-1 shrink-0 whitespace-nowrap" title={label}>
       <Icon className="w-3 h-3 shrink-0" aria-hidden="true" />
       <span>{weather.temp}&deg;</span>
       <span className="sr-only">, {label}</span>
@@ -699,6 +702,83 @@ function AvatarStack({ count }: { count: number }) {
   );
 }
 
+/**
+ * Horizontal strip of this calendar's plans that still have a spot open.
+ * Shown wherever a guest runs into a full plan (the RSVP form and the plan
+ * detail overlay), so the dead end has a way forward that doesn't send them
+ * back out to the calendar. Full-bleed inside a padded modal: the caller
+ * passes the negative margin / gutter pair matching its own padding.
+ */
+function OpenPlansCarousel({
+  plans,
+  brandColor,
+  onPick,
+  label = "Or join a plan with spots open",
+  bleedClass = "-mx-8 md:-mx-12",
+  gutterClass = "px-8 md:px-12",
+}: {
+  plans: Plan[];
+  brandColor?: string;
+  onPick: (plan: Plan) => void;
+  label?: string;
+  bleedClass?: string;
+  gutterClass?: string;
+}) {
+  if (plans.length === 0) return null;
+  return (
+    <div className={`${bleedClass} border-y border-zinc-100 bg-zinc-50/60 py-4`}>
+      <p className={`${gutterClass} text-[11px] tracking-widest uppercase font-bold text-zinc-500 mb-3`}>
+        {label}
+      </p>
+      <div className={`flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory ${gutterClass} pb-1`}>
+        {plans.map((alt) => {
+          const left = alt.capacity != null ? alt.capacity - alt.rsvpCount : null;
+          return (
+            <button
+              key={alt.id}
+              type="button"
+              onClick={() => onPick(alt)}
+              className="snap-start shrink-0 w-[150px] text-left group"
+            >
+              <div className="aspect-[4/3] w-full overflow-hidden rounded-lg bg-zinc-200 mb-2 relative">
+                {alt.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={alt.image}
+                    alt=""
+                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-zinc-400">
+                    <Calendar className="w-5 h-5" />
+                  </div>
+                )}
+                {left != null && left <= 3 && (
+                  <span className="absolute bottom-1.5 left-1.5 bg-white/95 text-zinc-900 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">
+                    {left} {left === 1 ? "spot" : "spots"} left
+                  </span>
+                )}
+              </div>
+              <p className="text-sm font-medium tracking-tight leading-snug line-clamp-2 group-hover:italic">
+                {alt.title}
+              </p>
+              <p className="text-[11px] text-zinc-500 mt-0.5 truncate">
+                {alt.date}{alt.time ? ` · ${alt.time}` : ""}
+              </p>
+              <p
+                className="text-[11px] font-bold uppercase tracking-wider mt-1 flex items-center gap-1"
+                style={{ color: brandColor || "#18181b" }}
+              >
+                {alt.requireApproval ? "Request" : "Join"} <ArrowRight className="w-3 h-3" />
+              </p>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function RsvpModal({
   plan,
   onClose,
@@ -916,56 +996,11 @@ function RsvpModal({
                 calendar's open plans right here; a tap re-targets this modal
                 (verified phone kept) instead of sending them back out. */}
             {showAlternatives && alternatives && (
-              <div className="-mx-8 md:-mx-12 border-y border-zinc-100 bg-zinc-50/60 py-4">
-                <p className="px-8 md:px-12 text-[11px] tracking-widest uppercase font-bold text-zinc-500 mb-3">
-                  Or join a plan with spots open
-                </p>
-                <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory px-8 md:px-12 pb-1">
-                  {alternatives.map((alt) => {
-                    const left = alt.capacity != null ? alt.capacity - alt.rsvpCount : null;
-                    return (
-                      <button
-                        key={alt.id}
-                        type="button"
-                        onClick={() => switchTo(alt, "carousel")}
-                        className="snap-start shrink-0 w-[150px] text-left group"
-                      >
-                        <div className="aspect-[4/3] w-full overflow-hidden rounded-lg bg-zinc-200 mb-2 relative">
-                          {alt.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={alt.image}
-                              alt=""
-                              className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-zinc-400">
-                              <Calendar className="w-5 h-5" />
-                            </div>
-                          )}
-                          {left != null && left <= 3 && (
-                            <span className="absolute bottom-1.5 left-1.5 bg-white/95 text-zinc-900 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">
-                              {left} {left === 1 ? "spot" : "spots"} left
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm font-medium tracking-tight leading-snug line-clamp-2 group-hover:italic">
-                          {alt.title}
-                        </p>
-                        <p className="text-[11px] text-zinc-500 mt-0.5 truncate">
-                          {alt.date}{alt.time ? ` · ${alt.time}` : ""}
-                        </p>
-                        <p
-                          className="text-[11px] font-bold uppercase tracking-wider mt-1 flex items-center gap-1"
-                          style={{ color: brandColor || "#18181b" }}
-                        >
-                          {alt.requireApproval ? "Request" : "Join"} <ArrowRight className="w-3 h-3" />
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <OpenPlansCarousel
+                plans={alternatives}
+                brandColor={brandColor}
+                onPick={(alt) => switchTo(alt, "carousel")}
+              />
             )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -3959,32 +3994,51 @@ export default function OrgCalendarPage() {
   // FollowModal (and never chains the share kit).
   const [interestPrompt, setInterestPrompt] = useState<InterestPromptItem[] | null>(null);
 
-  // Plans a guest could still get into, for the RSVP modal's "or join a plan
-  // with spots open" carousel when the plan they picked is full. Real hosted
-  // plans only (no polls), RSVP still open, not full, and not one the viewer
-  // already holds a place in or hosts. Soonest first, capped so the strip
-  // stays a nudge rather than a second calendar.
-  const rsvpAlternatives = useMemo<Plan[]>(() => {
-    if (!org || !rsvpPlan) return [];
-    return org.plans
-      .filter(
-        (p) =>
-          p.id !== rsvpPlan.id &&
-          !p.isPoll &&
-          !planIsFull(p) &&
-          planLifecycle(p.dateISO, p.endDateISO) === "upcoming" &&
-          !rsvpedPlanIds.has(p.id) &&
-          !pendingRsvpIds.has(p.id) &&
-          !viewerHostsPlan(p),
-      )
-      .sort((a, b) => {
-        const am = Date.parse(String(a.dateISO ?? ""));
-        const bm = Date.parse(String(b.dateISO ?? ""));
-        return (Number.isFinite(am) ? am : Infinity) - (Number.isFinite(bm) ? bm : Infinity);
-      })
-      .slice(0, 8);
+  // Plans a guest could still get into, for the "or join a plan with spots
+  // open" carousel shown when the plan they picked is full (RSVP modal and
+  // plan detail overlay). Real hosted plans only (no polls), RSVP still open,
+  // not full, and not one the viewer already holds a place in or hosts.
+  // Soonest first, capped so the strip stays a nudge rather than a second
+  // calendar.
+  const openPlansExcluding = useCallback(
+    (excludeId: string): Plan[] => {
+      if (!org) return [];
+      return org.plans
+        .filter(
+          (p) =>
+            p.id !== excludeId &&
+            !p.isPoll &&
+            !planIsFull(p) &&
+            planLifecycle(p.dateISO, p.endDateISO) === "upcoming" &&
+            !rsvpedPlanIds.has(p.id) &&
+            !pendingRsvpIds.has(p.id) &&
+            !viewerHostsPlan(p),
+        )
+        .sort((a, b) => {
+          const am = Date.parse(String(a.dateISO ?? ""));
+          const bm = Date.parse(String(b.dateISO ?? ""));
+          return (Number.isFinite(am) ? am : Infinity) - (Number.isFinite(bm) ? bm : Infinity);
+        })
+        .slice(0, 8);
+    },
+    // viewerHostsPlan is a plain closure over hostedPlanIds / parseUser; the
+    // ids set is the input that actually changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [org, rsvpPlan, rsvpedPlanIds, pendingRsvpIds, hostedPlanIds]);
+    [org, rsvpedPlanIds, pendingRsvpIds, hostedPlanIds],
+  );
+  const rsvpAlternatives = useMemo<Plan[]>(
+    () => (rsvpPlan ? openPlansExcluding(rsvpPlan.id) : []),
+    [rsvpPlan, openPlansExcluding],
+  );
+  // Only computed for a full plan — that's the one case the detail overlay
+  // shows the strip (under "Join Waitlist").
+  const detailAlternatives = useMemo<Plan[]>(
+    () => (selectedEvent && planIsFull(selectedEvent) ? openPlansExcluding(selectedEvent.id) : []),
+    [selectedEvent, openPlansExcluding],
+  );
+  // Scroll column of the detail overlay, so a carousel tap that re-targets
+  // the overlay lands the guest at the top of the new plan, not mid-page.
+  const detailScrollRef = useRef<HTMLDivElement | null>(null);
 
   // 2a — "Around the city": a slim 122px full-width band. These are citywide
   // happenings looking for a host, not this calendar's own upcoming plans, so
@@ -4488,9 +4542,16 @@ export default function OrgCalendarPage() {
                         and across the page from it on the next. Same
                         treatment as the detail modal. */}
                     {plan.promotedFrom && <CrossPromoEyebrow source={plan.promotedFrom} />}
-                    <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                    {/* Flex so the forecast can sit hard right, in its own slot,
+                        instead of trailing the time as a third bullet — the
+                        date and time are properties of the plan, the weather
+                        isn't, and equal billing made it read as bolted on.
+                        With no forecast there is a single child and
+                        justify-between leaves it flush left, so rows without
+                        one are untouched. */}
+                    <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400 flex items-center justify-between gap-3">
                       {plan.isPoll ? (
-                        <>
+                        <span>
                           Date Poll &bull; {plan.pollOptionCount || 0} {plan.pollOptionCount === 1 ? "option" : "options"}
                           {plan.pollClosesAt && (() => {
                             const ms = new Date(plan.pollClosesAt).getTime() - Date.now();
@@ -4498,17 +4559,14 @@ export default function OrgCalendarPage() {
                             const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
                             return <> &bull; {days}d left</>;
                           })()}
-                        </>
+                        </span>
                       ) : (
                         <>
-                          {plan.date}{plan.time ? <> &bull; {plan.time}</> : ""}
-                          {/* Absent for most rows — the forecast only reaches
-                              14 days out and only covers outdoor venues — so
-                              it appends rather than occupying a reserved slot.
-                              A placeholder here would read as broken on the
-                              majority of the list. */}
+                          <span>{plan.date}{plan.time ? <> &bull; {plan.time}</> : ""}</span>
+                          {/* Absent on most rows — the forecast only reaches 14
+                              days out and only covers outdoor venues. */}
                           {planWeather[plan.id] && (
-                            <> &bull; <WeatherChip weather={planWeather[plan.id]} /></>
+                            <WeatherChip weather={planWeather[plan.id]} />
                           )}
                         </>
                       )}
@@ -5536,7 +5594,7 @@ export default function OrgCalendarPage() {
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 md:p-16 space-y-12">
+            <div ref={detailScrollRef} className="flex-1 overflow-y-auto p-8 md:p-16 space-y-12">
               <div className="space-y-4">
                 {selectedEvent.promotedFrom && (
                   <div className="flex">
@@ -5900,6 +5958,37 @@ export default function OrgCalendarPage() {
                       <span className="text-xs font-bold uppercase tracking-widest">Share</span>
                     </button>
                   </div>
+                )}
+                {/* Full plan: the guest just read the whole pitch and hit a
+                    waitlist. Show this calendar's other hosted plans with a
+                    spot open right under the button, so the way forward is
+                    one tap away. A tap re-targets this overlay (same modal,
+                    scrolled back to the top) rather than closing it. The
+                    RSVP form shows the same strip if they go for the
+                    waitlist anyway. */}
+                {!selectedEvent.isPoll
+                  && planIsFull(selectedEvent)
+                  && planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "upcoming"
+                  && !org.rsvpLimitReached
+                  && !rsvpedPlanIds.has(selectedEvent.id)
+                  && !pendingRsvpIds.has(selectedEvent.id)
+                  && !viewerHostsPlan(selectedEvent)
+                  && detailAlternatives.length > 0 && (
+                  <OpenPlansCarousel
+                    plans={detailAlternatives}
+                    brandColor={org.brandColor || undefined}
+                    bleedClass="-mx-8 md:-mx-16"
+                    gutterClass="px-8 md:px-16"
+                    onPick={(alt) => {
+                      track(
+                        "plan_detail_full_alternative_tap",
+                        { fromPlanId: selectedEvent.id, toPlanId: alt.id },
+                        org.objectId,
+                      );
+                      setSelectedEvent(alt);
+                      detailScrollRef.current?.scrollTo({ top: 0 });
+                    }}
+                  />
                 )}
                 {/* Add to Calendar — only on real plans (not polls), only when we have a date,
                     and only when the viewer is actually attending or hosting (otherwise it's
