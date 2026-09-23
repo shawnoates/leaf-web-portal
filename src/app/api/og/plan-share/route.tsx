@@ -204,15 +204,14 @@ function headline(phase: "before" | "after", hood: string | null): Word[] {
   return hood ? [...plain("Join me in"), ...hi(hood)] : [...hi("Join me.")];
 }
 
-// The "before" card carries no body line: headline, title, when, URL. The
-// going count and the "no pressure" reassurance read as filler under the
-// headline, and the caption already says both. The "after" card carries no
-// headcount either: rsvpCount is who said yes, not who came, and a number
-// the host didn't write is a claim they'd have to stand behind.
-function bodyLine(phase: "before" | "after"): string | null {
-  if (phase !== "after") return null;
-  return "The next one's already on the calendar.";
-}
+// Neither card carries a body line. On the "before" card the going count and
+// the "no pressure" reassurance read as filler under the headline, and the
+// caption already says both. The "after" card carried "The next one's already
+// on the calendar." until 2026-09-22, and it had to go for the same reason its
+// headcount did: nothing here knows whether there IS a next one. The calendar
+// may be empty, and the post is signed by the host, so an unkept promise is
+// theirs to answer for, not ours. The link and the QR invite people to look,
+// which is true whatever the calendar holds.
 
 // ---------------------------------------------------------------------------
 // Route
@@ -265,7 +264,6 @@ export async function GET(request: Request) {
   const words = headline(phase, hood);
   const title = clip(plan?.title || "A plan on Leaf", 70);
   const when = phase === "before" ? whenLabel(plan?.expiryDate ?? null, plan?.location?.timezone ?? null) : null;
-  const body = bodyLine(phase);
 
   // Where the card sends people. Before the night, the plan. After it, the
   // CALENDAR: the plan has ended, so a link that lands on it offers a join
@@ -316,7 +314,6 @@ export async function GET(request: Request) {
   const qrSvg = qr.createSvgTag({ cellSize: 4, margin: 0 });
   const qrSrc = `data:image/svg+xml;base64,${Buffer.from(qrSvg).toString("base64")}`;
   const titleSize = Math.round(46 * s);
-  const bodySize = Math.round(32 * s);
   const urlSize = Math.round(34 * s);
 
   const fontFamily = font ? "Inter, system-ui, sans-serif" : "system-ui, -apple-system, sans-serif";
@@ -473,19 +470,6 @@ export async function GET(request: Request) {
               }}
             >
               {when}
-            </div>
-          )}
-
-          {body && (
-            <div
-              style={{
-                display: "flex",
-                fontSize: bodySize,
-                lineHeight: 1.35,
-                color: "rgba(255,255,255,0.86)",
-              }}
-            >
-              {body}
             </div>
           )}
 
