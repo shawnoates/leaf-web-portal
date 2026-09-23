@@ -30,7 +30,7 @@ Friend Mode is **free**. The long-term revenue is venues paying for groups Leaf 
 | Booking | **Leaf sends the night's host a booking link.** Leaf doesn't book. Plenty of products plan for free, so Friend Mode earns its money on the venue side, and the booking link is where that money comes in later (partner links, featured picks). |
 | Where places come from | **The Crew Book:** a shared web list of places the group wants to go. Each member sees their own saved places and adds any of them to the crew in one tap. Leaf picks from the book first. Saying which neighborhood you're usually in is optional. `homeArea` is worked out from the spots and past nights, not asked for. |
 | Who can start a plan | **Any member who's in.** Two ways: ask Leaf to find a night ("Plan something" or text `PLAN`), or propose your own ("I've got one": pick the place and 1–3 dates). Leaf runs the counting and texting either way. The person who proposes hosts that night and gets the booking link. |
-| App users | **Every cycle happens in `PlanningChatView`.** Each cycle is a `PlanningSession` (`sourceType: "crew"`) with the members who are app users as participants. Leaf posts its messages and the date poll there. SMS members' votes appear live in the same poll. There's no separate crew chat. |
+| App users | **Nothing happens in planning chats** (decided 2026-09-23: it was too confusing next to normal plan chats). App members who are push-reachable get a push instead of a text; tapping it opens their personal `/crew/<token>` page in the in-app browser, or the plan itself once a night is locked. Everyone else gets the SMS with the same link. Crews are started on the web (`/crew/start`, or the dashboard switch), not in the app; Settings → Friend Mode lists a member's crews with on/off switches (owner: the crew; member: themselves) and lets an owner delete a crew. |
 | Visual identity | **"Friend Mode — Design Spec" (Sep 23, 2026)** is the source of truth for the toggle: a switch whose knob is a trail of three people, lime `#C8F25A` only when on, three states (enabled / disabled / locked). Web: `src/components/crew/FriendModeGlyphs.tsx` (`FriendModeIcon` B6, `FriendModeMark` B7, `FriendModeSwitch`). iOS: `Leaflet/Friend Mode/FriendModeGlyphs.swift`. No leaf emoji anywhere in Friend Mode. The dashboard settings row follows the spec's row states, including the locked subline "Not available · Friend Mode is for circles under 15 followers". |
 | Members set their own pace | **Yes.** The crew keeps its rhythm (the initiator's). A member who wants nights less often (8 weeks in a 2-week crew) is only asked, and only counts toward quorum, on their own pace — about every 4th cycle — and can always jump in from the crew page or app, where cycles they sat out say so. Asked once by text right after joining ("How often do you want {Crew} nights? Reply a number of weeks"), changeable anytime with `EVERY 8` by text, a select on `/crew/[token]`, or the menu in `CrewView`. Stored as `GroupMembership.fmRhythmDays` (+ `fmLastCycleAt`); each `CrewCycle` stamps `invitedMemberIds`. Half a crew rhythm of slack keeps the 8-week member on the 4th cycle rather than the 5th (`memberDueForCycle`). |
 | Dark by default | **Friend Mode surfaces are dark**, per the design spec, so they read as a different thing from community calendars: canvas `#101A16`, cards `#253A33`, line `#3B5449`, ink `#F2F1EC`, muted `#8A928C`. Web: everything inside a `.fm` wrapper (`globals.css`) — the crew pages, `/friends`, the start flow, the CTAs, and dark tiles (`fm-dark`) on the light `/me`. iOS: the Friend Mode screens use `FMColor.*`; the Home section's header stays dark ink on the light Home page. Lime stays reserved for the switch's "on" state. |
@@ -149,7 +149,6 @@ Unique on `(crew, location)`, enforced by upsert in code. When a new place is ad
 | `trigger` | `rhythm` (Leaf, on schedule), `member_ask` (a member asked Leaf to plan), `member_proposal` (a member proposed their own place and dates) or `opportunity` (phase 4) |
 | `startedBy` | pointer to `_User`, or null when Leaf started it |
 | `host` | who hosts the night and gets the booking link: the proposer for `member_proposal`, otherwise the member who asked, otherwise the crew owner |
-| `planningSession` | pointer to the `PlanningSession` app members use for this cycle (see "App users: the planning chat") |
 | `state` | `picking` → `polling` → `locked` → `booked` → `done`, or `skipped`. Any state before `done` can move to `cancelled`. |
 | `venue`, `backupVenue` | `{name, placeId, address, lat, lng, bookingUrl?, phone?}` |
 | `pollEventGroup` | the `EventGroup` made by the internal date-poll create (`isPollPlan: true`). The same id becomes the plan on lock. |
@@ -186,7 +185,7 @@ A log of every Friend Mode message on any channel: `crew`, `member`, `cycle?`, `
 
 ### 2. Invite and consent
 - **Phone-only friends** get text F1. `IN` sets `fmStatus: "in"` and `fmConsentAt`. `OUT` or `STOP` sets `declined` / `fmOptedOutAt`. No reply means Leaf sends nothing more; one reminder (F1b) goes out after 3 days, then it stops.
-- **App users** get a push plus an in-app accept card. Accepting counts as consent.
+- **App users** get the invite as a push that opens their crew page, where they accept (and set their pace). Accepting counts as consent.
 - **The inviter** sees "invited" until the person joins. A decline is never shown as a decline.
 - **The first cycle** starts once there are `quorum` members who are in.
 
@@ -219,7 +218,7 @@ A log of every Friend Mode message on any channel: `crew`, `member`, `cycle?`, `
   - The state becomes `locked`.
 - **No quorum:** send F5 with the backup venue and 2 new dates, once. If that also misses, F6 and `skipped`; the next cycle starts on rhythm.
 - **Book:**
-  - Right after lock, the cycle's `host` gets F7 with the booking link (Resy or OpenTable search deep link, or the venue's phone), in the planning chat if they're an app user, otherwise by text.
+  - Right after lock, the cycle's `host` gets F7 with the booking link (Resy or OpenTable search deep link, or the venue's phone), as a push if they're an app user, otherwise by text.
   - `BOOKED` moves the state to `booked` and sends F8 to everyone who's in.
   - No `BOOKED` within 48h leaves the state at `locked`. The plan still stands; people just go.
 - **Day of:** F9 at 10am local to everyone who's in.
@@ -234,34 +233,13 @@ A log of every Friend Mode message on any channel: `crew`, `member`, `cycle?`, `
 
 ## Reaching members (`reachCrewMember(member, message, {trigger})`)
 1. If the member is opted out or has no consent yet, send nothing (except the single invite text).
-2. **App user:** if `isPushReachable(user)` is true and the app was opened within 14 days, the message goes **into the cycle's planning chat** (see below), and they get the existing `planning_message` push with `sessionId`, which already opens `PlanningChatView`. If there's no response after 24h on a message that expects one (a vote, IN/OUT), send one SMS fallback with the `leaf://planning/{sessionId}` link.
+2. **App user:** if `isPushReachable(user)` is true, they get a push (`notification_type: "friend_mode"`) whose text is the SMS copy without the link, and whose payload carries `crewId`, `cycleId`, `url` (their `/crew/<token>` page) and, once the night is locked, `planId`. The app opens the plan when `planId` is present, otherwise the `url` in the in-app browser. No SMS, nothing in any chat.
 3. **Otherwise, SMS** from `FRIEND_MODE_TWILIO_NUMBER`, through `crewChannel.send`, which wraps `sendSmsTracked` with the `fm*` trigger names. The send is held until `nextQuietWindowOpen` if it falls outside 9am–9pm local.
 4. **Cap:** 3 texts per member per week across all their crews (5 for members of a weekly crew, since one cycle is poll + lock + reminder), tracked with `fmSmsWeeks` on the user, the same bucket approach as `weekBucket`. Invites, F2 and F4 are always allowed; nudges and reminders are dropped first.
 5. Every send writes a `CrewMessage`.
 
-## App users: the planning chat
-For members who are active app users, **each cycle happens in `PlanningChatView`**, the same Planning Hub chat used for group hangouts today. There is no separate crew chat.
-
-**Most of this already works:**
-- **A poll on a calendar can already have a planning chat.** `createCalendarDatePoll` already creates a `PlanningSession` with `convertedGroup` set to the poll `EventGroup` when the host has an app account (`functions.js`, step 4b).
-- **The chat already recognizes poll plans.** `PlanningChatViewModel.isPollPlanSession` treats such sessions as poll plans: it seeds the Firebase `ChatPoll` from `CatchUpPlanPost.dateTimeOptions` (`importExistingPollPlanOptions`), imports existing votes (`importExistingPollPlanVotes`), and **live-queries `CatchUpPlanVote`** (`subscribeToCatchUpPlanVoteUpdates`, :875). SMS members' votes therefore show up in the chat as they arrive.
-- **Members see sessions they're part of.** The Planning Hub loads sessions where you're the creator **or** a participant (`loadActiveSessions` → `fetchActiveSessions` + `fetchSessionsAsParticipant`), so every member who's in sees the cycle.
-- **The server already posts to planning chats.** It writes Leaf messages and polls to `planning_sessions/{firebaseId}/messages` and `/polls` (`insertChatMessage`, `sendReEngagementStraggler` in `forYouGroupFunctions.js`), and the `planning_message` push deep-links into the chat.
-
-**What Friend Mode adds:**
-- **Cycle start:** `createDatePollInternal` always creates the `PlanningSession` for a crew cycle with:
-  - `sourceType: "crew"` (a new `SourceType` case on iOS)
-  - `creator` = `startedBy`, or the crew owner when Leaf started it
-  - `participants` = every member who's in and has an app account (whether or not they're active; the session is where the plan lives)
-  - `chatName` = "{Crew} · {Venue}"
-  - `aiContextData.crewId` and `aiContextData.crewCycleId`
-  - `host`
-- **Leaf's messages** (`from: "leaf_ai"`) replace the texts for app users, one per step: the proposal with a Crew Book credit ("Sal's, from Jess's list"), the nudge, "Locked for Thu 10/9, 5 going", the booking link for the host (with a **Booked** button that calls `markCrewBooked`), day-of and recap. Copy matches F2–F10 without the "reply 1 3" instructions.
-- **Everyone else's messages stay in the chat.** App members chatting to each other is normal planning chat. Leaf does **not** forward chat messages to SMS members (same privacy rule as free-text texts), and SMS members' free-text never appears in the chat.
-- **In-chat votes must write `CatchUpPlanVote`**, the source of truth the cycle engine counts. *Verify in Phase 1* that voting in a poll-plan chat already writes it (`CatchUpPlanVote.fetchMyVote` is used at `PlanningChatView.swift:3581`). If it doesn't, add a `recordPollVote` call from the chat's vote action.
-- **After lock:** the session is set to `status: "completed"` and `selectedDateTime`, as `closeAndConvertPoll` does today. The night then continues in the normal plan chat (`groups/{eventGroupId}/messages`).
-- **Expiry:** crew sessions are left out of `sendPlanningSessionExpiryReminders` and `cleanupStaleForYouSessions`. The cycle engine owns their lifetime.
-- **Starting a cycle in the app:** "Plan something" and "I've got one" call `startCrewCycle` / `proposeCrewNight`, then open the new session in `PlanningChatView`.
+## App users: push to the crew page
+App members are reached by push only (see "Reaching each member"). The push opens the same web page SMS members use, so there is one surface for votes, IN/OUT, pace, the Crew Book and "tell Leaf". When a night is locked the cycle's plan (`EventGroup`) exists and everyone gets the normal plan invite (`EventNotification` → Invited), so the push opens the plan in the app instead. There is no `PlanningSession` per cycle and Leaf never posts into planning chats.
 
 ## Inbound SMS
 **New route:** `/twilioFriendModeInbound` on the dedicated number. It checks the Twilio signature, like `/twilioInboundSms`.
