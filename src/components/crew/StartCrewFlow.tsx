@@ -30,11 +30,14 @@ export default function StartCrewFlow({
   signedIn,
   suggest = false,
   initialName = "",
+  fromEventGroupId = null,
   onClose,
 }: {
   signedIn: boolean;
   suggest?: boolean;
   initialName?: string;
+  /** A plan the visitor came from (/m/ or /p/ CTA): its attendees are offered first. */
+  fromEventGroupId?: string | null;
   /** null when rendered as a page; a handler when rendered in a modal. */
   onClose: (() => void) | null;
 }) {
@@ -56,10 +59,10 @@ export default function StartCrewFlow({
   useEffect(() => { trackMarketingEvent("friend_mode_intro_step", { step: STEPS.indexOf(step) + 1 }); }, [step]);
   useEffect(() => {
     if (!signedIn) return;
-    Parse.Cloud.run("getFriendModeSuggestions")
+    Parse.Cloud.run("getFriendModeSuggestions", fromEventGroupId ? { eventGroupId: fromEventGroupId } : {})
       .then((r: { people: Suggestion[] }) => setSuggestions(r.people || []))
       .catch(() => {});
-  }, [signedIn]);
+  }, [signedIn, fromEventGroupId]);
 
   const validRows = rows.filter((r) => r.phone.replace(/\D/g, "").length >= 10);
   const peopleCount = validRows.length + pickedIds.size;
@@ -206,8 +209,8 @@ export default function StartCrewFlow({
               <button type="button" className="text-sm text-leaf-700 hover:underline" onClick={() => setRows([...rows, { name: "", phone: "" }])}>+ one more</button>
             )}
           </div>
-          {suggest && suggestions.length === 0 && signedIn && (
-            <p className="mt-3 text-xs text-zinc-500">No one from community plans yet. Add friends by number.</p>
+          {(suggest || fromEventGroupId) && suggestions.length === 0 && signedIn && (
+            <p className="mt-3 text-xs text-zinc-500">{fromEventGroupId ? "No one else from that plan yet. Add friends by number." : "No one from community plans yet. Add friends by number."}</p>
           )}
           <div className="mt-6 flex items-center gap-4">
             <Button onClick={next} disabled={peopleCount < 2}>Next{peopleCount ? ` (${peopleCount})` : ""}</Button>

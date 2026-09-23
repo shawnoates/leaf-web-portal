@@ -27,6 +27,7 @@ export default function StartCrewClient() {
         signedIn={signedIn}
         suggest={params.get("suggest") === "1"}
         initialName={params.get("name") || ""}
+        fromEventGroupId={params.get("from")}
         onClose={null}
       />
     </CrewShell>

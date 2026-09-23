@@ -179,6 +179,10 @@ export interface OrgDashboard {
   billingInterval: string | null; // "month" or "year"
   isOwner: boolean;
   isOrgCoHost: boolean;
+  /** Friend Mode (cloud/friend-mode/): on/off and the member count the
+   *  15-person limit is checked against. Optional until the getOrgDashboard
+   *  deploy that sends it is live. */
+  friendMode?: { enabled: boolean; memberCount: number };
   /** Whether the viewer has linked the iOS app (functions.js: getOrgDashboard
    *  returns this off the requesting _User). Only ever used to flip the local
    *  flag on, never off — the auth effect seeds it from Parse.User.current(). */
