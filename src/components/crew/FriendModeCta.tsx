@@ -26,7 +26,7 @@ export default function FriendModeCta({
   useEffect(() => { trackMarketingEvent("friend_mode_cta_view", { surface }); }, [surface]);
   const others = Math.max(0, peopleCount - 1);
   return (
-    <div className={`rounded-xl border border-dashed border-leaf-300 bg-leaf-50/50 p-4 ${className}`}>
+    <div className={`fm rounded-xl border p-4 ${className}`} style={{ borderColor: "#3B5449" }}>
       <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-leaf-600"><FriendModeIcon size={24} /> Friend Mode</div>
       <p className="mt-1 text-sm text-leaf-900">
         {surface === "recap" ? "Keep seeing these people?" : "Like this crowd?"}{" "}

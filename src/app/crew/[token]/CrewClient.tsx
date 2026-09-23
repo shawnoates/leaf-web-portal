@@ -14,7 +14,7 @@ import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import { Button, Card, CrewHeader, CrewShell, DeadState, Eyebrow, Spinner } from "@/components/crew/CrewShell";
 import ProposeNight from "@/components/crew/ProposeNight";
 import {
-  crewHref, cycleStatusLine, dayLabel, optionLabel, rhythmLabel, run, toDate,
+  RHYTHM_LABELS, crewHref, cycleStatusLine, dayLabel, optionLabel, rhythmLabel, run, toDate,
   type CrewAuth, type CrewPage, type CycleView,
 } from "@/lib/crew";
 
@@ -34,7 +34,8 @@ export default function CrewClient({ token }: { token: string }) {
 }
 
 function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; reload: () => Promise<void> }) {
-  const { crew, members, names, open, past, book } = data;
+  const { crew, me, members, names, open, past, book } = data;
+  const [pace, setPace] = useState<string>(me.rhythmDays ? String(me.rhythmDays) : "");
   const [proposing, setProposing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState("");
@@ -141,6 +142,26 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             Waiting on {crew.quorum - crew.joinedCount} more to join before Leaf plans the first night.
           </p>
         )}
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-zinc-700">
+          <label htmlFor="my-pace">How often for you</label>
+          <select
+            id="my-pace"
+            value={pace}
+            disabled={busy !== null}
+            onChange={(e) => {
+              const v = e.target.value;
+              setPace(v);
+              act("pace", () => run("setCrewPace", auth, { weeks: v ? Number(v) / 7 : null }));
+            }}
+            className="rounded-xl border border-zinc-300 px-2 py-1.5 text-sm"
+          >
+            <option value="">Same as the crew ({rhythmLabel(crew.rhythmDays).toLowerCase()})</option>
+            {Object.entries(RHYTHM_LABELS).map(([d, l]) => (
+              <option key={d} value={d}>{l}</option>
+            ))}
+          </select>
+          <span className="text-xs text-zinc-500">Slower than the crew? Leaf only asks you on your pace.</span>
+        </div>
       </Card>
 
       {past.length > 0 && (
@@ -234,6 +255,9 @@ function CycleCard({
       <h2 className="mt-1 text-lg font-semibold text-leaf-900">{c.venue?.name || "Picking a place…"}</h2>
       {c.venue?.address && <p className="text-sm text-zinc-500">{c.venue.address}</p>}
       <p className="mt-1 text-sm text-zinc-600">{cycleStatusLine(c, names)}</p>
+      {c.invited === false && (
+        <p className="mt-1 text-xs text-zinc-500">You&rsquo;re sitting this one out (your pace). Answer here anyway if you want in.</p>
+      )}
 
       {c.state === "picking" && c.waitingForQuorum && (
         <p className="mt-3 text-[15px] text-zinc-700">

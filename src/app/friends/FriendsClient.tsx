@@ -41,7 +41,9 @@ export default function FriendsClient() {
 
   return (
     <div className="mkt min-h-screen">
+      {/* The site nav stays light; everything below it is the dark Friend Mode palette. */}
       <MarketingNav isLoggedIn={isLoggedIn} />
+      <div className="fm">
 
       <section className="mx-auto max-w-3xl px-5 pb-16 pt-14 text-center">
         <div className="flex items-center justify-center gap-2 text-xs font-medium uppercase tracking-wide text-leaf-600"><FriendModeIcon size={24} /> Friend Mode</div>
@@ -105,14 +107,15 @@ export default function FriendsClient() {
         </div>
       </section>
 
-      <section className="bg-leaf-800 py-14 text-center text-white">
+      <section className="py-14 text-center" style={{ background: "#253A33", color: "#F2F1EC" }}>
         <h2 className="text-2xl font-semibold">Add your people. Leaf does the rest.</h2>
-        <Link href={cta} onClick={onCta} className="mt-6 inline-block rounded-full bg-white px-6 py-3 text-[15px] font-medium text-leaf-900 hover:bg-leaf-50">
+        <Link href={cta} onClick={onCta} className="mt-6 inline-block rounded-full px-6 py-3 text-[15px] font-medium" style={{ background: "#F2F1EC", color: "#253A33" }}>
           Start a crew
         </Link>
       </section>
 
       <MarketingFooter blurb="Leaf finds the night. You show up." />
+      </div>
     </div>
   );
 }
