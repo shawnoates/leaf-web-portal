@@ -871,6 +871,32 @@ export default function TermsPage() {
           </section>
 
           <section className="space-y-4">
+            <h2 className="text-xl font-normal text-zinc-900">SMS / Text Messaging Terms</h2>
+            <p>
+              <strong>Program.</strong> Leaf by One Common LLC (&ldquo;Leaf&rdquo;) sends text messages about plans,
+              RSVPs and reminders, and, for Friend Mode, about the nights Leaf plans for a small group of friends
+              (invitations to join a crew, date polls, the locked plan, a day-of reminder and a recap). You receive
+              these messages only after opting in on a Leaf form, by replying IN to an invitation sent at a friend&apos;s
+              request, or by texting a keyword to a Leaf number.
+            </p>
+            <p>
+              <strong>Frequency.</strong> Message frequency varies. Friend Mode sends up to 5 messages per week.{" "}
+              <strong>Message and data rates may apply.</strong>
+            </p>
+            <p>
+              <strong>Opt out.</strong> Reply <strong>STOP</strong> to any message to cancel. You will receive one
+              confirmation and no further messages. Reply <strong>HELP</strong> for help, or email{" "}
+              <a href="mailto:support@getleaflets.co" className="underline hover:text-zinc-900">support@getleaflets.co</a>.
+            </p>
+            <p>
+              Carriers are not liable for delayed or undelivered messages. Your information is handled as described
+              in our{" "}
+              <a href="/privacy-policy" className="underline hover:text-zinc-900">Privacy Policy</a>; we do not share
+              SMS opt-in data with third parties for marketing purposes.
+            </p>
+          </section>
+
+          <section className="space-y-4">
             <h2 className="text-xl font-normal text-zinc-900">Contact Us</h2>
             <p>
               If you have any questions about these Terms and Conditions, You can
