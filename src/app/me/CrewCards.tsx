@@ -57,7 +57,7 @@ export function CrewActionCard({ actions, onAnswered }: { actions: CrewAction[];
   const call = (name: string, params: Record<string, unknown>) => Parse.Cloud.run(name, { crewId: a.crewId, ...params });
 
   return (
-    <section className="sinv" role="region" aria-label="Your crew needs an answer">
+    <section className="sinv fm-dark" role="region" aria-label="Your crew needs an answer">
       <div className="sinv-head">
         <div className="eyebrow sinv-eyebrow">
           <Users className="sinv-icon" aria-hidden />
@@ -130,7 +130,7 @@ export function CrewsRail({ rows }: { rows: CrewRow[] }) {
       <div className="eyebrow">Your crews</div>
       <div className="cals">
         {rows.map((c) => (
-          <Link key={c.crewId} className="cal-row" href={`/crew/${c.crewId}`}>
+          <Link key={c.crewId} className="cal-row fm-dark" href={`/crew/${c.crewId}`} style={{ borderRadius: 12, padding: "10px 12px" }}>
             <span className="cal-ava ph">{(c.name || "C").charAt(0).toUpperCase()}</span>
             <div className="cal-body">
               <div className="cal-n">{c.name}</div>
@@ -151,7 +151,7 @@ export function CrewSuggestionBox({ suggestion }: { suggestion: NonNullable<Crew
   const names = suggestion.names.slice(0, 2).join(", ");
   const rest = suggestion.count - Math.min(2, suggestion.names.length);
   return (
-    <div className="prompt-box">
+    <div className="prompt-box fm-dark" style={{ borderStyle: "solid" }}>
       <div className="prompt-body">
         <div className="prompt-h">You and {names}{rest > 0 ? ` and ${rest} other${rest === 1 ? "" : "s"}` : ""} keep ending up at the same things.</div>
         <p className="prompt-p">Start a crew and Leaf will find a night that works for all of you, then plan it. Free, and nobody needs the app.</p>

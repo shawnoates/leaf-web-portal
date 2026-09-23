@@ -137,7 +137,7 @@ export default function StartCrewFlow({
   ) : null;
 
   return (
-    <div className="text-leaf-900">
+    <div className="fm rounded-2xl p-1 text-leaf-900">
       {step === "intro" && (
         <div>
           <div className="mb-4"><FriendModeIcon size={64} /></div>

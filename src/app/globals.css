@@ -96,3 +96,43 @@
     transform: none !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Friend Mode: dark-first, per "Friend Mode — Design Spec" (Sep 23, 2026).
+   Community calendars stay light; anything wrapped in `.fm` takes the spec's
+   palette: canvas #101A16, surface #253A33, line #3B5449, ink #F2F1EC,
+   muted-text #8A928C. Lime (#C8F25A) is reserved for the switch's "on" state
+   and never used as a general accent here. The crew pages are written with
+   the portal's ordinary light utilities; these scoped rules re-map them, so
+   one wrapper class themes a whole page.
+   ------------------------------------------------------------------------ */
+.fm { background: #101A16; color: #F2F1EC; }
+.fm .bg-white, .fm .bg-zinc-50 { background-color: #253A33; }
+.fm .bg-leaf-50 { background-color: #1B2B25; }
+.fm .bg-leaf-800 { background-color: #F2F1EC; color: #253A33; }
+.fm .bg-leaf-800:hover { background-color: #FFFFFF; }
+.fm .bg-leaf-800 .text-white, .fm .bg-leaf-800.text-white { color: #253A33; }
+.fm .text-leaf-900, .fm .text-zinc-800, .fm .text-zinc-900 { color: #F2F1EC; }
+.fm .text-zinc-700, .fm .text-zinc-600 { color: #C9D1CB; }
+.fm .text-zinc-500, .fm .text-zinc-400, .fm .text-leaf-600, .fm .text-leaf-700 { color: #8A928C; }
+.fm .border-zinc-200, .fm .border-zinc-300, .fm .border-zinc-100, .fm .border-leaf-200, .fm .border-leaf-300 { border-color: #3B5449; }
+.fm .border-leaf-700 { border-color: #F2F1EC; }
+.fm .divide-zinc-100 > :not([hidden]) ~ :not([hidden]) { border-color: #2E4038; }
+.fm .shadow-sm { box-shadow: none; }
+.fm input, .fm select, .fm textarea { background-color: #1B2B25; color: #F2F1EC; border-color: #3B5449; }
+.fm input::placeholder, .fm textarea::placeholder { color: #6F7D75; }
+.fm .bg-red-50 { background-color: #3A2321; }
+.fm .text-red-700 { color: #F2A39A; }
+.fm .bg-zinc-100 { background-color: #1B2B25; color: #F2F1EC; }
+.fm .text-zinc-700.bg-zinc-100 { color: #F2F1EC; }
+
+/* Friend Mode tiles inside the (light) /me page: dark cards on paper. */
+.leafme .fm-dark { background: #253A33 !important; border-color: #3B5449 !important; color: #F2F1EC; }
+.leafme .fm-dark .sinv-title, .leafme .fm-dark .cal-n, .leafme .fm-dark .prompt-h { color: #F2F1EC; }
+.leafme .fm-dark .sinv-meta, .leafme .fm-dark .cal-s, .leafme .fm-dark .eyebrow, .leafme .fm-dark .prompt-p, .leafme .fm-dark .sinv-count { color: #8A928C; }
+.leafme .fm-dark .sinv-btn.primary, .leafme .fm-dark .btn.primary { background: #F2F1EC; color: #253A33; border-color: #F2F1EC; }
+.leafme .fm-dark .sinv-btn.ghost, .leafme .fm-dark .btn.ghost, .leafme .fm-dark .btn.text { background: transparent; color: #F2F1EC; border-color: #3B5449; }
+.leafme .fm-dark .cal-row { border-color: #2E4038; }
+.leafme .fm-dark .cal-ava.ph { background: #1B2B25; color: #F2F1EC; }
+.leafme .fm-dark .cal-cta { color: #F2F1EC; }
+.leafme .fm-dark .sinv-icon { stroke: #8A928C; }

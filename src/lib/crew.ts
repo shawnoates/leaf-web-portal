@@ -39,6 +39,8 @@ export type CycleView = {
   hostId: string | null;
   isHost: boolean;
   waitingForQuorum: boolean;
+  /** false when this member sat the cycle out (their own pace); they can still answer from the page */
+  invited?: boolean;
   votes: Record<string, number[]> | null;
   myVotes: number[] | null;
   rsvps: Record<string, "in" | "out">;
@@ -90,7 +92,7 @@ export type CrewPage = {
     joinedCount: number;
     ownerId: string | null;
   };
-  me: Member & { isOwner: boolean; token: string };
+  me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null };
   members: Member[];
   names: Record<string, string>;
   open: CycleView[];

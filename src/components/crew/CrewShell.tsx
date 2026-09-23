@@ -10,7 +10,12 @@ import type { ReactNode } from "react";
 import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
 
 export function CrewShell({ children }: { children: ReactNode }) {
-  return <main className="mx-auto max-w-lg px-5 py-8 pb-24">{children}</main>;
+  // `fm` = the dark Friend Mode palette (globals.css); community calendars stay light.
+  return (
+    <div className="fm min-h-screen">
+      <main className="mx-auto max-w-lg px-5 py-8 pb-24">{children}</main>
+    </div>
+  );
 }
 
 export function CrewHeader({
