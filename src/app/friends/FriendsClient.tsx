@@ -24,6 +24,8 @@ const STEPS = [
   { n: "04", title: "It learns", body: "Thumbs up or down the morning after. Leaf remembers what the crew liked and which nights never work." },
 ];
 
+const FRIEND_MODE_NUMBER = process.env.NEXT_PUBLIC_FRIEND_MODE_NUMBER || "(646) 588-1360";
+
 const FAQ = [
   { q: "Do my friends need the app?", a: "No. Friends without the app answer by text: reply IN, OUT, or the numbers of the nights that work. Friends with the app plan in a chat with Leaf." },
   { q: "Will Leaf spam my friends?", a: "No one is texted until they reply IN to one invite. After that it's a few texts around each night, never more than a handful a week, and anyone can text STOP at any time." },
@@ -90,6 +92,28 @@ export default function FriendsClient() {
           <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-zinc-700">
             Friend Mode is how a neighborhood calendar turns into a friend group. Anyone you&rsquo;ve been to a plan with can be added to your crew in a tap. They see your name, never your number, and only join if they say so.
           </p>
+        </div>
+      </section>
+
+      <section id="text-to-join" className="border-t border-zinc-100 py-14">
+        <div className="mx-auto max-w-3xl px-5">
+          <h2 className="text-2xl font-semibold text-leaf-900">Join by text</h2>
+          <p className="mt-2 text-[15px] leading-relaxed text-zinc-700">
+            Text <strong>JOIN</strong> to <strong>{FRIEND_MODE_NUMBER}</strong> and Leaf replies with a link to start or join a crew.
+            When a friend adds you to their crew, Leaf sends one invitation; reply <strong>IN</strong> to join it.
+          </p>
+          <p className="mt-3 text-sm text-zinc-500">
+            By texting JOIN or replying IN you agree to receive text messages from Leaf (Leaf by One Common LLC) about your
+            crew&rsquo;s plans. Up to 5 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.{" "}
+            <Link href="/terms-conditions" className="underline">Terms</Link> ·{" "}
+            <Link href="/privacy-policy" className="underline">Privacy</Link>
+          </p>
+          <div className="mt-6 rounded-2xl border border-zinc-200 bg-white p-4 text-sm">
+            <div className="text-xs text-zinc-500">What the exchange looks like</div>
+            <p className="mt-2"><span className="text-zinc-500">Friend&rsquo;s invite from Leaf:</span> Sam added you to Thursday crew on Leaf. Leaf finds a night that works for everyone and plans it. Reply IN to join. Up to 5 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.</p>
+            <p className="mt-2"><span className="text-zinc-500">You:</span> IN</p>
+            <p className="mt-2"><span className="text-zinc-500">Leaf:</span> You&rsquo;re in Thursday crew on Leaf. Up to 5 msgs/wk about nights with your crew. Msg &amp; data rates may apply. Reply HELP for help, STOP to cancel.</p>
+          </div>
         </div>
       </section>
 

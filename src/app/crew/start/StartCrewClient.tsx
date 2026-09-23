@@ -29,6 +29,7 @@ export default function StartCrewClient() {
         suggest={params.get("suggest") === "1"}
         initialName={params.get("name") || ""}
         fromEventGroupId={params.get("from")}
+        initialStep={params.get("step") === "consent" ? "consent" : null}
         onClose={null}
       />
     </CrewShell>
