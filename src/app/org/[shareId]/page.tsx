@@ -711,6 +711,8 @@ function RsvpModal({
   followRequestPending: followRequestPendingProp,
   isPrivateCalendar,
   onFollowedCalendar,
+  alternatives,
+  onSwitchPlan,
 }: {
   plan: Plan;
   brandColor?: string;
@@ -723,12 +725,53 @@ function RsvpModal({
   followRequestPending?: boolean;
   isPrivateCalendar?: boolean;
   onFollowedCalendar?: (pending: boolean) => void;
+  /**
+   * Plans on this calendar with a spot still open, soonest first. Shown as a
+   * carousel when `plan` is full, so a would-be waitlister can join something
+   * else in the same modal instead of bouncing.
+   */
+  alternatives?: Plan[];
+  /** Re-target the modal at another plan (a carousel tap). */
+  onSwitchPlan?: (plan: Plan) => void;
 }) {
   const verify = usePhoneVerify();
   const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
   const [errorMsg, setErrorMsg] = useState("");
   const [notificationId, setNotificationId] = useState<string | null>(existingNotificationId || null);
   const [rsvpNote, setRsvpNote] = useState("");
+  // The full plan this modal opened on, when the guest switched away via the
+  // carousel — powers "Back to the waitlist". The modal is not keyed on
+  // plan.id, so the verified phone survives the switch; only the plan-scoped
+  // state below has to reset.
+  const [switchedFrom, setSwitchedFrom] = useState<Plan | null>(null);
+  useEffect(() => {
+    setNotificationId(existingNotificationId || null);
+    setRsvpNote("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan.id]);
+  const switchTo = (target: Plan, via: "carousel" | "back") => {
+    if (!onSwitchPlan) return;
+    track(
+      "rsvp_full_alternative_tap",
+      { via, fromPlanId: plan.id, toPlanId: target.id },
+      calendarId,
+    );
+    setSwitchedFrom(via === "carousel" ? (switchedFrom ?? plan) : null);
+    onSwitchPlan(target);
+  };
+  const showAlternatives =
+    planIsFull(plan) && Boolean(onSwitchPlan) && (alternatives?.length ?? 0) > 0;
+  const shownAlternativesRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!showAlternatives || !alternatives) return;
+    if (shownAlternativesRef.current === plan.id) return;
+    shownAlternativesRef.current = plan.id;
+    track(
+      "rsvp_full_alternatives_shown",
+      { planId: plan.id, count: alternatives.length, planIds: alternatives.map((p) => p.id) },
+      calendarId,
+    );
+  }, [showAlternatives, alternatives, plan.id, calendarId]);
   const [isPendingResult, setIsPendingResult] = useState(false);
   const [isWaitlistResult, setIsWaitlistResult] = useState(false);
   const [sharePhone, setSharePhone] = useState(true);
@@ -857,7 +900,74 @@ function RsvpModal({
               <p className="text-sm text-zinc-500 mt-1">
                 {plan.date}{plan.time ? ` at ${plan.time}` : ""}
               </p>
+              {switchedFrom && !planIsFull(plan) && (
+                <button
+                  type="button"
+                  onClick={() => switchTo(switchedFrom, "back")}
+                  className="text-xs text-zinc-400 hover:text-zinc-900 underline underline-offset-2 mt-2"
+                >
+                  Back to the {switchedFrom.title} waitlist
+                </button>
+              )}
             </div>
+
+            {/* Full plan: the waitlist form still works, but most guests who
+                hit a cap want a plan they can actually get into. Offer the
+                calendar's open plans right here; a tap re-targets this modal
+                (verified phone kept) instead of sending them back out. */}
+            {showAlternatives && alternatives && (
+              <div className="-mx-8 md:-mx-12 border-y border-zinc-100 bg-zinc-50/60 py-4">
+                <p className="px-8 md:px-12 text-[11px] tracking-widest uppercase font-bold text-zinc-500 mb-3">
+                  Or join a plan with spots open
+                </p>
+                <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory px-8 md:px-12 pb-1">
+                  {alternatives.map((alt) => {
+                    const left = alt.capacity != null ? alt.capacity - alt.rsvpCount : null;
+                    return (
+                      <button
+                        key={alt.id}
+                        type="button"
+                        onClick={() => switchTo(alt, "carousel")}
+                        className="snap-start shrink-0 w-[150px] text-left group"
+                      >
+                        <div className="aspect-[4/3] w-full overflow-hidden rounded-lg bg-zinc-200 mb-2 relative">
+                          {alt.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={alt.image}
+                              alt=""
+                              className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-zinc-400">
+                              <Calendar className="w-5 h-5" />
+                            </div>
+                          )}
+                          {left != null && left <= 3 && (
+                            <span className="absolute bottom-1.5 left-1.5 bg-white/95 text-zinc-900 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">
+                              {left} {left === 1 ? "spot" : "spots"} left
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm font-medium tracking-tight leading-snug line-clamp-2 group-hover:italic">
+                          {alt.title}
+                        </p>
+                        <p className="text-[11px] text-zinc-500 mt-0.5 truncate">
+                          {alt.date}{alt.time ? ` · ${alt.time}` : ""}
+                        </p>
+                        <p
+                          className="text-[11px] font-bold uppercase tracking-wider mt-1 flex items-center gap-1"
+                          style={{ color: brandColor || "#18181b" }}
+                        >
+                          {alt.requireApproval ? "Request" : "Join"} <ArrowRight className="w-3 h-3" />
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-5">
               <PhoneVerifyFields verify={verify} onSendOTP={verify.sendOTP} />
               {verify.isVerified && (
@@ -3849,6 +3959,33 @@ export default function OrgCalendarPage() {
   // FollowModal (and never chains the share kit).
   const [interestPrompt, setInterestPrompt] = useState<InterestPromptItem[] | null>(null);
 
+  // Plans a guest could still get into, for the RSVP modal's "or join a plan
+  // with spots open" carousel when the plan they picked is full. Real hosted
+  // plans only (no polls), RSVP still open, not full, and not one the viewer
+  // already holds a place in or hosts. Soonest first, capped so the strip
+  // stays a nudge rather than a second calendar.
+  const rsvpAlternatives = useMemo<Plan[]>(() => {
+    if (!org || !rsvpPlan) return [];
+    return org.plans
+      .filter(
+        (p) =>
+          p.id !== rsvpPlan.id &&
+          !p.isPoll &&
+          !planIsFull(p) &&
+          planLifecycle(p.dateISO, p.endDateISO) === "upcoming" &&
+          !rsvpedPlanIds.has(p.id) &&
+          !pendingRsvpIds.has(p.id) &&
+          !viewerHostsPlan(p),
+      )
+      .sort((a, b) => {
+        const am = Date.parse(String(a.dateISO ?? ""));
+        const bm = Date.parse(String(b.dateISO ?? ""));
+        return (Number.isFinite(am) ? am : Infinity) - (Number.isFinite(bm) ? bm : Infinity);
+      })
+      .slice(0, 8);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [org, rsvpPlan, rsvpedPlanIds, pendingRsvpIds, hostedPlanIds]);
+
   // 2a — "Around the city": a slim 122px full-width band. These are citywide
   // happenings looking for a host, not this calendar's own upcoming plans, so
   // they render ABOVE the "Upcoming Plans" label rather than inside that list.
@@ -5838,6 +5975,8 @@ export default function OrgCalendarPage() {
           isFollowingCalendar={isFollowing}
           followRequestPending={followRequestPending || org.followRequestPending}
           isPrivateCalendar={org.isPrivate}
+          alternatives={rsvpAlternatives}
+          onSwitchPlan={(next) => setRsvpPlan(next)}
           onFollowedCalendar={(pending) => {
             if (pending) {
               setFollowRequestPending(true);
