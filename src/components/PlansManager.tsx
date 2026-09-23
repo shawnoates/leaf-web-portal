@@ -11,6 +11,7 @@ import HostIdeaModal from "@/components/HostIdeaModal";
 import PlanChatDrawer from "@/components/PlanChatDrawer";
 import NudgeModal from "@/components/dashboard/NudgeModal";
 import SharePlanSheet from "@/components/dashboard/SharePlanSheet";
+import FriendModeCard from "@/components/dashboard/FriendModeCard";
 import { CrossPromoPhotoBadge } from "@/components/CrossPromoBadge";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
@@ -720,6 +721,9 @@ export default function PlansManager({
   // for each instead of appearing complete and then growing under the cursor.
   const [pendingIdeaCount, setPendingIdeaCount] = useState(0);
   const [hidePlanIdeas, setHidePlanIdeas] = useState(false);
+  // Friend Mode is a per-calendar switch, shown on the calendar's own page
+  // (owner only). getOrgDashboard reports it for the org and for each child.
+  const [friendMode, setFriendMode] = useState<{ enabled: boolean; memberCount: number } | null>(null);
 
   // Assign-a-host: members eligible to be assigned as a suggestion's host,
   // plus the idea currently being assigned (null = picker closed) and the
@@ -882,11 +886,14 @@ export default function PlansManager({
   async function fetchOrgInfo() {
     try {
       const result = await Parse.Cloud.run("getOrgDashboard", { calendarId: orgId });
+      type FM = { enabled: boolean; memberCount: number } | undefined;
       if (orgId !== calendarId && result.calendars) {
-        const child = result.calendars.find((c: { objectId: string; hidePlanIdeas?: boolean }) => c.objectId === calendarId);
+        const child = result.calendars.find((c: { objectId: string; hidePlanIdeas?: boolean; friendMode?: FM }) => c.objectId === calendarId);
         setHidePlanIdeas((child ? child.hidePlanIdeas : result.hidePlanIdeas) || false);
+        setFriendMode(result.isOwner && child?.friendMode ? child.friendMode : null);
       } else {
         setHidePlanIdeas(result.hidePlanIdeas || false);
+        setFriendMode(result.isOwner && result.friendMode ? (result.friendMode as FM) ?? null : null);
       }
       setTier(result.tier);
       setTierLoaded(true);
@@ -2018,6 +2025,11 @@ export default function PlansManager({
             <p className="text-sm text-zinc-400">No past plans yet.</p>
           )}
         </section>
+
+        {/* Friend Mode — the per-calendar switch (owner only, ≤15 members) */}
+        {friendMode && (
+          <FriendModeCard calendarId={calendarId} enabled={friendMode.enabled} memberCount={friendMode.memberCount} />
+        )}
 
         {/* Existing Plan Ideas */}
         <section>

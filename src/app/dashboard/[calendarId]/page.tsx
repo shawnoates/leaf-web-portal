@@ -64,7 +64,6 @@ import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
 import { trackScorecard } from "@/lib/scorecard-track";
 import SettingsSwitch from "@/components/SettingsSwitch";
-import FriendModeCard from "@/components/dashboard/FriendModeCard";
 import {
   Calendar,
   Check,
@@ -2177,13 +2176,6 @@ export default function OrgDashboardPage() {
 
                 {dashboard.isOwner && settingsSection === "general" && (
                 <div className="space-y-8">
-                {/* Friend Mode — small calendars only; see FriendModeCard */}
-                <FriendModeCard
-                  calendarId={calendarId}
-                  enabled={dashboard.friendMode?.enabled ?? false}
-                  memberCount={dashboard.friendMode?.memberCount ?? dashboard.followerCount ?? 0}
-                />
-
                 {/* Organization details */}
                 <section className="border border-zinc-200 rounded-xl p-6">
                   <div className="flex items-center justify-between mb-4">
