@@ -5587,11 +5587,15 @@ export default function OrgCalendarPage() {
                     </p>
                   </div>
                 )}
-                <div className="flex gap-6 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">
+                {/* One line: each item is nowrap so the date never breaks
+                    mid-phrase and "Full" stays glued to the attendee count.
+                    flex-wrap is the fallback for a viewport too narrow for
+                    all of it — a whole item drops, never a word. */}
+                <div className="flex flex-wrap items-center gap-x-4 sm:gap-x-5 gap-y-2 text-xs sm:text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">
                   {selectedEvent.isPoll ? (
                     <>
-                      <span className="flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
+                      <span className="flex items-center gap-2 whitespace-nowrap">
+                        <Clock className="w-4 h-4 flex-shrink-0" />
                         {selectedEvent.pollOptionCount || 0} {selectedEvent.pollOptionCount === 1 ? "option" : "options"}
                         {selectedEvent.pollClosesAt && (() => {
                           const ms = new Date(selectedEvent.pollClosesAt).getTime() - Date.now();
@@ -5600,17 +5604,26 @@ export default function OrgCalendarPage() {
                           return <> &middot; {days}d left</>;
                         })()}
                       </span>
-                      <span className="flex items-center gap-2">
-                        <Users className="w-4 h-4" /> {selectedEvent.pollVoteCount || 0} {selectedEvent.pollVoteCount === 1 ? "vote" : "votes"}
+                      <span className="flex items-center gap-2 whitespace-nowrap">
+                        <Users className="w-4 h-4 flex-shrink-0" /> {selectedEvent.pollVoteCount || 0} {selectedEvent.pollVoteCount === 1 ? "vote" : "votes"}
                       </span>
                     </>
                   ) : (
                     <>
-                      <span className="flex items-center gap-2">
-                        <Clock className="w-4 h-4" /> {selectedEvent.date}{selectedEvent.time ? ` at ${selectedEvent.time}` : ""}
+                      <span className="flex items-center gap-2 whitespace-nowrap">
+                        <Clock className="w-4 h-4 flex-shrink-0" />
+                        {/* Phones get "Wed, Sep 30 · 6:00 PM" — the long
+                            weekday plus "at" pushes the attendee count onto a
+                            second line at 390px. */}
+                        <span className="sm:hidden">
+                          {selectedEvent.date.replace(/^([A-Za-z]{3})[A-Za-z]*,/, "$1,")}{selectedEvent.time ? ` · ${selectedEvent.time}` : ""}
+                        </span>
+                        <span className="hidden sm:inline">
+                          {selectedEvent.date}{selectedEvent.time ? ` at ${selectedEvent.time}` : ""}
+                        </span>
                       </span>
-                      <span className="flex items-center gap-2">
-                        <Users className="w-4 h-4" /> {selectedEvent.attendeeCount} attending
+                      <span className="flex items-center gap-2 whitespace-nowrap">
+                        <Users className="w-4 h-4 flex-shrink-0" /> {selectedEvent.attendeeCount} attending
                         {planIsFull(selectedEvent) && (
                           <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600">· Full</span>
                         )}
