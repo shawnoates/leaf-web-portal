@@ -10,9 +10,11 @@
  */
 
 import { useState } from "react";
+import Parse from "@/lib/parse-client";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import { Button, Card, CrewHeader, CrewShell, DeadState, Eyebrow, Spinner } from "@/components/crew/CrewShell";
 import ProposeNight from "@/components/crew/ProposeNight";
+import { FM, FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
   RHYTHM_LABELS, crewHref, cycleStatusLine, dayLabel, optionLabel, rhythmLabel, run, toDate,
   type CrewAuth, type CrewPage, type CycleView,
@@ -207,6 +209,26 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
           </form>
         )}
       </Card>
+
+      {me.isOwner && (
+        <Card className="mb-4">
+          <div className="flex items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-medium text-leaf-900">Friend Mode</p>
+              <p className="mt-0.5 text-[13px]" style={{ color: crew.enabled === false ? FM.mutedText : FM.accent }}>
+                {crew.enabled === false ? "Off · nothing is planned or texted" : "On · Leaf plans nights for this group"}
+              </p>
+            </div>
+            <FriendModeSwitch
+              label="Friend Mode"
+              checked={crew.enabled !== false}
+              disabled={busy !== null}
+              onChange={(v) => act("fm", () => Parse.Cloud.run("setFriendModeOnCalendar", { calendarId: crew.id, enabled: v }))}
+            />
+          </div>
+          {crew.enabled === false && <p className="mt-2 text-xs text-zinc-500">Turning it off ended any night being planned. Past nights stay.</p>}
+        </Card>
+      )}
 
       <div className="mt-8 flex flex-wrap gap-3 text-sm">
         {crew.status === "active" ? (
