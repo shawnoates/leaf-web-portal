@@ -5591,7 +5591,7 @@ export default function OrgCalendarPage() {
                     mid-phrase and "Full" stays glued to the attendee count.
                     flex-wrap is the fallback for a viewport too narrow for
                     all of it — a whole item drops, never a word. */}
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">
+                <div className="flex flex-wrap items-center gap-x-4 sm:gap-x-5 gap-y-2 text-xs sm:text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">
                   {selectedEvent.isPoll ? (
                     <>
                       <span className="flex items-center gap-2 whitespace-nowrap">
