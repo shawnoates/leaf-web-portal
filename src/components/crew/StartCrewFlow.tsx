@@ -55,6 +55,10 @@ export default function StartCrewFlow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState<Created | null>(null);
+  // 10DLC web-form consent: two separate, un-pre-checked boxes (messages; terms + privacy).
+  const [smsConsent, setSmsConsent] = useState(false);
+  const [termsConsent, setTermsConsent] = useState(false);
+  const consented = smsConsent && termsConsent;
 
   useEffect(() => { trackMarketingEvent("friend_mode_intro_view"); }, []);
   useEffect(() => { trackMarketingEvent("friend_mode_intro_step", { step: STEPS.indexOf(step) + 1 }); }, [step]);
@@ -129,6 +133,25 @@ export default function StartCrewFlow({
       setBusy(false);
     }
   };
+
+  const consentBlock = (
+    <div className="mt-4 space-y-2 rounded-xl border border-zinc-300 p-3 text-[13px] text-zinc-700">
+      <label className="flex items-start gap-2">
+        <input type="checkbox" checked={smsConsent} onChange={(e) => setSmsConsent(e.target.checked)} className="mt-0.5" />
+        <span>
+          I agree to receive text messages from Leaf about my crew&rsquo;s plans at the number I provide. Up to 5 msgs/wk.
+          Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.
+        </span>
+      </label>
+      <label className="flex items-start gap-2">
+        <input type="checkbox" checked={termsConsent} onChange={(e) => setTermsConsent(e.target.checked)} className="mt-0.5" />
+        <span>
+          I agree to the <a href="/terms-conditions" target="_blank" rel="noreferrer" className="underline">Terms of Service</a> and{" "}
+          <a href="/privacy-policy" target="_blank" rel="noreferrer" className="underline">Privacy Policy</a>.
+        </span>
+      </label>
+    </div>
+  );
 
   const closeLink = onClose ? (
     <button className="text-sm text-zinc-500 hover:underline" onClick={() => { trackMarketingEvent("friend_mode_intro_dismiss", { step }); onClose(); }}>
@@ -238,8 +261,9 @@ export default function StartCrewFlow({
               </li>
             ))}
           </ul>
+          {signedIn && consentBlock}
           <div className="mt-6 flex items-center gap-4">
-            <Button onClick={() => (signedIn ? create() : next())} disabled={busy}>{signedIn ? (busy ? "Sending…" : "Send the invites") : "Next"}</Button>
+            <Button onClick={() => (signedIn ? create() : next())} disabled={busy || (signedIn && !consented)}>{signedIn ? (busy ? "Sending…" : "Send the invites") : "Next"}</Button>
             <button className="text-sm text-zinc-500 hover:underline" onClick={back}>Back</button>
           </div>
           {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
@@ -257,12 +281,13 @@ export default function StartCrewFlow({
               <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="6-digit code" inputMode="numeric" className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-[15px]" autoFocus />
             )}
           </div>
+          {!codeSent && consentBlock}
           {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
           <div className="mt-6 flex items-center gap-4">
             {codeSent ? (
               <Button onClick={verifyAndCreate} disabled={busy || code.length < 4}>{busy ? "Sending invites…" : "Send the invites"}</Button>
             ) : (
-              <Button onClick={sendCode} disabled={busy}>{busy ? "Sending code…" : "Text me a code"}</Button>
+              <Button onClick={sendCode} disabled={busy || !consented}>{busy ? "Sending code…" : "Text me a code"}</Button>
             )}
             <button className="text-sm text-zinc-500 hover:underline" onClick={() => (codeSent ? setCodeSent(false) : back())}>Back</button>
           </div>
