@@ -15,6 +15,7 @@ import MarketingNav from "@/components/marketing/MarketingNav";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
 import { useIsLoggedIn } from "@/components/marketing/useMarketingSession";
 import { trackMarketingEvent } from "@/components/marketing/analytics";
+import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
 
 const STEPS = [
   { n: "01", title: "Add your people", body: "Name the crew and add a few friends. Each gets one text asking to join. Nothing else until they say IN." },
@@ -43,7 +44,8 @@ export default function FriendsClient() {
       <MarketingNav isLoggedIn={isLoggedIn} />
 
       <section className="mx-auto max-w-3xl px-5 pb-16 pt-14 text-center">
-        <div className="text-xs font-medium uppercase tracking-wide text-leaf-600">🍃 Friend Mode</div>
+        <div className="flex items-center justify-center gap-2 text-xs font-medium uppercase tracking-wide text-leaf-600"><FriendModeIcon size={24} /> Friend Mode</div>
+        <div className="mt-6 flex justify-center"><FriendModeIcon size={96} title="Friend Mode" /></div>
         <h1 className="mt-3 text-4xl font-semibold leading-tight text-leaf-900 sm:text-5xl">
           Your friends, actually seeing each other.
         </h1>

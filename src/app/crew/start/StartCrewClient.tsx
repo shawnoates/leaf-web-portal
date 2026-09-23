@@ -10,6 +10,7 @@ import { useSearchParams } from "next/navigation";
 import { useIsLoggedIn } from "@/components/marketing/useMarketingSession";
 import StartCrewFlow from "@/components/crew/StartCrewFlow";
 import { CrewShell } from "@/components/crew/CrewShell";
+import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
 
 export default function StartCrewClient() {
   const params = useSearchParams();
@@ -20,7 +21,7 @@ export default function StartCrewClient() {
       <div className="mb-6">
         <Link href="/" className="text-sm text-leaf-600 hover:underline">← Leaf</Link>
         <div className="mt-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-leaf-600">
-          <span aria-hidden>🍃</span> Friend Mode
+          <FriendModeIcon size={24} /> Friend Mode
         </div>
       </div>
       <StartCrewFlow

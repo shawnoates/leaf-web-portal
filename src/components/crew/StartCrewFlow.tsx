@@ -18,6 +18,7 @@ import { setVerifiedUserCookie } from "@/lib/verified-user";
 import { trackMarketingEvent } from "@/components/marketing/analytics";
 import { Button } from "@/components/crew/CrewShell";
 import { RHYTHM_LABELS } from "@/lib/crew";
+import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
 
 type Suggestion = { userId: string; name: string; avatar: string | null; sharedPlans: number };
 type Row = { name: string; phone: string };
@@ -139,14 +140,15 @@ export default function StartCrewFlow({
     <div className="text-leaf-900">
       {step === "intro" && (
         <div>
+          <div className="mb-4"><FriendModeIcon size={64} /></div>
           <h1 className="text-2xl font-semibold">Meet Friend Mode</h1>
           <p className="mt-3 text-[15px] leading-relaxed text-zinc-700">
             Leaf finds a night that works for your friends and plans it. You add the people; Leaf does the rest.
           </p>
           <ul className="mt-4 space-y-2 text-[15px] text-zinc-700">
-            <li>🍃 Every few weeks Leaf picks a place from your crew&rsquo;s book and asks everyone which nights work.</li>
-            <li>📱 Friends answer by text or in the app. No one has to be the planner.</li>
-            <li>🔒 Your friends get one text asking to join. Nothing else until they say IN.</li>
+            <li>Every few weeks Leaf picks a place from your crew&rsquo;s book and asks everyone which nights work.</li>
+            <li>Friends answer by text or in the app. No one has to be the planner.</li>
+            <li>Your friends get one text asking to join. Nothing else until they say IN.</li>
           </ul>
           <div className="mt-6 flex items-center gap-4">
             <Button onClick={next}>Start a crew</Button>
@@ -269,7 +271,7 @@ export default function StartCrewFlow({
 
       {step === "done" && created && (
         <div>
-          <h1 className="text-2xl font-semibold">Invites sent 🍃</h1>
+          <h1 className="text-2xl font-semibold">Invites sent</h1>
           <p className="mt-3 text-[15px] leading-relaxed text-zinc-700">
             Leaf starts planning {name.trim()}&rsquo;s first night as soon as {Math.max(1, created.quorum - 1)} more {created.quorum - 1 === 1 ? "person joins" : "people join"}. You&rsquo;ll see it here and by text.
           </p>
