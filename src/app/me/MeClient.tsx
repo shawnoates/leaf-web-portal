@@ -23,6 +23,10 @@ import NewPlanModal, {
   type PostToOption,
 } from "./NewPlanModal";
 import { PlanMiniMap, PlansRailMap, type MapPin } from "./PlanMaps";
+import {
+  CrewActionCard, CrewsRail, CrewSuggestionBox, FriendModeIntroModal,
+  type CrewAction, type CrewRow, type CrewSuggestion, type FriendModeIntro,
+} from "./CrewCards";
 
 // ============================================================================
 // Attendee dashboard (/me). The signed-in home: the next plan, everything
@@ -58,6 +62,8 @@ interface Plan {
   time: string | null;
   venueName: string | null;
   venueAddress: string | null;
+  /** Set when the plan is a Friend Mode crew night (its calendar is the crew). */
+  crew?: { id: string; name: string } | null;
   venueLat: number | null;
   venueLng: number | null;
   calendarId: string | null;
@@ -242,6 +248,11 @@ interface Dashboard {
   unreadMessageCount: number;
   ask: { kind: "pattern" | "generic"; copy: string; promptPrefill: string | null } | null;
   seriesInvites?: SeriesInvite[]; // may be absent while the server side ships
+  // Friend Mode (all optional while the server side ships)
+  crews?: CrewRow[];
+  crewActions?: CrewAction[];
+  crewSuggestion?: CrewSuggestion;
+  friendModeIntro?: FriendModeIntro;
   hostInvites?: HostInvite[]; // may be absent while the server side ships
   // One prompt card at a time, chosen and flag-gated server-side. Only
   // community_qualifier renders here; other keys are ignored.
@@ -680,7 +691,8 @@ function DashboardView({
 }) {
   const hero = data.nextPlan;
   const spine = data.plans.slice(1); // hero is plans[0]
-  const calCount = new Set(data.plans.map((p) => p.calendarId).filter(Boolean)).size;
+  // Crew nights sit in the spine but a crew isn't a calendar you "follow".
+  const calCount = new Set(data.plans.filter((p) => !p.crew).map((p) => p.calendarId).filter(Boolean)).size;
   const [openPlanId, setOpenPlanId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
 
@@ -814,6 +826,18 @@ function DashboardView({
   const [popupIdea, setPopupIdea] = useState<HostPlan | null>(
     () => (firstUnseenRecap(data.pendingRecaps) ? null : data.needsHost?.popup || null),
   );
+  // Friend Mode intro: one more one-shot popup, lowest in the pecking order —
+  // it yields to a recap and to a needs-a-host idea, and only shows for people
+  // with no crew whom the server found "people you keep seeing" for. Seen is
+  // stamped the moment it opens, so closing it means it never auto-opens again.
+  const [introOpen, setIntroOpen] = useState<boolean>(
+    () => !firstUnseenRecap(data.pendingRecaps) && !data.needsHost?.popup && data.friendModeIntro?.eligible === true,
+  );
+  useEffect(() => {
+    if (!introOpen) return;
+    Parse.Cloud.run("markFriendModeIntroSeen").catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [popupAnsweredId, setPopupAnsweredId] = useState<string | null>(null);
   useEffect(() => {
     if (!popupIdea) return;
@@ -835,6 +859,8 @@ function DashboardView({
   const shown = showAll ? spine : spine.slice(0, PLAN_PAGE);
   const moreCount = spine.length - shown.length;
   const seriesInvites = data.seriesInvites || [];
+  const crewActions = data.crewActions || [];
+  const crews = data.crews || [];
   const hostInvites = data.hostInvites || [];
   const firstName = (data.person.firstName || "").trim().split(/\s+/)[0] || "";
   const rail = data.needsHost;
@@ -859,7 +885,8 @@ function DashboardView({
     (rail && (rail.tier1.length > 0 || rail.tier2.length > 0)) ||
     places.length > 0 ||
     recaps.length > 0 ||
-    mapPins.length > 0;
+    mapPins.length > 0 ||
+    crews.length > 0;
 
   return (
     <>
@@ -914,6 +941,12 @@ function DashboardView({
           {/* Directly under the hero and above the promo strip: someone is
               waiting on this person's answer, which outranks a thank-you but
               not their own next plan. */}
+          {/* A crew waiting on this person's answer (join, vote, IN/OUT, book)
+              sits first: it's the smallest ask and the most time-boxed. */}
+          {crewActions.length > 0 && (
+            <CrewActionCard actions={crewActions} onAnswered={onRefresh} />
+          )}
+
           {seriesInvites.length > 0 && (
             <SeriesInviteCard invites={seriesInvites} onAnswered={onRefresh} />
           )}
@@ -971,7 +1004,11 @@ function DashboardView({
             />
           )}
 
-          {!qualifierActive && !data.person.ownsCalendars && (
+          {!qualifierActive && crews.length === 0 && data.crewSuggestion && (
+            <CrewSuggestionBox suggestion={data.crewSuggestion} />
+          )}
+
+          {!qualifierActive && !data.person.ownsCalendars && !(crews.length === 0 && data.crewSuggestion) && (
             <div className="prompt-box">
               <div className="prompt-body">
                 <div className="prompt-h">Hosting an event soon?</div>
@@ -997,7 +1034,7 @@ function DashboardView({
             </div>
           )}
 
-          {!hasRail && <TextsCard />}
+          {!hasRail && <TextsCard inCrew={crews.length > 0} />}
         </div>
 
         {hasRail && (
@@ -1017,8 +1054,9 @@ function DashboardView({
             {places.length > 0 && (
               <PlacesRail probes={places} onAnswered={(id) => setPopupAnsweredId(id)} />
             )}
+            {crews.length > 0 && <CrewsRail rows={crews} />}
             {rail && rail.tier2.length > 0 && <CalendarsRail rows={rail.tier2} />}
-            <TextsCard />
+            <TextsCard inCrew={crews.length > 0} />
           </aside>
         )}
       </main>
@@ -1026,6 +1064,8 @@ function DashboardView({
       {openPlan && (
         <PlanModal plan={openPlan} onClose={() => setOpenPlanId(null)} onRsvp={onRsvp} />
       )}
+
+      {introOpen && <FriendModeIntroModal onClose={() => setIntroOpen(false)} />}
 
       {popupIdea && (
         <NeedsHostPopup
@@ -1963,10 +2003,14 @@ function PlacesRail({
 }
 
 // ---- Texts / notification card --------------------------------------------
-function TextsCard() {
+function TextsCard({ inCrew = false }: { inCrew?: boolean }) {
   return (
     <div className="texts">
-      <p>One text a week, Sunday morning. Plus a heads-up when something lands late.</p>
+      <p>
+        {inCrew
+          ? "One text a week from Leaf, plus texts from your crews when there's a night to plan."
+          : "One text a week, Sunday morning. Plus a heads-up when something lands late."}
+      </p>
       <Link className="btn ghost sm" href="/unsubscribe">Texts</Link>
     </div>
   );

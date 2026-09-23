@@ -32,6 +32,7 @@ export default function MarketingFooter({ blurb }: { blurb: string }) {
           links={[
             { href: "/about", label: "About" },
             { href: "/personal", label: "For individuals" },
+            { href: "/friends", label: "Friend Mode" },
             { href: "/organizations", label: "For organizations" },
             { href: "/help", label: "Help" },
             { href: "#pricing", label: "Pricing" },
