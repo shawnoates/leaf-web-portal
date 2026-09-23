@@ -32,6 +32,7 @@ export default function StartCrewFlow({
   suggest = false,
   initialName = "",
   fromEventGroupId = null,
+  initialStep = null,
   onClose,
 }: {
   signedIn: boolean;
@@ -39,10 +40,12 @@ export default function StartCrewFlow({
   initialName?: string;
   /** A plan the visitor came from (/m/ or /p/ CTA): its attendees are offered first. */
   fromEventGroupId?: string | null;
+  /** `consent` opens straight on the consent/verify step (public proof for carrier review). */
+  initialStep?: "consent" | null;
   /** null when rendered as a page; a handler when rendered in a modal. */
   onClose: (() => void) | null;
 }) {
-  const [step, setStep] = useState<Step>("intro");
+  const [step, setStep] = useState<Step>(initialStep === "consent" ? "verify" : "intro");
   const [name, setName] = useState(initialName);
   const [rows, setRows] = useState<Row[]>([{ name: "", phone: "" }, { name: "", phone: "" }]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
