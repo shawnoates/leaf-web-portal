@@ -88,6 +88,8 @@ export type CrewPage = {
     name: string;
     rhythmDays: number;
     status: "active" | "paused";
+    /** false once the owner turned Friend Mode off */
+    enabled?: boolean;
     quorum: number;
     joinedCount: number;
     ownerId: string | null;
