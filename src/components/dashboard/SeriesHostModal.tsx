@@ -14,7 +14,9 @@ import { isSeriesLimitError, NTH_LABELS, WEEKDAY_NAMES } from "@/lib/series";
 const NOTE_MAX = 200;
 const TITLE_MAX = 120;
 
-type Repeats = "choose" | "nthWeekday" | "hostPicks";
+// "nthWeekday" and "otherMonthWeekday" are the same rule a month apart —
+// the server takes the spacing as intervalMonths (see series-schedule.js).
+type Repeats = "choose" | "nthWeekday" | "otherMonthWeekday" | "hostPicks";
 
 export type SeriesLimit = { title: string; hostName: string };
 
@@ -58,6 +60,8 @@ export default function SeriesHostModal({
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  const picksWeekday = repeats === "nthWeekday" || repeats === "otherMonthWeekday";
+
   const send = async () => {
     if (!follower.objectId) return;
     setError(null);
@@ -67,9 +71,10 @@ export default function SeriesHostModal({
         calendarId: follower.calendarId || calendarId,
         hostUserId: follower.objectId,
         title: title.trim(),
-        freq: repeats === "nthWeekday" ? "monthlyNthWeekday" : repeats === "hostPicks" ? "hostPicks" : undefined,
-        nth: repeats === "nthWeekday" ? nth : undefined,
-        weekday: repeats === "nthWeekday" ? weekday : undefined,
+        freq: picksWeekday ? "monthlyNthWeekday" : repeats === "hostPicks" ? "hostPicks" : undefined,
+        nth: picksWeekday ? nth : undefined,
+        weekday: picksWeekday ? weekday : undefined,
+        intervalMonths: repeats === "otherMonthWeekday" ? 2 : undefined,
         note: note.trim() || undefined,
       })) as { planSeriesId: string };
       setDone(true);
@@ -152,6 +157,7 @@ export default function SeriesHostModal({
                     [
                       ["choose", `Let ${firstName} choose`],
                       ["nthWeekday", "Monthly on a weekday"],
+                      ["otherMonthWeekday", "Every other month on a weekday"],
                       ["hostPicks", "Host picks each date"],
                     ] as [Repeats, string][]
                   ).map(([key, label]) => (
@@ -161,7 +167,7 @@ export default function SeriesHostModal({
                     </label>
                   ))}
                 </div>
-                {repeats === "nthWeekday" && (
+                {picksWeekday && (
                   <div className="mt-2 pl-6 flex items-center gap-2">
                     <select
                       value={nth}

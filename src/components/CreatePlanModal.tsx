@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import Parse from "@/lib/parse-client";
-import { hostCandidateNote, monthlyRuleOptionsForDate, NTH_LABELS, WEEKDAY_NAMES, type RuleOption, type SeriesHostCandidate } from "@/lib/series";
+import { everyOtherMonth, hostCandidateNote, monthlyRuleOptionsForDate, NTH_LABELS, WEEKDAY_NAMES, type RuleOption, type SeriesHostCandidate } from "@/lib/series";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { getDefaultCoverForSeed } from "@/lib/default-covers";
 import VenueSearch from "@/components/VenueSearch";
@@ -42,10 +42,10 @@ export type CreatePlanResult = {
 
 type PollOptionDraft = { date: string; time: string };
 
-type SeriesFreq = "weekly" | "biweekly" | "monthly";
-// Hosted-plan Repeats is rule-based (weekly · other week · monthly on the
-// 13th / 2nd Tuesday / last Tuesday · host picks). Ideas and poll
-// conversions keep the older three-value `SeriesFreq`.
+type SeriesFreq = "weekly" | "biweekly" | "monthly" | "bimonthly";
+// Hosted-plan Repeats is rule-based (weekly · other week · monthly or every
+// other month on the 13th / 2nd Tuesday / last Tuesday · host picks). Ideas
+// and poll conversions keep the older flat `SeriesFreq`.
 type HostedRuleKey = RuleOption["key"];
 type SeriesEndType = "occurrences" | "until";
 
@@ -351,7 +351,10 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
     }
     const monthly = monthlyRuleOptionsForDate(date);
     if (monthly.length) out.push(...monthly);
-    else out.push({ key: "monthlyNth", label: "Monthly on a weekday", freq: "monthlyNthWeekday", nth: genericNth, weekday: genericWeekday });
+    else {
+      const generic: RuleOption = { key: "monthlyNth", label: "Monthly on a weekday", freq: "monthlyNthWeekday", nth: genericNth, weekday: genericWeekday };
+      out.push(generic, { ...everyOtherMonth(generic), label: "Every other month on a weekday" });
+    }
     if (hostIsOther) out.push({ key: "hostPicks", label: "Host picks each date", freq: "hostPicks" });
     return out;
   }, [hostIsOther, date, genericNth, genericWeekday]);
@@ -1222,6 +1225,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           nth: selectedHostedRule.nth,
           weekday: selectedHostedRule.weekday,
           dayOfMonth: selectedHostedRule.dayOfMonth,
+          intervalMonths: selectedHostedRule.intervalMonths,
           hostUserId: hostIsOther ? seriesHostId : undefined,
           maxOccurrences: !hostIsOther && seriesEndType === "occurrences" ? occInt : undefined,
           endsAt: !hostIsOther && seriesEndType === "until" && seriesEndsAt ? `${seriesEndsAt}T23:59:59${tzSuffix}` : undefined,
@@ -2217,7 +2221,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
                       </div>
                       {hostIsOther && (
                         <p className="text-xs text-zinc-400 mt-1">
-                          {`${seriesHostFirstName} gets a text to accept. We'll remind them 3 weeks before each date, and skip the month if they don't confirm. The first date is optional.`}
+                          {`${seriesHostFirstName} gets a text to accept. We'll remind them 3 weeks before each date, and skip that date if they don't confirm. The first date is optional.`}
                         </p>
                       )}
                     </div>
@@ -2235,7 +2239,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
                           <option key={o.key} value={o.key}>{o.label}</option>
                         ))}
                       </select>
-                      {seriesRuleKey === "monthlyNth" && !date && (
+                      {(seriesRuleKey === "monthlyNth" || seriesRuleKey === "otherMonthNth") && !date && (
                         <div className="flex items-center gap-2 mt-2">
                           <select
                             value={genericNth}
@@ -2267,6 +2271,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
                         <option value="weekly">Week</option>
                         <option value="biweekly">Other week</option>
                         <option value="monthly">Month</option>
+                        <option value="bimonthly">Other month</option>
                       </select>
                     </div>
                   )}

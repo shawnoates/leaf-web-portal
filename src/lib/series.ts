@@ -4,10 +4,12 @@
 // returns; keep the two in step.
 
 export type SeriesRule = {
-  freq: "monthly" | "monthlyNthWeekday" | "hostPicks" | "weekly" | "biweekly" | null;
+  freq: "monthly" | "monthlyNthWeekday" | "hostPicks" | "weekly" | "biweekly" | "bimonthly" | null;
   dayOfMonth: number | null;
   nth: number | null;
   weekday: number | null;
+  /** Months between occurrences — 1 (or absent) monthly, 2 every other month. */
+  intervalMonths?: number | null;
   wallTime: string;
   timeZone: string;
   label: string | null;
@@ -113,17 +115,46 @@ export function ordinal(n: number): string {
 }
 
 export type RuleOption = {
-  key: "weekly" | "biweekly" | "monthlyDay" | "monthlyNth" | "monthlyLast" | "hostPicks";
+  key:
+    | "weekly"
+    | "biweekly"
+    | "monthlyDay"
+    | "monthlyNth"
+    | "monthlyLast"
+    | "otherMonthDay"
+    | "otherMonthNth"
+    | "otherMonthLast"
+    | "hostPicks";
   label: string;
   freq: "weekly" | "biweekly" | "monthly" | "monthlyNthWeekday" | "hostPicks";
   dayOfMonth?: number;
   nth?: number;
   weekday?: number;
+  /** 2 for the every-other-month twin of a monthly rule; absent means monthly. */
+  intervalMonths?: number;
 };
+
+/** The every-other-month key for a monthly one ("monthlyNth" → "otherMonthNth"). */
+const OTHER_MONTH_KEY: Record<string, RuleOption["key"]> = {
+  monthlyDay: "otherMonthDay",
+  monthlyNth: "otherMonthNth",
+  monthlyLast: "otherMonthLast",
+};
+
+/** The every-other-month twin of a monthly option: same rule, two months apart. */
+export function everyOtherMonth(option: RuleOption): RuleOption {
+  return {
+    ...option,
+    key: OTHER_MONTH_KEY[option.key] || option.key,
+    label: option.label.replace(/^Monthly on/, "Every other month on"),
+    intervalMonths: 2,
+  };
+}
 
 /**
  * Repeat rules a chosen first date supports, labelled from that date —
- * mirrors ruleOptionsForDate in cloud/series-schedule.js. `ymd` is "YYYY-MM-DD".
+ * mirrors ruleOptionsForDate in cloud/series-schedule.js. Each monthly shape
+ * is followed by its every-other-month twin. `ymd` is "YYYY-MM-DD".
  */
 export function monthlyRuleOptionsForDate(ymd: string): RuleOption[] {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd || "");
@@ -141,18 +172,37 @@ export function monthlyRuleOptionsForDate(ymd: string): RuleOption[] {
   if (day > daysInMonth - 7) {
     out.push({ key: "monthlyLast", label: `Monthly on the last ${WEEKDAY_NAMES[weekday]}`, freq: "monthlyNthWeekday", nth: -1, weekday });
   }
-  return out;
+  return [...out, ...out.map(everyOtherMonth)];
 }
 
-export function ruleLabel(rule: Pick<SeriesRule, "freq" | "nth" | "weekday" | "dayOfMonth">): string {
+/** How often a monthly rule comes round — mirrors cadenceWord in cloud/series-schedule.js. */
+function cadenceWord(intervalMonths?: number | null): string {
+  const n = intervalMonths && intervalMonths > 1 ? intervalMonths : 1;
+  if (n === 1) return "monthly";
+  if (n === 2) return "every other month";
+  return `every ${n} months`;
+}
+
+export function ruleLabel(rule: Pick<SeriesRule, "freq" | "nth" | "weekday" | "dayOfMonth" | "intervalMonths">): string {
   if (rule.freq === "hostPicks") return "host picks each date";
   if (rule.freq === "monthlyNthWeekday" && rule.nth != null && rule.weekday != null) {
-    return `${NTH_LABELS[rule.nth]} ${WEEKDAY_NAMES[rule.weekday]} monthly`;
+    return `${NTH_LABELS[rule.nth]} ${WEEKDAY_NAMES[rule.weekday]} ${cadenceWord(rule.intervalMonths)}`;
   }
-  if (rule.freq === "monthly") return rule.dayOfMonth ? `the ${ordinal(rule.dayOfMonth)} monthly` : "monthly";
+  if (rule.freq === "monthly") {
+    return rule.dayOfMonth ? `the ${ordinal(rule.dayOfMonth)} ${cadenceWord(rule.intervalMonths)}` : cadenceWord(rule.intervalMonths);
+  }
   if (rule.freq === "weekly") return "weekly";
   if (rule.freq === "biweekly") return "every other week";
+  if (rule.freq === "bimonthly") return "every other month";
   return "";
+}
+
+/** The picker key a stored rule corresponds to. */
+export function ruleOptionKey(rule: Pick<SeriesRule, "freq" | "nth" | "intervalMonths">): RuleOption["key"] {
+  if (rule.freq === "hostPicks") return "hostPicks";
+  const monthly: RuleOption["key"] =
+    rule.freq === "monthlyNthWeekday" ? (rule.nth === -1 ? "monthlyLast" : "monthlyNth") : "monthlyDay";
+  return (rule.intervalMonths || 1) > 1 ? OTHER_MONTH_KEY[monthly] : monthly;
 }
 
 export const PAUSED_REASON_LABEL: Record<string, string> = {
