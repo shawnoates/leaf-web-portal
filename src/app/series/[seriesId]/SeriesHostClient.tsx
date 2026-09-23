@@ -13,7 +13,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Parse from "@/lib/parse-client";
 import VenueSearch from "@/components/VenueSearch";
 import {
+  everyOtherMonth,
   monthlyRuleOptionsForDate,
+  ruleOptionKey,
   NTH_LABELS,
   WEEKDAY_NAMES,
   type RuleOption,
@@ -78,17 +80,16 @@ type RuleKey = RuleOption["key"];
 /** Repeat choices for a setup/settings form. Without a date the weekday rule is generic. */
 function ruleOptionsFor(date: string, generic: { nth: number; weekday: number }): RuleOption[] {
   const monthly = monthlyRuleOptionsForDate(date);
+  const genericNth: RuleOption = { key: "monthlyNth", label: "Monthly on a weekday", freq: "monthlyNthWeekday", nth: generic.nth, weekday: generic.weekday };
   const out: RuleOption[] = monthly.length
-    ? monthly
-    : [{ key: "monthlyNth", label: "Monthly on a weekday", freq: "monthlyNthWeekday", nth: generic.nth, weekday: generic.weekday }];
+    ? [...monthly]
+    : [genericNth, { ...everyOtherMonth(genericNth), label: "Every other month on a weekday" }];
   out.push({ key: "hostPicks", label: "I'll pick each date", freq: "hostPicks" });
   return out;
 }
 
 function keyForRule(rule: SeriesSummary["rule"]): RuleKey {
-  if (rule.freq === "hostPicks") return "hostPicks";
-  if (rule.freq === "monthlyNthWeekday") return rule.nth === -1 ? "monthlyLast" : "monthlyNth";
-  return "monthlyDay";
+  return ruleOptionKey(rule);
 }
 
 export default function SeriesHostClient({ seriesId, token }: { seriesId: string; token: string }) {
@@ -600,12 +601,13 @@ type Draft = {
 function draftFrom(data: SeriesSummary): Draft {
   const d = (data.setupDraft || {}) as Partial<{
     title: string; description: string; imageUrl: string; freq: string; nth: number; weekday: number; dayOfMonth: number;
-    wallClock: string; venue: Venue; capacity: string | number; requireApproval: boolean;
+    intervalMonths: number; wallClock: string; venue: Venue; capacity: string | number; requireApproval: boolean;
   }>;
-  const freq = d.freq || data.rule.freq;
+  const freq = (d.freq || data.rule.freq) as SeriesSummary["rule"]["freq"];
   const nth = d.nth ?? data.rule.nth ?? 2;
   const weekday = d.weekday ?? data.rule.weekday ?? 2;
-  const ruleKey: RuleKey = freq === "hostPicks" ? "hostPicks" : freq === "monthly" ? "monthlyDay" : nth === -1 ? "monthlyLast" : "monthlyNth";
+  const intervalMonths = d.intervalMonths ?? data.rule.intervalMonths ?? 1;
+  const ruleKey: RuleKey = ruleOptionKey({ freq, nth, intervalMonths });
   return {
     title: d.title || data.title,
     description: d.description || data.description || "",
@@ -653,6 +655,7 @@ function SetupForm({ data, seriesId, run, withSession, onPublished }: {
         draft: {
           title: draft.title, description: draft.description, imageUrl: draft.imageUrl,
           freq: rule?.freq, nth: rule?.nth, weekday: rule?.weekday, dayOfMonth: rule?.dayOfMonth,
+          intervalMonths: rule?.intervalMonths,
           wallClock: draft.date && draft.time ? `${draft.date}T${draft.time}` : undefined,
           venue: draft.venue, capacity: draft.capacity, requireApproval: draft.requireApproval,
         },
@@ -697,6 +700,7 @@ function SetupForm({ data, seriesId, run, withSession, onPublished }: {
           nth: rule.nth,
           weekday: rule.weekday,
           dayOfMonth: rule.dayOfMonth,
+          intervalMonths: rule.intervalMonths,
           wallClock: `${draft.date}T${draft.time}`,
           venue: draft.venue,
           capacity: draft.capacity ? parseInt(draft.capacity, 10) : undefined,
@@ -752,7 +756,7 @@ function SetupForm({ data, seriesId, run, withSession, onPublished }: {
               <option key={o.key} value={o.key}>{o.label}</option>
             ))}
           </select>
-          {draft.ruleKey === "monthlyNth" && !draft.date ? (
+          {(draft.ruleKey === "monthlyNth" || draft.ruleKey === "otherMonthNth") && !draft.date ? (
             <div className="mt-2 grid grid-cols-2 gap-3">
               <select className={inputClass} value={draft.nth} onChange={(e) => update({ nth: parseInt(e.target.value, 10) })} aria-label="Which week">
                 {[1, 2, 3, 4, -1].map((n) => <option key={n} value={n}>{NTH_LABELS[n]}</option>)}
@@ -821,10 +825,14 @@ function SettingsSection({ data, seriesId, run, withSession, onSaved }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const options: RuleOption[] = [
+  const monthlyOptions: RuleOption[] = [
     { key: "monthlyDay", label: `Monthly on the ${dayOfMonth}${dayOfMonth === 1 ? "st" : dayOfMonth === 2 ? "nd" : dayOfMonth === 3 ? "rd" : "th"}`, freq: "monthly", dayOfMonth },
     { key: "monthlyNth", label: "Monthly on a weekday", freq: "monthlyNthWeekday", nth, weekday },
     { key: "monthlyLast", label: `Monthly on the last ${WEEKDAY_NAMES[weekday]}`, freq: "monthlyNthWeekday", nth: -1, weekday },
+  ];
+  const options: RuleOption[] = [
+    ...monthlyOptions,
+    ...monthlyOptions.map(everyOtherMonth),
     { key: "hostPicks", label: "I'll pick each date", freq: "hostPicks" },
   ];
   const rule = options.find((o) => o.key === ruleKey) || options[1];
@@ -844,6 +852,7 @@ function SettingsSection({ data, seriesId, run, withSession, onSaved }: {
           nth: rule.nth,
           weekday: rule.weekday,
           dayOfMonth: rule.dayOfMonth,
+          intervalMonths: rule.intervalMonths || 1,
           alsoUpdateNext: alsoNext,
         })) as { series: SeriesSummary };
         onSaved(r.series);
@@ -892,9 +901,9 @@ function SettingsSection({ data, seriesId, run, withSession, onSaved }: {
             <select className={inputClass} value={ruleKey} onChange={(e) => setRuleKey(e.target.value as RuleKey)}>
               {options.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
             </select>
-            {ruleKey === "monthlyNth" || ruleKey === "monthlyLast" ? (
+            {ruleKey === "monthlyNth" || ruleKey === "monthlyLast" || ruleKey === "otherMonthNth" || ruleKey === "otherMonthLast" ? (
               <div className="mt-2 grid grid-cols-2 gap-3">
-                {ruleKey === "monthlyNth" ? (
+                {ruleKey === "monthlyNth" || ruleKey === "otherMonthNth" ? (
                   <select className={inputClass} value={nth} onChange={(e) => setNth(parseInt(e.target.value, 10))} aria-label="Which week">
                     {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{NTH_LABELS[n]}</option>)}
                   </select>

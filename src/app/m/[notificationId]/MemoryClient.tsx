@@ -9,6 +9,7 @@ import SurveyCard from "@/components/recap/SurveyCard";
 import PhotoUpload from "@/components/recap/PhotoUpload";
 import CalendarPromoBanner from "@/components/CalendarPromoBanner";
 import type { Photo, SurveyState, SurveyResult, PublicComment } from "@/components/recap/types";
+import FriendModeCta from "@/components/crew/FriendModeCta";
 
 type Attendee = {
   notificationId: string;
@@ -289,6 +290,11 @@ export default function MemoryClient({
           </ul>
         </div>
       )}
+
+      {/* Friend Mode: turn the people from this night into a crew. Everyone
+          with a seat on the plan sees it; the start flow offers the same
+          people by name once they're signed in. */}
+      <FriendModeCta eventGroupId={info.event.objectId} surface="recap" peopleCount={info.recap?.rsvpCount ?? 0} className="mb-6" />
 
       {/* Mark Attendance — host-only. Visible when the link belongs to the host
           (viewerRole === host|owner); writes require host-phone OTP verification. */}
