@@ -109,7 +109,7 @@ export default function FriendModeCard({
         <div className="min-w-0 flex-1">
           <p className="text-[14px] font-medium" style={{ color: locked ? FM.mutedText : FM.ink }}>
             Friend Mode{" "}
-            <Link href="/friends/what-is-friend-mode" target="_blank" className="ml-1 text-[12px] font-normal italic underline" style={{ color: FM.mutedText }}>
+            <Link href="/help/calendars-and-rsvps/friend-mode" target="_blank" className="ml-1 text-[12px] font-normal italic underline" style={{ color: FM.mutedText }}>
               What is this?
             </Link>
           </p>
