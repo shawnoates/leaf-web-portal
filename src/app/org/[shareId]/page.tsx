@@ -725,12 +725,21 @@ function OpenPlansCarousel({
   gutterClass?: string;
 }) {
   if (plans.length === 0) return null;
+  // The band bleeds to the modal edge but the scroll row sits inside the
+  // gutter, so the first card (and every snapped card after it) shares the
+  // label's left edge. Padding on the scroll container itself doesn't do
+  // that: once the row scrolls, cards slide under the gutter and the strip
+  // reads as starting at the modal edge.
   return (
     <div className={`${bleedClass} border-y border-zinc-100 bg-zinc-50/60 py-4`}>
-      <p className={`${gutterClass} text-[11px] tracking-widest uppercase font-bold text-zinc-500 mb-3`}>
-        {label}
-      </p>
-      <div className={`flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory ${gutterClass} pb-1`}>
+      <div className={gutterClass}>
+        <p className="text-[11px] tracking-widest uppercase font-bold text-zinc-500 mb-3">
+          {label}
+        </p>
+        {/* items-start: a <button> centers its content vertically, so in a
+            stretched flex row a one-line title would push its image down
+            relative to a neighbour with a two-line title. */}
+        <div className="flex items-start gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-1">
         {plans.map((alt) => {
           const left = alt.capacity != null ? alt.capacity - alt.rsvpCount : null;
           return (
@@ -738,7 +747,7 @@ function OpenPlansCarousel({
               key={alt.id}
               type="button"
               onClick={() => onPick(alt)}
-              className="snap-start shrink-0 w-[150px] text-left group"
+              className="snap-start shrink-0 w-[150px] text-left group flex flex-col items-stretch"
             >
               <div className="aspect-[4/3] w-full overflow-hidden rounded-lg bg-zinc-200 mb-2 relative">
                 {alt.image ? (
@@ -774,6 +783,7 @@ function OpenPlansCarousel({
             </button>
           );
         })}
+        </div>
       </div>
     </div>
   );
