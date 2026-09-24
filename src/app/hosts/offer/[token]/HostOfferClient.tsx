@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { IMAGE_ACCEPT, processImageFile } from "@/lib/image-utils";
+import HostIntroVideoCard, { type IntroVideoInfo } from "@/components/HostIntroVideoCard";
 
 type OfferState =
   | "offered"
@@ -79,6 +80,12 @@ type Offer = {
   planStarted: boolean;
   planEnded: boolean;
   completion: Completion | null;
+  /** Bonus for a 30-second intro video, frozen on the offer. 0 = none. */
+  videoBonusCents?: number;
+  videoBonusLabel?: string | null;
+  videoDeadlineHours?: number;
+  /** The video card's state + script; only on an accepted offer. */
+  video?: IntroVideoInfo | null;
 };
 
 const card =
@@ -476,6 +483,18 @@ export default function HostOfferClient({ token }: { token: string }) {
           )}
         </div>
 
+        {/* The 30-second intro. Before the checklist link on purpose: the
+            bonus clock is running from the moment they accepted. */}
+        {offer.video && (
+          <HostIntroVideoCard
+            token={token}
+            video={offer.video}
+            timeZone={p?.timeZone ?? null}
+            planStarted={offer.planStarted}
+            onChanged={load}
+          />
+        )}
+
         {/* After the night: confirm you were there. This is what releases pay. */}
         {offer.planStarted && (
           <div className={`${card} mt-6`}>
@@ -829,6 +848,13 @@ export default function HostOfferClient({ token }: { token: string }) {
               <span className="block text-[15px] font-normal text-zinc-600">
                 Paid within a day of the plan.
               </span>
+              {(offer.videoBonusCents ?? 0) > 0 && (
+                <span className="mt-1 block text-[15px] font-normal text-zinc-600">
+                  {offer.videoBonusLabel} for a 30-second intro video, optional,
+                  if it&rsquo;s up within {offer.videoDeadlineHours === 24 || !offer.videoDeadlineHours ? "a day" : `${offer.videoDeadlineHours} hours`} of accepting.
+                  We give you the script.
+                </span>
+              )}
             </dd>
           </div>
         </dl>

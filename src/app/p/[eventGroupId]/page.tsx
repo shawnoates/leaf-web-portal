@@ -33,7 +33,12 @@ type PlanShareInfo = {
   host: { name: string } | null;
   // The assigned roster host — the person who will physically be there, as
   // distinct from `host` (whose plan it is). Null when none is assigned.
-  rosterHost: { name: string; photoUrl: string | null; bio: string } | null;
+  rosterHost: {
+    name: string;
+    photoUrl: string | null;
+    bio: string;
+    introVideo?: { url: string; posterUrl: string | null } | null;
+  } | null;
   shareId: string | null;
   calendarName: string | null;
   calendarIsPrivate: boolean;

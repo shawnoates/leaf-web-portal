@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Lock, MapPin } from "lucide-react";
 import PlanHeroMedia from "./PlanHeroMedia";
+import HlsVideo from "@/components/HlsVideo";
 import PlanWhen from "./PlanWhen";
 import StandalonePlanRsvp from "./StandalonePlanRsvp";
 
@@ -28,7 +29,13 @@ type Props = {
   hostName: string | null;
   // The roster host who will physically be there — a different person from
   // `hostName` (whose plan it is). Null unless one has been assigned.
-  rosterHost: { name: string; photoUrl: string | null; bio: string } | null;
+  rosterHost: {
+    name: string;
+    photoUrl: string | null;
+    bio: string;
+    // Their 30-second intro, once uploaded and playable.
+    introVideo?: { url: string; posterUrl: string | null } | null;
+  } | null;
   calendarName: string | null;
   calendarProfilePhoto: string | null;
   // Only present when variant === "privateCalendar"
@@ -169,7 +176,17 @@ export default function StandalonePlanCard({
           */}
           {variant !== "copy" && rosterHost ? (
             <div className="flex gap-3 rounded-lg bg-zinc-50 p-3">
-              {rosterHost.photoUrl ? (
+              {rosterHost.introVideo ? (
+                // The intro stands in for the avatar: its poster is the face.
+                <div className="w-[132px] shrink-0 aspect-[9/16] overflow-hidden rounded-xl bg-zinc-900">
+                  <HlsVideo
+                    src={rosterHost.introVideo.url}
+                    poster={rosterHost.introVideo.posterUrl ?? rosterHost.photoUrl}
+                    preload="none"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ) : rosterHost.photoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={rosterHost.photoUrl}
@@ -185,6 +202,9 @@ export default function StandalonePlanCard({
                   <p className="mt-0.5 text-sm text-zinc-600 whitespace-pre-wrap">
                     {rosterHost.bio}
                   </p>
+                ) : null}
+                {rosterHost.introVideo ? (
+                  <p className="mt-2 text-xs text-zinc-500">▶ A quick hello from {rosterHost.name}</p>
                 ) : null}
               </div>
             </div>
