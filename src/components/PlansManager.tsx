@@ -1700,6 +1700,11 @@ export default function PlansManager({
 
   return (
     <div className="space-y-10">
+        {/* Friend Mode — the per-calendar switch (owner only, ≤15 members) */}
+        {friendMode && (
+          <FriendModeCard calendarId={calendarId} enabled={friendMode.enabled} memberCount={friendMode.memberCount} />
+        )}
+
         {/* Plans (Upcoming / Past) */}
         <section>
           <div className="flex items-center justify-between mb-4">
@@ -2025,11 +2030,6 @@ export default function PlansManager({
             <p className="text-sm text-zinc-400">No past plans yet.</p>
           )}
         </section>
-
-        {/* Friend Mode — the per-calendar switch (owner only, ≤15 members) */}
-        {friendMode && (
-          <FriendModeCard calendarId={calendarId} enabled={friendMode.enabled} memberCount={friendMode.memberCount} />
-        )}
 
         {/* Existing Plan Ideas */}
         <section>
