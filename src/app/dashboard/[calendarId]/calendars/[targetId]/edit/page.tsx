@@ -7,6 +7,7 @@ import Parse from "@/lib/parse-client";
 import { SITE_HOST } from "@/lib/site";
 import CityAutocomplete from "@/components/CityAutocomplete";
 import SettingsSwitch from "@/components/SettingsSwitch";
+import { ORG_TYPES } from "@/lib/orgTypes";
 import { IMAGE_ACCEPT, processImageFile } from "@/lib/image-utils";
 import {
   ArrowLeft,
@@ -26,6 +27,9 @@ interface CalendarEntry {
   description: string;
   shareId: string;
   city: string;
+  // Category. Null on calendars created before the picker existed; the server
+  // resolves a child's blank value to its parent's before sending it.
+  orgType: string | null;
   isPrimary: boolean;
   role: "Owner" | "Host";
   calendarImage: string | null;
@@ -70,6 +74,7 @@ export default function EditCalendarPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [slug, setSlug] = useState("");
+  const [orgType, setOrgType] = useState("");
   const [city, setCity] = useState("");
   const [citySelected, setCitySelected] = useState(false);
   const [lat, setLat] = useState<number | null>(null);
@@ -151,6 +156,10 @@ export default function EditCalendarPage() {
     setSlug(cal.shareId || "");
     originalSlugRef.current = cal.shareId || "";
     setSlugAvailable(null);
+    // Lowercased to match a picker value: legacy rows carry types the picker
+    // never offered ("Church", "run club"), and an unmatched value would
+    // silently render as the first option and get saved over on the next save.
+    setOrgType((cal.orgType || "").toLowerCase());
     setCity(cal.city || "");
     setCitySelected(false);
     setLat(null);
@@ -302,6 +311,7 @@ export default function EditCalendarPage() {
         hidePlanIdeas,
         hideCustomPlans,
         hideDeals,
+        orgType,
       };
       if (slug !== originalSlugRef.current) p.slug = slug;
       if (citySelected && city) {
@@ -490,6 +500,34 @@ export default function EditCalendarPage() {
               className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-y"
               placeholder="What is this calendar about?"
             />
+          </Field>
+          <Field label="Category">
+            <div className="relative">
+              <select
+                value={orgType}
+                onChange={(e) => setOrgType(e.target.value)}
+                className="w-full appearance-none border-b border-zinc-300 bg-white py-2 pr-7 text-sm font-light focus:outline-none focus:border-zinc-900"
+              >
+                <option value="">Uncategorized</option>
+                {ORG_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+                {/* Legacy rows carry types the picker never offered. Listing
+                    the current value keeps it selected instead of showing
+                    "Uncategorized" and quietly erasing it on save. */}
+                {orgType && !ORG_TYPES.some((t) => t.value === orgType) && (
+                  <option value={orgType}>{orgType}</option>
+                )}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+            </div>
+            <p className="text-xs text-zinc-400 mt-1">
+              Shapes the plans Leaf suggests, and which features this calendar
+              gets — Friend Mode is only offered on Friends / Community
+              calendars.
+            </p>
           </Field>
           <Field label="URL slug">
             <div className="flex items-center gap-0">

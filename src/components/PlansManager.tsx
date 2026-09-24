@@ -886,14 +886,19 @@ export default function PlansManager({
   async function fetchOrgInfo() {
     try {
       const result = await Parse.Cloud.run("getOrgDashboard", { calendarId: orgId });
-      type FM = { enabled: boolean; memberCount: number } | undefined;
+      type FM = { enabled: boolean; memberCount: number; eligible?: boolean } | undefined;
+      // Friend Mode belongs to Friends / Community calendars only — the server
+      // decides (category + size) and says so in `eligible`. A calendar that
+      // already has it on stays eligible there, so re-categorising can't hide
+      // the only switch that turns it off.
+      const showFriendMode = (fm: FM) => (fm && fm.eligible !== false ? fm : null);
       if (orgId !== calendarId && result.calendars) {
         const child = result.calendars.find((c: { objectId: string; hidePlanIdeas?: boolean; friendMode?: FM }) => c.objectId === calendarId);
         setHidePlanIdeas((child ? child.hidePlanIdeas : result.hidePlanIdeas) || false);
-        setFriendMode(result.isOwner && child?.friendMode ? child.friendMode : null);
+        setFriendMode(result.isOwner ? showFriendMode(child?.friendMode) : null);
       } else {
         setHidePlanIdeas(result.hidePlanIdeas || false);
-        setFriendMode(result.isOwner && result.friendMode ? (result.friendMode as FM) ?? null : null);
+        setFriendMode(result.isOwner ? showFriendMode(result.friendMode as FM) : null);
       }
       setTier(result.tier);
       setTierLoaded(true);

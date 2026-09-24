@@ -850,7 +850,8 @@ export default function HostOfferClient({ token }: { token: string }) {
               </span>
               {(offer.videoBonusCents ?? 0) > 0 && (
                 <span className="mt-1 block text-[15px] font-normal text-zinc-600">
-                  {offer.videoBonusLabel} for a 30-second intro video, optional,
+                  {offer.videoBonusLabel}{" "}
+                  for a 30-second intro video, optional,
                   if it&rsquo;s up within {offer.videoDeadlineHours === 24 || !offer.videoDeadlineHours ? "a day" : `${offer.videoDeadlineHours} hours`} of accepting.
                   We give you the script.
                 </span>
