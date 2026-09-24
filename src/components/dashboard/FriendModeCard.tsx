@@ -18,7 +18,7 @@ import { FM, FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 const MAX_MEMBERS = 15;
 
 type Person = { userId: string; name: string; channel: "push" | "sms" | "none"; canInvite: boolean; reason: string | null };
-type Preview = { people: Person[]; invited: number; joined: number };
+type Preview = { people: Person[]; invited: number; joined: number; ownerSmsOptIn?: boolean; ownerHasPhone?: boolean };
 
 export default function FriendModeCard({
   calendarId,
@@ -35,7 +35,7 @@ export default function FriendModeCard({
   const [note, setNote] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [confirming, setConfirming] = useState(false);
-  // The owner's own text opt-in, asked when turning it on. Never pre-ticked.
+  // The owner's own text opt-in, offered once Friend Mode is on. Never pre-ticked.
   const [ownerSms, setOwnerSms] = useState(false);
   const locked = memberCount > MAX_MEMBERS;
 
@@ -58,7 +58,7 @@ export default function FriendModeCard({
     setConfirming(false);
     setEnabled(v); // optimistic; a failure flips it back
     try {
-      const r = (await Parse.Cloud.run("setFriendModeOnCalendar", v ? { calendarId, enabled: v, ownerSms } : { calendarId, enabled: v })) as { enabled: boolean };
+      const r = (await Parse.Cloud.run("setFriendModeOnCalendar", { calendarId, enabled: v })) as { enabled: boolean };
       setEnabled(r.enabled);
       if (!r.enabled) setPreview(null);
     } catch (err) {
@@ -79,6 +79,20 @@ export default function FriendModeCard({
       await loadPreview();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't send invites.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setTexts = async (on: boolean) => {
+    setSaving(true);
+    setError("");
+    try {
+      await Parse.Cloud.run("setCrewTexts", { crewId: calendarId, on });
+      setOwnerSms(false);
+      await loadPreview();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't change that.");
     } finally {
       setSaving(false);
     }
@@ -120,16 +134,6 @@ export default function FriendModeCard({
         <FriendModeSwitch label="Friend Mode" checked={enabled} locked={locked} disabled={saving} onChange={toggle} />
       </div>
 
-      {!enabled && !locked && (
-        <label className="mt-2 flex items-start gap-2 pb-1 text-[12px]" style={{ color: FM.mutedText }}>
-          <input type="checkbox" checked={ownerSms} onChange={(e) => setOwnerSms(e.target.checked)} className="mt-0.5" />
-          <span>
-            <span style={{ color: FM.ink }}>Text me about this crew&rsquo;s plans</span> — up to 5 msgs/wk. Msg &amp; data rates may apply.
-            Reply HELP for help, STOP to opt out. You can change this on the crew page.
-          </span>
-        </label>
-      )}
-
       {(enabled || locked || error) && (
         <div className="mt-1.5 space-y-2 pb-1 text-[12px]" style={{ color: FM.mutedText }}>
           {error && <p style={{ color: "#F2A39A" }}>{error}</p>}
@@ -145,6 +149,30 @@ export default function FriendModeCard({
               )}
               <Link href={`/crew/${calendarId}`} className="underline" style={{ color: FM.ink }}>Open the crew page</Link>
             </div>
+          )}
+
+          {enabled && preview?.ownerHasPhone && (
+            preview.ownerSmsOptIn ? (
+              <p>
+                Texts to you about this crew are on.{" "}
+                <button className="underline" disabled={saving} onClick={() => setTexts(false)} style={{ color: FM.ink }}>Turn off</button>
+              </p>
+            ) : (
+              <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
+                <label className="flex flex-1 items-start gap-2">
+                  <input type="checkbox" checked={ownerSms} onChange={(e) => setOwnerSms(e.target.checked)} className="mt-0.5" />
+                  <span>
+                    <span style={{ color: FM.ink }}>Text me about this crew&rsquo;s plans</span> — up to 5 msgs/wk. Msg &amp; data rates may apply.
+                    Reply HELP for help, STOP to opt out.
+                  </span>
+                </label>
+                {ownerSms && (
+                  <button onClick={() => setTexts(true)} disabled={saving} className="rounded-full px-3 py-1 font-medium disabled:opacity-60" style={{ background: FM.accent, color: FM.canvas }}>
+                    Save
+                  </button>
+                )}
+              </div>
+            )
           )}
 
           {enabled && confirming && (
