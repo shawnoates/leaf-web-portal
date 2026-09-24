@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useState } from "react";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 import Parse from "@/lib/parse-client";
 import { getVerifiedUserCookie, setVerifiedUserCookie } from "@/lib/verified-user";
 import { trackMarketingEvent } from "@/components/marketing/analytics";
@@ -60,10 +61,10 @@ export default function StartCrewFlow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState<Created | null>(null);
-  // 10DLC web-form consent: two separate, un-pre-checked boxes (messages; terms + privacy).
+  // 10DLC: texts to the organizer are strictly optional. One un-pre-checked
+  // box; nothing on this page requires it (carriers rejected a required box).
+  // Unchecked = the crew still gets made; the organizer just isn't texted.
   const [smsConsent, setSmsConsent] = useState(false);
-  const [termsConsent, setTermsConsent] = useState(false);
-  const consented = smsConsent && termsConsent;
 
   useEffect(() => { trackMarketingEvent("friend_mode_intro_view"); }, []);
   useEffect(() => { trackMarketingEvent("friend_mode_intro_step", { step: STEPS.indexOf(step) + 1 }); }, [step]);
@@ -88,7 +89,7 @@ export default function StartCrewFlow({
         ...validRows.map((r) => ({ name: r.name.trim(), phone: r.phone })),
         ...[...pickedIds].map((userId) => ({ userId })),
       ];
-      const r = (await Parse.Cloud.run("createFriendCrew", { name: name.trim(), rhythmDays: rhythm, invitees })) as Created;
+      const r = (await Parse.Cloud.run("createFriendCrew", { name: name.trim(), rhythmDays: rhythm, invitees, ownerSms: smsConsent })) as Created;
       setCreated(r);
       trackMarketingEvent("friend_mode_crew_created", { people: invitees.length, met: pickedIds.size });
       setStep("done");
@@ -140,23 +141,31 @@ export default function StartCrewFlow({
   };
 
   const consentBlock = (
-    <div className="mt-4 space-y-2 rounded-xl border border-zinc-300 p-3 text-[13px] text-zinc-700">
-      <label className="flex items-start gap-2">
+    <div className="mt-4 space-y-2 text-[13px] text-zinc-700">
+      <label className="flex items-start gap-2 rounded-xl border border-zinc-300 p-3">
         <input type="checkbox" checked={smsConsent} onChange={(e) => setSmsConsent(e.target.checked)} className="mt-0.5" />
         <span>
-          I agree to receive text messages from Leaf about my crew&rsquo;s plans at the number I provide. Up to 5 msgs/wk.
-          Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.
+          Optional: text me about my crew&rsquo;s plans. I agree to receive text messages from Leaf at my number. Up to 5 msgs/wk.
+          Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out. You don&rsquo;t need to check this to start a crew.
         </span>
       </label>
-      <label className="flex items-start gap-2">
-        <input type="checkbox" checked={termsConsent} onChange={(e) => setTermsConsent(e.target.checked)} className="mt-0.5" />
-        <span>
-          I agree to the <a href="/terms-conditions" target="_blank" rel="noreferrer" className="underline">Terms of Service</a> and{" "}
-          <a href="/privacy-policy" target="_blank" rel="noreferrer" className="underline">Privacy Policy</a>.
-        </span>
-      </label>
+      <p className="text-[12px] text-zinc-500">
+        By continuing you agree to the <a href="/terms-conditions" target="_blank" rel="noreferrer" className="underline">Terms of Service</a> and{" "}
+        <a href="/privacy-policy" target="_blank" rel="noreferrer" className="underline">Privacy Policy</a>.
+      </p>
     </div>
   );
+
+  const googleSignedIn = async () => {
+    if (!myName.trim()) { setError("Your name, so your friends know who added them."); return; }
+    const me = Parse.User.current();
+    if (me && !me.get("full_name")) {
+      me.set("full_name", myName.trim());
+      me.set("name", myName.trim());
+      await me.save().catch(() => {});
+    }
+    await create();
+  };
 
   const closeLink = onClose ? (
     <button className="text-sm text-zinc-500 hover:underline" onClick={() => { trackMarketingEvent("friend_mode_intro_dismiss", { step }); onClose(); }}>
@@ -268,7 +277,7 @@ export default function StartCrewFlow({
           </ul>
           {signedIn && consentBlock}
           <div className="mt-6 flex items-center gap-4">
-            <Button onClick={() => (signedIn ? create() : next())} disabled={busy || (signedIn && !consented)}>{signedIn ? (busy ? "Sending…" : "Send the invites") : "Next"}</Button>
+            <Button onClick={() => (signedIn ? create() : next())} disabled={busy}>{signedIn ? (busy ? "Sending…" : "Send the invites") : "Next"}</Button>
             <button className="text-sm text-zinc-500 hover:underline" onClick={back}>Back</button>
           </div>
           {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
@@ -278,21 +287,27 @@ export default function StartCrewFlow({
       {step === "verify" && (
         <div>
           <h1 className="text-2xl font-semibold">Last thing: you</h1>
-          <p className="mt-2 text-[15px] text-zinc-700">Your friends will see your name. We text you a code to prove the number is yours.</p>
+          <p className="mt-2 text-[15px] text-zinc-700">Your friends will see your name. Sign in with Google, or with your phone number (we text you a one-time code).</p>
           <div className="mt-4 space-y-2">
             <input value={myName} onChange={(e) => setMyName(e.target.value)} placeholder="Your name" className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-[15px]" disabled={codeSent} />
-            <input value={myPhone} onChange={(e) => setMyPhone(e.target.value)} placeholder="Your phone" inputMode="tel" className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-[15px]" disabled={codeSent} />
+            <input value={myPhone} onChange={(e) => setMyPhone(e.target.value)} placeholder="Your phone (optional)" inputMode="tel" className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-[15px]" disabled={codeSent} />
             {codeSent && (
               <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="6-digit code" inputMode="numeric" className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-[15px]" autoFocus />
             )}
           </div>
           {!codeSent && consentBlock}
+          {!codeSent && (
+            <div className="mt-4">
+              <p className="mb-2 text-[13px] text-zinc-500">No phone? Use Google instead:</p>
+              <GoogleSignInButton onSignIn={() => { void googleSignedIn(); }} onError={(e) => setError(e)} />
+            </div>
+          )}
           {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
           <div className="mt-6 flex items-center gap-4">
             {codeSent ? (
               <Button onClick={verifyAndCreate} disabled={busy || code.length < 4}>{busy ? "Sending invites…" : "Send the invites"}</Button>
             ) : (
-              <Button onClick={sendCode} disabled={busy || !consented}>{busy ? "Sending code…" : "Text me a code"}</Button>
+              <Button onClick={sendCode} disabled={busy || myPhone.replace(/\D/g, "").length < 10}>{busy ? "Sending code…" : "Text me a code"}</Button>
             )}
             <button className="text-sm text-zinc-500 hover:underline" onClick={() => (codeSent ? setCodeSent(false) : back())}>Back</button>
           </div>

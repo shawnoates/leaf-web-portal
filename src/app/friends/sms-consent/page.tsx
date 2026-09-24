@@ -23,39 +23,39 @@ export default function SmsConsentPage() {
         Text messages are sent by Leaf by One Common LLC, operating as Leaf. People consent in one of two ways.
       </p>
 
-      <h2 className="mt-8 text-lg font-semibold text-zinc-900">1. Web form (the person starting a crew)</h2>
+      <h2 className="mt-8 text-lg font-semibold text-zinc-900">1. Web form (the person starting a crew) — optional</h2>
       <p className="mt-1 text-[15px]">
         At <Link href="/crew/start" className="underline">joinleaf.com/crew/start</Link>, after naming the crew and adding friends, the last step
-        collects the organizer&rsquo;s name and mobile number. Both boxes below start unchecked and both must be ticked before a
-        verification code is sent or any invitation goes out. This is the step exactly as it appears:
+        asks for the organizer&rsquo;s name and a way to sign in: Google, or a phone number with a one-time sign-in code. A phone number is
+        not required. The text-message box starts unchecked and is <strong>optional</strong>: the form submits and the crew is created
+        whether or not it is checked. If it is left unchecked, Leaf never sends the organizer Friend Mode text messages. This is the step
+        exactly as it appears:
       </p>
       <div className="mt-4 rounded-xl border border-zinc-300 p-4">
         <p className="text-lg font-semibold text-zinc-900">Last thing: you</p>
-        <p className="mt-1 text-sm text-zinc-600">Your friends will see your name. We text you a code to prove the number is yours.</p>
+        <p className="mt-1 text-sm text-zinc-600">Your friends will see your name. Sign in with Google, or with your phone number (we text you a one-time code).</p>
         <div className="mt-3 space-y-2">
           <div className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-400">Your name</div>
-          <div className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-400">Your phone</div>
+          <div className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-400">Your phone (optional)</div>
         </div>
-        <div className="mt-3 space-y-2 rounded-xl border border-zinc-300 p-3 text-[13px]">
-          <label className="flex items-start gap-2">
-            <input type="checkbox" disabled className="mt-0.5" aria-label="SMS consent (example, not pre-checked)" />
-            <span>
-              I agree to receive text messages from Leaf about my crew&rsquo;s plans at the number I provide. Up to 5 msgs/wk.
-              Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.
-            </span>
-          </label>
-          <label className="flex items-start gap-2">
-            <input type="checkbox" disabled className="mt-0.5" aria-label="Terms and Privacy consent (example, not pre-checked)" />
-            <span>
-              I agree to the <Link href="/terms-conditions" className="underline">Terms of Service</Link> and{" "}
-              <Link href="/privacy-policy" className="underline">Privacy Policy</Link>.
-            </span>
-          </label>
+        <label className="mt-3 flex items-start gap-2 rounded-xl border border-zinc-300 p-3 text-[13px]">
+          <input type="checkbox" disabled className="mt-0.5" aria-label="Optional SMS consent (example, not pre-checked)" />
+          <span>
+            Optional: text me about my crew&rsquo;s plans. I agree to receive text messages from Leaf at my number. Up to 5 msgs/wk.
+            Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out. You don&rsquo;t need to check this to start a crew.
+          </span>
+        </label>
+        <p className="mt-2 text-[12px] text-zinc-500">
+          By continuing you agree to the <Link href="/terms-conditions" className="underline">Terms of Service</Link> and{" "}
+          <Link href="/privacy-policy" className="underline">Privacy Policy</Link>.
+        </p>
+        <div className="mt-3 flex gap-2">
+          <div className="inline-block rounded-full bg-zinc-200 px-4 py-2 text-sm text-zinc-500">Text me a code</div>
+          <div className="inline-block rounded-full border border-zinc-300 px-4 py-2 text-sm text-zinc-500">Sign in with Google</div>
         </div>
-        <div className="mt-3 inline-block rounded-full bg-zinc-200 px-4 py-2 text-sm text-zinc-500">Text me a code</div>
       </div>
       <p className="mt-2 text-sm text-zinc-600">
-        After verifying the code they receive: &ldquo;You&rsquo;re in [Crew name] on Leaf. Up to 5 msgs/wk about nights with your crew.
+        Only if the box was checked, after signing in they receive: &ldquo;You&rsquo;re in [Crew name] on Leaf. Up to 5 msgs/wk about nights with your crew.
         Msg &amp; data rates may apply. Reply HELP for help, STOP to cancel.&rdquo;
       </p>
 
