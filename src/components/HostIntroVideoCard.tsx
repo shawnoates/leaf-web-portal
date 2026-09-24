@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Parse from "@/lib/parse-client";
 import HlsVideo from "@/components/HlsVideo";
+import IntroVideoRecorder, { type Beat, canRecordInBrowser } from "@/components/IntroVideoRecorder";
 
 export type IntroVideoInfo = {
   available: boolean;
@@ -29,6 +30,8 @@ export type IntroVideoInfo = {
   deadlineAt: string | null;
   deadlineOpen: boolean;
   maxSeconds: number;
+  /** What to cover, and one way of saying each. The prompter reads these. */
+  beats: Beat[];
   script: string;
   tips: string[];
 };
@@ -108,6 +111,18 @@ export default function HostIntroVideoCard({
   const [error, setError] = useState<string | null>(null);
   const [showScript, setShowScript] = useState(video.status === "none");
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [recording, setRecording] = useState(false);
+  // `null` until we've asked the browser. Capability can only be read on the
+  // client, so reading it during render makes the server and the client
+  // disagree and React throws away the tree. Null is treated as "assume we
+  // can" below, which keeps both passes identical.
+  const [canRecordHere, setCanRecordHere] = useState<boolean | null>(null);
+  useEffect(() => {
+    setCanRecordHere(canRecordInBrowser());
+  }, []);
+  // Set when the browser turns out not to be able to record, or the host
+  // says no to the camera. From then on the card offers the camera app.
+  const [recorderOff, setRecorderOff] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const bonus = video.bonusCents > 0 ? money(video.bonusCents) : null;
@@ -133,6 +148,36 @@ export default function HostIntroVideoCard({
     throw new Error("The upload is taking longer than usual. Reload this page in a minute.");
   }, [token]);
 
+  /** Mint an upload, PUT the bytes, tell the server. Shared by both paths. */
+  const upload = useCallback(async (file: File) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : undefined;
+    const up = (await Parse.Cloud.run("createHostIntroUpload", { token, origin })) as { uploadUrl: string; uploadId: string };
+    setPhase("uploading");
+    setProgress(0);
+    await putWithProgress(up.uploadUrl, file, setProgress);
+    setPhase("finalizing");
+    await finalize(up.uploadId);
+    await onChanged();
+    setShowScript(false);
+  }, [token, finalize, onChanged]);
+
+  // Straight out of the in-browser recorder: length is already capped there
+  // and the blob came from our own MediaRecorder, so there is nothing to
+  // check that we did not just produce.
+  const onRecorded = useCallback(async (file: File, _durationSec: number) => {
+    void _durationSec;
+    setRecording(false);
+    setError(null);
+    try {
+      await upload(file);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't upload that.");
+    } finally {
+      setPhase("idle");
+    }
+  }, [upload]);
+
+  // The camera-app path: anything could arrive, so check it first.
   const onPick = async (files: FileList | null) => {
     const file = files?.[0];
     if (!file) return;
@@ -144,15 +189,7 @@ export default function HostIntroVideoCard({
       if (dur !== null && dur > video.maxSeconds + 1) {
         throw new Error(`That one's ${Math.round(dur)} seconds. Keep it under ${video.maxSeconds} — short beats polished.`);
       }
-      const origin = typeof window !== "undefined" ? window.location.origin : undefined;
-      const up = (await Parse.Cloud.run("createHostIntroUpload", { token, origin })) as { uploadUrl: string; uploadId: string };
-      setPhase("uploading");
-      setProgress(0);
-      await putWithProgress(up.uploadUrl, file, setProgress);
-      setPhase("finalizing");
-      await finalize(up.uploadId);
-      await onChanged();
-      setShowScript(false);
+      await upload(file);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't upload that.");
     } finally {
@@ -178,6 +215,27 @@ export default function HostIntroVideoCard({
 
   const busy = phase !== "idle";
   const live = video.status === "ready" && video.url;
+  // In-browser recording is the main route, because it is the only one that
+  // can put the prompts on screen while the camera is running. Anything that
+  // rules it out drops the card back to the camera app. Optimistic before the
+  // capability check lands: the recorder reports back through `onUnsupported`
+  // if a tap in that window turns out to be a browser that can't record.
+  const canRecord = video.beats.length > 0 && !recorderOff && canRecordHere !== false;
+
+  if (recording) {
+    return (
+      <IntroVideoRecorder
+        beats={video.beats}
+        maxSeconds={video.maxSeconds}
+        onCancel={() => setRecording(false)}
+        onRecorded={onRecorded}
+        onUnsupported={(reason) => {
+          setRecording(false);
+          setRecorderOff(reason);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="mt-6 rounded-2xl border border-zinc-200 bg-white p-6">
@@ -254,7 +312,11 @@ export default function HostIntroVideoCard({
         </div>
       )}
 
-      {/* ── Script ── */}
+      {/* ── What to cover ──
+          Beats, not a script. The cue is the thing to say; the line under it
+          is one way of saying it, in lighter type so it reads as an example
+          rather than a line to perform. Same shape the prompter shows while
+          they record, so nothing is a surprise once the camera is on. */}
       {!live && video.status !== "processing" && (
         <div className="mt-4">
           <button
@@ -262,12 +324,29 @@ export default function HostIntroVideoCard({
             onClick={() => setShowScript((s) => !s)}
             className="text-[14px] font-medium text-leaf-800 underline"
           >
-            {showScript ? "Hide the script" : "Show the script"}
+            {showScript ? "Hide what to cover" : "What do I say?"}
           </button>
           {showScript && (
             <div className="mt-3 rounded-xl bg-leaf-50 p-4">
-              <p className="whitespace-pre-line text-[17px] leading-relaxed text-leaf-900">{video.script}</p>
-              <ul className="mt-4 space-y-1 text-[13px] text-leaf-800/80">
+              <p className="text-[13px] font-medium uppercase tracking-wide text-leaf-800/70">
+                Six things to hit, in your words
+              </p>
+              <ol className="mt-3 space-y-3">
+                {video.beats.map((b, i) => (
+                  <li key={b.id} className="flex gap-3">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-leaf-800 text-[11px] font-semibold text-white">
+                      {i + 1}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[15px] font-medium leading-snug text-leaf-900">{b.cue}</span>
+                      <span className="mt-0.5 block text-[14px] leading-snug text-leaf-800/60">
+                        &ldquo;{b.line}&rdquo;
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              <ul className="mt-4 space-y-1 border-t border-leaf-800/10 pt-3 text-[13px] text-leaf-800/80">
                 {video.tips.map((t) => (
                   <li key={t}>· {t}</li>
                 ))}
@@ -293,8 +372,10 @@ export default function HostIntroVideoCard({
           {error && <p className="text-[14px] text-red-700">{error}</p>}
           {!planStarted && (
             <>
-              {/* capture="user" opens the front camera straight away on a
-                  phone; on a desktop it's a normal file picker. */}
+              {/* The camera-app path. `capture="user"` opens the front camera
+                  straight away on a phone, which takes the whole screen — so
+                  it is the fallback, not the main route. On a desktop with no
+                  camera it is just a file picker. */}
               <input
                 ref={inputRef}
                 type="file"
@@ -304,14 +385,44 @@ export default function HostIntroVideoCard({
                 onChange={(e) => onPick(e.target.files)}
                 disabled={busy}
               />
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => inputRef.current?.click()}
-                className={live ? btnQuiet : btnPrimary}
-              >
-                {busy ? "Working…" : live ? "Record another" : "Record it now"}
-              </button>
+              {canRecord ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => { setError(null); setRecording(true); }}
+                    className={live ? btnQuiet : btnPrimary}
+                  >
+                    {busy ? "Working…" : live ? "Record another" : "Record it here"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => inputRef.current?.click()}
+                    className="w-full text-center text-[14px] font-medium text-zinc-500 underline disabled:opacity-50"
+                  >
+                    Upload one I already made
+                  </button>
+                </>
+              ) : (
+                <>
+                  {recorderOff && (
+                    <p className="text-[14px] leading-snug text-amber-800">{recorderOff}</p>
+                  )}
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => inputRef.current?.click()}
+                    className={live ? btnQuiet : btnPrimary}
+                  >
+                    {busy ? "Working…" : live ? "Record another" : "Open the camera"}
+                  </button>
+                  <p className="text-[13px] leading-snug text-zinc-500">
+                    Your camera app takes over the screen, so read the six
+                    prompts above first and then say them your way.
+                  </p>
+                </>
+              )}
             </>
           )}
           {live && !planStarted && (
