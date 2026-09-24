@@ -19,7 +19,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
-import { FM, FriendModeIcon, FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
+import { FM, FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 
 const MAX_MEMBERS = 15;
 
@@ -37,7 +37,6 @@ export default function FriendModeCard({
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const locked = memberCount > MAX_MEMBERS;
-  const state = locked ? "locked" : enabled ? "enabled" : "disabled";
 
   const toggle = async (v: boolean) => {
     setSaving(true);
@@ -60,27 +59,26 @@ export default function FriendModeCard({
   const subline = locked
     ? `Not available · Friend Mode is for circles under ${MAX_MEMBERS} followers`
     : enabled
-      ? "On · Leaf plans nights for this group"
-      : "Leaf picks a place, asks everyone which dates work, and locks the night";
+      ? "On · recurring plans with your crew, on your schedule"
+      : "Recurring plans with your crew, on your schedule";
 
   return (
     <section
-      className="rounded-xl p-5"
+      className="rounded-xl px-4 py-2.5"
       style={{
         background: locked ? FM.surfaceDim : FM.brand,
         border: `1px solid ${locked ? FM.lineDim : FM.line}`,
       }}
     >
       <div className="flex items-center gap-4">
-        <FriendModeIcon state={state} size={40} />
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-medium" style={{ color: locked ? FM.mutedText : FM.ink }}>Friend Mode</p>
-          <p className="mt-0.5 text-[13px]" style={{ color: locked ? FM.muted : enabled ? FM.accent : FM.mutedText }}>{subline}</p>
+          <p className="text-[14px] font-medium" style={{ color: locked ? FM.mutedText : FM.ink }}>Friend Mode</p>
+          <p className="text-[12px]" style={{ color: locked ? FM.muted : enabled ? FM.accent : FM.mutedText }}>{subline}</p>
         </div>
         <FriendModeSwitch label="Friend Mode" checked={enabled} locked={locked} disabled={saving} onChange={toggle} />
       </div>
       {(note || error || enabled || locked) && (
-        <div className="mt-3 text-[13px]" style={{ color: FM.mutedText }}>
+        <div className="mt-1.5 text-[12px]" style={{ color: FM.mutedText }}>
           {note && <p style={{ color: FM.ink }}>{note}</p>}
           {error && <p style={{ color: "#F2A39A" }}>{error}</p>}
           {enabled && !locked && (
