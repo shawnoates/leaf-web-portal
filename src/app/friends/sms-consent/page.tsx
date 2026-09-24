@@ -64,15 +64,15 @@ export default function SmsConsentPage() {
         turn texts off there at any time.
       </p>
 
-      <h2 className="mt-8 text-lg font-semibold text-zinc-900">2. The calendar owner, when turning Friend Mode on</h2>
+      <h2 className="mt-8 text-lg font-semibold text-zinc-900">2. The calendar owner, after turning Friend Mode on</h2>
       <p className="mt-1 text-[15px]">
-        The owner turns Friend Mode on from their calendar&rsquo;s page in the Leaf dashboard (signed in). Under the switch:
+        The owner turns Friend Mode on from their calendar&rsquo;s page in the Leaf dashboard (signed in). Once it&rsquo;s on, the banner offers:
       </p>
       <div className="mt-3 rounded-xl border border-zinc-300 p-4">
         <p className="text-sm font-medium">Friend Mode — Recurring plans with your crew, on your schedule</p>
         <Box label="Owner SMS consent">
           <strong>Text me about this crew&rsquo;s plans</strong> — up to 5 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help,
-          STOP to opt out. You can change this on the crew page.
+          STOP to opt out.
         </Box>
       </div>
 
