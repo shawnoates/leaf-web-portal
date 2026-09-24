@@ -206,7 +206,26 @@ export default function HostIntroVideoCard({
           <h2 className="text-[17px] font-semibold text-leaf-900">
             {bonusOpen ? `Earn ${bonus} more: a 30-second hello.` : "Add a 30-second hello."}
           </h2>
-          <p className="mt-1.5 text-[14px] leading-snug text-zinc-600">
+          {/* The viewfinder loop. It earns its place by doing the explaining
+              the copy can't: phone upright, face centred, short. Decorative,
+              so no alt text — the heading and the paragraph carry the
+              meaning. Animated WebP at 575KB rather than the 3.9MB GIF it
+              came from; anyone who asked for less motion, or whose browser
+              can't do animated WebP, gets the first frame as a still. */}
+          <picture className="mt-4 block">
+            <source media="(prefers-reduced-motion: reduce)" srcSet="/host-intro-hero.jpg" />
+            <source type="image/webp" srcSet="/host-intro-hero.webp" />
+            <img
+              src="/host-intro-hero.jpg"
+              alt=""
+              width={400}
+              height={500}
+              loading="lazy"
+              decoding="async"
+              className="mx-auto block w-full max-w-[200px] rounded-2xl"
+            />
+          </picture>
+          <p className="mt-4 text-[14px] leading-snug text-zinc-600">
             A quick intro to camera goes on the plan page next to your bio. People RSVP to a face.
             {bonusOpen && deadlineLabel
               ? ` It pays ${bonus} on top if it's up by ${deadlineLabel}.`
