@@ -35,6 +35,8 @@ export default function FriendModeCard({
   const [note, setNote] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [confirming, setConfirming] = useState(false);
+  // The owner's own text opt-in, asked when turning it on. Never pre-ticked.
+  const [ownerSms, setOwnerSms] = useState(false);
   const locked = memberCount > MAX_MEMBERS;
 
   const loadPreview = useCallback(async () => {
@@ -56,7 +58,7 @@ export default function FriendModeCard({
     setConfirming(false);
     setEnabled(v); // optimistic; a failure flips it back
     try {
-      const r = (await Parse.Cloud.run("setFriendModeOnCalendar", { calendarId, enabled: v })) as { enabled: boolean };
+      const r = (await Parse.Cloud.run("setFriendModeOnCalendar", v ? { calendarId, enabled: v, ownerSms } : { calendarId, enabled: v })) as { enabled: boolean };
       setEnabled(r.enabled);
       if (!r.enabled) setPreview(null);
     } catch (err) {
@@ -117,6 +119,16 @@ export default function FriendModeCard({
         </div>
         <FriendModeSwitch label="Friend Mode" checked={enabled} locked={locked} disabled={saving} onChange={toggle} />
       </div>
+
+      {!enabled && !locked && (
+        <label className="mt-2 flex items-start gap-2 pb-1 text-[12px]" style={{ color: FM.mutedText }}>
+          <input type="checkbox" checked={ownerSms} onChange={(e) => setOwnerSms(e.target.checked)} className="mt-0.5" />
+          <span>
+            <span style={{ color: FM.ink }}>Text me about this crew&rsquo;s plans</span> — up to 5 msgs/wk. Msg &amp; data rates may apply.
+            Reply HELP for help, STOP to opt out. You can change this on the crew page.
+          </span>
+        </label>
+      )}
 
       {(enabled || locked || error) && (
         <div className="mt-1.5 space-y-2 pb-1 text-[12px]" style={{ color: FM.mutedText }}>

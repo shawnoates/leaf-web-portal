@@ -43,6 +43,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const [note, setNote] = useState("");
   const [noteSent, setNoteSent] = useState(false);
   const [error, setError] = useState("");
+  // "Text me about this crew's plans": never pre-ticked (10DLC).
+  const [smsBox, setSmsBox] = useState(false);
 
   const act = async (key: string, fn: () => Promise<unknown>) => {
     setBusy(key);
@@ -69,6 +71,43 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
       />
 
       {error && <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+
+      {me.status === "invited" && (
+        <Card className="mb-4">
+          <Eyebrow>You&rsquo;re invited</Eyebrow>
+          <p className="mt-2 text-[15px] text-zinc-700">
+            Join {crew.name} and Leaf finds a night that works for the group and plans it, {rhythmLabel(crew.rhythmDays).toLowerCase()}.
+          </p>
+          {me.hasPhone && <SmsOptInBox checked={smsBox} onChange={setSmsBox} />}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button onClick={() => act("join", () => run("respondToCrewInvite", auth, { accept: true, sms: smsBox }))} disabled={busy !== null}>
+              Join
+            </Button>
+            <Button kind="ghost" onClick={() => act("decline", () => run("respondToCrewInvite", auth, { accept: false }))} disabled={busy !== null}>
+              No thanks
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {me.status === "in" && me.hasPhone && (
+        me.smsOptIn ? (
+          <p className="mb-4 text-[13px] text-zinc-500">
+            Texts about {crew.name} are on.{" "}
+            <button className="underline" disabled={busy !== null} onClick={() => act("texts", () => run("setCrewTexts", auth, { on: false }))}>Turn off</button>
+          </p>
+        ) : (
+          <Card className="mb-4">
+            <p className="text-[15px] text-zinc-700">Want these by text instead?</p>
+            <SmsOptInBox checked={smsBox} onChange={setSmsBox} />
+            <div className="mt-3">
+              <Button small onClick={() => act("texts", () => run("setCrewTexts", auth, { on: true }))} disabled={busy !== null || !smsBox}>
+                Turn on texts
+              </Button>
+            </div>
+          </Card>
+        )
+      )}
 
       {open.length === 0 && (
         <Card className="mb-4">
@@ -356,5 +395,19 @@ function CycleCard({
         </div>
       )}
     </Card>
+  );
+}
+
+/** The one text-message opt-in. Starts unticked; joining never requires it. */
+function SmsOptInBox({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="mt-3 flex items-start gap-2 rounded-xl border border-zinc-300 p-3 text-[13px] text-zinc-700">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5" />
+      <span>
+        <span className="block font-medium text-leaf-900">Text me about this crew&rsquo;s plans</span>
+        Date polls and the night&rsquo;s details, so you don&rsquo;t have to open the app. Up to 5 msgs/wk. Msg &amp; data rates may apply.
+        Reply HELP for help, STOP to opt out.
+      </span>
+    </label>
   );
 }

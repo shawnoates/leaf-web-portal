@@ -24,7 +24,6 @@ const STEPS = [
   { n: "04", title: "It learns", body: "Thumbs up or down the morning after. Leaf remembers what the crew liked and which nights never work." },
 ];
 
-const FRIEND_MODE_NUMBER = process.env.NEXT_PUBLIC_FRIEND_MODE_NUMBER || "(646) 588-1360";
 
 const FAQ = [
   { q: "Do my friends need the app?", a: "No. Friends without the app answer by text: reply IN, OUT, or the numbers of the nights that work. Friends with the app plan in a chat with Leaf." },
@@ -95,25 +94,15 @@ export default function FriendsClient() {
         </div>
       </section>
 
-      <section id="text-to-join" className="border-t border-zinc-100 py-14">
+      <section id="texts" className="border-t border-zinc-100 py-14">
         <div className="mx-auto max-w-3xl px-5">
-          <h2 className="text-2xl font-semibold text-leaf-900">Join by text</h2>
+          <h2 className="text-2xl font-semibold text-leaf-900">Texts are up to you</h2>
           <p className="mt-2 text-[15px] leading-relaxed text-zinc-700">
-            Text <strong>JOIN</strong> to <strong>{FRIEND_MODE_NUMBER}</strong> and Leaf replies with a link to start or join a crew.
-            When a friend adds you to their crew, Leaf sends one invitation; reply <strong>IN</strong> to join it.
+            Friend Mode works in the Leaf app and on the web. If you&rsquo;d rather get date polls and the night&rsquo;s details by
+            text, check &ldquo;Text me about this crew&rsquo;s plans&rdquo; when you join. It&rsquo;s never checked for you, and you can turn it off
+            any time on your crew page or by replying STOP.{" "}
+            <Link href="/friends/sms-consent" className="underline">How text consent works</Link>
           </p>
-          <p className="mt-3 text-sm text-zinc-500">
-            By texting JOIN or replying IN you agree to receive text messages from Leaf (Leaf by One Common LLC) about your
-            crew&rsquo;s plans. Up to 5 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.{" "}
-            <Link href="/terms-conditions" className="underline">Terms</Link> ·{" "}
-            <Link href="/privacy-policy" className="underline">Privacy</Link>
-          </p>
-          <div className="mt-6 rounded-2xl border border-zinc-200 bg-white p-4 text-sm">
-            <div className="text-xs text-zinc-500">What the exchange looks like</div>
-            <p className="mt-2"><span className="text-zinc-500">Friend&rsquo;s invite from Leaf:</span> Sam added you to Thursday crew on Leaf. Leaf finds a night that works for everyone and plans it. Reply IN to join. Up to 5 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.</p>
-            <p className="mt-2"><span className="text-zinc-500">You:</span> IN</p>
-            <p className="mt-2"><span className="text-zinc-500">Leaf:</span> You&rsquo;re in Thursday crew on Leaf. Up to 5 msgs/wk about nights with your crew. Msg &amp; data rates may apply. Reply HELP for help, STOP to cancel.</p>
-          </div>
         </div>
       </section>
 

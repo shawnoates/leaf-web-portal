@@ -94,7 +94,7 @@ export type CrewPage = {
     joinedCount: number;
     ownerId: string | null;
   };
-  me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null };
+  me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean };
   members: Member[];
   names: Record<string, string>;
   open: CycleView[];
