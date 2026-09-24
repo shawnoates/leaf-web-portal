@@ -107,7 +107,12 @@ export default function FriendModeCard({
     >
       <div className="flex items-center gap-4">
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-medium" style={{ color: locked ? FM.mutedText : FM.ink }}>Friend Mode</p>
+          <p className="text-[14px] font-medium" style={{ color: locked ? FM.mutedText : FM.ink }}>
+            Friend Mode{" "}
+            <Link href="/friends/what-is-friend-mode" target="_blank" className="ml-1 text-[12px] font-normal italic underline" style={{ color: FM.mutedText }}>
+              What is this?
+            </Link>
+          </p>
           <p className="text-[12px]" style={{ color: locked ? FM.muted : enabled ? FM.accent : FM.mutedText }}>{subline}</p>
         </div>
         <FriendModeSwitch label="Friend Mode" checked={enabled} locked={locked} disabled={saving} onChange={toggle} />
