@@ -34,6 +34,8 @@ export type IntroVideoInfo = {
   beats: Beat[];
   script: string;
   tips: string[];
+  /** The one hard rule, kept out of `tips` so it gets its own line. */
+  venueRule: string;
 };
 
 const MAX_BYTES = 250 * 1024 * 1024;
@@ -291,6 +293,13 @@ export default function HostIntroVideoCard({
                 ? " The bonus window has closed, but it's still worth adding."
                 : ""}
           </p>
+          {/* The rule, before they ever hit record, and out of the
+              collapsible — a venue said out loud on camera is the one thing
+              here that can't be taken back. It shows again on the beat where
+              they'd say it. */}
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[14px] font-medium leading-snug text-amber-900">
+            {video.venueRule}
+          </p>
           {video.status === "errored" && (
             <p className="mt-2 text-[14px] text-amber-800">
               The last file couldn&rsquo;t be processed. Try recording it again.
@@ -342,6 +351,11 @@ export default function HostIntroVideoCard({
                       <span className="mt-0.5 block text-[14px] leading-snug text-leaf-800/60">
                         &ldquo;{b.line}&rdquo;
                       </span>
+                      {b.note && (
+                        <span className="mt-1 block text-[13px] font-medium leading-snug text-amber-800">
+                          {b.note}
+                        </span>
+                      )}
                     </span>
                   </li>
                 ))}

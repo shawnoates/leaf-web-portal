@@ -20,7 +20,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type Beat = { id: string; cue: string; line: string };
+export type Beat = {
+  id: string;
+  cue: string;
+  line: string;
+  /** A rule that applies to this beat only, shown right where it bites. */
+  note?: string;
+};
 
 type Phase = "idle" | "starting" | "countdown" | "recording" | "review";
 
@@ -293,6 +299,14 @@ export default function IntroVideoRecorder({
             </div>
             <p className="text-[22px] font-semibold leading-snug">{beat.cue}</p>
             <p className="mt-1.5 text-[15px] leading-snug text-white/55">{beat.line}</p>
+            {/* The venue rule rides the "where" beat. On screen at the one
+                moment they are about to say it out loud, and gone again on
+                every other beat. */}
+            {beat.note && (
+              <p className="mt-2 text-[14px] font-medium leading-snug text-amber-300">
+                {beat.note}
+              </p>
+            )}
             {!last && (
               <p className="mt-2 text-[12px] uppercase tracking-wide text-white/40">
                 Tap for the next one
