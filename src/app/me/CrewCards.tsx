@@ -8,7 +8,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Users } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import EnableFriendModeFlow from "@/components/crew/EnableFriendModeFlow";
 import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
@@ -63,7 +62,7 @@ export function CrewActionCard({ actions, onAnswered }: { actions: CrewAction[];
     <section className="sinv fm-dark" role="region" aria-label="Your crew needs an answer">
       <div className="sinv-head">
         <div className="eyebrow sinv-eyebrow">
-          <Users className="sinv-icon" aria-hidden />
+          <FriendModeIcon size={20} />
           {a.crewName}
         </div>
         {actions.length > 1 && <div className="eyebrow sinv-count">{index + 1} of {actions.length}</div>}
