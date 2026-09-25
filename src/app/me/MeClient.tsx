@@ -1599,7 +1599,7 @@ function HeroActions({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: Rsv
   // Open waitlist offer: the seat is claimed, not granted. A late tap gets
   // "taken" and stays on the list rather than an error.
   const [claimNote, setClaimNote] = useState<string | null>(null);
-  const canClaim = waitlisted && plan.waitlistOffered === true;
+  const canClaim = waitlisted && plan.waitlistOffered === true && !planIsFull(plan);
   async function claim() {
     if (busy) return;
     setBusy(true);
@@ -2342,7 +2342,7 @@ function AttendButtons({
   // Open waitlist offer: the seat is claimed, not granted. A late tap gets
   // "taken" and stays on the list rather than an error.
   const [claimNote, setClaimNote] = useState<string | null>(null);
-  const canClaim = waitlisted && plan.waitlistOffered === true;
+  const canClaim = waitlisted && plan.waitlistOffered === true && !planIsFull(plan);
   async function claim() {
     if (busy) return;
     setBusy(true);

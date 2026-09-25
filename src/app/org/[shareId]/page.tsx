@@ -2023,6 +2023,14 @@ export default function OrgCalendarPage() {
   const [hostThisNote, setHostThisNote] = useState("");
   const [rsvpedPlanIds, setRsvpedPlanIds] = useState<Set<string>>(new Set());
   const [pendingRsvpIds, setPendingRsvpIds] = useState<Set<string>>(new Set());
+  // Waitlist state on top of "pending": which pending rows are waitlist
+  // seats (vs approval requests), and which of those hold an open claim
+  // offer from the server (waitlist-offers.js). The Claim button shows only
+  // while the plan also reads as not-full — a stale offer on a refilled plan
+  // would otherwise invite a tap that can only come back "taken".
+  const [waitlistedIds, setWaitlistedIds] = useState<Set<string>>(new Set());
+  const [waitlistOfferedIds, setWaitlistOfferedIds] = useState<Set<string>>(new Set());
+  const [claimingPlanId, setClaimingPlanId] = useState<string | null>(null);
   // planId → EventNotification.objectId for the viewer's own RSVP. Powers
   // the "Join Plan Chat" button (linked to /c/{notificationId}).
   const [rsvpNotificationIds, setRsvpNotificationIds] = useState<Map<string, string>>(new Map());
@@ -2722,6 +2730,72 @@ export default function OrgCalendarPage() {
     setTimeout(() => setToast(null), 3000);
   }
 
+  // A waitlisted viewer with an open offer takes the freed seat. First tap
+  // wins server-side; a loser hears "taken" and stays exactly where they were
+  // on the waitlist — the offer flag is dropped locally so the button doesn't
+  // invite a second tap until the next fetch says a seat is open again.
+  async function handleClaimWaitlistSpot(planId: string) {
+    if (claimingPlanId) return;
+    const storedPhone = localStorage.getItem("leaf_follower_phone");
+    const cachedUser = getVerifiedUserCookie();
+    const phone = storedPhone || cachedUser?.phone?.replace(/\D/g, "") || null;
+    setClaimingPlanId(planId);
+    const dropOffer = () => setWaitlistOfferedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(planId);
+      return next;
+    });
+    try {
+      const params: { eventGroupId: string; phoneNumber?: string } = { eventGroupId: planId };
+      if (phone) params.phoneNumber = phone;
+      const res = (await Parse.Cloud.run("claimWaitlistSpot", params)) as
+        { claimed?: boolean; rsvpState?: string; reason?: string } | null;
+      dropOffer();
+      if (res?.claimed && res.rsvpState === "going") {
+        removePendingRsvpCookie(planId);
+        addRsvpCookie(planId);
+        setPendingRsvpIds((prev) => {
+          const next = new Set(prev);
+          next.delete(planId);
+          return next;
+        });
+        setWaitlistedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(planId);
+          return next;
+        });
+        setRsvpedPlanIds((prev) => new Set([...prev, planId]));
+        setOrg((prev) => prev ? {
+          ...prev,
+          plans: prev.plans.map((p) =>
+            p.id === planId ? { ...p, attendeeCount: p.attendeeCount + 1, rsvpCount: p.rsvpCount + 1 } : p
+          ),
+        } : prev);
+        setSelectedEvent((prev) =>
+          prev && prev.id === planId ? { ...prev, attendeeCount: prev.attendeeCount + 1, rsvpCount: prev.rsvpCount + 1 } : prev
+        );
+        setToast("You're in — spot confirmed!");
+      } else if (res?.claimed) {
+        // requireApproval plan: out of the waitlist, into the host's queue.
+        setWaitlistedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(planId);
+          return next;
+        });
+        setToast("Sent to the host to confirm your spot.");
+      } else {
+        setToast(res?.reason === "taken"
+          ? "That spot was just taken — you're still on the waitlist."
+          : "No open spot right now — you're still on the waitlist.");
+      }
+    } catch (err: unknown) {
+      setToast(err instanceof Error ? err.message : "Couldn't claim the spot. Try again.");
+    } finally {
+      setClaimingPlanId(null);
+      setTimeout(() => setToast(null), 4000);
+    }
+  }
+
   async function handleCancelPlan(planId: string) {
     if (!confirm("Cancel this plan? All attendees will be notified.")) return;
     setCancellingPlan(true);
@@ -3240,9 +3314,11 @@ export default function OrgCalendarPage() {
 
       // Sync RSVP cookies with backend data (handles admin-removed RSVPs)
       if (result.userRsvpPlanIds && Array.isArray(result.userRsvpPlanIds)) {
-        const rsvpEntries = result.userRsvpPlanIds as Array<{ planId: string; status: string; notificationId?: string }>;
+        const rsvpEntries = result.userRsvpPlanIds as Array<{ planId: string; status: string; notificationId?: string; waitlisted?: boolean; waitlistOffered?: boolean }>;
         const confirmedIds = new Set<string>(rsvpEntries.filter((r) => r.status === "Accepted").map((r) => r.planId));
         const pendingIds = new Set<string>(rsvpEntries.filter((r) => r.status === "pendingRsvp" || r.status === "Requested").map((r) => r.planId));
+        const waitlistIds = new Set<string>(rsvpEntries.filter((r) => pendingIds.has(r.planId) && r.waitlisted === true).map((r) => r.planId));
+        const offeredIds = new Set<string>(rsvpEntries.filter((r) => waitlistIds.has(r.planId) && r.waitlistOffered === true).map((r) => r.planId));
         const notifIdMap = new Map<string, string>();
         for (const r of rsvpEntries) {
           if (r.notificationId) notifIdMap.set(r.planId, r.notificationId);
@@ -3262,6 +3338,8 @@ export default function OrgCalendarPage() {
 
         setRsvpedPlanIds(confirmedIds);
         setPendingRsvpIds(pendingIds);
+        setWaitlistedIds(waitlistIds);
+        setWaitlistOfferedIds(offeredIds);
         setRsvpNotificationIds(notifIdMap);
       }
 
@@ -4864,7 +4942,10 @@ export default function OrgCalendarPage() {
                             </span>
                           ) : pendingRsvpIds.has(plan.id) ? (
                             <span className="text-xs font-bold uppercase tracking-widest text-amber-500 flex items-center gap-1">
-                              <Clock className="w-3 h-3" /> Pending
+                              <Clock className="w-3 h-3" />
+                              {waitlistOfferedIds.has(plan.id) && !planIsFull(plan) ? "Spot open — claim it"
+                                : waitlistedIds.has(plan.id) ? "Waitlisted"
+                                : "Pending"}
                             </span>
                           ) : rsvpedPlanIds.has(plan.id) ? (
                             <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
@@ -5983,10 +6064,32 @@ export default function OrgCalendarPage() {
                   </div>
                 ) : pendingRsvpIds.has(selectedEvent.id) ? (
                   <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-center gap-2 py-2">
-                      <Clock className="w-4 h-4 text-amber-500" />
-                      <span className="text-xs font-bold uppercase tracking-widest text-amber-500">Request Pending</span>
-                    </div>
+                    {waitlistOfferedIds.has(selectedEvent.id) && !planIsFull(selectedEvent) ? (
+                      <>
+                        <div className="flex items-center justify-center gap-2 py-2">
+                          <Clock className="w-4 h-4 text-amber-500" />
+                          <span className="text-xs font-bold uppercase tracking-widest text-amber-500">A spot opened up</span>
+                        </div>
+                        <button
+                          onClick={() => handleClaimWaitlistSpot(selectedEvent.id)}
+                          disabled={claimingPlanId === selectedEvent.id}
+                          className="text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2 rounded-lg"
+                          style={{ backgroundColor: org.brandColor || "#18181b" }}
+                        >
+                          <Check className="w-4 h-4" /> {claimingPlanId === selectedEvent.id ? "Claiming…" : "Claim my spot"}
+                        </button>
+                        <p className="text-xs text-zinc-400 text-center">
+                          First to claim gets it. If it&apos;s already gone, you keep your place on the waitlist.
+                        </p>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-center gap-2 py-2">
+                        <Clock className="w-4 h-4 text-amber-500" />
+                        <span className="text-xs font-bold uppercase tracking-widest text-amber-500">
+                          {waitlistedIds.has(selectedEvent.id) ? "On the Waitlist" : "Request Pending"}
+                        </span>
+                      </div>
+                    )}
                     <button
                       onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title, selectedEvent.promotedFrom ? org.objectId : null)}
                       className="border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2"
