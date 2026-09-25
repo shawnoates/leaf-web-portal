@@ -19,9 +19,12 @@ import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import { Button, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Spinner } from "@/components/crew/CrewShell";
 import { crewHref, run, toDate, type BookSpot, type CrewAuth, type SavedPlace } from "@/lib/crew";
 
-/** Places people nearby have been saving lately (server: crewTrendingSpots). */
-type TrendingSpot = { locationId: string; name: string; neighborhood: string | null; category: string | null; photo: string | null; saves: number };
-type Book = { crew: { id: string; name: string }; shared: BookSpot[]; mine: SavedPlace[]; trending?: TrendingSpot[] };
+/** A real place from Google Places (server: crew-places.js). */
+type Suggested = {
+  placeId: string; name: string; address: string | null; shortAddress: string | null; category: string | null;
+  rating: number | null; lat: number | null; lng: number | null; saves: number; isNew?: boolean;
+};
+type Book = { crew: { id: string; name: string }; shared: BookSpot[]; mine: SavedPlace[]; popular?: Suggested[] };
 
 export default function CrewBookClient({ token }: { token: string }) {
   const load = useCrewAuth(token);
@@ -37,6 +40,18 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
+  // "What are you in the mood for?" — real places for a vibe (searchCrewPlaces).
+  const [vibe, setVibe] = useState("");
+  const [found, setFound] = useState<Suggested[] | null>(null);
+  const [finding, setFinding] = useState(false);
+  const findPlaces = async () => {
+    if (vibe.trim().length < 3) return;
+    setFinding(true);
+    try {
+      const r = await run<{ results: Suggested[] }>("searchCrewPlaces", auth, { query: vibe.trim() });
+      setFound(r.results);
+    } catch { setFound([]); } finally { setFinding(false); }
+  };
 
   const refresh = useCallback(async () => setBook(await run<Book>("getCrewBook", auth)), [auth]);
   useEffect(() => { refresh().catch((e) => setError(e.message)); }, [refresh]);
@@ -52,6 +67,26 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
   // The same place saved twice (two bookmarks) shows once.
   const seen = new Set<string>();
   const mine = book.mine.filter((p) => !seen.has(p.locationId) && seen.add(p.locationId));
+
+  const suggestionRow = (p: Suggested) => (
+    <li key={p.placeId} className="flex items-center gap-3 py-3.5">
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-base font-semibold lg:text-[15px]">
+          {p.name}
+          {p.isNew && <span className="ml-2 rounded-full bg-fm-accent px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase text-fm-canvas">New</span>}
+        </div>
+        <div className="truncate text-[13px] text-fm-muted">
+          {[p.category, p.shortAddress, p.rating ? `★ ${p.rating.toFixed(1)}` : null, p.saves ? `saved by ${p.saves} on Leaf` : null].filter(Boolean).join(" · ")}
+        </div>
+      </div>
+      <Button small disabled={busy !== null || !canAdd} onClick={() => act(`p-${p.placeId}`, async () => {
+        await run("addToCrewBook", auth, { placeId: p.placeId, venue: { name: p.name, address: p.address, lat: p.lat, lng: p.lng, placeId: p.placeId } });
+        setFound((f) => f && f.filter((x) => x.placeId !== p.placeId));
+      })}>
+        <Plus size={14} strokeWidth={2.4} aria-hidden /> Add<span className="sr-only"> {p.name} to {crewName}</span>
+      </Button>
+    </li>
+  );
 
   return (
     <CrewShell wide topBar={<CrewTopBar auth={auth} active="book" />}>
@@ -153,33 +188,29 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
             </ul>
           )}
 
-          {(book.trending?.length ?? 0) > 0 && (
+          <div className="mt-4 border-t border-fm-line-dim pt-5">
+            <h2 className="m-0 font-fm-serif text-[28px] font-normal lg:text-[30px]">Find places</h2>
+            <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); void findPlaces(); }}>
+              <input
+                value={vibe}
+                onChange={(e) => setVibe(e.target.value)}
+                placeholder="What are you in the mood for?"
+                className="min-w-0 flex-1 rounded-full border border-fm-line bg-fm-card px-4 py-2.5 text-[15px] text-fm-ink placeholder:text-fm-muted"
+              />
+              <Button small disabled={finding || vibe.trim().length < 3} type="submit">{finding ? "Looking…" : "Find"}</Button>
+            </form>
+            <p className="mb-1 mt-2 text-[13px] text-fm-muted">Try &ldquo;coffee shops in Boerum Hill&rdquo; or &ldquo;cheap Thai near Atlantic Ave&rdquo;.</p>
+            {found && (found.length ? (
+              <ul className="divide-y divide-fm-line-dim">{found.map((p) => suggestionRow(p))}</ul>
+            ) : <p className="mt-2 text-[15px] text-fm-ink-2">Nothing matched. Try different words.</p>)}
+          </div>
+
+          {(book.popular?.length ?? 0) > 0 && (
             <>
               <div className="mt-4 flex items-center justify-between border-t border-fm-line-dim pt-5">
-                <h2 className="m-0 font-fm-serif text-[28px] font-normal lg:text-[30px]">Trending nearby</h2>
+                <h2 className="m-0 font-fm-serif text-[28px] font-normal lg:text-[30px]">Popular nearby</h2>
               </div>
-              <p className="mb-1 mt-1 text-[13px] text-fm-muted">Places people near you have been saving lately.</p>
-              <ul className="divide-y divide-fm-line-dim">
-                {book.trending!.map((p) => (
-                  <li key={p.locationId} className="flex items-center gap-3 py-3.5">
-                    <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-fm-line bg-fm-card">
-                      {p.photo ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.photo} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <span aria-hidden className="absolute inset-0 flex items-center justify-center font-fm-serif text-[22px] text-fm-knob">{p.name.charAt(0)}</span>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-base font-semibold lg:text-[15px]">{p.name}</div>
-                      <div className="truncate text-[13px] text-fm-muted">{[p.neighborhood, p.category, `${p.saves} saves lately`].filter(Boolean).join(" · ")}</div>
-                    </div>
-                    <Button small disabled={busy !== null || !canAdd} onClick={() => act(`t-${p.locationId}`, () => run("addToCrewBook", auth, { locationId: p.locationId }))}>
-                      <Plus size={14} strokeWidth={2.4} aria-hidden /> Add<span className="sr-only"> {p.name} to {crewName}</span>
-                    </Button>
-                  </li>
-                ))}
-              </ul>
+              <ul className="divide-y divide-fm-line-dim">{book.popular!.map((p) => suggestionRow(p))}</ul>
             </>
           )}
         </aside>

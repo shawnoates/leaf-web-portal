@@ -18,7 +18,11 @@ import { RHYTHM_LABELS } from "@/lib/crew";
 
 type Person = { userId: string; name: string; channel: "push" | "sms" | "none"; canInvite: boolean };
 type Preview = { people: Person[]; inviteLink?: string; rhythmDays?: number };
-type Spot = { locationId: string; name: string; neighborhood: string | null; category: string | null; saves: number };
+/** A real place from Google Places (server: crew-places.js). */
+type Spot = {
+  placeId: string; name: string; address: string | null; shortAddress: string | null; category: string | null;
+  rating: number | null; lat: number | null; lng: number | null; saves: number; isNew?: boolean;
+};
 type Step = "rhythm" | "invite" | "spots";
 
 export default function FriendModeSetup({
@@ -40,7 +44,10 @@ export default function FriendModeSetup({
   const [shared, setShared] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [trending, setTrending] = useState<Spot[]>([]);
+  const [popular, setPopular] = useState<Spot[]>([]);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<Spot[] | null>(null);
+  const [searching, setSearching] = useState(false);
   const [added, setAdded] = useState<Set<string>>(new Set());
   const on = step === "spots";
 
@@ -76,7 +83,7 @@ export default function FriendModeSetup({
       onDone(false);
       setStep("spots");
       Parse.Cloud.run("getCrewBook", { crewId: calendarId })
-        .then((r: { trending?: Spot[] }) => setTrending(r.trending || []))
+        .then((r: { popular?: Spot[] }) => setPopular(r.popular || []))
         .catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't turn on Friend Mode.");
@@ -87,10 +94,39 @@ export default function FriendModeSetup({
 
   const addSpot = async (s: Spot) => {
     try {
-      await Parse.Cloud.run("addToCrewBook", { crewId: calendarId, locationId: s.locationId });
-      setAdded(new Set(added).add(s.locationId));
+      await Parse.Cloud.run("addToCrewBook", {
+        crewId: calendarId, placeId: s.placeId,
+        venue: { name: s.name, address: s.address, lat: s.lat, lng: s.lng, placeId: s.placeId },
+      });
+      setAdded(new Set(added).add(s.placeId));
     } catch { /* leave it */ }
   };
+
+  const search = async () => {
+    if (query.trim().length < 3) return;
+    setSearching(true);
+    try {
+      const r = (await Parse.Cloud.run("searchCrewPlaces", { crewId: calendarId, query: query.trim() })) as { results: Spot[]; limited?: boolean };
+      setResults(r.results);
+    } catch { setResults([]); } finally { setSearching(false); }
+  };
+
+  const spotRow = (s: Spot) => (
+    <li key={s.placeId} className="flex items-center gap-3 rounded-xl px-3 py-2" style={{ border: `1px solid ${FM.line}` }}>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[14px]">
+          {s.name}
+          {s.isNew && <span className="ml-2 rounded-full px-1.5 py-0.5 text-[10px] uppercase" style={{ background: FM.accent, color: FM.canvas }}>New</span>}
+        </span>
+        <span className="block truncate text-[12px]" style={{ color: FM.mutedText }}>
+          {[s.category, s.shortAddress, s.rating ? `★ ${s.rating.toFixed(1)}` : null, s.saves ? `saved by ${s.saves} on Leaf` : null].filter(Boolean).join(" · ")}
+        </span>
+      </span>
+      {added.has(s.placeId)
+        ? <span className="text-[12px]" style={{ color: FM.accent }}>Added ✓</span>
+        : <button onClick={() => addSpot(s)} className="rounded-full px-3 py-1 text-[12px]" style={pill(false)}>Add</button>}
+    </li>
+  );
 
   const pill = (active: boolean) => ({
     background: active ? FM.accent : "transparent",
@@ -207,27 +243,32 @@ export default function FriendModeSetup({
               {picked.size ? `${picked.size} ${picked.size === 1 ? "person was" : "people were"} invited. ` : ""}
               Leaf plans the first night as soon as enough people join.
             </p>
-            {trending.length > 0 && (
-              <div className="mt-4">
-                <p className="text-[15px] font-medium">Start the group&rsquo;s list</p>
-                <p className="mt-1 text-[13px]" style={{ color: FM.mutedText }}>Places people nearby have been saving. Leaf picks each night from this list.</p>
-                <ul className="mt-3 space-y-1.5">
-                  {trending.map((s) => (
-                    <li key={s.locationId} className="flex items-center gap-3 rounded-xl px-3 py-2" style={{ border: `1px solid ${FM.line}` }}>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[14px]">{s.name}</span>
-                        <span className="block truncate text-[12px]" style={{ color: FM.mutedText }}>
-                          {[s.category, s.neighborhood].filter(Boolean).join(" · ")}{s.saves ? ` · ${s.saves} saves lately` : ""}
-                        </span>
-                      </span>
-                      {added.has(s.locationId)
-                        ? <span className="text-[12px]" style={{ color: FM.accent }}>Added ✓</span>
-                        : <button onClick={() => addSpot(s)} className="rounded-full px-3 py-1 text-[12px]" style={pill(false)}>Add</button>}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <div className="mt-4">
+              <p className="text-[15px] font-medium">Add 2–3 places to start</p>
+              <p className="mt-1 text-[13px]" style={{ color: FM.mutedText }}>Leaf picks each night from the group&rsquo;s list. Anyone in the group can add more.</p>
+              <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); void search(); }}>
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="What are you in the mood for? e.g. coffee shops in Boerum Hill"
+                  className="min-w-0 flex-1 rounded-xl px-3 py-2 text-[14px]"
+                  style={{ background: FM.brand, border: `1px solid ${FM.line}`, color: FM.ink }}
+                />
+                <button type="submit" disabled={searching || query.trim().length < 3} className="rounded-full px-4 py-2 text-[13px] font-medium disabled:opacity-50" style={{ background: FM.accent, color: FM.canvas }}>
+                  {searching ? "Looking…" : "Find"}
+                </button>
+              </form>
+              {results && (
+                results.length ? <ul className="mt-3 space-y-1.5">{results.map(spotRow)}</ul>
+                  : <p className="mt-2 text-[13px]" style={{ color: FM.mutedText }}>Nothing matched. Try different words.</p>
+              )}
+              {popular.length > 0 && (
+                <>
+                  <p className="mt-4 text-[12px] uppercase tracking-wide" style={{ color: FM.mutedText }}>Popular nearby</p>
+                  <ul className="mt-2 space-y-1.5">{popular.map(spotRow)}</ul>
+                </>
+              )}
+            </div>
             <div className="mt-5">
               <button onClick={() => onDone(true)} className="rounded-full px-5 py-2 text-[14px] font-medium" style={{ background: FM.accent, color: FM.canvas }}>Done</button>
             </div>
