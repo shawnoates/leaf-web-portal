@@ -10,7 +10,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { Users } from "lucide-react";
 import Parse from "@/lib/parse-client";
-import StartCrewFlow from "@/components/crew/StartCrewFlow";
+import EnableFriendModeFlow from "@/components/crew/EnableFriendModeFlow";
+import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
 import { dayLabel, optionLabel, type DateOption, type Venue } from "@/lib/crew";
 
 export type CrewAction =
@@ -126,7 +127,7 @@ export function CrewActionCard({ actions, onAnswered }: { actions: CrewAction[];
   );
 }
 
-export function CrewsRail({ rows }: { rows: CrewRow[] }) {
+export function CrewsRail({ rows, onEnable }: { rows: CrewRow[]; onEnable: () => void }) {
   return (
     <section className="rail">
       <div className="eyebrow">Your crews</div>
@@ -137,7 +138,7 @@ export function CrewsRail({ rows }: { rows: CrewRow[] }) {
               // eslint-disable-next-line @next/next/no-img-element
               <img className="cal-ava" src={c.image} alt="" />
             ) : (
-              <span className="cal-ava ph">{(c.name || "C").charAt(0).toUpperCase()}</span>
+              <span className="cal-ava" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}><FriendModeIcon size={28} /></span>
             )}
             <div className="cal-body">
               <div className="cal-n">{c.name}</div>
@@ -148,33 +149,34 @@ export function CrewsRail({ rows }: { rows: CrewRow[] }) {
         ))}
       </div>
       <div style={{ marginTop: 8 }}>
-        <Link className="btn text sm" href="/crew/start">Start another crew</Link>
+        <button className="btn text sm" onClick={onEnable}>Enable Friend Mode for another group</button>
       </div>
     </section>
   );
 }
 
-export function CrewSuggestionBox({ suggestion }: { suggestion: NonNullable<CrewSuggestion> }) {
+export function CrewSuggestionBox({ suggestion, onEnable }: { suggestion: NonNullable<CrewSuggestion>; onEnable: () => void }) {
   const names = suggestion.names.slice(0, 2).join(", ");
   const rest = suggestion.count - Math.min(2, suggestion.names.length);
   return (
     <div className="prompt-box fm-dark" style={{ borderStyle: "solid" }}>
       <div className="prompt-body">
         <div className="prompt-h">You and {names}{rest > 0 ? ` and ${rest} other${rest === 1 ? "" : "s"}` : ""} keep ending up at the same things.</div>
-        <p className="prompt-p">Start a crew and Leaf will find a night that works for all of you, then plan it. Free, and nobody needs the app.</p>
+        <p className="prompt-p">Recurring plans with your crew, on your schedule. Leaf finds a night that works for all of you, then plans it.</p>
       </div>
-      <Link className="sinv-btn primary" href="/crew/start?suggest=1">Start a crew</Link>
+      <button className="sinv-btn primary" onClick={onEnable}>Enable Friend Mode</button>
     </div>
   );
 }
 
+/** "Enable Friend Mode" in a modal: creates a private calendar with Friend Mode on. */
 export function FriendModeIntroModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <button className="modal-x" onClick={onClose} aria-label="Close">×</button>
         <div className="modal-body">
-          <StartCrewFlow signedIn suggest onClose={onClose} />
+          <EnableFriendModeFlow onClose={onClose} />
         </div>
       </div>
     </div>

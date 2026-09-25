@@ -18,7 +18,7 @@ import { FM, FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 const MAX_MEMBERS = 15;
 
 type Person = { userId: string; name: string; channel: "push" | "sms" | "none"; canInvite: boolean; reason: string | null };
-type Preview = { people: Person[]; invited: number; joined: number; ownerSmsOptIn?: boolean; ownerPhoneLast4?: string | null };
+type Preview = { people: Person[]; invited: number; joined: number; ownerSmsOptIn?: boolean; ownerPhoneLast4?: string | null; inviteLink?: string };
 
 export default function FriendModeCard({
   calendarId,
@@ -38,6 +38,11 @@ export default function FriendModeCard({
   // The owner's own text opt-in, offered once Friend Mode is on. Never pre-ticked.
   const [ownerSms, setOwnerSms] = useState(false);
   const [ownerPhone, setOwnerPhone] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
+  const copyLink = async () => {
+    if (!preview?.inviteLink) return;
+    try { await navigator.clipboard.writeText(preview.inviteLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); } catch { /* ignore */ }
+  };
   const locked = memberCount > MAX_MEMBERS;
 
   const loadPreview = useCallback(async () => {
@@ -147,6 +152,9 @@ export default function FriendModeCard({
                 <button onClick={() => setConfirming(true)} className="font-medium underline" style={{ color: FM.ink }}>
                   Invite members
                 </button>
+              )}
+              {preview?.inviteLink && (
+                <button onClick={copyLink} className="underline" style={{ color: FM.ink }}>{linkCopied ? "Link copied" : "Copy invite link"}</button>
               )}
               <Link href={`/crew/${calendarId}`} className="underline" style={{ color: FM.ink }}>Open the crew page</Link>
             </div>

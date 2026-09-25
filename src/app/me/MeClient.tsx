@@ -833,18 +833,8 @@ function DashboardView({
   const [popupIdea, setPopupIdea] = useState<HostPlan | null>(
     () => (firstUnseenRecap(data.pendingRecaps) ? null : data.needsHost?.popup || null),
   );
-  // Friend Mode intro: one more one-shot popup, lowest in the pecking order —
-  // it yields to a recap and to a needs-a-host idea, and only shows for people
-  // with no crew whom the server found "people you keep seeing" for. Seen is
-  // stamped the moment it opens, so closing it means it never auto-opens again.
-  const [introOpen, setIntroOpen] = useState<boolean>(
-    () => !firstUnseenRecap(data.pendingRecaps) && !data.needsHost?.popup && data.friendModeIntro?.eligible === true,
-  );
-  useEffect(() => {
-    if (!introOpen) return;
-    Parse.Cloud.run("markFriendModeIntroSeen").catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // "Enable Friend Mode" opens on request only (suggestion box / crews rail).
+  const [introOpen, setIntroOpen] = useState(false);
   const [popupAnsweredId, setPopupAnsweredId] = useState<string | null>(null);
   useEffect(() => {
     if (!popupIdea) return;
@@ -1012,7 +1002,7 @@ function DashboardView({
           )}
 
           {!qualifierActive && crews.length === 0 && data.crewSuggestion && (
-            <CrewSuggestionBox suggestion={data.crewSuggestion} />
+            <CrewSuggestionBox suggestion={data.crewSuggestion} onEnable={() => setIntroOpen(true)} />
           )}
 
           {!qualifierActive && !data.person.ownsCalendars && !(crews.length === 0 && data.crewSuggestion) && (
@@ -1061,7 +1051,7 @@ function DashboardView({
             {places.length > 0 && (
               <PlacesRail probes={places} onAnswered={(id) => setPopupAnsweredId(id)} />
             )}
-            {crews.length > 0 && <CrewsRail rows={crews} />}
+            {crews.length > 0 && <CrewsRail rows={crews} onEnable={() => setIntroOpen(true)} />}
             {rail && rail.tier2.length > 0 && <CalendarsRail rows={rail.tier2} />}
             <TextsCard inCrew={crews.length > 0} />
           </aside>
