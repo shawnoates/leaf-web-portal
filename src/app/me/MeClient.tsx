@@ -28,6 +28,8 @@ import {
   type CrewAction, type CrewRow,
 } from "./CrewCards";
 import FriendModeIntro, { friendModeIntroDue, stampFriendModeIntro } from "@/components/crew/FriendModeIntro";
+import FriendModeSetup from "@/components/dashboard/FriendModeSetup";
+import FriendModeCalendarPicker from "@/components/crew/FriendModeCalendarPicker";
 
 // ============================================================================
 // Attendee dashboard (/me). The signed-in home: the next plan, everything
@@ -830,11 +832,13 @@ function DashboardView({
   // venue question and a hostable plan were competing for the same one modal,
   // and only one of them is something a person can act on.
   //
-  // The Friend Mode intro takes this slot once a month for calendar owners
-  // who aren't in a crew yet; the needs-a-host idea waits for the next visit.
-  const [fmIntro, setFmIntro] = useState(
-    () => data.person.ownsCalendars && (data.crews || []).length === 0 && friendModeIntroDue(),
-  );
+  // The Friend Mode intro takes this slot once a month for anyone not in a
+  // crew yet; the needs-a-host idea waits for the next visit. Calendar owners
+  // pick which calendar it goes on (or make another); everyone else sets up
+  // a new private calendar right here.
+  const [fmIntro, setFmIntro] = useState(() => (data.crews || []).length === 0 && friendModeIntroDue());
+  const [fmPick, setFmPick] = useState(false);
+  const [fmSetup, setFmSetup] = useState<{ calendarId: string | null; name: string } | null>(null);
   useEffect(() => { if (fmIntro) stampFriendModeIntro(); }, [fmIntro]);
   const [popupIdea, setPopupIdea] = useState<HostPlan | null>(
     () => (fmIntro || firstUnseenRecap(data.pendingRecaps) ? null : data.needsHost?.popup || null),
@@ -1068,7 +1072,29 @@ function DashboardView({
 
 
       {fmIntro && (
-        <FriendModeIntro onClose={() => setFmIntro(false)} startHref="/dashboard" startLabel="Set up Friend Mode" />
+        <FriendModeIntro
+          onClose={() => setFmIntro(false)}
+          startLabel="Set up Friend Mode"
+          onStart={() => {
+            setFmIntro(false);
+            if (data.person.ownsCalendars) setFmPick(true);
+            else setFmSetup({ calendarId: null, name: firstName ? `${firstName}'s crew` : "My crew" });
+          }}
+        />
+      )}
+      {fmPick && (
+        <FriendModeCalendarPicker
+          onClose={() => setFmPick(false)}
+          onPick={(c) => { setFmPick(false); setFmSetup({ calendarId: c.id, name: c.name }); }}
+        />
+      )}
+      {fmSetup && (
+        <FriendModeSetup
+          calendarId={fmSetup.calendarId}
+          calendarName={fmSetup.name}
+          onDone={(finished) => { if (finished) { setFmSetup(null); void onRefresh(); } }}
+          onCancel={() => setFmSetup(null)}
+        />
       )}
 
       {popupIdea && (

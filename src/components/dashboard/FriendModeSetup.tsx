@@ -9,6 +9,10 @@
  *   2. Invite people      (required: followers pre-selected — untick to leave out — or share the link)
  *   3. Turn on            → enables, sends the picked invites
  *   4. Add a few spots    (optional: places trending nearby, then Done)
+ *
+ * Without a `calendarId` (someone who owns no calendar, from the /me intro)
+ * the same steps make a new private calendar: the invite step offers people
+ * they keep ending up at plans with, and Turn on calls createFriendCrew.
  */
 
 import { useEffect, useState } from "react";
@@ -31,12 +35,15 @@ export default function FriendModeSetup({
   onDone,
   onCancel,
 }: {
-  calendarId: string;
+  /** null: make a new private calendar named `calendarName` on Turn on. */
+  calendarId: string | null;
   calendarName: string;
   /** Friend Mode is on (called after step 3 succeeds and again on Done). */
   onDone: (turnedOn: boolean) => void;
   onCancel: () => void;
 }) {
+  // The calendar the later steps act on: the one given, or the one just made.
+  const [crewId, setCrewId] = useState<string | null>(calendarId);
   const [step, setStep] = useState<Step>("rhythm");
   const [rhythm, setRhythm] = useState(28);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -52,17 +59,30 @@ export default function FriendModeSetup({
   const on = step === "spots";
 
   useEffect(() => {
-    Parse.Cloud.run("previewCalendarInvites", { calendarId })
-      .then((r: Preview) => {
-        setPreview(r);
-        // Everyone is invited by default; the owner unticks anyone to leave out.
-        setPicked(new Set(r.people.filter((p) => p.canInvite).map((p) => p.userId)));
-      })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Couldn't load your followers."));
+    if (calendarId) {
+      Parse.Cloud.run("previewCalendarInvites", { calendarId })
+        .then((r: Preview) => {
+          setPreview(r);
+          // Everyone is invited by default; the owner unticks anyone to leave out.
+          setPicked(new Set(r.people.filter((p) => p.canInvite).map((p) => p.userId)));
+        })
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : "Couldn't load your followers."));
+    } else {
+      // No calendar yet: offer the people they keep seeing at plans. The
+      // invite link exists once the calendar does (after Turn on).
+      Parse.Cloud.run("getFriendModeSuggestions", {})
+        .then((r: { people: { userId: string; name: string }[] }) => {
+          setPreview({ people: r.people.map((p) => ({ ...p, channel: "push" as const, canInvite: true })) });
+          setPicked(new Set(r.people.map((p) => p.userId)));
+        })
+        .catch(() => setPreview({ people: [] }));
+    }
   }, [calendarId]);
 
   const invitable = preview?.people.filter((p) => p.canInvite) ?? [];
-  const canFinish = picked.size > 0 || shared;
+  // A calendar needs someone invited to turn on. A new crew can start with
+  // just the owner: the link to share comes right after.
+  const canFinish = !calendarId || picked.size > 0 || shared;
   const close = () => (on ? onDone(true) : onCancel());
 
   const shareLink = async () => {
@@ -78,11 +98,24 @@ export default function FriendModeSetup({
     setBusy(true);
     setError("");
     try {
-      await Parse.Cloud.run("setFriendModeOnCalendar", { calendarId, enabled: true, rhythmDays: rhythm });
-      if (picked.size) await Parse.Cloud.run("inviteCalendarMembers", { calendarId, userIds: [...picked] });
+      let id = calendarId;
+      if (id) {
+        await Parse.Cloud.run("setFriendModeOnCalendar", { calendarId: id, enabled: true, rhythmDays: rhythm });
+        if (picked.size) await Parse.Cloud.run("inviteCalendarMembers", { calendarId: id, userIds: [...picked] });
+      } else {
+        const r = (await Parse.Cloud.run("createFriendCrew", {
+          name: calendarName,
+          rhythmDays: rhythm,
+          invitees: [...picked].map((userId) => ({ userId })),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        })) as { crewId: string; inviteLink: string };
+        id = r.crewId;
+        setCrewId(id);
+        setPreview((p) => ({ people: p?.people ?? [], inviteLink: r.inviteLink }));
+      }
       onDone(false);
       setStep("spots");
-      Parse.Cloud.run("getCrewBook", { crewId: calendarId })
+      Parse.Cloud.run("getCrewBook", { crewId: id })
         .then((r: { popular?: Spot[] }) => setPopular(r.popular || []))
         .catch(() => {});
     } catch (e) {
@@ -95,7 +128,7 @@ export default function FriendModeSetup({
   const addSpot = async (s: Spot) => {
     try {
       await Parse.Cloud.run("addToCrewBook", {
-        crewId: calendarId, placeId: s.placeId,
+        crewId, placeId: s.placeId,
         venue: { name: s.name, address: s.address, lat: s.lat, lng: s.lng, placeId: s.placeId },
       });
       setAdded(new Set(added).add(s.placeId));
@@ -106,7 +139,7 @@ export default function FriendModeSetup({
     if (query.trim().length < 3) return;
     setSearching(true);
     try {
-      const r = (await Parse.Cloud.run("searchCrewPlaces", { crewId: calendarId, query: query.trim() })) as { results: Spot[]; limited?: boolean };
+      const r = (await Parse.Cloud.run("searchCrewPlaces", { crewId, query: query.trim() })) as { results: Spot[]; limited?: boolean };
       setResults(r.results);
     } catch { setResults([]); } finally { setSearching(false); }
   };
@@ -177,14 +210,15 @@ export default function FriendModeSetup({
           <div className="mt-5">
             <p className="text-[15px] font-medium">Invite your people</p>
             <p className="mt-1 text-[13px]" style={{ color: FM.mutedText }}>
-              Friend Mode turns on once you invite at least one person. Nobody joins until they say yes, and anyone who
-              doesn&rsquo;t stays a follower as before.
+              {calendarId
+                ? "Friend Mode turns on once you invite at least one person. Nobody joins until they say yes, and anyone who doesn't stays a follower as before."
+                : "People you've been at plans with. Nobody joins until they say yes; you'll get a link for everyone else right after."}
             </p>
 
             {invitable.length > 0 && (
               <div className="mt-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-[12px] uppercase tracking-wide" style={{ color: FM.mutedText }}>Followers</p>
+                  <p className="text-[12px] uppercase tracking-wide" style={{ color: FM.mutedText }}>{calendarId ? "Followers" : "People you keep seeing"}</p>
                   <button
                     className="text-[12px] underline"
                     style={{ color: FM.ink }}
@@ -213,13 +247,19 @@ export default function FriendModeSetup({
               </div>
             )}
 
-            <div className="mt-4 rounded-xl p-3" style={{ border: `1px solid ${FM.line}` }}>
-              <p className="text-[14px]">{invitable.length > 0 ? "Or share the invite link" : "Share the invite link"}</p>
-              <p className="mt-0.5 text-[12px]" style={{ color: FM.mutedText }}>Send it from your phone to anyone you want in. It works once Friend Mode is on.</p>
-              <button onClick={shareLink} disabled={!preview?.inviteLink} className="mt-2 rounded-full px-4 py-1.5 text-[13px]" style={pill(shared)}>
-                {shared ? "Link shared ✓" : "Share the link"}
-              </button>
-            </div>
+            {calendarId ? (
+              <div className="mt-4 rounded-xl p-3" style={{ border: `1px solid ${FM.line}` }}>
+                <p className="text-[14px]">{invitable.length > 0 ? "Or share the invite link" : "Share the invite link"}</p>
+                <p className="mt-0.5 text-[12px]" style={{ color: FM.mutedText }}>Send it from your phone to anyone you want in. It works once Friend Mode is on.</p>
+                <button onClick={shareLink} disabled={!preview?.inviteLink} className="mt-2 rounded-full px-4 py-1.5 text-[13px]" style={pill(shared)}>
+                  {shared ? "Link shared ✓" : "Share the link"}
+                </button>
+              </div>
+            ) : (
+              invitable.length === 0 && preview && (
+                <p className="mt-4 text-[13px]" style={{ color: FM.mutedText }}>Nobody to suggest yet. Turn it on and share the link with your people.</p>
+              )
+            )}
 
             {error && <p className="mt-3 text-[13px]" style={{ color: "#F2A39A" }}>{error}</p>}
             <div className="mt-5 flex items-center gap-3">
@@ -243,6 +283,15 @@ export default function FriendModeSetup({
               {picked.size ? `${picked.size} ${picked.size === 1 ? "person was" : "people were"} invited. ` : ""}
               Leaf plans the first night as soon as enough people join.
             </p>
+            {!calendarId && preview?.inviteLink && (
+              <div className="mt-4 rounded-xl p-3" style={{ border: `1px solid ${FM.line}` }}>
+                <p className="text-[14px]">Share the invite link</p>
+                <p className="mt-0.5 text-[12px]" style={{ color: FM.mutedText }}>Send it from your phone to anyone you want in.</p>
+                <button onClick={shareLink} className="mt-2 rounded-full px-4 py-1.5 text-[13px]" style={pill(shared)}>
+                  {shared ? "Link shared ✓" : "Share the link"}
+                </button>
+              </div>
+            )}
             <div className="mt-4">
               <p className="text-[15px] font-medium">Add 2–3 places to start</p>
               <p className="mt-1 text-[13px]" style={{ color: FM.mutedText }}>Leaf picks each night from the group&rsquo;s list. Anyone in the group can add more.</p>
