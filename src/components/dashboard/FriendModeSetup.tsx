@@ -6,7 +6,7 @@
  * — nothing was changed on the server, so there's nothing to undo.
  *
  *   1. How often          (required, defaults to monthly)
- *   2. Invite people      (required: pick followers, or share the invite link)
+ *   2. Invite people      (required: followers pre-selected — untick to leave out — or share the link)
  *   3. Turn on            → enables, sends the picked invites
  *   4. Add a few spots    (optional: places trending nearby, then Done)
  */
@@ -46,7 +46,11 @@ export default function FriendModeSetup({
 
   useEffect(() => {
     Parse.Cloud.run("previewCalendarInvites", { calendarId })
-      .then((r: Preview) => setPreview(r))
+      .then((r: Preview) => {
+        setPreview(r);
+        // Everyone is invited by default; the owner unticks anyone to leave out.
+        setPicked(new Set(r.people.filter((p) => p.canInvite).map((p) => p.userId)));
+      })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Couldn't load your followers."));
   }, [calendarId]);
 
