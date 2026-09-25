@@ -2539,7 +2539,9 @@ function OtpModal({ onVerified }: { onVerified: () => void | Promise<void> }) {
 const CSS = `
 .leafme{
   --ink:#17150f; --body:#6f6a5f; --muted:#8b8578; --faint:#c9c4b8;
-  --green:#1f6b45; --green-tint:#f4f8f4; --orange:#c2410c;
+  /* Brand green (#253A33): the same green as the Friend Mode card, so Host
+     this, the hearts and the crew card read as one family. */
+  --green:#253a33; --green-tint:#f3f7f5; --orange:#c2410c;
   --paper:#fff; --recessed:#faf9f7;
   --fill:#e3e0d8; --hatch:repeating-linear-gradient(135deg,#e8e4dc 0 6px,#f2efe9 6px 12px);
   --line:rgba(0,0,0,.07); --rule:rgba(0,0,0,.08); --card:rgba(0,0,0,.09);
@@ -2585,7 +2587,7 @@ const CSS = `
 
 /* Post-create confirmation strip */
 .leafme .created{display:flex;align-items:center;justify-content:space-between;gap:14px;
-  border:1px solid rgba(31,107,69,.35);background:var(--green-tint);border-radius:10px;
+  border:1px solid rgba(37,58,51,.35);background:var(--green-tint);border-radius:10px;
   padding:12px 14px;margin-bottom:18px;font-size:12.5px;color:var(--ink)}
 .leafme .created-link{font-size:12px;color:var(--green);text-decoration:underline;white-space:nowrap}
 
@@ -2709,7 +2711,7 @@ const CSS = `
 .leafme .row-btn.ghost{background:var(--paper);color:var(--ink);border-color:var(--edge)}
 .leafme .row-btn.ghost:hover{border-color:rgba(0,0,0,.28);background:var(--recessed)}
 .leafme .row-btn.host{background:var(--green);color:#fff;border-color:var(--green)}
-.leafme .row-btn.host:hover{background:#1a5a3a}
+.leafme .row-btn.host:hover{background:#1b2b25}
 .leafme .row-btn:disabled{opacity:.55;cursor:default}
 .leafme .status{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;
   letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
@@ -2799,7 +2801,7 @@ const CSS = `
 .leafme .hostact{flex:none;display:flex;align-items:center;gap:7px}
 .leafme .hostbtn{flex:none;border:0;background:var(--green);color:#fff;font-size:11px;font-weight:500;
   padding:8px 10px;border-radius:7px;cursor:pointer}
-.leafme .hostbtn:hover{background:#1a5a3a}
+.leafme .hostbtn:hover{background:#1b2b25}
 
 .leafme .places{background:var(--paper);border:1px solid var(--card);border-radius:10px;overflow:hidden}
 .leafme .place{display:flex;align-items:center;gap:10px;padding:9px 11px}
@@ -2858,7 +2860,7 @@ const CSS = `
 .leafme .probe-undo{display:block;margin:10px auto 0;font-family:var(--sans);font-style:normal}
 .leafme .popup-actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch;margin-top:16px}
 .leafme .popup-heart{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:12px 13px;border:1.5px solid var(--green);background:var(--green);border-radius:8px;color:#fff;font-size:13px;font-weight:500;cursor:pointer;transition:background 120ms ease}
-.leafme .popup-heart:hover{background:#1a5a3a;border-color:#1a5a3a}
+.leafme .popup-heart:hover{background:#1b2b25;border-color:#1b2b25}
 .leafme .popup-heart:disabled{cursor:default}
 .leafme .popup-host{background:#fff;color:var(--green);border:1.5px solid var(--green);flex:1 1 auto;font-weight:500}
 
