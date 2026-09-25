@@ -119,17 +119,6 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             </div>
           </div>
 
-          <div className="hidden lg:block">
-            <Eyebrow>Members</Eyebrow>
-            {/* Two columns so a big crew doesn't push settings below the fold. */}
-            <ul className="mt-1.5 grid grid-cols-2 gap-x-6">
-              {joined.map((m) => (
-                <MemberRow key={m.membershipId} m={m} note={m.userId === crew.ownerId ? "Started it" : m.membershipId === me.membershipId ? "You" : undefined} />
-              ))}
-              {/* Invited reads from the dashed avatar; no label, so names get the room. */}
-              {invited.map((m) => <MemberRow key={m.membershipId} m={m} />)}
-            </ul>
-          </div>
           {crew.joinedCount < crew.quorum && (
             <p className="m-0 text-sm text-fm-ink-2">
               Waiting on {crew.quorum - crew.joinedCount} more to join before Leaf plans the first night.
@@ -290,8 +279,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
           </div>
         </div>
 
-        {/* Settings */}
-        <div className="mt-10 lg:col-start-1 lg:row-start-2 lg:mt-8 lg:self-start">
+        {/* Settings — right under who the crew is, so the switch is never below a long member list */}
+        <div className="mt-10 lg:col-start-1 lg:row-start-2 lg:mt-8 lg:self-start lg:flex lg:flex-col lg:gap-8">
           <div className="divide-y divide-fm-line-dim rounded-3xl border border-fm-line-dim bg-fm-surface">
             {me.isOwner && (
               <div className="py-4 pl-5 pr-4">
@@ -408,6 +397,17 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             >
               Leave
             </button>
+          </div>
+          <div className="hidden lg:block">
+            <Eyebrow>Members</Eyebrow>
+            {/* Two columns so a big crew doesn't push settings below the fold. */}
+            <ul className="mt-1.5 grid grid-cols-2 gap-x-6">
+              {joined.map((m) => (
+                <MemberRow key={m.membershipId} m={m} note={m.userId === crew.ownerId ? "Started it" : m.membershipId === me.membershipId ? "You" : undefined} />
+              ))}
+              {/* Invited reads from the dashed avatar; no label, so names get the room. */}
+              {invited.map((m) => <MemberRow key={m.membershipId} m={m} />)}
+            </ul>
           </div>
         </div>
       </div>

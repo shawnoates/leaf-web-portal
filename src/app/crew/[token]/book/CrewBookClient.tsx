@@ -94,14 +94,15 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
         <ChevronLeft size={20} aria-hidden /> {crewName}
       </Link>
 
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between lg:gap-12">
+      {/* Title, then the search right under it (it floated at the far right on desktop). */}
+      <div className="flex flex-col gap-6 lg:gap-7">
         <div className="flex flex-col gap-2.5 lg:gap-3">
           <span className="hidden text-sm text-fm-muted lg:block">{crewName}</span>
           <DisplayTitle italic="book">The</DisplayTitle>
           <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">Places the crew wants to go. Leaf plans nights from here first.</p>
         </div>
         {canAdd && (
-          <div className="lg:w-[480px]">
+          <div className="lg:max-w-[560px]">
             <label className="relative block">
               <span className="sr-only">Add a place</span>
               <Search size={18} aria-hidden className="pointer-events-none absolute left-[18px] top-1/2 z-10 -translate-y-1/2 text-fm-muted" />
