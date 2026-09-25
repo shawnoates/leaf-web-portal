@@ -95,6 +95,9 @@ interface Plan {
   attendeeCount: number;
   requireApproval?: boolean;
   capacity?: number | null;
+  /** A seat opened and the server offered it to this viewer (rsvpState is
+   *  "waitlisted"). First to claim wins — see claimWaitlistSpot. */
+  waitlistOffered?: boolean;
   weather: Weather | null;
   messages: PlanMessage[];
 }
@@ -432,7 +435,11 @@ function statusFor(plan: Plan): { cls: string; text: string } | null {
   // The viewer's own queued state outranks host-context pills — it's the
   // state they act on ("did my request go through?").
   if (plan.rsvpState === "pending") return { cls: "wait", text: "Requested · waiting on host" };
-  if (plan.rsvpState === "waitlisted") return { cls: "wait", text: "On the waitlist" };
+  if (plan.rsvpState === "waitlisted") {
+    return plan.waitlistOffered
+      ? { cls: "wait", text: "A spot opened up — claim it" }
+      : { cls: "wait", text: "On the waitlist" };
+  }
   if (plan.viewerIsHost) {
     return { cls: "host", text: plan.attendeeCount > 0 ? `You're hosting · ${plan.attendeeCount} going` : "You're hosting" };
   }
@@ -1566,6 +1573,28 @@ function HeroActions({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: Rsv
     }
   }
 
+  // Open waitlist offer: the seat is claimed, not granted. A late tap gets
+  // "taken" and stays on the list rather than an error.
+  const [claimNote, setClaimNote] = useState<string | null>(null);
+  const canClaim = waitlisted && plan.waitlistOffered === true;
+  async function claim() {
+    if (busy) return;
+    setBusy(true);
+    setClaimNote(null);
+    try {
+      const res = (await Parse.Cloud.run("claimWaitlistSpot", { eventGroupId: plan.id })) as
+        { claimed?: boolean; rsvpState?: RsvpState; reason?: string } | null;
+      if (res?.claimed && res.rsvpState) onRsvp(plan.id, res.rsvpState);
+      else setClaimNote(res?.reason === "taken"
+        ? "That spot was just taken — you're still on the waitlist."
+        : "No open spot right now — you're still on the waitlist.");
+    } catch (e) {
+      setClaimNote(e instanceof Error ? e.message : "Couldn't claim the spot. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const primaryLabel = hosting ? "You're hosting"
     : going ? "Going ✓"
     : pending ? "Requested ✓"
@@ -1593,6 +1622,12 @@ function HeroActions({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: Rsv
           <span className="chat-label">{chatVerb(plan)}{unread > 0 ? ` · ${unread}` : ""}</span>
         </Link>
       )}
+      {canClaim && (
+        <button className="btn primary" disabled={busy} onClick={claim}>
+          Claim my spot
+        </button>
+      )}
+      {claimNote && <span className="claim-note" role="status">{claimNote}</span>}
       {!hosting && plan.rsvpState !== "not_going" && (
         <button className="btn text" disabled={busy} onClick={() => set("not_going")}>
           {pending ? "Withdraw request" : waitlisted ? "Leave waitlist" : "Can't make it"}
@@ -2279,6 +2314,28 @@ function AttendButtons({
     }
   }
 
+  // Open waitlist offer: the seat is claimed, not granted. A late tap gets
+  // "taken" and stays on the list rather than an error.
+  const [claimNote, setClaimNote] = useState<string | null>(null);
+  const canClaim = waitlisted && plan.waitlistOffered === true;
+  async function claim() {
+    if (busy) return;
+    setBusy(true);
+    setClaimNote(null);
+    try {
+      const res = (await Parse.Cloud.run("claimWaitlistSpot", { eventGroupId: plan.id })) as
+        { claimed?: boolean; rsvpState?: RsvpState; reason?: string } | null;
+      if (res?.claimed && res.rsvpState) onRsvp(plan.id, res.rsvpState);
+      else setClaimNote(res?.reason === "taken"
+        ? "That spot was just taken — you're still on the waitlist."
+        : "No open spot right now — you're still on the waitlist.");
+    } catch (e) {
+      setClaimNote(e instanceof Error ? e.message : "Couldn't claim the spot. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // Hosts don't RSVP to their own plan — they host it. A virtual host fronts
   // the plan instead, so the real owner is just another potential attendee.
   if (viewerHosts(plan)) {
@@ -2300,6 +2357,12 @@ function AttendButtons({
           : plan.requireApproval ? "Request to attend"
           : "Count me in"}
       </button>
+      {canClaim && (
+        <button className="btn primary" disabled={busy} onClick={claim}>
+          Claim my spot
+        </button>
+      )}
+      {claimNote && <span className="claim-note" role="status">{claimNote}</span>}
       <button
         className="btn ghost"
         aria-pressed={plan.rsvpState === "not_going"}
@@ -2800,6 +2863,7 @@ const CSS = `
 /* ---- Thread ---- */
 .leafme .thread{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
 .leafme .msg{display:flex;gap:11px;padding:9px 0}
+.leafme .claim-note{flex-basis:100%;font-size:12px;color:var(--muted);line-height:1.35}
 .leafme .msg:first-child{padding-top:0}
 .leafme .mava{width:26px;height:26px;border-radius:999px;flex-shrink:0;background:#dce5dc;
   display:grid;place-items:center;font-family:var(--serif);font-size:12px;color:#2f5d43;position:relative}
