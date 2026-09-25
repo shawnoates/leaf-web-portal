@@ -1462,7 +1462,7 @@ function HostInviteCard({
           <div className="sinv-text">
             <h2 className="sinv-title">
               {invite.calendarShareId ? (
-                <Link href={`/org/${invite.calendarShareId}?idea=${invite.ideaId}`}>{invite.title}</Link>
+                <Link href={`/org/${invite.calendarShareId}?idea=${invite.ideaId}`} onClick={bridgeIdentityToOrgPage}>{invite.title}</Link>
               ) : invite.title}
             </h2>
             {meta && <div className="sinv-meta">{meta}</div>}
@@ -1692,7 +1692,7 @@ function PlanRow({
       </div>
       <div className="row-act">
         {plan.hostState === "waiting_on_host" ? (
-          <Link className="row-btn host" href={hostHref}>Host this</Link>
+          <Link className="row-btn host" href={hostHref} onClick={bridgeIdentityToOrgPage}>Host this</Link>
         ) : canAttend ? (
           <AttendCta plan={plan} onRsvp={onRsvp} />
         ) : canChat(plan) ? (
@@ -1883,7 +1883,7 @@ function NeedsHostRail({ plans, onHosted }: { plans: HostPlan[]; onHosted: () =>
                 {p.kind === "aiEvent" && p.calendarShareId ? (
                   // A starter card is hosted on its own calendar page — the
                   // ?aiEvent deep link opens that card's host/interest sheet.
-                  <Link className="hostbtn" href={`/org/${p.calendarShareId}?aiEvent=${encodeURIComponent(p.aiEventUid || "")}`}>
+                  <Link className="hostbtn" href={`/org/${p.calendarShareId}?aiEvent=${encodeURIComponent(p.aiEventUid || "")}`} onClick={bridgeIdentityToOrgPage}>
                     Host this
                   </Link>
                 ) : (
@@ -2052,6 +2052,7 @@ function CalendarsRail({ rows }: { rows: HostCalRow[] }) {
             key={c.calendarId}
             className="cal-row"
             href={c.calendarShareId ? `/org/${c.calendarShareId}` : "#"}
+            onClick={bridgeIdentityToOrgPage}
           >
             {c.calendarPhoto ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -2147,6 +2148,7 @@ function NeedsHostPopup({
   // its sheet there); only CalendarGeneratedPlan ideas host in place.
   useEffect(() => {
     if (hosting && isStarterCard && idea.calendarShareId) {
+      bridgeIdentityToOrgPage();
       window.location.assign(`/org/${idea.calendarShareId}?aiEvent=${encodeURIComponent(idea.aiEventUid || "")}`);
     }
   }, [hosting, isStarterCard, idea.calendarShareId, idea.aiEventUid]);
@@ -2369,7 +2371,10 @@ function AttendButtons({
 // The /org calendar page identifies visitors by phone (leaf_follower_phone /
 // leaf_verified_user), not by Parse session — without this stamp a logged-in
 // /me user lands there as a stranger: RSVP state missing, gated venues
-// redacted, and re-RSVP'ing mints a duplicate identity.
+// redacted, and re-RSVP'ing mints a duplicate identity. On a PRIVATE
+// calendar it is worse: the follow gate never saw them, so a follower was
+// asked to re-verify. Every /org link on this page goes through this (the
+// /org page also bridges its own session on arrival, as a second net).
 function bridgeIdentityToOrgPage() {
   const u = Parse.User.current();
   const digits = ((u?.get("phone") as string) || "").replace(/\D/g, "");

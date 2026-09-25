@@ -1223,6 +1223,12 @@ function RsvpModal({
 
 // --- Cookie Helpers ---
 
+// Same shape /me uses to decide whether a magic link may switch the session.
+function isAdminFlag(u: { get: (k: string) => unknown } | null | undefined): boolean {
+  const v = u?.get("is_admin");
+  return v === true || v === "yes";
+}
+
 // Keep legacy follower cookie for backward compat
 function setFollowerCookie(calendarId: string, name: string, phone: string) {
   const data = JSON.stringify({ calendarId, name, phone });
@@ -2755,12 +2761,75 @@ export default function OrgCalendarPage() {
     }
   }, [org?.objectId]);
 
-  // Check for existing Parse session (returning owner/host from dashboard)
+  // Resolve WHO is looking before the first fetch, so a follower of a private
+  // calendar is recognised on arrival instead of being walled off and asked
+  // to verify a phone we already know. Two arrivals need this:
+  //
+  //  1. A tokenized link (`?u=<userId>&t=<token>`), the same signed pair the
+  //     /me digest carries. Follower SMS (approval, dormant nudge, host
+  //     nudges) now append it to /org links. Redeemed through
+  //     getDashboardSession -> Parse.User.become, exactly like /me.
+  //  2. A Parse session already in this browser (a /me user tapping a
+  //     calendar link). The server gate reads request.user, but the phone
+  //     cookie / leaf_follower_phone drive every phone-keyed flow on this
+  //     page (RSVP, interest, follow), so the session is bridged into them.
+  //
+  // fetchOrg waits on `viewerReady`; a failed or expired token just falls
+  // through to the ordinary gate, never an error.
+  const [viewerReady, setViewerReady] = useState(false);
   useEffect(() => {
-    try {
-      const current = Parse.User.current();
-      if (current) setParseUser(current);
-    } catch { /* no session */ }
+    let cancelled = false;
+    (async () => {
+      let becameLinkUser = false;
+      try {
+        const sp = new URLSearchParams(window.location.search);
+        const uid = sp.get("u");
+        const token = sp.get("t");
+        if (uid && token) {
+          const before = Parse.User.current();
+          // An admin already signed in here keeps their own session (mirrors
+          // /me, which asks before switching; here the link just yields).
+          const adminHere = !!before && before.id !== uid && isAdminFlag(before);
+          if (!adminHere && (!before || before.id !== uid)) {
+            try {
+              const r = (await Parse.Cloud.run("getDashboardSession", { userId: uid, token })) as
+                | { sessionToken?: string }
+                | undefined;
+              if (r?.sessionToken?.startsWith("r:")) {
+                await Parse.User.become(r.sessionToken);
+                becameLinkUser = true;
+              }
+            } catch { /* expired or bad token — ordinary gate applies */ }
+          } else if (before && before.id === uid) {
+            becameLinkUser = true;
+          }
+          const url = new URL(window.location.href);
+          url.searchParams.delete("u");
+          url.searchParams.delete("t");
+          window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+        }
+      } catch { /* URL or storage unavailable */ }
+
+      try {
+        const current = Parse.User.current();
+        if (current) {
+          if (!cancelled) setParseUser(current);
+          const digits = String(current.get("phone") || "").replace(/\D/g, "");
+          const name = String(current.get("full_name") || current.get("first_name") || current.get("name") || "");
+          // The link's identity wins outright; an existing session only fills
+          // a gap, so a phone someone verified by OTP here isn't overwritten.
+          const stored = localStorage.getItem("leaf_follower_phone");
+          const cookie = getVerifiedUserCookie();
+          if (digits && (becameLinkUser || (!stored && !cookie?.phone))) {
+            setVerifiedUserCookie(name, digits);
+            localStorage.setItem("leaf_follower_phone", digits);
+          }
+        }
+      } catch { /* no session or storage unavailable */ }
+
+      if (!cancelled) setViewerReady(true);
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Timed follow popup
@@ -3225,8 +3294,10 @@ export default function OrgCalendarPage() {
   }, [shareId]);
 
   useEffect(() => {
-    if (shareId) fetchOrg();
-  }, [shareId, fetchOrg]);
+    // viewerReady: the link/session identity above must land before the first
+    // fetch, or a private calendar answers the wrong question.
+    if (shareId && viewerReady) fetchOrg();
+  }, [shareId, viewerReady, fetchOrg]);
 
   // Auto-open the plan details modal if the URL contains ?plan={eventGroupId}.
   // This is the landing target for the /p/[eventGroupId] share page used by
