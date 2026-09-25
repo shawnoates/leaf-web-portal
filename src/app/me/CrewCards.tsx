@@ -27,6 +27,8 @@ export type CrewRow = {
   statusLine: string;
   nextPlanId: string | null;
   isOwner?: boolean;
+  /** The calendar's photo, like the "Calendars you follow" rows. */
+  image?: string | null;
 };
 
 export type CrewSuggestion = { names: string[]; count: number } | null;
@@ -131,7 +133,12 @@ export function CrewsRail({ rows }: { rows: CrewRow[] }) {
       <div className="cals">
         {rows.map((c) => (
           <Link key={c.crewId} className="cal-row fm-dark" href={`/crew/${c.crewId}`} style={{ borderRadius: 12, padding: "10px 12px" }}>
-            <span className="cal-ava ph">{(c.name || "C").charAt(0).toUpperCase()}</span>
+            {c.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="cal-ava" src={c.image} alt="" />
+            ) : (
+              <span className="cal-ava ph">{(c.name || "C").charAt(0).toUpperCase()}</span>
+            )}
             <div className="cal-body">
               <div className="cal-n">{c.name}</div>
               <div className="cal-s">{c.statusLine}</div>
