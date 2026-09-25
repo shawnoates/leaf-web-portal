@@ -105,7 +105,8 @@ export default function FriendModeSetup({
       } else {
         const r = (await Parse.Cloud.run("createFriendCrew", {
           name: calendarName,
-          rhythmDays: rhythm,
+          rhythmDays: rhythm || 28,
+          oneTime: rhythm === 0,
           invitees: [...picked].map((userId) => ({ userId })),
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         })) as { crewId: string; inviteLink: string };
