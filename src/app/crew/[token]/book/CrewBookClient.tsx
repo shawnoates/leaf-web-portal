@@ -44,6 +44,7 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
   const [vibe, setVibe] = useState("");
   const [found, setFound] = useState<Suggested[] | null>(null);
   const [finding, setFinding] = useState(false);
+  const [showAllSaves, setShowAllSaves] = useState(false);
   const findPlaces = async () => {
     if (vibe.trim().length < 3) return;
     setFinding(true);
@@ -121,8 +122,8 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
 
       {error && <p className="mt-4 rounded-2xl bg-[#3A2321] px-4 py-3 text-sm text-fm-danger">{error}</p>}
 
-      <div className="mt-8 grid gap-10 lg:mt-10 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-12">
-        <section>
+      <div className="mt-8 grid grid-cols-1 gap-10 lg:mt-10 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-12">
+        <section className="min-w-0">
           <div className="mb-2 flex items-center justify-between lg:mb-5">
             <Eyebrow>In the book · {shared.length}</Eyebrow>
             <div role="group" aria-label="Sort" className="flex rounded-full border border-fm-line-dim bg-fm-surface p-[3px]">
@@ -154,7 +155,7 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
         </section>
 
         {/* On desktop the saves stick beside the book and scroll inside their own panel, however many there are. */}
-        <aside className="rounded-[28px] border border-fm-line-dim bg-fm-surface px-5 pb-2 pt-5 lg:sticky lg:top-6 lg:max-h-[calc(100vh-48px)] lg:overflow-y-auto lg:px-6 lg:pt-6">
+        <aside className="min-w-0 rounded-[28px] border border-fm-line-dim bg-fm-surface px-5 pb-2 pt-5 lg:sticky lg:top-6 lg:max-h-[calc(100vh-48px)] lg:overflow-y-auto lg:px-6 lg:pt-6">
           <div className="flex items-center justify-between">
             <h2 className="m-0 font-fm-serif text-[28px] font-normal lg:text-[30px]">Your saves</h2>
             <span className="flex items-center gap-1.5 text-xs text-fm-muted"><Lock size={13} aria-hidden /> Only you see this</span>
@@ -163,7 +164,7 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
             <p className="mb-4 mt-2 text-[15px] text-fm-ink-2">Nothing saved yet. Places you save on Leaf show up here, ready to add in one tap.</p>
           ) : (
             <ul className="divide-y divide-fm-line-dim">
-              {mine.map((p) => (
+              {(showAllSaves ? mine : mine.slice(0, 8)).map((p) => (
                 <li key={p.bookmarkId} className="flex items-center gap-3 py-3.5">
                   <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-fm-line bg-fm-card">
                     {p.photo ? (
@@ -187,6 +188,11 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
                 </li>
               ))}
             </ul>
+          )}
+          {mine.length > 8 && (
+            <button className="mb-2 mt-1 text-sm font-medium text-fm-ink underline underline-offset-4" onClick={() => setShowAllSaves(!showAllSaves)}>
+              {showAllSaves ? "Show fewer" : `Show all ${mine.length}`}
+            </button>
           )}
 
           <div className="mt-4 border-t border-fm-line-dim pt-5">
