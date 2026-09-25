@@ -840,18 +840,6 @@ function DashboardView({
   const [fmPick, setFmPick] = useState(false);
   const [fmSetup, setFmSetup] = useState<{ calendarId: string | null; name: string } | null>(null);
   useEffect(() => { if (fmIntro) stampFriendModeIntro(); }, [fmIntro]);
-  // The app's "Set up Friend Mode" opens /me?…&fm=start: go straight into the
-  // flow (pick a calendar, or make one) instead of waiting for the intro.
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    if (url.searchParams.get("fm") !== "start") return;
-    url.searchParams.delete("fm");
-    window.history.replaceState(null, "", url.pathname + url.search);
-    setFmIntro(false);
-    if (data.person.ownsCalendars) setFmPick(true);
-    else setFmSetup({ calendarId: null, name: data.person.firstName ? `${data.person.firstName}'s crew` : "My crew" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   const [popupIdea, setPopupIdea] = useState<HostPlan | null>(
     () => (fmIntro || firstUnseenRecap(data.pendingRecaps) ? null : data.needsHost?.popup || null),
   );
