@@ -15,7 +15,9 @@ import { dayLabel, optionLabel, type DateOption, type Venue } from "@/lib/crew";
 
 export type CrewAction =
   | { kind: "invite"; crewId: string; crewName: string; inviterName: string }
-  | { kind: "poll"; crewId: string; crewName: string; cycleId: string; venue: Venue | null; dateOptions: DateOption[]; votes: Record<string, number[]> | null }
+  | { kind: "poll"; crewId: string; crewName: string; cycleId: string; venue: Venue | null; dateOptions: DateOption[]; votes: Record<string, number[]> | null;
+      /** Dates their calendar says they're free for: pre-selected, never auto-voted. */
+      myFree?: number[] | null; fit?: { free: number; known: number }[] | null }
   | { kind: "rsvp"; crewId: string; crewName: string; cycleId: string; venue: Venue | null; chosenOption: DateOption | null; going: number }
   | { kind: "book"; crewId: string; crewName: string; cycleId: string; venue: Venue | null; chosenOption: DateOption | null; going: number; bookingUrl: string | null };
 
@@ -38,6 +40,12 @@ export function CrewActionCard({ actions, onAnswered }: { actions: CrewAction[];
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [error, setError] = useState("");
   const a = actions[index];
+  // Each poll starts from the dates their calendar says they're free.
+  const [prefilledFor, setPrefilledFor] = useState<string | null>(null);
+  if (a && a.kind === "poll" && prefilledFor !== a.cycleId) {
+    setPrefilledFor(a.cycleId);
+    setPicked(new Set(a.myFree || []));
+  }
   if (!a) return null;
 
   const run = async (fn: () => Promise<unknown>) => {
@@ -85,7 +93,7 @@ export function CrewActionCard({ actions, onAnswered }: { actions: CrewAction[];
                 const count = a.votes ? Object.values(a.votes).filter((v) => v.includes(i)).length : 0;
                 return (
                   <button key={i} type="button" className={`sinv-btn ${on ? "primary" : "ghost"}`} onClick={() => { const n = new Set(picked); if (on) n.delete(i); else n.add(i); setPicked(n); }}>
-                    {optionLabel(o)}{count ? ` · ${count}` : ""}
+                    {optionLabel(o)}{count ? ` · ${count}` : ""}{a.fit?.[i] && a.fit[i].known > 0 ? ` · ${a.fit[i].free}/${a.fit[i].known} free` : ""}
                   </button>
                 );
               })}

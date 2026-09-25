@@ -12,7 +12,7 @@
  * the left, what needs you on the right.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ArrowUp, Check, ChevronUp, Plus } from "lucide-react";
 import Parse from "@/lib/parse-client";
@@ -60,6 +60,9 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const [error, setError] = useState("");
   // "Text me about this crew's plans": never pre-ticked (10DLC).
   const [smsBox, setSmsBox] = useState(false);
+  // Calendar sync needs a Leaf sign-in (a crew link alone isn't an account session).
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => { setSignedIn(Boolean(Parse.User.current())); }, []);
   const [smsPhone, setSmsPhone] = useState("");
   const phoneOk = !smsBox || Boolean(me.phoneLast4) || smsPhone.replace(/\D/g, "").length >= 10;
 
@@ -338,6 +341,31 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               </div>
             )}
 
+            {me.status === "in" && signedIn && (
+              <div className="py-4 pl-5 pr-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-base font-semibold lg:text-[15px]">Your calendar</div>
+                    <div className="text-[13px] text-fm-muted">
+                      {me.calendarSynced ? "Synced · Leaf offers nights you're free" : "Sync Google Calendar and Leaf offers nights you're free"}
+                    </div>
+                  </div>
+                  {!me.calendarSynced && (
+                    <Button
+                      small
+                      disabled={busy !== null}
+                      onClick={() => act("gcal", async () => {
+                        const r = (await Parse.Cloud.run("createGoogleCalendarConnectUrl", { returnTo: window.location.href })) as { url: string };
+                        window.location.href = r.url;
+                      })}
+                    >
+                      Connect
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="py-4 pl-5 pr-4">
               <label htmlFor="my-pace" className="block text-base font-semibold lg:text-[15px]">Your pace</label>
               <select
@@ -410,7 +438,9 @@ function CycleCard({
   quorum: number;
   joined: number;
 }) {
-  const [picked, setPicked] = useState<Set<number>>(new Set(c.myVotes || []));
+  // Not voted yet: start from the dates their calendar says they're free.
+  const [picked, setPicked] = useState<Set<number>>(new Set(c.myVotes ?? c.myFree ?? []));
+  const prefilled = c.myVotes === null && (c.myFree?.length ?? 0) > 0;
   const [saved, setSaved] = useState(c.myVotes !== null);
   const goingIds = Object.entries(c.rsvps).filter(([, r]) => r === "in").map(([id]) => id);
   const going = goingIds.map((id) => names[id] || "Someone");
@@ -460,7 +490,9 @@ function CycleCard({
 
       {c.state === "polling" && (
         <>
-          <p className="m-0 text-[15px] text-fm-ink-2">Which nights work? Pick all that do.</p>
+          <p className="m-0 text-[15px] text-fm-ink-2">
+            {prefilled ? "Your calendar says you're free for the ones picked. Change anything, then save." : "Which nights work? Pick all that do."}
+          </p>
           <ul className="grid grid-cols-3 gap-2 lg:gap-2.5">
             {c.options.map((o, i) => {
               const p = dayParts(o.date);
@@ -480,7 +512,10 @@ function CycleCard({
                   >
                     <Mono className={`whitespace-nowrap ${on ? "" : "text-fm-muted"}`}>{p.dow}{o.time ? ` ${timeLabel(o.time)}` : ""}</Mono>
                     <span className="font-fm-serif text-[34px] leading-none lg:text-[38px]">{p.month} {p.day}</span>
-                    <span className={`text-xs ${on ? "font-semibold" : "text-fm-muted"}`}>{count} can</span>
+                    <span className={`text-xs ${on ? "font-semibold" : "text-fm-muted"}`}>
+                      {count} can
+                      {c.fit?.[i] && c.fit[i].known > 0 ? ` · ${c.fit[i].free} of ${c.fit[i].known} free` : ""}
+                    </span>
                   </button>
                 </li>
               );

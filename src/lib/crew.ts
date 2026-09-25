@@ -43,6 +43,10 @@ export type CycleView = {
   invited?: boolean;
   votes: Record<string, number[]> | null;
   myVotes: number[] | null;
+  /** Dates this person looks free for (synced calendar / Leaf plans); pre-selected, never auto-voted. */
+  myFree?: number[] | null;
+  /** Per option: members Leaf knows about that night, and how many look free. */
+  fit?: { free: number; known: number }[] | null;
   rsvps: Record<string, "in" | "out">;
   myRsvp: "in" | "out" | null;
 };
@@ -94,7 +98,7 @@ export type CrewPage = {
     joinedCount: number;
     ownerId: string | null;
   };
-  me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null };
+  me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null; calendarSynced?: boolean };
   members: Member[];
   names: Record<string, string>;
   open: CycleView[];
