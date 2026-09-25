@@ -8,14 +8,23 @@
  * behind the camera UI. So we record in the browser instead, with the
  * prompt sitting directly under the lens.
  *
- * It deliberately does NOT scroll sentences past them. A prompter that
- * shows finished prose gets you someone reading finished prose, and a stiff
- * read is worth less than no video at all. Each beat shows the CUE in large
- * type, with one way of saying it small and dimmed underneath, and the host
- * taps forward when they're ready. Nothing moves on a timer, so the pace is
- * theirs and the words come out in their own voice.
+ * It deliberately does NOT scroll sentences past them. A prompter showing
+ * finished prose gets you someone reading finished prose, and a stiff read
+ * is worth less than no video. Each beat shows the CUE large, with one way
+ * of saying it small and dimmed underneath.
  *
- * Falls back to the caller's file input when the browser can't record.
+ * And it records a beat at a time. One continuous take with a prompt
+ * changing on it forces the host to stop talking, tap, and read, five times
+ * in half a minute — the exact stop-start delivery the cues were meant to
+ * prevent. Instead, tapping Next PAUSES the recorder; they read the next
+ * prompt at their own pace and press record again. `MediaRecorder.pause()`
+ * leaves the paused time out of the file, so the joins land as hard cuts:
+ * the jumpcut grammar everyone already reads as an edit rather than a
+ * stumble. One file, no stitching.
+ *
+ * Browsers without pause support fall back to a single continuous take, and
+ * browsers without MediaRecorder at all fall back to the caller's camera-app
+ * input.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -28,7 +37,10 @@ export type Beat = {
   note?: string;
 };
 
-type Phase = "idle" | "starting" | "countdown" | "recording" | "review";
+// `resuming` is the brief hold between pressing record again and the
+// recorder actually resuming, so the first frame of a segment isn't a hand
+// reaching for the screen.
+type Phase = "idle" | "countdown" | "recording" | "paused" | "resuming" | "review";
 
 /** Safari gives us mp4, Chrome and Firefox webm. Mux ingests all of them. */
 const CANDIDATE_TYPES = [
@@ -37,6 +49,10 @@ const CANDIDATE_TYPES = [
   "video/webm;codecs=vp8,opus",
   "video/webm",
 ];
+
+// Long enough that the first frame of a segment isn't a hand reaching for
+// the screen, short enough that six of them don't feel like a queue.
+const RESUME_DELAY_MS = 700;
 
 export function canRecordInBrowser() {
   if (typeof window === "undefined") return false;
@@ -83,17 +99,21 @@ export default function IntroVideoRecorder({
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [beatIndex, setBeatIndex] = useState(0);
+  const [captured, setCaptured] = useState(0); // segments in the can
   const [elapsed, setElapsed] = useState(0);
   const [countdown, setCountdown] = useState(3);
   const [error, setError] = useState<string | null>(null);
   const [reviewUrl, setReviewUrl] = useState<string | null>(null);
+  const [segmented, setSegmented] = useState(true);
 
   const previewRef = useRef<HTMLVideoElement>(null);
-  const reviewRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
-  const startedAtRef = useRef(0);
+  // Recorded time only. The clock stops while they read the next prompt,
+  // because the paused stretch is not in the file either.
+  const bankedMsRef = useRef(0);
+  const segmentStartRef = useRef(0);
   const resultRef = useRef<{ file: File; duration: number } | null>(null);
 
   const stopStream = useCallback(() => {
@@ -147,39 +167,36 @@ export default function IntroVideoRecorder({
     [reviewUrl]
   );
 
-  const stop = useCallback(() => {
+  const finish = useCallback(() => {
     const rec = recorderRef.current;
-    if (rec && rec.state !== "inactive") rec.stop();
+    if (!rec || rec.state === "inactive") return;
+    if (rec.state === "recording") {
+      bankedMsRef.current += Date.now() - segmentStartRef.current;
+    }
+    rec.stop();
   }, []);
 
-  // The elapsed counter, and the hard stop at the cap.
+  // The clock, and the hard stop at the cap. Runs only while rolling.
   useEffect(() => {
     if (phase !== "recording") return;
     const id = setInterval(() => {
-      const secs = (Date.now() - startedAtRef.current) / 1000;
+      const secs = (bankedMsRef.current + (Date.now() - segmentStartRef.current)) / 1000;
       setElapsed(secs);
-      if (secs >= maxSeconds) stop();
+      if (secs >= maxSeconds) finish();
     }, 200);
     return () => clearInterval(id);
-  }, [phase, maxSeconds, stop]);
+  }, [phase, maxSeconds, finish]);
 
-  // 3, 2, 1 before the light goes on, so nobody's first frame is them
-  // reaching for the button.
-  useEffect(() => {
-    if (phase !== "countdown") return;
-    if (countdown <= 0) {
-      begin();
-      return;
-    }
-    const id = setTimeout(() => setCountdown((c) => c - 1), 800);
-    return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, countdown]);
+  const roll = useCallback(() => {
+    segmentStartRef.current = Date.now();
+    setPhase("recording");
+  }, []);
 
-  const begin = () => {
+  const begin = useCallback(() => {
     const stream = streamRef.current;
     if (!stream) return;
     chunksRef.current = [];
+    bankedMsRef.current = 0;
     const mimeType = pickMimeType();
     let rec: MediaRecorder;
     try {
@@ -188,6 +205,10 @@ export default function IntroVideoRecorder({
       onUnsupported("This browser can't record video.");
       return;
     }
+    // Pause and resume are what make the segments a single file. Without
+    // them the whole thing is one continuous take and Next just turns the
+    // page, which is the old behaviour rather than a broken one.
+    setSegmented(typeof rec.pause === "function" && typeof rec.resume === "function");
     recorderRef.current = rec;
     rec.ondataavailable = (e) => {
       if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
@@ -195,20 +216,34 @@ export default function IntroVideoRecorder({
     rec.onstop = () => {
       const type = rec.mimeType || mimeType || "video/webm";
       const blob = new Blob(chunksRef.current, { type });
-      const duration = (Date.now() - startedAtRef.current) / 1000;
+      const duration = bankedMsRef.current / 1000;
       const ext = type.includes("mp4") ? "mp4" : "webm";
       const file = new File([blob], `host-intro.${ext}`, { type });
       resultRef.current = { file, duration };
-      const url = URL.createObjectURL(blob);
-      setReviewUrl(url);
+      setReviewUrl(URL.createObjectURL(blob));
       setPhase("review");
     };
-    startedAtRef.current = Date.now();
-    setElapsed(0);
     setBeatIndex(0);
+    setCaptured(0);
+    setElapsed(0);
     rec.start();
-    setPhase("recording");
-  };
+    roll();
+  }, [onUnsupported, roll]);
+
+  // 3, 2, 1 before the light goes on, so nobody's first frame is them
+  // reaching for the button. Only before the first segment — a countdown
+  // between every prompt would turn a two-minute job into a queue.
+  useEffect(() => {
+    if (phase !== "countdown") return;
+    // Everything happens in the timeout, never in the effect body: "1" gets
+    // its full beat on screen before the light goes on, and the state change
+    // is not a render-phase side effect.
+    const id = setTimeout(() => {
+      if (countdown <= 1) begin();
+      else setCountdown((c) => c - 1);
+    }, 800);
+    return () => clearTimeout(id);
+  }, [phase, countdown, begin]);
 
   const start = () => {
     setError(null);
@@ -220,14 +255,42 @@ export default function IntroVideoRecorder({
     setPhase("countdown");
   };
 
+  /** End this segment: bank the time, cut, and show the next prompt. */
+  const nextSegment = () => {
+    const rec = recorderRef.current;
+    if (!rec) return;
+    if (!segmented || rec.state !== "recording") {
+      setBeatIndex((i) => Math.min(i + 1, beats.length - 1));
+      return;
+    }
+    bankedMsRef.current += Date.now() - segmentStartRef.current;
+    rec.pause();
+    setElapsed(bankedMsRef.current / 1000);
+    setCaptured((c) => c + 1);
+    setBeatIndex((i) => Math.min(i + 1, beats.length - 1));
+    setPhase("paused");
+  };
+
+  const resumeSegment = () => {
+    const rec = recorderRef.current;
+    if (!rec || rec.state !== "paused") return;
+    setPhase("resuming");
+    window.setTimeout(() => {
+      if (recorderRef.current?.state !== "paused") return;
+      recorderRef.current.resume();
+      roll();
+    }, RESUME_DELAY_MS);
+  };
+
   const retake = () => {
     if (reviewUrl) URL.revokeObjectURL(reviewUrl);
     setReviewUrl(null);
     resultRef.current = null;
+    bankedMsRef.current = 0;
     setElapsed(0);
     setBeatIndex(0);
+    setCaptured(0);
     setPhase("idle");
-    // The preview element is remounted by the phase switch; reattach.
     requestAnimationFrame(() => {
       if (previewRef.current && streamRef.current) {
         previewRef.current.srcObject = streamRef.current;
@@ -244,13 +307,22 @@ export default function IntroVideoRecorder({
   };
 
   const close = () => {
+    const rec = recorderRef.current;
+    if (rec && rec.state !== "inactive") {
+      rec.onstop = null;
+      rec.stop();
+    }
     stopStream();
     onCancel();
   };
 
   const beat = beats[beatIndex];
+  const nextBeat = beats[beatIndex + 1];
   const last = beatIndex >= beats.length - 1;
   const over = elapsed >= targetSeconds;
+  const rolling = phase === "recording";
+  const resuming = phase === "resuming";
+  const started = rolling || phase === "paused" || resuming;
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-black text-white">
@@ -258,7 +330,6 @@ export default function IntroVideoRecorder({
       <div className="relative flex-1 overflow-hidden">
         {phase === "review" && reviewUrl ? (
           <video
-            ref={reviewRef}
             src={reviewUrl}
             controls
             playsInline
@@ -278,22 +349,35 @@ export default function IntroVideoRecorder({
           />
         )}
 
+        {/* Anywhere on the picture ends the segment. Hunting for a small
+            target mid-sentence is its own pause, and the thumb is already
+            resting on the screen. */}
+        {rolling && !last && (
+          <button
+            type="button"
+            aria-label="Next prompt"
+            onClick={nextSegment}
+            className="absolute inset-0 z-10"
+          />
+        )}
+
         {/* ── The prompt, directly under the lens ──
             High on the screen on purpose: the camera is at the top of the
             phone, so reading here keeps their eyes near it. Lower down and
             everyone looks like they're staring at their shoes. */}
         {phase !== "review" && beat && (
-          <button
-            type="button"
-            onClick={() => !last && setBeatIndex((i) => i + 1)}
-            className="absolute inset-x-0 top-0 px-5 pb-6 pt-[max(1rem,env(safe-area-inset-top))] text-left"
+          <div
+            onClick={rolling && !last ? nextSegment : undefined}
+            className="absolute inset-x-0 top-0 z-20 px-5 pb-6 pt-[max(1rem,env(safe-area-inset-top))] text-left"
             style={{ background: "linear-gradient(to bottom, rgba(0,0,0,.72), rgba(0,0,0,0))" }}
           >
             <div className="mb-2 flex gap-1.5">
               {beats.map((b, i) => (
                 <span
                   key={b.id}
-                  className={`h-1 flex-1 rounded-full ${i <= beatIndex ? "bg-white" : "bg-white/30"}`}
+                  className={`h-1 flex-1 rounded-full ${
+                    i < captured ? "bg-white" : i === beatIndex ? "bg-white/70" : "bg-white/25"
+                  }`}
                 />
               ))}
             </div>
@@ -307,32 +391,43 @@ export default function IntroVideoRecorder({
                 {beat.note}
               </p>
             )}
-            {!last && (
-              <p className="mt-2 text-[12px] uppercase tracking-wide text-white/40">
-                Tap for the next one
+            {/* Read-ahead, so the end of a segment isn't a cliff. */}
+            {nextBeat ? (
+              <p className="mt-3 border-t border-white/15 pt-2 text-[13px] leading-snug text-white/40">
+                <span className="uppercase tracking-wide text-white/30">Next</span>{" "}
+                {nextBeat.cue}
+              </p>
+            ) : (
+              <p className="mt-3 border-t border-white/15 pt-2 text-[13px] uppercase tracking-wide text-white/30">
+                Last one
               </p>
             )}
-          </button>
+          </div>
         )}
 
         {phase === "countdown" && (
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 z-30 flex items-center justify-center">
             <span className="text-[96px] font-semibold tabular-nums drop-shadow-lg">
               {countdown}
             </span>
           </div>
         )}
 
-        {phase === "recording" && (
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+        {/* Rolling / held. The dot is the only thing that says which. */}
+        {(rolling || phase === "paused" || resuming) && (
+          <div className="absolute bottom-4 left-0 right-0 z-30 flex justify-center">
             <span
               className={`flex items-center gap-2 rounded-full px-3 py-1 text-[13px] font-medium tabular-nums ${
-                over ? "bg-amber-500/90 text-black" : "bg-black/60"
+                phase === "paused" ? "bg-black/60 text-white/70" : over ? "bg-amber-500/90 text-black" : "bg-black/60"
               }`}
             >
-              <span className="h-2 w-2 rounded-full bg-red-500" />
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  rolling ? "bg-red-500" : resuming ? "bg-red-500/50" : "bg-white/40"
+                }`}
+              />
               {clock(elapsed)}
-              {over ? " · wrap it up" : ""}
+              {phase === "paused" ? " · held" : over ? " · wrap it up" : ""}
             </span>
           </div>
         )}
@@ -356,17 +451,54 @@ export default function IntroVideoRecorder({
               onClick={retake}
               className="w-full rounded-lg border border-white/30 px-5 py-3.5 text-[16px] font-medium"
             >
-              Record it again
+              Start again
             </button>
           </div>
-        ) : phase === "recording" ? (
-          <button
-            type="button"
-            onClick={stop}
-            className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border-4 border-white"
-          >
-            <span className="h-6 w-6 rounded bg-red-500" />
-          </button>
+        ) : rolling || resuming ? (
+          <>
+            <button
+              type="button"
+              onClick={last ? finish : nextSegment}
+              disabled={resuming}
+              className="w-full rounded-lg bg-white px-5 py-3.5 text-[16px] font-medium text-black disabled:opacity-50"
+            >
+              {last ? "Finish" : segmented ? "Cut — next prompt" : "Next prompt"}
+            </button>
+            {!last && (
+              <button
+                type="button"
+                onClick={finish}
+                className="mt-3 w-full text-center text-[14px] text-white/50 underline"
+              >
+                That&rsquo;s enough, finish here
+              </button>
+            )}
+            <p className="mt-3 text-center text-[13px] text-white/50">
+              {segmented
+                ? "Say this bit, then cut. The join reads as an edit, not a stumble."
+                : "Keep going — the next prompt is already showing."}
+            </p>
+          </>
+        ) : phase === "paused" ? (
+          <>
+            <button
+              type="button"
+              onClick={resumeSegment}
+              className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border-4 border-white"
+            >
+              <span className="h-11 w-11 rounded-full bg-red-500" />
+            </button>
+            <p className="mt-3 text-center text-[13px] text-white/50">
+              Held. Read the next one, take a breath, then record when you&rsquo;re ready.
+            </p>
+            <button
+              type="button"
+              onClick={finish}
+              className="mt-3 w-full text-center text-[14px] text-white/50 underline"
+            >
+              That&rsquo;s enough, finish here
+            </button>
+          </>
         ) : (
           <>
             <button
@@ -378,13 +510,13 @@ export default function IntroVideoRecorder({
               <span className="h-11 w-11 rounded-full bg-red-500" />
             </button>
             <p className="mt-3 text-center text-[13px] text-white/50">
-              Say it your way. The prompts are only there so you don&rsquo;t lose your
-              place.
+              Say it your way. You record it one prompt at a time, so there&rsquo;s no
+              rush and nothing to memorise.
             </p>
           </>
         )}
 
-        {phase !== "recording" && (
+        {!started && phase !== "review" && (
           <button
             type="button"
             onClick={close}
