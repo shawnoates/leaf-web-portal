@@ -73,6 +73,11 @@ export type BookSpot = {
   upvotes: number;
   upvotedByMe: boolean;
   triedAt: string | { iso: string } | null;
+  /** Set when the entry came from a dated event (an Eventbrite link, a post with a real date). */
+  eventTitle?: string | null;
+  eventDate?: string | { iso: string } | null;
+  /** The event's day is over: the entry sits at the bottom and Leaf won't pick it for a night. */
+  eventPassed?: boolean;
 };
 
 export type SavedPlace = {

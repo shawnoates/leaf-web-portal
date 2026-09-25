@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, ChevronUp, Lock, Plus, Search } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronUp, Lock, Plus, Search } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import { Button, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Spinner } from "@/components/crew/CrewShell";
@@ -231,9 +231,17 @@ function SpotItem({ s, busy, act, auth }: {
 }) {
   const tried = toDate(s.triedAt);
   const triedLabel = tried ? `Tried ${tried.toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : null;
+  // A dated event: its name and day while it's ahead; once passed, a tag and
+  // a dimmed row (the server has already moved it to the bottom).
+  const eventDay = toDate(s.eventDate ?? null);
+  const eventLabel = s.eventPassed
+    ? `Event passed${s.eventTitle ? ` · ${s.eventTitle}` : ""}`
+    : eventDay
+      ? `${s.eventTitle || "Event"} · ${eventDay.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`
+      : null;
   const on = s.upvotedByMe;
   return (
-    <li className="flex items-center gap-3.5 py-3.5 lg:flex-col lg:items-stretch lg:gap-3.5 lg:rounded-3xl lg:border lg:border-fm-line-dim lg:bg-fm-surface lg:p-3 lg:pb-4">
+    <li className={`flex items-center gap-3.5 py-3.5 lg:flex-col${s.eventPassed ? " opacity-60" : ""} lg:items-stretch lg:gap-3.5 lg:rounded-3xl lg:border lg:border-fm-line-dim lg:bg-fm-surface lg:p-3 lg:pb-4`}>
       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-fm-line bg-fm-card lg:h-[180px] lg:w-full lg:border-0">
         {s.photo ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -257,6 +265,11 @@ function SpotItem({ s, busy, act, auth }: {
             <span className="lg:hidden">{s.addedBy && ` · added by ${s.addedByMe ? "you" : s.addedBy}`}</span>
           </div>
           {s.addedBy && <div className="hidden truncate text-xs text-fm-muted lg:block">Added by {s.addedByMe ? "you" : s.addedBy}</div>}
+          {eventLabel && (
+            <span className={`mt-0.5 flex h-[22px] w-fit max-w-full items-center gap-1 rounded-full border px-2 text-[11px] ${s.eventPassed ? "border-fm-line-dim text-fm-muted" : "border-fm-line text-fm-ink-2"}`}>
+              <CalendarDays size={12} aria-hidden className="shrink-0" /> <span className="truncate">{eventLabel}</span>
+            </span>
+          )}
           {triedLabel && (
             <span className="mt-0.5 flex h-[22px] w-fit items-center gap-1 rounded-full border border-fm-line px-2 text-[11px] text-fm-ink-2 lg:hidden">
               <Check size={12} strokeWidth={2.6} aria-hidden /> {triedLabel}
