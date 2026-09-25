@@ -9,6 +9,7 @@ import {
   Plus,
 } from "lucide-react";
 import type { DashboardTab, OrgDashboardCalendar } from "./types";
+import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
 
 // Persistent desktop sidebar (≥1024px) for the redesigned dashboard.
 // Carries the org switcher block, the five places, the calendar list, and the
@@ -145,6 +146,8 @@ export default function DashboardSidebar({
                   alt=""
                   className="w-[18px] h-[18px] rounded-[5px] object-cover shrink-0"
                 />
+              ) : cal.friendMode?.enabled ? (
+                <FriendModeIcon size={18} className="shrink-0" />
               ) : (
                 <div className="w-[18px] h-[18px] rounded-[5px] bg-zinc-100 border border-zinc-200 shrink-0" />
               )}

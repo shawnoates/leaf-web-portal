@@ -1,5 +1,6 @@
 "use client";
 
+import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -1669,6 +1670,8 @@ export default function OrgDashboardPage() {
               alt=""
               className="w-[30px] h-[30px] rounded-lg object-cover shrink-0"
             />
+          ) : dashboard.friendMode?.enabled ? (
+            <FriendModeIcon size={30} className="shrink-0" />
           ) : (
             <div className="w-[30px] h-[30px] rounded-lg bg-zinc-200 flex items-center justify-center shrink-0">
               <span className="text-xs font-semibold text-zinc-500">

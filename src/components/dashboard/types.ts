@@ -72,6 +72,8 @@ export interface OrgDashboardCalendar {
   isActive: boolean;
   role: "Owner" | "Host";
   calendarImage: string | null;
+  /** Friend Mode on this calendar (getOrgDashboard, per calendar). */
+  friendMode?: { enabled: boolean; memberCount: number };
   hideVenueUntilRsvp: boolean;
   requireApprovalDefault: boolean;
   isPrivate: boolean;
