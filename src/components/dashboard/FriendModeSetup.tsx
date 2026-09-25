@@ -165,15 +165,14 @@ export default function FriendModeSetup({
                             onChange={() => { const n = new Set(picked); if (sel) n.delete(p.userId); else n.add(p.userId); setPicked(n); }}
                           />
                           <span className="flex-1 text-[14px]">{p.name}</span>
-                          <span className="text-[12px]" style={{ color: FM.mutedText }}>{p.channel === "push" ? "App" : "Text"}</span>
                         </label>
                       </li>
                     );
                   })}
                 </ul>
-                {[...picked].some((id) => invitable.find((p) => p.userId === id)?.channel === "sms") && (
-                  <p className="mt-2 text-[12px]" style={{ color: FM.mutedText }}>Texts come from Leaf&rsquo;s usual number, between 9am and 9pm.</p>
-                )}
+                <p className="mt-2 text-[12px]" style={{ color: FM.mutedText }}>
+                  People not on the app get a text from Leaf&rsquo;s usual number, between 9am and 9pm.
+                </p>
               </div>
             )}
 
