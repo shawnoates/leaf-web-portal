@@ -19,7 +19,9 @@ import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import { Button, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Spinner } from "@/components/crew/CrewShell";
 import { crewHref, run, toDate, type BookSpot, type CrewAuth, type SavedPlace } from "@/lib/crew";
 
-type Book = { crew: { id: string; name: string }; shared: BookSpot[]; mine: SavedPlace[] };
+/** Places people nearby have been saving lately (server: crewTrendingSpots). */
+type TrendingSpot = { locationId: string; name: string; neighborhood: string | null; category: string | null; photo: string | null; saves: number };
+type Book = { crew: { id: string; name: string }; shared: BookSpot[]; mine: SavedPlace[]; trending?: TrendingSpot[] };
 
 export default function CrewBookClient({ token }: { token: string }) {
   const load = useCrewAuth(token);
@@ -149,6 +151,36 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
                 </li>
               ))}
             </ul>
+          )}
+
+          {(book.trending?.length ?? 0) > 0 && (
+            <>
+              <div className="mt-4 flex items-center justify-between border-t border-fm-line-dim pt-5">
+                <h2 className="m-0 font-fm-serif text-[28px] font-normal lg:text-[30px]">Trending nearby</h2>
+              </div>
+              <p className="mb-1 mt-1 text-[13px] text-fm-muted">Places people near you have been saving lately.</p>
+              <ul className="divide-y divide-fm-line-dim">
+                {book.trending!.map((p) => (
+                  <li key={p.locationId} className="flex items-center gap-3 py-3.5">
+                    <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-fm-line bg-fm-card">
+                      {p.photo ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.photo} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span aria-hidden className="absolute inset-0 flex items-center justify-center font-fm-serif text-[22px] text-fm-knob">{p.name.charAt(0)}</span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-base font-semibold lg:text-[15px]">{p.name}</div>
+                      <div className="truncate text-[13px] text-fm-muted">{[p.neighborhood, p.category, `${p.saves} saves lately`].filter(Boolean).join(" · ")}</div>
+                    </div>
+                    <Button small disabled={busy !== null || !canAdd} onClick={() => act(`t-${p.locationId}`, () => run("addToCrewBook", auth, { locationId: p.locationId }))}>
+                      <Plus size={14} strokeWidth={2.4} aria-hidden /> Add<span className="sr-only"> {p.name} to {crewName}</span>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </aside>
       </div>

@@ -14,21 +14,27 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { FM, FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
+import { RHYTHM_LABELS } from "@/lib/crew";
+import FriendModeSetup from "./FriendModeSetup";
 
 const MAX_MEMBERS = 15;
 
 type Person = { userId: string; name: string; channel: "push" | "sms" | "none"; canInvite: boolean; reason: string | null };
-type Preview = { people: Person[]; invited: number; joined: number; ownerSmsOptIn?: boolean; ownerPhoneLast4?: string | null; inviteLink?: string };
+type Preview = { people: Person[]; invited: number; joined: number; ownerSmsOptIn?: boolean; ownerPhoneLast4?: string | null; inviteLink?: string; rhythmDays?: number };
 
 export default function FriendModeCard({
   calendarId,
+  calendarName = "",
   enabled: initialEnabled,
   memberCount,
 }: {
   calendarId: string;
+  calendarName?: string;
   enabled: boolean;
   memberCount: number;
 }) {
+  // Turning on goes through the setup pop-up; it's only on once that's done.
+  const [settingUp, setSettingUp] = useState(false);
   const [enabled, setEnabled] = useState(initialEnabled);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -58,6 +64,7 @@ export default function FriendModeCard({
   }, [enabled, locked, loadPreview]);
 
   const toggle = async (v: boolean) => {
+    if (v) { setError(""); setSettingUp(true); return; }
     setSaving(true);
     setError("");
     setNote("");
@@ -96,6 +103,19 @@ export default function FriendModeCard({
     try {
       await Parse.Cloud.run("setCrewTexts", { crewId: calendarId, on, ...(on && ownerPhone ? { phone: ownerPhone } : {}) });
       setOwnerSms(false);
+      await loadPreview();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't change that.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setRhythm = async (days: number) => {
+    setSaving(true);
+    setError("");
+    try {
+      await Parse.Cloud.run("setCrewRhythm", { calendarId, rhythmDays: days });
       await loadPreview();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't change that.");
@@ -150,6 +170,21 @@ export default function FriendModeCard({
         <div className="mt-1.5 space-y-2 pb-1 text-[12px]" style={{ color: FM.mutedText }}>
           {error && <p style={{ color: "#F2A39A" }}>{error}</p>}
           {note && <p style={{ color: FM.ink }}>{note}</p>}
+
+          {enabled && !locked && preview?.rhythmDays && (
+            <label className="flex items-center gap-2">
+              <span>How often</span>
+              <select
+                value={preview.rhythmDays}
+                disabled={saving}
+                onChange={(e) => setRhythm(Number(e.target.value))}
+                className="rounded-md px-2 py-1 text-[12px]"
+                style={{ background: FM.canvas, border: `1px solid ${FM.line}`, color: FM.ink }}
+              >
+                {Object.entries(RHYTHM_LABELS).map(([d, label]) => <option key={d} value={d}>{label}</option>)}
+              </select>
+            </label>
+          )}
 
           {enabled && !locked && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -221,6 +256,18 @@ export default function FriendModeCard({
             <p>Friend Mode is for smaller groups. Make a new private calendar for the people you want to see, then turn it on there.</p>
           )}
         </div>
+      )}
+      {settingUp && (
+        <FriendModeSetup
+          calendarId={calendarId}
+          calendarName={calendarName}
+          onDone={(finished) => {
+            setEnabled(true);
+            void loadPreview();
+            if (finished) setSettingUp(false);
+          }}
+          onCancel={() => setSettingUp(false)}
+        />
       )}
     </section>
   );

@@ -723,7 +723,7 @@ export default function PlansManager({
   const [hidePlanIdeas, setHidePlanIdeas] = useState(false);
   // Friend Mode is a per-calendar switch, shown on the calendar's own page
   // (owner only). getOrgDashboard reports it for the org and for each child.
-  const [friendMode, setFriendMode] = useState<{ enabled: boolean; memberCount: number } | null>(null);
+  const [friendMode, setFriendMode] = useState<{ enabled: boolean; memberCount: number; name?: string } | null>(null);
 
   // Assign-a-host: members eligible to be assigned as a suggestion's host,
   // plus the idea currently being assigned (null = picker closed) and the
@@ -893,12 +893,14 @@ export default function PlansManager({
       // the only switch that turns it off.
       const showFriendMode = (fm: FM) => (fm && fm.eligible !== false ? fm : null);
       if (orgId !== calendarId && result.calendars) {
-        const child = result.calendars.find((c: { objectId: string; hidePlanIdeas?: boolean; friendMode?: FM }) => c.objectId === calendarId);
+        const child = result.calendars.find((c: { objectId: string; name?: string; hidePlanIdeas?: boolean; friendMode?: FM }) => c.objectId === calendarId);
         setHidePlanIdeas((child ? child.hidePlanIdeas : result.hidePlanIdeas) || false);
-        setFriendMode(result.isOwner ? showFriendMode(child?.friendMode) : null);
+        const fm = result.isOwner ? showFriendMode(child?.friendMode) : null;
+        setFriendMode(fm ? { ...fm, name: child?.name || "" } : null);
       } else {
         setHidePlanIdeas(result.hidePlanIdeas || false);
-        setFriendMode(result.isOwner ? showFriendMode(result.friendMode as FM) : null);
+        const fm = result.isOwner ? showFriendMode(result.friendMode as FM) : null;
+        setFriendMode(fm ? { ...fm, name: result.name || "" } : null);
       }
       setTier(result.tier);
       setTierLoaded(true);
@@ -1707,7 +1709,7 @@ export default function PlansManager({
     <div className="space-y-10">
         {/* Friend Mode — the per-calendar switch (owner only, ≤15 members) */}
         {friendMode && (
-          <FriendModeCard calendarId={calendarId} enabled={friendMode.enabled} memberCount={friendMode.memberCount} />
+          <FriendModeCard calendarId={calendarId} calendarName={friendMode.name} enabled={friendMode.enabled} memberCount={friendMode.memberCount} />
         )}
 
         {/* Plans (Upcoming / Past) */}
