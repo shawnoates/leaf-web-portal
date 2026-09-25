@@ -118,11 +118,13 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
 
           <div className="hidden lg:block">
             <Eyebrow>Members</Eyebrow>
-            <ul className="mt-1.5 divide-y divide-fm-line-dim">
+            {/* Two columns so a big crew doesn't push settings below the fold. */}
+            <ul className="mt-1.5 grid grid-cols-2 gap-x-6">
               {joined.map((m) => (
                 <MemberRow key={m.membershipId} m={m} note={m.userId === crew.ownerId ? "Started it" : m.membershipId === me.membershipId ? "You" : undefined} />
               ))}
-              {invited.map((m) => <MemberRow key={m.membershipId} m={m} note="Invited" />)}
+              {/* Invited reads from the dashed avatar; no label, so names get the room. */}
+              {invited.map((m) => <MemberRow key={m.membershipId} m={m} />)}
             </ul>
           </div>
           {crew.joinedCount < crew.quorum && (
@@ -193,9 +195,17 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               </Link>
             </div>
             {book.length === 0 ? (
-              <p className="m-0 text-[15px] text-fm-ink-2">
-                No places yet. Add a few you&rsquo;ve been wanting to try and Leaf will plan nights around them.
-              </p>
+              <Link
+                href={crewHref(auth, "book")}
+                className="flex flex-col items-start gap-4 rounded-[28px] border border-dashed border-fm-line p-6 hover:border-fm-ink-2 lg:flex-row lg:items-center lg:justify-between lg:p-8"
+              >
+                <p className="m-0 max-w-[44ch] text-[15px] leading-relaxed text-fm-ink-2 lg:text-base">
+                  No places yet. Add a few you&rsquo;ve been wanting to try and Leaf will plan nights around them.
+                </p>
+                <span className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-fm-ink px-5 text-sm font-semibold text-fm-canvas">
+                  <Plus size={16} strokeWidth={2.2} aria-hidden /> Add a place
+                </span>
+              </Link>
             ) : (
               <ul className="no-scrollbar -mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 lg:mx-0 lg:grid lg:grid-cols-4 lg:gap-4 lg:overflow-visible lg:px-0">
                 {book.map((s) => (
@@ -222,7 +232,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             )}
           </section>
 
-          <div className="grid gap-10 lg:grid-cols-2 lg:gap-12">
+          <div className={`grid gap-10 ${past.length > 0 ? "lg:grid-cols-2 lg:gap-12" : ""}`}>
             {past.length > 0 && (
               <section>
                 <SectionTitle>Past nights</SectionTitle>
@@ -241,7 +251,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               </section>
             )}
 
-            <section className="flex flex-col gap-2.5 lg:gap-3">
+            <section className="flex flex-col gap-2.5 lg:max-w-[640px] lg:gap-3">
               <SectionTitle>Tell Leaf</SectionTitle>
               <p className="m-0 text-sm text-fm-muted">Only Leaf sees this. Days that never work, places to avoid, anything.</p>
               {noteSent ? (
@@ -380,7 +390,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
 function MemberRow({ m, note }: { m: Member; note?: string }) {
   const inv = m.status === "invited";
   return (
-    <li className="flex items-center gap-3 py-2.5">
+    <li className="flex items-center gap-3 border-b border-fm-line-dim py-2.5">
       <Avatar name={m.name} src={m.avatar} invited={inv} />
       <span className={`min-w-0 flex-1 truncate text-[15px] ${inv ? "text-fm-muted" : "font-medium"}`}>{m.name}</span>
       {note && <span className="text-xs text-fm-muted">{note}</span>}

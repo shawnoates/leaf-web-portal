@@ -47,6 +47,9 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
 
   if (!book) return <Spinner label="Opening the book…" />;
   const shared = [...book.shared].sort((a, b) => (sort === "wanted" ? b.upvotes - a.upvotes : 0));
+  // The same place saved twice (two bookmarks) shows once.
+  const seen = new Set<string>();
+  const mine = book.mine.filter((p) => !seen.has(p.locationId) && seen.add(p.locationId));
 
   return (
     <CrewShell wide topBar={<CrewTopBar auth={auth} active="book" />}>
@@ -99,7 +102,12 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
             </div>
           </div>
           {shared.length === 0 ? (
-            <p className="m-0 text-[15px] text-fm-ink-2">Empty so far. Add the first place.</p>
+            <div className="flex flex-col items-center gap-3 rounded-[28px] border border-dashed border-fm-line px-6 py-12 text-center lg:min-h-[320px] lg:justify-center">
+              <p className="m-0 font-fm-serif text-[28px] leading-tight lg:text-[32px]">Empty so far.</p>
+              <p className="m-0 max-w-[36ch] text-[15px] leading-relaxed text-fm-ink-2">
+                {canAdd ? "Search for a place, or add one from your saves. Leaf plans nights from here first." : "Join the crew to add places."}
+              </p>
+            </div>
           ) : (
             <ul className="divide-y divide-fm-line-dim lg:grid lg:grid-cols-3 lg:gap-4 lg:divide-y-0">
               {shared.map((s) => <SpotItem key={s.spotId} s={s} busy={busy} act={act} auth={auth} />)}
@@ -107,16 +115,17 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
           )}
         </section>
 
-        <aside className="rounded-[28px] border border-fm-line-dim bg-fm-surface px-5 pb-2 pt-5 lg:px-6 lg:pt-6">
+        {/* On desktop the saves stick beside the book and scroll inside their own panel, however many there are. */}
+        <aside className="rounded-[28px] border border-fm-line-dim bg-fm-surface px-5 pb-2 pt-5 lg:sticky lg:top-6 lg:max-h-[calc(100vh-48px)] lg:overflow-y-auto lg:px-6 lg:pt-6">
           <div className="flex items-center justify-between">
             <h2 className="m-0 font-fm-serif text-[28px] font-normal lg:text-[30px]">Your saves</h2>
             <span className="flex items-center gap-1.5 text-xs text-fm-muted"><Lock size={13} aria-hidden /> Only you see this</span>
           </div>
-          {book.mine.length === 0 ? (
+          {mine.length === 0 ? (
             <p className="mb-4 mt-2 text-[15px] text-fm-ink-2">Nothing saved yet. Places you save on Leaf show up here, ready to add in one tap.</p>
           ) : (
             <ul className="divide-y divide-fm-line-dim">
-              {book.mine.map((p) => (
+              {mine.map((p) => (
                 <li key={p.bookmarkId} className="flex items-center gap-3 py-4">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-base font-semibold lg:text-[15px]">{p.name}</div>
