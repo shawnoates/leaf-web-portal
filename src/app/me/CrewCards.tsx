@@ -23,7 +23,7 @@ export type CrewRow = {
   crewId: string;
   name: string;
   memberAvatars: string[];
-  status: "active" | "paused" | "invited";
+  status: "active" | "paused" | "invited" | "off";
   statusLine: string;
   nextPlanId: string | null;
   isOwner?: boolean;
@@ -70,11 +70,11 @@ export function CrewActionCard({ actions, onAnswered }: { actions: CrewAction[];
       <div className="sinv-text">
         {a.kind === "invite" && (
           <>
-            <h2 className="sinv-title">{a.inviterName} added you to {a.crewName}</h2>
-            <div className="sinv-meta">Leaf finds a night that works for everyone and plans it. Want in?</div>
+            <h2 className="sinv-title">Plan with {a.inviterName}</h2>
+            <div className="sinv-meta">{a.crewName} · Leaf finds a night that works for the group and plans it.</div>
             <div className="sinv-act">
               <button className="sinv-btn primary" disabled={busy} onClick={() => run(() => call("respondToCrewInvite", { accept: true }))}>Join</button>
-              <button className="sinv-btn ghost" disabled={busy} onClick={() => run(() => call("respondToCrewInvite", { accept: false }))}>Not now</button>
+              <button className="sinv-btn ghost" disabled={busy} onClick={() => run(() => call("respondToCrewInvite", { accept: false }))}>No thanks</button>
             </div>
           </>
         )}
@@ -126,29 +126,34 @@ export function CrewActionCard({ actions, onAnswered }: { actions: CrewAction[];
   );
 }
 
-export function CrewsRail({ rows, onEnable }: { rows: CrewRow[]; onEnable: () => void }) {
+/**
+ * The quiet state of the crew card: shown when you're in a crew and nothing
+ * needs you. The next night (or what Leaf is doing) and a way into the crew.
+ * Pages through crews like the action card. Crews that are off aren't shown;
+ * owners manage those from the dashboard.
+ */
+export function CrewQuietCard({ rows }: { rows: CrewRow[] }) {
+  const [index, setIndex] = useState(0);
+  const c = rows[index];
+  if (!c) return null;
   return (
-    <section className="rail">
-      <div className="eyebrow">Your crews</div>
-      <div className="cals">
-        {rows.map((c) => (
-          <Link key={c.crewId} className="cal-row fm-dark" href={`/crew/${c.crewId}`} style={{ borderRadius: 12, padding: "10px 12px" }}>
-            {c.image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img className="cal-ava" src={c.image} alt="" />
-            ) : (
-              <span className="cal-ava" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}><FriendModeIcon size={28} /></span>
-            )}
-            <div className="cal-body">
-              <div className="cal-n">{c.name}</div>
-              <div className="cal-s">{c.statusLine}</div>
-            </div>
-            <span className="cal-cta">Open</span>
-          </Link>
-        ))}
+    <section className="sinv fm-dark" role="region" aria-label="Your crew">
+      <div className="sinv-head">
+        <div className="eyebrow sinv-eyebrow">
+          <FriendModeIcon size={20} />
+          {c.name}
+        </div>
+        {rows.length > 1 && (
+          <button className="eyebrow sinv-count" style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }} onClick={() => setIndex((index + 1) % rows.length)} aria-label="Next crew">
+            {index + 1} of {rows.length} ›
+          </button>
+        )}
       </div>
-      <div style={{ marginTop: 8 }}>
-        <button className="btn text sm" onClick={onEnable}>Enable Friend Mode for another group</button>
+      <div className="sinv-text">
+        <h2 className="sinv-title">{c.statusLine || "Nothing planned yet"}</h2>
+        <div className="sinv-act">
+          <Link className="sinv-btn ghost" href={`/crew/${c.crewId}`}>Open crew</Link>
+        </div>
       </div>
     </section>
   );

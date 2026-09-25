@@ -24,7 +24,7 @@ import NewPlanModal, {
 } from "./NewPlanModal";
 import { PlanMiniMap, PlansRailMap, type MapPin } from "./PlanMaps";
 import {
-  CrewActionCard, CrewsRail, CrewSuggestionBox, FriendModeIntroModal,
+  CrewActionCard, CrewQuietCard, CrewSuggestionBox, FriendModeIntroModal,
   type CrewAction, type CrewRow, type CrewSuggestion, type FriendModeIntro,
 } from "./CrewCards";
 
@@ -858,6 +858,8 @@ function DashboardView({
   const seriesInvites = data.seriesInvites || [];
   const crewActions = data.crewActions || [];
   const crews = data.crews || [];
+  // Crews you're in and that are on — the quiet crew card when nothing needs you.
+  const quietCrews = crews.filter((c) => c.status !== "invited" && c.status !== "off");
   const hostInvites = data.hostInvites || [];
   const firstName = (data.person.firstName || "").trim().split(/\s+/)[0] || "";
   const rail = data.needsHost;
@@ -940,9 +942,11 @@ function DashboardView({
               not their own next plan. */}
           {/* A crew waiting on this person's answer (join, vote, IN/OUT, book)
               sits first: it's the smallest ask and the most time-boxed. */}
-          {crewActions.length > 0 && (
+          {crewActions.length > 0 ? (
             <CrewActionCard actions={crewActions} onAnswered={onRefresh} />
-          )}
+          ) : quietCrews.length > 0 ? (
+            <CrewQuietCard rows={quietCrews} />
+          ) : null}
 
           {seriesInvites.length > 0 && (
             <SeriesInviteCard invites={seriesInvites} onAnswered={onRefresh} />
@@ -1051,7 +1055,6 @@ function DashboardView({
             {places.length > 0 && (
               <PlacesRail probes={places} onAnswered={(id) => setPopupAnsweredId(id)} />
             )}
-            {crews.length > 0 && <CrewsRail rows={crews} onEnable={() => setIntroOpen(true)} />}
             {rail && rail.tier2.length > 0 && <CalendarsRail rows={rail.tier2} />}
             <TextsCard inCrew={crews.length > 0} />
           </aside>
