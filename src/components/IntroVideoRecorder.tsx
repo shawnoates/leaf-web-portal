@@ -110,7 +110,7 @@ export default function IntroVideoRecorder({
   const [countdown, setCountdown] = useState(3);
   const [error, setError] = useState<string | null>(null);
   const [reviewUrl, setReviewUrl] = useState<string | null>(null);
-  const [reviewMeta, setReviewMeta] = useState<{ seconds: number; bytes: number; container: string; shape: "portrait" | "raw" } | null>(null);
+  const [reviewMeta, setReviewMeta] = useState<{ seconds: number; bytes: number; container: string; shape: "portrait" | "landscape" } | null>(null);
   const reviewRef = useRef<HTMLVideoElement>(null);
   const [segmented, setSegmented] = useState(true);
 
@@ -125,76 +125,67 @@ export default function IntroVideoRecorder({
   const mimeRef = useRef("");
   const finalizedRef = useRef(false);
   const watchdogRef = useRef<number | null>(null);
-  // Portrait-at-capture. The raw camera feed goes into a hidden <video>; a
-  // canvas draws the centred 9:16 slice of it every frame and is both the
-  // preview and what gets recorded. iPhones hand the browser 1920x1080
-  // landscape frames however the phone is held, and cropping once here
-  // beats three shape-aware layouts downstream — and the host sees exactly
-  // the frame that is being recorded.
   const sourceRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const cropRef = useRef<{ sx: number; sy: number; sw: number; sh: number } | null>(null);
-  const drawRef = useRef<{ raf: number | null; vfc: number | null }>({ raf: null, vfc: null });
-  const shapeRef = useRef<"portrait" | "raw">("raw");
-
-  const stopDrawing = useCallback(() => {
-    const d = drawRef.current;
-    if (d.raf !== null) cancelAnimationFrame(d.raf);
-    const v = sourceRef.current as (HTMLVideoElement & { cancelVideoFrameCallback?: (h: number) => void }) | null;
-    if (d.vfc !== null && v?.cancelVideoFrameCallback) v.cancelVideoFrameCallback(d.vfc);
-    drawRef.current = { raf: null, vfc: null };
-  }, []);
+  // The shape the camera actually delivered, read off the element once its
+  // metadata lands. Never cropped: a crop of a wide frame is a zoom-in, and
+  // on an iPhone it left a host's face filling the whole frame. Portrait
+  // comes from asking the camera for it (see acquireStream), or not at all.
+  const shapeRef = useRef<"portrait" | "landscape">("landscape");
 
   const stopStream = useCallback(() => {
-    stopDrawing();
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
-  }, [stopDrawing]);
+  }, []);
 
   /**
-   * Size the canvas to the largest centred 9:16 slice of the source, capped
-   * at 1080 tall, on even dimensions (encoders want them), then draw the
-   * source into it every frame. requestVideoFrameCallback where it exists
-   * (one draw per camera frame, and Safari has it), rAF otherwise.
+   * Ask the camera for a portrait feed, several ways, and keep the first
+   * that actually comes back taller than wide.
+   *
+   * iPhones answer a 1080x1920 request with a 1920x1080 landscape preset,
+   * and those presets throw away vertical field of view — which is the
+   * "zoomed in" look. Whether any request gets a true portrait mode out of
+   * WebKit is the open question; each candidate below is one hypothesis,
+   * most specific first. The shape is read off the element's metadata, not
+   * the track's settings, because WebKit has reported those swapped.
+   *
+   * If nothing comes back portrait, the LAST candidate — the camera's own
+   * default — is kept whole. Wide beats cropped: a crop is a zoom.
    */
-  const startDrawing = useCallback(() => {
-    const v = sourceRef.current;
-    const c = canvasRef.current;
-    if (!v || !c || !v.videoWidth || !v.videoHeight) return false;
-    const target = 9 / 16;
-    let sw = v.videoWidth;
-    let sh = v.videoHeight;
-    if (sw / sh > target) sw = Math.round(sh * target);
-    else sh = Math.round(sw / target);
-    const sx = Math.floor((v.videoWidth - sw) / 2);
-    const sy = Math.floor((v.videoHeight - sh) / 2);
-    // Cap at 1920 tall: a portrait-native 1080x1920 feed keeps its full
-    // resolution, while a landscape 1920x1080 feed's crop is only 1080 tall
-    // anyway. A lower cap was silently halving portrait sources.
-    let ch = Math.min(sh, 1920);
-    let cw = Math.round(ch * target);
-    cw -= cw % 2;
-    ch -= ch % 2;
-    cropRef.current = { sx, sy, sw, sh };
-    if (c.width !== cw || c.height !== ch) {
-      c.width = cw;
-      c.height = ch;
-    }
-    const ctx = c.getContext("2d");
-    if (!ctx) return false;
-    stopDrawing();
-    const vv = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
-    const draw = () => {
-      const crop = cropRef.current;
-      if (crop && v.readyState >= 2) {
-        ctx.drawImage(v, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, c.width, c.height);
+  const acquireStream = useCallback(async (): Promise<{ stream: MediaStream; portrait: boolean }> => {
+    const candidates: MediaTrackConstraints[] = [
+      { facingMode: "user", width: { ideal: 1080 }, height: { ideal: 1920 }, aspectRatio: { ideal: 9 / 16 } },
+      { facingMode: "user", width: { ideal: 960 }, height: { ideal: 1280 } },
+      { facingMode: "user", width: { ideal: 720 }, height: { ideal: 1280 } },
+      { facingMode: "user", aspectRatio: { ideal: 9 / 16 } },
+      { facingMode: "user" },
+    ];
+    const probe = document.createElement("video");
+    probe.muted = true;
+    probe.playsInline = true;
+    let last: MediaStream | null = null;
+    let lastErr: unknown = null;
+    for (const video of candidates) {
+      if (last) last.getTracks().forEach((t) => t.stop());
+      last = null;
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ video, audio: true });
+        last = s;
+        const dims = await new Promise<{ w: number; h: number }>((resolve) => {
+          const done = () => resolve({ w: probe.videoWidth, h: probe.videoHeight });
+          probe.onloadedmetadata = done;
+          probe.srcObject = s;
+          probe.play().catch(() => {});
+          window.setTimeout(done, 1500);
+        });
+        if (dims.h > dims.w) return { stream: s, portrait: true };
+      } catch (e) {
+        lastErr = e;
       }
-      if (vv.requestVideoFrameCallback) drawRef.current.vfc = vv.requestVideoFrameCallback(draw);
-      else drawRef.current.raf = requestAnimationFrame(draw);
-    };
-    draw();
-    return true;
-  }, [stopDrawing]);
+    }
+    probe.srcObject = null;
+    if (last) return { stream: last, portrait: false };
+    throw lastErr ?? new Error("no camera");
+  }, []);
 
   // Camera on mount. Asking straight away rather than behind another tap:
   // they already chose to record, and the permission sheet is the thing
@@ -207,26 +198,13 @@ export default function IntroVideoRecorder({
         return;
       }
       try {
-        // Portrait is asked for three ways because phones honour it
-        // unevenly: iPhones tend to hand back 1920x1080 landscape whatever
-        // is requested, and the recorder captures exactly what the track
-        // delivers. The preview below is object-contain for that reason —
-        // the host sees the frame that is actually being recorded, not a
-        // crop of it that looks upright and isn't.
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: "user",
-            width: { ideal: 1080 },
-            height: { ideal: 1920 },
-            aspectRatio: { ideal: 9 / 16 },
-          },
-          audio: true,
-        });
+        const { stream, portrait } = await acquireStream();
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
         streamRef.current = stream;
+        shapeRef.current = portrait ? "portrait" : "landscape";
         // As wide as the camera goes. Phones default to a cropped-in
         // "zoomed" front view; where the track exposes zoom (iOS 17+,
         // Chrome on Android) ask for its minimum. Best effort — a camera
@@ -241,12 +219,7 @@ export default function IntroVideoRecorder({
         const src = sourceRef.current;
         if (src) {
           src.srcObject = stream;
-          // Dimensions arrive with the metadata; the crop can't be sized
-          // before then. Sizing also re-runs if the phone rotates.
-          src.onloadedmetadata = () => { startDrawing(); };
-          src.onresize = () => { startDrawing(); };
           await src.play().catch(() => {});
-          startDrawing();
         }
       } catch (e) {
         const name = e instanceof Error ? e.name : "";
@@ -261,7 +234,7 @@ export default function IntroVideoRecorder({
       cancelled = true;
       stopStream();
     };
-  }, [onUnsupported, stopStream, startDrawing]);
+  }, [onUnsupported, stopStream, acquireStream]);
 
   useEffect(
     () => () => {
@@ -354,41 +327,15 @@ export default function IntroVideoRecorder({
     chunksRef.current = [];
     bankedMsRef.current = 0;
     const mimeType = pickMimeType();
-    // Record the portrait canvas plus the microphone. If the canvas can't
-    // be captured here, record the raw feed; the pages size their player
-    // from the stored aspect ratio, so a landscape take still shows whole.
-    let recordStream: MediaStream = stream;
-    shapeRef.current = "raw";
-    const canvas = canvasRef.current as (HTMLCanvasElement & { captureStream?: (fps?: number) => MediaStream }) | null;
-    if (canvas && cropRef.current && typeof canvas.captureStream === "function") {
-      try {
-        const canvasStream = canvas.captureStream(30);
-        const videoTrack = canvasStream.getVideoTracks()[0];
-        if (videoTrack) {
-          recordStream = new MediaStream([videoTrack, ...stream.getAudioTracks()]);
-          shapeRef.current = "portrait";
-        }
-      } catch {
-        recordStream = stream;
-      }
-    }
+    // The feed is recorded exactly as the camera delivers it. The pages
+    // size their player from the stored aspect ratio, so a landscape take
+    // shows whole rather than cropped.
     let rec: MediaRecorder;
     try {
-      rec = new MediaRecorder(recordStream, mimeType ? { mimeType } : undefined);
+      rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     } catch {
-      if (recordStream !== stream) {
-        // Some builds capture a canvas but refuse to record it. Raw feed.
-        try {
-          rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-          shapeRef.current = "raw";
-        } catch {
-          onUnsupported("This browser can't record video.");
-          return;
-        }
-      } else {
-        onUnsupported("This browser can't record video.");
-        return;
-      }
+      onUnsupported("This browser can't record video.");
+      return;
     }
     // Pause and resume are what make the segments a single file. Without
     // them the whole thing is one continuous take and Next just turns the
@@ -490,8 +437,15 @@ export default function IntroVideoRecorder({
     setBeatIndex(0);
     setCaptured(0);
     setPhase("idle");
-    // The source video and its draw loop never stopped — the stream is
-    // only released on Use or Close — so the preview is already live.
+    // The stream is only released on Use or Close, so the preview element
+    // remounted by the phase switch just needs the stream reattached.
+    requestAnimationFrame(() => {
+      const src = sourceRef.current;
+      if (src && streamRef.current && src.srcObject !== streamRef.current) {
+        src.srcObject = streamRef.current;
+        src.play().catch(() => {});
+      }
+    });
   };
 
   const use = async () => {
@@ -571,27 +525,17 @@ export default function IntroVideoRecorder({
           // the camera would read as "still recording".
           <div className="absolute inset-0 bg-black" />
         ) : (
-          <>
-            {/* The raw feed. Kept in the DOM and playing because the canvas
-                draws from it; parked offscreen rather than display:none,
-                which some engines treat as "stop decoding". */}
-            <video
-              ref={sourceRef}
-              muted
-              playsInline
-              autoPlay
-              aria-hidden="true"
-              className="pointer-events-none absolute left-0 top-0 h-px w-px opacity-0"
-            />
-            {/* The preview IS the recording: the portrait crop, mirrored
-                only for display (an unmirrored preview of your own face
-                makes people stop and restart), object-contain so nothing
-                is hidden that will end up in the file. */}
-            <canvas
-              ref={canvasRef}
-              className="absolute inset-0 h-full w-full object-contain [transform:scaleX(-1)]"
-            />
-          </>
+          // The feed as it will be recorded: object-contain so nothing that
+          // ends up in the file is hidden, mirrored only for display (an
+          // unmirrored preview of your own face makes people stop and
+          // restart).
+          <video
+            ref={sourceRef}
+            muted
+            playsInline
+            autoPlay
+            className="absolute inset-0 h-full w-full object-contain [transform:scaleX(-1)]"
+          />
         )}
 
         {/* Anywhere on the picture ends the segment. Hunting for a small
@@ -687,7 +631,7 @@ export default function IntroVideoRecorder({
             {reviewMeta && (
               <p className="text-center text-[12px] tabular-nums text-white/45">
                 {clock(reviewMeta.seconds)} · {reviewMeta.container} · {fmtBytes(reviewMeta.bytes)}
-                {reviewMeta.shape === "raw" ? " · as the camera gave it" : ""}
+                {" · "}{reviewMeta.shape}
               </p>
             )}
             {reviewUrl && (
