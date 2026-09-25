@@ -147,9 +147,9 @@ export default function FriendModeSetup({
   const spotRow = (s: Spot) => (
     <li key={s.placeId} className="flex items-center gap-3 rounded-xl px-3 py-2" style={{ border: `1px solid ${FM.line}` }}>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14px]">
-          {s.name}
-          {s.isNew && <span className="ml-2 rounded-full px-1.5 py-0.5 text-[10px] uppercase" style={{ background: FM.accent, color: FM.canvas }}>New</span>}
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-[14px]">{s.name}</span>
+          {s.isNew && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] uppercase" style={{ background: FM.accent, color: FM.canvas }}>New</span>}
         </span>
         <span className="block truncate text-[12px]" style={{ color: FM.mutedText }}>
           {[s.category, s.shortAddress, s.rating ? `★ ${s.rating.toFixed(1)}` : null, s.saves ? `saved by ${s.saves} on Leaf` : null].filter(Boolean).join(" · ")}

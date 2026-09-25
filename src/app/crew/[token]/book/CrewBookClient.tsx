@@ -72,9 +72,9 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
   const suggestionRow = (p: Suggested) => (
     <li key={p.placeId} className="flex items-center gap-3 py-3.5">
       <div className="min-w-0 flex-1">
-        <div className="truncate text-base font-semibold lg:text-[15px]">
-          {p.name}
-          {p.isNew && <span className="ml-2 rounded-full bg-fm-accent px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase text-fm-canvas">New</span>}
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-base font-semibold lg:text-[15px]">{p.name}</span>
+          {p.isNew && <span className="shrink-0 rounded-full bg-fm-accent px-1.5 py-0.5 text-[10px] font-semibold uppercase text-fm-canvas">New</span>}
         </div>
         <div className="truncate text-[13px] text-fm-muted">
           {[p.category, p.shortAddress, p.rating ? `★ ${p.rating.toFixed(1)}` : null, p.saves ? `saved by ${p.saves} on Leaf` : null].filter(Boolean).join(" · ")}

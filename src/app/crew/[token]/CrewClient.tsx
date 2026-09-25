@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ArrowUp, Check, ChevronUp, Plus, Settings } from "lucide-react";
+import { ArrowRight, ArrowUp, Check, ChevronUp, Plus, Settings, UserPlus } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import {
@@ -61,6 +61,34 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   // "Text me about this crew's plans": never pre-ticked (10DLC).
   const [smsBox, setSmsBox] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Invite: the owner picks followers not yet invited; anyone in can share the link.
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [invitable, setInvitable] = useState<{ userId: string; name: string }[] | null>(null);
+  const [invitePicked, setInvitePicked] = useState<Set<string>>(new Set());
+  const [inviteNote, setInviteNote] = useState("");
+  const [linkDone, setLinkDone] = useState("");
+  const openInvite = () => {
+    setInviteOpen(true);
+    setInviteNote("");
+    setLinkDone("");
+    if (me.isOwner) {
+      run<{ people: { userId: string; name: string; canInvite: boolean }[] }>("previewCrewInvites", auth)
+        .then((r) => {
+          const list = r.people.filter((p) => p.canInvite);
+          setInvitable(list);
+          setInvitePicked(new Set(list.map((p) => p.userId)));
+        })
+        .catch(() => setInvitable([]));
+    }
+  };
+  const shareInviteLink = async () => {
+    if (!me.inviteLink) return;
+    const text = `Join ${crew.name} on Leaf — we're planning get-togethers: ${me.inviteLink}`;
+    try {
+      if (navigator.share) { await navigator.share({ title: crew.name, text }); setLinkDone("Shared"); return; }
+    } catch { return; }
+    try { await navigator.clipboard.writeText(me.inviteLink); setLinkDone("Link copied"); } catch { /* ignore */ }
+  };
   // Calendar sync needs a Leaf sign-in (a crew link alone isn't an account session).
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => { setSignedIn(Boolean(Parse.User.current())); }, []);
@@ -117,12 +145,16 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 ))}
               </div>
               <p className="m-0 text-sm text-fm-ink-2 lg:text-[15px]">{summary}</p>
-              <button
-                className="ml-auto flex shrink-0 items-center gap-1.5 text-sm font-medium text-fm-ink hover:underline lg:ml-2"
-                onClick={() => setSettingsOpen(true)}
-              >
-                <Settings size={15} aria-hidden /> Settings
-              </button>
+              <div className="ml-auto flex shrink-0 items-center gap-3 lg:ml-2">
+                {me.inviteLink && (
+                  <button className="flex items-center gap-1.5 text-sm font-medium text-fm-ink hover:underline" onClick={openInvite}>
+                    <UserPlus size={15} aria-hidden /> Invite
+                  </button>
+                )}
+                <button className="flex items-center gap-1.5 text-sm font-medium text-fm-ink hover:underline" onClick={() => setSettingsOpen(true)}>
+                  <Settings size={15} aria-hidden /> Settings
+                </button>
+              </div>
             </div>
           </div>
 
@@ -317,6 +349,91 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
           </div>
         </div>
       </div>
+
+      {inviteOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-6" onClick={() => setInviteOpen(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Invite to ${crew.name}`}
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-fm-line bg-fm-surface px-5 pb-5 pt-4 sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-lg font-semibold">Invite to {crew.name}</div>
+                <div className="text-[13px] text-fm-muted">Nobody joins until they say yes.</div>
+              </div>
+              <button aria-label="Close" className="text-xl leading-none text-fm-muted" onClick={() => setInviteOpen(false)}>×</button>
+            </div>
+
+            {me.isOwner && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between">
+                  <Eyebrow>Followers not invited yet</Eyebrow>
+                  {invitable && invitable.length > 0 && (
+                    <button
+                      className="text-xs text-fm-ink underline underline-offset-4"
+                      onClick={() => setInvitePicked(invitePicked.size === invitable.length ? new Set() : new Set(invitable.map((p) => p.userId)))}
+                    >
+                      {invitePicked.size === invitable.length ? "Clear" : "Select all"}
+                    </button>
+                  )}
+                </div>
+                {invitable === null ? (
+                  <p className="mt-2 text-sm text-fm-muted">Loading…</p>
+                ) : invitable.length === 0 ? (
+                  <p className="mt-2 text-sm text-fm-muted">Everyone who follows the calendar has been invited.</p>
+                ) : (
+                  <>
+                    <ul className="mt-2 space-y-1.5">
+                      {invitable.map((p) => {
+                        const sel = invitePicked.has(p.userId);
+                        return (
+                          <li key={p.userId}>
+                            <label className={`flex cursor-pointer items-center gap-3 rounded-xl border border-fm-line px-3 py-2 ${sel ? "bg-fm-card" : ""}`}>
+                              <input
+                                type="checkbox"
+                                checked={sel}
+                                onChange={() => { const n = new Set(invitePicked); if (sel) n.delete(p.userId); else n.add(p.userId); setInvitePicked(n); }}
+                              />
+                              <span className="flex-1 text-[15px]">{p.name}</span>
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <div className="mt-3">
+                      <Button
+                        small
+                        disabled={busy !== null || invitePicked.size === 0}
+                        onClick={() => act("invite", async () => {
+                          const r = await run<{ invited: number }>("inviteCrewMembers", auth, { userIds: [...invitePicked] });
+                          setInviteNote(`${r.invited} ${r.invited === 1 ? "person was" : "people were"} invited.`);
+                          setInvitable((l) => (l || []).filter((p) => !invitePicked.has(p.userId)));
+                          setInvitePicked(new Set());
+                        })}
+                      >
+                        Invite {invitePicked.size || ""}
+                      </Button>
+                    </div>
+                  </>
+                )}
+                {inviteNote && <p className="mt-2 text-sm text-fm-ink-2">{inviteNote}</p>}
+              </div>
+            )}
+
+            <div className="mt-5 rounded-2xl border border-fm-line p-4">
+              <div className="text-[15px] font-semibold">{me.isOwner ? "Or share the invite link" : "Share the invite link"}</div>
+              <p className="mt-1 text-[13px] text-fm-muted">Send it from your phone to anyone you want in. They join with one tap.</p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <Button small onClick={shareInviteLink}>{linkDone || "Share the link"}</Button>
+                <span className="min-w-0 truncate text-xs text-fm-muted">{me.inviteLink}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {settingsOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-6" onClick={() => setSettingsOpen(false)}>
