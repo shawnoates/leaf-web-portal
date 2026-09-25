@@ -25,7 +25,7 @@ import NewPlanModal, {
 import { PlanMiniMap, PlansRailMap, type MapPin } from "./PlanMaps";
 import {
   CrewActionCard, CrewQuietCard,
-  type CrewAction, type CrewRow, type CrewSuggestion, type FriendModeIntro,
+  type CrewAction, type CrewRow,
 } from "./CrewCards";
 
 // ============================================================================
@@ -254,8 +254,6 @@ interface Dashboard {
   // Friend Mode (all optional while the server side ships)
   crews?: CrewRow[];
   crewActions?: CrewAction[];
-  crewSuggestion?: CrewSuggestion;
-  friendModeIntro?: FriendModeIntro;
   hostInvites?: HostInvite[]; // may be absent while the server side ships
   // One prompt card at a time, chosen and flag-gated server-side. Only
   // community_qualifier renders here; other keys are ignored.

@@ -212,10 +212,7 @@ export default function FriendModeCard({
           )}
 
           {locked && (
-            <p>
-              Start a crew with the people you keep seeing instead:{" "}
-              <Link href="/crew/start?suggest=1" className="underline" style={{ color: FM.ink }}>Start a crew</Link>
-            </p>
+            <p>Friend Mode is for smaller groups. Make a new private calendar for the people you want to see, then turn it on there.</p>
           )}
         </div>
       )}

@@ -31,8 +31,6 @@ export type CrewRow = {
   image?: string | null;
 };
 
-export type CrewSuggestion = { names: string[]; count: number } | null;
-export type FriendModeIntro = { eligible: boolean; suggestions: { userId: string; name: string }[] };
 
 export function CrewActionCard({ actions, onAnswered }: { actions: CrewAction[]; onAnswered: () => Promise<void> }) {
   const [index, setIndex] = useState(0);

@@ -5,8 +5,8 @@
  *
  * Not built on MarketingPage: that page is shaped around "type a vibe, get a
  * calendar" (prompt hero, calendar grid, sticky generate bar), and none of
- * that is the ask here. This one has a single job: get someone to add their
- * people at /crew/start.
+ * that is the ask here. This one has a single job: get a calendar owner to
+ * turn Friend Mode on from their calendar in the dashboard.
  */
 
 import Link from "next/link";
@@ -18,7 +18,7 @@ import { trackMarketingEvent } from "@/components/marketing/analytics";
 import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
 
 const STEPS = [
-  { n: "01", title: "Add your people", body: "Name the crew and add a few friends. Each gets one text asking to join. Nothing else until they say IN." },
+  { n: "01", title: "Turn it on", body: "Flip the Friend Mode switch on a calendar you own (up to 15 people), then invite your followers or share the invite link." },
   { n: "02", title: "Leaf picks a night", body: "Every few weeks Leaf picks a place from your crew's book and asks everyone which dates work, by text or in the app." },
   { n: "03", title: "It locks itself", body: "The night most people can make gets locked. Whoever's booking gets the link. Everyone gets a reminder the day of." },
   { n: "04", title: "It learns", body: "Thumbs up or down the morning after. Leaf remembers what the crew liked and which nights never work." },
@@ -26,8 +26,8 @@ const STEPS = [
 
 
 const FAQ = [
-  { q: "Do my friends need the app?", a: "No. Friends without the app answer by text: reply IN, OUT, or the numbers of the nights that work. Friends with the app plan in a chat with Leaf." },
-  { q: "Will Leaf spam my friends?", a: "No one is texted until they reply IN to one invite. After that it's a few texts around each night, never more than a handful a week, and anyone can text STOP at any time." },
+  { q: "Do my friends need the app?", a: "No. Everything works on the web from their personal link. App users get notifications, and anyone can choose to get texts instead." },
+  { q: "Will Leaf spam my friends?", a: "No. Leaf only texts people who choose to get texts about the crew (it's never switched on for them), at most 5 a week, and anyone can reply STOP at any time." },
   { q: "What if nobody can make it?", a: "Leaf tries the backup place and two new dates once. If that misses too, it skips this round and comes back on the next rhythm." },
   { q: "Who books the table?", a: "Whoever started that night, or the person who started the crew. Leaf sends them a booking link and tells everyone once they reply BOOKED." },
   { q: "How much does it cost?", a: "Nothing. Friend Mode is free for friends." },
@@ -37,7 +37,7 @@ const FAQ = [
 export default function FriendsClient() {
   const isLoggedIn = useIsLoggedIn();
   useEffect(() => { trackMarketingEvent("friend_mode_cta_view", { surface: "friends_page" }); }, []);
-  const cta = "/crew/start";
+  const cta = "/dashboard";
   const onCta = () => trackMarketingEvent("friend_mode_cta_click", { surface: "friends_page" });
 
   return (
@@ -57,7 +57,7 @@ export default function FriendsClient() {
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link href={cta} onClick={onCta} className="rounded-full bg-leaf-800 px-6 py-3 text-[15px] font-medium text-white hover:bg-leaf-700">
-            Start a crew
+            Turn it on for your calendar
           </Link>
           <span className="text-sm text-zinc-500">Free. Friends don&rsquo;t need the app.</span>
         </div>
@@ -121,9 +121,9 @@ export default function FriendsClient() {
       </section>
 
       <section className="py-14 text-center" style={{ background: "#253A33", color: "#F2F1EC" }}>
-        <h2 className="text-2xl font-semibold">Add your people. Leaf does the rest.</h2>
+        <h2 className="text-2xl font-semibold">Invite your people. Leaf does the rest.</h2>
         <Link href={cta} onClick={onCta} className="mt-6 inline-block rounded-full px-6 py-3 text-[15px] font-medium" style={{ background: "#F2F1EC", color: "#253A33" }}>
-          Start a crew
+          Turn it on for your calendar
         </Link>
       </section>
 

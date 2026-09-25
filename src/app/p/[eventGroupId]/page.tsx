@@ -6,7 +6,6 @@ import PlanShareRedirect from "./PlanShareRedirect";
 import ArrivalTracker from "./ArrivalTracker";
 import StandalonePlanCard from "./StandalonePlanCard";
 import { planLifecycle } from "@/lib/wall-clock";
-import FriendModeCta from "@/components/crew/FriendModeCta";
 
 type ShareMode = "invite" | "copy";
 
@@ -344,13 +343,6 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
       rsvpClosed={rsvpClosed}
       autoOpenRsvp={autoOpenRsvp && !rsvpClosed}
     />
-    {/* Friend Mode nudge for people who are on the guest list. Non-attendees
-        never see it: the start flow would offer them names they can't see here. */}
-    {info.viewerIsAttendee && (
-      <div className="mx-auto max-w-lg px-5 pb-10">
-        <FriendModeCta eventGroupId={eventGroupId} surface="plan" peopleCount={info.rsvpCount ?? 0} />
-      </div>
-    )}
     </>
   );
 }
