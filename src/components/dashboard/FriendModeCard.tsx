@@ -112,7 +112,7 @@ export default function FriendModeCard({
     ? `Not available · Friend Mode is for circles under ${MAX_MEMBERS} followers`
     : enabled
       ? "On · recurring plans with your crew, on your schedule"
-      : "Recurring plans with your crew, on your schedule";
+      : "Off · recurring plans with your crew, on your schedule";
 
   const status = preview
     ? [
@@ -137,6 +137,12 @@ export default function FriendModeCard({
           </p>
           <p className="text-[12px]" style={{ color: locked ? FM.muted : enabled ? FM.accent : FM.mutedText }}>{subline}</p>
         </div>
+        {/* The switch's state in words, so it reads without knowing which side is on. */}
+        {!locked && (
+          <span aria-hidden className="text-[12px] font-medium uppercase tracking-wide" style={{ color: enabled ? FM.accent : FM.mutedText }}>
+            {enabled ? "On" : "Off"}
+          </span>
+        )}
         <FriendModeSwitch label="Friend Mode" checked={enabled} locked={locked} disabled={saving} onChange={toggle} />
       </div>
 
