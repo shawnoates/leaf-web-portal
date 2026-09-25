@@ -126,7 +126,15 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
           ) : (
             <ul className="divide-y divide-fm-line-dim">
               {mine.map((p) => (
-                <li key={p.bookmarkId} className="flex items-center gap-3 py-4">
+                <li key={p.bookmarkId} className="flex items-center gap-3 py-3.5">
+                  <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-fm-line bg-fm-card">
+                    {p.photo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.photo} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span aria-hidden className="absolute inset-0 flex items-center justify-center font-fm-serif text-[22px] text-fm-knob">{p.name.charAt(0)}</span>
+                    )}
+                  </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-base font-semibold lg:text-[15px]">{p.name}</div>
                     <div className="truncate text-[13px] text-fm-muted">{[p.neighborhood, p.category].filter(Boolean).join(" · ")}</div>
