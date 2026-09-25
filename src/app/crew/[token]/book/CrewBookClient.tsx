@@ -23,6 +23,8 @@ import { crewHref, run, toDate, type BookSpot, type CrewAuth, type SavedPlace } 
 type Suggested = {
   placeId: string; name: string; address: string | null; shortAddress: string | null; category: string | null;
   rating: number | null; lat: number | null; lng: number | null; saves: number; isNew?: boolean;
+  /** Why it fits the ask (from the prompt search), or the place's own line. */
+  blurb?: string | null;
 };
 type Book = { crew: { id: string; name: string }; shared: BookSpot[]; mine: SavedPlace[]; popular?: Suggested[] };
 
@@ -85,6 +87,7 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
           <span className="truncate text-base font-semibold lg:text-[15px]">{p.name}</span>
           {p.isNew && <span className="shrink-0 rounded-full bg-fm-accent px-1.5 py-0.5 text-[10px] font-semibold uppercase text-fm-canvas">New</span>}
         </div>
+        {p.blurb && <div className="text-[13px] leading-snug text-fm-ink-2">{p.blurb}</div>}
         <div className="truncate text-[13px] text-fm-muted">
           {[p.category, p.shortAddress, p.rating ? `★ ${p.rating.toFixed(1)}` : null, p.saves ? `saved by ${p.saves} on Leaf` : null].filter(Boolean).join(" · ")}
         </div>

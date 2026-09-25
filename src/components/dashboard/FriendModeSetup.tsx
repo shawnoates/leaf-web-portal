@@ -28,6 +28,8 @@ type Preview = { people: Person[]; inviteLink?: string; rhythmDays?: number };
 type Spot = {
   placeId: string; name: string; address: string | null; shortAddress: string | null; category: string | null;
   rating: number | null; lat: number | null; lng: number | null; saves: number; isNew?: boolean;
+  /** Why it fits the ask (from the prompt search), or the place's own line. */
+  blurb?: string | null;
 };
 type Step = "rhythm" | "invite" | "spots";
 
@@ -172,6 +174,7 @@ export default function FriendModeSetup({
           <span className="truncate text-[14px]">{s.name}</span>
           {s.isNew && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] uppercase" style={{ background: FM.accent, color: FM.canvas }}>New</span>}
         </span>
+        {s.blurb && <span className="block text-[12px] leading-snug" style={{ color: "#C9D1CB" }}>{s.blurb}</span>}
         <span className="block truncate text-[12px]" style={{ color: FM.mutedText }}>
           {[s.category, s.shortAddress, s.rating ? `★ ${s.rating.toFixed(1)}` : null, s.saves ? `saved by ${s.saves} on Leaf` : null].filter(Boolean).join(" · ")}
         </span>
