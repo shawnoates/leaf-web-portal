@@ -125,7 +125,12 @@ export default function HostIntroVideoCard({
   // Set when the browser turns out not to be able to record, or the host
   // says no to the camera. From then on the card offers the camera app.
   const [recorderOff, setRecorderOff] = useState<string | null>(null);
+  // Two inputs, because `capture` is not a hint on iOS: an input that carries
+  // it opens the camera and never the library. The camera one is the
+  // fallback when in-browser recording isn't possible; the library one is
+  // for a clip they already have.
   const inputRef = useRef<HTMLInputElement>(null);
+  const libraryInputRef = useRef<HTMLInputElement>(null);
 
   const bonus = video.bonusCents > 0 ? money(video.bonusCents) : null;
   const deadlineLabel = fmtDeadline(video.deadlineAt, timeZone);
@@ -197,6 +202,7 @@ export default function HostIntroVideoCard({
     } finally {
       setPhase("idle");
       if (inputRef.current) inputRef.current.value = "";
+      if (libraryInputRef.current) libraryInputRef.current.value = "";
     }
   };
 
@@ -399,6 +405,15 @@ export default function HostIntroVideoCard({
                 onChange={(e) => onPick(e.target.files)}
                 disabled={busy}
               />
+              {/* No `capture`: this one opens the photo library. */}
+              <input
+                ref={libraryInputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => onPick(e.target.files)}
+                disabled={busy}
+              />
               {canRecord ? (
                 <>
                   <button
@@ -412,7 +427,7 @@ export default function HostIntroVideoCard({
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => inputRef.current?.click()}
+                    onClick={() => libraryInputRef.current?.click()}
                     className="w-full text-center text-[14px] font-medium text-zinc-500 underline disabled:opacity-50"
                   >
                     Upload one I already made

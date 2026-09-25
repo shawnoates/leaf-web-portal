@@ -28,6 +28,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { withMp4Duration } from "@/lib/mp4-duration";
 
 export type Beat = {
   id: string;
@@ -109,6 +110,8 @@ export default function IntroVideoRecorder({
   const [countdown, setCountdown] = useState(3);
   const [error, setError] = useState<string | null>(null);
   const [reviewUrl, setReviewUrl] = useState<string | null>(null);
+  const [reviewMeta, setReviewMeta] = useState<{ seconds: number; bytes: number; container: string } | null>(null);
+  const reviewRef = useRef<HTMLVideoElement>(null);
   const [segmented, setSegmented] = useState(true);
 
   const previewRef = useRef<HTMLVideoElement>(null);
@@ -193,9 +196,27 @@ export default function IntroVideoRecorder({
     const ext = type.includes("mp4") ? "mp4" : "webm";
     const file = new File([blob], `host-intro.${ext}`, { type });
     resultRef.current = blob.size ? { file, duration } : null;
-    setReviewUrl(blob.size ? URL.createObjectURL(blob) : null);
-    if (!blob.size) setError("Nothing came back from the recorder. Try again, or use your camera app.");
+    setReviewMeta(blob.size ? { seconds: duration, bytes: blob.size, container: ext } : null);
+    if (!blob.size) {
+      setError("Nothing came back from the recorder. Try again, or use your camera app.");
+      setReviewUrl(null);
+      setPhase("review");
+      return;
+    }
     setPhase("review");
+    // Safari's fragmented MP4 carries no duration, so played from a blob it
+    // is a "Live Broadcast" with a dead scrubber and, after any seek, no
+    // frames. The recorder knows the length; write it into the header of
+    // the playback copy. The upload is left untouched — Mux computes its
+    // own. WebM (Chrome) gets the seek trick in settleDuration instead.
+    if (ext === "mp4") {
+      withMp4Duration(blob, duration).then(({ blob: fixed, report }) => {
+        if (report) console.log("[intro-video] mp4 duration patch", report);
+        setReviewUrl(URL.createObjectURL(fixed));
+      });
+    } else {
+      setReviewUrl(URL.createObjectURL(blob));
+    }
   }, []);
 
   const finish = useCallback(() => {
@@ -375,11 +396,14 @@ export default function IntroVideoRecorder({
   };
 
   /**
-   * MediaRecorder writes no duration into the container, so the blob reports
-   * Infinity and the scrubber is dead until the element is forced to walk to
-   * the end and back. Harmless once the real duration lands.
+   * WebM from Chrome's MediaRecorder reports Infinity until the element is
+   * forced to walk to the end and back; harmless once the real duration
+   * lands. NEVER for MP4: on Safari that same seek lands on a live edge with
+   * no frames behind it and the resolving event never fires, which is the
+   * black screen. MP4 gets its duration written into the header instead.
    */
   const settleDuration = (v: HTMLVideoElement) => {
+    if (reviewMeta?.container === "mp4") return;
     if (v.duration !== Infinity) return;
     const onDur = () => {
       if (v.duration === Infinity) return;
@@ -389,6 +413,18 @@ export default function IntroVideoRecorder({
     v.addEventListener("durationchange", onDur);
     try { v.currentTime = 1e101; } catch { /* fine */ }
   };
+
+  /** Replay from the top. Reloading the source is the one way that works on a stream Safari still calls live. */
+  const replay = () => {
+    const v = reviewRef.current;
+    if (!v) return;
+    try { v.currentTime = 0; } catch { /* fine */ }
+    try { v.load(); } catch { /* fine */ }
+    const p = v.play();
+    if (p && p.catch) p.catch(() => {});
+  };
+
+  const fmtBytes = (n: number) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`);
 
   const beat = beats[beatIndex];
   const nextBeat = beats[beatIndex + 1];
@@ -404,10 +440,12 @@ export default function IntroVideoRecorder({
       <div className="relative flex-1 overflow-hidden">
         {phase === "review" && reviewUrl ? (
           <video
+            ref={reviewRef}
             src={reviewUrl}
             controls
             playsInline
             autoPlay
+            preload="auto"
             onLoadedMetadata={(e) => settleDuration(e.currentTarget)}
             className="absolute inset-0 h-full w-full object-contain"
           />
@@ -518,14 +556,28 @@ export default function IntroVideoRecorder({
 
         {phase === "review" ? (
           <div className="space-y-3">
+            {reviewMeta && (
+              <p className="text-center text-[12px] tabular-nums text-white/45">
+                {clock(reviewMeta.seconds)} · {reviewMeta.container} · {fmtBytes(reviewMeta.bytes)}
+              </p>
+            )}
             {reviewUrl && (
-              <button
-                type="button"
-                onClick={use}
-                className="w-full rounded-lg bg-white px-5 py-3.5 text-[16px] font-medium text-black"
-              >
-                Use this one
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={use}
+                  className="w-full rounded-lg bg-white px-5 py-3.5 text-[16px] font-medium text-black"
+                >
+                  Use this one
+                </button>
+                <button
+                  type="button"
+                  onClick={replay}
+                  className="w-full rounded-lg border border-white/30 px-5 py-3.5 text-[16px] font-medium"
+                >
+                  Play it again
+                </button>
+              </>
             )}
             <button
               type="button"
