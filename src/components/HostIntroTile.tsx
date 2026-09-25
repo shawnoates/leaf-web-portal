@@ -27,7 +27,19 @@ export type HostIntro = {
   poster: string | null;
   /** Seconds, when the server sends it; the duration chip is hidden without it. */
   durationSec: number | null;
+  /**
+   * Mux's "W:H" for the stored take. Phones hand the browser landscape
+   * frames even held upright, so this is not always 9:16 — and a landscape
+   * take forced into a portrait box came out as a crop of one eye. The
+   * resting circle doesn't care; the open player follows it.
+   */
+  aspectRatio?: string | null;
 };
+
+function isLandscape(aspectRatio: string | null | undefined) {
+  const m = /^(\d+):(\d+)$/.exec(aspectRatio ?? "");
+  return Boolean(m && Number(m[1]) > Number(m[2]));
+}
 
 function clock(sec: number) {
   const s = Math.max(0, Math.round(sec));
@@ -128,8 +140,14 @@ export default function HostIntroTile({
       }}
     >
       <div className="absolute inset-3 flex items-end gap-4 md:inset-4">
+        {/* Portrait takes stand beside the name; a landscape take fills the
+            cover's width instead and the side column steps aside — the bio
+            is in the sheet anyway, and a 16:9 frame squeezed to the cover's
+            height would be a crop, which is the thing being fixed. */}
         <div
-          className="relative aspect-[9/16] h-full shrink-0 cursor-pointer overflow-hidden rounded-xl bg-black shadow-[0_16px_40px_rgba(0,0,0,0.5)] ring-2 ring-white"
+          className={`relative shrink-0 cursor-pointer overflow-hidden rounded-xl bg-black shadow-[0_16px_40px_rgba(0,0,0,0.5)] ring-2 ring-white ${
+            isLandscape(video.aspectRatio) ? "aspect-video max-h-full w-full" : "aspect-[9/16] h-full"
+          }`}
           onClick={(e) => {
             e.stopPropagation();
             const v = videoEl.current;
@@ -200,7 +218,7 @@ export default function HostIntroTile({
             </div>
           </div>
         </div>
-        <div className="min-w-0 flex-1 pb-2 text-white" onClick={stop}>
+        <div className={`min-w-0 flex-1 pb-2 text-white ${isLandscape(video.aspectRatio) ? "hidden" : ""}`} onClick={stop}>
           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/70">Your host</p>
           <p className="mt-1 text-2xl font-light tracking-tight md:text-[26px]">{hostName}</p>
           {hostBio && (

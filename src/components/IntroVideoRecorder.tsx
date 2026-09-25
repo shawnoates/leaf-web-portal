@@ -143,8 +143,19 @@ export default function IntroVideoRecorder({
         return;
       }
       try {
+        // Portrait is asked for three ways because phones honour it
+        // unevenly: iPhones tend to hand back 1920x1080 landscape whatever
+        // is requested, and the recorder captures exactly what the track
+        // delivers. The preview below is object-contain for that reason —
+        // the host sees the frame that is actually being recorded, not a
+        // crop of it that looks upright and isn't.
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: { ideal: 1080 }, height: { ideal: 1920 } },
+          video: {
+            facingMode: "user",
+            width: { ideal: 1080 },
+            height: { ideal: 1920 },
+            aspectRatio: { ideal: 9 / 16 },
+          },
           audio: true,
         });
         if (cancelled) {
@@ -461,8 +472,10 @@ export default function IntroVideoRecorder({
             autoPlay
             // Mirrored, because an unmirrored preview of your own face is
             // disconcerting enough to make people stop and restart. The
-            // recording itself is not mirrored.
-            className="absolute inset-0 h-full w-full object-cover [transform:scaleX(-1)]"
+            // recording itself is not mirrored. object-contain, not cover:
+            // cover showed an upright-looking crop of a landscape frame and
+            // the recording came out wide, which surprised the host.
+            className="absolute inset-0 h-full w-full object-contain [transform:scaleX(-1)]"
           />
         )}
 

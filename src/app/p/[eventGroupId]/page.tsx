@@ -36,7 +36,7 @@ type PlanShareInfo = {
     name: string;
     photoUrl: string | null;
     bio: string;
-    introVideo?: { url: string; posterUrl: string | null } | null;
+    introVideo?: { url: string; posterUrl: string | null; aspectRatio?: string | null } | null;
   } | null;
   shareId: string | null;
   calendarName: string | null;

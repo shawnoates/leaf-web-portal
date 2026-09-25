@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Lock, MapPin } from "lucide-react";
 import PlanHeroMedia from "./PlanHeroMedia";
 import HlsVideo from "@/components/HlsVideo";
+import { introVideoFrame } from "@/lib/intro-video-frame";
 import PlanWhen from "./PlanWhen";
 import StandalonePlanRsvp from "./StandalonePlanRsvp";
 
@@ -33,8 +34,9 @@ type Props = {
     name: string;
     photoUrl: string | null;
     bio: string;
-    // Their 30-second intro, once uploaded and playable.
-    introVideo?: { url: string; posterUrl: string | null } | null;
+    // Their 30-second intro, once uploaded and playable. `aspectRatio` is
+    // Mux's "W:H" for the stored take; the box follows it.
+    introVideo?: { url: string; posterUrl: string | null; aspectRatio?: string | null } | null;
   } | null;
   calendarName: string | null;
   calendarProfilePhoto: string | null;
@@ -175,10 +177,14 @@ export default function StandalonePlanCard({
             else is coming or where anyone lives.
           */}
           {variant !== "copy" && rosterHost ? (
-            <div className="flex gap-3 rounded-lg bg-zinc-50 p-3">
+            <div className="flex flex-wrap gap-3 rounded-lg bg-zinc-50 p-3">
               {rosterHost.introVideo ? (
                 // The intro stands in for the avatar: its poster is the face.
-                <div className="w-[132px] shrink-0 aspect-[9/16] overflow-hidden rounded-xl bg-zinc-900">
+                // Sized from the take's real shape, never cropped to a tall box.
+                <div
+                  className={introVideoFrame(rosterHost.introVideo.aspectRatio).className}
+                  style={introVideoFrame(rosterHost.introVideo.aspectRatio).style}
+                >
                   <HlsVideo
                     src={rosterHost.introVideo.url}
                     poster={rosterHost.introVideo.posterUrl ?? rosterHost.photoUrl}

@@ -10,7 +10,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
-import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
+import { FriendModeMark } from "@/components/crew/FriendModeGlyphs";
 import { dayLabel, optionLabel, type DateOption, type Venue } from "@/lib/crew";
 
 export type CrewAction =
@@ -68,7 +68,7 @@ export function CrewActionCard({ actions, onAnswered }: { actions: CrewAction[];
     <section className="sinv fm-dark" role="region" aria-label="Your crew needs an answer">
       <div className="sinv-head">
         <div className="eyebrow sinv-eyebrow">
-          <FriendModeIcon size={20} />
+          <FriendModeMark width={32} />
           {a.crewName}
         </div>
         {actions.length > 1 && <div className="eyebrow sinv-count">{index + 1} of {actions.length}</div>}
@@ -146,7 +146,7 @@ export function CrewQuietCard({ rows }: { rows: CrewRow[] }) {
     <section className="sinv fm-dark" role="region" aria-label="Your crew">
       <div className="sinv-head">
         <div className="eyebrow sinv-eyebrow">
-          <FriendModeIcon size={20} />
+          <FriendModeMark width={32} />
           {c.name}
         </div>
         {rows.length > 1 && (

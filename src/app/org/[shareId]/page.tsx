@@ -37,6 +37,7 @@ import { isVenueBlacklisted } from "@/lib/venue-blacklist";
 import { fetchVenuePhotoUrl } from "@/lib/google-places";
 import PlanAddonStack from "@/components/PlanAddonStack";
 import HlsVideo from "@/components/HlsVideo";
+import { introVideoFrame } from "@/lib/intro-video-frame";
 import HostIntroTile, { type HostIntro } from "@/components/HostIntroTile";
 import {
   Plus,
@@ -3021,7 +3022,7 @@ export default function OrgCalendarPage() {
         hostBio: ((p.host as Record<string, unknown>)?.bio as string) || null,
         hostIntroVideo: (() => {
           const iv = (p.host as Record<string, unknown>)?.introVideo as
-            | { url?: string; posterUrl?: string | null; durationSec?: number | null }
+            | { url?: string; posterUrl?: string | null; durationSec?: number | null; aspectRatio?: string | null }
             | null
             | undefined;
           return iv && typeof iv.url === "string" && iv.url
@@ -3029,6 +3030,10 @@ export default function OrgCalendarPage() {
                 url: iv.url,
                 poster: iv.posterUrl ?? null,
                 durationSec: typeof iv.durationSec === "number" && iv.durationSec > 0 ? iv.durationSec : null,
+                // Mux's "W:H" for the stored take. Phones hand the browser
+                // landscape frames even held upright; the box follows this
+                // so the take is shown whole, not cropped to a tall slice.
+                aspectRatio: typeof iv.aspectRatio === "string" ? iv.aspectRatio : null,
               }
             : null;
         })(),
@@ -5825,12 +5830,17 @@ export default function OrgCalendarPage() {
                     the plan, this is about the person, and a follower host
                     has no bio to show here (their words ARE the note). */}
                 {selectedEvent.hasRosterHost && (selectedEvent.hostBio || selectedEvent.hostIntroVideo) && (
-                  <div className="flex gap-3 rounded-lg bg-zinc-50 p-3">
+                  <div className="flex flex-wrap gap-3 rounded-lg bg-zinc-50 p-3">
                     {/* The intro video, when there is one, stands in for the
-                        avatar: its poster IS the face. Portrait, because it
-                        was shot on a phone held upright. Never autoplays. */}
+                        avatar: its poster IS the face. Sized from the take's
+                        real shape — phones hand the browser landscape frames
+                        even held upright, and cropping those into a tall box
+                        zoomed the face onto one eye. Never autoplays. */}
                     {selectedEvent.hostIntroVideo ? (
-                      <div className="w-[132px] shrink-0 aspect-[9/16] overflow-hidden rounded-xl bg-zinc-900">
+                      <div
+                        className={introVideoFrame(selectedEvent.hostIntroVideo.aspectRatio).className}
+                        style={introVideoFrame(selectedEvent.hostIntroVideo.aspectRatio).style}
+                      >
                         <HlsVideo
                           src={selectedEvent.hostIntroVideo.url}
                           poster={selectedEvent.hostIntroVideo.poster ?? selectedEvent.hostAvatar}

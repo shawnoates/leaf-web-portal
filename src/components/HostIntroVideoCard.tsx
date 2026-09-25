@@ -17,12 +17,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Parse from "@/lib/parse-client";
 import HlsVideo from "@/components/HlsVideo";
 import IntroVideoRecorder, { type Beat, canRecordInBrowser } from "@/components/IntroVideoRecorder";
+import { introVideoFrame } from "@/lib/intro-video-frame";
 
 export type IntroVideoInfo = {
   available: boolean;
   status: "none" | "processing" | "ready" | "errored" | "removed";
   url: string | null;
   posterUrl: string | null;
+  /** Mux's "W:H" for the stored take; the player box follows it. */
+  aspectRatio?: string | null;
+  /** The plan was called off; the video has no page to be on. */
+  planCancelled?: boolean;
   durationSec: number | null;
   uploadedAt: string | null;
   bonusEarned: boolean;
@@ -250,13 +255,17 @@ export default function HostIntroVideoCard({
       {/* ── Heading: what this is and what it pays ── */}
       {live ? (
         <>
-          <h2 className="text-[17px] font-semibold text-leaf-900">Your intro is on the plan page.</h2>
+          <h2 className="text-[17px] font-semibold text-leaf-900">
+            {video.planCancelled ? "This plan was called off." : "Your intro is on the plan page."}
+          </h2>
           <p className="mt-1.5 text-[14px] leading-snug text-zinc-600">
-            {video.bonusEarned
-              ? `You earned ${bonus} on top — it's paid with the plan.`
-              : bonus
-                ? "Added after the bonus window, but it's up, and people RSVP to a face."
-                : "People RSVP to a face."}
+            {video.planCancelled
+              ? "Your intro is saved, but there's no plan page for it to be on any more."
+              : video.bonusEarned
+                ? `You earned ${bonus} on top — it's paid with the plan.`
+                : bonus
+                  ? "Added after the bonus window, but it's up, and people RSVP to a face."
+                  : "People RSVP to a face."}
           </p>
         </>
       ) : video.status === "processing" ? (
@@ -316,8 +325,10 @@ export default function HostIntroVideoCard({
 
       {/* ── The video itself, once live ── */}
       {live && (
-        <div className="mt-4 flex gap-4">
-          <div className="w-[132px] shrink-0 aspect-[9/16] overflow-hidden rounded-xl bg-zinc-900">
+        <div className="mt-4 flex flex-wrap gap-4">
+          {/* Sized from the take's real shape — a landscape recording is
+              shown whole, never cropped into a tall slice. */}
+          <div className={introVideoFrame(video.aspectRatio).className} style={introVideoFrame(video.aspectRatio).style}>
             <HlsVideo src={video.url as string} poster={video.posterUrl} preload="none" className="h-full w-full object-cover" />
           </div>
           <div className="min-w-0 flex-1 space-y-2 text-[14px] text-zinc-600">
