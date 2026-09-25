@@ -18,7 +18,7 @@ import { FM, FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 const MAX_MEMBERS = 15;
 
 type Person = { userId: string; name: string; channel: "push" | "sms" | "none"; canInvite: boolean; reason: string | null };
-type Preview = { people: Person[]; invited: number; joined: number; ownerSmsOptIn?: boolean; ownerHasPhone?: boolean };
+type Preview = { people: Person[]; invited: number; joined: number; ownerSmsOptIn?: boolean; ownerPhoneLast4?: string | null };
 
 export default function FriendModeCard({
   calendarId,
@@ -37,6 +37,7 @@ export default function FriendModeCard({
   const [confirming, setConfirming] = useState(false);
   // The owner's own text opt-in, offered once Friend Mode is on. Never pre-ticked.
   const [ownerSms, setOwnerSms] = useState(false);
+  const [ownerPhone, setOwnerPhone] = useState("");
   const locked = memberCount > MAX_MEMBERS;
 
   const loadPreview = useCallback(async () => {
@@ -88,7 +89,7 @@ export default function FriendModeCard({
     setSaving(true);
     setError("");
     try {
-      await Parse.Cloud.run("setCrewTexts", { crewId: calendarId, on });
+      await Parse.Cloud.run("setCrewTexts", { crewId: calendarId, on, ...(on && ownerPhone ? { phone: ownerPhone } : {}) });
       setOwnerSms(false);
       await loadPreview();
     } catch (err) {
@@ -151,7 +152,7 @@ export default function FriendModeCard({
             </div>
           )}
 
-          {enabled && preview?.ownerHasPhone && (
+          {enabled && preview && (
             preview.ownerSmsOptIn ? (
               <p>
                 Texts to you about this crew are on.{" "}
@@ -166,7 +167,19 @@ export default function FriendModeCard({
                     Reply HELP for help, STOP to opt out.
                   </span>
                 </label>
-                {ownerSms && (
+                <label className="w-full pl-6">
+                  <span className="block" style={{ color: FM.mutedText }}>Mobile number</span>
+                  <input
+                    value={ownerPhone}
+                    onChange={(e) => setOwnerPhone(e.target.value)}
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder={preview.ownerPhoneLast4 ? `Number on file ending in ${preview.ownerPhoneLast4}` : "(555) 555-5555"}
+                    className="mt-1 w-full max-w-xs rounded-lg px-3 py-1.5 text-[13px]"
+                    style={{ background: FM.canvas, border: `1px solid ${FM.line}`, color: FM.ink }}
+                  />
+                </label>
+                {ownerSms && (preview.ownerPhoneLast4 || ownerPhone.replace(/\D/g, "").length >= 10) && (
                   <button onClick={() => setTexts(true)} disabled={saving} className="rounded-full px-3 py-1 font-medium disabled:opacity-60" style={{ background: FM.accent, color: FM.canvas }}>
                     Save
                   </button>

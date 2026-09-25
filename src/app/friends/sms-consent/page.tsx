@@ -14,10 +14,16 @@ export const metadata: Metadata = {
  */
 function Box({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="mt-3 flex items-start gap-2 rounded-xl border border-zinc-300 p-3 text-[13px]">
-      <input type="checkbox" disabled className="mt-0.5" aria-label={`${label} (example, not pre-checked)`} />
-      <span>{children}</span>
-    </label>
+    <div className="mt-3 rounded-xl border border-zinc-300 p-3 text-[13px]">
+      <label className="flex items-start gap-2">
+        <input type="checkbox" disabled className="mt-0.5" aria-label={`${label} (example, not pre-checked)`} />
+        <span>{children}</span>
+      </label>
+      <div className="mt-2 pl-6">
+        <span className="block text-xs text-zinc-500">Mobile number</span>
+        <div className="mt-1 rounded-lg border border-zinc-300 px-3 py-1.5 text-zinc-400">(555) 555-5555</div>
+      </div>
+    </div>
   );
 }
 
@@ -34,7 +40,9 @@ export default function SmsConsentPage() {
       </p>
       <p className="mt-2 text-[15px]">
         Leaf sends no message from this number until the person checks the unchecked box below, or texts a keyword (IN, JOIN or
-        START) to this number themselves. The box is never pre-checked, and every form submits whether or not it is checked.
+        START) to this number themselves. The box is never pre-checked, and every form submits whether or not it is checked. Each
+        box has a mobile number field on the same form, so it is clear which number is agreeing to receive texts. It is pre-filled
+        with the number on the person&rsquo;s Leaf account when there is one (shown by its last four digits) and can be changed.
       </p>
 
       <h2 className="mt-8 text-lg font-semibold text-zinc-900">1. Invited members, on their crew page</h2>

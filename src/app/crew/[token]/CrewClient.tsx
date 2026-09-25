@@ -45,6 +45,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const [error, setError] = useState("");
   // "Text me about this crew's plans": never pre-ticked (10DLC).
   const [smsBox, setSmsBox] = useState(false);
+  const [smsPhone, setSmsPhone] = useState("");
+  const phoneOk = !smsBox || Boolean(me.phoneLast4) || smsPhone.replace(/\D/g, "").length >= 10;
 
   const act = async (key: string, fn: () => Promise<unknown>) => {
     setBusy(key);
@@ -78,9 +80,9 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
           <p className="mt-2 text-[15px] text-zinc-700">
             Join {crew.name} and Leaf finds a night that works for the group and plans it, {rhythmLabel(crew.rhythmDays).toLowerCase()}.
           </p>
-          {me.hasPhone && <SmsOptInBox checked={smsBox} onChange={setSmsBox} />}
+          <SmsOptInBox checked={smsBox} onChange={setSmsBox} phone={smsPhone} onPhone={setSmsPhone} last4={me.phoneLast4 ?? null} />
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={() => act("join", () => run("respondToCrewInvite", auth, { accept: true, sms: smsBox }))} disabled={busy !== null}>
+            <Button onClick={() => act("join", () => run("respondToCrewInvite", auth, { accept: true, sms: smsBox, phone: smsBox ? smsPhone || null : null }))} disabled={busy !== null || !phoneOk}>
               Join
             </Button>
             <Button kind="ghost" onClick={() => act("decline", () => run("respondToCrewInvite", auth, { accept: false }))} disabled={busy !== null}>
@@ -90,7 +92,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
         </Card>
       )}
 
-      {me.status === "in" && me.hasPhone && (
+      {me.status === "in" && (
         me.smsOptIn ? (
           <p className="mb-4 text-[13px] text-zinc-500">
             Texts about {crew.name} are on.{" "}
@@ -99,9 +101,9 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
         ) : (
           <Card className="mb-4">
             <p className="text-[15px] text-zinc-700">Want these by text instead?</p>
-            <SmsOptInBox checked={smsBox} onChange={setSmsBox} />
+            <SmsOptInBox checked={smsBox} onChange={setSmsBox} phone={smsPhone} onPhone={setSmsPhone} last4={me.phoneLast4 ?? null} />
             <div className="mt-3">
-              <Button small onClick={() => act("texts", () => run("setCrewTexts", auth, { on: true }))} disabled={busy !== null || !smsBox}>
+              <Button small onClick={() => act("texts", () => run("setCrewTexts", auth, { on: true, phone: smsPhone || null }))} disabled={busy !== null || !smsBox || !phoneOk}>
                 Turn on texts
               </Button>
             </div>
@@ -398,16 +400,36 @@ function CycleCard({
   );
 }
 
-/** The one text-message opt-in. Starts unticked; joining never requires it. */
-function SmsOptInBox({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+/**
+ * The one text-message opt-in, with the number it applies to on the same
+ * form (10DLC). Starts unticked; joining never requires it. The number on
+ * file is shown only by its last 4 digits (this page's link can be shared);
+ * typing one replaces it for this crew's texts.
+ */
+function SmsOptInBox({ checked, onChange, phone, onPhone, last4 }: {
+  checked: boolean; onChange: (v: boolean) => void; phone: string; onPhone: (v: string) => void; last4: string | null;
+}) {
   return (
-    <label className="mt-3 flex items-start gap-2 rounded-xl border border-zinc-300 p-3 text-[13px] text-zinc-700">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5" />
-      <span>
-        <span className="block font-medium text-leaf-900">Text me about this crew&rsquo;s plans</span>
-        Date polls and the night&rsquo;s details, so you don&rsquo;t have to open the app. Up to 5 msgs/wk. Msg &amp; data rates may apply.
-        Reply HELP for help, STOP to opt out.
-      </span>
-    </label>
+    <div className="mt-3 rounded-xl border border-zinc-300 p-3 text-[13px] text-zinc-700">
+      <label className="flex items-start gap-2">
+        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5" />
+        <span>
+          <span className="block font-medium text-leaf-900">Text me about this crew&rsquo;s plans</span>
+          Date polls and the night&rsquo;s details, so you don&rsquo;t have to open the app. Up to 5 msgs/wk. Msg &amp; data rates may apply.
+          Reply HELP for help, STOP to opt out.
+        </span>
+      </label>
+      <label className="mt-2 block pl-6">
+        <span className="block text-xs text-zinc-500">Mobile number</span>
+        <input
+          value={phone}
+          onChange={(e) => onPhone(e.target.value)}
+          inputMode="tel"
+          autoComplete="tel"
+          placeholder={last4 ? `Number on file ending in ${last4}` : "(555) 555-5555"}
+          className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-[14px]"
+        />
+      </label>
+    </div>
   );
 }
