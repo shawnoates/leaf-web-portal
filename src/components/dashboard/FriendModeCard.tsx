@@ -284,7 +284,7 @@ export default function FriendModeCard({
         </div>
       )}
       {intro && !settingUp && (
-        <FriendModeIntro onClose={() => setIntro(false)} onStart={() => { setIntro(false); setSettingUp(true); }} />
+        <FriendModeIntro source="dashboard" onClose={() => setIntro(false)} onStart={() => { setIntro(false); setSettingUp(true); }} />
       )}
       {!enabled && !locked && preview?.lastOneTime && (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 pb-1 text-[12px]" style={{ color: FM.mutedText }}>

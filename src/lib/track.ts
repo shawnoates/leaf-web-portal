@@ -26,6 +26,10 @@ export type WebEvent =
   | "cross_promo_decided"
   | "rsvp_full_alternatives_shown"
   | "rsvp_full_alternative_tap"
+  | "fm_intro_shown"
+  | "fm_intro_cta"
+  | "fm_setup_started"
+  | "fm_setup_completed"
   | "plan_detail_full_alternative_tap";
 
 const ANON_COOKIE = "leaf_anon_id";

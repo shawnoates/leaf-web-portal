@@ -16,6 +16,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { Check, MessageCircle, RefreshCw, X } from "lucide-react";
 import { FriendModeMark } from "@/components/crew/FriendModeGlyphs";
+import { track } from "@/lib/track";
 
 const STAMP_KEY = "leaf_fm_intro_shown";
 const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
@@ -39,19 +40,34 @@ export function stampFriendModeIntro() {
   try { localStorage.setItem(STAMP_KEY, String(Date.now())); } catch { /* ignore */ }
 }
 
+/** Where a Friend Mode setup started; logged on the funnel events and stored on the calendar. */
+export type FriendModeSource = "me" | "dashboard" | "ios";
+
 export default function FriendModeIntro({
   onClose,
   onStart,
   startHref,
   startLabel = "Turn on Friend Mode",
+  source,
 }: {
   onClose: () => void;
   /** The primary button's action; `startHref` makes it a link instead. */
   onStart?: () => void;
   startHref?: string;
   startLabel?: string;
+  source: FriendModeSource;
 }) {
   const panel = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    track("fm_intro_shown", { src: source });
+    // Once per open; the source doesn't change while it's up.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const start = () => {
+    track("fm_intro_cta", { src: source });
+    onStart?.();
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -142,9 +158,9 @@ export default function FriendModeIntro({
           <div className="mt-auto flex flex-col gap-1.5 lg:gap-3.5">
             <div className="flex flex-col gap-1.5 lg:flex-row lg:items-center lg:gap-2.5">
               {startHref ? (
-                <Link href={startHref} className={cta}>{startLabel}</Link>
+                <Link href={startHref} onClick={() => track("fm_intro_cta", { src: source })} className={cta}>{startLabel}</Link>
               ) : (
-                <button type="button" onClick={onStart} className={cta}>{startLabel}</button>
+                <button type="button" onClick={start} className={cta}>{startLabel}</button>
               )}
               <button
                 type="button"

@@ -27,7 +27,7 @@ import {
   CrewActionCard, CrewQuietCard,
   type CrewAction, type CrewRow,
 } from "./CrewCards";
-import FriendModeIntro, { friendModeIntroDue, stampFriendModeIntro } from "@/components/crew/FriendModeIntro";
+import FriendModeIntro, { friendModeIntroDue, stampFriendModeIntro, type FriendModeSource } from "@/components/crew/FriendModeIntro";
 import FriendModeSetup from "@/components/dashboard/FriendModeSetup";
 import FriendModeCalendarPicker from "@/components/crew/FriendModeCalendarPicker";
 
@@ -836,12 +836,34 @@ function DashboardView({
   // crew yet; the needs-a-host idea waits for the next visit. Calendar owners
   // pick which calendar it goes on (or make another); everyone else sets up
   // a new private calendar right here.
-  const [fmIntro, setFmIntro] = useState(() => (data.crews || []).length === 0 && friendModeIntroDue());
-  const [fmPick, setFmPick] = useState(false);
-  const [fmSetup, setFmSetup] = useState<{ calendarId: string | null; name: string } | null>(null);
+  //
+  // `?fm=start` (the app's "Set up Friend Mode", `&src=ios`) skips the intro
+  // and opens the flow itself. This subtree only renders once the dashboard
+  // has loaded on the client, so reading the URL here is safe.
+  const [fmStart] = useState<{ src: FriendModeSource } | null>(() => {
+    const q = new URLSearchParams(window.location.search);
+    return q.get("fm") === "start" ? { src: q.get("src") === "ios" ? "ios" : "me" } : null;
+  });
+  const fmSource: FriendModeSource = fmStart?.src ?? "me";
+  const newCrewName = () => {
+    const first = (data.person.firstName || "").trim().split(/\s+/)[0];
+    return first ? `${first}'s crew` : "My crew";
+  };
+  const [fmIntro, setFmIntro] = useState(() => !fmStart && (data.crews || []).length === 0 && friendModeIntroDue());
+  const [fmPick, setFmPick] = useState(() => Boolean(fmStart && data.person.ownsCalendars));
+  const [fmSetup, setFmSetup] = useState<{ calendarId: string | null; name: string } | null>(
+    () => (fmStart && !data.person.ownsCalendars ? { calendarId: null, name: newCrewName() } : null),
+  );
   useEffect(() => { if (fmIntro) stampFriendModeIntro(); }, [fmIntro]);
+  useEffect(() => {
+    if (!fmStart) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("fm");
+    url.searchParams.delete("src");
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }, [fmStart]);
   const [popupIdea, setPopupIdea] = useState<HostPlan | null>(
-    () => (fmIntro || firstUnseenRecap(data.pendingRecaps) ? null : data.needsHost?.popup || null),
+    () => (fmStart || fmIntro || firstUnseenRecap(data.pendingRecaps) ? null : data.needsHost?.popup || null),
   );
   const [popupAnsweredId, setPopupAnsweredId] = useState<string | null>(null);
   useEffect(() => {
@@ -1073,12 +1095,13 @@ function DashboardView({
 
       {fmIntro && (
         <FriendModeIntro
+          source="me"
           onClose={() => setFmIntro(false)}
           startLabel="Set up Friend Mode"
           onStart={() => {
             setFmIntro(false);
             if (data.person.ownsCalendars) setFmPick(true);
-            else setFmSetup({ calendarId: null, name: firstName ? `${firstName}'s crew` : "My crew" });
+            else setFmSetup({ calendarId: null, name: newCrewName() });
           }}
         />
       )}
@@ -1092,6 +1115,7 @@ function DashboardView({
         <FriendModeSetup
           calendarId={fmSetup.calendarId}
           calendarName={fmSetup.name}
+          source={fmSource}
           onDone={(finished) => { if (finished) { setFmSetup(null); void onRefresh(); } }}
           onCancel={() => setFmSetup(null)}
         />

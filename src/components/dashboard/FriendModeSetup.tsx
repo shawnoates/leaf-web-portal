@@ -19,6 +19,8 @@ import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { FM, FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
 import { RHYTHM_LABELS } from "@/lib/crew";
+import { track } from "@/lib/track";
+import type { FriendModeSource } from "@/components/crew/FriendModeIntro";
 
 type Person = { userId: string; name: string; channel: "push" | "sms" | "none"; canInvite: boolean };
 type Preview = { people: Person[]; inviteLink?: string; rhythmDays?: number };
@@ -34,6 +36,7 @@ export default function FriendModeSetup({
   calendarName,
   onDone,
   onCancel,
+  source = "dashboard",
 }: {
   /** null: make a new private calendar named `calendarName` on Turn on. */
   calendarId: string | null;
@@ -41,7 +44,15 @@ export default function FriendModeSetup({
   /** Friend Mode is on (called after step 3 succeeds and again on Done). */
   onDone: (turnedOn: boolean) => void;
   onCancel: () => void;
+  /** Where this setup started, for the funnel events and friendMode.enabledVia. */
+  source?: FriendModeSource;
 }) {
+  const path = calendarId ? "calendar" : "new";
+  useEffect(() => {
+    track("fm_setup_started", { src: source, path }, calendarId);
+    // Once per open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // The calendar the later steps act on: the one given, or the one just made.
   const [crewId, setCrewId] = useState<string | null>(calendarId);
   const [step, setStep] = useState<Step>("rhythm");
@@ -100,7 +111,7 @@ export default function FriendModeSetup({
     try {
       let id = calendarId;
       if (id) {
-        await Parse.Cloud.run("setFriendModeOnCalendar", { calendarId: id, enabled: true, rhythmDays: rhythm || 28, oneTime: rhythm === 0 });
+        await Parse.Cloud.run("setFriendModeOnCalendar", { calendarId: id, enabled: true, rhythmDays: rhythm || 28, oneTime: rhythm === 0, source });
         if (picked.size) await Parse.Cloud.run("inviteCalendarMembers", { calendarId: id, userIds: [...picked] });
       } else {
         const r = (await Parse.Cloud.run("createFriendCrew", {
@@ -109,11 +120,13 @@ export default function FriendModeSetup({
           oneTime: rhythm === 0,
           invitees: [...picked].map((userId) => ({ userId })),
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          source,
         })) as { crewId: string; inviteLink: string };
         id = r.crewId;
         setCrewId(id);
         setPreview((p) => ({ people: p?.people ?? [], inviteLink: r.inviteLink }));
       }
+      track("fm_setup_completed", { src: source, path, oneTime: rhythm === 0, invited: picked.size }, id);
       onDone(false);
       setStep("spots");
       Parse.Cloud.run("getCrewBook", { crewId: id })
