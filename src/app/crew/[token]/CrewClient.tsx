@@ -60,6 +60,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const [error, setError] = useState("");
   // "Text me about this crew's plans": never pre-ticked (10DLC).
   const [smsBox, setSmsBox] = useState(false);
+  const [textsOpen, setTextsOpen] = useState(false);
   // Calendar sync needs a Leaf sign-in (a crew link alone isn't an account session).
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => { setSignedIn(Boolean(Parse.User.current())); }, []);
@@ -119,6 +120,22 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             </div>
           </div>
 
+          {me.isOwner && (
+            <div className="flex items-center gap-4 rounded-full border border-fm-line bg-fm-surface py-2 pl-5 pr-2">
+              <div className="min-w-0 flex-1">
+                <div className="text-[15px] font-semibold">Friend Mode</div>
+                <div className="truncate text-[12px] text-fm-muted">
+                  {crew.enabled === false ? "Off · nothing is planned or texted" : "On · Leaf plans nights for this group"}
+                </div>
+              </div>
+              <FriendModeSwitch
+                label="Friend Mode"
+                checked={crew.enabled !== false}
+                disabled={busy !== null}
+                onChange={(v) => act("fm", () => Parse.Cloud.run("setFriendModeOnCalendar", { calendarId: crew.id, enabled: v }))}
+              />
+            </div>
+          )}
           {crew.joinedCount < crew.quorum && (
             <p className="m-0 text-sm text-fm-ink-2">
               Waiting on {crew.quorum - crew.joinedCount} more to join before Leaf plans the first night.
@@ -282,51 +299,19 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
         {/* Settings — right under who the crew is, so the switch is never below a long member list */}
         <div className="mt-10 lg:col-start-1 lg:row-start-2 lg:mt-8 lg:self-start lg:flex lg:flex-col lg:gap-8">
           <div className="divide-y divide-fm-line-dim rounded-3xl border border-fm-line-dim bg-fm-surface">
-            {me.isOwner && (
-              <div className="py-4 pl-5 pr-4">
-                <div className="flex items-center gap-3.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-base font-semibold lg:text-[15px]">Friend Mode</div>
-                    <div className="text-[13px] text-fm-muted">
-                      {crew.enabled === false ? "Off · nothing is planned or texted" : "On · Leaf plans nights for this group"}
-                    </div>
-                  </div>
-                  <FriendModeSwitch
-                    label="Friend Mode"
-                    checked={crew.enabled !== false}
-                    disabled={busy !== null}
-                    onChange={(v) => act("fm", () => Parse.Cloud.run("setFriendModeOnCalendar", { calendarId: crew.id, enabled: v }))}
-                  />
-                </div>
-                {crew.enabled === false && <p className="mb-0 mt-2 text-xs text-fm-muted">Turning it off ended any night being planned. Past nights stay.</p>}
-              </div>
-            )}
-
             {me.status === "in" && (
               <div className="py-4 pl-5 pr-4">
                 <div className="flex items-center gap-3.5">
                   <div className="min-w-0 flex-1">
                     <div className="text-base font-semibold lg:text-[15px]">Texts about this crew</div>
                     <div className="text-[13px] text-fm-muted">
-                      {me.smsOptIn ? `On${me.phoneLast4 ? ` · number ending ${me.phoneLast4}` : ""}` : "Off · want these by text instead?"}
+                      {me.smsOptIn ? `On${me.phoneLast4 ? ` · number ending ${me.phoneLast4}` : ""}` : "Off"}
                     </div>
                   </div>
-                  {me.smsOptIn && (
-                    <Button kind="ghost" small disabled={busy !== null} onClick={() => act("texts", () => run("setCrewTexts", auth, { on: false }))}>
-                      Turn off
-                    </Button>
-                  )}
+                  <button className="text-sm font-medium text-fm-ink underline underline-offset-4" onClick={() => setTextsOpen(true)}>
+                    Edit
+                  </button>
                 </div>
-                {!me.smsOptIn && (
-                  <>
-                    <SmsOptInBox checked={smsBox} onChange={setSmsBox} phone={smsPhone} onPhone={setSmsPhone} last4={me.phoneLast4 ?? null} />
-                    <div className="mt-3">
-                      <Button small onClick={() => act("texts", () => run("setCrewTexts", auth, { on: true, phone: smsPhone || null }))} disabled={busy !== null || !smsBox || !phoneOk}>
-                        Turn on texts
-                      </Button>
-                    </div>
-                  </>
-                )}
               </div>
             )}
 
@@ -411,6 +396,44 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
           </div>
         </div>
       </div>
+
+      {textsOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-6" onClick={() => setTextsOpen(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Texts about this crew"
+            className="w-full max-w-md rounded-t-3xl border border-fm-line bg-fm-surface p-5 sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-lg font-semibold">Texts about {crew.name}</div>
+                <div className="text-[13px] text-fm-muted">
+                  {me.smsOptIn ? `On${me.phoneLast4 ? ` · number ending ${me.phoneLast4}` : ""}` : "Off · you get these in the app or on this page"}
+                </div>
+              </div>
+              <button aria-label="Close" className="text-xl leading-none text-fm-muted" onClick={() => setTextsOpen(false)}>×</button>
+            </div>
+            {me.smsOptIn ? (
+              <div className="mt-4">
+                <Button kind="ghost" small disabled={busy !== null} onClick={() => act("texts", async () => { await run("setCrewTexts", auth, { on: false }); setTextsOpen(false); })}>
+                  Turn off texts
+                </Button>
+              </div>
+            ) : (
+              <>
+                <SmsOptInBox checked={smsBox} onChange={setSmsBox} phone={smsPhone} onPhone={setSmsPhone} last4={me.phoneLast4 ?? null} />
+                <div className="mt-4">
+                  <Button small onClick={() => act("texts", async () => { await run("setCrewTexts", auth, { on: true, phone: smsPhone || null }); setTextsOpen(false); })} disabled={busy !== null || !smsBox || !phoneOk}>
+                    Turn on texts
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </CrewShell>
   );
 }
