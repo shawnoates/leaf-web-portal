@@ -76,6 +76,11 @@ function pickMimeType() {
   return "";
 }
 
+/** A recorder's state as the union, defeating TS narrowing across a mutating call. */
+function stateOf(rec: MediaRecorder): RecordingState {
+  return rec.state;
+}
+
 function clock(sec: number) {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
@@ -115,6 +120,9 @@ export default function IntroVideoRecorder({
   const bankedMsRef = useRef(0);
   const segmentStartRef = useRef(0);
   const resultRef = useRef<{ file: File; duration: number } | null>(null);
+  const mimeRef = useRef("");
+  const finalizedRef = useRef(false);
+  const watchdogRef = useRef<number | null>(null);
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -167,14 +175,49 @@ export default function IntroVideoRecorder({
     [reviewUrl]
   );
 
+  /**
+   * Turn whatever is in `chunks` into the file and move to review. Reached
+   * from the stop event in the normal case, and from a watchdog when that
+   * event never comes — WebKit has been seen to fire nothing for a stop()
+   * issued after pause/resume cycles, and a host who has just done four
+   * takes must not be left staring at the live camera.
+   */
+  const finalize = useCallback(() => {
+    if (finalizedRef.current) return;
+    finalizedRef.current = true;
+    if (watchdogRef.current) window.clearTimeout(watchdogRef.current);
+    const rec = recorderRef.current;
+    const type = (rec && rec.mimeType) || mimeRef.current || "video/webm";
+    const blob = new Blob(chunksRef.current, { type });
+    const duration = bankedMsRef.current / 1000;
+    const ext = type.includes("mp4") ? "mp4" : "webm";
+    const file = new File([blob], `host-intro.${ext}`, { type });
+    resultRef.current = blob.size ? { file, duration } : null;
+    setReviewUrl(blob.size ? URL.createObjectURL(blob) : null);
+    if (!blob.size) setError("Nothing came back from the recorder. Try again, or use your camera app.");
+    setPhase("review");
+  }, []);
+
   const finish = useCallback(() => {
     const rec = recorderRef.current;
     if (!rec || rec.state === "inactive") return;
     if (rec.state === "recording") {
       bankedMsRef.current += Date.now() - segmentStartRef.current;
     }
-    rec.stop();
-  }, []);
+    // Stopping from paused is legal by the spec and silently broken in
+    // WebKit; give it a running recorder to stop.
+    if (rec.state === "paused") {
+      try { rec.resume(); } catch { /* fall through to stop */ }
+    }
+    try { rec.requestData(); } catch { /* not all builds have it */ }
+    try {
+      rec.stop();
+    } catch {
+      finalize();
+      return;
+    }
+    watchdogRef.current = window.setTimeout(finalize, 2000);
+  }, [finalize]);
 
   // The clock, and the hard stop at the cap. Runs only while rolling.
   useEffect(() => {
@@ -207,28 +250,26 @@ export default function IntroVideoRecorder({
     }
     // Pause and resume are what make the segments a single file. Without
     // them the whole thing is one continuous take and Next just turns the
-    // page, which is the old behaviour rather than a broken one.
+    // page, which is the old behaviour rather than a broken one. The
+    // methods existing is not proof they work — nextSegment re-checks the
+    // recorder's state after calling pause.
     setSegmented(typeof rec.pause === "function" && typeof rec.resume === "function");
     recorderRef.current = rec;
+    mimeRef.current = mimeType;
+    finalizedRef.current = false;
     rec.ondataavailable = (e) => {
       if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
     };
-    rec.onstop = () => {
-      const type = rec.mimeType || mimeType || "video/webm";
-      const blob = new Blob(chunksRef.current, { type });
-      const duration = bankedMsRef.current / 1000;
-      const ext = type.includes("mp4") ? "mp4" : "webm";
-      const file = new File([blob], `host-intro.${ext}`, { type });
-      resultRef.current = { file, duration };
-      setReviewUrl(URL.createObjectURL(blob));
-      setPhase("review");
-    };
+    rec.onstop = finalize;
+    rec.onerror = () => finalize();
     setBeatIndex(0);
     setCaptured(0);
     setElapsed(0);
-    rec.start();
+    // A timeslice, so data lands every second while rolling. If the final
+    // flush on stop() goes missing, the take is still in `chunks`.
+    rec.start(1000);
     roll();
-  }, [onUnsupported, roll]);
+  }, [onUnsupported, roll, finalize]);
 
   // 3, 2, 1 before the light goes on, so nobody's first frame is them
   // reaching for the button. Only before the first segment — a countdown
@@ -263,8 +304,17 @@ export default function IntroVideoRecorder({
       setBeatIndex((i) => Math.min(i + 1, beats.length - 1));
       return;
     }
+    try { rec.pause(); } catch { /* checked below */ }
+    // Read through a function: TS has narrowed `rec.state` to "recording"
+    // from the guard above and does not know pause() mutates it.
+    if (stateOf(rec) !== "paused") {
+      // pause() was a no-op. Drop to one continuous take rather than
+      // stranding them in a "held" screen that isn't holding anything.
+      setSegmented(false);
+      setBeatIndex((i) => Math.min(i + 1, beats.length - 1));
+      return;
+    }
     bankedMsRef.current += Date.now() - segmentStartRef.current;
-    rec.pause();
     setElapsed(bankedMsRef.current / 1000);
     setCaptured((c) => c + 1);
     setBeatIndex((i) => Math.min(i + 1, beats.length - 1));
@@ -273,19 +323,26 @@ export default function IntroVideoRecorder({
 
   const resumeSegment = () => {
     const rec = recorderRef.current;
-    if (!rec || rec.state !== "paused") return;
+    if (!rec) return;
+    if (rec.state === "recording") { roll(); return; }
+    if (rec.state !== "paused") { finish(); return; }
     setPhase("resuming");
     window.setTimeout(() => {
-      if (recorderRef.current?.state !== "paused") return;
-      recorderRef.current.resume();
+      const r = recorderRef.current;
+      if (!r) return;
+      try { r.resume(); } catch { /* checked below */ }
+      if (r.state !== "recording") { finish(); return; }
       roll();
     }, RESUME_DELAY_MS);
   };
 
   const retake = () => {
+    if (watchdogRef.current) window.clearTimeout(watchdogRef.current);
     if (reviewUrl) URL.revokeObjectURL(reviewUrl);
     setReviewUrl(null);
+    setError(null);
     resultRef.current = null;
+    finalizedRef.current = false;
     bankedMsRef.current = 0;
     setElapsed(0);
     setBeatIndex(0);
@@ -307,13 +364,30 @@ export default function IntroVideoRecorder({
   };
 
   const close = () => {
+    if (watchdogRef.current) window.clearTimeout(watchdogRef.current);
     const rec = recorderRef.current;
     if (rec && rec.state !== "inactive") {
       rec.onstop = null;
-      rec.stop();
+      try { rec.stop(); } catch { /* leaving anyway */ }
     }
     stopStream();
     onCancel();
+  };
+
+  /**
+   * MediaRecorder writes no duration into the container, so the blob reports
+   * Infinity and the scrubber is dead until the element is forced to walk to
+   * the end and back. Harmless once the real duration lands.
+   */
+  const settleDuration = (v: HTMLVideoElement) => {
+    if (v.duration !== Infinity) return;
+    const onDur = () => {
+      if (v.duration === Infinity) return;
+      v.removeEventListener("durationchange", onDur);
+      try { v.currentTime = 0; } catch { /* fine */ }
+    };
+    v.addEventListener("durationchange", onDur);
+    try { v.currentTime = 1e101; } catch { /* fine */ }
   };
 
   const beat = beats[beatIndex];
@@ -334,8 +408,13 @@ export default function IntroVideoRecorder({
             controls
             playsInline
             autoPlay
+            onLoadedMetadata={(e) => settleDuration(e.currentTarget)}
             className="absolute inset-0 h-full w-full object-contain"
           />
+        ) : phase === "review" ? (
+          // Nothing was captured. A black frame, not the live camera —
+          // the camera would read as "still recording".
+          <div className="absolute inset-0 bg-black" />
         ) : (
           <video
             ref={previewRef}
@@ -439,13 +518,15 @@ export default function IntroVideoRecorder({
 
         {phase === "review" ? (
           <div className="space-y-3">
-            <button
-              type="button"
-              onClick={use}
-              className="w-full rounded-lg bg-white px-5 py-3.5 text-[16px] font-medium text-black"
-            >
-              Use this one
-            </button>
+            {reviewUrl && (
+              <button
+                type="button"
+                onClick={use}
+                className="w-full rounded-lg bg-white px-5 py-3.5 text-[16px] font-medium text-black"
+              >
+                Use this one
+              </button>
+            )}
             <button
               type="button"
               onClick={retake}
