@@ -24,7 +24,7 @@ import NewPlanModal, {
 } from "./NewPlanModal";
 import { PlanMiniMap, PlansRailMap, type MapPin } from "./PlanMaps";
 import {
-  CrewActionCard, CrewQuietCard, CrewSuggestionBox, FriendModeIntroModal,
+  CrewActionCard, CrewQuietCard,
   type CrewAction, type CrewRow, type CrewSuggestion, type FriendModeIntro,
 } from "./CrewCards";
 
@@ -833,8 +833,6 @@ function DashboardView({
   const [popupIdea, setPopupIdea] = useState<HostPlan | null>(
     () => (firstUnseenRecap(data.pendingRecaps) ? null : data.needsHost?.popup || null),
   );
-  // "Enable Friend Mode" opens on request only (suggestion box / crews rail).
-  const [introOpen, setIntroOpen] = useState(false);
   const [popupAnsweredId, setPopupAnsweredId] = useState<string | null>(null);
   useEffect(() => {
     if (!popupIdea) return;
@@ -1005,11 +1003,8 @@ function DashboardView({
             />
           )}
 
-          {!qualifierActive && crews.length === 0 && data.crewSuggestion && (
-            <CrewSuggestionBox suggestion={data.crewSuggestion} onEnable={() => setIntroOpen(true)} />
-          )}
 
-          {!qualifierActive && !data.person.ownsCalendars && !(crews.length === 0 && data.crewSuggestion) && (
+          {!qualifierActive && !data.person.ownsCalendars && (
             <div className="prompt-box">
               <div className="prompt-body">
                 <div className="prompt-h">Hosting an event soon?</div>
@@ -1065,7 +1060,6 @@ function DashboardView({
         <PlanModal plan={openPlan} onClose={() => setOpenPlanId(null)} onRsvp={onRsvp} />
       )}
 
-      {introOpen && <FriendModeIntroModal onClose={() => setIntroOpen(false)} />}
 
       {popupIdea && (
         <NeedsHostPopup
