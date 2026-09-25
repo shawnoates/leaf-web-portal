@@ -6,10 +6,13 @@
  * can go on it (Friends / Community, up to 15 members), then hands the pick
  * to the setup pop-up. The last row is New calendar when their plan has
  * room, or Upgrade to Pro when it doesn't.
+ *
+ * Those two rows are plain <a> links, not next/link: in the iOS app's web
+ * view a real link tap is sent to Safari, which keeps the dashboard (and its
+ * Stripe checkout) out of the app. Client-side navigation would bypass that.
  */
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { ArrowRight, Lock, Plus, X } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { FriendModeMark } from "@/components/crew/FriendModeGlyphs";
@@ -131,21 +134,21 @@ export default function FriendModeCalendarPicker({
               {add && (
                 <li>
                   {add.atLimit ? (
-                    <Link href={`/dashboard/${add.orgId}?tab=settings`} className="flex min-h-[60px] w-full items-center gap-3 rounded-2xl border border-dashed border-fm-line px-4 py-3 hover:border-fm-ink-2">
+                    <a href={`/dashboard/${add.orgId}?tab=settings`} className="flex min-h-[60px] w-full items-center gap-3 rounded-2xl border border-dashed border-fm-line px-4 py-3 hover:border-fm-ink-2">
                       <span className="min-w-0 flex-1">
                         <span className="block text-[15px] font-semibold">Upgrade to Pro</span>
                         <span className="block text-[13px] text-fm-muted">Your plan is at its calendar limit. Pro adds more, so you can make one just for your crew.</span>
                       </span>
                       <ArrowRight size={18} className="shrink-0" aria-hidden />
-                    </Link>
+                    </a>
                   ) : (
-                    <Link href={`/dashboard/${add.orgId}?tab=calendars`} className="flex min-h-[60px] w-full items-center gap-3 rounded-2xl border border-dashed border-fm-line px-4 py-3 hover:border-fm-ink-2">
+                    <a href={`/dashboard/${add.orgId}?tab=calendars`} className="flex min-h-[60px] w-full items-center gap-3 rounded-2xl border border-dashed border-fm-line px-4 py-3 hover:border-fm-ink-2">
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-fm-line-dim bg-fm-surface"><Plus size={16} aria-hidden /></span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-[15px] font-semibold">New calendar</span>
                         <span className="block text-[13px] text-fm-muted">Make one just for your crew, then turn Friend Mode on there.</span>
                       </span>
-                    </Link>
+                    </a>
                   )}
                 </li>
               )}
