@@ -66,6 +66,8 @@ export default function FriendModeSetup({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Spot[] | null>(null);
   const [searching, setSearching] = useState(false);
+  /** Why a search came back empty (daily limit, or an error). */
+  const [searchNote, setSearchNote] = useState("");
   const [added, setAdded] = useState<Set<string>>(new Set());
   const on = step === "spots";
 
@@ -152,10 +154,15 @@ export default function FriendModeSetup({
   const search = async () => {
     if (query.trim().length < 3) return;
     setSearching(true);
+    setSearchNote("");
     try {
       const r = (await Parse.Cloud.run("searchCrewPlaces", { crewId, query: query.trim() })) as { results: Spot[]; limited?: boolean };
       setResults(r.results);
-    } catch { setResults([]); } finally { setSearching(false); }
+      if (r.limited) setSearchNote("This crew has used today's searches. More tomorrow.");
+    } catch (e) {
+      setResults([]);
+      setSearchNote(e instanceof Error ? e.message : "Search isn't working right now.");
+    } finally { setSearching(false); }
   };
 
   const spotRow = (s: Spot) => (
@@ -327,7 +334,7 @@ export default function FriendModeSetup({
               </form>
               {results && (
                 results.length ? <ul className="mt-3 space-y-1.5">{results.map(spotRow)}</ul>
-                  : <p className="mt-2 text-[13px]" style={{ color: FM.mutedText }}>Nothing matched. Try different words.</p>
+                  : <p className="mt-2 text-[13px]" style={{ color: FM.mutedText }}>{searchNote || "Nothing matched. Try different words."}</p>
               )}
               {popular.length > 0 && (
                 <>

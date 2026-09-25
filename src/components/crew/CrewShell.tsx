@@ -11,17 +11,31 @@
  */
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { FriendModeMark } from "@/components/crew/FriendModeGlyphs";
 import { crewHref, type CrewAuth } from "@/lib/crew";
 
+/**
+ * True inside the iOS app's crew web view (it appends "LeafApp/ios" to its
+ * user agent). The app's own nav bar already shows the crew's name and a
+ * back button, so the pages drop their top bar and back link there.
+ */
+export function useInApp() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => /LeafApp\//.test(navigator.userAgent),
+    () => false,
+  );
+}
+
 export function CrewShell({ children, wide = false, topBar }: { children: ReactNode; wide?: boolean; topBar?: ReactNode }) {
+  const inApp = useInApp();
   // `fm` keeps the older light-utility re-maps working for shared bits
   // (VenueSearch's dropdown, form fields) that aren't written in fm-* colors.
   return (
     <div className="fm min-h-screen bg-fm-canvas font-fm-sans text-fm-ink">
-      {topBar}
-      <main className={`mx-auto px-5 pb-24 ${wide ? "max-w-lg pt-5 lg:max-w-[1344px] lg:px-12 lg:pt-14" : "max-w-lg pt-8"}`}>{children}</main>
+      {!inApp && topBar}
+      <main className={`mx-auto px-5 pb-24 ${wide ? "max-w-lg pt-5 lg:max-w-[1344px] lg:px-12 lg:pt-14" : "max-w-lg pt-8"} ${inApp ? "pt-2" : ""}`}>{children}</main>
     </div>
   );
 }

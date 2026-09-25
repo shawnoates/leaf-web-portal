@@ -16,7 +16,7 @@ import Link from "next/link";
 import { CalendarDays, Check, ChevronLeft, ChevronUp, Lock, Plus, Search } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
-import { Button, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Spinner } from "@/components/crew/CrewShell";
+import { Button, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Spinner, useInApp } from "@/components/crew/CrewShell";
 import { crewHref, run, toDate, type BookSpot, type CrewAuth, type SavedPlace } from "@/lib/crew";
 
 /** A real place from Google Places (server: crew-places.js). */
@@ -43,15 +43,24 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
   // "What are you in the mood for?" — real places for a vibe (searchCrewPlaces).
   const [vibe, setVibe] = useState("");
   const [found, setFound] = useState<Suggested[] | null>(null);
+  // Why a search came back empty: the crew's daily limit, or an error —
+  // both used to read as "Nothing matched", which hid the real cause.
+  const [findNote, setFindNote] = useState("");
   const [finding, setFinding] = useState(false);
   const [showAllSaves, setShowAllSaves] = useState(false);
+  const inApp = useInApp();
   const findPlaces = async () => {
     if (vibe.trim().length < 3) return;
     setFinding(true);
+    setFindNote("");
     try {
-      const r = await run<{ results: Suggested[] }>("searchCrewPlaces", auth, { query: vibe.trim() });
+      const r = await run<{ results: Suggested[]; limited?: boolean }>("searchCrewPlaces", auth, { query: vibe.trim() });
       setFound(r.results);
-    } catch { setFound([]); } finally { setFinding(false); }
+      if (r.limited) setFindNote("This crew has used today's searches. More tomorrow.");
+    } catch (e) {
+      setFound([]);
+      setFindNote(e instanceof Error ? e.message : "Search isn't working right now.");
+    } finally { setFinding(false); }
   };
 
   const refresh = useCallback(async () => setBook(await run<Book>("getCrewBook", auth)), [auth]);
@@ -91,9 +100,11 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
 
   return (
     <CrewShell wide topBar={<CrewTopBar auth={auth} active="book" />}>
-      <Link href={crewHref(auth)} className="-ml-2 mb-2 flex min-h-11 w-fit items-center gap-0.5 px-2 text-sm font-semibold text-fm-ink-2 hover:text-fm-ink lg:hidden">
-        <ChevronLeft size={20} aria-hidden /> {crewName}
-      </Link>
+      {!inApp && (
+        <Link href={crewHref(auth)} className="-ml-2 mb-2 flex min-h-11 w-fit items-center gap-0.5 px-2 text-sm font-semibold text-fm-ink-2 hover:text-fm-ink lg:hidden">
+          <ChevronLeft size={20} aria-hidden /> {crewName}
+        </Link>
+      )}
 
       {/* Title, then the search right under it (it floated at the far right on desktop). */}
       <div className="flex flex-col gap-6 lg:gap-7">
@@ -209,7 +220,7 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
             <p className="mb-1 mt-2 text-[13px] text-fm-muted">Try &ldquo;coffee shops in Boerum Hill&rdquo; or &ldquo;cheap Thai near Atlantic Ave&rdquo;.</p>
             {found && (found.length ? (
               <ul className="divide-y divide-fm-line-dim">{found.map((p) => suggestionRow(p))}</ul>
-            ) : <p className="mt-2 text-[15px] text-fm-ink-2">Nothing matched. Try different words.</p>)}
+            ) : <p className="mt-2 text-[15px] text-fm-ink-2">{findNote || "Nothing matched. Try different words."}</p>)}
           </div>
 
           {(book.popular?.length ?? 0) > 0 && (
