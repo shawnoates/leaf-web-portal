@@ -102,7 +102,7 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
           <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">Places the crew wants to go. Leaf plans nights from here first.</p>
         </div>
         {canAdd && (
-          <div className="lg:max-w-[560px]">
+          <div className="lg:mr-[428px]" /* same width as the book column: page minus the 380px saves panel + 48px gap */>
             <label className="relative block">
               <span className="sr-only">Add a place</span>
               <Search size={18} aria-hidden className="pointer-events-none absolute left-[18px] top-1/2 z-10 -translate-y-1/2 text-fm-muted" />

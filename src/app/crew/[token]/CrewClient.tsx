@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ArrowUp, Check, ChevronUp, Plus } from "lucide-react";
+import { ArrowRight, ArrowUp, Check, ChevronUp, Plus, Settings } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import {
@@ -60,7 +60,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const [error, setError] = useState("");
   // "Text me about this crew's plans": never pre-ticked (10DLC).
   const [smsBox, setSmsBox] = useState(false);
-  const [textsOpen, setTextsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   // Calendar sync needs a Leaf sign-in (a crew link alone isn't an account session).
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => { setSignedIn(Boolean(Parse.User.current())); }, []);
@@ -117,6 +117,12 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 ))}
               </div>
               <p className="m-0 text-sm text-fm-ink-2 lg:text-[15px]">{summary}</p>
+              <button
+                className="ml-auto flex shrink-0 items-center gap-1.5 text-sm font-medium text-fm-ink hover:underline lg:ml-2"
+                onClick={() => setSettingsOpen(true)}
+              >
+                <Settings size={15} aria-hidden /> Settings
+              </button>
             </div>
           </div>
 
@@ -296,93 +302,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
           </div>
         </div>
 
-        {/* Settings — right under who the crew is, so the switch is never below a long member list */}
-        <div className="mt-10 lg:col-start-1 lg:row-start-2 lg:mt-8 lg:self-start lg:flex lg:flex-col lg:gap-8">
-          <div className="divide-y divide-fm-line-dim rounded-3xl border border-fm-line-dim bg-fm-surface">
-            {me.status === "in" && (
-              <div className="py-4 pl-5 pr-4">
-                <div className="flex items-center gap-3.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-base font-semibold lg:text-[15px]">Texts about this crew</div>
-                    <div className="text-[13px] text-fm-muted">
-                      {me.smsOptIn ? `On${me.phoneLast4 ? ` · number ending ${me.phoneLast4}` : ""}` : "Off"}
-                    </div>
-                  </div>
-                  <button className="text-sm font-medium text-fm-ink underline underline-offset-4" onClick={() => setTextsOpen(true)}>
-                    Edit
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {me.status === "in" && signedIn && (
-              <div className="py-4 pl-5 pr-4">
-                <div className="flex items-center gap-3.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-base font-semibold lg:text-[15px]">Your calendar</div>
-                    <div className="text-[13px] text-fm-muted">
-                      {me.calendarSynced ? "Synced · Leaf offers nights you're free" : "Sync Google Calendar and Leaf offers nights you're free"}
-                    </div>
-                  </div>
-                  {!me.calendarSynced && (
-                    <Button
-                      small
-                      disabled={busy !== null}
-                      onClick={() => act("gcal", async () => {
-                        const r = (await Parse.Cloud.run("createGoogleCalendarConnectUrl", { returnTo: window.location.href })) as { url: string };
-                        window.location.href = r.url;
-                      })}
-                    >
-                      Connect
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="py-4 pl-5 pr-4">
-              <label htmlFor="my-pace" className="block text-base font-semibold lg:text-[15px]">Your pace</label>
-              <select
-                id="my-pace"
-                value={pace}
-                disabled={busy !== null}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setPace(v);
-                  act("pace", () => run("setCrewPace", auth, { weeks: v ? Number(v) / 7 : null }));
-                }}
-                className="mt-2 h-11 w-full rounded-xl border px-3 text-sm"
-              >
-                <option value="">Same as the crew ({rhythmLabel(crew.rhythmDays).toLowerCase()})</option>
-                {Object.entries(RHYTHM_LABELS).map(([d, l]) => (
-                  <option key={d} value={d}>{l}</option>
-                ))}
-              </select>
-              <p className="mb-0 mt-2 text-xs text-fm-muted">Slower than the crew? Leaf only asks you on your pace.</p>
-            </div>
-          </div>
-
-          <div className="mt-5 flex justify-center gap-1 lg:-ml-3 lg:justify-start">
-            {crew.status === "active" ? (
-              <button className="h-11 rounded-full px-4 text-sm font-medium text-fm-muted hover:bg-fm-surface" onClick={() => act("pause", () => run("setCrewPaused", auth, { paused: true }))}>
-                Pause the crew
-              </button>
-            ) : (
-              <button className="h-11 rounded-full px-4 text-sm font-medium text-fm-ink hover:bg-fm-surface" onClick={() => act("resume", () => run("setCrewPaused", auth, { paused: false }))}>
-                Resume the crew
-              </button>
-            )}
-            <button
-              className="h-11 rounded-full px-4 text-sm font-medium text-fm-danger hover:bg-fm-surface"
-              onClick={() => {
-                if (window.confirm(`Leave ${crew.name}? Leaf will stop texting you about it.`)) {
-                  act("leave", async () => { await run("leaveCrew", auth); window.location.reload(); });
-                }
-              }}
-            >
-              Leave
-            </button>
-          </div>
+        {/* Members (desktop). Personal settings live in the Settings pop-up. */}
+        <div className="mt-10 lg:col-start-1 lg:row-start-2 lg:mt-8 lg:self-start">
           <div className="hidden lg:block">
             <Eyebrow>Members</Eyebrow>
             {/* Two columns so a big crew doesn't push settings below the fold. */}
@@ -397,40 +318,113 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
         </div>
       </div>
 
-      {textsOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-6" onClick={() => setTextsOpen(false)}>
+      {settingsOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-6" onClick={() => setSettingsOpen(false)}>
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Texts about this crew"
-            className="w-full max-w-md rounded-t-3xl border border-fm-line bg-fm-surface p-5 sm:rounded-3xl"
+            aria-label="Your settings"
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-fm-line bg-fm-surface px-5 pb-5 pt-4 sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-lg font-semibold">Texts about {crew.name}</div>
-                <div className="text-[13px] text-fm-muted">
-                  {me.smsOptIn ? `On${me.phoneLast4 ? ` · number ending ${me.phoneLast4}` : ""}` : "Off · you get these in the app or on this page"}
-                </div>
+                <div className="text-lg font-semibold">Your settings</div>
+                <div className="text-[13px] text-fm-muted">{crew.name} · only you see these</div>
               </div>
-              <button aria-label="Close" className="text-xl leading-none text-fm-muted" onClick={() => setTextsOpen(false)}>×</button>
+              <button aria-label="Close" className="text-xl leading-none text-fm-muted" onClick={() => setSettingsOpen(false)}>×</button>
             </div>
-            {me.smsOptIn ? (
-              <div className="mt-4">
-                <Button kind="ghost" small disabled={busy !== null} onClick={() => act("texts", async () => { await run("setCrewTexts", auth, { on: false }); setTextsOpen(false); })}>
-                  Turn off texts
-                </Button>
-              </div>
-            ) : (
-              <>
-                <SmsOptInBox checked={smsBox} onChange={setSmsBox} phone={smsPhone} onPhone={setSmsPhone} last4={me.phoneLast4 ?? null} />
-                <div className="mt-4">
-                  <Button small onClick={() => act("texts", async () => { await run("setCrewTexts", auth, { on: true, phone: smsPhone || null }); setTextsOpen(false); })} disabled={busy !== null || !smsBox || !phoneOk}>
-                    Turn on texts
-                  </Button>
+
+            <div className="mt-2 divide-y divide-fm-line-dim">
+              {me.status === "in" && (
+                <div className="py-4">
+                  <div className="text-[15px] font-semibold">Texts about this crew</div>
+                  <div className="text-[13px] text-fm-muted">
+                    {me.smsOptIn ? `On${me.phoneLast4 ? ` · number ending ${me.phoneLast4}` : ""}` : "Off · you get these in the app or on this page"}
+                  </div>
+                  {me.smsOptIn ? (
+                    <div className="mt-3">
+                      <Button kind="ghost" small disabled={busy !== null} onClick={() => act("texts", () => run("setCrewTexts", auth, { on: false }))}>
+                        Turn off texts
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <SmsOptInBox checked={smsBox} onChange={setSmsBox} phone={smsPhone} onPhone={setSmsPhone} last4={me.phoneLast4 ?? null} />
+                      <div className="mt-3">
+                        <Button small onClick={() => act("texts", () => run("setCrewTexts", auth, { on: true, phone: smsPhone || null }))} disabled={busy !== null || !smsBox || !phoneOk}>
+                          Turn on texts
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </div>
-              </>
-            )}
+              )}
+
+              {me.status === "in" && signedIn && (
+              <div className="flex items-center gap-3.5 py-4">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[15px] font-semibold">Your calendar</div>
+                  <div className="text-[13px] text-fm-muted">{me.calendarSynced ? "Synced · Leaf offers nights you're free" : "Sync Google Calendar and Leaf offers nights you're free"}</div>
+                </div>
+                {!me.calendarSynced && (
+                  <Button
+                    small
+                    disabled={busy !== null}
+                    onClick={() => act("gcal", async () => {
+                      const r = (await Parse.Cloud.run("createGoogleCalendarConnectUrl", { returnTo: window.location.href })) as { url: string };
+                      window.location.href = r.url;
+                    })}
+                  >
+                    Connect
+                  </Button>
+                )}
+              </div>
+              )}
+
+              <div className="py-4">
+                <label htmlFor="my-pace" className="block text-[15px] font-semibold">Your pace</label>
+                <select
+                  id="my-pace"
+                  value={pace}
+                  disabled={busy !== null}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setPace(v);
+                    act("pace", () => run("setCrewPace", auth, { weeks: v ? Number(v) / 7 : null }));
+                  }}
+                  className="mt-2 h-11 w-full rounded-xl border px-3 text-sm"
+                >
+                  <option value="">Same as the crew ({cadenceLabel(crew).toLowerCase()})</option>
+                  {Object.entries(RHYTHM_LABELS).map(([d, l]) => (
+                    <option key={d} value={d}>{l}</option>
+                  ))}
+                </select>
+                <p className="mb-0 mt-2 text-xs text-fm-muted">Slower than the crew? Leaf only asks you on your pace.</p>
+              </div>
+
+              <div className="flex flex-wrap gap-1 pt-3">
+                {crew.status === "active" ? (
+                  <button className="h-11 rounded-full px-3 text-sm font-medium text-fm-muted hover:bg-fm-card" onClick={() => act("pause", () => run("setCrewPaused", auth, { paused: true }))}>
+                    Pause the crew
+                  </button>
+                ) : (
+                  <button className="h-11 rounded-full px-3 text-sm font-medium text-fm-ink hover:bg-fm-card" onClick={() => act("resume", () => run("setCrewPaused", auth, { paused: false }))}>
+                    Resume the crew
+                  </button>
+                )}
+                <button
+                  className="h-11 rounded-full px-3 text-sm font-medium text-fm-danger hover:bg-fm-card"
+                  onClick={() => {
+                    if (window.confirm(`Leave ${crew.name}? Leaf will stop texting you about it.`)) {
+                      act("leave", async () => { await run("leaveCrew", auth); window.location.reload(); });
+                    }
+                  }}
+                >
+                  Leave
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
