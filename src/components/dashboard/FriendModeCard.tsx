@@ -16,6 +16,7 @@ import Parse from "@/lib/parse-client";
 import { FM, FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import { RHYTHM_LABELS } from "@/lib/crew";
 import FriendModeSetup from "./FriendModeSetup";
+import FriendModeIntro, { friendModeIntroDue, stampFriendModeIntro } from "@/components/crew/FriendModeIntro";
 
 const MAX_MEMBERS = 15;
 
@@ -50,6 +51,13 @@ export default function FriendModeCard({
     try { await navigator.clipboard.writeText(preview.inviteLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); } catch { /* ignore */ }
   };
   const locked = memberCount > MAX_MEMBERS;
+  // The once-a-month intro, for owners who haven't turned Friend Mode on.
+  const [intro, setIntro] = useState(false);
+  useEffect(() => {
+    if (initialEnabled || locked || !friendModeIntroDue()) return;
+    stampFriendModeIntro();
+    setIntro(true);
+  }, [initialEnabled, locked]);
 
   const loadPreview = useCallback(async () => {
     try {
@@ -256,6 +264,9 @@ export default function FriendModeCard({
             <p>Friend Mode is for smaller groups. Make a new private calendar for the people you want to see, then turn it on there.</p>
           )}
         </div>
+      )}
+      {intro && !settingUp && (
+        <FriendModeIntro onClose={() => setIntro(false)} onStart={() => { setIntro(false); setSettingUp(true); }} />
       )}
       {settingUp && (
         <FriendModeSetup

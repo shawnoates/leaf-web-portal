@@ -27,6 +27,7 @@ import {
   CrewActionCard, CrewQuietCard,
   type CrewAction, type CrewRow,
 } from "./CrewCards";
+import FriendModeIntro, { friendModeIntroDue, stampFriendModeIntro } from "@/components/crew/FriendModeIntro";
 
 // ============================================================================
 // Attendee dashboard (/me). The signed-in home: the next plan, everything
@@ -828,8 +829,15 @@ function DashboardView({
   // Spot probes no longer auto-open at all; they live in PlacesRail only. A
   // venue question and a hostable plan were competing for the same one modal,
   // and only one of them is something a person can act on.
+  //
+  // The Friend Mode intro takes this slot once a month for calendar owners
+  // who aren't in a crew yet; the needs-a-host idea waits for the next visit.
+  const [fmIntro, setFmIntro] = useState(
+    () => data.person.ownsCalendars && (data.crews || []).length === 0 && friendModeIntroDue(),
+  );
+  useEffect(() => { if (fmIntro) stampFriendModeIntro(); }, [fmIntro]);
   const [popupIdea, setPopupIdea] = useState<HostPlan | null>(
-    () => (firstUnseenRecap(data.pendingRecaps) ? null : data.needsHost?.popup || null),
+    () => (fmIntro || firstUnseenRecap(data.pendingRecaps) ? null : data.needsHost?.popup || null),
   );
   const [popupAnsweredId, setPopupAnsweredId] = useState<string | null>(null);
   useEffect(() => {
@@ -1058,6 +1066,10 @@ function DashboardView({
         <PlanModal plan={openPlan} onClose={() => setOpenPlanId(null)} onRsvp={onRsvp} />
       )}
 
+
+      {fmIntro && (
+        <FriendModeIntro onClose={() => setFmIntro(false)} startHref="/dashboard" startLabel="Set up Friend Mode" />
+      )}
 
       {popupIdea && (
         <NeedsHostPopup
