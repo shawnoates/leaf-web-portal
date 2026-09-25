@@ -37,6 +37,7 @@ import { isVenueBlacklisted } from "@/lib/venue-blacklist";
 import { fetchVenuePhotoUrl } from "@/lib/google-places";
 import PlanAddonStack from "@/components/PlanAddonStack";
 import HlsVideo from "@/components/HlsVideo";
+import HostIntroTile, { type HostIntro } from "@/components/HostIntroTile";
 import {
   Plus,
   Users,
@@ -94,7 +95,7 @@ interface Plan {
   hostBio: string | null;
   // The roster host's 30-second intro (Mux HLS + a portrait poster). Only
   // ever set alongside `hasRosterHost`; unset server-side when they leave.
-  hostIntroVideo: { url: string; poster: string | null } | null;
+  hostIntroVideo: HostIntro | null;
   attendeeCount: number;
   /** Accepted RSVPs only (host excluded) — the number the server compares
    *  against `capacity` when deciding to waitlist. `attendeeCount` pads +1
@@ -1867,18 +1868,9 @@ export default function OrgCalendarPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Plan | null>(null);
-  // Set when the detail sheet was opened from a card's "Meet your host" chip:
-  // the host block scrolls into view and flashes a ring once.
-  const [introFocus, setIntroFocus] = useState(false);
-  const introBlockRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!selectedEvent || !introFocus) return;
-    const el = introBlockRef.current;
-    if (!el) return;
-    el.scrollIntoView({ block: "center", behavior: "smooth" });
-    const t = setTimeout(() => setIntroFocus(false), 1600);
-    return () => clearTimeout(t);
-  }, [selectedEvent, introFocus]);
+  // Hosts whose intro was (mostly) watched from a card this visit, so the
+  // sheet's host block doesn't ask them to watch it again.
+  const [watchedIntroHosts, setWatchedIntroHosts] = useState<Set<string>>(() => new Set());
   const [rsvpPlan, setRsvpPlan] = useState<Plan | null>(null);
   // A follow that landed inside the RSVP modal (inline checkbox or the
   // post-success button) shows the interest prompt for THIS page's calendar
@@ -3028,9 +3020,16 @@ export default function OrgCalendarPage() {
         hasRosterHost: Boolean((p.host as Record<string, unknown>)?.isRosterHost),
         hostBio: ((p.host as Record<string, unknown>)?.bio as string) || null,
         hostIntroVideo: (() => {
-          const iv = (p.host as Record<string, unknown>)?.introVideo as { url?: string; posterUrl?: string | null } | null | undefined;
+          const iv = (p.host as Record<string, unknown>)?.introVideo as
+            | { url?: string; posterUrl?: string | null; durationSec?: number | null }
+            | null
+            | undefined;
           return iv && typeof iv.url === "string" && iv.url
-            ? { url: iv.url, poster: iv.posterUrl ?? null }
+            ? {
+                url: iv.url,
+                poster: iv.posterUrl ?? null,
+                durationSec: typeof iv.durationSec === "number" && iv.durationSec > 0 ? iv.durationSec : null,
+              }
             : null;
         })(),
         // rsvpCount tracks RSVPs only; a real host is always attending so add 1 —
@@ -4635,6 +4634,26 @@ export default function OrgCalendarPage() {
                       <Calendar className="w-16 h-16 text-zinc-300" />
                     </div>
                   )}
+                  {/* The host's hello, on the photo. A sibling of the image,
+                      so it doesn't ride the hover zoom; it swallows its own
+                      clicks so the cover's click (open the sheet) stays put. */}
+                  {plan.hasRosterHost && plan.hostIntroVideo && (
+                    <HostIntroTile
+                      video={plan.hostIntroVideo}
+                      hostName={plan.hostName}
+                      hostBio={plan.hostBio}
+                      hostAvatar={plan.hostAvatar}
+                      onWatched={() => {
+                        if (!plan.hostId) return;
+                        setWatchedIntroHosts((prev) => {
+                          if (prev.has(plan.hostId as string)) return prev;
+                          const next = new Set(prev);
+                          next.add(plan.hostId as string);
+                          return next;
+                        });
+                      }}
+                    />
+                  )}
                 </div>
 
                 <div className="w-full md:w-2/5 space-y-6">
@@ -4715,45 +4734,17 @@ export default function OrgCalendarPage() {
                               if they set a profile picture), else the brand
                               dot that used to sit here. */}
                           {plan.hostAvatar ? (
-                            <span className="relative flex-shrink-0">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={plan.hostAvatar}
-                                alt=""
-                                aria-hidden="true"
-                                className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200"
-                              />
-                              {/* A play badge on the face: this host recorded an intro. */}
-                              {plan.hostIntroVideo && (
-                                <span
-                                  aria-hidden="true"
-                                  className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5 items-center justify-center rounded-full ring-1 ring-white"
-                                  style={{ backgroundColor: org.brandColor || "#18181b" }}
-                                >
-                                  <span className="ml-px h-0 w-0 border-y-[2.5px] border-l-[3.5px] border-y-transparent border-l-white" />
-                                </span>
-                              )}
-                            </span>
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={plan.hostAvatar}
+                              alt=""
+                              aria-hidden="true"
+                              className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200 flex-shrink-0"
+                            />
                           ) : (
                             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: org.brandColor || "#18181b" }} />
                           )}
                           Hosted by {plan.hostName}
-                          {plan.hostIntroVideo && (
-                            <>
-                              <span className="text-zinc-300">·</span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setIntroFocus(true);
-                                  setSelectedEvent(plan);
-                                }}
-                                className="normal-case tracking-normal font-medium text-xs text-zinc-600 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900"
-                              >
-                                Meet your host
-                              </button>
-                            </>
-                          )}
                         </p>
                       )}
                       {/* Per-plan leaf-host chat pill — owner-only.
@@ -5834,12 +5825,7 @@ export default function OrgCalendarPage() {
                     the plan, this is about the person, and a follower host
                     has no bio to show here (their words ARE the note). */}
                 {selectedEvent.hasRosterHost && (selectedEvent.hostBio || selectedEvent.hostIntroVideo) && (
-                  <div
-                    ref={introBlockRef}
-                    className={`flex gap-3 rounded-lg bg-zinc-50 p-3 transition-shadow duration-700 ${
-                      introFocus ? "ring-2 ring-zinc-900/40" : "ring-0 ring-transparent"
-                    }`}
-                  >
+                  <div className="flex gap-3 rounded-lg bg-zinc-50 p-3">
                     {/* The intro video, when there is one, stands in for the
                         avatar: its poster IS the face. Portrait, because it
                         was shot on a phone held upright. Never autoplays. */}
@@ -5871,7 +5857,9 @@ export default function OrgCalendarPage() {
                       )}
                       {selectedEvent.hostIntroVideo && (
                         <p className="mt-2 text-xs text-zinc-500">
-                          ▶ A quick hello from {selectedEvent.hostName}
+                          {selectedEvent.hostId && watchedIntroHosts.has(selectedEvent.hostId)
+                            ? "✓ Watched. Play it again anytime."
+                            : `▶ A quick hello from ${selectedEvent.hostName}`}
                         </p>
                       )}
                     </div>

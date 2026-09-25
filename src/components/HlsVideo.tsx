@@ -19,6 +19,10 @@ export default function HlsVideo({
   autoPlay = false,
   muted = false,
   onUnplayable,
+  onVideoElement,
+  onTimeUpdate,
+  onPlayingChange,
+  onEnded,
 }: {
   src: string;
   poster: string | null;
@@ -28,6 +32,11 @@ export default function HlsVideo({
   autoPlay?: boolean;
   muted?: boolean;
   onUnplayable?: () => void;
+  /** The underlying element, for a caller that draws its own controls. */
+  onVideoElement?: (el: HTMLVideoElement | null) => void;
+  onTimeUpdate?: (currentSec: number, durationSec: number) => void;
+  onPlayingChange?: (playing: boolean) => void;
+  onEnded?: () => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [playable, setPlayable] = useState(true);
@@ -78,7 +87,10 @@ export default function HlsVideo({
 
   return (
     <video
-      ref={ref}
+      ref={(el) => {
+        ref.current = el;
+        onVideoElement?.(el);
+      }}
       poster={poster ?? undefined}
       controls={controls}
       autoPlay={autoPlay}
@@ -86,6 +98,17 @@ export default function HlsVideo({
       playsInline
       preload={preload}
       className={className}
+      onTimeUpdate={
+        onTimeUpdate
+          ? (e) => {
+              const v = e.currentTarget;
+              onTimeUpdate(v.currentTime, Number.isFinite(v.duration) ? v.duration : 0);
+            }
+          : undefined
+      }
+      onPlay={onPlayingChange ? () => onPlayingChange(true) : undefined}
+      onPause={onPlayingChange ? () => onPlayingChange(false) : undefined}
+      onEnded={onEnded}
     />
   );
 }
