@@ -17,6 +17,26 @@
   --color-leaf-700: #325348;
   --color-leaf-800: #253a33;
   --color-leaf-900: #1a2924;
+
+  /* Friend Mode dark palette (FRIEND_MODE_DESIGN_SPEC.md). The crew pages use
+     these directly; `.fm` below still re-maps light utilities for older
+     Friend Mode surfaces. */
+  --color-fm-canvas: #101a16;
+  --color-fm-surface: #1b2b25;
+  --color-fm-card: #253a33;
+  --color-fm-line: #3b5449;
+  --color-fm-line-dim: #2e4038;
+  --color-fm-ink: #f2f1ec;
+  --color-fm-ink-2: #c9d1cb;
+  --color-fm-muted: #a3aca6;
+  --color-fm-knob: #6f7d75;
+  --color-fm-danger: #f2a39a;
+}
+
+@theme inline {
+  --font-fm-serif: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
+  --font-fm-sans: var(--font-manrope), var(--font-geist-sans), system-ui, sans-serif;
+  --font-fm-mono: var(--font-jetbrains-mono), ui-monospace, Menlo, monospace;
 }
 
 /* Hide scrollbar for carousels */

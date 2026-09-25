@@ -4,14 +4,19 @@
  * The Crew Book — /crew/[token]/book
  *
  * Two lists. The crew's shared book (everyone sees it: who added each place,
- * 👍, tried), and "Your saves" (only you see it) with a one-tap Add. Nothing
- * moves from your saves into the book unless you tap.
+ * upvotes, tried), and "Your saves" (only you see it) with a one-tap Add.
+ * Nothing moves from your saves into the book unless you tap.
+ *
+ * Phone: one column, the book as rows. Desktop (lg+): the book as a 3-column
+ * card grid with your saves in a sidebar.
  */
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { Check, ChevronLeft, ChevronUp, Lock, Plus, Search } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
-import { Button, Card, CrewHeader, CrewShell, DeadState, Eyebrow, Spinner } from "@/components/crew/CrewShell";
+import { Button, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Spinner } from "@/components/crew/CrewShell";
 import { crewHref, run, toDate, type BookSpot, type CrewAuth, type SavedPlace } from "@/lib/crew";
 
 type Book = { crew: { id: string; name: string }; shared: BookSpot[]; mine: SavedPlace[] };
@@ -44,100 +49,156 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
   const shared = [...book.shared].sort((a, b) => (sort === "wanted" ? b.upvotes - a.upvotes : 0));
 
   return (
-    <CrewShell>
-      <CrewHeader crewName={`${crewName}'s book`} subtitle="Places the crew wants to go. Leaf plans nights from here first." backHref={crewHref(auth)} backLabel={crewName} />
-      {error && <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+    <CrewShell wide topBar={<CrewTopBar auth={auth} active="book" />}>
+      <Link href={crewHref(auth)} className="-ml-2 mb-2 flex min-h-11 w-fit items-center gap-0.5 px-2 text-sm font-semibold text-fm-ink-2 hover:text-fm-ink lg:hidden">
+        <ChevronLeft size={20} aria-hidden /> {crewName}
+      </Link>
 
-      {canAdd && (
-        <Card className="mb-4">
-          <Eyebrow>Add a place</Eyebrow>
-          <div className="mt-2">
-            <VenueSearch
-              value={query}
-              onChange={setQuery}
-              onSelect={(v) => act("search", async () => { await run("addToCrewBook", auth, { placeId: v.placeId, venue: v }); setQuery(""); })}
-              placeholder="Search a restaurant, bar, anything"
-              className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-[15px]"
-            />
-          </div>
-          <p className="mt-2 text-xs text-zinc-500">Goes into the book and your own saves.</p>
-        </Card>
-      )}
-
-      <Card className="mb-4">
-        <div className="flex items-baseline justify-between">
-          <Eyebrow>In the book · {shared.length}</Eyebrow>
-          <div className="flex gap-2 text-xs">
-            <button className={sort === "wanted" ? "font-medium text-leaf-900" : "text-zinc-500"} onClick={() => setSort("wanted")}>Most wanted</button>
-            <button className={sort === "new" ? "font-medium text-leaf-900" : "text-zinc-500"} onClick={() => setSort("new")}>New</button>
-          </div>
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between lg:gap-12">
+        <div className="flex flex-col gap-2.5 lg:gap-3">
+          <span className="hidden text-sm text-fm-muted lg:block">{crewName}</span>
+          <DisplayTitle italic="book">The</DisplayTitle>
+          <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">Places the crew wants to go. Leaf plans nights from here first.</p>
         </div>
-        {shared.length === 0 ? (
-          <p className="mt-2 text-[15px] text-zinc-700">Empty so far. Add the first place.</p>
-        ) : (
-          <ul className="mt-3 divide-y divide-zinc-100">
-            {shared.map((s) => {
-              const tried = toDate(s.triedAt);
-              return (
-                <li key={s.spotId} className="flex items-center gap-3 py-3">
-                  {s.photo ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={s.photo} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
-                  ) : (
-                    <div className="h-12 w-12 shrink-0 rounded-lg bg-leaf-50" />
-                  )}
+        {canAdd && (
+          <div className="lg:w-[480px]">
+            <label className="relative block">
+              <span className="sr-only">Add a place</span>
+              <Search size={18} aria-hidden className="pointer-events-none absolute left-[18px] top-1/2 z-10 -translate-y-1/2 text-fm-muted" />
+              <VenueSearch
+                value={query}
+                onChange={setQuery}
+                onSelect={(v) => act("search", async () => { await run("addToCrewBook", auth, { placeId: v.placeId, venue: v }); setQuery(""); })}
+                placeholder="Add a restaurant, bar, anything"
+                className="h-14 w-full rounded-full border pl-12 pr-5 text-[15px] outline-none"
+              />
+            </label>
+            <p className="mb-0 ml-5 mt-2 text-xs text-fm-muted">Goes into the book and your own saves.</p>
+          </div>
+        )}
+      </div>
+
+      {error && <p className="mt-4 rounded-2xl bg-[#3A2321] px-4 py-3 text-sm text-fm-danger">{error}</p>}
+
+      <div className="mt-8 grid gap-10 lg:mt-10 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-12">
+        <section>
+          <div className="mb-2 flex items-center justify-between lg:mb-5">
+            <Eyebrow>In the book · {shared.length}</Eyebrow>
+            <div role="group" aria-label="Sort" className="flex rounded-full border border-fm-line-dim bg-fm-surface p-[3px]">
+              {([["wanted", "Most wanted"], ["new", "New"]] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={sort === key}
+                  onClick={() => setSort(key)}
+                  className={`h-8 rounded-full px-3 text-[13px] lg:h-9 lg:px-3.5 ${sort === key ? "bg-fm-ink font-semibold text-fm-canvas" : "font-medium text-fm-ink-2 hover:text-fm-ink"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {shared.length === 0 ? (
+            <p className="m-0 text-[15px] text-fm-ink-2">Empty so far. Add the first place.</p>
+          ) : (
+            <ul className="divide-y divide-fm-line-dim lg:grid lg:grid-cols-3 lg:gap-4 lg:divide-y-0">
+              {shared.map((s) => <SpotItem key={s.spotId} s={s} busy={busy} act={act} auth={auth} />)}
+            </ul>
+          )}
+        </section>
+
+        <aside className="rounded-[28px] border border-fm-line-dim bg-fm-surface px-5 pb-2 pt-5 lg:px-6 lg:pt-6">
+          <div className="flex items-center justify-between">
+            <h2 className="m-0 font-fm-serif text-[28px] font-normal lg:text-[30px]">Your saves</h2>
+            <span className="flex items-center gap-1.5 text-xs text-fm-muted"><Lock size={13} aria-hidden /> Only you see this</span>
+          </div>
+          {book.mine.length === 0 ? (
+            <p className="mb-4 mt-2 text-[15px] text-fm-ink-2">Nothing saved yet. Places you save on Leaf show up here, ready to add in one tap.</p>
+          ) : (
+            <ul className="divide-y divide-fm-line-dim">
+              {book.mine.map((p) => (
+                <li key={p.bookmarkId} className="flex items-center gap-3 py-4">
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[15px] text-leaf-900">{s.name}</div>
-                    <div className="truncate text-xs text-zinc-500">
-                      {[s.neighborhood, s.category].filter(Boolean).join(" · ")}
-                      {s.addedBy && ` · added by ${s.addedByMe ? "you" : s.addedBy}`}
-                      {tried && ` · tried ✓ ${tried.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
-                    </div>
+                    <div className="truncate text-base font-semibold lg:text-[15px]">{p.name}</div>
+                    <div className="truncate text-[13px] text-fm-muted">{[p.neighborhood, p.category].filter(Boolean).join(" · ")}</div>
                   </div>
-                  <button
-                    className={`rounded-full px-2.5 py-1 text-sm ${s.upvotedByMe ? "bg-leaf-800 text-white" : "bg-zinc-100 text-zinc-700"}`}
-                    disabled={busy !== null}
-                    onClick={() => act(s.spotId, () => run("toggleCrewSpotUpvote", auth, { spotId: s.spotId }))}
-                    aria-label="Want to go"
-                  >
-                    👍 {s.upvotes}
-                  </button>
-                  {s.addedByMe && (
-                    <button className="text-xs text-zinc-400 hover:text-red-600" disabled={busy !== null} onClick={() => act(`rm-${s.spotId}`, () => run("removeFromCrewBook", auth, { spotId: s.spotId }))}>
-                      Remove
-                    </button>
+                  {p.inBook ? (
+                    <span className="flex shrink-0 items-center gap-1.5 text-[13px] text-fm-ink-2"><Check size={14} strokeWidth={2.4} aria-hidden /> In the book</span>
+                  ) : (
+                    <Button small disabled={busy !== null || !canAdd} onClick={() => act(p.bookmarkId, () => run("addToCrewBook", auth, { bookmarkId: p.bookmarkId }))}>
+                      <Plus size={14} strokeWidth={2.4} aria-hidden /> Add<span className="sr-only"> {p.name} to {crewName}</span>
+                    </Button>
                   )}
                 </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
-
-      <Card className="mb-4">
-        <Eyebrow>Your saves · only you see this</Eyebrow>
-        {book.mine.length === 0 ? (
-          <p className="mt-2 text-[15px] text-zinc-700">Nothing saved yet. Places you save on Leaf show up here, ready to add in one tap.</p>
-        ) : (
-          <ul className="mt-3 divide-y divide-zinc-100">
-            {book.mine.map((p) => (
-              <li key={p.bookmarkId} className="flex items-center gap-3 py-3">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[15px] text-leaf-900">{p.name}</div>
-                  <div className="truncate text-xs text-zinc-500">{[p.neighborhood, p.category].filter(Boolean).join(" · ")}</div>
-                </div>
-                {p.inBook ? (
-                  <span className="text-xs text-leaf-700">In the book ✓</span>
-                ) : (
-                  <Button small disabled={busy !== null || !canAdd} onClick={() => act(p.bookmarkId, () => run("addToCrewBook", auth, { bookmarkId: p.bookmarkId }))}>
-                    Add to {crewName}
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+              ))}
+            </ul>
+          )}
+        </aside>
+      </div>
     </CrewShell>
+  );
+}
+
+function SpotItem({ s, busy, act, auth }: {
+  s: BookSpot; busy: string | null; act: (key: string, fn: () => Promise<unknown>) => Promise<void>; auth: CrewAuth;
+}) {
+  const tried = toDate(s.triedAt);
+  const triedLabel = tried ? `Tried ${tried.toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : null;
+  const on = s.upvotedByMe;
+  return (
+    <li className="flex items-center gap-3.5 py-3.5 lg:flex-col lg:items-stretch lg:gap-3.5 lg:rounded-3xl lg:border lg:border-fm-line-dim lg:bg-fm-surface lg:p-3 lg:pb-4">
+      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-fm-line bg-fm-card lg:h-[180px] lg:w-full lg:border-0">
+        {s.photo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={s.photo} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span aria-hidden className="absolute inset-0 flex items-center justify-center font-fm-serif text-[28px] text-fm-knob lg:inset-auto lg:bottom-3 lg:left-3 lg:text-[64px] lg:leading-[0.8] lg:text-fm-line">
+            {s.name.charAt(0)}
+          </span>
+        )}
+        {triedLabel && (
+          <span className="absolute bottom-3 right-3 hidden h-[26px] items-center gap-1 rounded-full bg-fm-canvas px-2.5 text-xs text-fm-ink-2 lg:flex">
+            <Check size={12} strokeWidth={2.6} aria-hidden /> {triedLabel}
+          </span>
+        )}
+      </div>
+      <div className="flex min-w-0 flex-1 items-center gap-3 lg:px-1">
+        <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+          <div className="truncate text-base font-semibold lg:text-[17px]">{s.name}</div>
+          <div className="truncate text-[13px] text-fm-muted">
+            {[s.neighborhood, s.category].filter(Boolean).join(" · ")}
+            <span className="lg:hidden">{s.addedBy && ` · added by ${s.addedByMe ? "you" : s.addedBy}`}</span>
+          </div>
+          {s.addedBy && <div className="hidden truncate text-xs text-fm-muted lg:block">Added by {s.addedByMe ? "you" : s.addedBy}</div>}
+          {triedLabel && (
+            <span className="mt-0.5 flex h-[22px] w-fit items-center gap-1 rounded-full border border-fm-line px-2 text-[11px] text-fm-ink-2 lg:hidden">
+              <Check size={12} strokeWidth={2.6} aria-hidden /> {triedLabel}
+            </span>
+          )}
+          {s.addedByMe && (
+            <button
+              className="w-fit text-xs text-fm-muted hover:text-fm-danger"
+              disabled={busy !== null}
+              onClick={() => act(`rm-${s.spotId}`, () => run("removeFromCrewBook", auth, { spotId: s.spotId }))}
+            >
+              Remove
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          aria-pressed={on}
+          aria-label={`Want to go to ${s.name}, ${s.upvotes} ${s.upvotes === 1 ? "vote" : "votes"}`}
+          disabled={busy !== null}
+          onClick={() => act(s.spotId, () => run("toggleCrewSpotUpvote", auth, { spotId: s.spotId }))}
+          className={`flex h-14 w-[52px] shrink-0 flex-col items-center justify-center gap-px rounded-[18px] border transition disabled:opacity-60 ${
+            on ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink hover:border-fm-ink-2"
+          }`}
+        >
+          <ChevronUp size={16} strokeWidth={2.4} aria-hidden />
+          <span className={`text-sm ${on ? "font-bold" : "font-semibold"}`}>{s.upvotes}</span>
+        </button>
+      </div>
+    </li>
   );
 }

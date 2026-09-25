@@ -134,6 +134,13 @@ export function timeLabel(hhmm: string | null | undefined) {
   return m ? `${hh}:${String(m).padStart(2, "0")}${ap}` : `${hh}${ap}`;
 }
 
+/** The pieces of a 'YYYY-MM-DD' day for date tiles: { dow: "Thu", month: "Oct", day: 9 }. */
+export function dayParts(ymd: string) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return { dow: WEEKDAY[dt.getUTCDay()], month: MONTH[m - 1], day: d };
+}
+
 export function optionLabel(o: DateOption) {
   return `${dayLabel(o.date)}${o.time ? ` · ${timeLabel(o.time)}` : ""}`;
 }
