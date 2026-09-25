@@ -174,9 +174,6 @@ export default function FriendModeSetup({
                     );
                   })}
                 </ul>
-                <p className="mt-2 text-[12px]" style={{ color: FM.mutedText }}>
-                  People not on the app get a text from Leaf&rsquo;s usual number, between 9am and 9pm.
-                </p>
               </div>
             )}
 
