@@ -23,7 +23,7 @@ import {
 import ProposeNight from "@/components/crew/ProposeNight";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
-  RHYTHM_LABELS, crewHref, cycleStatusLine, dayParts, rhythmLabel, run, timeLabel, toDate,
+  RHYTHM_LABELS, crewHref, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, timeLabel, toDate,
   type CrewAuth, type CrewPage, type CycleView, type Member,
 } from "@/lib/crew";
 
@@ -83,7 +83,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const invited = members.filter((m) => m.status === "invited");
   const canStart = open.length < 2 && !open.some((c) => c.state === "picking" && !c.waitingForQuorum);
   const [first, second] = splitName(crew.name);
-  const summary = [`${joined.length} in`, invited.length ? `${invited.length} invited` : null, rhythmLabel(crew.rhythmDays).toLowerCase(), crew.status === "paused" ? "paused" : null]
+  const summary = [`${joined.length} in`, invited.length ? `${invited.length} invited` : null, cadenceLabel(crew).toLowerCase(), crew.status === "paused" ? "paused" : null]
     .filter(Boolean)
     .join(" · ");
 
@@ -144,7 +144,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <Card>
                 <Eyebrow>You&rsquo;re invited</Eyebrow>
                 <p className="mt-3 text-[15px] leading-relaxed text-fm-ink-2">
-                  Join {crew.name} and Leaf finds a night that works for the group and plans it, {rhythmLabel(crew.rhythmDays).toLowerCase()}.
+                  Join {crew.name} and Leaf finds a night that works for the group and plans it{crew.oneTime ? "" : `, ${rhythmLabel(crew.rhythmDays).toLowerCase()}`}.
                 </p>
                 <SmsOptInBox checked={smsBox} onChange={setSmsBox} phone={smsPhone} onPhone={setSmsPhone} last4={me.phoneLast4 ?? null} />
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -167,7 +167,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <Card>
                 <Eyebrow>Nothing being planned</Eyebrow>
                 <p className="mt-3 text-[15px] leading-relaxed text-fm-ink-2">
-                  Leaf will start the next night on its own ({rhythmLabel(crew.rhythmDays).toLowerCase()}). Or start one now.
+                  {crew.oneTime ? "Leaf starts planning the night as soon as enough people are in." : `Leaf will start the next night on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()}). Or start one now.`}
                 </p>
               </Card>
             )}

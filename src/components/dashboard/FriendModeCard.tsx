@@ -21,7 +21,8 @@ import FriendModeIntro, { friendModeIntroDue, stampFriendModeIntro } from "@/com
 const MAX_MEMBERS = 15;
 
 type Person = { userId: string; name: string; channel: "push" | "sms" | "none"; canInvite: boolean; reason: string | null };
-type Preview = { people: Person[]; invited: number; joined: number; ownerSmsOptIn?: boolean; ownerPhoneLast4?: string | null; inviteLink?: string; rhythmDays?: number };
+type Preview = { people: Person[]; invited: number; joined: number; ownerSmsOptIn?: boolean; ownerPhoneLast4?: string | null; inviteLink?: string; rhythmDays?: number; oneTime?: boolean;
+  lastOneTime?: { happened: boolean; venue: string | null; chosenOption: { date: string; time?: string | null } | null } | null };
 
 export default function FriendModeCard({
   calendarId,
@@ -68,7 +69,8 @@ export default function FriendModeCard({
   }, [calendarId]);
 
   useEffect(() => {
-    if (enabled && !locked) void loadPreview();
+    // Also when off: a finished "Just once" night offers "Do it again?".
+    if (!locked) void loadPreview();
   }, [enabled, locked, loadPreview]);
 
   const toggle = async (v: boolean) => {
@@ -119,11 +121,26 @@ export default function FriendModeCard({
     }
   };
 
+  // After a "Just once" night: another single night, or monthly from now on.
+  const again = async (oneTime: boolean) => {
+    setSaving(true);
+    setError("");
+    try {
+      await Parse.Cloud.run("runCrewAgain", { calendarId, oneTime, ...(oneTime ? {} : { rhythmDays: 28 }) });
+      setEnabled(true);
+      await loadPreview();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't start it again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const setRhythm = async (days: number) => {
     setSaving(true);
     setError("");
     try {
-      await Parse.Cloud.run("setCrewRhythm", { calendarId, rhythmDays: days });
+      await Parse.Cloud.run("setCrewRhythm", days === 0 ? { calendarId, oneTime: true } : { calendarId, rhythmDays: days });
       await loadPreview();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't change that.");
@@ -183,13 +200,14 @@ export default function FriendModeCard({
             <label className="flex items-center gap-2">
               <span>How often</span>
               <select
-                value={preview.rhythmDays}
+                value={preview.oneTime ? 0 : preview.rhythmDays}
                 disabled={saving}
                 onChange={(e) => setRhythm(Number(e.target.value))}
                 className="rounded-md px-2 py-1 text-[12px]"
                 style={{ background: FM.canvas, border: `1px solid ${FM.line}`, color: FM.ink }}
               >
                 {Object.entries(RHYTHM_LABELS).map(([d, label]) => <option key={d} value={d}>{label}</option>)}
+                <option value={0}>Just once</option>
               </select>
             </label>
           )}
@@ -268,6 +286,20 @@ export default function FriendModeCard({
       {intro && !settingUp && (
         <FriendModeIntro onClose={() => setIntro(false)} onStart={() => { setIntro(false); setSettingUp(true); }} />
       )}
+      {!enabled && !locked && preview?.lastOneTime && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 pb-1 text-[12px]" style={{ color: FM.mutedText }}>
+          <span style={{ color: FM.ink }}>
+            {preview.lastOneTime.happened
+              ? `That was the one night${preview.lastOneTime.venue ? ` at ${preview.lastOneTime.venue}` : ""}. Do it again?`
+              : "The night didn't come together. Try again?"}
+          </span>
+          <button onClick={() => again(true)} disabled={saving} className="rounded-full px-3 py-1 font-medium" style={{ background: FM.accent, color: FM.canvas }}>
+            One more time
+          </button>
+          <button onClick={() => again(false)} disabled={saving} className="underline" style={{ color: FM.ink }}>Make it regular</button>
+        </div>
+      )}
+
       {settingUp && (
         <FriendModeSetup
           calendarId={calendarId}

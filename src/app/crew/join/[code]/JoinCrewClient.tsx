@@ -14,10 +14,10 @@ import Parse from "@/lib/parse-client";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { CrewShell, Card, Button } from "@/components/crew/CrewShell";
 import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
-import { rhythmLabel } from "@/lib/crew";
+import { cadenceLabel } from "@/lib/crew";
 
 type Invite = {
-  name: string; ownerName: string; image: string | null; rhythmDays: number; joined: number; full: boolean;
+  name: string; ownerName: string; image: string | null; rhythmDays: number; oneTime?: boolean; joined: number; full: boolean;
   mine: { status: string | null; crewId: string } | null;
 };
 
@@ -109,7 +109,7 @@ export default function JoinCrewClient({ code }: { code: string }) {
           : <FriendModeIcon size={48} />}
         <div>
           <h1 className="text-2xl font-semibold text-leaf-900">{invite.name}</h1>
-          <p className="text-[14px] text-zinc-600">{invite.ownerName} invited you · {rhythmLabel(invite.rhythmDays)} · {invite.joined} in</p>
+          <p className="text-[14px] text-zinc-600">{invite.ownerName} invited you · {cadenceLabel(invite)} · {invite.joined} in</p>
         </div>
       </div>
 

@@ -91,6 +91,8 @@ export type CrewPage = {
     id: string;
     name: string;
     rhythmDays: number;
+    /** "Just once": one night, then Friend Mode switches itself off. */
+    oneTime?: boolean;
     status: "active" | "paused";
     /** false once the owner turned Friend Mode off */
     enabled?: boolean;
@@ -117,6 +119,11 @@ export const RHYTHM_LABELS: Record<number, string> = {
 
 export function rhythmLabel(days: number) {
   return RHYTHM_LABELS[days] || `Every ${days} days`;
+}
+
+/** "Just once" for a one-time crew, else its rhythm ("Every month"). */
+export function cadenceLabel(crew: { rhythmDays: number; oneTime?: boolean }) {
+  return crew.oneTime ? "Just once" : rhythmLabel(crew.rhythmDays);
 }
 
 const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

@@ -100,7 +100,7 @@ export default function FriendModeSetup({
     try {
       let id = calendarId;
       if (id) {
-        await Parse.Cloud.run("setFriendModeOnCalendar", { calendarId: id, enabled: true, rhythmDays: rhythm });
+        await Parse.Cloud.run("setFriendModeOnCalendar", { calendarId: id, enabled: true, rhythmDays: rhythm || 28, oneTime: rhythm === 0 });
         if (picked.size) await Parse.Cloud.run("inviteCalendarMembers", { calendarId: id, userIds: [...picked] });
       } else {
         const r = (await Parse.Cloud.run("createFriendCrew", {
@@ -191,9 +191,13 @@ export default function FriendModeSetup({
         {step === "rhythm" && (
           <div className="mt-5">
             <p className="text-[15px] font-medium">How often should Leaf plan a night?</p>
-            <p className="mt-1 text-[13px]" style={{ color: FM.mutedText }}>You can change this later. Each person can also ask to be asked less often.</p>
+            <p className="mt-1 text-[13px]" style={{ color: FM.mutedText }}>
+              {rhythm === 0
+                ? "One night, then Friend Mode switches off. You can do it again or make it regular afterwards."
+                : "You can change this later. Each person can also ask to be asked less often."}
+            </p>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              {Object.entries(RHYTHM_LABELS).map(([d, label]) => (
+              {[...Object.entries(RHYTHM_LABELS), ["0", "Just once"] as [string, string]].map(([d, label]) => (
                 <button key={d} onClick={() => setRhythm(Number(d))} className="rounded-xl px-3 py-2.5 text-left text-[14px]" style={pill(rhythm === Number(d))}>
                   {label}
                 </button>
