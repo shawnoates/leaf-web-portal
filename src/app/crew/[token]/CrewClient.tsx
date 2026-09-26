@@ -54,6 +54,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const { crew, me, members, names, open, past, book } = data;
   const [pace, setPace] = useState<string>(me.rhythmDays ? String(me.rhythmDays) : "");
   const [proposing, setProposing] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [noteSent, setNoteSent] = useState(false);
@@ -119,7 +120,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const startButtons = (
     <>
       <Button onClick={() => act("plan", () => run("startCrewCycleForMember", auth))} disabled={busy !== null} small>
-        <Plus size={16} strokeWidth={2.2} aria-hidden /> Plan something
+        <Plus size={16} strokeWidth={2.2} aria-hidden /> Have Leaf plan it
       </Button>
       <Button kind="ghost" onClick={() => setProposing(true)} small>
         I&rsquo;ve got one
@@ -254,7 +255,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 </span>
               </Link>
             ) : (
-              <ul className="no-scrollbar -mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 lg:mx-0 lg:grid lg:grid-cols-4 lg:gap-4 lg:overflow-visible lg:px-0">
+              <ul className="no-scrollbar -mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 scroll-pl-5 lg:mx-0 lg:grid lg:grid-cols-4 lg:gap-4 lg:overflow-visible lg:px-0">
                 {book.map((s) => (
                   <li key={s.spotId} className="flex w-[148px] shrink-0 snap-start flex-col gap-2 lg:w-auto lg:gap-2.5 lg:[&:nth-child(n+5)]:hidden">
                     <div className="relative h-[148px] overflow-hidden rounded-[20px] border border-fm-line bg-fm-card lg:h-[168px] lg:rounded-[22px]">
@@ -530,17 +531,23 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     Resume the crew
                   </button>
                 )}
-                <button
-                  className="h-11 rounded-full px-3 text-sm font-medium text-fm-danger hover:bg-fm-card"
-                  onClick={() => {
-                    if (window.confirm(`Leave ${crew.name}? Leaf will stop texting you about it.`)) {
-                      act("leave", async () => { await run("leaveCrew", auth); window.location.reload(); });
-                    }
-                  }}
-                >
-                  Leave
-                </button>
+                {/* Confirm in-page: window.confirm() is silently false inside the app's web view. */}
+                {confirmLeave ? (
+                  <>
+                    <button className="h-11 rounded-full bg-fm-danger px-4 text-sm font-semibold text-fm-canvas" disabled={busy !== null} onClick={() => act("leave", async () => { await run("leaveCrew", auth); window.location.reload(); })}>
+                      Yes, leave {crew.name}
+                    </button>
+                    <button className="h-11 rounded-full px-3 text-sm font-medium text-fm-ink-2 hover:bg-fm-card" onClick={() => setConfirmLeave(false)}>
+                      Stay
+                    </button>
+                  </>
+                ) : (
+                  <button className="h-11 rounded-full px-3 text-sm font-medium text-fm-danger hover:bg-fm-card" onClick={() => setConfirmLeave(true)}>
+                    Leave
+                  </button>
+                )}
               </div>
+              {confirmLeave && <p className="mb-0 mt-1 text-xs text-fm-muted">Leaf will stop texting you about this crew.</p>}
             </div>
           </div>
         </div>

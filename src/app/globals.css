@@ -128,6 +128,11 @@
    one wrapper class themes a whole page.
    ------------------------------------------------------------------------ */
 .fm { background: #101A16; color: #F2F1EC; }
+/* iOS zooms the page when a field under 16px is focused, and stays zoomed
+   after — in the app's web view that leaves the right edge cut off. */
+@media (max-width: 1023px) {
+  .fm :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { font-size: 16px; }
+}
 .fm .bg-white, .fm .bg-zinc-50 { background-color: #253A33; }
 .fm .bg-leaf-50 { background-color: #1B2B25; }
 .fm .bg-leaf-800 { background-color: #F2F1EC; color: #253A33; }
