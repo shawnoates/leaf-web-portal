@@ -142,8 +142,17 @@ export default function FriendModeCard({
     >
       <div className="flex items-center gap-4">
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-medium" style={{ color: locked ? FM.mutedText : FM.ink }}>
+          <p className="flex items-center gap-2.5 text-[14px] font-medium" style={{ color: locked ? FM.mutedText : FM.ink }}>
             Friend Mode
+            {enabled && !locked && (
+              <Link
+                href={`/crew/${calendarId}`}
+                className="rounded-full px-2.5 py-0.5 text-[11px] font-medium leading-4 no-underline"
+                style={{ border: `1px solid ${FM.line}`, color: FM.ink }}
+              >
+                View
+              </Link>
+            )}
             {!enabled && (
               <Link href="/help/calendars-and-rsvps/friend-mode" target="_blank" className="ml-2 text-[12px] font-normal italic underline" style={{ color: FM.mutedText }}>
                 What is this?
@@ -161,20 +170,15 @@ export default function FriendModeCard({
         <FriendModeSwitch label="Friend Mode" checked={enabled} locked={locked} disabled={saving} onChange={toggle} />
       </div>
 
-      {(enabled || locked || error) && (
+      {(locked || error || note || (enabled && (invitable.length > 0 || confirming))) && (
         <div className="mt-1.5 space-y-2 pb-1 text-[12px]" style={{ color: FM.mutedText }}>
           {error && <p style={{ color: "#F2A39A" }}>{error}</p>}
           {note && <p style={{ color: FM.ink }}>{note}</p>}
 
-          {enabled && !locked && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-              <Link href={`/crew/${calendarId}`} className="font-medium underline" style={{ color: FM.ink }}>Open the crew page →</Link>
-              {invitable.length > 0 && !confirming && (
-                <button onClick={() => setConfirming(true)} className="underline" style={{ color: FM.ink }}>
-                  Invite {invitable.length} new {invitable.length === 1 ? "follower" : "followers"}
-                </button>
-              )}
-            </div>
+          {enabled && !locked && invitable.length > 0 && !confirming && (
+            <button onClick={() => setConfirming(true)} className="underline" style={{ color: FM.ink }}>
+              Invite {invitable.length} new {invitable.length === 1 ? "follower" : "followers"}
+            </button>
           )}
 
           {enabled && confirming && (
