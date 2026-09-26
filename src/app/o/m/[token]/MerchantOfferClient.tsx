@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
+import PayoutSetup from "./PayoutSetup";
 
 type DateOption = { dateKey: string; label: string };
 
@@ -47,13 +48,14 @@ function Shell({ children }: { children: React.ReactNode }) {
   return <main className="mx-auto max-w-lg px-5 py-10 pb-24">{children}</main>;
 }
 
-function Closed({ title, body }: { title: string; body: string }) {
+function Closed({ title, body, children }: { title: string; body: string; children?: React.ReactNode }) {
   return (
     <Shell>
       <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-6">
         <h1 className="text-xl font-semibold text-leaf-900">{title}</h1>
         <p className="mt-3 text-[15px] leading-relaxed text-zinc-700">{body}</p>
       </div>
+      {children}
     </Shell>
   );
 }
@@ -215,7 +217,9 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               ? `We've got you down for ${done.bookedDate}. Shawn will email everyone involved with the details, and your ${title} goes up on the ${form.neighborhood} calendar.`
               : "We've saved your dates. Shawn will match you to the first open week that works and email you to confirm."
         }
-      />
+      >
+        {Number(price) > 0 && <PayoutSetup token={token} />}
+      </Closed>
     );
   }
 
@@ -243,6 +247,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           </>
         )}
       </p>
+
+      {form.state === "accepted" && form.offer.priceCents > 0 && <PayoutSetup token={token} />}
 
       <section className="mt-8 space-y-4">
         <label className="block">

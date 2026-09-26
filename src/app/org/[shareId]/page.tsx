@@ -37,6 +37,7 @@ import { AUDIENCE_COHORT_LABELS } from "@/lib/audience-cohorts";
 import { isVenueBlacklisted } from "@/lib/venue-blacklist";
 import { fetchVenuePhotoUrl } from "@/lib/google-places";
 import PlanAddonStack from "@/components/PlanAddonStack";
+import PaidRsvp from "@/components/PaidRsvp";
 import HlsVideo from "@/components/HlsVideo";
 import { introVideoFrame } from "@/lib/intro-video-frame";
 import HostIntroTile, { type HostIntro } from "@/components/HostIntroTile";
@@ -171,6 +172,9 @@ interface Plan {
    * server never sends one. The source venue is deliberately withheld: where
    * the host buys the coffee is checklist and payout data, not guest copy.
    */
+  /** Offer Pipeline paid tickets: RSVPing means paying price + booking fee. */
+  ticketPriceCents?: number | null;
+  bookingFeeCents?: number | null;
   addons?: {
     objectId: string;
     frameworkSlug: string;
@@ -831,7 +835,10 @@ function RsvpModal({
   /** Re-target the modal at another plan (a carousel tap). */
   onSwitchPlan?: (plan: Plan) => void;
 }) {
-  const verify = usePhoneVerify();
+  // A paid night needs the one-time code: the server only sells a ticket to a
+  // verified session, never to a phone number typed in.
+  const paidTicket = (plan.ticketPriceCents ?? 0) > 0;
+  const verify = usePhoneVerify(paidTicket ? { requireSession: true } : undefined);
   const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
   const [errorMsg, setErrorMsg] = useState("");
   const [notificationId, setNotificationId] = useState<string | null>(existingNotificationId || null);
@@ -1022,6 +1029,12 @@ function RsvpModal({
             )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
+              {paidTicket && (
+                <p className="text-sm text-zinc-700">
+                  ${((plan.ticketPriceCents ?? 0) / 100).toFixed((plan.ticketPriceCents ?? 0) % 100 ? 2 : 0)} ticket
+                  {(plan.bookingFeeCents ?? 0) > 0 ? ` + $${((plan.bookingFeeCents ?? 0) / 100).toFixed(2)} booking fee` : ""}
+                </p>
+              )}
               <PhoneVerifyFields verify={verify} onSendOTP={verify.sendOTP} />
               {verify.isVerified && (
                 <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -1063,6 +1076,22 @@ function RsvpModal({
                   <p className="text-xs text-zinc-400 text-right mt-0.5">{rsvpNote.length}/200</p>
                 </div>
               )}
+              {paidTicket ? (
+                verify.isVerified && verify.sessionToken ? (
+                  <PaidRsvp
+                    planId={plan.id}
+                    sessionToken={verify.sessionToken}
+                    name={verify.name}
+                    priceCents={plan.ticketPriceCents ?? 0}
+                    feeCents={plan.bookingFeeCents ?? 0}
+                    brandColor={brandColor}
+                    onPaid={(already) => {
+                      setFormStep("success");
+                      onRsvpSuccess?.(plan.id, already);
+                    }}
+                  />
+                ) : null
+              ) : (
               <button
                 type="submit"
                 disabled={formStep === "submitting" || !verify.isVerified || !verify.name}
@@ -1079,6 +1108,7 @@ function RsvpModal({
                   <>Confirm RSVP <ArrowRight className="w-4 h-4" /></>
                 )}
               </button>
+              )}
             </form>
           </div>
         ) : formStep === "error" ? (
@@ -3151,6 +3181,8 @@ export default function OrgCalendarPage() {
           : undefined,
         hostNote: p.hostNote as string || null,
         requireApproval: p.requireApproval as boolean || false,
+        ticketPriceCents: typeof p.ticketPriceCents === "number" ? p.ticketPriceCents : null,
+        bookingFeeCents: typeof p.bookingFeeCents === "number" ? p.bookingFeeCents : null,
         isPoll: p.isPoll as boolean || false,
         pollOptionCount: (p.pollOptionCount as number) || 0,
         pollVoteCount: (p.pollVoteCount as number) || 0,
