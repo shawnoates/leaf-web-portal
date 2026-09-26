@@ -17,7 +17,7 @@ import { CalendarDays, Check, ChevronLeft, ChevronUp, Lock, Plus, Search } from 
 import VenueSearch from "@/components/VenueSearch";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import { Button, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Spinner, useInApp } from "@/components/crew/CrewShell";
-import { crewHref, run, toDate, type BookSpot, type CrewAuth, type SavedPlace } from "@/lib/crew";
+import { spotHref, crewHref, run, toDate, type BookSpot, type CrewAuth, type SavedPlace } from "@/lib/crew";
 
 /** A real place from Google Places (server: crew-places.js). */
 type Suggested = {
@@ -243,6 +243,7 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
 function SpotItem({ s, busy, act, auth }: {
   s: BookSpot; busy: string | null; act: (key: string, fn: () => Promise<unknown>) => Promise<void>; auth: CrewAuth;
 }) {
+  const inApp = useInApp();
   const tried = toDate(s.triedAt);
   const triedLabel = tried ? `Tried ${tried.toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : null;
   // A dated event: its name and day while it's ahead; once passed, a tag and
@@ -256,7 +257,7 @@ function SpotItem({ s, busy, act, auth }: {
   const on = s.upvotedByMe;
   return (
     <li className={`flex items-center gap-3.5 py-3.5 lg:flex-col${s.eventPassed ? " opacity-60" : ""} lg:items-stretch lg:gap-3.5 lg:rounded-3xl lg:border lg:border-fm-line-dim lg:bg-fm-surface lg:p-3 lg:pb-4`}>
-      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-fm-line bg-fm-card lg:h-[180px] lg:w-full lg:border-0">
+      <a href={spotHref(s, inApp)} target={inApp ? undefined : "_blank"} rel="noreferrer" className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-fm-line bg-fm-card lg:h-[180px] lg:w-full lg:border-0">
         {s.photo ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={s.photo} alt="" className="h-full w-full object-cover" />
@@ -270,10 +271,10 @@ function SpotItem({ s, busy, act, auth }: {
             <Check size={12} strokeWidth={2.6} aria-hidden /> {triedLabel}
           </span>
         )}
-      </div>
+      </a>
       <div className="flex min-w-0 flex-1 items-center gap-3 lg:px-1">
         <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
-          <div className="truncate text-base font-semibold lg:text-[17px]">{s.name}</div>
+          <a href={spotHref(s, inApp)} target={inApp ? undefined : "_blank"} rel="noreferrer" className="truncate text-base font-semibold hover:underline lg:text-[17px]">{s.name}</a>
           <div className="truncate text-[13px] text-fm-muted">
             {[s.neighborhood, s.category].filter(Boolean).join(" · ")}
             <span className="lg:hidden">{s.addedBy && ` · added by ${s.addedByMe ? "you" : s.addedBy}`}</span>

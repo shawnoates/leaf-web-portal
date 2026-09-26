@@ -18,12 +18,12 @@ import { ArrowRight, ArrowUp, Check, ChevronUp, Plus, Settings, UserPlus } from 
 import Parse from "@/lib/parse-client";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import {
-  Avatar, Button, Card, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Mono, SectionTitle, Spinner,
+  Avatar, Button, Card, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Mono, SectionTitle, Spinner, useInApp,
 } from "@/components/crew/CrewShell";
 import ProposeNight from "@/components/crew/ProposeNight";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
-  RHYTHM_LABELS, crewHref, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, timeLabel, toDate,
+  RHYTHM_LABELS, crewHref, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, timeLabel, toDate,
   type CrewAuth, type CrewPage, type CycleView, type Member,
 } from "@/lib/crew";
 
@@ -54,6 +54,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const { crew, me, members, names, open, past, book } = data;
   const [pace, setPace] = useState<string>(me.rhythmDays ? String(me.rhythmDays) : "");
   const [proposing, setProposing] = useState(false);
+  const inApp = useInApp();
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState("");
@@ -255,6 +256,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <ul className="no-scrollbar -mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 scroll-pl-5 lg:mx-0 lg:grid lg:grid-cols-4 lg:gap-4 lg:overflow-visible lg:px-0">
                 {book.map((s) => (
                   <li key={s.spotId} className="flex w-[148px] shrink-0 snap-start flex-col gap-2 lg:w-auto lg:gap-2.5 lg:[&:nth-child(n+5)]:hidden">
+                   <a href={spotHref(s, inApp)} target={inApp ? undefined : "_blank"} rel="noreferrer" className="flex flex-col gap-2 lg:gap-2.5">
                     <div className="relative h-[148px] overflow-hidden rounded-[20px] border border-fm-line bg-fm-card lg:h-[168px] lg:rounded-[22px]">
                       {s.photo ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -271,6 +273,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                       <div className="truncate text-[15px] font-semibold lg:text-base">{s.name}</div>
                       <div className="truncate text-[13px] text-fm-muted">{[s.neighborhood, s.triedAt ? "tried" : null].filter(Boolean).join(" · ") || s.category}</div>
                     </div>
+                   </a>
                   </li>
                 ))}
               </ul>

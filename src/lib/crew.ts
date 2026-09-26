@@ -122,6 +122,17 @@ export const RHYTHM_LABELS: Record<number, string> = {
   56: "Every 2 months",
 };
 
+/**
+ * Where tapping a book entry goes. Inside the app the link is a leaf://
+ * deep link the crew web view turns into the native place screen; on the
+ * web it opens the place on Google Maps.
+ */
+export function spotHref(s: { locationId: string; placeId: string | null; name: string; address: string | null }, inApp: boolean) {
+  if (inApp) return `leaf://location/${s.locationId}`;
+  if (s.placeId) return `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(s.placeId)}`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([s.name, s.address].filter(Boolean).join(" "))}`;
+}
+
 export function rhythmLabel(days: number) {
   return RHYTHM_LABELS[days] || `Every ${days} days`;
 }
