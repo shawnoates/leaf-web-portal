@@ -33,10 +33,10 @@ export default function CrewBookClient({ token }: { token: string }) {
   if (load.status === "loading") return <Spinner label="Opening the book…" />;
   if (load.status === "expired") return <DeadState title="This link has expired." body="Text PLAN to the number Leaf wrote from and you'll get a fresh one." />;
   if (load.status === "error") return <DeadState title="Couldn't open the book." body={load.message} />;
-  return <BookView auth={load.auth} crewName={load.data.crew.name} canAdd={load.data.me.status === "in"} />;
+  return <BookView auth={load.auth} crewName={load.data.crew.name} canAdd={load.data.me.status === "in"} isOwner={load.data.me.isOwner} />;
 }
 
-function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string; canAdd: boolean }) {
+function BookView({ auth, crewName, canAdd, isOwner }: { auth: CrewAuth; crewName: string; canAdd: boolean; isOwner: boolean }) {
   const [book, setBook] = useState<Book | null>(null);
   const [sort, setSort] = useState<"wanted" | "new">("wanted");
   const [query, setQuery] = useState("");
@@ -163,7 +163,7 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
             </div>
           ) : (
             <ul className="divide-y divide-fm-line-dim lg:grid lg:grid-cols-3 lg:gap-4 lg:divide-y-0">
-              {shared.map((s) => <SpotItem key={s.spotId} s={s} busy={busy} act={act} auth={auth} />)}
+              {shared.map((s) => <SpotItem key={s.spotId} s={s} busy={busy} act={act} auth={auth} isOwner={isOwner} />)}
             </ul>
           )}
         </section>
@@ -240,8 +240,10 @@ function BookView({ auth, crewName, canAdd }: { auth: CrewAuth; crewName: string
   );
 }
 
-function SpotItem({ s, busy, act, auth }: {
+function SpotItem({ s, busy, act, auth, isOwner }: {
   s: BookSpot; busy: string | null; act: (key: string, fn: () => Promise<unknown>) => Promise<void>; auth: CrewAuth;
+  /** The organizer can take anything out of the book, not only their own adds. */
+  isOwner: boolean;
 }) {
   const inApp = useInApp();
   const tried = toDate(s.triedAt);
@@ -290,7 +292,7 @@ function SpotItem({ s, busy, act, auth }: {
               <Check size={12} strokeWidth={2.6} aria-hidden /> {triedLabel}
             </span>
           )}
-          {s.addedByMe && (
+          {(s.addedByMe || isOwner) && (
             <button
               className="w-fit text-xs text-fm-muted hover:text-fm-danger"
               disabled={busy !== null}
