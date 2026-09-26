@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ArrowUp, Check, ChevronUp, Plus, Settings, UserPlus } from "lucide-react";
+import { ArrowUp, Check, ChevronUp, Plus, Settings, UserPlus } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import {
@@ -237,7 +237,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             <div className="flex items-center justify-between">
               <SectionTitle>The book</SectionTitle>
               <Link href={crewHref(auth, "book")} className="flex min-h-11 items-center gap-1 text-sm font-semibold text-fm-ink hover:text-white">
-                Open<span className="hidden lg:inline"> the book</span> <ArrowRight size={16} aria-hidden />
+                <Plus size={16} strokeWidth={2.2} aria-hidden /> Add<span className="hidden lg:inline"> a place</span>
               </Link>
             </div>
             {book.length === 0 ? (
