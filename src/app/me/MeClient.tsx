@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CalendarPlus, Heart, Repeat } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import HostIdeaModal from "@/components/HostIdeaModal";
+import { HostIntroPlayer } from "@/components/HostIntroTile";
 import CommunityQualifierCard, {
   type QualifierCalendar,
   type QualifierCreatedPlan,
@@ -89,8 +90,15 @@ interface Plan {
   viewerIsHost: boolean;
   /** Owns or co-hosts the calendar — may watch the chat without attending. */
   viewerIsOwner?: boolean;
-  /** The paid Leaf roster host running this plan, when one has accepted. */
-  rosterHost?: { name: string; photoUrl: string | null } | null;
+  /** The paid Leaf roster host running this plan, when one has accepted.
+   *  `bio` and `introVideo` arrive once the server side ships; the hero
+   *  shows a plain "Hosted by" line without them. */
+  rosterHost?: {
+    name: string;
+    photoUrl: string | null;
+    bio?: string | null;
+    introVideo?: { url: string; posterUrl: string | null; aspectRatio?: string | null; durationSec?: number | null } | null;
+  } | null;
   rsvpState: RsvpState;
   /** Accepted RSVPs only — the server emits EventGroup.rsvpCount here, which
    *  excludes the host. Unlike /org's attendeeCount there is NO +1 host pad,
@@ -1184,6 +1192,18 @@ function Hero({
     wx && (wx.temp || wx.text) ? [wx.temp && `${wx.temp}°`, wx.text].filter(Boolean).join(" ") : null,
   ].filter(Boolean).join(" · ");
 
+  // The person at the door. A roster host is a stranger to most attendees,
+  // so the hero names them, and plays their hello when they recorded one.
+  // The 92px tile is too small to lay a player over, so the hello opens as
+  // its own band between the text and the actions. Not for the host
+  // themself: their pill already says "You're hosting".
+  const host = !plan.viewerIsHost && plan.rosterHost?.name ? plan.rosterHost : null;
+  const intro = host?.introVideo?.url
+    ? { url: host.introVideo.url, poster: host.introVideo.posterUrl, durationSec: host.introVideo.durationSec ?? null, aspectRatio: host.introVideo.aspectRatio ?? null }
+    : null;
+  const [introOpen, setIntroOpen] = useState(false);
+  const closeIntro = useCallback(() => setIntroOpen(false), []);
+
   return (
     <section className="hero">
       <div className="hero-top">
@@ -1195,8 +1215,35 @@ function Hero({
           </h2>
           {context && <div className="hero-ctx">{context}</div>}
           {statusLine && <div className="hero-status">{statusLine}</div>}
+          {host && (
+            <div className="hero-host">
+              {(intro?.poster || host.photoUrl) && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={intro?.poster || host.photoUrl || ""} alt="" />
+              )}
+              <span>Hosted by {host.name}</span>
+              {intro && !introOpen && (
+                <button type="button" className="meet" onClick={() => setIntroOpen(true)}>
+                  <span className="meet-play" aria-hidden />
+                  Meet {host.name}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
+      {intro && introOpen && (
+        <div className="hero-intro" onClick={closeIntro}>
+          <HostIntroPlayer
+            video={intro}
+            hostName={host!.name}
+            hostBio={host!.bio ?? null}
+            hostAvatar={host!.photoUrl}
+            onClose={closeIntro}
+            closeHint="Sound is on."
+          />
+        </div>
+      )}
       <HeroActions plan={plan} onRsvp={onRsvp} />
     </section>
   );
@@ -2673,6 +2720,18 @@ const CSS = `
   color:var(--ink);margin-bottom:4px}
 .leafme .hero-ctx{font-size:12.5px;color:var(--body)}
 .leafme .hero-status{font-size:12px;color:var(--muted);margin-top:3px}
+.leafme .hero-host{display:flex;align-items:center;gap:7px;margin-top:7px;font-size:12.5px;color:var(--body)}
+.leafme .hero-host img{width:22px;height:22px;border-radius:50%;object-fit:cover;flex:none}
+.leafme .hero-host .meet{background:none;border:0;padding:0;margin-left:2px;font:inherit;font-weight:600;
+  color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:5px;
+  text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.leafme .hero-host .meet:hover{text-decoration-color:var(--ink)}
+.leafme .hero-host .meet-play{width:0;height:0;border-style:solid;border-width:4px 0 4px 6px;
+  border-color:transparent transparent transparent var(--ink)}
+/* The hello: a dark band the player fills, the same chrome as the calendar
+   card's overlay. Fixed height so the hero doesn't reflow while it loads. */
+.leafme .hero-intro{background:#101a16;padding:14px;height:250px;box-sizing:border-box;
+  border-top:1px solid var(--rule)}
 .leafme .hero-actions{display:flex;gap:8px;flex-wrap:wrap;padding:12px 14px;
   border-top:1px solid var(--rule);background:var(--recessed)}
 .leafme .hero-actions.flat{padding:0;border-top:0;background:none;margin-top:18px}
@@ -2970,6 +3029,8 @@ const CSS = `
   .leafme .hero-title{font-size:22px;line-height:1.15;margin:5px 0 4px}
   .leafme .hero-ctx{font-size:12px}
   .leafme .hero-status{font-size:11.5px}
+  .leafme .hero-host{font-size:12px}
+  .leafme .hero-intro{height:230px;padding:12px;margin-top:12px}
   .leafme .hero-actions{padding:13px 14px 14px;border-top:0;background:none;gap:8px;flex-wrap:wrap}
   .leafme .hero-actions .btn{flex:1 1 0;padding:14px 0;border-radius:9px;font-size:12.5px}
   .leafme .hero-actions .btn.chat{flex:none;width:46px;padding:14px 0}
