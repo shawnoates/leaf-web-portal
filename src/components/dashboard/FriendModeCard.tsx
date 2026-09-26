@@ -142,17 +142,8 @@ export default function FriendModeCard({
     >
       <div className="flex items-center gap-4">
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-2.5 text-[14px] font-medium" style={{ color: locked ? FM.mutedText : FM.ink }}>
+          <p className="text-[14px] font-medium" style={{ color: locked ? FM.mutedText : FM.ink }}>
             Friend Mode
-            {enabled && !locked && (
-              <Link
-                href={`/crew/${calendarId}`}
-                className="rounded-full px-2.5 py-0.5 text-[11px] font-medium leading-4 no-underline"
-                style={{ border: `1px solid ${FM.line}`, color: FM.ink }}
-              >
-                View
-              </Link>
-            )}
             {!enabled && (
               <Link href="/help/calendars-and-rsvps/friend-mode" target="_blank" className="ml-2 text-[12px] font-normal italic underline" style={{ color: FM.mutedText }}>
                 What is this?
@@ -161,6 +152,15 @@ export default function FriendModeCard({
           </p>
           <p className="text-[12px]" style={{ color: locked ? FM.muted : enabled ? FM.accent : FM.mutedText }}>{subline}</p>
         </div>
+        {enabled && !locked && (
+          <Link
+            href={`/crew/${calendarId}`}
+            className="shrink-0 rounded-full px-3 py-1 text-[12px] font-medium leading-4 no-underline"
+            style={{ border: `1px solid ${FM.line}`, color: FM.ink }}
+          >
+            View
+          </Link>
+        )}
         {/* The switch's state in words, so it reads without knowing which side is on. */}
         {!locked && (
           <span aria-hidden className="text-[12px] font-medium uppercase tracking-wide" style={{ color: enabled ? FM.accent : FM.mutedText }}>
