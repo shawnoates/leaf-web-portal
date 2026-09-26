@@ -161,12 +161,6 @@ export default function FriendModeCard({
             View
           </Link>
         )}
-        {/* The switch's state in words, so it reads without knowing which side is on. */}
-        {!locked && (
-          <span aria-hidden className="text-[12px] font-medium uppercase tracking-wide" style={{ color: enabled ? FM.accent : FM.mutedText }}>
-            {enabled ? "On" : "Off"}
-          </span>
-        )}
         <FriendModeSwitch label="Friend Mode" checked={enabled} locked={locked} disabled={saving} onChange={toggle} />
       </div>
 
