@@ -117,15 +117,12 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
     .filter(Boolean)
     .join(" · ");
 
+  // Leaf starts each night on the crew's rhythm by itself; the only manual
+  // path is a member bringing their own place and dates.
   const startButtons = (
-    <>
-      <Button onClick={() => act("plan", () => run("startCrewCycleForMember", auth))} disabled={busy !== null} small>
-        <Plus size={16} strokeWidth={2.2} aria-hidden /> Have Leaf plan it
-      </Button>
-      <Button kind="ghost" onClick={() => setProposing(true)} small>
-        I&rsquo;ve got one
-      </Button>
-    </>
+    <Button kind="ghost" onClick={() => setProposing(true)} small>
+      I&rsquo;ve got one
+    </Button>
   );
 
   return (
@@ -212,7 +209,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <Card>
                 <Eyebrow>Nothing being planned</Eyebrow>
                 <p className="mt-3 text-[15px] leading-relaxed text-fm-ink-2">
-                  {crew.oneTime ? "Leaf starts planning the night as soon as enough people are in." : `Leaf will start the next night on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()}). Or start one now.`}
+                  {crew.oneTime ? "Leaf starts planning the night as soon as enough people are in." : `Leaf starts the next night on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()}). Got a place and a date in mind? Say so below.`}
                 </p>
               </Card>
             )}
@@ -225,7 +222,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               </div>
             )}
 
-            {canStart && !proposing && <div className="grid grid-cols-2 gap-2 lg:hidden">{startButtons}</div>}
+            {canStart && !proposing && <div className="flex lg:hidden">{startButtons}</div>}
             {proposing && (
               <ProposeNight
                 auth={auth}
