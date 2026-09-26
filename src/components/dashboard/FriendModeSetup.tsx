@@ -95,9 +95,13 @@ export default function FriendModeSetup({
   }, [calendarId]);
 
   const invitable = preview?.people.filter((p) => p.canInvite) ?? [];
+  // Invited already and not answered yet (inside the re-invite cooldown).
+  // They're a reason to turn on, not a reason the list is empty: the crew
+  // goes active and the sweep nudges them on day 3 and day 10.
+  const waiting = preview?.people.filter((p) => p.pending && !p.canInvite) ?? [];
   // A calendar needs someone invited to turn on. A new crew can start with
   // just the owner: the link to share comes right after.
-  const canFinish = !calendarId || picked.size > 0 || shared;
+  const canFinish = !calendarId || picked.size > 0 || shared || waiting.length > 0;
   const close = () => (on ? onDone(true) : onCancel());
 
   const shareLink = async () => {
@@ -276,16 +280,31 @@ export default function FriendModeSetup({
               </div>
             )}
 
+            {waiting.length > 0 && (
+              <div className="mt-4">
+                <p className="text-[12px] uppercase tracking-wide" style={{ color: FM.mutedText }}>Invited · waiting on them</p>
+                <ul className="mt-2 space-y-1.5">
+                  {waiting.map((p) => (
+                    <li key={p.userId} className="flex items-center gap-3 rounded-xl px-3 py-2" style={{ border: `1px solid ${FM.line}`, opacity: 0.7 }}>
+                      <span className="flex-1 text-[14px]">{p.name}</span>
+                      <span className="text-[11px]" style={{ color: FM.mutedText }}>invited · no answer yet</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[12px]" style={{ color: FM.mutedText }}>Leaf reminds them on day 3 and day 10 once Friend Mode is on.</p>
+              </div>
+            )}
+
             {calendarId ? (
               <div className="mt-4 rounded-xl p-3" style={{ border: `1px solid ${FM.line}` }}>
-                <p className="text-[14px]">{invitable.length > 0 ? "Or share the invite link" : "Share the invite link"}</p>
+                <p className="text-[14px]">{invitable.length > 0 || waiting.length > 0 ? "Or share the invite link" : "Share the invite link"}</p>
                 <p className="mt-0.5 text-[12px]" style={{ color: FM.mutedText }}>Send it from your phone to anyone you want in. It works once Friend Mode is on.</p>
                 <button onClick={shareLink} disabled={!preview?.inviteLink} className="mt-2 rounded-full px-4 py-1.5 text-[13px]" style={pill(shared)}>
                   {shared ? "Link shared ✓" : "Share the link"}
                 </button>
               </div>
             ) : (
-              invitable.length === 0 && preview && (
+              invitable.length === 0 && waiting.length === 0 && preview && (
                 <p className="mt-4 text-[13px]" style={{ color: FM.mutedText }}>Nobody to suggest yet. Turn it on and share the link with your people.</p>
               )
             )}
