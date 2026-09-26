@@ -18,6 +18,7 @@ import InterestPrompt, {
   type InterestPromptCloseVia,
 } from "@/components/InterestPrompt";
 import { track } from "@/lib/track";
+import { captureFollowSource, followSource } from "@/lib/follow-source";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import CalendarPromoBanner from "@/components/CalendarPromoBanner";
 import { renderLinkedText } from "@/lib/linkify";
@@ -895,6 +896,7 @@ function RsvpModal({
         calendarId,
         name: verify.name,
         phoneNumber: verify.phone.replace(/\D/g, ""),
+        source: followSource(calendarId),
       }) as { alreadyFollowing?: boolean; pending?: boolean } | null | undefined;
       setFollowerCookie(calendarId, verify.name, verify.phone);
       setVerifiedUserCookie(verify.name, verify.phone);
@@ -1685,6 +1687,7 @@ function FollowModal({
         calendarId,
         name: verify.name,
         phoneNumber: verify.phone.replace(/\D/g, ""),
+        source: followSource(calendarId),
       })) as { pending?: boolean; userId?: string; buildingIntro?: ShareKitPayload | null };
       setFollowerCookie(calendarId, verify.name, verify.phone);
       setVerifiedUserCookie(verify.name, verify.phone);
@@ -1866,6 +1869,15 @@ export default function OrgCalendarPage() {
   const router = useRouter();
 
   const [org, setOrg] = useState<OrgData | null>(null);
+
+  // A tagged link (a venue placard's QR is ?src=v-…): count the arrival once
+  // per visit and keep the tag for any follow made on this page.
+  const orgIdForSource = org?.objectId;
+  useEffect(() => {
+    if (!orgIdForSource) return;
+    const src = captureFollowSource(orgIdForSource);
+    if (src) track("calendar_src_arrival", { src }, orgIdForSource);
+  }, [orgIdForSource]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Plan | null>(null);
@@ -2976,6 +2988,7 @@ export default function OrgCalendarPage() {
           calendarId: org.objectId,
           name: cached.name,
           phoneNumber: cached.phone.replace(/\D/g, ""),
+          source: followSource(org.objectId),
         });
         setFollowerCookie(org.objectId, cached.name, cached.phone);
         setVerifiedUserCookie(cached.name, cached.phone);
