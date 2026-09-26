@@ -501,6 +501,28 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               </div>
               )}
 
+              {me.isOwner && (
+                <div className="border-b border-fm-line-dim py-4">
+                  <label htmlFor="crew-rhythm" className="block text-[15px] font-semibold">How often the crew goes out</label>
+                  <select
+                    id="crew-rhythm"
+                    value={crew.oneTime ? "0" : String(crew.rhythmDays)}
+                    disabled={busy !== null}
+                    onChange={(e) => {
+                      const days = Number(e.target.value);
+                      act("rhythm", () => Parse.Cloud.run("setCrewRhythm", days === 0 ? { calendarId: crew.id, oneTime: true } : { calendarId: crew.id, rhythmDays: days }));
+                    }}
+                    className="mt-2 h-11 w-full rounded-xl border px-3 text-sm"
+                  >
+                    {Object.entries(RHYTHM_LABELS).map(([d, l]) => (
+                      <option key={d} value={d}>{l}</option>
+                    ))}
+                    <option value="0">Just once</option>
+                  </select>
+                  <p className="mb-0 mt-2 text-xs text-fm-muted">Leaf starts each night on this rhythm. Members can set a slower pace of their own below.</p>
+                </div>
+              )}
+
               <div className="py-4">
                 <label htmlFor="my-pace" className="block text-[15px] font-semibold">Your pace</label>
                 <select

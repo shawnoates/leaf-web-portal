@@ -43,14 +43,6 @@ export default function FriendModeCard({
   const [note, setNote] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [confirming, setConfirming] = useState(false);
-  // The owner's own text opt-in, offered once Friend Mode is on. Never pre-ticked.
-  const [ownerSms, setOwnerSms] = useState(true); // owners get texts unless they untick
-  const [ownerPhone, setOwnerPhone] = useState("");
-  const [linkCopied, setLinkCopied] = useState(false);
-  const copyLink = async () => {
-    if (!preview?.inviteLink) return;
-    try { await navigator.clipboard.writeText(preview.inviteLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); } catch { /* ignore */ }
-  };
   const locked = memberCount > MAX_MEMBERS;
   // The once-a-month intro, for owners who haven't turned Friend Mode on.
   const [intro, setIntro] = useState(false);
@@ -107,20 +99,6 @@ export default function FriendModeCard({
     }
   };
 
-  const setTexts = async (on: boolean) => {
-    setSaving(true);
-    setError("");
-    try {
-      await Parse.Cloud.run("setCrewTexts", { crewId: calendarId, on, ...(on && ownerPhone ? { phone: ownerPhone } : {}) });
-      setOwnerSms(false);
-      await loadPreview();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't change that.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   // After a "Just once" night: another single night, or monthly from now on.
   const again = async (oneTime: boolean) => {
     setSaving(true);
@@ -136,36 +114,26 @@ export default function FriendModeCard({
     }
   };
 
-  const setRhythm = async (days: number) => {
-    setSaving(true);
-    setError("");
-    try {
-      await Parse.Cloud.run("setCrewRhythm", days === 0 ? { calendarId, oneTime: true } : { calendarId, rhythmDays: days });
-      await loadPreview();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't change that.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const invitable = preview?.people.filter((p) => p.canInvite) ?? [];
   const pushes = invitable.filter((p) => p.channel === "push");
   const texts = invitable.filter((p) => p.channel === "sms");
 
-  const subline = locked
-    ? `Not available · Friend Mode is for circles under ${MAX_MEMBERS} followers`
-    : enabled
-      ? "On · recurring plans with your crew, on your schedule"
-      : "Off · recurring plans with your crew, on your schedule";
-
+  // On: one line of status. Everything else (rhythm, texts, invite link)
+  // lives on the crew page, so the card stays a switch and a door.
+  const rhythmText = preview ? (preview.oneTime ? "just once" : RHYTHM_LABELS[preview.rhythmDays || 28]?.toLowerCase()) : null;
   const status = preview
     ? [
+        rhythmText,
         `${preview.joined + 1} in`,
         preview.invited ? `${preview.invited} invited` : null,
         invitable.length ? `${invitable.length} not invited yet` : null,
       ].filter(Boolean).join(" · ")
     : "";
+  const subline = locked
+    ? `Not available · Friend Mode is for circles under ${MAX_MEMBERS} followers`
+    : enabled
+      ? `On${status ? ` · ${status}` : ""}`
+      : "Off · recurring plans with your crew, on your schedule";
 
   return (
     <section
@@ -175,10 +143,12 @@ export default function FriendModeCard({
       <div className="flex items-center gap-4">
         <div className="min-w-0 flex-1">
           <p className="text-[14px] font-medium" style={{ color: locked ? FM.mutedText : FM.ink }}>
-            Friend Mode{" "}
-            <Link href="/help/calendars-and-rsvps/friend-mode" target="_blank" className="ml-1 text-[12px] font-normal italic underline" style={{ color: FM.mutedText }}>
-              What is this?
-            </Link>
+            Friend Mode
+            {!enabled && (
+              <Link href="/help/calendars-and-rsvps/friend-mode" target="_blank" className="ml-2 text-[12px] font-normal italic underline" style={{ color: FM.mutedText }}>
+                What is this?
+              </Link>
+            )}
           </p>
           <p className="text-[12px]" style={{ color: locked ? FM.muted : enabled ? FM.accent : FM.mutedText }}>{subline}</p>
         </div>
@@ -196,71 +166,15 @@ export default function FriendModeCard({
           {error && <p style={{ color: "#F2A39A" }}>{error}</p>}
           {note && <p style={{ color: FM.ink }}>{note}</p>}
 
-          {enabled && !locked && preview?.rhythmDays && (
-            <label className="flex items-center gap-2">
-              <span>How often</span>
-              <select
-                value={preview.oneTime ? 0 : preview.rhythmDays}
-                disabled={saving}
-                onChange={(e) => setRhythm(Number(e.target.value))}
-                className="rounded-md px-2 py-1 text-[12px]"
-                style={{ background: FM.canvas, border: `1px solid ${FM.line}`, color: FM.ink }}
-              >
-                {Object.entries(RHYTHM_LABELS).map(([d, label]) => <option key={d} value={d}>{label}</option>)}
-                <option value={0}>Just once</option>
-              </select>
-            </label>
-          )}
-
           {enabled && !locked && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              {status && <span>{status}</span>}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <Link href={`/crew/${calendarId}`} className="font-medium underline" style={{ color: FM.ink }}>Open the crew page →</Link>
               {invitable.length > 0 && !confirming && (
-                <button onClick={() => setConfirming(true)} className="font-medium underline" style={{ color: FM.ink }}>
-                  Invite members
+                <button onClick={() => setConfirming(true)} className="underline" style={{ color: FM.ink }}>
+                  Invite {invitable.length} new {invitable.length === 1 ? "follower" : "followers"}
                 </button>
               )}
-              {preview?.inviteLink && (
-                <button onClick={copyLink} className="underline" style={{ color: FM.ink }}>{linkCopied ? "Link copied" : "Copy invite link"}</button>
-              )}
-              <Link href={`/crew/${calendarId}`} className="underline" style={{ color: FM.ink }}>Open the crew page</Link>
             </div>
-          )}
-
-          {enabled && preview && (
-            preview.ownerSmsOptIn ? (
-              <p>
-                Texts to you about this crew are on.{" "}
-                <button className="underline" disabled={saving} onClick={() => setTexts(false)} style={{ color: FM.ink }}>Turn off</button>
-              </p>
-            ) : (
-              <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
-                <label className="flex flex-1 items-start gap-2">
-                  <input type="checkbox" checked={ownerSms} onChange={(e) => setOwnerSms(e.target.checked)} className="mt-0.5" />
-                  <span>
-                    <span style={{ color: FM.ink }}>Text me about this crew&rsquo;s plans</span> — up to 5 msgs/wk. Msg &amp; data rates may apply.
-                    Reply HELP for help, STOP to opt out.
-                  </span>
-                </label>
-                <label className="w-full pl-6">
-                  <span className="block" style={{ color: FM.mutedText }}>Mobile number</span>
-                  <input
-                    value={ownerPhone}
-                    onChange={(e) => setOwnerPhone(e.target.value)}
-                    inputMode="tel"
-                    autoComplete="tel"
-                    placeholder={preview.ownerPhoneLast4 ? `Number on file ending in ${preview.ownerPhoneLast4}` : "(555) 555-5555"}
-                    className="mt-1 w-full max-w-xs rounded-lg px-3 py-1.5 text-[13px]"
-                    style={{ background: FM.canvas, border: `1px solid ${FM.line}`, color: FM.ink }}
-                  />
-                </label>
-                {ownerSms && (preview.ownerPhoneLast4 || ownerPhone.replace(/\D/g, "").length >= 10) && (
-                  <button onClick={() => setTexts(true)} disabled={saving} className="rounded-full px-3 py-1 font-medium disabled:opacity-60" style={{ background: FM.accent, color: FM.canvas }}>
-                    Save
-                  </button>
-                )}
-              </div>
-            )
           )}
 
           {enabled && confirming && (
