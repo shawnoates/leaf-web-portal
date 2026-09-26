@@ -44,7 +44,7 @@ export default function FriendModeCard({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [confirming, setConfirming] = useState(false);
   // The owner's own text opt-in, offered once Friend Mode is on. Never pre-ticked.
-  const [ownerSms, setOwnerSms] = useState(false);
+  const [ownerSms, setOwnerSms] = useState(true); // owners get texts unless they untick
   const [ownerPhone, setOwnerPhone] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
   const copyLink = async () => {
