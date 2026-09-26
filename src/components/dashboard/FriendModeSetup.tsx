@@ -22,7 +22,7 @@ import { RHYTHM_LABELS } from "@/lib/crew";
 import { track } from "@/lib/track";
 import type { FriendModeSource } from "@/components/crew/FriendModeIntro";
 
-type Person = { userId: string; name: string; channel: "push" | "sms" | "none"; canInvite: boolean };
+type Person = { userId: string; name: string; channel: "push" | "sms" | "none"; canInvite: boolean; pending?: boolean };
 type Preview = { people: Person[]; inviteLink?: string; rhythmDays?: number };
 /** A real place from Google Places (server: crew-places.js). */
 type Spot = {
@@ -267,6 +267,7 @@ export default function FriendModeSetup({
                             onChange={() => { const n = new Set(picked); if (sel) n.delete(p.userId); else n.add(p.userId); setPicked(n); }}
                           />
                           <span className="flex-1 text-[14px]">{p.name}</span>
+                          {p.pending && <span className="text-[11px]" style={{ color: FM.mutedText }}>invited before · no answer</span>}
                         </label>
                       </li>
                     );

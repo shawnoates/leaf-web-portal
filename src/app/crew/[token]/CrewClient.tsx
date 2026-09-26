@@ -65,7 +65,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Invite: the owner picks followers not yet invited; anyone in can share the link.
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [invitable, setInvitable] = useState<{ userId: string; name: string }[] | null>(null);
+  const [invitable, setInvitable] = useState<{ userId: string; name: string; pending?: boolean }[] | null>(null);
   const [invitePicked, setInvitePicked] = useState<Set<string>>(new Set());
   const [inviteNote, setInviteNote] = useState("");
   const [linkDone, setLinkDone] = useState("");
@@ -74,7 +74,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
     setInviteNote("");
     setLinkDone("");
     if (me.isOwner) {
-      run<{ people: { userId: string; name: string; canInvite: boolean }[] }>("previewCrewInvites", auth)
+      run<{ people: { userId: string; name: string; canInvite: boolean; pending?: boolean }[] }>("previewCrewInvites", auth)
         .then((r) => {
           const list = r.people.filter((p) => p.canInvite);
           setInvitable(list);
@@ -371,7 +371,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             {me.isOwner && (
               <div className="mt-4">
                 <div className="flex items-center justify-between">
-                  <Eyebrow>Followers not invited yet</Eyebrow>
+                  <Eyebrow>Followers not in yet</Eyebrow>
                   {invitable && invitable.length > 0 && (
                     <button
                       className="text-xs text-fm-ink underline underline-offset-4"
@@ -384,7 +384,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 {invitable === null ? (
                   <p className="mt-2 text-sm text-fm-muted">Loading…</p>
                 ) : invitable.length === 0 ? (
-                  <p className="mt-2 text-sm text-fm-muted">Everyone who follows the calendar has been invited.</p>
+                  <p className="mt-2 text-sm text-fm-muted">Everyone who follows the calendar is in, or was invited in the last two weeks.</p>
                 ) : (
                   <>
                     <ul className="mt-2 space-y-1.5">
@@ -399,6 +399,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                                 onChange={() => { const n = new Set(invitePicked); if (sel) n.delete(p.userId); else n.add(p.userId); setInvitePicked(n); }}
                               />
                               <span className="flex-1 text-[15px]">{p.name}</span>
+                              {p.pending && <span className="text-[11px] text-fm-muted">invited before · no answer</span>}
                             </label>
                           </li>
                         );
