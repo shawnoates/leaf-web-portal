@@ -28,6 +28,13 @@ type Props = {
   // them back via onLocationRevealed so the card swaps in the values.
   location: { name: string | null; address: string | null; timezone: string | null } | null;
   hostName: string | null;
+  // The plan's own host's face: their photo and, when they recorded one,
+  // their 30-second hello (intro-video.js). Rendered as a "Your host" block
+  // only when there is a hello — a photo alone changes nothing on this page.
+  hostIntro?: {
+    photoUrl: string | null;
+    introVideo: { url: string; posterUrl: string | null; aspectRatio?: string | null } | null;
+  } | null;
   // The roster host who will physically be there — a different person from
   // `hostName` (whose plan it is). Null unless one has been assigned.
   rosterHost: {
@@ -66,6 +73,7 @@ export default function StandalonePlanCard({
   expiryDate,
   location,
   hostName,
+  hostIntro,
   rosterHost,
   calendarName,
   calendarProfilePhoto,
@@ -212,6 +220,26 @@ export default function StandalonePlanCard({
                 {rosterHost.introVideo ? (
                   <p className="mt-2 text-xs text-zinc-500">▶ A quick hello from {rosterHost.name}</p>
                 ) : null}
+              </div>
+            </div>
+          ) : variant !== "copy" && hostIntro?.introVideo && hostName ? (
+            // The plan's own host said hello. Same block as the roster one,
+            // minus the bio (a _User has none); the poster is the face.
+            <div className="flex flex-wrap gap-3 rounded-lg bg-zinc-50 p-3">
+              <div
+                className={introVideoFrame(hostIntro.introVideo.aspectRatio).className}
+                style={introVideoFrame(hostIntro.introVideo.aspectRatio).style}
+              >
+                <HlsVideo
+                  src={hostIntro.introVideo.url}
+                  poster={hostIntro.introVideo.posterUrl ?? hostIntro.photoUrl}
+                  preload="none"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-zinc-900">Your host, {hostName}</p>
+                <p className="mt-2 text-xs text-zinc-500">▶ A quick hello from {hostName}</p>
               </div>
             </div>
           ) : null}

@@ -13,6 +13,10 @@ import {
 } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { renderLinkedText } from "@/lib/linkify";
+import HostIntroVideoCard, { type IntroVideoInfo } from "@/components/HostIntroVideoCard";
+
+/** The checklist row that opens into the recorder (intro-video.js). */
+const INTRO_TASK_KEY = "record_intro";
 
 export type HostTask = {
   id: string;
@@ -68,6 +72,12 @@ export type HostChecklist = {
   chatUrl?: string | null;
   /** The seat's share kit, independent of any row. */
   shareKitUrl?: string | null;
+  /**
+   * The recorder card behind the "record a hello" row: state, beats, the
+   * venue rule. Null on roster-hosted plans (they record from the offer
+   * page) and when video is off, in which case the row is not sent either.
+   */
+  introVideo?: IntroVideoInfo | null;
   tasks: HostTask[];
 };
 
@@ -311,6 +321,43 @@ function Row({
   );
 }
 
+/**
+ * The hello row. Not a checkbox: the card IS the task, and the server ticks
+ * the row itself when the clip goes live (and unticks it on removal), so
+ * the host never has to claim they did it. Shown in the Done section too,
+ * where the card is the live take with "record another".
+ */
+function IntroRow({
+  task,
+  video,
+  notificationId,
+  onChanged,
+}: {
+  task: HostTask;
+  video: IntroVideoInfo;
+  notificationId: string;
+  onChanged: () => Promise<unknown>;
+}) {
+  return (
+    <li className="border-b border-zinc-100 last:border-b-0 px-4 py-3.5">
+      <p className="text-[15px] leading-snug text-zinc-900">{task.title}</p>
+      {task.status !== "done" && task.detail && (
+        <p className="block text-[13px] text-zinc-500 mt-0.5 leading-relaxed">{task.detail}</p>
+      )}
+      <div className="mt-3">
+        <HostIntroVideoCard
+          source={{ kind: "checklist", notificationId }}
+          video={video}
+          timeZone={null}
+          planStarted={video.planStarted === true}
+          onChanged={onChanged}
+          embedded
+        />
+      </div>
+    </li>
+  );
+}
+
 export default function ChecklistClient({
   notificationId,
   initial,
@@ -325,6 +372,31 @@ export default function ChecklistClient({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
+
+  // The recorder card re-reads the whole list after an upload or removal:
+  // the server moves the hello row between open and done itself.
+  const refresh = useCallback(async () => {
+    try {
+      const fresh = (await Parse.Cloud.run("getHostChecklist", { notificationId })) as HostChecklist;
+      setData(fresh);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't refresh the list.");
+    }
+  }, [notificationId]);
+
+  const renderRow = (t: HostTask) =>
+    t.key === INTRO_TASK_KEY && data?.introVideo ? (
+      <IntroRow key={t.id} task={t} video={data.introVideo} notificationId={notificationId} onChanged={refresh} />
+    ) : (
+      <Row
+        key={t.id}
+        task={t}
+        busy={busyId === t.id}
+        notificationId={notificationId}
+        onToggle={toggle}
+        onSent={markSent}
+      />
+    );
 
   const tasks = data?.tasks ?? [];
   // `open` is the count; `listed` is what renders. An optional row is in the
@@ -478,16 +550,7 @@ export default function ChecklistClient({
         )}
 
         <ul className="mt-1">
-          {listed.map((t) => (
-            <Row
-              key={t.id}
-              task={t}
-              busy={busyId === t.id}
-              notificationId={notificationId}
-              onToggle={toggle}
-              onSent={markSent}
-            />
-          ))}
+          {listed.map(renderRow)}
         </ul>
 
         <div className="px-4 py-3 border-t border-zinc-100">
@@ -522,16 +585,7 @@ export default function ChecklistClient({
               Done
             </h2>
             <ul>
-              {done.map((t) => (
-                <Row
-                  key={t.id}
-                  task={t}
-                  busy={busyId === t.id}
-                  notificationId={notificationId}
-                  onToggle={toggle}
-                  onSent={markSent}
-                />
-              ))}
+              {done.map(renderRow)}
             </ul>
           </section>
         )}

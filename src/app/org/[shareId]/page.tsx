@@ -96,8 +96,10 @@ interface Plan {
   // set when `hasRosterHost` — follower hosts have no bio field; their own
   // words are `hostNote`. Never merged into hostNote on either side.
   hostBio: string | null;
-  // The roster host's 30-second intro (Mux HLS + a portrait poster). Only
-  // ever set alongside `hasRosterHost`; unset server-side when they leave.
+  // The host's 30-second intro (Mux HLS + a poster), whoever the host is: a
+  // roster host records from their offer page, the plan's own host from
+  // their checklist or the dashboard. The server only sends it while it
+  // still belongs to the current host.
   hostIntroVideo: HostIntro | null;
   attendeeCount: number;
   /** Accepted RSVPs only (host excluded) — the number the server compares
@@ -4765,7 +4767,7 @@ export default function OrgCalendarPage() {
                   {/* The host's hello, on the photo. A sibling of the image,
                       so it doesn't ride the hover zoom; it swallows its own
                       clicks so the cover's click (open the sheet) stays put. */}
-                  {plan.hasRosterHost && plan.hostIntroVideo && (
+                  {plan.hostIntroVideo && (
                     <HostIntroTile
                       video={plan.hostIntroVideo}
                       hostName={plan.hostName}
@@ -5955,7 +5957,7 @@ export default function OrgCalendarPage() {
                     poured into "Note from Host" below: that quote is about
                     the plan, this is about the person, and a follower host
                     has no bio to show here (their words ARE the note). */}
-                {selectedEvent.hasRosterHost && (selectedEvent.hostBio || selectedEvent.hostIntroVideo) && (
+                {(selectedEvent.hostBio || selectedEvent.hostIntroVideo) && (
                   <div className="flex flex-wrap gap-3 rounded-lg bg-zinc-50 p-3">
                     {/* The intro video, when there is one, stands in for the
                         avatar: its poster IS the face. Sized from the take's
@@ -6158,6 +6160,19 @@ export default function OrgCalendarPage() {
                         style={{ backgroundColor: org.brandColor || "#18181b" }}
                       >
                         <MessageCircle className="w-4 h-4" /> Message Attendees
+                      </a>
+                    )}
+                    {/* The host's own hello lives on their checklist (the
+                        recorder needs the bearer that page carries). Offered
+                        here only while there is none up. */}
+                    {hostNotificationId && !selectedEvent.hostIntroVideo && (
+                      <a
+                        href={`/t/${hostNotificationId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest"
+                      >
+                        Record a 30-second hello
                       </a>
                     )}
                     <button

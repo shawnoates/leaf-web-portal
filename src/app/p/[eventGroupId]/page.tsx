@@ -29,7 +29,13 @@ type PlanShareInfo = {
   // attendees (Accepted/Owned) and approved followers/owners see them
   // inline.
   location: { name: string | null; address: string | null; timezone: string | null } | null;
-  host: { name: string } | null;
+  host: {
+    name: string;
+    // The plan's own host's photo and hello (intro-video.js); absent from
+    // servers that predate them.
+    photoUrl?: string | null;
+    introVideo?: { url: string; posterUrl: string | null; aspectRatio?: string | null } | null;
+  } | null;
   // The assigned roster host — the person who will physically be there, as
   // distinct from `host` (whose plan it is). Null when none is assigned.
   rosterHost: {
@@ -333,6 +339,7 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
       expiryDate={info.expiryDate}
       location={info.location}
       hostName={info.host?.name ?? null}
+      hostIntro={info.host ? { photoUrl: info.host.photoUrl ?? null, introVideo: info.host.introVideo ?? null } : null}
       rosterHost={info.rosterHost ?? null}
       calendarName={info.calendarName}
       calendarProfilePhoto={info.calendarProfilePhoto}

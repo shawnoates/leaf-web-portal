@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import PlanAttendeeList, { isPendingStatus } from "./PlanAttendeeList";
 import { CrossPromoEyebrow } from "./CrossPromoBadge";
+import PlanIntroSection from "./PlanIntroSection";
 
 const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2";
@@ -591,6 +592,19 @@ export default function PlanDetailModal({
                 </button>
               )}
             </div>
+
+            {/* The host's 30-second hello. The recorder when the viewer IS
+                the host; the take plus a "remove" when someone else hosts
+                it on this calendar. Roster-hosted plans record from the
+                offer page, and the server says so — the section stays
+                empty for them. */}
+            {!plan.isPoll && !plan.hostIsRoster && !isPromoted && (
+              <PlanIntroSection
+                eventGroupId={plan.objectId}
+                hostName={hostNameOverride || plan.hostName}
+                planStarted={Boolean(plan.date && new Date(plan.date).getTime() <= Date.now())}
+              />
+            )}
 
             {/* Change-host picker — owner/co-host reassigns hosting to a
                 follower/member (or themselves). Inline so it stays in the

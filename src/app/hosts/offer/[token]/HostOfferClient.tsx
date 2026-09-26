@@ -487,7 +487,7 @@ export default function HostOfferClient({ token }: { token: string }) {
             bonus clock is running from the moment they accepted. */}
         {offer.video && (
           <HostIntroVideoCard
-            token={token}
+            source={{ kind: "offer", token }}
             video={offer.video}
             timeZone={p?.timeZone ?? null}
             planStarted={offer.planStarted}

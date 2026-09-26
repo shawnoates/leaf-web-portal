@@ -1,16 +1,21 @@
 "use client";
 
 /**
- * The intro-video card on the accepted offer page.
+ * The intro-video card: a host records a 30-second hello to camera and it
+ * goes on the plan page next to their name. The file goes straight from the
+ * browser to Mux — the server only mints the one-shot upload URL and is told
+ * when the PUT has landed.
  *
- * A host records a 30-second hello to camera; it goes on the plan page next
- * to their bio, and pays a bonus if it is up within a day of accepting. The
- * file goes straight from the browser to Mux — the server only mints the
- * one-shot upload URL and is told when the PUT has landed.
+ * Three places render it, with three credentials, so `source` picks the
+ * cloud functions and their params:
+ *   - offer:     the roster host's accepted offer page (token; pays a bonus)
+ *   - plan:      the dashboard's plan modal (session; the plan's own host)
+ *   - checklist: the host checklist /t/<id> (notification id bearer; the
+ *                follower-host with no password)
  *
- * States: ask → checking → uploading → processing → live. After the bonus
- * window the same card stays, minus the money line: a late video still
- * introduces the host.
+ * States: ask → checking → uploading → processing → live. On the offer page
+ * the same card stays after the bonus window, minus the money line: a late
+ * video still introduces the host. The other two never had a money line.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -28,6 +33,8 @@ export type IntroVideoInfo = {
   aspectRatio?: string | null;
   /** The plan was called off; the video has no page to be on. */
   planCancelled?: boolean;
+  /** The plan has started — recording is closed; a live take still shows. */
+  planStarted?: boolean;
   durationSec: number | null;
   uploadedAt: string | null;
   bonusEarned: boolean;
@@ -39,9 +46,25 @@ export type IntroVideoInfo = {
   beats: Beat[];
   script: string;
   tips: string[];
-  /** The one hard rule, kept out of `tips` so it gets its own line. */
-  venueRule: string;
+  /** The one hard rule, kept out of `tips` so it gets its own line. Null when
+   *  the plan shows its venue anyway, so there is nothing to keep. */
+  venueRule: string | null;
 };
+
+/** Which page is asking, and therefore which cloud functions and credential. */
+export type IntroVideoSource =
+  | { kind: "offer"; token: string }
+  | { kind: "plan"; eventGroupId: string }
+  | { kind: "checklist"; notificationId: string };
+
+function fnsFor(source: IntroVideoSource) {
+  if (source.kind === "offer") {
+    const base = { token: source.token };
+    return { create: "createHostIntroUpload", finalize: "finalizeHostIntroUpload", remove: "removeHostIntroVideo", base };
+  }
+  const base = source.kind === "plan" ? { eventGroupId: source.eventGroupId } : { notificationId: source.notificationId };
+  return { create: "createPlanIntroUpload", finalize: "finalizePlanIntroUpload", remove: "removePlanIntroVideo", base };
+}
 
 const MAX_BYTES = 250 * 1024 * 1024;
 
@@ -100,18 +123,22 @@ function putWithProgress(url: string, file: File, onProgress: (pct: number) => v
 }
 
 export default function HostIntroVideoCard({
-  token,
+  source,
   video,
   timeZone,
   planStarted,
   onChanged,
+  embedded = false,
 }: {
-  token: string;
+  source: IntroVideoSource;
   video: IntroVideoInfo;
   timeZone: string | null;
   planStarted: boolean;
-  /** Re-fetch the offer; the card re-renders from the fresh `video`. */
+  /** Re-fetch the page's data; the card re-renders from the fresh `video`. */
   onChanged: () => Promise<unknown>;
+  /** Inside another card (the checklist row, the plan modal): tighter
+   *  chrome, no viewfinder loop. */
+  embedded?: boolean;
 }) {
   const [phase, setPhase] = useState<"idle" | "checking" | "uploading" | "finalizing">("idle");
   const [progress, setProgress] = useState(0);
@@ -137,12 +164,16 @@ export default function HostIntroVideoCard({
   const inputRef = useRef<HTMLInputElement>(null);
   const libraryInputRef = useRef<HTMLInputElement>(null);
 
+  const fns = fnsFor(source);
   const bonus = video.bonusCents > 0 ? money(video.bonusCents) : null;
   const deadlineLabel = fmtDeadline(video.deadlineAt, timeZone);
   const bonusOpen = Boolean(bonus && video.deadlineOpen);
+  const started = planStarted || video.planStarted === true;
+  // Roster hosts have a bio on the page; everyone else has their name.
+  const besideWhat = source.kind === "offer" ? "your bio" : "your name";
 
   // Mux usually has a phone clip playable in well under a minute. Poll the
-  // offer while it says processing so the host sees it flip without a
+  // page while it says processing so the host sees it flip without a
   // reload; the server re-checks Mux on each read.
   useEffect(() => {
     if (video.status !== "processing") return;
@@ -153,17 +184,18 @@ export default function HostIntroVideoCard({
   const finalize = useCallback(async (uploadId: string) => {
     // The PUT is done; the asset can take a beat to appear on Mux's side.
     for (let attempt = 0; attempt < 8; attempt++) {
-      const r = (await Parse.Cloud.run("finalizeHostIntroUpload", { token, uploadId })) as { status?: string };
+      const r = (await Parse.Cloud.run(fns.finalize, { ...fns.base, uploadId })) as { status?: string };
       if (r.status !== "uploading") return;
       await new Promise((res) => setTimeout(res, 1500));
     }
     throw new Error("The upload is taking longer than usual. Reload this page in a minute.");
-  }, [token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fns.finalize, JSON.stringify(fns.base)]);
 
   /** Mint an upload, PUT the bytes, tell the server. Shared by both paths. */
   const upload = useCallback(async (file: File) => {
     const origin = typeof window !== "undefined" ? window.location.origin : undefined;
-    const up = (await Parse.Cloud.run("createHostIntroUpload", { token, origin })) as { uploadUrl: string; uploadId: string };
+    const up = (await Parse.Cloud.run(fns.create, { ...fns.base, origin })) as { uploadUrl: string; uploadId: string };
     setPhase("uploading");
     setProgress(0);
     await putWithProgress(up.uploadUrl, file, setProgress);
@@ -171,7 +203,8 @@ export default function HostIntroVideoCard({
     await finalize(up.uploadId);
     await onChanged();
     setShowScript(false);
-  }, [token, finalize, onChanged]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fns.create, JSON.stringify(fns.base), finalize, onChanged]);
 
   // Straight out of the in-browser recorder: length is already capped there
   // and the blob came from our own MediaRecorder, so there is nothing to
@@ -214,7 +247,7 @@ export default function HostIntroVideoCard({
   const remove = async () => {
     setError(null);
     try {
-      await Parse.Cloud.run("removeHostIntroVideo", { token });
+      await Parse.Cloud.run(fns.remove, { ...fns.base });
       setConfirmRemove(false);
       await onChanged();
       setShowScript(true);
@@ -224,7 +257,7 @@ export default function HostIntroVideoCard({
   };
 
   if (!video.available) return null;
-  if (planStarted && video.status !== "ready") return null;
+  if (started && video.status !== "ready") return null;
 
   const busy = phase !== "idle";
   const live = video.status === "ready" && video.url;
@@ -251,7 +284,7 @@ export default function HostIntroVideoCard({
   }
 
   return (
-    <div className="mt-6 rounded-2xl border border-zinc-200 bg-white p-6">
+    <div className={embedded ? "rounded-xl border border-zinc-200 bg-white p-4" : "mt-6 rounded-2xl border border-zinc-200 bg-white p-6"}>
       {/* ── Heading: what this is and what it pays ── */}
       {live ? (
         <>
@@ -286,22 +319,26 @@ export default function HostIntroVideoCard({
               so no alt text — the heading and the paragraph carry the
               meaning. Animated WebP at 575KB rather than the 3.9MB GIF it
               came from; anyone who asked for less motion, or whose browser
-              can't do animated WebP, gets the first frame as a still. */}
-          <picture className="mt-4 block">
-            <source media="(prefers-reduced-motion: reduce)" srcSet="/host-intro-hero.jpg" />
-            <source type="image/webp" srcSet="/host-intro-hero.webp" />
-            <img
-              src="/host-intro-hero.jpg"
-              alt=""
-              width={400}
-              height={500}
-              loading="lazy"
-              decoding="async"
-              className="mx-auto block w-full max-w-[200px] rounded-2xl"
-            />
-          </picture>
-          <p className="mt-4 text-[14px] leading-snug text-zinc-600">
-            A quick intro to camera goes on the plan page next to your bio. People RSVP to a face.
+              can't do animated WebP, gets the first frame as a still. Left
+              out when the card sits inside another card: there it is a
+              row, not a page. */}
+          {!embedded && (
+            <picture className="mt-4 block">
+              <source media="(prefers-reduced-motion: reduce)" srcSet="/host-intro-hero.jpg" />
+              <source type="image/webp" srcSet="/host-intro-hero.webp" />
+              <img
+                src="/host-intro-hero.jpg"
+                alt=""
+                width={400}
+                height={500}
+                loading="lazy"
+                decoding="async"
+                className="mx-auto block w-full max-w-[200px] rounded-2xl"
+              />
+            </picture>
+          )}
+          <p className={`${embedded ? "mt-2" : "mt-4"} text-[14px] leading-snug text-zinc-600`}>
+            A quick intro to camera goes on the plan page next to {besideWhat}. People RSVP to a face.
             {bonusOpen && deadlineLabel
               ? ` It pays ${bonus} on top if it's up by ${deadlineLabel}.`
               : bonus
@@ -311,10 +348,12 @@ export default function HostIntroVideoCard({
           {/* The rule, before they ever hit record, and out of the
               collapsible — a venue said out loud on camera is the one thing
               here that can't be taken back. It shows again on the beat where
-              they'd say it. */}
-          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[14px] font-medium leading-snug text-amber-900">
-            {video.venueRule}
-          </p>
+              they'd say it. Absent when the plan shows its venue anyway. */}
+          {video.venueRule && (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[14px] font-medium leading-snug text-amber-900">
+              {video.venueRule}
+            </p>
+          )}
           {video.status === "errored" && (
             <p className="mt-2 text-[14px] text-amber-800">
               The last file couldn&rsquo;t be processed. Try recording it again.
@@ -355,7 +394,7 @@ export default function HostIntroVideoCard({
           {showScript && (
             <div className="mt-3 rounded-xl bg-leaf-50 p-4">
               <p className="text-[13px] font-medium uppercase tracking-wide text-leaf-800/70">
-                Six things to hit, in your words
+                {video.beats.length === 6 ? "Six" : video.beats.length === 5 ? "Five" : video.beats.length} things to hit, in your words
               </p>
               <ol className="mt-3 space-y-3">
                 {video.beats.map((b, i) => (
@@ -401,7 +440,7 @@ export default function HostIntroVideoCard({
           {phase === "finalizing" && <p className="text-[13px] text-zinc-500">Almost there…</p>}
           {phase === "checking" && <p className="text-[13px] text-zinc-500">Checking the file…</p>}
           {error && <p className="text-[14px] text-red-700">{error}</p>}
-          {!planStarted && (
+          {!started && (
             <>
               {/* The camera-app path. `capture="user"` opens the front camera
                   straight away on a phone, which takes the whole screen — so
@@ -458,14 +497,14 @@ export default function HostIntroVideoCard({
                     {busy ? "Working…" : live ? "Record another" : "Open the camera"}
                   </button>
                   <p className="text-[13px] leading-snug text-zinc-500">
-                    Your camera app takes over the screen, so read the six
+                    Your camera app takes over the screen, so read the
                     prompts above first and then say them your way.
                   </p>
                 </>
               )}
             </>
           )}
-          {live && !planStarted && (
+          {live && !started && (
             confirmRemove ? (
               <div className="flex items-center gap-3 text-[14px]">
                 <span className="text-zinc-600">

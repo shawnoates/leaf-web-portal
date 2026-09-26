@@ -16,6 +16,7 @@ import RecapPopup from "@/components/recap/RecapPopup";
 import CalendarPromoBanner from "@/components/CalendarPromoBanner";
 import NamePrompt from "@/components/NamePrompt";
 import { setVerifiedUserCookie } from "@/lib/verified-user";
+import { AUDIENCE_COHORT_LABELS } from "@/lib/audience-cohorts";
 import NewPlanModal, {
   LINK_ONLY,
   ME_PLAN_DRAFT_KEY,
@@ -90,6 +91,11 @@ interface Plan {
   viewerIsHost: boolean;
   /** Owns or co-hosts the calendar — may watch the chat without attending. */
   viewerIsOwner?: boolean;
+  /** On the viewer's own plans: the seat id that opens their host checklist
+   *  (/t/<id>), where the 30-second hello is recorded. */
+  hostNotificationId?: string | null;
+  /** On the viewer's own plans: their hello, once it is up. */
+  hostIntroVideo?: { url: string; posterUrl: string | null } | null;
   /** The paid Leaf roster host running this plan, when one has accepted.
    *  `bio` and `introVideo` arrive once the server side ships; the hero
    *  shows a plain "Hosted by" line without them. */
@@ -109,6 +115,9 @@ interface Plan {
   /** A seat opened and the server offered it to this viewer (rsvpState is
    *  "waitlisted"). First to claim wins — see claimWaitlistSpot. */
   waitlistOffered?: boolean;
+  /** Cohort the originating idea was aimed at ("moms", …). Null when the plan
+   *  has no idea behind it; "any" and unknown slugs render no chip. */
+  audienceTag?: string | null;
   weather: Weather | null;
   messages: PlanMessage[];
 }
@@ -140,6 +149,7 @@ interface HostPlan {
   kind?: "idea" | "aiEvent";
   aiEventUid?: string;
   aiEventIndex?: number;
+  audienceTag?: string | null;
 }
 interface HostCalRow {
   calendarId: string;
@@ -342,6 +352,14 @@ function ago(iso: string | null) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 function initial(name: string) { return (name || "?").trim().charAt(0).toUpperCase() || "?"; }
+function cohortLabel(tag: string | null | undefined) {
+  return AUDIENCE_COHORT_LABELS[tag ?? ""] ?? null;
+}
+/** Eyebrow suffix naming who a plan is for — "· Moms". */
+function CohortMark({ tag }: { tag: string | null | undefined }) {
+  const label = cohortLabel(tag);
+  return label ? <>{" · "}<span className="cohort">{label}</span></> : null;
+}
 function greetingWord() {
   const h = new Date().getHours();
   if (h < 12) return "Good morning";
@@ -1215,6 +1233,20 @@ function Hero({
           </h2>
           {context && <div className="hero-ctx">{context}</div>}
           {statusLine && <div className="hero-status">{statusLine}</div>}
+          {/* The host's own hello: one line to the checklist, where the
+              recorder lives, until it is up. */}
+          {plan.viewerIsHost && plan.hostNotificationId && (
+            <div className="hero-host">
+              {plan.hostIntroVideo ? (
+                <span>Your 30-second hello is up.</span>
+              ) : (
+                <a className="meet" href={`/t/${plan.hostNotificationId}`}>
+                  <span className="meet-play" aria-hidden />
+                  Record a 30-second hello
+                </a>
+              )}
+            </div>
+          )}
           {host && (
             <div className="hero-host">
               {(intro?.poster || host.photoUrl) && (
@@ -1785,6 +1817,10 @@ function PlanRow({
               </span>
             </>
           )}
+          {/* A discovery cue, so only while the plan is still a question: once
+              the viewer has answered (or is hosting) it would read as a
+              verdict on whether they belong. */}
+          {plan.rsvpState === "no_response" && !hosting && <CohortMark tag={plan.audienceTag} />}
           {hosting && (
             <span className="hostmark"><span className="hostdot" />You&rsquo;re hosting</span>
           )}
@@ -1970,7 +2006,7 @@ function NeedsHostRail({ plans, onHosted }: { plans: HostPlan[]; onHosted: () =>
                 <div className="hostthumb ph" />
               )}
               <div className="hostbody">
-                <div className="row-cal">{p.calendarName}</div>
+                <div className="row-cal">{p.calendarName}<CohortMark tag={p.audienceTag} /></div>
                 <h3 className="hostcard-title">{p.title}</h3>
                 <div className="hostcard-when">
                   {[weekday(p.date)?.slice(0, 3), fmtTime(p.time, p.date), p.venueName || p.venueAddress]
@@ -2302,7 +2338,7 @@ function NeedsHostPopup({
             </div>
           ) : (
             <>
-              <div className="row-cal">{idea.calendarName}</div>
+              <div className="row-cal">{idea.calendarName}<CohortMark tag={idea.audienceTag} /></div>
               <h2 className="modal-title">{idea.title}</h2>
               {(when || where) && (
                 <div className="hero-ctx">{[when, where].filter(Boolean).join(" · ")}</div>
@@ -2808,6 +2844,7 @@ const CSS = `
 .leafme .row-cal{font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:.1em;
   text-transform:uppercase;color:var(--muted)}
 .leafme .hostmark{display:inline-flex;align-items:center;gap:5px;margin-left:8px;color:var(--green)}
+.leafme .cohort{color:var(--ink)}
 .leafme .hostdot{width:5px;height:5px;border-radius:999px;background:var(--green)}
 .leafme .row-title{font-family:var(--serif);font-size:15px;line-height:1.3;font-weight:400;color:var(--ink)}
 .leafme .row-meta{font-size:11.5px;color:var(--muted)}
