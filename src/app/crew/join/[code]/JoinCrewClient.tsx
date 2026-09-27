@@ -14,6 +14,7 @@ import Parse from "@/lib/parse-client";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import { CrewShell, Card, Button } from "@/components/crew/CrewShell";
 import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
+import SeedPlaces from "@/components/crew/SeedPlaces";
 import { cadenceLabel } from "@/lib/crew";
 
 type Invite = {
@@ -34,6 +35,9 @@ export default function JoinCrewClient({ code }: { code: string }) {
   const [smsPhone, setSmsPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Set once they're in: the optional tap-to-add step runs before the crew
+  // page so it's asked while they're still here, not buried on a later visit.
+  const [joinedCrewId, setJoinedCrewId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -83,7 +87,8 @@ export default function JoinCrewClient({ code }: { code: string }) {
     setBusy(true); setError("");
     try {
       const r = (await Parse.Cloud.run("joinCrewByCode", { code, sms, phone: sms ? smsPhone || null : null })) as { crewId: string };
-      router.push(`/crew/${r.crewId}`);
+      setJoinedCrewId(r.crewId);
+      setBusy(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't join.");
       setBusy(false);
@@ -98,6 +103,21 @@ export default function JoinCrewClient({ code }: { code: string }) {
     );
   }
   if (!invite) return <CrewShell><p className="text-sm text-zinc-500">Loading…</p></CrewShell>;
+
+  if (joinedCrewId) {
+    return (
+      <CrewShell>
+        <Card>
+          <p className="m-0 mb-4 text-[15px] text-zinc-700">You&rsquo;re in {invite.name}.</p>
+          <SeedPlaces
+            auth={{ crewId: joinedCrewId }}
+            crewName={invite.name}
+            onDone={() => router.push(`/crew/${joinedCrewId}`)}
+          />
+        </Card>
+      </CrewShell>
+    );
+  }
 
   const smsOk = !sms || smsPhone.replace(/\D/g, "").length >= 10;
   return (

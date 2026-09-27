@@ -21,6 +21,7 @@ import {
   Avatar, Button, Card, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Mono, SectionTitle, Spinner, useInApp,
 } from "@/components/crew/CrewShell";
 import ProposeNight from "@/components/crew/ProposeNight";
+import SeedPlaces from "@/components/crew/SeedPlaces";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
   RHYTHM_LABELS, crewHref, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
@@ -63,6 +64,9 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   // "Text me about this crew's plans": never pre-ticked (10DLC).
   const [smsBox, setSmsBox] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Someone who joined by text or in the app never saw the tap-to-add step.
+  // Offer it once here, dismissible, above the book it feeds.
+  const [seedDone, setSeedDone] = useState(false);
   // Invite: the owner picks followers not yet invited; anyone in can share the link.
   const [inviteOpen, setInviteOpen] = useState(false);
   const [invitable, setInvitable] = useState<{ userId: string; name: string; pending?: boolean }[] | null>(null);
@@ -232,6 +236,17 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               />
             )}
           </section>
+
+          {me.needsSeed && !seedDone && (
+            <section className="rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
+              <SeedPlaces
+                auth={auth}
+                crewName={crew.name}
+                heading="Where would you go?"
+                onDone={() => { setSeedDone(true); void reload(); }}
+              />
+            </section>
+          )}
 
           <section className="flex flex-col gap-3.5 lg:gap-5">
             <div className="flex items-center justify-between">
