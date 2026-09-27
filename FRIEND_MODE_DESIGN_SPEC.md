@@ -224,6 +224,8 @@ A log of every Friend Mode message on any channel: `crew`, `member`, `cycle?`, `
 - **Day of:** F9 at 10am local to everyone who's in.
 - **Day after:** the existing photo recap (`/m/`) plus F10.
   - A 👍 or 👎 reply, or the survey, updates `profile`. The venue goes to `likedPlaces` or `dislikedPlaces`, and the winning weekday gets a higher `dayWeights`.
+  - `dayWeights` only influence the poll through `proposeDateOptions`, which returns each option's `weight`; `pickDatesForGroup` ranks on it. (Without that the weights are invisible, because `startCycle` asks for more candidates than the window holds and the options come back in date order.)
+  - Per-member day preferences count in `pickDatesForGroup` exactly like synced calendar time: a stated avoid is busy, a stated prefer is free and pre-ticks that date. The round's organizer gets a hard veto on days they ruled out, never allowed to empty the window.
   - Then `done`, and `lastNightAt` and `headcount` are set.
 
 ### 4. Pause, leave, end
@@ -420,9 +422,11 @@ Existing helpers must skip friend calendars: `ownsCalendars` and the `CalendarsR
   - past nights with recap photos
   - a Crew Book preview (the top 5 places by 👍) with "Open the book" leading to `/crew/[token]/book` (see "The Crew Book")
   - members (names only)
-  - a "Tell Leaf" box that writes a `CrewMessage` with `channel: web`
+  - a "Tell Leaf" box that writes a `CrewMessage` with `channel: web`, and stores anything actionable in it: day preferences go on the member's own `GroupMembership` (`fmPreferDays` / `fmAvoidDays` / `fmAvoidDates`, parsed by `crew-prefs-parser.js`), a "no more <place>" that matches somewhere already in the book goes to `profile.dislikedPlaces`, and the raw text is kept on `profile.notes`. The box reads the days back ("Got it — I'll aim for Wednesdays and Thursdays") so a misread is catchable. The same parse runs on inbound SMS that isn't a command.
+  - a one-time tap-to-add step (`SeedPlaces`) for a member who hasn't been offered it (`me.needsSeed`): the crew's own book first (a tap is an upvote, not a duplicate entry) then popular nearby. Optional — Skip is remembered (`fmSeedSkippedAt`) and it never returns.
   - Leave
   - Invalid or revoked tokens show an "This link has expired. Text PLAN to {number}" state.
+- **`src/app/crew/join/[code]/`:** the invite link. After `joinCrewByCode` it shows the tap-to-add step before routing to the crew page, so it's asked while the person is still there. Never blocks joining: opt-in is what gets a crew to quorum.
 - **`src/app/crew/start/`:** name, rhythm (every 2 / 3 / 4 / 6 weeks), area, then friends (name and phone rows, up to 14), then verifying your own phone, then done. `?from=<eventGroupId>` pre-fills co-attendees (names only; the server maps them to users).
 - **`src/app/friends/page.tsx`:** `MarketingPage` plus `components/marketing/content/friends.ts`, following `src/app/personal/page.tsx`.
 - **CTAs:** a `FriendModeCta` component on `/m/` and `/p/` (shown when the viewer attended and there are 2 or more other attendees).
