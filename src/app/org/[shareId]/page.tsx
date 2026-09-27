@@ -41,6 +41,7 @@ import PaidRsvp from "@/components/PaidRsvp";
 import HlsVideo from "@/components/HlsVideo";
 import { introVideoFrame } from "@/lib/intro-video-frame";
 import HostIntroTile, { type HostIntro } from "@/components/HostIntroTile";
+import HostIntroInline from "@/components/HostIntroInline";
 import PlanIntroSection from "@/components/PlanIntroSection";
 import {
   Plus,
@@ -940,6 +941,18 @@ function RsvpModal({
         viaCalendarId: plan.promotedFrom && calendarId ? calendarId : undefined,
       }) as { eventNotificationId?: string; alreadyRsvpd?: boolean; pendingApproval?: boolean; waitlisted?: boolean } | null | undefined;
       console.log("[RSVP] result:", result);
+      // Closes the watch → RSVP funnel: on its own it is just an RSVP, but
+      // joined to this browser's earlier host_video_play on the same plan
+      // it is the only evidence we have that a hello did anything.
+      track(
+        "plan_rsvp_web",
+        {
+          planId: plan.id,
+          hadVideo: Boolean(plan.hostIntroVideo),
+          status: result?.waitlisted ? "waitlisted" : result?.pendingApproval ? "pending" : "going",
+        },
+        calendarId ?? null,
+      );
       setVerifiedUserCookie(verify.name, verify.phone);
       if (result?.eventNotificationId) {
         setNotificationId(result.eventNotificationId);
@@ -4789,6 +4802,9 @@ export default function OrgCalendarPage() {
                       hostName={plan.hostName}
                       hostBio={plan.hostBio}
                       hostAvatar={plan.hostAvatar}
+                      planId={plan.id}
+                      by={plan.hasRosterHost ? "roster" : "host"}
+                      calendarId={org.objectId}
                       onWatched={() => {
                         if (!plan.hostId) return;
                         setWatchedIntroHosts((prev) => {
@@ -5985,11 +6001,14 @@ export default function OrgCalendarPage() {
                         className={introVideoFrame(selectedEvent.hostIntroVideo.aspectRatio).className}
                         style={introVideoFrame(selectedEvent.hostIntroVideo.aspectRatio).style}
                       >
-                        <HlsVideo
+                        <HostIntroInline
                           src={selectedEvent.hostIntroVideo.url}
                           poster={selectedEvent.hostIntroVideo.poster ?? selectedEvent.hostAvatar}
-                          preload="none"
                           className="h-full w-full object-cover"
+                          planId={selectedEvent.id}
+                          by={selectedEvent.hasRosterHost ? "roster" : "host"}
+                          surface="sheet"
+                          calendarId={org.objectId}
                         />
                       </div>
                     ) : selectedEvent.hostAvatar ? (

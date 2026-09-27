@@ -25,6 +25,7 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { Play, Volume2, VolumeX, X } from "lucide-react";
 import HlsVideo from "@/components/HlsVideo";
+import { useHostVideoTracking, type HostVideoBy } from "@/lib/host-video-track";
 
 export type HostIntro = {
   url: string;
@@ -63,6 +64,10 @@ export function HostIntroPlayer({
   onClose,
   onWatched,
   closeHint = "Sound is on. Click anywhere else to close.",
+  planId,
+  by = "roster",
+  surface = "card",
+  calendarId,
 }: {
   video: HostIntro;
   hostName: string;
@@ -72,12 +77,19 @@ export function HostIntroPlayer({
   /** Fired once, when most of the video has played. */
   onWatched?: () => void;
   closeHint?: string | null;
+  /** Watch measurement. Without a planId nothing is reported — the event
+   *  would have nothing to join an RSVP to. */
+  planId?: string | null;
+  by?: HostVideoBy;
+  surface?: string;
+  calendarId?: string | null;
 }) {
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [time, setTime] = useState({ current: 0, duration: video.durationSec ?? 0 });
   const videoEl = useRef<HTMLVideoElement | null>(null);
   const watched = useRef(false);
+  const measure = useHostVideoTracking({ planId, by, surface, calendarId });
 
   const poster = video.poster ?? hostAvatar;
   const stop = (e: MouseEvent) => e.stopPropagation();
@@ -130,10 +142,17 @@ export function HostIntroPlayer({
           }}
           onTimeUpdate={(current, duration) => {
             setTime({ current, duration });
+            measure.onTimeUpdate(current, duration);
             if (duration > 0 && current / duration >= 0.8) markWatched();
           }}
-          onPlayingChange={setPlaying}
-          onEnded={markWatched}
+          onPlayingChange={(isPlaying) => {
+            setPlaying(isPlaying);
+            measure.onPlayingChange(isPlaying);
+          }}
+          onEnded={() => {
+            measure.onEnded();
+            markWatched();
+          }}
         />
         {!playing && (
           <span className="pointer-events-none absolute left-1/2 top-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 shadow-md">
@@ -197,6 +216,9 @@ export default function HostIntroTile({
   hostBio,
   hostAvatar,
   onWatched,
+  planId,
+  by = "roster",
+  calendarId,
 }: {
   video: HostIntro;
   hostName: string;
@@ -204,6 +226,10 @@ export default function HostIntroTile({
   hostAvatar: string | null;
   /** Fired once, when most of the video has played. */
   onWatched?: () => void;
+  /** Passed to the player for watch measurement. */
+  planId?: string | null;
+  by?: HostVideoBy;
+  calendarId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const poster = video.poster ?? hostAvatar;
@@ -263,6 +289,10 @@ export default function HostIntroTile({
           hostAvatar={hostAvatar}
           onClose={close}
           onWatched={onWatched}
+          planId={planId}
+          by={by}
+          surface="card"
+          calendarId={calendarId}
         />
       </div>
     </div>

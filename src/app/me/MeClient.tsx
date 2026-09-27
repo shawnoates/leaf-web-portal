@@ -1273,6 +1273,10 @@ function Hero({
             hostAvatar={host!.photoUrl}
             onClose={closeIntro}
             closeHint="Sound is on."
+            planId={plan.id}
+            by="roster"
+            surface="me"
+            calendarId={plan.calendarId}
           />
         </div>
       )}

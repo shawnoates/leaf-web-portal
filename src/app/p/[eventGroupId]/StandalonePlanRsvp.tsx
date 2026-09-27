@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
+import { track } from "@/lib/track";
 import {
   setVerifiedUserCookie,
   getVerifiedUserCookie,
@@ -54,6 +55,9 @@ type Props = {
   // via onLocationRevealed.
   location: { name: string | null; address: string | null; timezone: string | null } | null;
   requireApproval: boolean;
+  /** A host hello was on the page when this RSVP happened. Reported with
+   *  the event so the watch → RSVP funnel can tell those plans apart. */
+  hadIntroVideo?: boolean;
   // Capacity reached — the CTA becomes "Join the Waitlist" and the server
   // queues the RSVP as a waitlisted request instead of confirming it.
   isFull: boolean;
@@ -108,6 +112,7 @@ export default function StandalonePlanRsvp({
   expiryDate,
   location,
   requireApproval,
+  hadIntroVideo,
   isFull,
   rsvpClosed,
   autoOpenRsvp,
@@ -159,6 +164,7 @@ export default function StandalonePlanRsvp({
           expiryDate={expiryDate}
           location={location}
           requireApproval={requireApproval}
+          hadIntroVideo={hadIntroVideo}
           isFull={isFull}
           onClose={() => setOpen(false)}
           onLocationRevealed={onLocationRevealed}
@@ -175,10 +181,12 @@ function RsvpModal({
   expiryDate,
   location,
   requireApproval,
+  hadIntroVideo,
   isFull,
   onClose,
   onLocationRevealed,
 }: {
+  hadIntroVideo?: boolean;
   eventGroupId: string;
   planTitle: string;
   planDescription: string;
@@ -281,6 +289,14 @@ function RsvpModal({
         | null
         | undefined;
       setVerifiedUserCookie(name, phone);
+      // Closes the watch → RSVP funnel: joined to this browser's earlier
+      // host_video_play on the same plan, it is what turns a play into a
+      // path rather than a view count.
+      track("plan_rsvp_web", {
+        planId: eventGroupId,
+        hadVideo: Boolean(hadIntroVideo),
+        status: result?.waitlisted ? "waitlisted" : result?.pendingApproval ? "pending" : "going",
+      });
       // Capture the EventNotification id so the success view's "Open Plan
       // Chat in Leaf" button can deep-link straight into the chat. Web chat
       // session minting is intentionally skipped — standalone plans push

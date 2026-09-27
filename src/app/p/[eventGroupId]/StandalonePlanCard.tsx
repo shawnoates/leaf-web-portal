@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Lock, MapPin } from "lucide-react";
 import PlanHeroMedia from "./PlanHeroMedia";
 import HlsVideo from "@/components/HlsVideo";
+import HostIntroInline from "@/components/HostIntroInline";
 import { introVideoFrame } from "@/lib/intro-video-frame";
 import PlanWhen from "./PlanWhen";
 import StandalonePlanRsvp from "./StandalonePlanRsvp";
@@ -193,11 +194,13 @@ export default function StandalonePlanCard({
                   className={introVideoFrame(rosterHost.introVideo.aspectRatio).className}
                   style={introVideoFrame(rosterHost.introVideo.aspectRatio).style}
                 >
-                  <HlsVideo
+                  <HostIntroInline
                     src={rosterHost.introVideo.url}
                     poster={rosterHost.introVideo.posterUrl ?? rosterHost.photoUrl}
-                    preload="none"
                     className="h-full w-full object-cover"
+                    planId={eventGroupId}
+                    by="roster"
+                    surface="plan_page"
                   />
                 </div>
               ) : rosterHost.photoUrl ? (
@@ -230,11 +233,13 @@ export default function StandalonePlanCard({
                 className={introVideoFrame(hostIntro.introVideo.aspectRatio).className}
                 style={introVideoFrame(hostIntro.introVideo.aspectRatio).style}
               >
-                <HlsVideo
+                <HostIntroInline
                   src={hostIntro.introVideo.url}
                   poster={hostIntro.introVideo.posterUrl ?? hostIntro.photoUrl}
-                  preload="none"
                   className="h-full w-full object-cover"
+                  planId={eventGroupId}
+                  by="host"
+                  surface="plan_page"
                 />
               </div>
               <div className="min-w-0">
@@ -264,6 +269,7 @@ export default function StandalonePlanCard({
             <>
               <StandalonePlanRsvp
                 eventGroupId={eventGroupId}
+                hadIntroVideo={Boolean(rosterHost?.introVideo || hostIntro?.introVideo)}
                 planTitle={title}
                 planDescription={description}
                 expiryDate={expiryDate}
