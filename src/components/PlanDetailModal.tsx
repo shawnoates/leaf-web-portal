@@ -603,6 +603,7 @@ export default function PlanDetailModal({
                 eventGroupId={plan.objectId}
                 hostName={hostNameOverride || plan.hostName}
                 planStarted={Boolean(plan.date && new Date(plan.date).getTime() <= Date.now())}
+                compact
               />
             )}
 

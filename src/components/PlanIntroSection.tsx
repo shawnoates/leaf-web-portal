@@ -31,6 +31,7 @@ export default function PlanIntroSection({
   notificationId,
   hostName,
   planStarted,
+  compact = false,
 }: {
   /** Session route: the signed-in viewer against the plan's host. */
   eventGroupId?: string;
@@ -41,6 +42,10 @@ export default function PlanIntroSection({
   /** The name on the "Hosted by" line, for the owner's view. */
   hostName: string;
   planStarted: boolean;
+  /** The plan detail modal: a one-row strip instead of the full card. The
+   *  post-publish "One more thing" screens leave it off — there the hello
+   *  is the whole ask, so it gets the full pitch. */
+  compact?: boolean;
 }) {
   const [state, setState] = useState<IntroState | null>(null);
   const [hidden, setHidden] = useState(false);
@@ -80,7 +85,8 @@ export default function PlanIntroSection({
         planStarted={planStarted || state.video.planStarted === true}
         onChanged={load}
         embedded
-        compact
+        compact={compact}
+        scriptCollapsed
       />
     );
   }
