@@ -884,6 +884,8 @@ export default function PlansManager({
   }
 
   async function fetchOrgInfo() {
+    // Don't carry the last calendar's Friend Mode card over while this one loads.
+    setFriendMode(null);
     try {
       const result = await Parse.Cloud.run("getOrgDashboard", { calendarId: orgId });
       type FM = { enabled: boolean; memberCount: number; eligible?: boolean } | undefined;
@@ -1709,7 +1711,9 @@ export default function PlansManager({
     <div className="space-y-10">
         {/* Friend Mode — the per-calendar switch (owner only, ≤15 members) */}
         {friendMode && (
-          <FriendModeCard calendarId={calendarId} calendarName={friendMode.name} enabled={friendMode.enabled} memberCount={friendMode.memberCount} />
+          // Keyed by calendar: the card holds its own on/off state seeded from
+          // props, so switching calendars must start a fresh card.
+          <FriendModeCard key={calendarId} calendarId={calendarId} calendarName={friendMode.name} enabled={friendMode.enabled} memberCount={friendMode.memberCount} />
         )}
 
         {/* Plans (Upcoming / Past) */}
