@@ -68,6 +68,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   // Someone who joined by text or in the app never saw the tap-to-add step.
   // Offer it once here, dismissible, above the book it feeds.
   const [seedDone, setSeedDone] = useState(false);
+  // "How often for you?" — asked once, right after joining.
+  const [paceDone, setPaceDone] = useState(false);
   // Invite: the owner picks followers not yet invited; anyone in can share the link.
   const [inviteOpen, setInviteOpen] = useState(false);
   const [invitable, setInvitable] = useState<{ userId: string; name: string; pending?: boolean }[] | null>(null);
@@ -326,6 +328,39 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               />
             )}
           </section>
+
+          {me.needsPace && !paceDone && !crew.oneTime && (
+            <section className="rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
+              <label htmlFor="first-pace" className="block font-fm-serif text-[26px] leading-tight">How often for you?</label>
+              <p className="mb-0 mt-2 text-[14px] leading-relaxed text-fm-ink-2">
+                The crew goes out {cadenceLabel(crew).toLowerCase()}. Slower works too: Leaf only asks you on your pace.
+              </p>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <select
+                  id="first-pace"
+                  value={pace}
+                  onChange={(e) => setPace(e.target.value)}
+                  className="h-11 min-w-0 flex-1 rounded-xl border px-3 text-sm"
+                >
+                  <option value="">Same as the crew ({cadenceLabel(crew).toLowerCase()})</option>
+                  {Object.entries(RHYTHM_LABELS)
+                    .filter(([d]) => Number(d) >= crew.rhythmDays)
+                    .filter(([d]) => Number(d) !== crew.rhythmDays)
+                    .map(([d, l]) => (
+                      <option key={d} value={d}>{l}</option>
+                    ))}
+                </select>
+                <Button
+                  small
+                  disabled={busy !== null}
+                  onClick={() => act("pace", async () => { await run("setCrewPace", auth, { weeks: pace ? Number(pace) / 7 : null }); setPaceDone(true); })}
+                >
+                  {busy === "pace" ? "Saving…" : "Save"}
+                </Button>
+              </div>
+              <p className="mb-0 mt-2 text-xs text-fm-muted">You can change it any time in your settings.</p>
+            </section>
+          )}
 
           {me.needsSeed && !seedDone && (
             <section className="rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
