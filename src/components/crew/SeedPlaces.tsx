@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Check, Plus } from "lucide-react";
+import { Check, ChevronUp, Plus } from "lucide-react";
 import { Button, Eyebrow, SectionTitle, Spinner } from "@/components/crew/CrewShell";
 import { run, type CrewAuth } from "@/lib/crew";
 
@@ -116,6 +116,14 @@ export default function SeedPlaces({
   // one new pick read as three new places.
   const count = [...chosen].filter((k) => !initial.has(k)).length;
   const removed = [...initial].filter((k) => !chosen.has(k)).length;
+  // New taps split into votes (places already in the book) and adds (new places).
+  const bookKeys = new Set((data?.book ?? []).map(keyOf));
+  const newVotes = [...chosen].filter((k) => !initial.has(k) && bookKeys.has(k)).length;
+  const newAdds = count - newVotes;
+  const label = newAdds > 0 && newVotes > 0 ? `Add ${newAdds} · vote ${newVotes}`
+    : newAdds > 0 ? `Add ${newAdds}`
+    : newVotes > 0 ? `Vote for ${newVotes}`
+    : removed > 0 ? "Save" : initial.size > 0 ? "Done" : "Pick a few";
   const nothing = data.book.length === 0 && data.popular.length === 0;
   if (nothing) {
     // No book and no nearby places: say so and get out of the way rather than
@@ -142,10 +150,10 @@ export default function SeedPlaces({
 
       {data.book.length > 0 && (
         <section className="flex flex-col gap-2.5">
-          <Eyebrow>Already in the book</Eyebrow>
+          <Eyebrow>Already in the book · vote for the ones you&rsquo;d go to</Eyebrow>
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {data.book.map((p) => (
-              <PlaceRow key={keyOf(p)} place={p} on={chosen.has(keyOf(p))} onTap={() => toggle(p)} />
+              <PlaceRow key={keyOf(p)} place={p} on={chosen.has(keyOf(p))} wasOn={initial.has(keyOf(p))} vote onTap={() => toggle(p)} />
             ))}
           </ul>
         </section>
@@ -166,7 +174,7 @@ export default function SeedPlaces({
 
       <div className="flex items-center gap-3">
         <Button onClick={() => submit(false)} disabled={busy || (count === 0 && initial.size === 0)}>
-          {busy ? "Saving…" : count > 0 ? `Add ${count}` : removed > 0 ? "Save" : initial.size > 0 ? "Done" : "Pick a few"}
+          {busy ? "Saving…" : label}
         </Button>
         <button
           type="button"
@@ -181,14 +189,26 @@ export default function SeedPlaces({
   );
 }
 
-function PlaceRow({ place, on, onTap }: { place: SeedPlace; on: boolean; onTap: () => void }) {
+function PlaceRow({ place, on, wasOn = false, vote = false, onTap }: {
+  place: SeedPlace;
+  on: boolean;
+  /** Their vote was already on this place when the step opened. */
+  wasOn?: boolean;
+  /** A place already in the book: the tap is a vote, shown as the book's vote pill. */
+  vote?: boolean;
+  onTap: () => void;
+}) {
   const sub = [place.category, place.shortAddress || place.address].filter(Boolean).join(" · ");
+  // The count moves with the tap, like the book page: their own vote is in
+  // `upvotes` already when wasOn, so only a change from that shifts it.
+  const votes = Math.max(0, (place.upvotes ?? 0) + (on ? 1 : 0) - (wasOn ? 1 : 0));
   return (
     <li>
       <button
         type="button"
         onClick={onTap}
         aria-pressed={on}
+        aria-label={vote ? `${on ? "Remove your vote for" : "Vote for"} ${place.name}, ${votes} ${votes === 1 ? "vote" : "votes"}` : undefined}
         className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
           on ? "border-fm-ink bg-fm-ink/10" : "border-fm-line bg-fm-surface"
         }`}
@@ -197,17 +217,26 @@ function PlaceRow({ place, on, onTap }: { place: SeedPlace; on: boolean; onTap: 
           <span className="block truncate text-[15px] font-semibold">{place.name}</span>
           {sub && <span className="block truncate text-[13px] text-fm-muted">{sub}</span>}
         </span>
-        {typeof place.upvotes === "number" && place.upvotes > 0 && (
-          <span className="shrink-0 text-[13px] text-fm-muted">{place.upvotes} 👍</span>
+        {vote ? (
+          <span
+            aria-hidden
+            className={`flex h-12 w-11 shrink-0 flex-col items-center justify-center rounded-xl text-[13px] font-semibold leading-none ${
+              on ? "bg-fm-ink text-fm-canvas" : "border border-fm-line text-fm-ink"
+            }`}
+          >
+            <ChevronUp size={15} strokeWidth={2.6} />
+            <span className="mt-0.5">{votes}</span>
+          </span>
+        ) : (
+          <span
+            aria-hidden
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${
+              on ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-muted"
+            }`}
+          >
+            {on ? <Check size={15} strokeWidth={2.5} /> : <Plus size={15} strokeWidth={2.2} />}
+          </span>
         )}
-        <span
-          aria-hidden
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${
-            on ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-muted"
-          }`}
-        >
-          {on ? <Check size={15} strokeWidth={2.5} /> : <Plus size={15} strokeWidth={2.2} />}
-        </span>
       </button>
     </li>
   );
