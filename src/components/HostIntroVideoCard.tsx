@@ -25,13 +25,6 @@ import IntroVideoRecorder, { type Beat, canRecordInBrowser } from "@/components/
 import { introVideoFrame } from "@/lib/intro-video-frame";
 import { TrendingUp } from "lucide-react";
 
-/**
- * The one-line reason to record, shown before there's a video.
- * TODO(shawn): confirm "2x" against real numbers — plans with a live
- * hostIntroVideo vs without, RSVPs per plan — before relying on it.
- */
-export const HELLO_RSVP_STAT = "Plans with a host hello get 2x more RSVPs.";
-
 export type IntroVideoInfo = {
   available: boolean;
   status: "none" | "processing" | "ready" | "errored" | "removed";
@@ -57,6 +50,10 @@ export type IntroVideoInfo = {
   /** The one hard rule, kept out of `tips` so it gets its own line. Null when
    *  the plan shows its venue anyway, so there is nothing to keep. */
   venueRule: string | null;
+  /** A real-numbers reason to record ("Plans with a host hello get 2x more
+   *  RSVPs."), from Config.hostVideoPolicy.rsvpStat on the server. Absent
+   *  until someone sets it; the card then says "People RSVP to a face." */
+  rsvpStat?: string | null;
   /**
    * Whether Leaf may repost the clip on its own social accounts — asked of
    * PAID roster hosts only, so the field is absent on every other card and
@@ -363,7 +360,9 @@ export default function HostIntroVideoCard({
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-semibold leading-tight text-leaf-900">Add a 30-second hello</p>
             <p className="mt-0.5 text-[13px] leading-snug text-zinc-500">
-              {video.status === "errored" ? "The last file couldn\u2019t be processed. Record it again." : HELLO_RSVP_STAT}
+              {video.status === "errored"
+                ? "The last file couldn\u2019t be processed. Record it again."
+                : video.rsvpStat || "People RSVP to a face."}
             </p>
           </div>
           <button
@@ -471,17 +470,19 @@ export default function HostIntroVideoCard({
             </picture>
           )}
           <p className={`${embedded ? "mt-2" : "mt-4"} text-[14px] leading-snug text-zinc-600`}>
-            A quick intro to camera goes on the plan page next to {besideWhat}.
+            A quick intro to camera goes on the plan page next to {besideWhat}.{video.rsvpStat ? "" : " People RSVP to a face."}
             {bonusOpen && deadlineLabel
               ? ` It pays ${bonus} on top if it's up by ${deadlineLabel}.`
               : bonus
                 ? " The bonus window has closed, but it's still worth adding."
                 : ""}
           </p>
-          <p className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-[14px] font-medium leading-snug text-emerald-800">
-            <TrendingUp className="h-4 w-4 shrink-0" aria-hidden="true" />
-            {HELLO_RSVP_STAT}
-          </p>
+          {video.rsvpStat && (
+            <p className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-[14px] font-medium leading-snug text-emerald-800">
+              <TrendingUp className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {video.rsvpStat}
+            </p>
+          )}
           {/* The rule, before they ever hit record, and out of the
               collapsible — a venue said out loud on camera is the one thing
               here that can't be taken back. It shows again on the beat where
