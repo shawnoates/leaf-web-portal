@@ -12,7 +12,7 @@
  * the left, what needs you on the right.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowUp, Check, ChevronUp, Plus, Settings, UserPlus } from "lucide-react";
 import Parse from "@/lib/parse-client";
@@ -751,9 +751,31 @@ function CycleCard({
   onConnectCalendar: () => void;
 }) {
   // Not voted yet: start from the dates their calendar says they're free.
-  const [picked, setPicked] = useState<Set<number>>(new Set(c.myVotes ?? c.myFree ?? []));
-  const prefilled = c.myVotes === null && (c.myFree?.length ?? 0) > 0;
-  const [saved, setSaved] = useState(c.myVotes !== null);
+  // Nothing pre-ticked: Leaf already picked these dates around everyone's
+  // calendars, so a tap here is a preference, and it saves by itself.
+  const [picked, setPicked] = useState<Set<number>>(new Set(c.myVotes ?? []));
+  const [voteState, setVoteState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveVotes = (next: Set<number>) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    // A short pause so a few quick taps save once.
+    saveTimer.current = setTimeout(async () => {
+      setVoteState("saving");
+      try {
+        await run("crewVote", auth, { cycleId: c.cycleId, options: [...next] });
+        setVoteState("saved");
+        setTimeout(() => setVoteState((v) => (v === "saved" ? "idle" : v)), 2200);
+      } catch {
+        setVoteState("error");
+      }
+    }, 700);
+  };
+  const toggleDate = (i: number) => {
+    const n = new Set(picked);
+    if (n.has(i)) n.delete(i); else n.add(i);
+    setPicked(n);
+    saveVotes(n);
+  };
   const goingIds = Object.entries(c.rsvps).filter(([, r]) => r === "in").map(([id]) => id);
   const going = goingIds.map((id) => names[id] || "Someone");
   const closes = toDate(c.pollClosesAt);
@@ -802,9 +824,14 @@ function CycleCard({
 
       {c.state === "polling" && (
         <>
-          <p className="m-0 text-[15px] text-fm-ink-2">
-            {prefilled ? "Your calendar says you're free for the ones picked. Change anything, then save." : "Which nights work? Pick all that do."}
-          </p>
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="m-0 text-[15px] text-fm-ink-2">
+              {calendarSynced ? "Picked around everyone's calendars. Tap any you'd go to." : "Which nights work? Tap any you'd go to."}
+            </p>
+            <span role="status" aria-live="polite" className={`shrink-0 text-xs ${voteState === "error" ? "text-fm-danger" : "text-fm-muted"}`}>
+              {voteState === "saving" ? "Saving…" : voteState === "saved" ? "Saved ✓" : voteState === "error" ? "Didn't save — tap again" : ""}
+            </span>
+          </div>
           {!calendarSynced && (
             <div className="flex items-center gap-3 rounded-2xl border border-fm-line-dim px-3.5 py-2.5">
               <p className="m-0 min-w-0 flex-1 text-[13px] leading-snug text-fm-ink-2">Connect Google Calendar and Leaf ticks the nights you&rsquo;re free.</p>
@@ -823,14 +850,14 @@ function CycleCard({
               const p = dayParts(o.date);
               const on = picked.has(i);
               const baseCount = c.votes ? Object.values(c.votes).filter((v) => v.includes(i)).length : 0;
-              // Show the count as it will be once this member saves.
+              // The count including this member's own taps, saved or not.
               const count = baseCount - (c.myVotes?.includes(i) ? 1 : 0) + (on ? 1 : 0);
               return (
                 <li key={i}>
                   <button
                     type="button"
                     aria-pressed={on}
-                    onClick={() => { const n = new Set(picked); if (on) n.delete(i); else n.add(i); setPicked(n); setSaved(false); }}
+                    onClick={() => toggleDate(i)}
                     className={`flex h-[116px] w-full flex-col items-start justify-between rounded-[18px] border p-3 text-left transition lg:h-[124px] lg:rounded-[20px] lg:p-3.5 ${
                       on ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line bg-fm-canvas text-fm-ink hover:border-fm-ink-2"
                     }`}
@@ -846,13 +873,15 @@ function CycleCard({
               );
             })}
           </ul>
-          <Button
-            block
-            disabled={busy !== null || saved}
-            onClick={() => onAct("vote", async () => { await run("crewVote", auth, { cycleId: c.cycleId, options: [...picked] }); setSaved(true); })}
-          >
-            {saved ? <><Check size={18} aria-hidden /> Saved</> : picked.size ? "Save my picks" : "None work for me"}
-          </Button>
+          {picked.size === 0 && (
+            <button
+              type="button"
+              className="w-fit text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink"
+              onClick={() => { setPicked(new Set()); saveVotes(new Set()); }}
+            >
+              {c.myVotes !== null && c.myVotes.length === 0 ? "You said none of these work" : "None of these work for me"}
+            </button>
+          )}
         </>
       )}
 
