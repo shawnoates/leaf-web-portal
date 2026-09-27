@@ -104,6 +104,8 @@ export type CrewPage = {
     quorum: number;
     joinedCount: number;
     ownerId: string | null;
+    /** 'friends': started with Start a crew (its calendar is hidden). 'calendar': Friend Mode on a real calendar. */
+    origin?: "friends" | "calendar";
   };
   me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null; calendarSynced?: boolean; inviteLink?: string | null; needsSeed?: boolean; needsPace?: boolean };
   members: Member[];

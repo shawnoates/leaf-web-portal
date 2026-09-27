@@ -76,11 +76,15 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const [invitePicked, setInvitePicked] = useState<Set<string>>(new Set());
   const [inviteNote, setInviteNote] = useState("");
   const [linkDone, setLinkDone] = useState("");
+  // Only a crew built on a real calendar has followers to pick from. A crew
+  // from Start a crew has a calendar behind it that nobody ever sees, so the
+  // sheet never mentions one.
+  const hasFollowers = me.isOwner && crew.origin !== "friends";
   const openInvite = () => {
     setInviteOpen(true);
     setInviteNote("");
     setLinkDone("");
-    if (me.isOwner) {
+    if (hasFollowers) {
       run<{ people: { userId: string; name: string; canInvite: boolean; pending?: boolean }[] }>("previewCrewInvites", auth)
         .then((r) => {
           const list = r.people.filter((p) => p.canInvite);
@@ -513,10 +517,19 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <button aria-label="Close" className="text-xl leading-none text-fm-muted" onClick={() => setInviteOpen(false)}>×</button>
             </div>
 
-            {me.isOwner && (
+            {inApp && (
+              <a
+                href={`leaf://crew-invite/${crew.id}`}
+                className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-fm-line px-4 text-[15px] font-semibold text-fm-ink"
+              >
+                Choose from contacts
+              </a>
+            )}
+
+            {hasFollowers && (
               <div className="mt-4">
                 <div className="flex items-center justify-between">
-                  <Eyebrow>Followers not in yet</Eyebrow>
+                  <Eyebrow>Your followers not in yet</Eyebrow>
                   {invitable && invitable.length > 0 && (
                     <button
                       className="text-xs text-fm-ink underline underline-offset-4"
@@ -529,7 +542,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 {invitable === null ? (
                   <p className="mt-2 text-sm text-fm-muted">Loading…</p>
                 ) : invitable.length === 0 ? (
-                  <p className="mt-2 text-sm text-fm-muted">Everyone who follows the calendar is in, or was invited in the last two weeks.</p>
+                  <p className="mt-2 text-sm text-fm-muted">All your followers are in, or were invited in the last two weeks.</p>
                 ) : (
                   <>
                     <ul className="mt-2 space-y-1.5">
@@ -571,7 +584,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             )}
 
             <div className="mt-5 rounded-2xl border border-fm-line p-4">
-              <div className="text-[15px] font-semibold">{me.isOwner ? "Or share the invite link" : "Share the invite link"}</div>
+              <div className="text-[15px] font-semibold">{hasFollowers || inApp ? "Or share the invite link" : "Share the invite link"}</div>
               <p className="mt-1 text-[13px] text-fm-muted">Send it from your phone to anyone you want in. They join with one tap.</p>
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <Button small onClick={shareInviteLink}>{linkDone || "Share the link"}</Button>
