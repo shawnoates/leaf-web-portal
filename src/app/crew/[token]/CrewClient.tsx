@@ -182,9 +182,10 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             ) : (
               <p className="m-0 text-[15px] text-fm-ink-2">Join to see what the crew is planning. Nobody sees your number.</p>
             )}
-            {/* Two ways in instead of a checkbox: the texts button IS the opt-in,
-                with the disclosure right under it. A number is asked for only
-                when there's none on file. */}
+            {/* One way in: the button is also the text opt-in, with the
+                disclosure right under it. A number is asked for only when
+                there's none on file. Texts can be turned off later (STOP, or
+                the crew page's settings). */}
             {!me.phoneLast4 && (
               <label className="mt-3 block">
                 <span className="block text-xs text-fm-muted">Mobile number, for texts</span>
@@ -208,9 +209,6 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <p className="m-0 text-[11px] leading-snug text-fm-muted">
                 Date polls and the night&rsquo;s details{me.phoneLast4 ? ` to the number ending in ${me.phoneLast4}` : ""}. Up to 5 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.
               </p>
-              <Button kind="ghost" onClick={() => act("join-quiet", () => run("respondToCrewInvite", auth, { accept: true, sms: false, phone: null }))} disabled={busy !== null}>
-                {busy === "join-quiet" ? "Joining…" : "Just join"}
-              </Button>
               {!declined && (
                 <button
                   type="button"
