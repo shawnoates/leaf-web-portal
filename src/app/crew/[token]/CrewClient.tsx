@@ -22,6 +22,7 @@ import {
 } from "@/components/crew/CrewShell";
 import ProposeNight from "@/components/crew/ProposeNight";
 import SeedPlaces from "@/components/crew/SeedPlaces";
+import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
   RHYTHM_LABELS, crewHref, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
@@ -98,6 +99,24 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   // Calendar sync needs a Leaf sign-in (a crew link alone isn't an account session).
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => { setSignedIn(Boolean(Parse.User.current())); }, []);
+
+  // Calendar connect needs a real session, not just this crew link: a
+  // forwarded link must not be able to attach someone else's Google
+  // calendar to this account. Signed in as this member → straight to
+  // Google; otherwise a phone code first, and only this member's account.
+  const [verifyForCalendar, setVerifyForCalendar] = useState(false);
+  const goConnectCalendar = async () => {
+    const r = (await Parse.Cloud.run("createGoogleCalendarConnectUrl", { returnTo: window.location.href })) as { url: string };
+    window.location.href = r.url;
+  };
+  const connectCalendar = () => {
+    const current = Parse.User.current();
+    if (current && (!me.userId || current.id === me.userId)) {
+      void act("gcal", goConnectCalendar);
+    } else {
+      setVerifyForCalendar(true);
+    }
+  };
   const [smsPhone, setSmsPhone] = useState("");
   const phoneOk = !smsBox || Boolean(me.phoneLast4) || smsPhone.replace(/\D/g, "").length >= 10;
 
@@ -184,6 +203,21 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
 
   return (
     <CrewShell wide topBar={<CrewTopBar auth={auth} active="crew" />}>
+      {verifyForCalendar && (
+        <PhoneVerificationModal
+          onClose={() => setVerifyForCalendar(false)}
+          onVerified={() => {
+            setVerifyForCalendar(false);
+            setSignedIn(true);
+            const current = Parse.User.current();
+            if (me.userId && current?.id !== me.userId) {
+              setError("That number belongs to a different Leaf account, so the calendar wasn't connected. Use the number this crew knows you by.");
+              return;
+            }
+            void act("gcal", goConnectCalendar);
+          }}
+        />
+      )}
       {error && <p className="mb-4 rounded-2xl bg-[#3A2321] px-4 py-3 text-sm text-fm-danger">{error}</p>}
 
       <div className="lg:grid lg:grid-cols-[400px_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:gap-x-[72px]">
@@ -256,7 +290,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             {open.length > 0 && (
               <div className={`grid gap-3 lg:gap-4 ${open.length > 1 ? "lg:grid-cols-2" : ""}`}>
                 {open.map((c) => (
-                  <CycleCard key={c.cycleId} cycle={c} names={names} members={members} busy={busy} onAct={act} auth={auth} quorum={crew.quorum} joined={joined.length} />
+                  <CycleCard key={c.cycleId} cycle={c} names={names} members={members} busy={busy} onAct={act} auth={auth} quorum={crew.quorum} joined={joined.length} calendarSynced={Boolean(me.calendarSynced)} onConnectCalendar={connectCalendar} />
                 ))}
               </div>
             )}
@@ -645,7 +679,7 @@ function MemberRow({ m, note }: { m: Member; note?: string }) {
 }
 
 function CycleCard({
-  cycle: c, names, members, busy, onAct, auth, quorum, joined,
+  cycle: c, names, members, busy, onAct, auth, quorum, joined, calendarSynced, onConnectCalendar,
 }: {
   cycle: CycleView;
   names: Record<string, string>;
@@ -655,6 +689,9 @@ function CycleCard({
   auth: CrewAuth;
   quorum: number;
   joined: number;
+  /** The member's Google Calendar is connected (Leaf pre-ticks their free nights). */
+  calendarSynced: boolean;
+  onConnectCalendar: () => void;
 }) {
   // Not voted yet: start from the dates their calendar says they're free.
   const [picked, setPicked] = useState<Set<number>>(new Set(c.myVotes ?? c.myFree ?? []));
@@ -711,6 +748,19 @@ function CycleCard({
           <p className="m-0 text-[15px] text-fm-ink-2">
             {prefilled ? "Your calendar says you're free for the ones picked. Change anything, then save." : "Which nights work? Pick all that do."}
           </p>
+          {!calendarSynced && (
+            <div className="flex items-center gap-3 rounded-2xl border border-fm-line-dim px-3.5 py-2.5">
+              <p className="m-0 min-w-0 flex-1 text-[13px] leading-snug text-fm-ink-2">Connect Google Calendar and Leaf ticks the nights you&rsquo;re free.</p>
+              <button
+                type="button"
+                onClick={onConnectCalendar}
+                disabled={busy !== null}
+                className="h-9 shrink-0 rounded-full border border-fm-line px-3.5 text-[13px] font-semibold text-fm-ink hover:bg-fm-card disabled:opacity-50"
+              >
+                Connect
+              </button>
+            </div>
+          )}
           <ul className="grid grid-cols-3 gap-2 lg:gap-2.5">
             {c.options.map((o, i) => {
               const p = dayParts(o.date);
