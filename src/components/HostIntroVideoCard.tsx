@@ -143,6 +143,7 @@ export default function HostIntroVideoCard({
   planStarted,
   onChanged,
   embedded = false,
+  compact = false,
 }: {
   source: IntroVideoSource;
   video: IntroVideoInfo;
@@ -153,11 +154,15 @@ export default function HostIntroVideoCard({
   /** Inside another card (the checklist row, the plan modal): tighter
    *  chrome, no viewfinder loop. */
   embedded?: boolean;
+  /** The dashboard's plan modal: "What do I say?" starts closed and opens
+   *  to the cues only. The example lines and tips stay on the checklist and
+   *  offer pages, and the prompter shows the full lines while recording. */
+  compact?: boolean;
 }) {
   const [phase, setPhase] = useState<"idle" | "checking" | "uploading" | "finalizing">("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [showScript, setShowScript] = useState(video.status === "none");
+  const [showScript, setShowScript] = useState(!compact && video.status === "none");
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [recording, setRecording] = useState(false);
   // `null` until we've asked the browser. Capability can only be read on the
@@ -423,7 +428,14 @@ export default function HostIntroVideoCard({
           >
             {showScript ? "Hide what to cover" : "What do I say?"}
           </button>
-          {showScript && (
+          {showScript && compact && (
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-[14px] leading-snug text-leaf-900 marker:text-leaf-800/60">
+              {video.beats.map((b) => (
+                <li key={b.id}>{b.cue}</li>
+              ))}
+            </ol>
+          )}
+          {showScript && !compact && (
             <div className="mt-3 rounded-xl bg-leaf-50 p-4">
               <p className="text-[13px] font-medium uppercase tracking-wide text-leaf-800/70">
                 {video.beats.length === 6 ? "Six" : video.beats.length === 5 ? "Five" : video.beats.length} things to hit, in your words

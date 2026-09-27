@@ -80,6 +80,7 @@ export default function PlanIntroSection({
         planStarted={planStarted || state.video.planStarted === true}
         onChanged={load}
         embedded
+        compact
       />
     );
   }
