@@ -14,6 +14,9 @@ import ChecklistClient, { type HostChecklist } from "./ChecklistClient";
 
 type PageProps = {
   params: Promise<{ notificationId: string }>;
+  // `?hello=1`: the host just accepted or was approved, and the link they
+  // followed promised the 30-second hello first. The client leads with it.
+  searchParams: Promise<{ hello?: string }>;
 };
 
 async function fetchChecklist(
@@ -46,14 +49,16 @@ export async function generateMetadata({
   };
 }
 
-export default async function HostChecklistPage({ params }: PageProps) {
+export default async function HostChecklistPage({ params, searchParams }: PageProps) {
   const { notificationId } = await params;
+  const { hello } = await searchParams;
   const { data, error } = await fetchChecklist(notificationId);
   return (
     <ChecklistClient
       notificationId={notificationId}
       initial={data}
       initialError={error}
+      hello={hello === "1"}
     />
   );
 }

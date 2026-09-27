@@ -41,6 +41,7 @@ import PaidRsvp from "@/components/PaidRsvp";
 import HlsVideo from "@/components/HlsVideo";
 import { introVideoFrame } from "@/lib/intro-video-frame";
 import HostIntroTile, { type HostIntro } from "@/components/HostIntroTile";
+import PlanIntroSection from "@/components/PlanIntroSection";
 import {
   Plus,
   Users,
@@ -1952,6 +1953,10 @@ export default function OrgCalendarPage() {
   // Real, current persona avatar for the "Add virtual host" button (server-
   // provided; seed URLs go stale).
   const [hostSuccess, setHostSuccess] = useState<boolean | "pending">(false);
+  // The new host's checklist seat when a plan just went live with them as
+  // host. Holds the success screen open on the "record a hello" card —
+  // the ask belongs to the moment they said yes. Null = auto-close as before.
+  const [hostHelloSeat, setHostHelloSeat] = useState<string | null>(null);
   const [hostSubmitting, setHostSubmitting] = useState(false);
   const [hostError, setHostError] = useState<string | null>(null);
   const [hostNote, setHostNote] = useState("");
@@ -2008,6 +2013,7 @@ export default function OrgCalendarPage() {
   >(null);
   const [customSubmitting, setCustomSubmitting] = useState(false);
   const [customSuccess, setCustomSuccess] = useState<false | true | "published">(false);
+  const [customHelloSeat, setCustomHelloSeat] = useState<string | null>(null);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [unsplashPhotos, setUnsplashPhotos] = useState<{ id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]>([]);
   const [unsplashLoading, setUnsplashLoading] = useState(false);
@@ -3900,6 +3906,7 @@ export default function OrgCalendarPage() {
             : undefined,
         });
         setHostSuccess(result?.pendingApproval ? "pending" : true);
+        setHostHelloSeat(result?.pendingApproval ? null : ((result as { hostNotificationId?: string | null })?.hostNotificationId ?? null));
         setHostNote("");
         setHostEmail("");
         setSelectedVenue(null);
@@ -3938,6 +3945,8 @@ export default function OrgCalendarPage() {
         } : undefined,
       });
       setHostSuccess(result?.pendingApproval ? "pending" : true);
+      const hostSeat = result?.pendingApproval ? null : ((result as { hostNotificationId?: string | null })?.hostNotificationId ?? null);
+      setHostHelloSeat(hostSeat);
       setHostNote("");
       setHostEmail("");
       setSelectedVenue(null);
@@ -3950,10 +3959,13 @@ export default function OrgCalendarPage() {
       }
       // Refresh data to show the new plan
       fetchOrg();
-      setTimeout(() => {
-        setHostingIdea(null);
-        setHostSuccess(false);
-      }, 2000);
+      // With a hello to offer, the screen stays until they record or pass.
+      if (!hostSeat) {
+        setTimeout(() => {
+          setHostingIdea(null);
+          setHostSuccess(false);
+        }, 2000);
+      }
     } catch (err) {
       // This used to only console.error, so a rejected submit looked like
       // nothing happened at all — the server's reason (venue closed at that
@@ -4019,6 +4031,8 @@ export default function OrgCalendarPage() {
         setVerifiedUserCookie(customVerify.name, customVerify.phone);
       }
       setCustomSuccess(result?.pendingApproval === false ? "published" : true);
+      const customSeat = result?.pendingApproval === false ? ((result as { hostNotificationId?: string | null })?.hostNotificationId ?? null) : null;
+      setCustomHelloSeat(customSeat);
       setHostNote("");
       setCustomEmail("");
       setSelectedVenue(null);
@@ -4035,10 +4049,12 @@ export default function OrgCalendarPage() {
       if (result?.pendingApproval === false) {
         fetchOrg();
       }
-      setTimeout(() => {
-        setCreatingCustomPlan(false);
-        setCustomSuccess(false);
-      }, 2500);
+      if (!customSeat) {
+        setTimeout(() => {
+          setCreatingCustomPlan(false);
+          setCustomSuccess(false);
+        }, 2500);
+      }
     } catch (err) {
       // Previously console-only, so a rejected submit looked like a dead
       // button. This is now the non-owner "edit a suggestion" path too, so the
@@ -6505,9 +6521,23 @@ export default function OrgCalendarPage() {
                   {hostSuccess === "pending" && (
                     <p className="text-sm text-zinc-500">The organizer will review your request and get back to you.</p>
                   )}
-                  <p className="text-zinc-400 uppercase tracking-widest text-xs">
-                    Closing...
-                  </p>
+                  {hostHelloSeat ? (
+                    <div className="mx-auto max-w-md space-y-4 text-left">
+                      <p className="text-center text-sm text-zinc-500">One more thing, while you&rsquo;re here.</p>
+                      <PlanIntroSection notificationId={hostHelloSeat} hostName="You" planStarted={false} />
+                      <button
+                        type="button"
+                        onClick={() => { setHostingIdea(null); setHostSuccess(false); setHostHelloSeat(null); }}
+                        className="w-full text-center text-sm font-medium text-zinc-500 underline underline-offset-2"
+                      >
+                        Not now
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-zinc-400 uppercase tracking-widest text-xs">
+                      Closing...
+                    </p>
+                  )}
                 </div>
               ) : (
                 <>
@@ -6840,9 +6870,23 @@ export default function OrgCalendarPage() {
                       ? "Your plan is live. Followers will see it on the calendar."
                       : "The organizer will review your custom plan and get back to you."}
                   </p>
-                  <p className="text-zinc-400 uppercase tracking-widest text-xs">
-                    Closing...
-                  </p>
+                  {customHelloSeat ? (
+                    <div className="mx-auto max-w-md space-y-4 text-left">
+                      <p className="text-center text-sm text-zinc-500">One more thing, while you&rsquo;re here.</p>
+                      <PlanIntroSection notificationId={customHelloSeat} hostName="You" planStarted={false} />
+                      <button
+                        type="button"
+                        onClick={() => { setCreatingCustomPlan(false); setCustomSuccess(false); setCustomHelloSeat(null); }}
+                        className="w-full text-center text-sm font-medium text-zinc-500 underline underline-offset-2"
+                      >
+                        Not now
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-zinc-400 uppercase tracking-widest text-xs">
+                      Closing...
+                    </p>
+                  )}
                 </div>
               ) : (
                 <>

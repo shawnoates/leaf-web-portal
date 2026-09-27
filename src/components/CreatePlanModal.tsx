@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import Parse from "@/lib/parse-client";
+import PlanIntroSection from "@/components/PlanIntroSection";
 import { everyOtherMonth, hostCandidateNote, monthlyRuleOptionsForDate, NTH_LABELS, WEEKDAY_NAMES, type RuleOption, type SeriesHostCandidate } from "@/lib/series";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { getDefaultCoverForSeed } from "@/lib/default-covers";
@@ -368,6 +369,10 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   const seriesHostFirstName = seriesHostName.trim().split(/\s+/)[0] || "They";
   const [creating, setCreating] = useState(false);
   const [success, setSuccess] = useState(false);
+  // A hosted plan just created with the creator as its host. The drawer
+  // stays open on the "record a 30-second hello" card instead of closing:
+  // the ask belongs to the moment the plan went live.
+  const [helloPlanId, setHelloPlanId] = useState<string | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [unsplashPhotos, setUnsplashPhotos] = useState<{ id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]>([]);
@@ -1295,10 +1300,14 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
       }
       setSuccess(true);
       onCreated(result);
-      setTimeout(() => {
-        setSuccess(false);
-        onClose();
-      }, 1500);
+      if (result.kind === "hosted" && result.eventGroupId && !hostIsOther) {
+        setHelloPlanId(result.eventGroupId);
+      } else {
+        setTimeout(() => {
+          setSuccess(false);
+          onClose();
+        }, 1500);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : editMode ? "Failed to update plan" : "Failed to create plan";
       alert(message);
@@ -1360,7 +1369,22 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        {helloPlanId && (
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+            <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg text-sm">
+              <Check className="w-4 h-4" /> Plan published. One more thing, while you&rsquo;re here.
+            </div>
+            <PlanIntroSection eventGroupId={helloPlanId} hostName="You" planStarted={false} />
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full text-center text-sm font-medium text-zinc-500 underline underline-offset-2"
+            >
+              Not now
+            </button>
+          </div>
+        )}
+        <div className={helloPlanId ? "hidden" : "flex-1 overflow-y-auto px-6 py-5 space-y-5"}>
           {success && (
             <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg text-sm">
               <Check className="w-4 h-4" /> {pollConvertMode ? "Poll converted — voters notified" : hostRequestMode ? "Approved — requester notified" : editMode ? (isPoll ? "Poll updated!" : "Plan updated!") : isPoll ? "Poll created — followers notified" : "Plan created successfully!"}
@@ -2356,7 +2380,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
 
         {/* Sticky footer — always in view so the Create action never scrolls
             off-screen (mobile keyboard covers the bottom of the drawer). */}
-        <div className="border-t border-zinc-100 px-6 py-3 flex items-center justify-end gap-2 bg-white shrink-0">
+        <div className={helloPlanId ? "hidden" : "border-t border-zinc-100 px-6 py-3 flex items-center justify-end gap-2 bg-white shrink-0"}>
           <button
             type="button"
             onClick={requestDismiss}

@@ -362,10 +362,14 @@ export default function ChecklistClient({
   notificationId,
   initial,
   initialError,
+  hello = false,
 }: {
   notificationId: string;
   initial: HostChecklist | null;
   initialError: string | null;
+  /** Lead with the 30-second hello: the host has just accepted or been
+   *  approved and the link they tapped said so. */
+  hello?: boolean;
 }) {
   const [data, setData] = useState<HostChecklist | null>(initial);
   const [error, setError] = useState<string | null>(initialError);
@@ -383,6 +387,15 @@ export default function ChecklistClient({
       setError(e instanceof Error ? e.message : "Couldn't refresh the list.");
     }
   }, [notificationId]);
+
+  // The hello leads the page when the host arrives from an accept/approve
+  // link and has not recorded one yet; the row then stays out of the list
+  // below so it is not asked twice. Once a take is up, the page is the
+  // ordinary list and the row sits in Done.
+  const leadWithHello = Boolean(
+    hello && data?.introVideo && data.introVideo.available
+      && data.introVideo.status !== "ready" && data.introVideo.status !== "processing" && !data.cancelled,
+  );
 
   const renderRow = (t: HostTask) =>
     t.key === INTRO_TASK_KEY && data?.introVideo ? (
@@ -549,8 +562,27 @@ export default function ChecklistClient({
           </div>
         )}
 
+        {leadWithHello && data.introVideo && (
+          <section className="px-5 pt-5 pb-4 border-b border-zinc-100 bg-leaf-50/40">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400">First, a hello</p>
+            <p className="mt-1.5 text-[15px] leading-snug text-zinc-900">
+              You&rsquo;re hosting. A 30-second hello to camera goes on the plan page next to your name — people RSVP to a face.
+            </p>
+            <div className="mt-3">
+              <HostIntroVideoCard
+                source={{ kind: "checklist", notificationId }}
+                video={data.introVideo}
+                timeZone={null}
+                planStarted={data.introVideo.planStarted === true}
+                onChanged={refresh}
+                embedded
+              />
+            </div>
+          </section>
+        )}
+
         <ul className="mt-1">
-          {listed.map(renderRow)}
+          {listed.filter((t) => !(leadWithHello && t.key === INTRO_TASK_KEY)).map(renderRow)}
         </ul>
 
         <div className="px-4 py-3 border-t border-zinc-100">

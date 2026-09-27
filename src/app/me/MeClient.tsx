@@ -1555,12 +1555,17 @@ function HostInviteCard({
         ideaId: invite.ideaId,
         accept,
         wallClock: accept ? invite.startWallClock || undefined : undefined,
-      })) as { eventGroupId?: string | null };
+      })) as { eventGroupId?: string | null; hostNotificationId?: string | null };
       setAnswered((prev) => new Set(prev).add(invite.ideaId));
       setConfirmDecline(false);
       if (accept) {
-        // Straight to the plan they now host — it needs a venue and a nudge to
-        // their people, and neither happens from this card.
+        // Straight to their host checklist, which opens on the 30-second
+        // hello — the ask lands the moment they've said yes. Older servers
+        // send no checklist id; those land on the plan page as before.
+        if (res?.hostNotificationId) {
+          window.location.assign(`/t/${res.hostNotificationId}?hello=1`);
+          return;
+        }
         if (res?.eventGroupId) {
           window.location.assign(`/p/${res.eventGroupId}`);
           return;

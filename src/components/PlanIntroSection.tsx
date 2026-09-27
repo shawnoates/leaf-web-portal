@@ -28,10 +28,16 @@ type IntroState = {
 
 export default function PlanIntroSection({
   eventGroupId,
+  notificationId,
   hostName,
   planStarted,
 }: {
-  eventGroupId: string;
+  /** Session route: the signed-in viewer against the plan's host. */
+  eventGroupId?: string;
+  /** Bearer route: the host's own checklist seat, which needs no session.
+   *  Preferred when both are known — a calendar page visitor may hold no
+   *  Parse session at all. */
+  notificationId?: string | null;
   /** The name on the "Hosted by" line, for the owner's view. */
   hostName: string;
   planStarted: boolean;
@@ -41,14 +47,20 @@ export default function PlanIntroSection({
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
 
+  const params = notificationId ? { notificationId } : { eventGroupId };
+  const source = notificationId
+    ? ({ kind: "checklist", notificationId } as const)
+    : ({ kind: "plan", eventGroupId: eventGroupId as string } as const);
+
   const load = useCallback(async () => {
     try {
-      const r = (await Parse.Cloud.run("getPlanIntroVideo", { eventGroupId })) as IntroState;
+      const r = (await Parse.Cloud.run("getPlanIntroVideo", params)) as IntroState;
       setState(r);
     } catch {
       setHidden(true);
     }
-  }, [eventGroupId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventGroupId, notificationId]);
 
   // Deferred a tick: the fetch resolves into setState from a callback, not
   // from the effect body itself (react-hooks/set-state-in-effect).
@@ -62,7 +74,7 @@ export default function PlanIntroSection({
   if (state.actor === "host") {
     return (
       <HostIntroVideoCard
-        source={{ kind: "plan", eventGroupId }}
+        source={source}
         video={state.video}
         timeZone={null}
         planStarted={planStarted || state.video.planStarted === true}
@@ -80,7 +92,7 @@ export default function PlanIntroSection({
   const pull = async () => {
     setError(null);
     try {
-      await Parse.Cloud.run("removePlanIntroVideo", { eventGroupId, reason: "Removed by the calendar owner" });
+      await Parse.Cloud.run("removePlanIntroVideo", { ...params, reason: "Removed by the calendar owner" });
       setConfirm(false);
       await load();
     } catch (e) {

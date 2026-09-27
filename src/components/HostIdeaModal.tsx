@@ -5,6 +5,7 @@ import Parse from "@/lib/parse-client";
 import { isVenueBlacklisted } from "@/lib/venue-blacklist";
 import { ensureGooglePlaces, fetchVenuePhotoUrl } from "@/lib/google-places";
 import { zoneOffsetSuffix } from "@/lib/wall-clock";
+import PlanIntroSection from "@/components/PlanIntroSection";
 import {
   AlertTriangle,
   Calendar,
@@ -153,6 +154,12 @@ export default function HostIdeaModal({
   const [hostRequireApproval, setHostRequireApproval] = useState(requireApprovalDefault);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  // The plan that just went live with the caller as host. Set only on the
+  // owner/co-host branch (a follower's proposal is pending, not live), and
+  // it holds the success screen open on the "record a hello" card instead
+  // of auto-closing: the ask belongs to the moment they said yes.
+  const [hostedPlanId, setHostedPlanId] = useState<string | null>(null);
+  const [hostedSeatId, setHostedSeatId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [coverFailed, setCoverFailed] = useState(false);
 
@@ -386,9 +393,17 @@ export default function HostIdeaModal({
           : undefined,
       });
       setSuccess(true);
-      // Refresh the parent behind the success screen, then auto-close.
-      onHosted(result as { pendingApproval?: boolean; eventGroupId?: string } | undefined);
-      setTimeout(() => onClose(), 1500);
+      // Refresh the parent behind the success screen, then auto-close —
+      // unless the plan is live with this person as host, in which case the
+      // screen stays on the hello card until they record or pass.
+      const hosted = result as { pendingApproval?: boolean; eventGroupId?: string; hostNotificationId?: string | null } | undefined;
+      onHosted(hosted);
+      if (hosted?.eventGroupId && hosted.pendingApproval !== true) {
+        setHostedPlanId(hosted.eventGroupId);
+        setHostedSeatId(hosted.hostNotificationId ?? null);
+      } else {
+        setTimeout(() => onClose(), 1500);
+      }
     } catch (err) {
       console.error("Failed to host suggestion:", err);
       setError(err instanceof Error ? err.message : "Failed to host this plan.");
@@ -473,7 +488,25 @@ export default function HostIdeaModal({
         </div>
 
         <div className="flex-1 overflow-y-auto no-scrollbar p-6 md:p-12 space-y-7">
-          {success ? (
+          {success && hostedPlanId ? (
+            <div className="py-6 space-y-6">
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 border border-zinc-900 rounded-full flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-8 h-8" />
+                </div>
+                <h4 className="text-2xl font-light">Your plan is live.</h4>
+                <p className="text-sm text-zinc-500">One more thing, while you&rsquo;re here.</p>
+              </div>
+              <PlanIntroSection eventGroupId={hostedPlanId} notificationId={hostedSeatId} hostName="You" planStarted={false} />
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full text-center text-sm font-medium text-zinc-500 underline underline-offset-2"
+              >
+                Not now
+              </button>
+            </div>
+          ) : success ? (
             <div className="py-20 text-center space-y-6">
               <div className="w-20 h-20 border border-zinc-900 rounded-full flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-10 h-10" />
