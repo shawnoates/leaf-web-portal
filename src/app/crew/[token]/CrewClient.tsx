@@ -182,10 +182,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             ) : (
               <p className="m-0 text-[15px] text-fm-ink-2">Join to see what the crew is planning. Nobody sees your number.</p>
             )}
-            {/* One way in: the button is also the text opt-in, with the
-                disclosure right under it. A number is asked for only when
-                there's none on file. Texts can be turned off later (STOP, or
-                the crew page's settings). */}
+            {/* A number is asked for only when there's none on file. Texts can
+                be turned off later (STOP, or the crew page's settings). */}
             {!me.phoneLast4 && (
               <label className="mt-3 block">
                 <span className="block text-xs text-fm-muted">Mobile number, for texts</span>
@@ -199,27 +197,24 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 />
               </label>
             )}
-            <div className="mt-4 flex flex-col gap-2">
+            <div className={`mt-4 grid gap-2 ${declined ? "grid-cols-1" : "grid-cols-2"}`}>
               <Button
                 onClick={() => act("join", () => run("respondToCrewInvite", auth, { accept: true, sms: true, phone: me.phoneLast4 ? null : smsPhone || null }))}
                 disabled={busy !== null || (!me.phoneLast4 && smsPhone.replace(/\D/g, "").length < 10)}
               >
-                {busy === "join" ? "Joining…" : "Join + text me updates"}
+                {busy === "join" ? "Joining…" : "Join"}
               </Button>
-              <p className="m-0 text-[11px] leading-snug text-fm-muted">
-                Date polls and the night&rsquo;s details{me.phoneLast4 ? ` to the number ending in ${me.phoneLast4}` : ""}. Up to 5 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.
-              </p>
               {!declined && (
-                <button
-                  type="button"
-                  className="h-11 text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink"
-                  onClick={() => act("decline", () => run("respondToCrewInvite", auth, { accept: false }))}
-                  disabled={busy !== null}
-                >
+                <Button kind="ghost" onClick={() => act("decline", () => run("respondToCrewInvite", auth, { accept: false }))} disabled={busy !== null}>
                   No thanks
-                </button>
+                </Button>
               )}
             </div>
+            {/* Joining turns on texts about this crew; the disclosure sits right
+                under the button so the tap is the consent. */}
+            <p className="mb-0 mt-3 text-[11px] leading-snug text-fm-muted">
+              By joining, you agree to get texts about this crew&rsquo;s plans (date polls and the night&rsquo;s details){me.phoneLast4 ? ` at the number ending in ${me.phoneLast4}` : ""}. Up to 5 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.
+            </p>
             {error && <p className="mb-0 mt-3 text-sm text-fm-danger">{error}</p>}
           </div>
           <p className="mt-4 text-xs text-fm-muted">No thanks just means Leaf won&rsquo;t ask you about this crew.</p>
