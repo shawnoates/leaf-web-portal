@@ -99,7 +99,9 @@ export default function SeedPlaces({
           // coordinates — findOrCreateLocationForVenue has nothing else to go on.
           : { placeId: p.placeId, locationId: p.locationId, venue: { name: p.name, address: p.address ?? null, placeId: p.placeId, lat: p.lat ?? null, lng: p.lng ?? null } }
       ));
-      const r = await run<{ added: number; upvoted: number }>("seedCrewBook", auth, { picks, skipped });
+      // Book places they'd voted for and unticked: the server takes the vote back.
+      const unpicks = skipped ? [] : data.book.filter((p) => p.spotId && initial.has(keyOf(p)) && !chosen.has(keyOf(p))).map((p) => p.spotId);
+      const r = await run<{ added: number; upvoted: number }>("seedCrewBook", auth, { picks, unpicks, skipped });
       onDone({ ...r, skipped });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save those.");
@@ -113,6 +115,7 @@ export default function SeedPlaces({
   // Existing votes start ticked and aren't news; "Add 3" for two old votes and
   // one new pick read as three new places.
   const count = [...chosen].filter((k) => !initial.has(k)).length;
+  const removed = [...initial].filter((k) => !chosen.has(k)).length;
   const nothing = data.book.length === 0 && data.popular.length === 0;
   if (nothing) {
     // No book and no nearby places: say so and get out of the way rather than
@@ -163,7 +166,7 @@ export default function SeedPlaces({
 
       <div className="flex items-center gap-3">
         <Button onClick={() => submit(false)} disabled={busy || (count === 0 && initial.size === 0)}>
-          {busy ? "Saving…" : count > 0 ? `Add ${count}` : initial.size > 0 ? "Done" : "Pick a few"}
+          {busy ? "Saving…" : count > 0 ? `Add ${count}` : removed > 0 ? "Save" : initial.size > 0 ? "Done" : "Pick a few"}
         </Button>
         <button
           type="button"
