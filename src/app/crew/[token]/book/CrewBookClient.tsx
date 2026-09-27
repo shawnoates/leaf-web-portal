@@ -33,7 +33,14 @@ export default function CrewBookClient({ token }: { token: string }) {
   if (load.status === "loading") return <Spinner label="Opening the book…" />;
   if (load.status === "expired") return <DeadState title="This link has expired." body="Text PLAN to the number Leaf wrote from and you'll get a fresh one." />;
   if (load.status === "error") return <DeadState title="Couldn't open the book." body={load.message} />;
+  // Invitees answer on the crew page first; the book stays closed until then.
+  if (load.data.me.status === "invited" || load.data.me.status === "declined") return <GoTo href={crewHref(load.auth)} />;
   return <BookView auth={load.auth} crewName={load.data.crew.name} canAdd={load.data.me.status === "in"} isOwner={load.data.me.isOwner} />;
+}
+
+function GoTo({ href }: { href: string }) {
+  useEffect(() => { window.location.replace(href); }, [href]);
+  return <Spinner label="Opening your invite…" />;
 }
 
 function BookView({ auth, crewName, canAdd, isOwner }: { auth: CrewAuth; crewName: string; canAdd: boolean; isOwner: boolean }) {

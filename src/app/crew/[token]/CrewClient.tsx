@@ -130,6 +130,58 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
     </Button>
   );
 
+  // Invited (or said no): answer first. Nothing about the crew's nights,
+  // book or members shows until they've joined.
+  if (me.status === "invited" || me.status === "declined") {
+    const declined = me.status === "declined";
+    const inviter = (crew.ownerId && names[crew.ownerId]) || members.find((m) => m.userId === crew.ownerId)?.name || "A friend";
+    const faces = joined.filter((m) => m.userId !== me.userId).slice(0, 5);
+    return (
+      <CrewShell>
+        <div className="flex min-h-[70vh] flex-col justify-center py-6">
+          <Eyebrow>{declined ? "You said no thanks" : `${inviter.split(" ")[0]} invited you`}</Eyebrow>
+          <div className="mt-4">
+            <DisplayTitle italic={second}>{first}</DisplayTitle>
+          </div>
+          <p className="mt-4 text-[15px] leading-relaxed text-fm-ink-2">
+            {crew.oneTime
+              ? "One night out with this crew. Leaf finds a date that works for everyone and plans it."
+              : `Nights out with this crew, ${rhythmLabel(crew.rhythmDays).toLowerCase()}. Leaf finds a date that works for everyone and plans it.`}
+          </p>
+          {faces.length > 0 && (
+            <div className="mt-5 flex items-center gap-3">
+              <div className="flex -space-x-2">
+                {faces.map((m) => <Avatar key={m.membershipId} name={m.name} src={m.avatar} ring="ring-2 ring-fm-canvas" />)}
+              </div>
+              <span className="text-sm text-fm-muted">{joined.length} in so far</span>
+            </div>
+          )}
+
+          <div className="mt-7 rounded-3xl border border-fm-line bg-fm-surface p-5">
+            {declined ? (
+              <p className="m-0 text-[15px] text-fm-ink-2">Changed your mind? You can still join.</p>
+            ) : (
+              <p className="m-0 text-[15px] text-fm-ink-2">Join to see what the crew is planning. Nobody sees your number.</p>
+            )}
+            <SmsOptInBox checked={smsBox} onChange={setSmsBox} phone={smsPhone} onPhone={setSmsPhone} last4={me.phoneLast4 ?? null} />
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <Button onClick={() => act("join", () => run("respondToCrewInvite", auth, { accept: true, sms: smsBox, phone: smsBox ? smsPhone || null : null }))} disabled={busy !== null || !phoneOk}>
+                {busy === "join" ? "Joining…" : "Join"}
+              </Button>
+              {!declined && (
+                <Button kind="ghost" onClick={() => act("decline", () => run("respondToCrewInvite", auth, { accept: false }))} disabled={busy !== null}>
+                  No thanks
+                </Button>
+              )}
+            </div>
+            {error && <p className="mb-0 mt-3 text-sm text-fm-danger">{error}</p>}
+          </div>
+          <p className="mt-4 text-xs text-fm-muted">No thanks just means Leaf won&rsquo;t ask you about this crew.</p>
+        </div>
+      </CrewShell>
+    );
+  }
+
   return (
     <CrewShell wide topBar={<CrewTopBar auth={auth} active="crew" />}>
       {error && <p className="mb-4 rounded-2xl bg-[#3A2321] px-4 py-3 text-sm text-fm-danger">{error}</p>}
@@ -187,24 +239,6 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
         {/* What needs you */}
         <div className="mt-7 flex min-w-0 flex-col gap-10 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:gap-14">
           <section className="flex flex-col gap-3 lg:gap-5">
-            {me.status === "invited" && (
-              <Card>
-                <Eyebrow>You&rsquo;re invited</Eyebrow>
-                <p className="mt-3 text-[15px] leading-relaxed text-fm-ink-2">
-                  Join {crew.name} and Leaf finds a night that works for the group and plans it{crew.oneTime ? "" : `, ${rhythmLabel(crew.rhythmDays).toLowerCase()}`}.
-                </p>
-                <SmsOptInBox checked={smsBox} onChange={setSmsBox} phone={smsPhone} onPhone={setSmsPhone} last4={me.phoneLast4 ?? null} />
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Button onClick={() => act("join", () => run("respondToCrewInvite", auth, { accept: true, sms: smsBox, phone: smsBox ? smsPhone || null : null }))} disabled={busy !== null || !phoneOk}>
-                    Join
-                  </Button>
-                  <Button kind="ghost" onClick={() => act("decline", () => run("respondToCrewInvite", auth, { accept: false }))} disabled={busy !== null}>
-                    No thanks
-                  </Button>
-                </div>
-              </Card>
-            )}
-
             <div className="hidden items-center justify-between lg:flex">
               <SectionTitle>Up next</SectionTitle>
               {canStart && !proposing && <div className="flex gap-2">{startButtons}</div>}
