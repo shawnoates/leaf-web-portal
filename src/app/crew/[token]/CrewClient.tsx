@@ -182,15 +182,44 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             ) : (
               <p className="m-0 text-[15px] text-fm-ink-2">Join to see what the crew is planning. Nobody sees your number.</p>
             )}
-            <SmsOptInBox checked={smsBox} onChange={setSmsBox} phone={smsPhone} onPhone={setSmsPhone} last4={me.phoneLast4 ?? null} />
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <Button onClick={() => act("join", () => run("respondToCrewInvite", auth, { accept: true, sms: smsBox, phone: smsBox ? smsPhone || null : null }))} disabled={busy !== null || !phoneOk}>
-                {busy === "join" ? "Joining…" : "Join"}
+            {/* Two ways in instead of a checkbox: the texts button IS the opt-in,
+                with the disclosure right under it. A number is asked for only
+                when there's none on file. */}
+            {!me.phoneLast4 && (
+              <label className="mt-3 block">
+                <span className="block text-xs text-fm-muted">Mobile number, for texts</span>
+                <input
+                  value={smsPhone}
+                  onChange={(e) => setSmsPhone(e.target.value)}
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="(555) 555-5555"
+                  className="mt-1 h-11 w-full rounded-xl border px-3 text-[14px]"
+                />
+              </label>
+            )}
+            <div className="mt-4 flex flex-col gap-2">
+              <Button
+                onClick={() => act("join", () => run("respondToCrewInvite", auth, { accept: true, sms: true, phone: me.phoneLast4 ? null : smsPhone || null }))}
+                disabled={busy !== null || (!me.phoneLast4 && smsPhone.replace(/\D/g, "").length < 10)}
+              >
+                {busy === "join" ? "Joining…" : "Join + text me updates"}
+              </Button>
+              <p className="m-0 text-[11px] leading-snug text-fm-muted">
+                Date polls and the night&rsquo;s details{me.phoneLast4 ? ` to the number ending in ${me.phoneLast4}` : ""}. Up to 5 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.
+              </p>
+              <Button kind="ghost" onClick={() => act("join-quiet", () => run("respondToCrewInvite", auth, { accept: true, sms: false, phone: null }))} disabled={busy !== null}>
+                {busy === "join-quiet" ? "Joining…" : "Just join"}
               </Button>
               {!declined && (
-                <Button kind="ghost" onClick={() => act("decline", () => run("respondToCrewInvite", auth, { accept: false }))} disabled={busy !== null}>
+                <button
+                  type="button"
+                  className="h-11 text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink"
+                  onClick={() => act("decline", () => run("respondToCrewInvite", auth, { accept: false }))}
+                  disabled={busy !== null}
+                >
                   No thanks
-                </Button>
+                </button>
               )}
             </div>
             {error && <p className="mb-0 mt-3 text-sm text-fm-danger">{error}</p>}
