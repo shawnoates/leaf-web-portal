@@ -210,3 +210,33 @@ export function cycleStatusLine(c: CycleView, names: Record<string, string>): st
   if (c.state === "booked") return `${when} · ${going} going · booked ✓`;
   return c.state;
 }
+
+/** What `crewTellLeaf` gives back: what Leaf managed to take from the note. */
+export type TellLeafResult = {
+  received: boolean;
+  understood?: boolean;
+  preferDays?: number[];
+  avoidDays?: number[];
+  dislikedAdded?: number;
+};
+
+const DAY_NAMES = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+
+function listDays(days: number[]): string {
+  const names = days.map((d) => DAY_NAMES[d]).filter(Boolean);
+  if (names.length <= 1) return names.join("");
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/**
+ * The line shown after a note is sent. When Leaf took something concrete from
+ * it, say so in the member's own terms — a silent "Got it" gives them no way
+ * to notice it was read backwards.
+ */
+export function tellLeafReceipt(r: TellLeafResult): string {
+  const prefer = r.preferDays?.length ? `I'll aim for ${listDays(r.preferDays)}` : "";
+  const avoid = r.avoidDays?.length ? `I'll steer clear of ${listDays(r.avoidDays)}` : "";
+  const both = [prefer, avoid].filter(Boolean).join(", and ");
+  if (both) return `Got it — ${both}.`;
+  return "Got it. Thanks.";
+}

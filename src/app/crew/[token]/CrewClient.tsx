@@ -23,8 +23,8 @@ import {
 import ProposeNight from "@/components/crew/ProposeNight";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
-  RHYTHM_LABELS, crewHref, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, timeLabel, toDate,
-  type CrewAuth, type CrewPage, type CycleView, type Member,
+  RHYTHM_LABELS, crewHref, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
+  type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult,
 } from "@/lib/crew";
 
 export default function CrewClient({ token }: { token: string }) {
@@ -58,7 +58,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState("");
-  const [noteSent, setNoteSent] = useState(false);
+  const [noteSent, setNoteSent] = useState<string | null>(null);
   const [error, setError] = useState("");
   // "Text me about this crew's plans": never pre-ticked (10DLC).
   const [smsBox, setSmsBox] = useState(false);
@@ -303,14 +303,19 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <SectionTitle>Tell Leaf</SectionTitle>
               <p className="m-0 text-sm text-fm-muted">Only Leaf sees this. Days that never work, places to avoid, anything.</p>
               {noteSent ? (
-                <p className="m-0 flex items-center gap-1.5 text-sm text-fm-ink-2"><Check size={16} aria-hidden /> Got it. Thanks.</p>
+                <p className="m-0 flex items-center gap-1.5 text-sm text-fm-ink-2"><Check size={16} aria-hidden /> {noteSent}</p>
               ) : (
                 <form
                   className="flex h-14 items-center gap-2 rounded-full border border-fm-line bg-fm-surface pl-[18px] pr-1.5"
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (!note.trim()) return;
-                    act("note", async () => { await run("crewTellLeaf", auth, { text: note }); setNoteSent(true); });
+                    act("note", async () => {
+                      const r = await run<TellLeafResult>("crewTellLeaf", auth, { text: note });
+                      // Read the days back: it's the only way someone catches
+                      // Leaf reading "Thursdays mostly" the wrong way round.
+                      setNoteSent(tellLeafReceipt(r));
+                    });
                   }}
                 >
                   <label htmlFor="tell-leaf" className="sr-only">Message to Leaf</label>

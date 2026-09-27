@@ -49,6 +49,20 @@ export type IntroVideoInfo = {
   /** The one hard rule, kept out of `tips` so it gets its own line. Null when
    *  the plan shows its venue anyway, so there is nothing to keep. */
   venueRule: string | null;
+  /**
+   * Whether Leaf may repost the clip on its own social accounts — asked of
+   * PAID roster hosts only, so the field is absent on every other card and
+   * the checkbox with it. A community member recording a hello for their
+   * own plan is not making marketing material, and the plan page is the
+   * whole of what they agreed to.
+   */
+  socialConsent?: {
+    allowed: boolean;
+    /** They actually touched the box, as opposed to leaving the default. */
+    explicit: boolean;
+    label: string;
+    detail: string;
+  } | null;
 };
 
 /** Which page is asking, and therefore which cloud functions and credential. */
@@ -157,6 +171,10 @@ export default function HostIntroVideoCard({
   // Set when the browser turns out not to be able to record, or the host
   // says no to the camera. From then on the card offers the camera app.
   const [recorderOff, setRecorderOff] = useState<string | null>(null);
+  // Mirrors `video.socialConsent.allowed` so the tick responds at once; the
+  // server is the truth and a failed write rolls it back.
+  const [social, setSocial] = useState<boolean | null>(null);
+  const [socialError, setSocialError] = useState<string | null>(null);
   // Two inputs, because `capture` is not a hint on iOS: an input that carries
   // it opens the camera and never the library. The camera one is the
   // fallback when in-browser recording isn't possible; the library one is
@@ -165,6 +183,20 @@ export default function HostIntroVideoCard({
   const libraryInputRef = useRef<HTMLInputElement>(null);
 
   const fns = fnsFor(source);
+  const consent = video.socialConsent ?? null;
+  const socialOn = social ?? consent?.allowed ?? true;
+
+  const toggleSocial = async (next: boolean) => {
+    if (source.kind !== "offer") return;
+    setSocial(next);
+    setSocialError(null);
+    try {
+      await Parse.Cloud.run("setHostIntroSocialConsent", { token: source.token, allowed: next });
+    } catch (e) {
+      setSocial(!next);
+      setSocialError(e instanceof Error ? e.message : "Couldn't save that.");
+    }
+  };
   const bonus = video.bonusCents > 0 ? money(video.bonusCents) : null;
   const deadlineLabel = fmtDeadline(video.deadlineAt, timeZone);
   const bonusOpen = Boolean(bonus && video.deadlineOpen);
@@ -435,6 +467,26 @@ export default function HostIntroVideoCard({
                 <div className="h-full bg-leaf-800 transition-all" style={{ width: `${progress}%` }} />
               </div>
               <p className="mt-1.5 text-[13px] text-zinc-500">Uploading… {progress}%</p>
+            </div>
+          )}
+          {/* Reposting is a bigger audience than the plan page, so it is
+              its own yes rather than something the agreement swept up. Ticked
+              by default and one tap to turn off, before or after recording. */}
+          {consent && (
+            <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={socialOn}
+                  onChange={(e) => toggleSocial(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-leaf-800"
+                />
+                <span className="min-w-0">
+                  <span className="block text-[14px] font-medium leading-snug text-leaf-900">{consent.label}</span>
+                  <span className="mt-0.5 block text-[13px] leading-snug text-zinc-500">{consent.detail}</span>
+                </span>
+              </label>
+              {socialError && <p className="mt-1.5 text-[13px] text-red-700">{socialError}</p>}
             </div>
           )}
           {phase === "finalizing" && <p className="text-[13px] text-zinc-500">Almost there…</p>}
