@@ -23,6 +23,14 @@ import Parse from "@/lib/parse-client";
 import HlsVideo from "@/components/HlsVideo";
 import IntroVideoRecorder, { type Beat, canRecordInBrowser } from "@/components/IntroVideoRecorder";
 import { introVideoFrame } from "@/lib/intro-video-frame";
+import { TrendingUp } from "lucide-react";
+
+/**
+ * The one-line reason to record, shown before there's a video.
+ * TODO(shawn): confirm "2x" against real numbers — plans with a live
+ * hostIntroVideo vs without, RSVPs per plan — before relying on it.
+ */
+export const HELLO_RSVP_STAT = "Plans with a host hello get 2x more RSVPs.";
 
 export type IntroVideoInfo = {
   available: boolean;
@@ -144,6 +152,7 @@ export default function HostIntroVideoCard({
   onChanged,
   embedded = false,
   compact = false,
+  scriptCollapsed = false,
 }: {
   source: IntroVideoSource;
   video: IntroVideoInfo;
@@ -154,15 +163,19 @@ export default function HostIntroVideoCard({
   /** Inside another card (the checklist row, the plan modal): tighter
    *  chrome, no viewfinder loop. */
   embedded?: boolean;
-  /** The dashboard's plan modal: "What do I say?" starts closed and opens
-   *  to the cues only. The example lines and tips stay on the checklist and
-   *  offer pages, and the prompter shows the full lines while recording. */
+  /** The dashboard's plan modal: before there's a video, a one-row strip
+   *  (title + Record) with the venue rule, "What do I say?" (cues only) and
+   *  upload on one line under it. The example lines and tips stay on the
+   *  checklist and offer pages; the prompter shows them while recording. */
   compact?: boolean;
+  /** Start "What do I say?" closed. The dashboard's hello sections (plan
+   *  modal, post-publish screens) do; the checklist and offer pages open it. */
+  scriptCollapsed?: boolean;
 }) {
   const [phase, setPhase] = useState<"idle" | "checking" | "uploading" | "finalizing">("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [showScript, setShowScript] = useState(!compact && video.status === "none");
+  const [showScript, setShowScript] = useState(!compact && !scriptCollapsed && video.status === "none");
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [recording, setRecording] = useState(false);
   // `null` until we've asked the browser. Capability can only be read on the
@@ -320,6 +333,89 @@ export default function HostIntroVideoCard({
     );
   }
 
+  // ── Compact: the plan modal, before there's a video ──
+  // One row (title + Record) and one line of small print (the venue rule,
+  // "What do I say?", upload). Everything else stays on the checklist and
+  // offer pages, and the prompter shows the full lines while recording.
+  if (compact && !consent && !live && video.status !== "processing") {
+    if (started) return null;
+    const rule = video.venueRule ? (video.venueRule.match(/^[^.!?]*[.!?]/)?.[0] ?? video.venueRule) : null;
+    return (
+      <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="video/*"
+          capture="user"
+          className="hidden"
+          onChange={(e) => onPick(e.target.files)}
+          disabled={busy}
+        />
+        <input
+          ref={libraryInputRef}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={(e) => onPick(e.target.files)}
+          disabled={busy}
+        />
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-semibold leading-tight text-leaf-900">Add a 30-second hello</p>
+            <p className="mt-0.5 text-[13px] leading-snug text-zinc-500">
+              {video.status === "errored" ? "The last file couldn\u2019t be processed. Record it again." : HELLO_RSVP_STAT}
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setError(null);
+              if (canRecord) setRecording(true);
+              else inputRef.current?.click();
+            }}
+            className="shrink-0 rounded-lg bg-leaf-800 px-4 py-2 text-[14px] font-medium text-white transition-colors hover:bg-leaf-900 disabled:opacity-50"
+          >
+            {busy ? "Working…" : "Record"}
+          </button>
+        </div>
+        <p className="mt-2 text-[13px] leading-snug text-zinc-500">
+          {rule && <span className="font-medium text-amber-800">{rule} </span>}
+          <button type="button" onClick={() => setShowScript((v) => !v)} className="font-medium text-leaf-800 underline">
+            {showScript ? "Hide" : "What do I say?"}
+          </button>
+          <span aria-hidden="true"> · </span>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => libraryInputRef.current?.click()}
+            className="font-medium underline disabled:opacity-50"
+          >
+            Upload one
+          </button>
+        </p>
+        {showScript && (
+          <ol className="mt-2 list-decimal space-y-0.5 pl-5 text-[13px] leading-snug text-leaf-900 marker:text-leaf-800/60">
+            {video.beats.map((b) => (
+              <li key={b.id}>{b.cue}</li>
+            ))}
+          </ol>
+        )}
+        {recorderOff && <p className="mt-2 text-[13px] leading-snug text-amber-800">{recorderOff}</p>}
+        {phase === "uploading" && (
+          <div className="mt-2">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200">
+              <div className="h-full bg-leaf-800 transition-all" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="mt-1 text-[12px] text-zinc-500">Uploading… {progress}%</p>
+          </div>
+        )}
+        {phase === "checking" && <p className="mt-2 text-[12px] text-zinc-500">Checking the file…</p>}
+        {error && <p className="mt-2 text-[13px] text-red-700">{error}</p>}
+      </div>
+    );
+  }
+
   return (
     <div className={embedded ? "rounded-xl border border-zinc-200 bg-white p-4" : "mt-6 rounded-2xl border border-zinc-200 bg-white p-6"}>
       {/* ── Heading: what this is and what it pays ── */}
@@ -375,12 +471,16 @@ export default function HostIntroVideoCard({
             </picture>
           )}
           <p className={`${embedded ? "mt-2" : "mt-4"} text-[14px] leading-snug text-zinc-600`}>
-            A quick intro to camera goes on the plan page next to {besideWhat}. People RSVP to a face.
+            A quick intro to camera goes on the plan page next to {besideWhat}.
             {bonusOpen && deadlineLabel
               ? ` It pays ${bonus} on top if it's up by ${deadlineLabel}.`
               : bonus
                 ? " The bonus window has closed, but it's still worth adding."
                 : ""}
+          </p>
+          <p className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-[14px] font-medium leading-snug text-emerald-800">
+            <TrendingUp className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {HELLO_RSVP_STAT}
           </p>
           {/* The rule, before they ever hit record, and out of the
               collapsible — a venue said out loud on camera is the one thing
@@ -428,14 +528,7 @@ export default function HostIntroVideoCard({
           >
             {showScript ? "Hide what to cover" : "What do I say?"}
           </button>
-          {showScript && compact && (
-            <ol className="mt-2 list-decimal space-y-1 pl-5 text-[14px] leading-snug text-leaf-900 marker:text-leaf-800/60">
-              {video.beats.map((b) => (
-                <li key={b.id}>{b.cue}</li>
-              ))}
-            </ol>
-          )}
-          {showScript && !compact && (
+          {showScript && (
             <div className="mt-3 rounded-xl bg-leaf-50 p-4">
               <p className="text-[13px] font-medium uppercase tracking-wide text-leaf-800/70">
                 {video.beats.length === 6 ? "Six" : video.beats.length === 5 ? "Five" : video.beats.length} things to hit, in your words
