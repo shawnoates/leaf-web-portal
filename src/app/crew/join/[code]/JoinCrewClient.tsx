@@ -35,6 +35,9 @@ export default function JoinCrewClient({ code }: { code: string }) {
   // Signed in with a number on file: no need to ask for one.
   const [hasPhone, setHasPhone] = useState(false);
   const [passed, setPassed] = useState(false);
+  // Signed out and tapped Join: now ask who they are (name, phone, code),
+  // then join straight away. The choice comes first, sign-in second.
+  const [joining, setJoining] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   // Set once they're in: the optional tap-to-add step runs before the crew
@@ -81,18 +84,21 @@ export default function JoinCrewClient({ code }: { code: string }) {
       const me = Parse.User.current();
       if (me && !me.get("full_name")) { me.set("full_name", name.trim()); me.set("name", name.trim()); await me.save().catch(() => {}); }
       setSignedIn(true);
+      setHasPhone(true);
       setSmsPhone(phone);
+      // They already chose Join — finish it, with the number they just verified.
+      if (joining) { setBusy(false); await join({ verified: true }); return; }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't verify that code.");
     } finally { setBusy(false); }
   };
-  const join = async () => {
+  const join = async ({ verified = false }: { verified?: boolean } = {}) => {
     setBusy(true); setError("");
     try {
       // Joining turns on texts about the crew (the terms sit under the
       // button), same as the crew page's invite screen.
-      const r = (await Parse.Cloud.run("joinCrewByCode", { code, sms: true, phone: hasPhone ? null : smsPhone || null })) as { crewId: string };
+      const r = (await Parse.Cloud.run("joinCrewByCode", { code, sms: true, phone: verified || hasPhone ? null : smsPhone || null })) as { crewId: string };
       setJoinedCrewId(r.crewId);
       setBusy(false);
     } catch (err) {
@@ -156,17 +162,31 @@ export default function JoinCrewClient({ code }: { code: string }) {
 
         {invite.full ? (
           <p className="mt-4 text-[15px] text-zinc-700">This crew is full.</p>
+        ) : !signedIn && !joining ? (
+          <div className="mt-2">
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <Button onClick={() => setJoining(true)}>Join</Button>
+              <Button kind="ghost" onClick={() => setPassed(true)}>No thanks</Button>
+            </div>
+            <p className="mb-0 mt-3 text-[11px] leading-snug text-zinc-500">
+              By joining, you agree to get texts about this crew&rsquo;s plans (date polls and the night&rsquo;s details). Up to 5 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.
+            </p>
+          </div>
         ) : !signedIn ? (
           <div className="mt-4 space-y-2">
-            <p className="text-[14px] text-zinc-600">Sign in to join. We text you a one-time code to confirm your number.</p>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-[15px]" disabled={codeSent} />
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Your phone" inputMode="tel" autoComplete="tel" className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-[15px]" disabled={codeSent} />
-            {codeSent && <input value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="6-digit code" inputMode="numeric" className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-[15px]" autoFocus />}
-            <div className="pt-2">
+            <p className="text-[14px] text-zinc-600">{codeSent ? "Enter the code we just texted you." : "Your name and number, so the crew knows who joined. We\u2019ll text a code to confirm it."}</p>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoComplete="name" className="h-11 w-full rounded-xl border border-zinc-300 px-3 text-[16px]" disabled={codeSent} />
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Your phone" inputMode="tel" autoComplete="tel" className="h-11 w-full rounded-xl border border-zinc-300 px-3 text-[16px]" disabled={codeSent} />
+            {codeSent && <input value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="6-digit code" inputMode="numeric" autoComplete="one-time-code" className="h-11 w-full rounded-xl border border-zinc-300 px-3 text-[16px]" autoFocus />}
+            <div className="flex items-center gap-3 pt-2">
               {codeSent
-                ? <Button onClick={verify} disabled={busy || otp.length < 4}>{busy ? "Checking…" : "Continue"}</Button>
+                ? <Button onClick={verify} disabled={busy || otp.length < 4}>{busy ? "Joining…" : "Join"}</Button>
                 : <Button onClick={sendCode} disabled={busy}>{busy ? "Sending…" : "Text me a code"}</Button>}
+              <button type="button" className="text-sm text-zinc-500 underline underline-offset-4" onClick={() => { setJoining(false); setError(""); }} disabled={busy}>Back</button>
             </div>
+            <p className="mb-0 pt-1 text-[11px] leading-snug text-zinc-500">
+              By joining, you agree to get texts about this crew&rsquo;s plans. Up to 5 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.
+            </p>
           </div>
         ) : (
           <div className="mt-2">
@@ -177,7 +197,7 @@ export default function JoinCrewClient({ code }: { code: string }) {
               </label>
             )}
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <Button onClick={join} disabled={busy || !smsOk}>{busy ? "Joining…" : "Join"}</Button>
+              <Button onClick={() => join()} disabled={busy || !smsOk}>{busy ? "Joining…" : "Join"}</Button>
               <Button kind="ghost" onClick={() => setPassed(true)} disabled={busy}>No thanks</Button>
             </div>
             <p className="mb-0 mt-3 text-[11px] leading-snug text-zinc-500">
