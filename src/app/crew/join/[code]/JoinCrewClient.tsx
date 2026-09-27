@@ -31,8 +31,10 @@ export default function JoinCrewClient({ code }: { code: string }) {
   const [phone, setPhone] = useState(() => getVerifiedUserCookie()?.phone || "");
   const [codeSent, setCodeSent] = useState(false);
   const [otp, setOtp] = useState("");
-  const [sms, setSms] = useState(false);
   const [smsPhone, setSmsPhone] = useState("");
+  // Signed in with a number on file: no need to ask for one.
+  const [hasPhone, setHasPhone] = useState(false);
+  const [passed, setPassed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   // Set once they're in: the optional tap-to-add step runs before the crew
@@ -50,7 +52,9 @@ export default function JoinCrewClient({ code }: { code: string }) {
   }, [code, router]);
 
   useEffect(() => {
-    setSignedIn(Boolean(Parse.User.current()));
+    const u = Parse.User.current();
+    setSignedIn(Boolean(u));
+    setHasPhone(Boolean(u?.get("phone")));
     void load();
   }, [load]);
 
@@ -86,7 +90,9 @@ export default function JoinCrewClient({ code }: { code: string }) {
   const join = async () => {
     setBusy(true); setError("");
     try {
-      const r = (await Parse.Cloud.run("joinCrewByCode", { code, sms, phone: sms ? smsPhone || null : null })) as { crewId: string };
+      // Joining turns on texts about the crew (the terms sit under the
+      // button), same as the crew page's invite screen.
+      const r = (await Parse.Cloud.run("joinCrewByCode", { code, sms: true, phone: hasPhone ? null : smsPhone || null })) as { crewId: string };
       setJoinedCrewId(r.crewId);
       setBusy(false);
     } catch (err) {
@@ -119,7 +125,17 @@ export default function JoinCrewClient({ code }: { code: string }) {
     );
   }
 
-  const smsOk = !sms || smsPhone.replace(/\D/g, "").length >= 10;
+  const smsOk = hasPhone || smsPhone.replace(/\D/g, "").length >= 10;
+
+  if (passed) {
+    return (
+      <CrewShell>
+        <Card>
+          <p className="m-0 text-[15px] text-zinc-700">No problem. Nothing&rsquo;s changed, and this link still works if you change your mind.</p>
+        </Card>
+      </CrewShell>
+    );
+  }
   return (
     <CrewShell>
       <div className="mb-5 flex items-center gap-3">
@@ -154,23 +170,19 @@ export default function JoinCrewClient({ code }: { code: string }) {
           </div>
         ) : (
           <div className="mt-2">
-            <div className="mt-3 rounded-xl border border-zinc-300 p-3 text-[13px] text-zinc-700">
-              <label className="flex items-start gap-2">
-                <input type="checkbox" checked={sms} onChange={(e) => setSms(e.target.checked)} className="mt-0.5" />
-                <span>
-                  <span className="block font-medium text-leaf-900">Text me about this crew&rsquo;s plans</span>
-                  Date polls and the night&rsquo;s details, so you don&rsquo;t have to open the app. Up to 5 msgs/wk. Msg &amp; data rates may apply.
-                  Reply HELP for help, STOP to opt out.
-                </span>
+            {!hasPhone && (
+              <label className="mt-3 block">
+                <span className="block text-xs text-zinc-500">Mobile number, for texts</span>
+                <input value={smsPhone} onChange={(e) => setSmsPhone(e.target.value)} inputMode="tel" autoComplete="tel" placeholder="(555) 555-5555" className="mt-1 h-11 w-full rounded-xl border border-zinc-300 px-3 text-[16px]" />
               </label>
-              <label className="mt-2 block pl-6">
-                <span className="block text-xs text-zinc-500">Mobile number</span>
-                <input value={smsPhone} onChange={(e) => setSmsPhone(e.target.value)} inputMode="tel" autoComplete="tel" placeholder="(555) 555-5555" className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-[14px]" />
-              </label>
-            </div>
-            <div className="mt-4">
+            )}
+            <div className="mt-4 grid grid-cols-2 gap-2">
               <Button onClick={join} disabled={busy || !smsOk}>{busy ? "Joining…" : "Join"}</Button>
+              <Button kind="ghost" onClick={() => setPassed(true)} disabled={busy}>No thanks</Button>
             </div>
+            <p className="mb-0 mt-3 text-[11px] leading-snug text-zinc-500">
+              By joining, you agree to get texts about this crew&rsquo;s plans (date polls and the night&rsquo;s details). Up to 5 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.
+            </p>
           </div>
         )}
         {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
