@@ -43,6 +43,10 @@ type PlanFacts = {
   durationMinutes: number | null;
   venueName: string | null;
   venueAddress: string | null;
+  /** The venue is shown to attendees only after they RSVP (most calendars). */
+  venueHidden?: boolean;
+  /** The host's exact meeting spot on the plan, null until set. */
+  meetingSpot?: string | null;
   mapUrl: string | null;
   neighborhoods: string[];
   planUrl: string;
@@ -460,6 +464,17 @@ export default function HostOfferClient({ token }: { token: string }) {
             Your photo and description are on the plan page now, so people know
             who to look for.
           </p>
+          {p?.venueName && (
+            <p className="mt-3 text-[15px] leading-relaxed text-leaf-800">
+              <strong>What attendees see:</strong>{" "}
+              {[p.venueName, p.venueAddress].filter(Boolean).join(", ")}
+              {p.venueHidden !== false ? ", and only once they RSVP" : ""}. Nothing
+              else &mdash; Leaf doesn&rsquo;t add a meeting point.{" "}
+              {p.meetingSpot
+                ? <>The meeting spot on the plan right now: &ldquo;{p.meetingSpot}&rdquo;.</>
+                : <>First thing on your checklist is to set the exact spot (an entrance, a landmark, what you&rsquo;ll be wearing); it goes on the plan page and in every RSVP confirmation.</>}
+            </p>
+          )}
           {offer.checklistUrl && !offer.planStarted && (
             <a href={offer.checklistUrl} className={`${btnPrimary} mt-4 block text-center`}>
               Open your host checklist

@@ -28,6 +28,9 @@ type Props = {
   // rsvpToPlanViaWeb returns both fields and StandalonePlanRsvp hands
   // them back via onLocationRevealed so the card swaps in the values.
   location: { name: string | null; address: string | null; timezone: string | null } | null;
+  // Where exactly at the venue, from the host. Gated with the address and
+  // revealed with it after RSVP; null when the host never set one.
+  meetingSpot?: string | null;
   hostName: string | null;
   // The plan's own host's face: their photo and, when they recorded one,
   // their 30-second hello (intro-video.js). Rendered as a "Your host" block
@@ -73,6 +76,7 @@ export default function StandalonePlanCard({
   videoUrl,
   expiryDate,
   location,
+  meetingSpot = null,
   hostName,
   hostIntro,
   rosterHost,
@@ -98,6 +102,7 @@ export default function StandalonePlanCard({
   const [revealedAddress, setRevealedAddress] = useState<string | null>(
     location?.address ?? null
   );
+  const [revealedSpot, setRevealedSpot] = useState<string | null>(meetingSpot);
   const locationGated =
     !!location && !revealedName && !revealedAddress && variant === "standalone";
 
@@ -138,6 +143,11 @@ export default function StandalonePlanCard({
                 {revealedName ? <div>{revealedName}</div> : null}
                 {revealedAddress ? (
                   <div className="text-zinc-500">{revealedAddress}</div>
+                ) : null}
+                {revealedSpot ? (
+                  <div className="mt-1 text-zinc-900">
+                    <span className="font-medium">Meet at:</span> {revealedSpot}
+                  </div>
                 ) : null}
               </div>
             )
@@ -289,6 +299,7 @@ export default function StandalonePlanCard({
                 onLocationRevealed={(loc) => {
                   if (loc.name) setRevealedName(loc.name);
                   if (loc.address) setRevealedAddress(loc.address);
+                  if (loc.meetingSpot) setRevealedSpot(loc.meetingSpot);
                 }}
               />
               {/* /open/p/<id> is the Universal Link bouncer — iOS intercepts

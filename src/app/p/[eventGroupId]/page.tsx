@@ -29,6 +29,8 @@ type PlanShareInfo = {
   // attendees (Accepted/Owned) and approved followers/owners see them
   // inline.
   location: { name: string | null; address: string | null; timezone: string | null } | null;
+  // The host's exact meeting spot, gated with the address (null before RSVP).
+  meetingSpot?: string | null;
   host: {
     name: string;
     // The plan's own host's photo and hello (intro-video.js); absent from
@@ -338,6 +340,7 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
       videoUrl={info.videoUrl ?? null}
       expiryDate={info.expiryDate}
       location={info.location}
+      meetingSpot={info.meetingSpot ?? null}
       hostName={info.host?.name ?? null}
       hostIntro={info.host ? { photoUrl: info.host.photoUrl ?? null, introVideo: info.host.introVideo ?? null } : null}
       rosterHost={info.rosterHost ?? null}

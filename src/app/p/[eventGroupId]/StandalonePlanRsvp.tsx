@@ -72,7 +72,7 @@ type Props = {
   // (Accepted/Owned) RSVP. Parent uses this to swap the redacted location
   // line for the real name/address inline, and to populate the ICS
   // download. Either field may be null if the host didn't set one.
-  onLocationRevealed?: (loc: { name: string | null; address: string | null }) => void;
+  onLocationRevealed?: (loc: { name: string | null; address: string | null; meetingSpot?: string | null }) => void;
 };
 
 // Mirror of buildIcsHref in org/[shareId]/page.tsx — keeps the standalone
@@ -195,7 +195,7 @@ function RsvpModal({
   requireApproval: boolean;
   isFull: boolean;
   onClose: () => void;
-  onLocationRevealed?: (loc: { name: string | null; address: string | null }) => void;
+  onLocationRevealed?: (loc: { name: string | null; address: string | null; meetingSpot?: string | null }) => void;
 }) {
   // Tracks the location pair the server hands back on a confirmed RSVP —
   // keeps the success modal's ICS download in sync with what the card
@@ -285,6 +285,7 @@ function RsvpModal({
             isHost?: boolean;
             locationName?: string | null;
             address?: string | null;
+            meetingSpot?: string | null;
           }
         | null
         | undefined;
@@ -313,6 +314,7 @@ function RsvpModal({
       const revealedLoc = {
         name: result?.locationName ?? null,
         address: result?.address ?? null,
+        meetingSpot: result?.meetingSpot ?? null,
       };
       if (revealedLoc.name) setRevealedName(revealedLoc.name);
       if (revealedLoc.address) setRevealedAddress(revealedLoc.address);

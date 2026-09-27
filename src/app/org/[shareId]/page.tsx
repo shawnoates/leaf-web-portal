@@ -129,6 +129,8 @@ interface Plan {
     time?: string | null;
   }[];
   hostNote: string | null;
+  /** The host's exact meeting spot; the server nulls it with the address. */
+  meetingSpot?: string | null;
   requireApproval?: boolean;
   isPoll?: boolean;
   pollOptionCount?: number;
@@ -3201,6 +3203,7 @@ export default function OrgCalendarPage() {
             }))
           : undefined,
         hostNote: p.hostNote as string || null,
+        meetingSpot: (p.meetingSpot as string | null) || null,
         requireApproval: p.requireApproval as boolean || false,
         ticketPriceCents: typeof p.ticketPriceCents === "number" ? p.ticketPriceCents : null,
         bookingFeeCents: typeof p.bookingFeeCents === "number" ? p.bookingFeeCents : null,
@@ -6111,6 +6114,9 @@ export default function OrgCalendarPage() {
                       <>
                         <p className="text-sm text-zinc-700">{selectedEvent.location.name}</p>
                         <p className="text-sm text-zinc-500">{selectedEvent.location.address}</p>
+                        {selectedEvent.meetingSpot && (
+                          <p className="text-sm text-zinc-900"><span className="font-medium">Meet at:</span> {selectedEvent.meetingSpot}</p>
+                        )}
                       </>
                     )}
                   </div>

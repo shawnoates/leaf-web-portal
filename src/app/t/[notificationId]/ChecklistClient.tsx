@@ -6,6 +6,7 @@ import {
   Check,
   Clock,
   Lock,
+  MapPin,
   MessageSquare,
   Plus,
   Send,
@@ -17,6 +18,8 @@ import HostIntroVideoCard, { type IntroVideoInfo } from "@/components/HostIntroV
 
 /** The checklist row that opens into the recorder (intro-video.js). */
 const INTRO_TASK_KEY = "record_intro";
+/** The row that is an editor for EventGroup.meetingSpot (host-task-functions.js). */
+const MEETING_SPOT_TASK_KEY = "set_meeting_spot";
 
 export type HostTask = {
   id: string;
@@ -60,6 +63,19 @@ export type HostTask = {
     postImageUrl: string;
     storyImageUrl: string;
   } | null;
+  /**
+   * On the meeting-spot row only: what attendees see and the spot as it
+   * stands. The row renders as an editor, and the server ticks it itself
+   * when a spot is saved.
+   */
+  meetingSpot?: {
+    current: string | null;
+    venueName: string | null;
+    venueAddress: string | null;
+    venueHidden: boolean;
+    maxLength: number;
+    editUrl: string | null;
+  } | null;
 };
 
 export type HostChecklist = {
@@ -78,6 +94,8 @@ export type HostChecklist = {
    * page) and when video is off, in which case the row is not sent either.
    */
   introVideo?: IntroVideoInfo | null;
+  /** Where exactly to meet, as it stands on the plan. */
+  meetingSpot?: string | null;
   tasks: HostTask[];
 };
 
@@ -358,6 +376,155 @@ function IntroRow({
   );
 }
 
+/**
+ * The meeting-spot row: the one place the checklist says what attendees
+ * actually see. Not a checkbox — saving the spot is what ticks it, and the
+ * server does that, so the host never claims work the plan can't show. Stays
+ * in Done as the spot with an Edit, because a wrong spot is worse than none.
+ */
+function MeetingSpotRow({
+  task,
+  notificationId,
+  onSaved,
+}: {
+  task: HostTask;
+  notificationId: string;
+  onSaved: (task: HostTask, meetingSpot: string | null) => void;
+}) {
+  const pack = task.meetingSpot;
+  const done = task.status === "done";
+  const [editing, setEditing] = useState(!done);
+  const [text, setText] = useState(pack?.current ?? "");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const max = pack?.maxLength ?? 300;
+  const shown = pack
+    ? [pack.venueName, pack.venueAddress].filter(Boolean).join(", ")
+    : "";
+
+  async function save(next: string) {
+    setSaving(true);
+    setErr(null);
+    try {
+      const res = (await Parse.Cloud.run("setPlanMeetingSpot", {
+        notificationId,
+        meetingSpot: next,
+      })) as { meetingSpot: string | null; task: HostTask | null };
+      onSaved(res.task ?? { ...task, status: res.meetingSpot ? "done" : "pending" }, res.meetingSpot);
+      setText(res.meetingSpot ?? "");
+      setEditing(!res.meetingSpot);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "That didn't save. Try again?");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <li id="meeting-spot" className="border-b border-zinc-100 last:border-b-0 px-4 py-3.5">
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden="true"
+          className={`mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
+            done ? "bg-zinc-900 border-zinc-900 text-white" : "border-zinc-300 bg-white"
+          }`}
+        >
+          {done && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className={`text-[15px] leading-snug ${done ? "text-zinc-500" : "text-zinc-900"}`}>{task.title}</p>
+          {!done && task.detail && (
+            <p className="text-[13px] text-zinc-500 mt-0.5 leading-relaxed">{task.detail}</p>
+          )}
+
+          {pack && shown && (
+            <div className="mt-2.5 rounded-xl border border-zinc-200 bg-zinc-50/70 px-3 py-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+                What people who RSVP see
+              </p>
+              <p className="mt-1 flex items-start gap-1.5 text-[14px] text-zinc-800">
+                <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-zinc-400" />
+                <span>
+                  {shown}
+                  {pack.current && !editing ? (
+                    <span className="block text-zinc-900 font-medium">Meet at: {pack.current}</span>
+                  ) : (
+                    <span className="block text-zinc-400 italic">No meeting spot yet</span>
+                  )}
+                </span>
+              </p>
+              {pack.venueHidden && (
+                <p className="mt-1.5 flex items-center gap-1 text-[12px] text-zinc-400">
+                  <Lock className="w-3 h-3" /> Shown only after someone RSVPs
+                </p>
+              )}
+            </div>
+          )}
+
+          {editing ? (
+            <div className="mt-2.5">
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value.slice(0, max))}
+                rows={2}
+                maxLength={max}
+                placeholder={
+                  pack?.venueName
+                    ? `e.g. the W 59th St entrance by Columbus Circle — I'll be in a beige jacket`
+                    : "Where exactly to find you"
+                }
+                aria-label="Exact meeting spot"
+                className="w-full text-[14px] leading-relaxed text-zinc-900 bg-white border border-zinc-200 rounded-lg p-2.5 outline-none focus:border-zinc-400 resize-none"
+              />
+              {err && <p className="text-[12px] text-amber-700 mt-1.5">{err}</p>}
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => save(text.trim())}
+                  disabled={saving || !text.trim()}
+                  className="inline-flex items-center gap-1.5 text-[13px] font-medium text-white bg-zinc-900 disabled:bg-zinc-300 rounded-lg px-3 py-1.5 transition-colors"
+                >
+                  {saving ? "Saving…" : "Save meeting spot"}
+                </button>
+                {pack?.current && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setText(pack.current ?? "");
+                      setEditing(false);
+                    }}
+                    className="text-[13px] text-zinc-400 hover:text-zinc-600 px-2 py-1.5 ml-auto"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="text-[13px] font-medium text-zinc-600 bg-zinc-100 hover:bg-zinc-200 rounded-full px-2.5 py-1 transition-colors"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => save("")}
+                disabled={saving}
+                className="text-[13px] text-zinc-400 hover:text-zinc-600 px-1 py-1"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
 export default function ChecklistClient({
   notificationId,
   initial,
@@ -397,9 +564,25 @@ export default function ChecklistClient({
       && data.introVideo.status !== "ready" && data.introVideo.status !== "processing" && !data.cancelled,
   );
 
+  // The spot row swaps itself between open and done on save — the server
+  // moved the row, and this mirrors it without a refetch.
+  const onSpotSaved = useCallback((task: HostTask, meetingSpot: string | null) => {
+    setData((d) =>
+      d
+        ? {
+            ...d,
+            meetingSpot,
+            tasks: d.tasks.map((t) => (t.id === task.id ? { ...t, ...task } : t)),
+          }
+        : d,
+    );
+  }, []);
+
   const renderRow = (t: HostTask) =>
     t.key === INTRO_TASK_KEY && data?.introVideo ? (
       <IntroRow key={t.id} task={t} video={data.introVideo} notificationId={notificationId} onChanged={refresh} />
+    ) : t.key === MEETING_SPOT_TASK_KEY && t.meetingSpot ? (
+      <MeetingSpotRow key={t.id} task={t} notificationId={notificationId} onSaved={onSpotSaved} />
     ) : (
       <Row
         key={t.id}
