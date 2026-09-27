@@ -63,6 +63,16 @@ export function CrewActionCard({ actions, onAnswered }: { actions: CrewAction[];
     }
   };
   const call = (name: string, params: Record<string, unknown>) => Parse.Cloud.run(name, { crewId: a.crewId, ...params });
+  // Join with texts on, like the crew page's invite screen. With no phone on
+  // file the server can't turn texts on, so they join without them.
+  const joinWithTexts = async () => {
+    try {
+      await call("respondToCrewInvite", { accept: true, sms: true });
+    } catch (err) {
+      if (err instanceof Error && /mobile number/i.test(err.message)) await call("respondToCrewInvite", { accept: true, sms: false });
+      else throw err;
+    }
+  };
 
   return (
     <section className="sinv fm-dark" role="region" aria-label="Your crew needs an answer">
@@ -79,8 +89,13 @@ export function CrewActionCard({ actions, onAnswered }: { actions: CrewAction[];
             <h2 className="sinv-title">Plan with {a.inviterName}</h2>
             <div className="sinv-meta">{a.crewName} · Leaf finds a night that works for the group and plans it.</div>
             <div className="sinv-act">
-              <button className="sinv-btn primary" disabled={busy} onClick={() => run(() => call("respondToCrewInvite", { accept: true }))}>Join</button>
+              <button className="sinv-btn primary" disabled={busy} onClick={() => run(() => joinWithTexts())}>Join</button>
               <button className="sinv-btn ghost" disabled={busy} onClick={() => run(() => call("respondToCrewInvite", { accept: false }))}>No thanks</button>
+            </div>
+            {/* Same terms as the crew page's invite screen: joining turns on
+                texts about this crew, and the tap is the consent. */}
+            <div className="sinv-meta" style={{ fontSize: 11, lineHeight: 1.4, marginTop: 8 }}>
+              By joining, you agree to get texts about this crew&rsquo;s plans (date polls and the night&rsquo;s details). Up to 5 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.
             </div>
           </>
         )}
