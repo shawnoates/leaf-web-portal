@@ -218,6 +218,8 @@ export type TellLeafResult = {
   preferDays?: number[];
   avoidDays?: number[];
   dislikedAdded?: number;
+  /** What happened to this round's open poll: new dates, or left alone because people already voted. */
+  pollDates?: "refreshed" | "others_voted" | "unchanged" | null;
 };
 
 const DAY_NAMES = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
@@ -237,6 +239,11 @@ export function tellLeafReceipt(r: TellLeafResult): string {
   const prefer = r.preferDays?.length ? `I'll aim for ${listDays(r.preferDays)}` : "";
   const avoid = r.avoidDays?.length ? `I'll steer clear of ${listDays(r.avoidDays)}` : "";
   const both = [prefer, avoid].filter(Boolean).join(", and ");
-  if (both) return `Got it — ${both}.`;
-  return "Got it. Thanks.";
+  const round = r.pollDates === "refreshed"
+    ? " New dates are up for this round."
+    : r.pollDates === "others_voted"
+      ? " People already voted on this round's dates, so it starts with the next one."
+      : "";
+  if (both) return `Got it — ${both}.${round}`;
+  return `Got it. Thanks.${round}`;
 }
