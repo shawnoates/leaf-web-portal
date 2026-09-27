@@ -49,6 +49,9 @@ export default function SeedPlaces({
 }) {
   const [data, setData] = useState<SeedData | null>(null);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
+  // What was ticked when the step loaded: the person's existing votes. The
+  // button counts only what's new since then.
+  const [initial, setInitial] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -61,7 +64,9 @@ export default function SeedPlaces({
         setData(r);
         // Places they already voted for start ticked, so the step reads as
         // "here's where you're at" rather than starting from nothing.
-        setChosen(new Set(r.book.filter((p) => p.picked).map(keyOf)));
+        const already = new Set(r.book.filter((p) => p.picked).map(keyOf));
+        setChosen(already);
+        setInitial(already);
       } catch (err) {
         if (live) setError(err instanceof Error ? err.message : "Couldn't load places.");
       }
@@ -105,7 +110,9 @@ export default function SeedPlaces({
   if (error && !data) return <p className="m-0 text-sm text-fm-muted">{error}</p>;
   if (!data) return <Spinner label="Finding places…" />;
 
-  const count = chosen.size;
+  // Existing votes start ticked and aren't news; "Add 3" for two old votes and
+  // one new pick read as three new places.
+  const count = [...chosen].filter((k) => !initial.has(k)).length;
   const nothing = data.book.length === 0 && data.popular.length === 0;
   if (nothing) {
     // No book and no nearby places: say so and get out of the way rather than
@@ -155,8 +162,8 @@ export default function SeedPlaces({
       {error && <p className="m-0 text-sm text-red-400">{error}</p>}
 
       <div className="flex items-center gap-3">
-        <Button onClick={() => submit(false)} disabled={busy || count === 0}>
-          {busy ? "Saving…" : count === 0 ? "Pick a few" : `Add ${count}`}
+        <Button onClick={() => submit(false)} disabled={busy || (count === 0 && initial.size === 0)}>
+          {busy ? "Saving…" : count > 0 ? `Add ${count}` : initial.size > 0 ? "Done" : "Pick a few"}
         </Button>
         <button
           type="button"
