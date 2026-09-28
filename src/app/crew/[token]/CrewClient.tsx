@@ -695,9 +695,12 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                   className="mt-2 h-11 w-full rounded-xl border px-3 text-sm"
                 >
                   <option value="">Same as the crew ({cadenceLabel(crew).toLowerCase()})</option>
-                  {Object.entries(RHYTHM_LABELS).map(([d, l]) => (
-                    <option key={d} value={d}>{l}</option>
-                  ))}
+                  {/* Only slower: Leaf runs rounds at the crew's pace, so a faster one would never happen. */}
+                  {Object.entries(RHYTHM_LABELS)
+                    .filter(([d]) => Number(d) > crew.rhythmDays)
+                    .map(([d, l]) => (
+                      <option key={d} value={d}>{l}</option>
+                    ))}
                 </select>
                 <p className="mb-0 mt-2 text-xs text-fm-muted">Slower than the crew? Leaf only asks you on your pace.</p>
               </div>

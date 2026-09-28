@@ -221,6 +221,8 @@ export type TellLeafResult = {
   avoidDays?: number[];
   /** "HH:mm" the member wants nights to start ("daytime" reads as 12:00). */
   preferTime?: string | null;
+  /** When a start can fall, "HH:mm" each end; either may be missing. */
+  timeWindow?: { earliest: string | null; latest: string | null } | null;
   dislikedAdded?: number;
   /** What happened to this round's open poll: new dates, or left alone because people already voted. */
   pollDates?: "refreshed" | "others_voted" | "unchanged" | null;
@@ -249,10 +251,15 @@ function clockLabel(hhmm: string): string {
  * to notice it was read backwards.
  */
 export function tellLeafReceipt(r: TellLeafResult): string {
-  const at = r.preferTime ? clockLabel(r.preferTime) : "";
+  const w = r.timeWindow;
+  const at = w && w.earliest && w.latest
+    ? `starting between ${clockLabel(w.earliest)} and ${clockLabel(w.latest)}`
+    : w?.earliest ? `starting no earlier than ${clockLabel(w.earliest)}`
+      : w?.latest ? `starting by ${clockLabel(w.latest)}`
+        : r.preferTime ? `around ${clockLabel(r.preferTime)}` : "";
   const prefer = r.preferDays?.length
-    ? `I'll aim for ${listDays(r.preferDays)}${at ? ` around ${at}` : ""}`
-    : at ? `I'll aim for around ${at}` : "";
+    ? `I'll aim for ${listDays(r.preferDays)}${at ? `, ${at}` : ""}`
+    : at ? `I'll aim for nights ${at}` : "";
   const avoid = r.avoidDays?.length ? `I'll steer clear of ${listDays(r.avoidDays)}` : "";
   const both = [prefer, avoid].filter(Boolean).join(", and ");
   const round = r.pollDates === "refreshed"
