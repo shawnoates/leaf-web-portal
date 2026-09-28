@@ -80,6 +80,12 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   // from Start a crew has a calendar behind it that nobody ever sees, so the
   // sheet never mentions one.
   const hasFollowers = me.isOwner && crew.origin !== "friends";
+  // Venue rotation off: the crew always meets at its own place, so there's
+  // no book, no seeding and no booking.
+  const fixedPlace = crew.placeMode === "fixed" ? crew.fixedPlace || null : null;
+  const [placeOn, setPlaceOn] = useState(crew.placeMode === "fixed");
+  const [placeLabel, setPlaceLabel] = useState(crew.fixedPlace?.label || "");
+  const [placeAddress, setPlaceAddress] = useState(crew.fixedPlace?.address || "");
   const openInvite = () => {
     setInviteOpen(true);
     setInviteNote("");
@@ -303,7 +309,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
           <section className="flex flex-col gap-3 lg:gap-5">
             <div className="hidden items-center justify-between lg:flex">
               <SectionTitle>Up next</SectionTitle>
-              {canStart && !proposing && <div className="flex gap-2">{startButtons}</div>}
+              {canStart && !proposing && !fixedPlace && <div className="flex gap-2">{startButtons}</div>}
             </div>
 
             {open.length === 0 && (
@@ -318,12 +324,12 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             {open.length > 0 && (
               <div className={`grid gap-3 lg:gap-4 ${open.length > 1 ? "lg:grid-cols-2" : ""}`}>
                 {open.map((c) => (
-                  <CycleCard key={c.cycleId} cycle={c} names={names} members={members} busy={busy} onAct={act} auth={auth} quorum={crew.quorum} joined={joined.length} calendarSynced={Boolean(me.calendarSynced)} onConnectCalendar={connectCalendar} />
+                  <CycleCard key={c.cycleId} cycle={c} names={names} members={members} busy={busy} onAct={act} auth={auth} quorum={crew.quorum} joined={joined.length} calendarSynced={Boolean(me.calendarSynced)} onConnectCalendar={connectCalendar} hostRotation={Boolean(crew.hostRotation)} />
                 ))}
               </div>
             )}
 
-            {canStart && !proposing && <div className="flex lg:hidden">{startButtons}</div>}
+            {canStart && !proposing && !fixedPlace && <div className="flex lg:hidden">{startButtons}</div>}
             {proposing && (
               <ProposeNight
                 auth={auth}
@@ -377,52 +383,61 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             </section>
           )}
 
-          <section className="flex flex-col gap-3.5 lg:gap-5">
-            <div className="flex items-center justify-between">
-              <SectionTitle>The book</SectionTitle>
-              <Link href={crewHref(auth, "book")} className="flex min-h-11 items-center gap-1 text-sm font-semibold text-fm-ink hover:text-white">
-                <Plus size={16} strokeWidth={2.2} aria-hidden /> Add<span className="hidden lg:inline"> a place</span>
-              </Link>
-            </div>
-            {book.length === 0 ? (
-              <Link
-                href={crewHref(auth, "book")}
-                className="flex flex-col items-start gap-4 rounded-[28px] border border-dashed border-fm-line p-6 hover:border-fm-ink-2 lg:flex-row lg:items-center lg:justify-between lg:p-8"
-              >
-                <p className="m-0 max-w-[44ch] text-[15px] leading-relaxed text-fm-ink-2 lg:text-base">
-                  No places yet. Add a few you&rsquo;ve been wanting to try and Leaf will plan nights around them.
-                </p>
-                <span className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-fm-ink px-5 text-sm font-semibold text-fm-canvas">
-                  <Plus size={16} strokeWidth={2.2} aria-hidden /> Add a place
-                </span>
-              </Link>
-            ) : (
-              <ul className="no-scrollbar -mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 scroll-pl-5 lg:mx-0 lg:grid lg:grid-cols-4 lg:gap-4 lg:overflow-visible lg:px-0">
-                {book.map((s) => (
-                  <li key={s.spotId} className="flex w-[148px] shrink-0 snap-start flex-col gap-2 lg:w-auto lg:gap-2.5 lg:[&:nth-child(n+5)]:hidden">
-                   <a href={spotHref(s, inApp)} target={inApp ? undefined : "_blank"} rel="noreferrer" className="flex flex-col gap-2 lg:gap-2.5">
-                    <div className="relative h-[148px] overflow-hidden rounded-[20px] border border-fm-line bg-fm-card lg:h-[168px] lg:rounded-[22px]">
-                      {s.photo ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={s.photo} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <span aria-hidden className="absolute bottom-2.5 left-3 font-fm-serif text-[44px] leading-[0.8] text-fm-line lg:text-[52px]">{s.name.charAt(0)}</span>
-                      )}
-                      <span className="absolute bottom-2.5 right-2.5 flex h-[26px] items-center gap-1 rounded-full bg-fm-canvas px-2.5 text-xs font-semibold">
-                        <ChevronUp size={13} strokeWidth={2.6} aria-hidden /> {s.upvotes}
-                        <span className="sr-only"> want to go</span>
-                      </span>
-                    </div>
-                    <div>
-                      <div className="truncate text-[15px] font-semibold lg:text-base">{s.name}</div>
-                      <div className="truncate text-[13px] text-fm-muted">{[s.neighborhood, s.triedAt ? "tried" : null].filter(Boolean).join(" · ") || s.category}</div>
-                    </div>
-                   </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          {fixedPlace ? (
+            <section className="flex flex-col gap-2 rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
+              <Eyebrow>Where</Eyebrow>
+              <div className="font-fm-serif text-[28px] leading-tight">{fixedPlace.label}</div>
+              {fixedPlace.address && <p className="m-0 text-sm text-fm-muted">{fixedPlace.address}</p>}
+              <p className="m-0 text-xs text-fm-muted">Every night is here. Leaf just finds the date.</p>
+            </section>
+          ) : (
+            <section className="flex flex-col gap-3.5 lg:gap-5">
+              <div className="flex items-center justify-between">
+                <SectionTitle>The book</SectionTitle>
+                <Link href={crewHref(auth, "book")} className="flex min-h-11 items-center gap-1 text-sm font-semibold text-fm-ink hover:text-white">
+                  <Plus size={16} strokeWidth={2.2} aria-hidden /> Add<span className="hidden lg:inline"> a place</span>
+                </Link>
+              </div>
+              {book.length === 0 ? (
+                <Link
+                  href={crewHref(auth, "book")}
+                  className="flex flex-col items-start gap-4 rounded-[28px] border border-dashed border-fm-line p-6 hover:border-fm-ink-2 lg:flex-row lg:items-center lg:justify-between lg:p-8"
+                >
+                  <p className="m-0 max-w-[44ch] text-[15px] leading-relaxed text-fm-ink-2 lg:text-base">
+                    No places yet. Add a few you&rsquo;ve been wanting to try and Leaf will plan nights around them.
+                  </p>
+                  <span className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-fm-ink px-5 text-sm font-semibold text-fm-canvas">
+                    <Plus size={16} strokeWidth={2.2} aria-hidden /> Add a place
+                  </span>
+                </Link>
+              ) : (
+                <ul className="no-scrollbar -mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 scroll-pl-5 lg:mx-0 lg:grid lg:grid-cols-4 lg:gap-4 lg:overflow-visible lg:px-0">
+                  {book.map((s) => (
+                    <li key={s.spotId} className="flex w-[148px] shrink-0 snap-start flex-col gap-2 lg:w-auto lg:gap-2.5 lg:[&:nth-child(n+5)]:hidden">
+                     <a href={spotHref(s, inApp)} target={inApp ? undefined : "_blank"} rel="noreferrer" className="flex flex-col gap-2 lg:gap-2.5">
+                      <div className="relative h-[148px] overflow-hidden rounded-[20px] border border-fm-line bg-fm-card lg:h-[168px] lg:rounded-[22px]">
+                        {s.photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={s.photo} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <span aria-hidden className="absolute bottom-2.5 left-3 font-fm-serif text-[44px] leading-[0.8] text-fm-line lg:text-[52px]">{s.name.charAt(0)}</span>
+                        )}
+                        <span className="absolute bottom-2.5 right-2.5 flex h-[26px] items-center gap-1 rounded-full bg-fm-canvas px-2.5 text-xs font-semibold">
+                          <ChevronUp size={13} strokeWidth={2.6} aria-hidden /> {s.upvotes}
+                          <span className="sr-only"> want to go</span>
+                        </span>
+                      </div>
+                      <div>
+                        <div className="truncate text-[15px] font-semibold lg:text-base">{s.name}</div>
+                        <div className="truncate text-[13px] text-fm-muted">{[s.neighborhood, s.triedAt ? "tried" : null].filter(Boolean).join(" · ") || s.category}</div>
+                      </div>
+                     </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
 
           <div className={`grid gap-10 ${past.length > 0 ? "lg:grid-cols-2 lg:gap-12" : ""}`}>
             {past.length > 0 && (
@@ -681,6 +696,73 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 </div>
               )}
 
+              {me.isOwner && (
+                <div className="border-b border-fm-line-dim py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[15px] font-semibold">Skip venue rotation</div>
+                      <div className="text-[13px] text-fm-muted">Always meet at one place, like a family dinner at home.</div>
+                    </div>
+                    <FriendModeSwitch
+                      label="Skip venue rotation"
+                      checked={placeOn}
+                      disabled={busy !== null}
+                      onChange={(v) => {
+                        setPlaceOn(v);
+                        // Turning it off takes effect now; turning it on waits for the place.
+                        if (!v && crew.placeMode === "fixed") act("place", () => Parse.Cloud.run("setCrewPlaceMode", { calendarId: crew.id, mode: "book" }));
+                      }}
+                    />
+                  </div>
+                  {placeOn && (
+                    <div className="mt-3 flex flex-col gap-2">
+                      <input
+                        value={placeLabel}
+                        onChange={(e) => setPlaceLabel(e.target.value)}
+                        placeholder="Name it, like Mom's"
+                        maxLength={60}
+                        aria-label="Place name"
+                        className="h-11 w-full rounded-xl border px-3 text-sm"
+                      />
+                      <input
+                        value={placeAddress}
+                        onChange={(e) => setPlaceAddress(e.target.value)}
+                        placeholder="Address (optional)"
+                        maxLength={200}
+                        autoComplete="street-address"
+                        aria-label="Address"
+                        className="h-11 w-full rounded-xl border px-3 text-sm"
+                      />
+                      <p className="m-0 text-xs text-fm-muted">Only people in the crew see the address.</p>
+                      <div>
+                        <Button
+                          small
+                          disabled={busy !== null || !placeLabel.trim()}
+                          onClick={() => act("place", () => Parse.Cloud.run("setCrewPlaceMode", { calendarId: crew.id, mode: "fixed", label: placeLabel.trim(), address: placeAddress.trim() }))}
+                        >
+                          {busy === "place" ? "Saving…" : crew.placeMode === "fixed" ? "Update place" : "Save place"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {me.isOwner && (
+                <div className="flex items-center gap-3 border-b border-fm-line-dim py-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] font-semibold">Rotate who hosts</div>
+                    <div className="text-[13px] text-fm-muted">Each night Leaf plans goes to the next person in the crew, you first.</div>
+                  </div>
+                  <FriendModeSwitch
+                    label="Rotate who hosts"
+                    checked={Boolean(crew.hostRotation)}
+                    disabled={busy !== null}
+                    onChange={(v) => act("rotation", () => Parse.Cloud.run("setCrewHostRotation", { calendarId: crew.id, enabled: v }))}
+                  />
+                </div>
+              )}
+
               <div className="py-4">
                 <label htmlFor="my-pace" className="block text-[15px] font-semibold">Your pace</label>
                 <select
@@ -752,7 +834,7 @@ function MemberRow({ m, note }: { m: Member; note?: string }) {
 }
 
 function CycleCard({
-  cycle: c, names, members, busy, onAct, auth, quorum, joined, calendarSynced, onConnectCalendar,
+  cycle: c, names, members, busy, onAct, auth, quorum, joined, calendarSynced, onConnectCalendar, hostRotation = false,
 }: {
   cycle: CycleView;
   names: Record<string, string>;
@@ -765,6 +847,8 @@ function CycleCard({
   /** The member's Google Calendar is connected (Leaf pre-ticks their free nights). */
   calendarSynced: boolean;
   onConnectCalendar: () => void;
+  /** Host rotation is on: say whose turn this night is. */
+  hostRotation?: boolean;
 }) {
   // Not voted yet: start from the dates their calendar says they're free.
   // Nothing pre-ticked: Leaf already picked these dates around everyone's
@@ -823,6 +907,9 @@ function CycleCard({
               ? [chosen?.dow, timeLabel(c.chosenOption.time), c.venue?.address].filter(Boolean).join(" · ")
               : c.venue?.address || cycleStatusLine(c, names)}
           </p>
+          {hostRotation && c.hostId && (
+            <p className="m-0 text-sm text-fm-ink-2">{c.isHost ? "You're hosting this one" : `${names[c.hostId] || "Someone"} is hosting`}</p>
+          )}
         </div>
       </div>
 
@@ -940,7 +1027,7 @@ function CycleCard({
             })}
           </div>
 
-          {c.isHost && c.state === "locked" && (
+          {c.isHost && c.state === "locked" && !c.venue?.fixed && (
             <div className="flex items-center gap-3 rounded-[18px] bg-fm-card px-4 py-3.5">
               <p className="m-0 flex-1 text-sm leading-snug text-fm-ink-2">You&rsquo;re booking this one. Tap when it&rsquo;s done and Leaf tells everyone.</p>
               <Button kind="ghost" small disabled={busy !== null} onClick={() => onAct("booked", () => run("markCrewBooked", auth, { cycleId: c.cycleId }))}>

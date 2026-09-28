@@ -21,6 +21,8 @@ export type Venue = {
   lng?: number | null;
   website?: string | null;
   phone?: string | null;
+  /** The crew's own place (venue rotation off): a name like "Mom's", maybe an address. */
+  fixed?: boolean;
 };
 
 export type CycleState = "picking" | "polling" | "locked" | "booked" | "done" | "skipped" | "cancelled";
@@ -106,6 +108,11 @@ export type CrewPage = {
     ownerId: string | null;
     /** 'friends': started with Start a crew (its calendar is hidden). 'calendar': Friend Mode on a real calendar. */
     origin?: "friends" | "calendar";
+    /** 'fixed': venue rotation off, the crew always meets at `fixedPlace`. */
+    placeMode?: "book" | "fixed";
+    fixedPlace?: { label: string; address: string | null } | null;
+    /** Each round Leaf starts goes to the next member to host. */
+    hostRotation?: boolean;
   };
   me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null; calendarSynced?: boolean; inviteLink?: string | null; needsSeed?: boolean; needsPace?: boolean };
   members: Member[];
