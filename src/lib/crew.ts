@@ -219,6 +219,8 @@ export type TellLeafResult = {
   understood?: boolean;
   preferDays?: number[];
   avoidDays?: number[];
+  /** "HH:mm" the member wants nights to start ("daytime" reads as 12:00). */
+  preferTime?: string | null;
   dislikedAdded?: number;
   /** What happened to this round's open poll: new dates, or left alone because people already voted. */
   pollDates?: "refreshed" | "others_voted" | "unchanged" | null;
@@ -227,9 +229,18 @@ export type TellLeafResult = {
 const DAY_NAMES = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
 
 function listDays(days: number[]): string {
+  if (days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d))) return "weekdays";
   const names = days.map((d) => DAY_NAMES[d]).filter(Boolean);
   if (names.length <= 1) return names.join("");
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/** "12:00" → "noon", "18:30" → "6:30 PM". */
+function clockLabel(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  if (h === 12 && m === 0) return "noon";
+  const hour = h % 12 || 12;
+  return `${hour}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h < 12 ? "AM" : "PM"}`;
 }
 
 /**
@@ -238,7 +249,10 @@ function listDays(days: number[]): string {
  * to notice it was read backwards.
  */
 export function tellLeafReceipt(r: TellLeafResult): string {
-  const prefer = r.preferDays?.length ? `I'll aim for ${listDays(r.preferDays)}` : "";
+  const at = r.preferTime ? clockLabel(r.preferTime) : "";
+  const prefer = r.preferDays?.length
+    ? `I'll aim for ${listDays(r.preferDays)}${at ? ` around ${at}` : ""}`
+    : at ? `I'll aim for around ${at}` : "";
   const avoid = r.avoidDays?.length ? `I'll steer clear of ${listDays(r.avoidDays)}` : "";
   const both = [prefer, avoid].filter(Boolean).join(", and ");
   const round = r.pollDates === "refreshed"
