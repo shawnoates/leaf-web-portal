@@ -347,7 +347,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             {open.length > 0 && (
               <div className={`grid gap-3 lg:gap-4 ${open.length > 1 ? "lg:grid-cols-2" : ""}`}>
                 {open.map((c) => (
-                  <CycleCard key={c.cycleId} cycle={c} names={names} members={members} busy={busy} onAct={act} auth={auth} quorum={crew.quorum} joined={joined.length} calendarSynced={Boolean(me.calendarSynced)} onConnectCalendar={connectCalendar} hostRotation={Boolean(crew.hostRotation)} />
+                  <CycleCard key={c.cycleId} cycle={c} names={names} members={members} busy={busy} onAct={act} auth={auth} quorum={crew.quorum} joined={joined.length} calendarSynced={Boolean(me.calendarSynced)} onConnectCalendar={connectCalendar} hostRotation={Boolean(crew.hostRotation)} isOwner={me.isOwner} />
                 ))}
               </div>
             )}
@@ -857,7 +857,7 @@ function MemberRow({ m, note }: { m: Member; note?: string }) {
 }
 
 function CycleCard({
-  cycle: c, names, members, busy, onAct, auth, quorum, joined, calendarSynced, onConnectCalendar, hostRotation = false,
+  cycle: c, names, members, busy, onAct, auth, quorum, joined, calendarSynced, onConnectCalendar, hostRotation = false, isOwner = false,
 }: {
   cycle: CycleView;
   names: Record<string, string>;
@@ -872,6 +872,8 @@ function CycleCard({
   onConnectCalendar: () => void;
   /** Host rotation is on: say whose turn this night is. */
   hostRotation?: boolean;
+  /** The crew's owner: may answer a combine offer like the round's host. */
+  isOwner?: boolean;
 }) {
   // Not voted yet: start from the dates their calendar says they're free.
   // Nothing pre-ticked: Leaf already picked these dates around everyone's
@@ -971,8 +973,27 @@ function CycleCard({
               </button>
             </div>
           )}
+          {c.combineOffer && (c.isHost || isOwner) && (
+            <div className="flex flex-col gap-3 rounded-[18px] border border-fm-line bg-fm-card p-4">
+              <p className="m-0 text-[15px] leading-snug text-fm-ink">
+                {c.combineOffer.crewName} is already set for{" "}
+                {c.options[c.combineOffer.optionIndex] ? `${dayParts(c.options[c.combineOffer.optionIndex].date).dow} ${dayParts(c.options[c.combineOffer.optionIndex].date).month} ${dayParts(c.options[c.combineOffer.optionIndex].date).day}` : "one of these nights"}
+                {c.combineOffer.venue ? ` at ${c.combineOffer.venue}` : ""}, with some of the same people. Combine them into one night?
+              </p>
+              <p className="m-0 text-[13px] text-fm-muted">Combine invites everyone here to that night and skips this round. Keep separate drops that date from this poll.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button small disabled={busy !== null} onClick={() => onAct("combine", () => run("resolveCrewClash", auth, { cycleId: c.cycleId, choice: "combine" }))}>
+                  {busy === "combine" ? "Combining…" : "Combine"}
+                </Button>
+                <Button small kind="ghost" disabled={busy !== null} onClick={() => onAct("combine", () => run("resolveCrewClash", auth, { cycleId: c.cycleId, choice: "separate" }))}>
+                  Keep separate
+                </Button>
+              </div>
+            </div>
+          )}
           <ul className="grid grid-cols-3 gap-2 lg:gap-2.5">
             {c.options.map((o, i) => {
+              const clash = c.clashes?.[String(i)];
               const p = dayParts(o.date);
               const on = picked.has(i);
               const baseCount = c.votes ? Object.values(c.votes).filter((v) => v.includes(i)).length : 0;
@@ -984,7 +1005,7 @@ function CycleCard({
                     type="button"
                     aria-pressed={on}
                     onClick={() => toggleDate(i)}
-                    className={`flex h-[116px] w-full flex-col items-start justify-between rounded-[18px] border p-3 text-left transition lg:h-[124px] lg:rounded-[20px] lg:p-3.5 ${
+                    className={`flex min-h-[116px] w-full flex-col items-start justify-between gap-1 rounded-[18px] border p-3 text-left transition lg:min-h-[124px] lg:rounded-[20px] lg:p-3.5 ${
                       on ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line bg-fm-canvas text-fm-ink hover:border-fm-ink-2"
                     }`}
                   >
@@ -993,6 +1014,7 @@ function CycleCard({
                     <span className={`text-xs ${on ? "font-semibold" : "text-fm-muted"}`}>
                       {count} can
                       {c.fit?.[i] && c.fit[i].known > 0 ? ` · ${c.fit[i].free} of ${c.fit[i].known} free` : ""}
+                      {clash && <span className={`mt-0.5 block truncate ${on ? "" : "text-fm-danger"}`}>Clashes with {clash.crewName}</span>}
                     </span>
                   </button>
                 </li>

@@ -49,6 +49,10 @@ export type CycleView = {
   myFree?: number[] | null;
   /** Per option: members Leaf knows about that night, and how many look free. */
   fit?: { free: number; known: number }[] | null;
+  /** Dates (by index) another crew with some of the same people already has a night. */
+  clashes?: Record<string, { crewName: string; venue: string | null }>;
+  /** Same place and time as another crew's night: the organizer can combine them. */
+  combineOffer?: { crewName: string; venue: string | null; optionIndex: number } | null;
   rsvps: Record<string, "in" | "out">;
   myRsvp: "in" | "out" | null;
 };
