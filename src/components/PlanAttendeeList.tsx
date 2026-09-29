@@ -15,6 +15,9 @@ export type Attendee = {
 
 type Props = {
   attendees: Attendee[];
+  /** Plan cap; null/undefined = unlimited. Only used to word the grant
+   *  confirm — the server decides whether the seat actually needs a bump. */
+  capacity?: number | null;
   onApprove: (a: Attendee) => Promise<void>;
   onDecline: (a: Attendee) => Promise<void>;
   onRemove: (a: Attendee) => Promise<void>;
@@ -65,11 +68,15 @@ function statusPill(status: string, waitlisted: boolean) {
   return { label: status, cls: "bg-zinc-100 text-zinc-600", dot: "bg-zinc-500" };
 }
 
-export default function PlanAttendeeList({ attendees, onApprove, onDecline, onRemove }: Props) {
+export default function PlanAttendeeList({ attendees, capacity, onApprove, onDecline, onRemove }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [menuForId, setMenuForId] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<Attendee | null>(null);
-  const [removing, setRemoving] = useState(false);
+  const [confirmApprove, setConfirmApprove] = useState<Attendee | null>(null);
+  // notificationId of the row whose approve/decline/remove call is in flight.
+  // Menu actions on that row are disabled meanwhile — a double-tap on
+  // "Give them a spot" otherwise sends a second approve that 409s.
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -86,6 +93,22 @@ export default function PlanAttendeeList({ attendees, onApprove, onDecline, onRe
     }
   };
 
+  const runBusy = async (a: Attendee, fn: (a: Attendee) => Promise<void>) => {
+    setBusyId(a.notificationId);
+    try {
+      await fn(a);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const goingCount = attendees.filter((a) => a.status === "Accepted").length;
+  // The parent's capacity is a snapshot from before any grant in this session.
+  // The server never leaves capacity below the accepted count, so the larger of
+  // the two is the live cap — keeps the copy right on back-to-back grants.
+  const effectiveCapacity = capacity != null ? Math.max(capacity, goingCount) : null;
+  const grantExceedsCap = effectiveCapacity != null && goingCount >= effectiveCapacity;
+
   return (
     <>
       <ul className="mt-3 rounded-xl border border-zinc-200">
@@ -95,14 +118,15 @@ export default function PlanAttendeeList({ attendees, onApprove, onDecline, onRe
             attendee={a}
             first={i === 0}
             expanded={expandedId === a.notificationId}
+            busy={busyId === a.notificationId}
             onToggle={() =>
               setExpandedId((cur) => (cur === a.notificationId ? null : a.notificationId))
             }
             menuOpen={menuForId === a.notificationId}
             onMenuOpenChange={(open) => setMenuForId(open ? a.notificationId : null)}
             onCopyNumber={copyNumber}
-            onApprove={onApprove}
-            onDecline={onDecline}
+            onApprove={(x) => setConfirmApprove(x)}
+            onDecline={(x) => void runBusy(x, onDecline)}
             onRemove={(x) => setConfirmRemove(x)}
           />
         ))}
@@ -112,21 +136,47 @@ export default function PlanAttendeeList({ attendees, onApprove, onDecline, onRe
       </ul>
 
       {confirmRemove && (
-        <ConfirmRemoveDialog
-          attendee={confirmRemove}
-          busy={removing}
+        <ConfirmDialog
+          title={`Remove ${confirmRemove.name}?`}
+          body="They'll lose their spot and won't be notified."
+          confirmLabel="Remove"
+          busyLabel="Removing…"
+          danger
+          busy={busyId === confirmRemove.notificationId}
           onCancel={() => setConfirmRemove(null)}
           onConfirm={async () => {
-            setRemoving(true);
-            try {
-              await onRemove(confirmRemove);
-              setConfirmRemove(null);
-            } finally {
-              setRemoving(false);
-            }
+            await runBusy(confirmRemove, onRemove);
+            setConfirmRemove(null);
           }}
         />
       )}
+
+      {confirmApprove && (() => {
+        const isWaitlist = isPendingStatus(confirmApprove.status) && confirmApprove.waitlisted === true;
+        const firstName = confirmApprove.name.trim().split(/\s+/)[0] || confirmApprove.name;
+        const lines = [
+          isWaitlist
+            ? `${firstName} will be added to the plan and get a text and a push saying they're in.`
+            : `${firstName} will be added to the plan and get a text and a push saying they're confirmed.`,
+        ];
+        if (grantExceedsCap && effectiveCapacity != null) {
+          lines.push(`This plan is full (${goingCount}/${effectiveCapacity}). Adding them makes it ${goingCount + 1}.`);
+        }
+        return (
+          <ConfirmDialog
+            title={isWaitlist ? `Give ${confirmApprove.name} a spot?` : `Approve ${confirmApprove.name}?`}
+            body={lines.join(" ")}
+            confirmLabel={isWaitlist ? "Give spot" : "Approve"}
+            busyLabel={isWaitlist ? "Adding…" : "Approving…"}
+            busy={busyId === confirmApprove.notificationId}
+            onCancel={() => setConfirmApprove(null)}
+            onConfirm={async () => {
+              await runBusy(confirmApprove, onApprove);
+              setConfirmApprove(null);
+            }}
+          />
+        );
+      })()}
 
       {toast && (
         <div
@@ -144,12 +194,14 @@ type RowProps = {
   attendee: Attendee;
   first: boolean;
   expanded: boolean;
+  /** A call for this row is in flight — its status-changing actions are disabled. */
+  busy: boolean;
   onToggle: () => void;
   menuOpen: boolean;
   onMenuOpenChange: (open: boolean) => void;
   onCopyNumber: (phone: string) => void;
-  onApprove: (a: Attendee) => Promise<void>;
-  onDecline: (a: Attendee) => Promise<void>;
+  onApprove: (a: Attendee) => void;
+  onDecline: (a: Attendee) => void;
   onRemove: (a: Attendee) => void;
 };
 
@@ -157,6 +209,7 @@ function AttendeeRow({
   attendee: a,
   first,
   expanded,
+  busy,
   onToggle,
   menuOpen,
   onMenuOpenChange,
@@ -244,15 +297,15 @@ function AttendeeRow({
           { divider: true },
           ...(pending
             ? [
-                { label: "Approve", onSelect: () => void onApprove(a) },
-                { label: "Decline", onSelect: () => void onDecline(a), danger: true },
+                { label: "Approve", onSelect: () => onApprove(a), disabled: busy },
+                { label: "Decline", onSelect: () => onDecline(a), danger: true, disabled: busy },
               ]
             : waitlisted
               ? [
-                  { label: "Give them a spot", onSelect: () => void onApprove(a) },
-                  { label: "Remove from waitlist", onSelect: () => void onDecline(a), danger: true },
+                  { label: "Give them a spot", onSelect: () => onApprove(a), disabled: busy },
+                  { label: "Remove from waitlist", onSelect: () => onDecline(a), danger: true, disabled: busy },
                 ]
-              : [{ label: "Remove from plan", onSelect: () => onRemove(a), danger: true }]),
+              : [{ label: "Remove from plan", onSelect: () => onRemove(a), danger: true, disabled: busy }]),
         ]}
       />
     </li>
@@ -377,13 +430,21 @@ function RowMenu({
   );
 }
 
-function ConfirmRemoveDialog({
-  attendee,
+function ConfirmDialog({
+  title,
+  body,
+  confirmLabel,
+  busyLabel,
+  danger = false,
   busy,
   onCancel,
   onConfirm,
 }: {
-  attendee: Attendee;
+  title: string;
+  body: string;
+  confirmLabel: string;
+  busyLabel: string;
+  danger?: boolean;
   busy: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -406,16 +467,14 @@ function ConfirmRemoveDialog({
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="remove-attendee-title"
+        aria-labelledby="attendee-confirm-title"
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"
       >
-        <h3 id="remove-attendee-title" className="text-base font-semibold text-zinc-900">
-          Remove {attendee.name}?
+        <h3 id="attendee-confirm-title" className="text-base font-semibold text-zinc-900">
+          {title}
         </h3>
-        <p className="mt-1.5 text-sm text-zinc-600">
-          They&apos;ll lose their spot and won&apos;t be notified.
-        </p>
+        <p className="mt-1.5 text-sm text-zinc-600">{body}</p>
         <div className="mt-5 flex justify-end gap-2">
           <button
             ref={cancelRef}
@@ -430,9 +489,9 @@ function ConfirmRemoveDialog({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className={`h-9 px-3.5 rounded-lg bg-red-600 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 ${FOCUS_RING}`}
+            className={`h-9 px-3.5 rounded-lg text-sm font-medium text-white disabled:opacity-50 ${danger ? "bg-red-600 hover:bg-red-700" : "bg-zinc-900 hover:bg-zinc-800"} ${FOCUS_RING}`}
           >
-            {busy ? "Removing…" : "Remove"}
+            {busy ? busyLabel : confirmLabel}
           </button>
         </div>
       </div>

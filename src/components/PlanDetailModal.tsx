@@ -442,13 +442,18 @@ export default function PlanDetailModal({
 
   const approveRsvp = async (r: { notificationId: string }) => {
     try {
-      await Parse.Cloud.run("approveRsvpRequest", { notificationId: r.notificationId });
+      // grantOverCapacity: the host has just confirmed a dialog that spells
+      // out the new headcount, so a full plan gets one more seat instead of
+      // the old 409 "raise the capacity first" dead-end. The server seats the
+      // guest before it raises the cap, so no one else can slip into the gap.
+      await Parse.Cloud.run("approveRsvpRequest", {
+        notificationId: r.notificationId,
+        grantOverCapacity: true,
+      });
       setPlanRsvps((prev) => prev.map((rsvp) => rsvp.notificationId === r.notificationId ? { ...rsvp, status: "Accepted", waitlisted: false } : rsvp));
       onPendingRsvpResolved?.(r.notificationId);
     } catch (err) {
       console.error("Failed to approve:", err);
-      // The server refuses to approve past capacity — the host has to raise
-      // it first, and the message says so.
       alert(err instanceof Error ? err.message : "Couldn't approve this request.");
     }
   };
@@ -910,6 +915,7 @@ export default function PlanDetailModal({
               ) : planRsvps.length > 0 ? (
                 <PlanAttendeeList
                   attendees={planRsvps}
+                  capacity={plan.capacity}
                   onApprove={approveRsvp}
                   onDecline={declineRsvp}
                   onRemove={removeRsvp}
