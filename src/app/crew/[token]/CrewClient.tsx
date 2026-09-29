@@ -54,6 +54,8 @@ function splitName(name: string): [string, string | undefined] {
 
 function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; reload: () => Promise<void> }) {
   const { crew, me, members, names, open, past, book } = data;
+  const pills = data.prefPills || [];
+  const [allPills, setAllPills] = useState(false);
   const [pace, setPace] = useState<string>(me.rhythmDays ? String(me.rhythmDays) : "");
   const [proposing, setProposing] = useState(false);
   const inApp = useInApp();
@@ -483,7 +485,35 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
 
             <section className="flex flex-col gap-2.5 lg:max-w-[640px] lg:gap-3">
               <SectionTitle>Tell Leaf</SectionTitle>
-              <p className="m-0 text-sm text-fm-muted">Only Leaf sees this. Days that never work, places to avoid, anything.</p>
+              <p className="m-0 text-sm text-fm-muted">
+                Days that never work, places to avoid, anything. Only Leaf reads what you write; the crew sees the topics below with counts, never who said what.
+              </p>
+              {pills.length > 0 && me.status === "in" && (
+                <div className="flex flex-wrap gap-2" aria-label="What the crew has told Leaf">
+                  {(allPills ? pills : pills.slice(0, 6)).map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      aria-pressed={p.mine}
+                      disabled={busy !== null}
+                      title={p.mine ? "Tap to take back your +1" : "Tap to +1"}
+                      onClick={() => act("pill", () => run("toggleCrewPrefPill", auth, { pillId: p.id, on: !p.mine }))}
+                      className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 text-sm transition disabled:opacity-60 ${
+                        p.mine ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink hover:border-fm-ink-2"
+                      }`}
+                    >
+                      {p.mine && <Check size={14} strokeWidth={2.4} aria-hidden />}
+                      <span>{p.label}</span>
+                      <span className={p.mine ? "font-semibold" : "text-fm-muted"}>{p.count}</span>
+                    </button>
+                  ))}
+                  {!allPills && pills.length > 6 && (
+                    <button type="button" onClick={() => setAllPills(true)} className="inline-flex min-h-10 items-center rounded-full border border-fm-line px-3.5 text-sm text-fm-ink hover:border-fm-ink-2">
+                      +{pills.length - 6}
+                    </button>
+                  )}
+                </div>
+              )}
               {noteSent ? (
                 <p className="m-0 flex items-center gap-1.5 text-sm text-fm-ink-2"><Check size={16} aria-hidden /> {noteSent}</p>
               ) : (

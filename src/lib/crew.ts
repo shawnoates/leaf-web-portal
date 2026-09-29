@@ -123,6 +123,8 @@ export type CrewPage = {
   me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null; calendarSynced?: boolean; inviteLink?: string | null; needsSeed?: boolean; needsPace?: boolean };
   members: Member[];
   names: Record<string, string>;
+  /** Tell Leaf pills: what the crew has said so far, with counts (never who). */
+  prefPills?: PrefPill[];
   open: CycleView[];
   past: { cycleId: string; venue: Venue | null; startsAt: string | { iso: string } | null; headcount: number; planId: string | null }[];
   book: BookSpot[];
@@ -227,6 +229,8 @@ export function cycleStatusLine(c: CycleView, names: Record<string, string>): st
 }
 
 /** What `crewTellLeaf` gives back: what Leaf managed to take from the note. */
+export type PrefPill = { id: string; label: string; count: number; mine: boolean; kind: "pref" | "theme" };
+
 export type TellLeafResult = {
   received: boolean;
   understood?: boolean;
