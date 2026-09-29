@@ -104,9 +104,11 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   };
   const shareInviteLink = async () => {
     if (!me.inviteLink) return;
-    const text = `Join ${crew.name} on Leaf — we're planning get-togethers: ${me.inviteLink}`;
+    // The link's preview already shows the crew (name, who invited you, how
+    // often), so the message stays short: no name, no title field.
+    const text = `Join our crew on Leaf so we can plan nights out together: ${me.inviteLink}`;
     try {
-      if (navigator.share) { await navigator.share({ title: crew.name, text }); setLinkDone("Shared"); return; }
+      if (navigator.share) { await navigator.share({ text }); setLinkDone("Shared"); return; }
     } catch { return; }
     try { await navigator.clipboard.writeText(me.inviteLink); setLinkDone("Link copied"); } catch { /* ignore */ }
   };

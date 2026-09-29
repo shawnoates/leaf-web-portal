@@ -106,9 +106,10 @@ export default function FriendModeSetup({
 
   const shareLink = async () => {
     if (!preview?.inviteLink) return;
-    const text = `Join ${calendarName} on Leaf — we're planning get-togethers: ${preview.inviteLink}`;
+    // The link's preview shows the crew itself; keep the message short.
+    const text = `Join our crew on Leaf so we can plan nights out together: ${preview.inviteLink}`;
     try {
-      if (navigator.share) { await navigator.share({ title: calendarName, text }); setShared(true); return; }
+      if (navigator.share) { await navigator.share({ text }); setShared(true); return; }
     } catch { return; /* cancelled */ }
     try { await navigator.clipboard.writeText(preview.inviteLink); setShared(true); } catch { /* ignore */ }
   };
