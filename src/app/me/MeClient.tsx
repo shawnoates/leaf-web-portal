@@ -32,6 +32,7 @@ import {
 import FriendModeIntro, { friendModeIntroDue, stampFriendModeIntro, type FriendModeSource } from "@/components/crew/FriendModeIntro";
 import FriendModeSetup from "@/components/dashboard/FriendModeSetup";
 import FriendModeCalendarPicker from "@/components/crew/FriendModeCalendarPicker";
+import { useInApp } from "@/components/crew/CrewShell";
 
 // ============================================================================
 // Attendee dashboard (/me). The signed-in home: the next plan, everything
@@ -535,6 +536,7 @@ export default function MeClient() {
     const url = new URL(window.location.href);
     url.searchParams.delete("t");
     url.searchParams.delete("u");
+    url.searchParams.delete("s");
     window.history.replaceState(null, "", url.pathname + url.search);
   }, []);
 
@@ -543,6 +545,9 @@ export default function MeClient() {
    *  under the new name for a beat. */
   const enterViaLink = useCallback(async (uid: string, token: string) => {
     const before = Parse.User.current()?.id || null;
+    // Already signed in as the link's user: every redeem mints a year-long
+    // session, and the app opens this link from every digest push.
+    if (before === uid) { stripLinkParams(); return; }
     try {
       const r = (await Parse.Cloud.run("getDashboardSession", { userId: uid, token })) as {
         sessionToken?: string;
@@ -578,13 +583,17 @@ export default function MeClient() {
       try {
         const token = new URLSearchParams(window.location.search).get("t");
         const uid = new URLSearchParams(window.location.search).get("u");
-        // Analytics: count the view. `fromLink` = arrived via the digest SMS
-        // link (has both u+t), which is the /me CTR numerator. Fire-and-forget.
+        // The weekly digest's DigestSend id — text or push. The server stamps
+        // the send clicked on its first view only.
+        const sendId = new URLSearchParams(window.location.search).get("s");
+        // Analytics: count the view. `fromLink` = arrived via a signed link
+        // (has both u+t). Fire-and-forget.
         if (!trackedRef.current) {
           trackedRef.current = true;
           Parse.Cloud.run("recordMeDashboardView", {
             userId: uid || undefined,
             fromLink: !!(token && uid),
+            sendId: sendId || undefined,
           }).catch(() => {});
         }
         if (token && uid) {
@@ -691,6 +700,46 @@ export default function MeClient() {
       )}
     </div>
   );
+}
+
+/**
+ * Inside the app's "Your week" screen (its user agent carries "LeafMe/"),
+ * plan, chat and crew taps open the app's own screens. This page's links are
+ * client-side, so the web view never sees them navigate — they're handed over
+ * as leaf:// links instead. Other app web views that can land on /me don't
+ * understand those, so the marker is required, not just "LeafApp/".
+ */
+function nativeLinkFor(href: string): string | null {
+  let path: string;
+  try {
+    const u = new URL(href, window.location.href);
+    if (u.origin !== window.location.origin) return null;
+    path = u.pathname;
+  } catch {
+    return null;
+  }
+  const m = path.match(/^\/(p|chat|crew)\/([A-Za-z0-9_-]+)\/?$/);
+  if (!m) return null;
+  const kind = m[1] === "p" ? "plan" : m[1] === "chat" ? "plan-chat" : "crew";
+  return `leaf://${kind}/${m[2]}`;
+}
+function useNativeLinksInApp() {
+  useEffect(() => {
+    if (!/LeafMe\//.test(navigator.userAgent)) return;
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey) return;
+      const a = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a) return;
+      const native = nativeLinkFor(a.getAttribute("href") || "");
+      if (!native) return;
+      e.preventDefault();
+      e.stopPropagation();
+      window.location.href = native;
+    };
+    // Capture phase, ahead of next/link's own handler.
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, []);
 }
 
 /** True when this load is the hop back from the Google Calendar consent screen. */
@@ -936,6 +985,9 @@ function DashboardView({
     return pins;
   }, [data.nextPlan, data.plans]);
 
+  const inApp = useInApp();
+  useNativeLinksInApp();
+
   const hasRail =
     (rail && (rail.tier1.length > 0 || rail.tier2.length > 0)) ||
     places.length > 0 ||
@@ -945,18 +997,24 @@ function DashboardView({
 
   return (
     <>
-      <header className="topbar">
+      {/* Inside the iOS app the nav bar already carries the brand and the
+          account, so only the one action stays. */}
+      <header className={`topbar ${inApp ? "inapp" : ""}`}>
         <div className="page topbar-in">
-          <div className="brand">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="brand-logo" src="/leaf-logo-black.png" alt="Leaf" />
-          </div>
+          {!inApp && (
+            <div className="brand">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="brand-logo" src="/leaf-logo-black.png" alt="Leaf" />
+            </div>
+          )}
           <div className="topbar-r">
             <button className="pill" onClick={openCreate}>+ New plan</button>
-            <div className="who">
-              <span>{data.person.firstName || "You"}</span>
-              <div className="ava">{initial(data.person.firstName || "Y")}</div>
-            </div>
+            {!inApp && (
+              <div className="who">
+                <span>{data.person.firstName || "You"}</span>
+                <div className="ava">{initial(data.person.firstName || "Y")}</div>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -2182,8 +2240,8 @@ function TextsCard({ inCrew = false }: { inCrew?: boolean }) {
     <div className="texts">
       <p>
         {inCrew
-          ? "One text a week from Leaf, plus texts from your crews when there's a night to plan."
-          : "One text a week, Sunday morning. Plus a heads-up when something lands late."}
+          ? "At most one text a week from Leaf, plus texts from your crews when there's a night to plan."
+          : "At most one text a week, when there's something new. Plus a heads-up when something lands late."}
       </p>
       <Link className="btn ghost sm" href="/unsubscribe">Texts</Link>
     </div>
@@ -2708,6 +2766,8 @@ const CSS = `
 .leafme .brand{display:flex;align-items:center}
 .leafme .brand-logo{height:22px;width:auto;display:block}
 .leafme .topbar-r{display:flex;align-items:center;gap:14px}
+.leafme .topbar.inapp{background:transparent;border-bottom:0}
+.leafme .topbar.inapp .topbar-in{justify-content:flex-end}
 .leafme .pill{border:0;background:var(--ink);color:#fff;font-size:12px;font-weight:500;
   padding:9px 16px;border-radius:999px;cursor:pointer;transition:opacity 120ms ease}
 .leafme .pill:hover{opacity:.92}
