@@ -293,7 +293,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 label="Friend Mode"
                 checked={crew.enabled !== false}
                 disabled={busy !== null}
-                onChange={(v) => act("fm", () => Parse.Cloud.run("setFriendModeOnCalendar", { calendarId: crew.id, enabled: v }))}
+                onChange={(v) => act("fm", () => run("setFriendModeOnCalendar", auth, { calendarId: crew.id, enabled: v }))}
               />
             </div>
           )}
@@ -683,7 +683,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     disabled={busy !== null}
                     onChange={(e) => {
                       const days = Number(e.target.value);
-                      act("rhythm", () => Parse.Cloud.run("setCrewRhythm", days === 0 ? { calendarId: crew.id, oneTime: true } : { calendarId: crew.id, rhythmDays: days }));
+                      act("rhythm", () => run("setCrewRhythm", auth, days === 0 ? { calendarId: crew.id, oneTime: true } : { calendarId: crew.id, rhythmDays: days }));
                     }}
                     className="mt-2 h-11 w-full rounded-xl border px-3 text-sm"
                   >
@@ -710,7 +710,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                       onChange={(v) => {
                         setPlaceOn(v);
                         // Turning it off takes effect now; turning it on waits for the place.
-                        if (!v && crew.placeMode === "fixed") act("place", () => Parse.Cloud.run("setCrewPlaceMode", { calendarId: crew.id, mode: "book" }));
+                        if (!v && crew.placeMode === "fixed") act("place", () => run("setCrewPlaceMode", auth, { calendarId: crew.id, mode: "book" }));
                       }}
                     />
                   </div>
@@ -738,7 +738,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                         <Button
                           small
                           disabled={busy !== null || !placeLabel.trim()}
-                          onClick={() => act("place", () => Parse.Cloud.run("setCrewPlaceMode", { calendarId: crew.id, mode: "fixed", label: placeLabel.trim(), address: placeAddress.trim() }))}
+                          onClick={() => act("place", () => run("setCrewPlaceMode", auth, { calendarId: crew.id, mode: "fixed", label: placeLabel.trim(), address: placeAddress.trim() }))}
                         >
                           {busy === "place" ? "Saving…" : crew.placeMode === "fixed" ? "Update place" : "Save place"}
                         </Button>
@@ -758,7 +758,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     label="Rotate who hosts"
                     checked={Boolean(crew.hostRotation)}
                     disabled={busy !== null}
-                    onChange={(v) => act("rotation", () => Parse.Cloud.run("setCrewHostRotation", { calendarId: crew.id, enabled: v }))}
+                    onChange={(v) => act("rotation", () => run("setCrewHostRotation", auth, { calendarId: crew.id, enabled: v }))}
                   />
                 </div>
               )}
