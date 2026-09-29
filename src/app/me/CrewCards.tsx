@@ -19,7 +19,9 @@ export type CrewAction =
       /** Dates their calendar says they're free for: pre-selected, never auto-voted. */
       myFree?: number[] | null; fit?: { free: number; known: number }[] | null }
   | { kind: "rsvp"; crewId: string; crewName: string; cycleId: string; venue: Venue | null; chosenOption: DateOption | null; going: number }
-  | { kind: "book"; crewId: string; crewName: string; cycleId: string; venue: Venue | null; chosenOption: DateOption | null; going: number; bookingUrl: string | null };
+  | { kind: "book"; crewId: string; crewName: string; cycleId: string; venue: Venue | null; chosenOption: DateOption | null; going: number; bookingUrl: string | null }
+  /** A one-time crew's night is over (organizer, for two weeks): run it again? */
+  | { kind: "again"; crewId: string; crewName: string; happened: boolean; venue: string | null };
 
 export type CrewRow = {
   crewId: string;
@@ -138,6 +140,16 @@ export function CrewActionCard({ actions, onAnswered }: { actions: CrewAction[];
             <div className="sinv-act">
               {a.bookingUrl && <a className="sinv-btn ghost" href={a.bookingUrl} target="_blank" rel="noreferrer">Booking link ↗</a>}
               <button className="sinv-btn primary" disabled={busy} onClick={() => run(() => call("markCrewBooked", { cycleId: a.cycleId }))}>Booked ✓</button>
+            </div>
+          </>
+        )}
+        {a.kind === "again" && (
+          <>
+            <h2 className="sinv-title">Do {a.crewName} again?</h2>
+            <div className="sinv-meta">{a.happened ? `One night out${a.venue ? ` at ${a.venue}` : ""}, done.` : "The night didn't come together."} Same people, a new date.</div>
+            <div className="sinv-act">
+              <button className="sinv-btn primary" disabled={busy} onClick={() => run(() => Parse.Cloud.run("runCrewAgain", { calendarId: a.crewId, oneTime: true }))}>Another night</button>
+              <button className="sinv-btn ghost" disabled={busy} onClick={() => run(() => Parse.Cloud.run("runCrewAgain", { calendarId: a.crewId, oneTime: false, rhythmDays: 28 }))}>Make it monthly</button>
             </div>
           </>
         )}

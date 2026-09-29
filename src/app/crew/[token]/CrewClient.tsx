@@ -306,6 +306,29 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
 
         {/* What needs you */}
         <div className="mt-7 flex min-w-0 flex-col gap-10 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:gap-14">
+          {crew.lastOneTime && (
+            <section className="flex flex-col gap-3 rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
+              <Eyebrow>{crew.lastOneTime.happened ? "That was the night" : "It didn't come together"}</Eyebrow>
+              <h2 className="m-0 font-fm-serif text-[30px] font-normal leading-[1.05] lg:text-[36px]">
+                {me.isOwner ? "Do it again?" : "One night out"}
+              </h2>
+              <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">
+                {me.isOwner
+                  ? `Same people${crew.lastOneTime.venue ? `, and ${crew.lastOneTime.venue} is still in the book` : ""}. Leaf finds a new date that works.`
+                  : `${(names[crew.ownerId || ""] || "The organizer").split(" ")[0]} can plan another one.`}
+              </p>
+              {me.isOwner && (
+                <div className="flex flex-wrap gap-2">
+                  <Button disabled={busy !== null} onClick={() => act("again", () => run("runCrewAgain", auth, { calendarId: crew.id, oneTime: true }))}>
+                    {busy === "again" ? "Starting…" : "Another night"}
+                  </Button>
+                  <Button kind="ghost" disabled={busy !== null} onClick={() => act("again", () => run("runCrewAgain", auth, { calendarId: crew.id, oneTime: false, rhythmDays: 28 }))}>
+                    Make it monthly
+                  </Button>
+                </div>
+              )}
+            </section>
+          )}
           <section className="flex flex-col gap-3 lg:gap-5">
             <div className="hidden items-center justify-between lg:flex">
               <SectionTitle>Up next</SectionTitle>

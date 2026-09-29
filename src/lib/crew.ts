@@ -113,6 +113,8 @@ export type CrewPage = {
     fixedPlace?: { label: string; address: string | null } | null;
     /** Each round Leaf starts goes to the next member to host. */
     hostRotation?: boolean;
+    /** A one-time crew after its night: offer "Do it again?". */
+    lastOneTime?: { happened: boolean; venue: string | null; at: string | { iso: string } | null } | null;
   };
   me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null; calendarSynced?: boolean; inviteLink?: string | null; needsSeed?: boolean; needsPace?: boolean };
   members: Member[];
