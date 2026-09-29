@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, Check, ChevronUp, Plus, Settings, UserPlus } from "lucide-react";
+import { ArrowUp, Check, ChevronUp, Plus, Settings, UserPlus, X } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import {
@@ -529,7 +529,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 <div className="text-lg font-semibold">Invite to {crew.name}</div>
                 <div className="text-[13px] text-fm-muted">Nobody joins until they say yes.</div>
               </div>
-              <button aria-label="Close" className="text-xl leading-none text-fm-muted" onClick={() => setInviteOpen(false)}>×</button>
+              <button type="button" aria-label="Close" className="-mr-1.5 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-fm-card text-fm-ink hover:bg-fm-line" onClick={() => setInviteOpen(false)}><X size={20} strokeWidth={2.2} aria-hidden /></button>
             </div>
 
             {inApp && (
@@ -624,7 +624,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 <div className="text-lg font-semibold">Your settings</div>
                 <div className="text-[13px] text-fm-muted">{crew.name} · only you see these</div>
               </div>
-              <button aria-label="Close" className="text-xl leading-none text-fm-muted" onClick={() => setSettingsOpen(false)}>×</button>
+              <button type="button" aria-label="Close" className="-mr-1.5 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-fm-card text-fm-ink hover:bg-fm-line" onClick={() => setSettingsOpen(false)}><X size={20} strokeWidth={2.2} aria-hidden /></button>
             </div>
 
             <div className="mt-2 divide-y divide-fm-line-dim">
