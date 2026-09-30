@@ -1,19 +1,30 @@
 "use client";
 
 /**
- * The merchant's acceptance form — /o/m/[token]
+ * The merchant's page — /o/m/[token]
  *
- * Linked from Shawn's offer email. A shop owner reads it on a phone between
- * customers, so everything Leaf already knows is filled in: the taster we
- * suggested, its price, their address and phone, whether they have room.
- * They confirm or change it, tick the dates that work, and they're done.
- * No account. Their answer fills the week on Leaf's side without anyone
- * retyping it.
+ * Linked from Shawn's offer email and read on a phone between customers, so
+ * it's one column, one scroll, and one button that stays in reach. Everything
+ * Leaf already knows is filled in (the night we suggested, their address and
+ * phone, how many fit); they confirm, tick dates, and they're done. No account.
+ *
+ * Two deals, set on the offer:
+ *  - ticket: workshops and tastings. They set a price; neighbors buy tickets.
+ *  - per_rsvp: bars and restaurants. Free for neighbors, everyone orders their
+ *    own, and the merchant pays a flat fee per RSVP after the night. They add
+ *    a card to accept; the first night is free.
+ *
+ * After accepting, the same link is their settings page: card, notifications,
+ * and (ticketed) payouts.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Parse from "@/lib/parse-client";
 import PayoutSetup from "./PayoutSetup";
+import CardSetup, { type Card, type CardSetupHandle } from "./CardSetup";
+import NoticePrefs, { noticePayload, type Notices } from "./NoticePrefs";
+import { Brand, Choice, Closed, Field, Section, Shell, dollars, formatPhone, input, textarea } from "./ui";
+import NightPicker, { nightMeta, type Suggested } from "./NightPicker";
 
 type DateOption = { dateKey: string; label: string };
 
@@ -42,42 +53,62 @@ type Form = {
     otherWindows: string;
   };
   dateOptions: DateOption[];
+  billing?: { model: "ticket" | "per_rsvp"; rsvpFeeCents: number; firstNightFree: boolean; card: Card | null; cardFailed: boolean };
+  spendEstimate?: { lowCents: number; highCents: number; source: string } | null;
+  categoryLabel?: string | null;
+  notices?: Notices;
+  suggested?: Suggested | null;
 };
 
-function Shell({ children }: { children: React.ReactNode }) {
-  return <main className="mx-auto max-w-lg px-5 py-10 pb-24">{children}</main>;
-}
+const EXAMPLE_RSVPS = 12;
 
-function Closed({ title, body, children }: { title: string; body: string; children?: React.ReactNode }) {
+function OfferCard({ form }: { form: Form }) {
+  const b = form.billing!;
+  const fee = dollars(b.rsvpFeeCents);
+  const spend = form.spendEstimate;
+  const rows: [string, string][] = [
+    [b.firstNightFree ? "Your first night is on us" : "Free for neighbors", "Neighbors join free and everyone orders their own."],
+    [`${fee} per RSVP after that`, "Charged after the night, counted 2 hours before, never more than you seat."],
+    ["No crowd, no charge", "Under 5 RSVPs costs nothing, and we set up another night."],
+  ];
   return (
-    <Shell>
-      <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-6">
-        <h1 className="text-xl font-semibold text-leaf-900">{title}</h1>
-        <p className="mt-3 text-[15px] leading-relaxed text-zinc-700">{body}</p>
+    <div className="overflow-hidden rounded-3xl bg-leaf-800 text-white">
+      <div className="p-5">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">How it works</p>
+        <ol className="mt-4 space-y-4">
+          {rows.map(([head, body], i) => (
+            <li key={head} className="flex gap-3.5">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 font-fm-serif text-[16px] text-leaf-100">{i + 1}</span>
+              <span>
+                <span className="block font-fm-serif text-[21px] leading-tight">{head}</span>
+                <span className="mt-0.5 block text-[14px] leading-snug text-leaf-200">{body}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
       </div>
-      {children}
-    </Shell>
-  );
-}
-
-const input =
-  "w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-[15px] text-zinc-900 focus:border-leaf-600 focus:outline-none";
-
-function Label({ children }: { children: React.ReactNode }) {
-  return <span className="mb-1.5 block text-[13px] font-medium text-zinc-600">{children}</span>;
-}
-
-function Choice({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex-1 rounded-xl border px-3 py-2.5 text-[15px] font-medium transition-colors ${
-        on ? "border-leaf-700 bg-leaf-800 text-white" : "border-zinc-300 bg-white text-zinc-800 hover:border-zinc-400"
-      }`}
-    >
-      {children}
-    </button>
+      {spend && (
+        <div className="border-t border-white/10 bg-black/15 px-5 py-4">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-leaf-300">{EXAMPLE_RSVPS} neighbors spend about</p>
+              <p className="mt-0.5 font-fm-serif text-[30px] leading-none">
+                {dollars(spend.lowCents * EXAMPLE_RSVPS)}–{dollars(spend.highCents * EXAMPLE_RSVPS)}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-leaf-300">You pay</p>
+              <p className="mt-0.5 font-fm-serif text-[30px] leading-none">{dollars(b.rsvpFeeCents * EXAMPLE_RSVPS)}</p>
+            </div>
+          </div>
+          <p className="mt-2.5 text-[12px] leading-snug text-leaf-300">
+            {`About ${dollars(spend.lowCents)}–${dollars(spend.highCents)} a person at ${
+              form.categoryLabel ? `${form.categoryLabel.toLowerCase()}s` : "places"
+            } like yours. An estimate from Google’s price level for your listing.`}
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -102,6 +133,10 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const [contactPhone, setContactPhone] = useState("");
   const [windows, setWindows] = useState<string[]>([]);
   const [otherWindows, setOtherWindows] = useState("");
+  const [card, setCard] = useState<Card | null>(null);
+  const [useOwn, setUseOwn] = useState(false);
+  const [notices, setNotices] = useState<Notices | null>(null);
+  const cardRef = useRef<CardSetupHandle>(null);
 
   const load = useCallback(async () => {
     try {
@@ -109,18 +144,29 @@ export default function MerchantOfferClient({ token }: { token: string }) {
       setForm(f);
       if (f.state !== "unavailable") {
         const o = f.offer;
-        setTitle(o.title);
-        setDescription(o.description);
+        const perRsvp = f.billing?.model === "per_rsvp";
+        // The suggestion stays selected unless they already wrote their own.
+        const own = Boolean(f.suggested && o.title && o.title !== f.suggested.title);
+        setUseOwn(own);
+        setTitle(own ? o.title : "");
+        setDescription(own ? o.description : "");
         setPrice(String(o.priceCents / 100));
         setDurationMin(String(o.durationMin || 60));
-        setHasSpace(o.hasSpace);
-        setCapacity(o.capacity ? String(o.capacity) : "");
+        setHasSpace(perRsvp ? true : o.hasSpace);
+        // Bars seat the group themselves: default to the top of the range.
+        const top = Number(String(f.headcount).split(/\D+/).filter(Boolean).pop()) || 15;
+        setCapacity(o.capacity ? String(o.capacity) : perRsvp ? String(top) : "");
         setAddress(o.address);
-        setMerchantHosts(o.merchantHosts);
+        setMerchantHosts(perRsvp && o.merchantHosts === null ? true : o.merchantHosts);
         setContactName(o.contactName);
-        setContactPhone(o.contactPhone);
+        setContactPhone(formatPhone(o.contactPhone));
         setWindows(o.windows);
         setOtherWindows(o.otherWindows);
+        setCard(f.billing?.card ?? null);
+        if (f.notices) {
+          // Texts go to the night's phone unless they've set another.
+          setNotices({ ...f.notices, smsPhone: f.notices.smsPhone || o.contactPhone || "" });
+        }
       }
     } catch {
       setForm({ state: "unavailable" } as Form);
@@ -133,18 +179,57 @@ export default function MerchantOfferClient({ token }: { token: string }) {
     load();
   }, [load]);
 
+  // #card and #notifications links from receipts and reminders land on the right section.
+  useEffect(() => {
+    if (!form || typeof window === "undefined" || !window.location.hash) return;
+    const el = document.getElementById(window.location.hash.slice(1));
+    if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+  }, [form]);
+
   const toggle = (k: string) => setWindows((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]));
 
+  const perRsvp = form?.billing?.model === "per_rsvp";
+  const suggested: Suggested | null = form?.suggested ?? (form?.offer ? { title: form.offer.title, description: form.offer.description, durationMin: form.offer.durationMin, priceCents: form.offer.priceCents } : null);
+  const nightTitle = useOwn || !suggested ? title : suggested.title;
+  const nightDescription = useOwn || !suggested ? description : suggested.description;
+  const phoneDigits = contactPhone.replace(/\D/g, "");
+  const missing: string[] = [];
+  if (!nightTitle.trim()) missing.push("a name for the night");
+  if (!perRsvp && hasSpace === null) missing.push("whether you have room");
+  if (!windows.length && !otherWindows.trim()) missing.push("a date");
+  if (phoneDigits.length < 10) missing.push("a phone for the night");
+
+  const saveCardOnly = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await cardRef.current?.save();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That card didn't save.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submit = async () => {
+    if (missing.length) {
+      setError(`Add ${missing.join(", ")}.`);
+      return;
+    }
     setError(null);
     setBusy(true);
     try {
+      if (perRsvp) await cardRef.current?.save();
+      if (notices) {
+        const r = (await Parse.Cloud.run("updateMerchantNotices", { token, ...noticePayload(notices) })) as { notices: Notices };
+        setNotices(r.notices);
+      }
       const r = (await Parse.Cloud.run("submitMerchantOfferForm", {
         token,
         accept: true,
-        title,
-        description,
-        priceCents: Math.round(Number(price || 0) * 100),
+        title: nightTitle,
+        description: nightDescription,
+        priceCents: perRsvp ? 0 : Math.round(Number(price || 0) * 100),
         durationMin: Number(durationMin),
         hasSpace,
         capacity: hasSpace ? Number(capacity) || null : null,
@@ -156,6 +241,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         otherWindows,
       })) as { state: string; bookedDate?: string | null; benched?: boolean; updated?: boolean };
       setDone({ bookedDate: r.bookedDate ?? null, benched: Boolean(r.benched), updated: r.updated });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       setError(e instanceof Error ? e.message : "That didn't go through. Try again?");
     } finally {
@@ -178,7 +264,13 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   if (loading) {
     return (
       <Shell>
-        <p className="text-[15px] text-zinc-500">Loading…</p>
+        <Brand />
+        <div className="mt-8 animate-pulse space-y-4" aria-label="Loading">
+          <div className="h-4 w-1/3 rounded bg-stone-200" />
+          <div className="h-8 w-4/5 rounded bg-stone-200" />
+          <div className="h-40 rounded-2xl bg-stone-100" />
+          <div className="h-12 rounded-xl bg-stone-100" />
+        </div>
       </Shell>
     );
   }
@@ -193,176 +285,321 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   if (form.state === "declined") {
     return (
       <Closed
-        title="Thanks for letting us know."
-        body="No problem at all. If the timing changes, reply to Shawn's email any time."
+        neighborhood={form.neighborhood}
+        title="No problem at all."
+        body="Thanks for letting us know. If the timing changes, reply to Shawn's email and we'll find another week."
       />
     );
   }
   if (form.state === "expired") {
     return (
       <Closed
+        neighborhood={form.neighborhood}
         title="This one has passed."
-        body="Those dates have gone by. Reply to Shawn's email and he'll find you new ones."
+        body="The weeks on this offer have gone by. Reply to Shawn's email if you'd like to be on a future night."
       />
     );
   }
+
   if (done) {
     return (
-      <Closed
-        title={done.updated ? "Updated. Thank you." : "You're on the calendar. Thank you!"}
-        body={
-          done.updated
-            ? "Your changes are saved. Shawn will be in touch with anything that affects the night."
-            : done.bookedDate
-              ? `We've got you down for ${done.bookedDate}. Shawn will email everyone involved with the details, and your ${title} goes up on the ${form.neighborhood} calendar.`
-              : "We've saved your dates. Shawn will match you to the first open week that works and email you to confirm."
-        }
-      >
-        {Number(price) > 0 && <PayoutSetup token={token} />}
-      </Closed>
+      <Shell>
+        <Brand neighborhood={form.neighborhood} />
+        <div className="mt-8 rounded-3xl bg-leaf-800 p-6 text-white">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">{done.updated ? "Saved" : "You're in"}</p>
+          <h1 className="mt-2 font-fm-serif text-[36px] leading-[1.02]">
+            {done.updated ? "Your changes are saved." : done.bookedDate ? `See you ${done.bookedDate}.` : "Thanks! We'll confirm your date."}
+          </h1>
+          <p className="mt-3 text-[15px] leading-relaxed text-leaf-100">
+            {done.updated
+              ? "We'll use the new details from here on."
+              : done.bookedDate
+                ? `${form.calendarName} neighbors can start RSVPing soon. We'll send the count 2 hours before${
+                    perRsvp && form.billing?.firstNightFree ? ", and this first night is on us" : ""
+                  }.`
+                : "Those weeks already have someone, so you're first in line for the next opening. We'll be in touch."}
+          </p>
+        </div>
+        <div className="mt-4 space-y-4">
+          {perRsvp && (
+            <section id="card" className="scroll-mt-6 rounded-3xl bg-white p-5 shadow-sm">
+              <h2 className="font-fm-serif text-[26px] text-stone-900">Card on file</h2>
+              <div className="mt-3">
+                <CardSetup ref={cardRef} token={token} card={card} onSaved={setCard} />
+              </div>
+              {card === null && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={saveCardOnly}
+                  className="mt-3 h-12 w-full rounded-xl bg-leaf-800 text-[15px] font-semibold text-white disabled:opacity-50"
+                >
+                  {busy ? "Saving…" : "Save card"}
+                </button>
+              )}
+            </section>
+          )}
+          {notices && (
+            <section id="notifications" className="scroll-mt-6 rounded-3xl bg-white p-5 shadow-sm">
+              <h2 className="font-fm-serif text-[26px] text-stone-900">Notifications</h2>
+              <div className="mt-3">
+                <NoticePrefs token={token} value={notices} onChange={setNotices} standalone />
+              </div>
+            </section>
+          )}
+          {!perRsvp && Number(price) > 0 && <PayoutSetup token={token} />}
+          {error && <p className="text-[14px] text-red-600">{error}</p>}
+        </div>
+      </Shell>
     );
   }
 
-  const cents = Math.round(Number(price || 0) * 100);
-  const overCeiling = cents > form.priceCeilingCents;
-  const canSubmit = title.trim() && hasSpace !== null && contactPhone.trim() && (windows.length > 0 || otherWindows.trim());
+  const accepted = form.state === "accepted";
+  const steps = (perRsvp ? 4 : 3) + (notices ? 1 : 0);
+  const cta = accepted ? "Save changes" : perRsvp && form.billing?.firstNightFree ? "Hold my free night" : "Count me in";
 
   return (
     <Shell>
-      <p className="text-[13px] font-medium uppercase tracking-wide text-leaf-700">{form.neighborhood} calendar</p>
-      <h1 className="mt-1 text-2xl font-semibold leading-tight text-leaf-900">
-        {form.merchantName ? `${form.merchantName}, ` : ""}here&rsquo;s your night
-      </h1>
-      <p className="mt-3 text-[15px] leading-relaxed text-zinc-700">
-        A short version of your {form.offer.existingOffering || "class"}, for {form.headcount} neighbors at{" "}
-        {form.startTimeLabel}. They RSVP and pay through Leaf, you see the headcount ahead, and you keep the ticket
-        money minus our 10%. Change anything below.
-        {form.calendarUrl && (
-          <>
-            {" "}
-            <a href={form.calendarUrl} className="text-leaf-700 underline" target="_blank" rel="noreferrer">
+      <Brand neighborhood={form.neighborhood} />
+
+      <header className="mt-8 px-1">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">{accepted ? "Your Leaf nights" : "An invitation from Leaf"}</p>
+        <h1 className="mt-2 font-fm-serif text-[40px] leading-[1.02] tracking-[-0.01em] text-stone-900">
+          {perRsvp ? (
+            <>
+              Let&rsquo;s fill a slow night at <em className="text-leaf-700">{form.merchantName}</em>.
+            </>
+          ) : (
+            <>
+              A night on the calendar at <em className="text-leaf-700">{form.merchantName}</em>.
+            </>
+          )}
+        </h1>
+        <p className="mt-4 text-[16px] leading-relaxed text-stone-600">
+          {perRsvp
+            ? `We bring ${form.headcount} neighbors from the ${form.calendarName} calendar to you at ${form.startTimeLabel}.`
+            : `A taster for ${form.headcount} neighbors on the ${form.calendarName} calendar at ${form.startTimeLabel}. Leaf keeps 10% of tickets.`}{" "}
+          {form.calendarUrl && (
+            <a href={form.calendarUrl} target="_blank" rel="noreferrer" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
               See the calendar
             </a>
-            .
-          </>
-        )}
-      </p>
-
-      {form.state === "accepted" && form.offer.priceCents > 0 && <PayoutSetup token={token} />}
-
-      <section className="mt-8 space-y-4">
-        <label className="block">
-          <Label>What people make or do</Label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} className={input} />
-        </label>
-        <label className="block">
-          <Label>In a sentence</Label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={`${input} resize-none`} />
-        </label>
-        <div className="flex gap-3">
-          <label className="block flex-1">
-            <Label>Price per person ($)</Label>
-            <input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} className={input} />
-          </label>
-          <label className="block w-32">
-            <Label>Minutes</Label>
-            <input inputMode="numeric" value={durationMin} onChange={(e) => setDurationMin(e.target.value)} className={input} />
-          </label>
-        </div>
-        {overCeiling && (
-          <p className="text-[13px] text-amber-700">
-            Totally your call. Above about ${form.priceCeilingCents / 100}, fewer people RSVP to a first taste.
-          </p>
-        )}
-      </section>
-
-      <section className="mt-8">
-        <Label>Do you have room for {form.headcount} people?</Label>
-        <div className="flex gap-2">
-          <Choice on={hasSpace === true} onClick={() => setHasSpace(true)}>Yes, at our place</Choice>
-          <Choice on={hasSpace === false} onClick={() => setHasSpace(false)}>We&rsquo;d need a room</Choice>
-        </div>
-        {hasSpace === true && (
-          <div className="mt-3 flex gap-3">
-            <label className="block flex-1">
-              <Label>Address</Label>
-              <input value={address} onChange={(e) => setAddress(e.target.value)} className={input} />
-            </label>
-            <label className="block w-24">
-              <Label>Fits</Label>
-              <input inputMode="numeric" value={capacity} onChange={(e) => setCapacity(e.target.value)} placeholder="15" className={input} />
-            </label>
-          </div>
-        )}
-        {hasSpace === false && (
-          <p className="mt-2 text-[13px] text-zinc-500">We&rsquo;ll find a café or bar nearby and confirm it with you.</p>
-        )}
-      </section>
-
-      <section className="mt-8">
-        <Label>Who welcomes people and keeps time?</Label>
-        <div className="flex gap-2">
-          <Choice on={merchantHosts === true} onClick={() => setMerchantHosts(true)}>We will</Choice>
-          <Choice on={merchantHosts === false} onClick={() => setMerchantHosts(false)}>Send a Leaf host</Choice>
-        </div>
-      </section>
-
-      <section className="mt-8">
-        <Label>Which {form.dateOptions[0]?.label.split(",")[0] || "week"}s work? Pick a few.</Label>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {form.dateOptions.map((d) => (
-            <Choice key={d.dateKey} on={windows.includes(d.dateKey)} onClick={() => toggle(d.dateKey)}>
-              {d.label.replace(/^\w+, /, "")}
-            </Choice>
-          ))}
-        </div>
-        <label className="mt-3 block">
-          <Label>None of these? Tell us what works</Label>
-          <input value={otherWindows} onChange={(e) => setOtherWindows(e.target.value)} placeholder="Tuesdays after 6 work better" className={input} />
-        </label>
-      </section>
-
-      <section className="mt-8 flex gap-3">
-        <label className="block flex-1">
-          <Label>Your name</Label>
-          <input value={contactName} onChange={(e) => setContactName(e.target.value)} autoComplete="name" className={input} />
-        </label>
-        <label className="block flex-1">
-          <Label>Phone for the night</Label>
-          <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} inputMode="tel" autoComplete="tel" className={input} />
-        </label>
-      </section>
-
-      {error && <p className="mt-6 text-[14px] text-red-700">{error}</p>}
-
-      <button
-        type="button"
-        onClick={submit}
-        disabled={busy || !canSubmit}
-        className="mt-8 w-full rounded-xl bg-leaf-800 px-4 py-3.5 text-[16px] font-semibold text-white hover:bg-leaf-900 disabled:opacity-40"
-      >
-        {busy ? "Saving…" : form.state === "accepted" ? "Save changes" : "Count me in"}
-      </button>
-
-      {form.state !== "accepted" && (
-        <div className="mt-6 text-center">
-          {declining ? (
-            <div className="space-y-3 text-left">
-              <label className="block">
-                <Label>Anything we should know? (optional)</Label>
-                <input value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} className={input} />
-              </label>
-              <button type="button" onClick={decline} disabled={busy} className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-[15px] font-medium text-zinc-700">
-                Not for us right now
-              </button>
-            </div>
-          ) : (
-            <button type="button" onClick={() => setDeclining(true)} className="text-[14px] text-zinc-500 underline">
-              Not for us right now
-            </button>
           )}
+        </p>
+      </header>
+
+      {perRsvp && form.billing && (
+        <div className="mt-7">
+          <OfferCard form={form} />
         </div>
       )}
+      {accepted && form.billing?.cardFailed && (
+        <p className="mt-6 rounded-xl bg-amber-50 p-3.5 text-[14px] text-amber-900">
+          Your last charge didn&rsquo;t go through.{" "}
+          <a href="#card" className="font-semibold underline">
+            Update your card
+          </a>
+        </p>
+      )}
+
+      <div className="mt-6 space-y-4">
+        <Section n={1} total={steps} title="Your night" sub="Keep ours, or write your own.">
+          {suggested && (
+            <NightPicker
+              suggested={suggested}
+              useOwn={useOwn}
+              setUseOwn={setUseOwn}
+              title={title}
+              setTitle={setTitle}
+              description={description}
+              setDescription={setDescription}
+              merchantName={form.merchantName}
+              meta={nightMeta({
+                startTimeLabel: form.startTimeLabel,
+                durationMin: Number(durationMin) || suggested.durationMin,
+                headcount: form.headcount,
+                priceCents: perRsvp ? 0 : Math.round(Number(price || 0) * 100),
+                perRsvp,
+              })}
+            />
+          )}
+          {perRsvp ? (
+            <Field label="How many can you seat together?" hint="We never bill for more RSVPs than this.">
+              <input value={capacity} onChange={(e) => setCapacity(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className={input} />
+            </Field>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Price per person">
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[16px] text-stone-500">$</span>
+                  <input
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))}
+                    inputMode="decimal"
+                    className={`${input} pl-7`}
+                  />
+                </div>
+              </Field>
+              <Field label="Minutes">
+                <input value={durationMin} onChange={(e) => setDurationMin(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className={input} />
+              </Field>
+            </div>
+          )}
+          {!perRsvp && Number(price) * 100 > form.priceCeilingCents && (
+            <p className="rounded-xl bg-amber-50 p-3 text-[14px] leading-snug text-amber-900">
+              Under {dollars(form.priceCeilingCents)} is where neighbors actually RSVP. Above it, they hesitate.
+            </p>
+          )}
+          {!perRsvp && (
+            <div>
+              <span className="mb-1.5 block text-[14px] font-medium text-stone-700">Do you have room for {form.headcount}?</span>
+              <div className="flex gap-2">
+                <Choice on={hasSpace === true} onClick={() => setHasSpace(true)}>
+                  Yes, here
+                </Choice>
+                <Choice on={hasSpace === false} onClick={() => setHasSpace(false)}>
+                  Find a space
+                </Choice>
+              </div>
+            </div>
+          )}
+          {!perRsvp && hasSpace && (
+            <div className="grid grid-cols-[1fr_6rem] gap-3">
+              <Field label="Address">
+                <input value={address} onChange={(e) => setAddress(e.target.value)} autoComplete="street-address" className={input} />
+              </Field>
+              <Field label="Fits">
+                <input value={capacity} onChange={(e) => setCapacity(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className={input} />
+              </Field>
+            </div>
+          )}
+        </Section>
+
+        <Section n={2} total={steps} title="Pick your nights" sub={`${form.startTimeLabel}. Tick every week that works; we book one at a time.`}>
+          <div className="grid grid-cols-2 gap-2">
+            {form.dateOptions.map((d) => {
+              const on = windows.includes(d.dateKey);
+              const [weekday, ...rest] = d.label.split(", ");
+              return (
+                <button
+                  key={d.dateKey}
+                  type="button"
+                  onClick={() => toggle(d.dateKey)}
+                  aria-pressed={on}
+                  className={`min-h-14 rounded-xl border px-3 py-2 text-left transition-colors ${
+                    on ? "border-leaf-800 bg-leaf-800 text-white" : "border-stone-300 bg-white text-stone-900 active:bg-stone-50"
+                  }`}
+                >
+                  <span className={`block text-[12px] ${on ? "text-leaf-200" : "text-stone-500"}`}>{weekday}</span>
+                  <span className="block text-[15px] font-semibold">{rest.join(", ") || d.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <Field label="None of these? Tell us what works">
+            <input value={otherWindows} onChange={(e) => setOtherWindows(e.target.value)} placeholder="e.g. Tuesdays in November" className={input} />
+          </Field>
+        </Section>
+
+        <Section n={3} total={steps} title="Who welcomes the group?">
+          <div className="flex gap-2">
+            <Choice on={merchantHosts === true} onClick={() => setMerchantHosts(true)}>
+              We will
+            </Choice>
+            <Choice on={merchantHosts === false} onClick={() => setMerchantHosts(false)}>
+              Send a Leaf host
+            </Choice>
+          </div>
+          {merchantHosts === false && (
+            <p className="text-[13px] leading-snug text-stone-500">
+              A Leaf host runs the night and sends you what guests spent, photos for your socials, and how many became regulars. We&rsquo;ll
+              confirm the host fee before your night.
+            </p>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Your name">
+              <input value={contactName} onChange={(e) => setContactName(e.target.value)} autoComplete="name" className={input} />
+            </Field>
+            <Field label="Phone for the night">
+              <input
+                value={contactPhone}
+                onChange={(e) => setContactPhone(formatPhone(e.target.value))}
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="(555) 555-5555"
+                className={input}
+              />
+            </Field>
+          </div>
+        </Section>
+
+        {perRsvp && (
+          <Section
+            n={4}
+            total={steps}
+            id="card"
+            title="Hold it with a card"
+            sub={form.billing?.firstNightFree ? "Your first night is free. After that, we charge after each night." : "We charge after each night."}
+          >
+            <CardSetup ref={cardRef} token={token} card={card} onSaved={setCard} />
+          </Section>
+        )}
+
+        {notices && (
+          <Section n={perRsvp ? 5 : 4} total={steps} id="notifications" title="How should we reach you?" sub="Only about your nights. Never marketing.">
+            <NoticePrefs token={token} value={notices} onChange={setNotices} />
+          </Section>
+        )}
+
+        {!accepted && (
+          <div className="px-1 pt-4">
+            {!declining ? (
+              <button
+                type="button"
+                onClick={() => setDeclining(true)}
+                className="min-h-11 text-[14px] font-medium text-stone-500 underline underline-offset-2"
+              >
+                Not for us right now
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <Field label="Anything we should know? (optional)">
+                  <textarea value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} rows={2} className={textarea} />
+                </Field>
+                <button
+                  type="button"
+                  onClick={decline}
+                  disabled={busy}
+                  className="h-12 w-full rounded-xl border border-stone-300 text-[15px] font-semibold text-stone-700 disabled:opacity-50"
+                >
+                  Not for us right now
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        {accepted && !perRsvp && Number(price) > 0 && <PayoutSetup token={token} />}
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-stone-200/80 bg-[#f6f2ea]/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
+        <div className="mx-auto max-w-lg">
+          {error && <p className="mb-2 text-[14px] leading-snug text-red-600">{error}</p>}
+          <button
+            type="button"
+            onClick={submit}
+            disabled={busy}
+            className="h-14 w-full rounded-2xl bg-leaf-800 text-[17px] font-semibold text-white shadow-sm transition-opacity active:opacity-90 disabled:opacity-50"
+          >
+            {busy ? "One moment…" : cta}
+          </button>
+          {perRsvp && !accepted && (
+            <p className="mt-2 text-center text-[12px] text-stone-500">
+              {form.billing?.firstNightFree ? "Free first night. " : ""}
+              {dollars(form.billing?.rsvpFeeCents ?? 600)} per RSVP after that. Stop anytime by replying to Shawn.
+            </p>
+          )}
+        </div>
+      </div>
     </Shell>
   );
 }
