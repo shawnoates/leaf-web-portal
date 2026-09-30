@@ -77,10 +77,18 @@ export default function PlanIntroSection({
   if (hidden || !state || !state.video.available) return null;
 
   if (state.actor === "host") {
+    // Owners and co-hosts say whatever they like about their own plan, so the
+    // "don't say the name of the place" rule (card line and prompter note)
+    // stays on the offer page and the host checklist only.
+    const video = {
+      ...state.video,
+      venueRule: null,
+      beats: state.video.beats.map((b) => ({ ...b, note: undefined })),
+    };
     return (
       <HostIntroVideoCard
         source={source}
-        video={state.video}
+        video={video}
         timeZone={null}
         planStarted={planStarted || state.video.planStarted === true}
         onChanged={load}
