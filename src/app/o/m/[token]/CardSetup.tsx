@@ -1,0 +1,103 @@
+"use client";
+
+/**
+ * The card on file for bars and restaurants. Stripe's Payment Element is
+ * mounted into a div; the parent calls `save()` (through the ref) when the
+ * merchant taps the main button, so saving the card and accepting is one tap.
+ */
+
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { loadStripe, type Stripe, type StripeElements } from "@stripe/stripe-js";
+import Parse from "@/lib/parse-client";
+
+export type Card = { brand: string; last4: string; exp: string };
+export type CardSetupHandle = { save: () => Promise<Card | null>; hasSavedCard: () => boolean };
+
+const BRAND: Record<string, string> = { visa: "Visa", mastercard: "Mastercard", amex: "Amex", discover: "Discover" };
+
+const CardSetup = forwardRef<CardSetupHandle, { token: string; card: Card | null; onSaved: (c: Card) => void }>(
+  function CardSetup({ token, card, onSaved }, ref) {
+    const [editing, setEditing] = useState(!card);
+    const [ready, setReady] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const mountRef = useRef<HTMLDivElement>(null);
+    const stripeRef = useRef<Stripe | null>(null);
+    const elementsRef = useRef<StripeElements | null>(null);
+
+    useEffect(() => {
+      if (!editing || !mountRef.current) return;
+      let cancelled = false;
+      setReady(false);
+      (async () => {
+        try {
+          const s = (await Parse.Cloud.run("createMerchantCardSetup", { token })) as { clientSecret: string; publishableKey: string };
+          if (!s.publishableKey) throw new Error("Card entry isn't available right now.");
+          const stripe = await loadStripe(s.publishableKey);
+          if (cancelled || !stripe || !mountRef.current) return;
+          stripeRef.current = stripe;
+          const elements = stripe.elements({
+            clientSecret: s.clientSecret,
+            appearance: {
+              theme: "stripe",
+              variables: { borderRadius: "12px", colorPrimary: "#253A33", fontFamily: "inherit", fontSizeBase: "16px" },
+            },
+          });
+          elementsRef.current = elements;
+          const el = elements.create("payment", { layout: "tabs", wallets: { applePay: "auto", googlePay: "auto" } });
+          el.on("ready", () => !cancelled && setReady(true));
+          el.mount(mountRef.current);
+        } catch (e) {
+          if (!cancelled) setError(e instanceof Error ? e.message : "Couldn't load card entry.");
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [editing, token]);
+
+    useImperativeHandle(ref, () => ({
+      hasSavedCard: () => Boolean(card) && !editing,
+      save: async () => {
+        if (card && !editing) return card;
+        const stripe = stripeRef.current;
+        const elements = elementsRef.current;
+        if (!stripe || !elements) throw new Error("Add a card to hold your first free night.");
+        const { error: err, setupIntent } = await stripe.confirmSetup({ elements, redirect: "if_required" });
+        if (err) throw new Error(err.message || "That card didn't save.");
+        if (!setupIntent) throw new Error("That card didn't save.");
+        const r = (await Parse.Cloud.run("saveMerchantCard", { token, setupIntentId: setupIntent.id })) as { card: Card };
+        setEditing(false);
+        onSaved(r.card);
+        return r.card;
+      },
+    }));
+
+    if (card && !editing) {
+      return (
+        <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-stone-50 px-4 py-3.5">
+          <div>
+            <p className="text-[15px] font-medium text-stone-900">
+              {BRAND[card.brand] || "Card"} ending {card.last4}
+            </p>
+            {card.exp && <p className="text-[13px] text-stone-500">Expires {card.exp}</p>}
+          </div>
+          <button type="button" onClick={() => setEditing(true)} className="min-h-11 px-2 text-[14px] font-semibold text-leaf-700">
+            Change
+          </button>
+        </div>
+      );
+    }
+    return (
+      <div>
+        <div ref={mountRef} className={ready || error ? "" : "min-h-40"} />
+        {!ready && !error && <p className="text-[14px] text-stone-500">Loading secure card entry…</p>}
+        {error && <p className="mt-2 text-[14px] text-red-600">{error}</p>}
+        <p className="mt-3 text-[13px] leading-snug text-stone-500">
+          Saved securely with Stripe. Nothing is charged today.
+        </p>
+      </div>
+    );
+  },
+);
+
+export default CardSetup;
