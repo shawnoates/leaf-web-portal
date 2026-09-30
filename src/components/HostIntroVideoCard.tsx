@@ -141,9 +141,21 @@ function putWithProgress(url: string, file: File, onProgress: (pct: number) => v
   });
 }
 
+/** "The exact spot comes with your RSVP." is for hosts who don't own the
+ *  plan — the offer page. Everyone else's script leaves it out. */
+function withoutRsvpLine(video: IntroVideoInfo): IntroVideoInfo {
+  return {
+    ...video,
+    beats: video.beats.map((b) => ({
+      ...b,
+      line: b.line.replace(/\s*The exact spot comes with your RSVP\.?/i, "").trim(),
+    })),
+  };
+}
+
 export default function HostIntroVideoCard({
   source,
-  video,
+  video: videoIn,
   timeZone,
   planStarted,
   onChanged,
@@ -169,6 +181,7 @@ export default function HostIntroVideoCard({
    *  modal, post-publish screens) do; the checklist and offer pages open it. */
   scriptCollapsed?: boolean;
 }) {
+  const video = source.kind === "offer" ? videoIn : withoutRsvpLine(videoIn);
   const [phase, setPhase] = useState<"idle" | "checking" | "uploading" | "finalizing">("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);

@@ -78,17 +78,12 @@ export default function PlanIntroSection({
 
   if (state.actor === "host") {
     // Owners and co-hosts say whatever they like about their own plan, so the
-    // "don't say the name of the place" rule (card line, prompter note, and
-    // the "exact spot comes with your RSVP" example line) stays on the offer
-    // page and the host checklist only.
+    // "don't say the name of the place" rule (card line and prompter note)
+    // stays on the offer page and the host checklist only.
     const video = {
       ...state.video,
       venueRule: null,
-      beats: state.video.beats.map((b) => ({
-        ...b,
-        note: undefined,
-        line: b.line.replace(/\s*The exact spot comes with your RSVP\.?/i, "").trim(),
-      })),
+      beats: state.video.beats.map((b) => ({ ...b, note: undefined })),
     };
     return (
       <HostIntroVideoCard
