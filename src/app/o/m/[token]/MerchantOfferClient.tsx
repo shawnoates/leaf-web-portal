@@ -500,20 +500,41 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           </Field>
         </Section>
 
-        <Section n={3} total={steps} title="Who welcomes the group?">
+        <Section n={3} total={steps} title="Who welcomes the group?" sub="Your team, or make it a Hosted night.">
           <div className="flex gap-2">
             <Choice on={merchantHosts === true} onClick={() => setMerchantHosts(true)}>
               We will
             </Choice>
             <Choice on={merchantHosts === false} onClick={() => setMerchantHosts(false)}>
-              Send a Leaf host
+              Hosted night
             </Choice>
           </div>
           {merchantHosts === false && (
-            <p className="text-[13px] leading-snug text-stone-500">
-              A Leaf host runs the night and sends you what guests spent, photos for your socials, and how many became regulars. We&rsquo;ll
-              confirm the host fee before your night.
-            </p>
+            <div className="rounded-2xl bg-leaf-50 p-4">
+              <p className="font-fm-serif text-[22px] leading-tight text-stone-900">Hosted night</p>
+              <p className="mt-1 text-[14px] leading-snug text-stone-600">A Leaf host runs the night, then you get:</p>
+              <ul className="mt-3 space-y-2 text-[14px] leading-snug text-stone-700">
+                <li className="flex gap-2.5">
+                  <span aria-hidden className="text-leaf-600">●</span>
+                  <span>
+                    <strong className="font-semibold text-stone-900">What your guests spent</strong>, from the night&rsquo;s receipts
+                  </span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span aria-hidden className="text-leaf-600">●</span>
+                  <span>
+                    <strong className="font-semibold text-stone-900">Photos for your socials</strong> of your place full of neighbors
+                  </span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span aria-hidden className="text-leaf-600">●</span>
+                  <span>
+                    <strong className="font-semibold text-stone-900">New regulars</strong>: how many followed you, and who came back
+                  </span>
+                </li>
+              </ul>
+              <p className="mt-3 text-[13px] leading-snug text-stone-500">We&rsquo;ll confirm the host fee with you before your night.</p>
+            </div>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Your name">
