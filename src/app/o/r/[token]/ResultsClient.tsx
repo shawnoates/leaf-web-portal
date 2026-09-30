@@ -27,6 +27,12 @@ type Results = {
   placardFollows: number | null;
   feedback: { rating: number | null; wentWell: string; change: string } | null;
   makeGood: { rsvps: number; choice: "run" | "move" | null } | null;
+  hostedReport?: {
+    sentAt: string;
+    spend: { subtotalCents: number; receipts: number; checks: number; perGuestCents: number | null };
+    photos: string[];
+    regulars: { followsFromNight: number | null; returning: number | null };
+  } | null;
   revenueCents?: number | null;
   payoutCents?: number | null;
   payoutStatus?: string | null;
@@ -249,14 +255,62 @@ export default function ResultsClient({ token }: { token: string }) {
       <section className="mt-8 grid grid-cols-2 gap-3">
         <Stat label="RSVPs" value={r.rsvps != null ? String(r.rsvps) : "—"} />
         <Stat label="Came" value={r.attended != null ? String(r.attended) : "—"} />
-        {r.role === "merchant" && <Stat label="Ticket sales" value={money(r.revenueCents)} />}
-        {r.role === "merchant" && (
+        {/* Bars and restaurants sell no tickets: only show money rows that exist. */}
+        {r.role === "merchant" && r.revenueCents != null && <Stat label="Ticket sales" value={money(r.revenueCents)} />}
+        {r.role === "merchant" && (r.revenueCents != null || r.payoutCents != null) && (
           <Stat label={r.payoutStatus === "paid" ? "Paid to you" : "Your payout"} value={money(r.payoutCents)} />
         )}
         {r.placardFollows != null && <Stat label="Followers from your card" value={String(r.placardFollows)} />}
       </section>
       {r.role === "merchant" && r.payoutStatus === "waiting_on_merchant" && (
         <p className="mt-3 text-[13px] text-amber-700">Your payout is waiting on payout setup. Use the link in your offer email to connect your bank.</p>
+      )}
+
+      {r.role === "merchant" && r.hostedReport && (
+        <section className="mt-8 rounded-2xl bg-leaf-800 p-5 text-white">
+          <p className="text-[12px] font-semibold uppercase tracking-wide text-leaf-300">Your Hosted night</p>
+          <div className="mt-3 grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-[12px] text-leaf-200">Your Leaf guests spent</p>
+              <p className="text-[28px] font-semibold leading-tight">{money(r.hostedReport.spend.subtotalCents)}</p>
+              <p className="text-[12px] text-leaf-300">
+                {r.hostedReport.spend.checks} check{r.hostedReport.spend.checks === 1 ? "" : "s"}, before tax and tip
+              </p>
+            </div>
+            {r.hostedReport.spend.perGuestCents != null && (
+              <div>
+                <p className="text-[12px] text-leaf-200">Per guest</p>
+                <p className="text-[28px] font-semibold leading-tight">{money(r.hostedReport.spend.perGuestCents)}</p>
+              </div>
+            )}
+            {r.hostedReport.regulars.followsFromNight != null && (
+              <div>
+                <p className="text-[12px] text-leaf-200">Followed from the night</p>
+                <p className="text-[28px] font-semibold leading-tight">{r.hostedReport.regulars.followsFromNight}</p>
+              </div>
+            )}
+            {r.hostedReport.regulars.returning != null && (
+              <div>
+                <p className="text-[12px] text-leaf-200">Came back for another night</p>
+                <p className="text-[28px] font-semibold leading-tight">{r.hostedReport.regulars.returning}</p>
+              </div>
+            )}
+          </div>
+          {r.hostedReport.photos.length > 0 && (
+            <>
+              <p className="mt-5 text-[13px] font-semibold text-leaf-100">Photos for your socials</p>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {r.hostedReport.photos.map((u) => (
+                  <a key={u} href={u} target="_blank" rel="noreferrer" download className="block">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={u} alt="" className="aspect-square w-full rounded-lg object-cover" />
+                  </a>
+                ))}
+              </div>
+              <p className="mt-2 text-[12px] text-leaf-300">Tap a photo to save it. Everyone pictured said it&rsquo;s OK to post.</p>
+            </>
+          )}
+        </section>
       )}
 
       <section className="mt-10 space-y-4">

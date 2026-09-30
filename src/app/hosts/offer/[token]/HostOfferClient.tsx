@@ -20,6 +20,7 @@ import { useCallback, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { IMAGE_ACCEPT, processImageFile } from "@/lib/image-utils";
 import HostIntroVideoCard, { type IntroVideoInfo } from "@/components/HostIntroVideoCard";
+import HostedNightReport from "./HostedNightReport";
 
 type OfferState =
   | "offered"
@@ -606,6 +607,9 @@ export default function HostOfferClient({ token }: { token: string }) {
             )}
           </div>
         )}
+
+        {/* Offer Pipeline Hosted nights only: the report for the merchant. */}
+        {offer.planStarted && <HostedNightReport token={token} />}
 
         {offer.chatUrl && !offer.completion?.completedAt && (
           <div className={`${card} mt-6`}>
