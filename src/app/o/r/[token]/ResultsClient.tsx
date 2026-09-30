@@ -343,7 +343,7 @@ export default function ResultsClient({ token }: { token: string }) {
                   </label>
                   <label className="flex items-center gap-2 text-[15px] text-zinc-700">
                     <input type="checkbox" checked={leafHost} onChange={(e) => setLeafHost(e.target.checked)} />
-                    Send a Leaf host (charged at cost, on top of {fee})
+                    Make it a Hosted night (host at cost, on top of {fee})
                   </label>
                   <button
                     type="button"
