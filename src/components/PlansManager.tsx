@@ -240,6 +240,8 @@ interface UpcomingPlan {
   time: string | null;
   rsvpCount: number;
   host: { name: string; isRoster?: boolean } | null;
+  /** Roster host cancelled; `host.name` is "Needs a host". */
+  awaitingHost?: boolean;
   /** True when `host.name` is a virtual-host persona rather than a real person.
    *  Owner/co-host only (getOrgDashboard is management-scoped) — drives the
    *  small ring next to the byline so the manager can tell the two apart. */
@@ -954,6 +956,7 @@ export default function PlansManager({
         time: string | null;
         hostName: string;
         hostIsRoster?: boolean;
+        awaitingHost?: boolean;
         rsvpCount: number;
         location: { name: string; address: string; placeId?: string | null } | null;
         locations?: {
@@ -984,6 +987,7 @@ export default function PlansManager({
         time: p.time,
         rsvpCount: p.rsvpCount,
         host: p.hostName ? { name: p.hostName, isRoster: p.hostIsRoster === true } : null,
+        awaitingHost: p.awaitingHost === true,
         location: p.location ? { name: p.location.name, address: p.location.address } : null,
         locations: p.locations,
         isPoll: p.isPoll,
@@ -1907,7 +1911,7 @@ export default function PlansManager({
                             on every card, survives name truncation, and costs
                             no width against the RSVP count. */}
                         <span className="flex items-center gap-1.5 min-w-0">
-                          <span className="truncate">{plan.host?.name || "You"}</span>
+                          <span className={`truncate ${plan.awaitingHost ? "text-rose-600" : ""}`}>{plan.host?.name || "You"}</span>
                         </span>
                         <div className="flex items-center gap-2 shrink-0 ml-2">
                           <span>{plan.rsvpCount} RSVPs</span>
@@ -2408,6 +2412,7 @@ export default function PlansManager({
             time: selectedPlan.time,
             hostName: selectedPlan.host?.name || "You",
             hostIsRoster: selectedPlan.host?.isRoster === true,
+            awaitingHost: selectedPlan.awaitingHost === true,
             rsvpCount: selectedPlan.rsvpCount,
             location: selectedPlan.location,
             locations: selectedPlan.locations,

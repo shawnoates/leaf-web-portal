@@ -80,6 +80,10 @@ export default function ChatShell({
   const [planDescription, setPlanDescription] = useState<string | null>(null);
   const [planLocationName, setPlanLocationName] = useState<string | null>(null);
   const [attendeeCount, setAttendeeCount] = useState<number | null>(null);
+  // The plan was cancelled: history stays readable, the composer is replaced
+  // by a notice. The RTDB rules refuse the write anyway (groups/{id}/closed);
+  // this is so the page says why instead of a send that silently fails.
+  const [planCancelled, setPlanCancelled] = useState(false);
   const [notificationId, setNotificationId] = useState<string | null>(null);
   const [device, setDevice] = useState<DeviceType>("desktop");
   const [showQrModal, setShowQrModal] = useState(false);
@@ -134,6 +138,7 @@ export default function ChatShell({
           planLocationName?: string | null;
           attendeeCount?: number | null;
           notificationId?: string | null;
+          planCancelled?: boolean;
           users?: Record<string, { name: string; profilePictureUrl?: string | null }>;
         };
 
@@ -181,6 +186,7 @@ export default function ChatShell({
         if (tokenResult.planLocationName) setPlanLocationName(tokenResult.planLocationName);
         if (typeof tokenResult.attendeeCount === "number") setAttendeeCount(tokenResult.attendeeCount);
         if (tokenResult.notificationId) setNotificationId(tokenResult.notificationId);
+        setPlanCancelled(tokenResult.planCancelled === true);
         // The persona name/avatar and the servicing timeline were read here.
         // Both went with the virtual host (2026-09-02); getVirtualHostTimeline
         // no longer exists server-side.
@@ -292,7 +298,7 @@ export default function ChatShell({
   async function handleSend() {
     const text = composeText.trim();
     const userId = currentUserIdRef.current;
-    if (!text || !userId || sending) return;
+    if (!text || !userId || sending || planCancelled) return;
     setSending(true);
     setComposeText("");
     try {
@@ -646,6 +652,15 @@ export default function ChatShell({
           )}
         </div>
 
+        {planCancelled ? (
+          <div
+            role="status"
+            className="bg-zinc-50 border-t border-zinc-200 px-4 md:px-6 py-4 shrink-0 text-center"
+          >
+            <p className="text-sm font-medium text-zinc-900">This plan was cancelled</p>
+            <p className="mt-0.5 text-xs text-zinc-500">The chat is closed. Earlier messages are still here.</p>
+          </div>
+        ) : (
         <div className="bg-white border-t border-zinc-200 px-4 md:px-6 py-3 shrink-0">
           {/* Deliberately NOT a <form>. Chrome only offers credit-card autofill
               inside a form context, and it ignores autocomplete="off" for
@@ -692,6 +707,7 @@ export default function ChatShell({
             </button>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

@@ -42,6 +42,8 @@ export type PlanDetailData = {
   hostName: string;
   /** The named host is a paid Leaf roster host on `assignedHost`, not the owner. */
   hostIsRoster?: boolean;
+  /** The roster host cancelled and the seat is still empty. */
+  awaitingHost?: boolean;
   rsvpCount: number;
   location: { name: string; address: string } | null;
   /** Full itinerary from the API (matches `getOrgCalendarPage.plans[i].locations`).
@@ -579,7 +581,16 @@ export default function PlanDetailModal({
             </h2>
             <div className="flex items-center gap-3 flex-wrap">
               <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
-                Hosted by {hostNameOverride || plan.hostName}
+                {plan.awaitingHost && !hostNameOverride ? (
+                  <>
+                    Needs a host
+                    <span className="ml-2 normal-case tracking-normal font-medium text-xs text-rose-700 bg-rose-50 rounded-full px-2 py-0.5">
+                      Host cancelled
+                    </span>
+                  </>
+                ) : (
+                  <>Hosted by {hostNameOverride || plan.hostName}</>
+                )}
                 {plan.hostIsRoster && !hostNameOverride && (
                   <span className="ml-2 normal-case tracking-normal font-medium text-xs text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5">
                     Leaf host

@@ -2884,6 +2884,7 @@ export default function OrgDashboardPage() {
             timezone: selectedActivePlan.timezone ?? null,
             time: selectedActivePlan.time,
             hostName: selectedActivePlan.hostName,
+            awaitingHost: selectedActivePlan.awaitingHost === true,
             rsvpCount: selectedActivePlan.rsvpCount,
             location: selectedActivePlan.location,
             isPoll: selectedActivePlan.isPoll,

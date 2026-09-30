@@ -3157,7 +3157,11 @@ export default function OrgCalendarPage() {
         description: p.description as string || "",
         image: p.image as string || "",
         hostId: (p.host as Record<string, string>)?.objectId || null,
-        hostName: (p.host as Record<string, string>)?.name || "Community Member",
+        // Empty when nobody is hosting — including a night whose roster host
+        // cancelled while a replacement is being found. The byline is then
+        // left off rather than guessing a name ("Community Member") or telling
+        // guests the seat is empty while Leaf is still filling it.
+        hostName: (p.host as Record<string, string>)?.name || "",
         hostAvatar: (p.host as Record<string, string>)?.profilePictureUrl || null,
         hasRosterHost: Boolean((p.host as Record<string, unknown>)?.isRosterHost),
         hostBio: ((p.host as Record<string, unknown>)?.bio as string) || null,
@@ -4893,7 +4897,7 @@ export default function OrgCalendarPage() {
                           <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                           Leaf is arranging this
                         </p>
-                      ) : (
+                      ) : plan.hostName ? (
                         <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
                           {/* A face beats a dot: the host's photo when they
                               have one (roster hosts always do; followers only
@@ -4912,7 +4916,7 @@ export default function OrgCalendarPage() {
                           )}
                           Hosted by {plan.hostName}
                         </p>
-                      )}
+                      ) : null}
                       {/* Per-plan leaf-host chat pill — owner-only.
                           Server strips these fields for non-owners so
                           the button never surfaces publicly. Unread
@@ -5916,7 +5920,7 @@ export default function OrgCalendarPage() {
                     <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                     Leaf is arranging this
                   </p>
-                ) : (
+                ) : selectedEvent.hostName ? (
                   <div className="flex items-center gap-2">
                     {selectedEvent.hostAvatar && (
                       /* eslint-disable-next-line @next/next/no-img-element */
@@ -5931,7 +5935,7 @@ export default function OrgCalendarPage() {
                       Hosted by {selectedEvent.hostName}
                     </p>
                   </div>
-                )}
+                ) : null}
                 {/* One line: each item is nowrap so the date never breaks
                     mid-phrase and "Full" stays glued to the attendee count.
                     flex-wrap is the fallback for a viewport too narrow for

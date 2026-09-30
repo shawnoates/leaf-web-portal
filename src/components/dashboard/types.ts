@@ -14,6 +14,9 @@ export interface CalActivePlan {
   timezone: string | null;
   time: string | null;
   hostName: string;
+  /** The Leaf roster host cancelled and nobody has taken the seat — `hostName`
+   *  is then "Needs a host", not a person. Optional until the server deploy. */
+  awaitingHost?: boolean;
   isVirtualHost?: boolean;
   virtualHostAvatarUrl?: string | null;
   leafHostState?: "leaf_hosted" | "leaf_arranging" | null;
