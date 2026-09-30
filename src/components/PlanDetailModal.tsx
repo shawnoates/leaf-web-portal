@@ -23,6 +23,7 @@ import {
 import PlanAttendeeList, { isPendingStatus } from "./PlanAttendeeList";
 import { CrossPromoEyebrow } from "./CrossPromoBadge";
 import PlanIntroSection from "./PlanIntroSection";
+import FittedImage from "./FittedImage";
 
 const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2";
@@ -523,8 +524,7 @@ export default function PlanDetailModal({
 
         <div className="hidden md:block w-1/2 h-full bg-zinc-100">
           {plan.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={plan.image} className="w-full h-full object-cover" alt="" />
+            <FittedImage src={plan.image} />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Calendar className="w-20 h-20 text-zinc-300" />

@@ -43,6 +43,7 @@ import { introVideoFrame } from "@/lib/intro-video-frame";
 import HostIntroTile, { type HostIntro } from "@/components/HostIntroTile";
 import HostIntroInline from "@/components/HostIntroInline";
 import PlanIntroSection from "@/components/PlanIntroSection";
+import FittedImage from "@/components/FittedImage";
 import {
   Plus,
   Users,
@@ -5872,11 +5873,7 @@ export default function OrgCalendarPage() {
 
             <div className="hidden md:block w-1/2 h-full bg-zinc-100">
               {selectedEvent.image ? (
-                <img
-                  src={selectedEvent.image}
-                  className="w-full h-full object-cover"
-                  alt=""
-                />
+                <FittedImage src={selectedEvent.image} />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <Calendar className="w-20 h-20 text-zinc-300" />
@@ -6522,11 +6519,7 @@ export default function OrgCalendarPage() {
 
             <div className="hidden md:block w-1/2 h-full bg-zinc-100">
               {hostingIdea.image ? (
-                <img
-                  src={hostingIdea.image}
-                  className="w-full h-full object-cover"
-                  alt=""
-                />
+                <FittedImage src={hostingIdea.image} />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <Sparkles className="w-20 h-20 text-zinc-300" />
