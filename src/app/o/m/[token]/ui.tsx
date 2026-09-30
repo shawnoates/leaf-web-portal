@@ -80,7 +80,9 @@ export function Shell({ children }: { children: ReactNode }) {
 export function Brand({ neighborhood }: { neighborhood?: string }) {
   return (
     <div className="flex items-center justify-between px-1">
-      <span className="font-fm-serif text-[24px] leading-none text-leaf-800">Leaf</span>
+      {/* The brand logo, as on the rest of the site. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/leaf-logo-black.png" alt="Leaf" className="h-7 w-auto" />
       {neighborhood && (
         <span className="rounded-full border border-leaf-200 bg-white/70 px-3 py-1 text-[12px] font-semibold text-leaf-700">{neighborhood}</span>
       )}
