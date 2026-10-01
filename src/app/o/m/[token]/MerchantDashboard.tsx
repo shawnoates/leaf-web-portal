@@ -8,7 +8,7 @@
 
 import { type ReactNode, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
-import { Brand, Shell, dollars } from "./ui";
+import { Brand, Shell, dollars, formatPhone } from "./ui";
 
 type Phase = "pending" | "confirmed" | "now" | "past" | "cancelled";
 type Night = {
@@ -21,6 +21,7 @@ type Night = {
   capacity: number | null;
   guests: number | null;
   host: { kind: "leaf" | "you"; name: string | null } | null;
+  contact?: { name: string; phone: string; isDefault: boolean };
   planUrl: string | null;
   charge: {
     status: "paid" | "free" | "make_good" | "failed" | "pending";
@@ -92,7 +93,86 @@ function H2({ children }: { children: ReactNode }) {
   return <h2 className="font-fm-serif text-[26px] leading-tight text-stone-900">{children}</h2>;
 }
 
-function UpcomingNight({ n }: { n: Night }) {
+/** Who the group asks for on this night; changeable when it's someone else on shift. */
+function NightContact({ token, n }: { token: string; n: Night }) {
+  const [c, setC] = useState(n.contact);
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(n.contact?.isDefault ? "" : n.contact?.name || "");
+  const [phone, setPhone] = useState(n.contact?.isDefault ? "" : n.contact?.phone || "");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async (reset = false) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = (await Parse.Cloud.run("updateMerchantNightContact", { token, slotId: n.id, name, phone, reset })) as {
+        contact: NonNullable<Night["contact"]>;
+        introSent: boolean;
+      };
+      setC(r.contact);
+      setEditing(false);
+      if (reset) {
+        setName("");
+        setPhone("");
+      }
+      setNote(r.introSent ? "Saved. Your host already has the earlier contact, so reply to Shawn and we'll let them know." : "Saved. We'll pass it to your host.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save that");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!c) return null;
+  const input = "h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-[15px] focus:border-leaf-600 focus:outline-none";
+  return (
+    <div className="mt-2 text-[14px]">
+      {!editing ? (
+        <p className="text-stone-600">
+          {`Ask for ${c.name || "your team"}${c.phone ? ` · ${c.phone}` : ""}`}
+          {!c.isDefault && <span className="ml-1.5 rounded-full bg-leaf-100 px-2 py-0.5 text-[11px] font-semibold text-leaf-800">this night</span>}
+          <button type="button" onClick={() => setEditing(true)} className="ml-2 font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+            Change
+          </button>
+        </p>
+      ) : (
+        <div className="rounded-2xl bg-stone-50 p-3">
+          <p className="mb-2 text-[13px] text-stone-600">Someone else on that night? Just for this date.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Their name" autoComplete="name" className={input} />
+            <input
+              value={phone}
+              onChange={(e) => setPhone(formatPhone(e.target.value))}
+              placeholder="(555) 555-5555"
+              type="tel"
+              inputMode="tel"
+              className={input}
+            />
+          </div>
+          {error && <p className="mt-2 text-[13px] text-red-600">{error}</p>}
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <button type="button" disabled={busy} onClick={() => save(false)} className="h-10 rounded-xl bg-leaf-800 px-4 text-[14px] font-semibold text-white disabled:opacity-50">
+              {busy ? "Saving…" : "Save for this night"}
+            </button>
+            {!c.isDefault && (
+              <button type="button" disabled={busy} onClick={() => save(true)} className="text-[13px] font-semibold text-stone-600 underline">
+                Use the usual contact
+              </button>
+            )}
+            <button type="button" onClick={() => setEditing(false)} className="text-[13px] text-stone-500">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {note && !editing && <p className="mt-1 text-[13px] text-leaf-700">{note}</p>}
+    </div>
+  );
+}
+
+function UpcomingNight({ n, token }: { n: Night; token: string }) {
   const p = PHASE[n.phase as keyof typeof PHASE];
   const pct = n.rsvps != null && n.capacity ? Math.min(100, Math.round((n.rsvps / n.capacity) * 100)) : null;
   return (
@@ -138,6 +218,7 @@ function UpcomingNight({ n }: { n: Night }) {
           </a>
         )}
       </div>
+      <NightContact token={token} n={n} />
     </div>
   );
 }
@@ -281,7 +362,7 @@ export default function MerchantDashboard({
           <H2>Coming up</H2>
           <div className="mt-3">
             {d.upcoming.length ? (
-              d.upcoming.map((n) => <UpcomingNight key={n.id} n={n} />)
+              d.upcoming.map((n) => <UpcomingNight key={n.id} n={n} token={token} />)
             ) : (
               <p className="text-[15px] text-stone-600">Nothing on the books right now. Pick more nights and we&rsquo;ll fill them.</p>
             )}
