@@ -25,7 +25,7 @@ import CardSetup, { type Card, type CardSetupHandle } from "./CardSetup";
 import NoticePrefs, { noticePayload, type Notices } from "./NoticePrefs";
 import { Brand, Choice, Closed, Field, Section, Shell, dollars, formatPhone, input, textarea } from "./ui";
 import NightPicker, { nightMeta, type Suggested } from "./NightPicker";
-import FreeNightCountdown from "./FreeNightCountdown";
+import FreeNightCountdown, { CountdownCells, TYPICAL_RSVPS, useCountdown } from "./FreeNightCountdown";
 
 type DateOption = { dateKey: string; label: string };
 
@@ -203,6 +203,11 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const toggle = (k: string) => setWindows((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]));
 
   const perRsvp = form?.billing?.model === "per_rsvp";
+  // The free-night clock rides on the button so it's always in view.
+  const freeLeft = useCountdown(
+    form?.billing?.freeNightDeadline,
+    perRsvp && form?.state !== "accepted" && form?.billing?.freeNightState === "open",
+  );
   const suggested: Suggested | null = form?.suggested ?? (form?.offer ? { title: form.offer.title, description: form.offer.description, durationMin: form.offer.durationMin, priceCents: form.offer.priceCents } : null);
   const nightTitle = useOwn || !suggested ? title : suggested.title;
   const nightDescription = useOwn || !suggested ? description : suggested.description;
@@ -371,6 +376,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const accepted = form.state === "accepted";
   const steps = (perRsvp ? 4 : 3) + (notices ? 1 : 0);
   const cta = accepted ? "Save changes" : perRsvp && form.billing?.firstNightFree ? "Hold my free night" : "Count me in";
+  const freeWorth = perRsvp && !accepted && form.billing?.firstNightFree ? dollars((form.billing?.rsvpFeeCents ?? 600) * TYPICAL_RSVPS) : null;
 
   return (
     <Shell>
@@ -407,6 +413,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             deadline={form.billing.freeNightDeadline ?? null}
             state={form.billing.freeNightState}
             feeLabel={dollars(form.billing.rsvpFeeCents)}
+            worthLabel={dollars(form.billing.rsvpFeeCents * TYPICAL_RSVPS)}
           />
         </div>
       )}
@@ -638,13 +645,31 @@ export default function MerchantOfferClient({ token }: { token: string }) {
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-stone-200/80 bg-[#f6f2ea]/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
         <div className="mx-auto max-w-lg">
           {error && <p className="mb-2 text-[14px] leading-snug text-red-600">{error}</p>}
+          {freeLeft != null && (
+            <div className="mb-2.5">
+              <p className="mb-1.5 text-center text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-600">Your free night is held for</p>
+              <CountdownCells left={freeLeft} compact />
+            </div>
+          )}
           <button
             type="button"
             onClick={submit}
             disabled={busy}
             className="h-14 w-full rounded-2xl bg-leaf-800 text-[17px] font-semibold text-white shadow-sm transition-opacity active:opacity-90 disabled:opacity-50"
           >
-            {busy ? "One moment…" : cta}
+            {busy ? (
+              "One moment…"
+            ) : (
+              <>
+                {cta}
+                {freeWorth && (
+                  <>
+                    <span className="sr-only">, usually </span>
+                    <s className="ml-2 font-normal text-white/60 decoration-white/60">{freeWorth}</s>
+                  </>
+                )}
+              </>
+            )}
           </button>
           {perRsvp && !accepted && (
             <p className="mt-2 text-center text-[12px] text-stone-500">
