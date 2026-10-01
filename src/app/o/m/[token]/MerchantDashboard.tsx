@@ -66,6 +66,8 @@ export type Dashboard = {
   };
   /** Open weeks on their night they can book now. */
   bookable?: { dateKey: string; label: string }[];
+  /** Nights they asked for that Leaf hasn't booked yet. */
+  requests?: { id: string; kind: "first" | "rebook"; label: string }[];
 };
 
 const PHASE: Record<Exclude<Phase, "past" | "cancelled">, { label: string; tone: string }> = {
@@ -306,21 +308,28 @@ export default function MerchantDashboard({
 }) {
   const [d, setD] = useState<Dashboard | null>(null);
   const [reload, setReload] = useState(0);
-  const [picking, setPicking] = useState<string | null>(null);
+  const [reqDate, setReqDate] = useState("");
+  const [reqPart, setReqPart] = useState<"morning" | "afternoon" | "evening" | null>(null);
   const [booking, setBooking] = useState(false);
   const [bookNote, setBookNote] = useState<string | null>(null);
   const [bookError, setBookError] = useState<string | null>(null);
+  // Nights inside 8 days can't be set up in time, so requests start after that.
+  const earliest = (() => {
+    const d = new Date(Date.now() + 8 * 864e5);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
 
-  const book = async (dateKey: string) => {
+  const requestNight = async () => {
     setBooking(true);
     setBookError(null);
     try {
-      const r = (await Parse.Cloud.run("merchantBookNight", { token, dateKey })) as { label: string };
-      setBookNote(`Booked: ${r.label}. We'll send the details.`);
-      setPicking(null);
+      const r = (await Parse.Cloud.run("merchantRequestNight", { token, dateKey: reqDate, partOfDay: reqPart })) as { request: { label: string } };
+      setBookNote(`Requested: ${r.request.label}. We'll confirm the time within a day.`);
+      setReqDate("");
+      setReqPart(null);
       setReload((n) => n + 1);
     } catch (e) {
-      setBookError(e instanceof Error ? e.message : "Couldn't book that night");
+      setBookError(e instanceof Error ? e.message : "Couldn't send that request");
     } finally {
       setBooking(false);
     }
@@ -403,44 +412,54 @@ export default function MerchantDashboard({
           </button>
         </Card>
 
-        {(Boolean(d.bookable?.length) || bookNote) && (
+        {d.requests && d.requests.length > 0 && (
           <Card>
-            <H2>Book another night</H2>
-            <p className="mt-1 text-[15px] text-stone-600">{`Open ${d.weekdayLabel || "nights"} at ${d.startTimeLabel}. Same as before: neighbors RSVP, you welcome them.`}</p>
-            {bookNote && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{bookNote}</p>}
-            {bookError && <p className="mt-3 text-[14px] text-red-600">{bookError}</p>}
-            {d.bookable && d.bookable.length > 0 ? (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {d.bookable.map((o) => {
-                  const [weekday, ...rest] = o.label.split(", ");
-                  return (
-                    <button
-                      key={o.dateKey}
-                      type="button"
-                      onClick={() => setPicking(picking === o.dateKey ? null : o.dateKey)}
-                      className={`rounded-2xl border px-3 py-3 text-left ${picking === o.dateKey ? "border-leaf-700 bg-leaf-50" : "border-stone-200 bg-white"}`}
-                    >
-                      <span className="block text-[12px] text-stone-500">{weekday}</span>
-                      <span className="block text-[15px] font-semibold text-stone-900">{rest.join(", ")}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="mt-3 text-[14px] text-stone-500">No open weeks right now. More open up as they get closer.</p>
-            )}
-            {picking && (
-              <button
-                type="button"
-                disabled={booking}
-                onClick={() => book(picking)}
-                className="mt-3 h-12 w-full rounded-xl bg-leaf-800 text-[15px] font-semibold text-white disabled:opacity-50"
-              >
-                {booking ? "Booking…" : `Book ${d.bookable?.find((o) => o.dateKey === picking)?.label || "this night"}`}
-              </button>
-            )}
+            <H2>Waiting on us</H2>
+            <div className="mt-2 space-y-2">
+              {d.requests.map((q) => (
+                <p key={q.id} className="text-[15px] text-stone-700">
+                  <span className="font-semibold text-stone-900">{q.kind === "first" ? `Your first ${q.label.replace(/s( \u00b7.*)?$/, "")}` : q.label}</span>
+                  <span className="block text-[13px] text-stone-500">We&rsquo;ll confirm the date and time within a day.</span>
+                </p>
+              ))}
+            </div>
           </Card>
         )}
+
+        <Card>
+          <H2>Book another night</H2>
+          <p className="mt-1 text-[15px] text-stone-600">Pick a date and the part of the day. We&rsquo;ll set the time and confirm.</p>
+          {bookNote && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{bookNote}</p>}
+          <input
+            type="date"
+            value={reqDate}
+            min={earliest}
+            onChange={(e) => setReqDate(e.target.value)}
+            className="mt-3 h-12 w-full rounded-xl border border-stone-300 bg-white px-3 text-[15px] focus:border-leaf-600 focus:outline-none"
+          />
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            {(["morning", "afternoon", "evening"] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setReqPart(reqPart === p ? null : p)}
+                aria-pressed={reqPart === p}
+                className={`h-11 rounded-xl border text-[14px] font-semibold capitalize ${reqPart === p ? "border-leaf-800 bg-leaf-800 text-white" : "border-stone-300 bg-white text-stone-800"}`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+          {bookError && <p className="mt-2 text-[14px] text-red-600">{bookError}</p>}
+          <button
+            type="button"
+            disabled={booking || !reqDate || !reqPart}
+            onClick={requestNight}
+            className="mt-3 h-12 w-full rounded-xl bg-leaf-800 text-[15px] font-semibold text-white disabled:opacity-40"
+          >
+            {booking ? "Sending…" : "Request this night"}
+          </button>
+        </Card>
 
         {d.past.length > 0 && (
           <Card>

@@ -114,5 +114,5 @@ export function nightMeta({ startTimeLabel, durationMin, headcount, priceCents, 
   priceCents: number;
   perRsvp: boolean;
 }) {
-  return [startTimeLabel, `${durationMin} min`, `${headcount} neighbors`, perRsvp ? "Free to join" : `${dollars(priceCents)} a seat`].join(" · ");
+  return [startTimeLabel, `${durationMin} min`, `${headcount} neighbors`, perRsvp ? "Free to join" : `${dollars(priceCents)} a seat`].filter(Boolean).join(" · ");
 }

@@ -26,6 +26,8 @@ import NoticePrefs, { noticePayload, type Notices } from "./NoticePrefs";
 import { Brand, Choice, Closed, Field, Section, Shell, dollars, formatPhone, input, textarea } from "./ui";
 import NightPicker, { nightMeta, type Suggested } from "./NightPicker";
 import MerchantDashboard from "./MerchantDashboard";
+
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 import FreeNightCountdown, { CountdownText, TYPICAL_RSVPS, useCountdown } from "./FreeNightCountdown";
 
 type DateOption = { dateKey: string; label: string };
@@ -147,6 +149,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [windows, setWindows] = useState<string[]>([]);
+  // New sign-ups give us a day; Shawn sets the date and time.
+  const [preferredDay, setPreferredDay] = useState<number | null>(null);
   const [otherWindows, setOtherWindows] = useState("");
   const [card, setCard] = useState<Card | null>(null);
   const [useOwn, setUseOwn] = useState(false);
@@ -213,8 +217,6 @@ export default function MerchantOfferClient({ token }: { token: string }) {
     if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   }, [form]);
 
-  // One night: picking it books it. More nights are booked from the dashboard.
-  const toggle = (k: string) => setWindows((prev) => (prev.length === 1 && prev[0] === k ? [] : [k]));
 
   const perRsvp = form?.billing?.model === "per_rsvp";
   // The free-night clock rides on the button so it's always in view.
@@ -229,7 +231,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const missing: string[] = [];
   if (!nightTitle.trim()) missing.push("a name for the night");
   if (!perRsvp && hasSpace === null) missing.push("whether you have room");
-  if (!windows.length && !otherWindows.trim()) missing.push("a date");
+  if (form?.state !== "accepted" && preferredDay === null) missing.push("a day");
   if (phoneDigits.length > 0 && phoneDigits.length < 10) missing.push("a full phone number (or leave it blank)");
 
   const saveCardOnly = async () => {
@@ -270,16 +272,20 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         merchantHosts: merchantHosts === true,
         contactName,
         contactPhone,
-        windows,
-        otherWindows,
-      })) as { state: string; bookedDate?: string | null; benched?: boolean; updated?: boolean };
+        // Editing keeps their dates; a new sign-up sends the day instead.
+        windows: form?.state === "accepted" ? windows : [],
+        otherWindows: form?.state === "accepted" ? otherWindows : "",
+        preferredDay: form?.state === "accepted" ? undefined : preferredDay,
+      })) as { state: string; bookedDate?: string | null; benched?: boolean; updated?: boolean; requested?: boolean };
       setDone({ bookedDate: r.bookedDate ?? null, benched: Boolean(r.benched), updated: r.updated });
       // Straight to their dashboard, with what just happened at the top.
       if (r.state === "accepted" && !noDashboard) {
         setWelcome(
           r.updated
             ? "Your changes are saved."
-            : r.bookedDate
+            : r.requested
+              ? `You're in. We'll confirm the date and time of your first ${DAYS[preferredDay ?? 0]} within a day.${perRsvp && form?.billing?.firstNightFree ? " It's on us." : ""}`
+              : r.bookedDate
               ? `You're in. See you ${r.bookedDate}.${perRsvp && form?.billing?.firstNightFree ? " This first night is on us." : ""}`
               : "You're in. Those weeks already have someone, so you're first in line for the next opening.",
         );
@@ -466,7 +472,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         </h1>
         <p className="mt-4 text-[16px] leading-relaxed text-stone-600">
           {perRsvp
-            ? `We bring ${form.headcount} neighbors from ${theCalendar(form.calendarName)} calendar to you at ${form.startTimeLabel}.`
+            ? `We bring ${form.headcount} neighbors from ${theCalendar(form.calendarName)} calendar to you, on your slowest day.`
             : `A taster for ${form.headcount} neighbors on ${theCalendar(form.calendarName)} calendar at ${form.startTimeLabel}. Leaf keeps 10% of tickets.`}{" "}
           {form.calendarUrl && (
             <a href={form.calendarUrl} target="_blank" rel="noreferrer" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
@@ -514,7 +520,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               setDescription={setDescription}
               merchantName={form.merchantName}
               meta={nightMeta({
-                startTimeLabel: form.startTimeLabel,
+                startTimeLabel: accepted ? form.startTimeLabel : "",
                 durationMin: Number(durationMin) || suggested.durationMin,
                 headcount: form.headcount,
                 priceCents: perRsvp ? 0 : Math.round(Number(price || 0) * 100),
@@ -577,39 +583,29 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         <Section
           n={2}
           total={steps}
-          title={accepted ? "Your nights" : perRsvp && form.billing?.firstNightFree ? "Pick your free night" : "Pick your night"}
-          sub={
-            accepted
-              ? "Book more nights from your dashboard."
-              : `${form.dateOptions[0]?.label.split(", ")[0] ? `${form.dateOptions[0].label.split(", ")[0]}s` : "Weekly"} at ${form.startTimeLabel}. Pick one; you can book more from your dashboard.`
-          }
+          title={accepted ? "Your nights" : "What day works best?"}
+          sub={accepted ? "Book more nights from your dashboard." : "Pick your slowest day. We'll set the time and confirm your first one within a day."}
         >
-          {form.dateOptions.length === 0 && (
-            <p className="rounded-xl bg-stone-50 p-3 text-[14px] text-stone-600">No open nights right now. Tell us what works below and we&rsquo;ll find one.</p>
+          {!accepted && (
+            <div className="grid grid-cols-4 gap-2">
+              {[1, 2, 3, 4, 5, 6, 0].map((d) => {
+                const on = preferredDay === d;
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setPreferredDay(on ? null : d)}
+                    aria-pressed={on}
+                    className={`min-h-12 rounded-xl border px-2 text-[15px] font-semibold transition-colors ${
+                      on ? "border-leaf-800 bg-leaf-800 text-white" : "border-stone-300 bg-white text-stone-900 active:bg-stone-50"
+                    }`}
+                  >
+                    {DAYS[d].slice(0, 3)}
+                  </button>
+                );
+              })}
+            </div>
           )}
-          <div className="grid grid-cols-2 gap-2">
-            {form.dateOptions.map((d) => {
-              const on = windows.includes(d.dateKey);
-              const [weekday, ...rest] = d.label.split(", ");
-              return (
-                <button
-                  key={d.dateKey}
-                  type="button"
-                  onClick={() => toggle(d.dateKey)}
-                  aria-pressed={on}
-                  className={`min-h-14 rounded-xl border px-3 py-2 text-left transition-colors ${
-                    on ? "border-leaf-800 bg-leaf-800 text-white" : "border-stone-300 bg-white text-stone-900 active:bg-stone-50"
-                  }`}
-                >
-                  <span className={`block text-[12px] ${on ? "text-leaf-200" : "text-stone-500"}`}>{weekday}</span>
-                  <span className="block text-[15px] font-semibold">{rest.join(", ") || d.label}</span>
-                </button>
-              );
-            })}
-          </div>
-          <Field label="None of these work? Tell us what does">
-            <input value={otherWindows} onChange={(e) => setOtherWindows(e.target.value)} placeholder="e.g. Tuesdays in November" className={input} />
-          </Field>
         </Section>
 
         <Section n={3} total={steps} title="Who welcomes the group?" sub="Your team, or make it a Hosted night.">
