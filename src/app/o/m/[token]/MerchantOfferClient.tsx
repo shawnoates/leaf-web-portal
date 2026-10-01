@@ -25,6 +25,7 @@ import CardSetup, { type Card, type CardSetupHandle } from "./CardSetup";
 import NoticePrefs, { noticePayload, type Notices } from "./NoticePrefs";
 import { Brand, Choice, Closed, Field, Section, Shell, dollars, formatPhone, input, textarea } from "./ui";
 import NightPicker, { nightMeta, type Suggested } from "./NightPicker";
+import FreeNightCountdown from "./FreeNightCountdown";
 
 type DateOption = { dateKey: string; label: string };
 
@@ -53,7 +54,15 @@ type Form = {
     otherWindows: string;
   };
   dateOptions: DateOption[];
-  billing?: { model: "ticket" | "per_rsvp"; rsvpFeeCents: number; firstNightFree: boolean; card: Card | null; cardFailed: boolean };
+  billing?: {
+    model: "ticket" | "per_rsvp";
+    rsvpFeeCents: number;
+    firstNightFree: boolean;
+    freeNightState?: "open" | "lapsed" | "granted" | "used";
+    freeNightDeadline?: string | null;
+    card: Card | null;
+    cardFailed: boolean;
+  };
   spendEstimate?: { lowCents: number; highCents: number; source: string } | null;
   categoryLabel?: string | null;
   notices?: Notices;
@@ -62,13 +71,18 @@ type Form = {
 
 const EXAMPLE_RSVPS = 12;
 
+/** "the X calendar", without doubling up when the name already starts with "The". */
+function theCalendar(name: string) {
+  return /^the\s/i.test(name) ? name : `the ${name}`;
+}
+
 function OfferCard({ form }: { form: Form }) {
   const b = form.billing!;
   const fee = dollars(b.rsvpFeeCents);
   const spend = form.spendEstimate;
   const rows: [string, string][] = [
     [b.firstNightFree ? "Your first night is on us" : "Free for neighbors", "Neighbors join free and everyone orders their own."],
-    [`${fee} per RSVP after that`, "Charged after the night, counted 2 hours before, never more than you seat."],
+    [b.firstNightFree ? `${fee} per RSVP after that` : `${fee} per RSVP`, "Charged after the night, counted 2 hours before, never more than you seat."],
     ["No crowd, no charge", "Under 5 RSVPs costs nothing, and we set up another night."],
   ];
   return (
@@ -377,8 +391,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         </h1>
         <p className="mt-4 text-[16px] leading-relaxed text-stone-600">
           {perRsvp
-            ? `We bring ${form.headcount} neighbors from the ${form.calendarName} calendar to you at ${form.startTimeLabel}.`
-            : `A taster for ${form.headcount} neighbors on the ${form.calendarName} calendar at ${form.startTimeLabel}. Leaf keeps 10% of tickets.`}{" "}
+            ? `We bring ${form.headcount} neighbors from ${theCalendar(form.calendarName)} calendar to you at ${form.startTimeLabel}.`
+            : `A taster for ${form.headcount} neighbors on ${theCalendar(form.calendarName)} calendar at ${form.startTimeLabel}. Leaf keeps 10% of tickets.`}{" "}
           {form.calendarUrl && (
             <a href={form.calendarUrl} target="_blank" rel="noreferrer" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
               See the calendar
@@ -387,8 +401,18 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         </p>
       </header>
 
-      {perRsvp && form.billing && (
+      {perRsvp && form.billing && !accepted && form.billing.freeNightState && (
         <div className="mt-7">
+          <FreeNightCountdown
+            deadline={form.billing.freeNightDeadline ?? null}
+            state={form.billing.freeNightState}
+            feeLabel={dollars(form.billing.rsvpFeeCents)}
+          />
+        </div>
+      )}
+
+      {perRsvp && form.billing && (
+        <div className="mt-4">
           <OfferCard form={form} />
         </div>
       )}
@@ -510,7 +534,15 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             </Choice>
           </div>
           {merchantHosts === false && (
-            <div className="rounded-2xl bg-leaf-50 p-4">
+            <div className="overflow-hidden rounded-2xl bg-leaf-50">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/hosted-night.jpg"
+                alt="A Leaf host pouring wine for neighbors at a long table in a busy local bar"
+                className="aspect-[4/3] w-full object-cover object-center"
+                loading="lazy"
+              />
+              <div className="p-4">
               <p className="font-fm-serif text-[22px] leading-tight text-stone-900">Hosted night</p>
               <p className="mt-1 text-[14px] leading-snug text-stone-600">A Leaf host runs the night, then you get:</p>
               <ul className="mt-3 space-y-2 text-[14px] leading-snug text-stone-700">
@@ -534,6 +566,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
                 </li>
               </ul>
               <p className="mt-3 text-[13px] leading-snug text-stone-500">We&rsquo;ll confirm the host fee with you before your night.</p>
+              </div>
             </div>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
