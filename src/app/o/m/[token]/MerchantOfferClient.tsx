@@ -679,7 +679,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             <Field label="Who should they ask for?" hint="Whoever's usually on. Someone else on a given night? Just tell us.">
               <input value={contactName} onChange={(e) => setContactName(e.target.value)} autoComplete="name" className={input} />
             </Field>
-            <Field label="Phone for the night (optional)" hint="The main line is fine. Only your host uses it, to find you on the night.">
+            <Field label="Phone (optional)" hint="The main line is fine. Only your host uses it, to find you on the night.">
               <input
                 value={contactPhone}
                 onChange={(e) => setContactPhone(formatPhone(e.target.value))}
