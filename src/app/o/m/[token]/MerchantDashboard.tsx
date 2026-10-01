@@ -64,6 +64,8 @@ export type Dashboard = {
     guests: number;
     chargedCents: number;
   };
+  /** Open weeks on their night they can book now. */
+  bookable?: { dateKey: string; label: string }[];
 };
 
 const PHASE: Record<Exclude<Phase, "past" | "cancelled">, { label: string; tone: string }> = {
@@ -292,14 +294,37 @@ export default function MerchantDashboard({
   onEdit,
   onUnavailable,
   account,
+  welcome = null,
 }: {
   token: string;
   onEdit: () => void;
   onUnavailable: () => void;
   /** Card and notification settings, rendered by the page that owns their state. */
   account: ReactNode;
+  /** What just happened (after Hold), shown at the top. */
+  welcome?: string | null;
 }) {
   const [d, setD] = useState<Dashboard | null>(null);
+  const [reload, setReload] = useState(0);
+  const [picking, setPicking] = useState<string | null>(null);
+  const [booking, setBooking] = useState(false);
+  const [bookNote, setBookNote] = useState<string | null>(null);
+  const [bookError, setBookError] = useState<string | null>(null);
+
+  const book = async (dateKey: string) => {
+    setBooking(true);
+    setBookError(null);
+    try {
+      const r = (await Parse.Cloud.run("merchantBookNight", { token, dateKey })) as { label: string };
+      setBookNote(`Booked: ${r.label}. We'll send the details.`);
+      setPicking(null);
+      setReload((n) => n + 1);
+    } catch (e) {
+      setBookError(e instanceof Error ? e.message : "Couldn't book that night");
+    } finally {
+      setBooking(false);
+    }
+  };
 
   useEffect(() => {
     let live = true;
@@ -314,7 +339,7 @@ export default function MerchantDashboard({
     return () => {
       live = false;
     };
-  }, [token, onUnavailable]);
+  }, [token, onUnavailable, reload]);
 
   if (!d) {
     return (
@@ -351,6 +376,8 @@ export default function MerchantDashboard({
         </div>
       </div>
 
+      {welcome && <div className="mt-4 rounded-2xl bg-leaf-100 p-4 text-[15px] font-semibold text-leaf-900">{welcome}</div>}
+
       {d.cardFailed && (
         <a href="#card" className="mt-4 block rounded-2xl bg-amber-50 p-4 text-[15px] text-amber-900 ring-1 ring-amber-200">
           Your last charge didn&rsquo;t go through. <span className="font-semibold underline">Update your card</span>
@@ -375,6 +402,45 @@ export default function MerchantDashboard({
             Change your nights or details
           </button>
         </Card>
+
+        {(Boolean(d.bookable?.length) || bookNote) && (
+          <Card>
+            <H2>Book another night</H2>
+            <p className="mt-1 text-[15px] text-stone-600">{`Open ${d.weekdayLabel || "nights"} at ${d.startTimeLabel}. Same as before: neighbors RSVP, you welcome them.`}</p>
+            {bookNote && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{bookNote}</p>}
+            {bookError && <p className="mt-3 text-[14px] text-red-600">{bookError}</p>}
+            {d.bookable && d.bookable.length > 0 ? (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {d.bookable.map((o) => {
+                  const [weekday, ...rest] = o.label.split(", ");
+                  return (
+                    <button
+                      key={o.dateKey}
+                      type="button"
+                      onClick={() => setPicking(picking === o.dateKey ? null : o.dateKey)}
+                      className={`rounded-2xl border px-3 py-3 text-left ${picking === o.dateKey ? "border-leaf-700 bg-leaf-50" : "border-stone-200 bg-white"}`}
+                    >
+                      <span className="block text-[12px] text-stone-500">{weekday}</span>
+                      <span className="block text-[15px] font-semibold text-stone-900">{rest.join(", ")}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="mt-3 text-[14px] text-stone-500">No open weeks right now. More open up as they get closer.</p>
+            )}
+            {picking && (
+              <button
+                type="button"
+                disabled={booking}
+                onClick={() => book(picking)}
+                className="mt-3 h-12 w-full rounded-xl bg-leaf-800 text-[15px] font-semibold text-white disabled:opacity-50"
+              >
+                {booking ? "Booking…" : `Book ${d.bookable?.find((o) => o.dateKey === picking)?.label || "this night"}`}
+              </button>
+            )}
+          </Card>
+        )}
 
         {d.past.length > 0 && (
           <Card>

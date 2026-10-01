@@ -10,7 +10,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { loadStripe, type Stripe, type StripeElements } from "@stripe/stripe-js";
 import Parse from "@/lib/parse-client";
 
-export type Card = { brand: string; last4: string; exp: string };
+export type Card = { brand: string; last4: string; exp: string; email?: string };
 export type CardSetupHandle = { save: () => Promise<Card | null>; hasSavedCard: () => boolean };
 
 const BRAND: Record<string, string> = { visa: "Visa", mastercard: "Mastercard", amex: "Amex", discover: "Discover" };
@@ -81,10 +81,14 @@ const CardSetup = forwardRef<
         <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-stone-50 px-4 py-3.5">
           <div>
             <p className="text-[15px] font-medium text-stone-900">
-              {BRAND[card.brand] || "Card"} ending {card.last4}
+              {card.brand === "link"
+                ? `Link${card.email ? ` · ${card.email}` : ""}`
+                : card.last4
+                  ? `${BRAND[card.brand] || "Card"} ending ${card.last4}`
+                  : BRAND[card.brand] || "Payment method saved"}
             </p>
             {card.exp && <p className="text-[13px] text-stone-500">Expires {card.exp}</p>}
-            <p className="mt-1 text-[13px] leading-snug text-stone-500">{`Leaf charges this card ${fee} per RSVP after each night.`}</p>
+            <p className="mt-1 text-[13px] leading-snug text-stone-500">{`Leaf charges ${card.brand === "link" ? "this Link account" : "this card"} ${fee} per RSVP after each night.`}</p>
           </div>
           <button type="button" onClick={() => setEditing(true)} className="min-h-11 px-2 text-[14px] font-semibold text-leaf-700">
             Change

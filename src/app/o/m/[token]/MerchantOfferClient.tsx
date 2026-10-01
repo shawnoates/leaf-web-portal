@@ -154,6 +154,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   // Merchants who said yes land on their dashboard; the form is one tap away.
   const [view, setView] = useState<"dashboard" | "form">("dashboard");
   const [noDashboard, setNoDashboard] = useState(false);
+  const [welcome, setWelcome] = useState<string | null>(null);
   const showForm = useCallback(() => setView("form"), []);
   const dashboardUnavailable = useCallback(() => {
     setNoDashboard(true);
@@ -272,6 +273,19 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         otherWindows,
       })) as { state: string; bookedDate?: string | null; benched?: boolean; updated?: boolean };
       setDone({ bookedDate: r.bookedDate ?? null, benched: Boolean(r.benched), updated: r.updated });
+      // Straight to their dashboard, with what just happened at the top.
+      if (r.state === "accepted" && !noDashboard) {
+        setWelcome(
+          r.updated
+            ? "Your changes are saved."
+            : r.bookedDate
+              ? `You're in. See you ${r.bookedDate}.${perRsvp && form?.billing?.firstNightFree ? " This first night is on us." : ""}`
+              : "You're in. Those weeks already have someone, so you're first in line for the next opening.",
+        );
+        setForm((f) => (f ? { ...f, state: "accepted" } : f));
+        setDone(null);
+        setView("dashboard");
+      }
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       setError(e instanceof Error ? e.message : "That didn't go through. Try again?");
@@ -310,7 +324,11 @@ export default function MerchantOfferClient({ token }: { token: string }) {
       <Closed
         title="We couldn't find this one."
         body="The link may have been cut off. Try tapping it again from Shawn's email, or just reply to it."
-      />
+      >
+        <a href="/partner/login" className="mt-4 block px-1 text-[15px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+          Already with Leaf? Email me my sign-in link
+        </a>
+      </Closed>
     );
   }
   if (form.state === "declined") {
@@ -328,7 +346,11 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         neighborhood={form.neighborhood}
         title="This one has passed."
         body="The weeks on this offer have gone by. Reply to Shawn's email if you'd like to be on a future night."
-      />
+      >
+        <a href="/partner/login" className="mt-4 block px-1 text-[15px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+          Already with Leaf? Email me my sign-in link
+        </a>
+      </Closed>
     );
   }
 
@@ -411,7 +433,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   }
 
   if (form.state === "accepted" && view === "dashboard") {
-    return <MerchantDashboard token={token} onEdit={showForm} onUnavailable={dashboardUnavailable} account={accountSections} />;
+    return <MerchantDashboard token={token} onEdit={showForm} onUnavailable={dashboardUnavailable} account={accountSections} welcome={welcome} />;
   }
 
   const accepted = form.state === "accepted";

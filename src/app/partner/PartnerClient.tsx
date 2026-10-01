@@ -197,6 +197,12 @@ export default function PartnerClient() {
             {busy && picked ? "One moment…" : picked ? `Continue with ${picked.name}` : "Find your business to start"}
           </button>
           <p className="mt-2 text-center text-[12px] text-stone-500">Next you&rsquo;ll pick your nights. Nothing is charged today.</p>
+          <p className="mt-3 text-center text-[13px] text-stone-500">
+            Already with Leaf?{" "}
+            <a href="/partner/login" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+              Sign in
+            </a>
+          </p>
         </div>
       </div>
     </Shell>
