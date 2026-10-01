@@ -15,8 +15,12 @@ export type CardSetupHandle = { save: () => Promise<Card | null>; hasSavedCard: 
 
 const BRAND: Record<string, string> = { visa: "Visa", mastercard: "Mastercard", amex: "Amex", discover: "Discover" };
 
-const CardSetup = forwardRef<CardSetupHandle, { token: string; card: Card | null; onSaved: (c: Card) => void }>(
-  function CardSetup({ token, card, onSaved }, ref) {
+const CardSetup = forwardRef<
+  CardSetupHandle,
+  { token: string; card: Card | null; onSaved: (c: Card) => void; feeCents?: number; firstNightFree?: boolean }
+>(
+  function CardSetup({ token, card, onSaved, feeCents = 600, firstNightFree = false }, ref) {
+    const fee = `$${Number.isInteger(feeCents / 100) ? feeCents / 100 : (feeCents / 100).toFixed(2)}`;
     const [editing, setEditing] = useState(!card);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -80,6 +84,7 @@ const CardSetup = forwardRef<CardSetupHandle, { token: string; card: Card | null
               {BRAND[card.brand] || "Card"} ending {card.last4}
             </p>
             {card.exp && <p className="text-[13px] text-stone-500">Expires {card.exp}</p>}
+            <p className="mt-1 text-[13px] leading-snug text-stone-500">{`Leaf charges this card ${fee} per RSVP after each night.`}</p>
           </div>
           <button type="button" onClick={() => setEditing(true)} className="min-h-11 px-2 text-[14px] font-semibold text-leaf-700">
             Change
@@ -92,9 +97,20 @@ const CardSetup = forwardRef<CardSetupHandle, { token: string; card: Card | null
         <div ref={mountRef} className={ready || error ? "" : "min-h-40"} />
         {!ready && !error && <p className="text-[14px] text-stone-500">Loading secure card entry…</p>}
         {error && <p className="mt-2 text-[14px] text-red-600">{error}</p>}
-        <p className="mt-3 text-[13px] leading-snug text-stone-500">
-          Saved securely with Stripe. Nothing is charged today.
+        {/* Consent for charges made later, when the merchant isn't here (off-session). */}
+        <p className="mt-3 text-[13px] leading-snug text-stone-600">
+          {`By saving your card, you authorize Leaf to charge it ${fee} per RSVP after each Leaf night at your place, counted 2 hours before the night and never more than you seat. ${
+            firstNightFree ? "Your first night is free. " : ""
+          }Nights with fewer than 5 RSVPs cost nothing. Nothing is charged today. You can remove your card or stop anytime by replying to Shawn. `}
+          <a href="/terms-conditions" target="_blank" className="underline">
+            Terms
+          </a>
+          {" · "}
+          <a href="/privacy-policy" target="_blank" className="underline">
+            Privacy
+          </a>
         </p>
+        <p className="mt-1.5 text-[12px] text-stone-400">Saved securely with Stripe.</p>
       </div>
     );
   },

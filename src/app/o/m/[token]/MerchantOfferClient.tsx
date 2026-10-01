@@ -338,7 +338,14 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             <section id="card" className="scroll-mt-6 rounded-3xl bg-white p-5 shadow-sm">
               <h2 className="font-fm-serif text-[26px] text-stone-900">Card on file</h2>
               <div className="mt-3">
-                <CardSetup ref={cardRef} token={token} card={card} onSaved={setCard} />
+                <CardSetup
+                  ref={cardRef}
+                  token={token}
+                  card={card}
+                  onSaved={setCard}
+                  feeCents={form.billing?.rsvpFeeCents ?? 600}
+                  firstNightFree={Boolean(form.billing?.firstNightFree)}
+                />
               </div>
               {card === null && (
                 <button
@@ -641,7 +648,14 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             title="Hold it with a card"
             sub={form.billing?.firstNightFree ? "Your first night is free. After that, we charge after each night." : "We charge after each night."}
           >
-            <CardSetup ref={cardRef} token={token} card={card} onSaved={setCard} />
+            <CardSetup
+                  ref={cardRef}
+                  token={token}
+                  card={card}
+                  onSaved={setCard}
+                  feeCents={form.billing?.rsvpFeeCents ?? 600}
+                  firstNightFree={Boolean(form.billing?.firstNightFree)}
+                />
           </Section>
         )}
 
