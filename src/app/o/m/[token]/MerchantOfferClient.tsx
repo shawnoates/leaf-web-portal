@@ -25,7 +25,7 @@ import CardSetup, { type Card, type CardSetupHandle } from "./CardSetup";
 import NoticePrefs, { noticePayload, type Notices } from "./NoticePrefs";
 import { Brand, Choice, Closed, Field, Section, Shell, dollars, formatPhone, input, textarea } from "./ui";
 import NightPicker, { nightMeta, type Suggested } from "./NightPicker";
-import FreeNightCountdown, { CountdownCells, TYPICAL_RSVPS, useCountdown } from "./FreeNightCountdown";
+import FreeNightCountdown, { CountdownText, TYPICAL_RSVPS, useCountdown } from "./FreeNightCountdown";
 
 type DateOption = { dateKey: string; label: string };
 
@@ -646,10 +646,9 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         <div className="mx-auto max-w-lg">
           {error && <p className="mb-2 text-[14px] leading-snug text-red-600">{error}</p>}
           {freeLeft != null && (
-            <div className="mb-2.5">
-              <p className="mb-1.5 text-center text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-600">Your free night is held for</p>
-              <CountdownCells left={freeLeft} compact />
-            </div>
+            <p className="mb-2 text-center text-[14px] text-stone-600">
+              Your free night is held for <span className="text-[18px]"><CountdownText left={freeLeft} /></span>
+            </p>
           )}
           <button
             type="button"

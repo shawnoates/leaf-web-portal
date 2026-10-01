@@ -29,31 +29,13 @@ export function useCountdown(deadline: string | null | undefined, active: boolea
   return left > 0 ? left : null;
 }
 
-/** The four-cell timer. `compact` is the size for the sticky button bar. */
-export function CountdownCells({ left, compact = false }: { left: number; compact?: boolean }) {
+/** The time left as one line of text, e.g. "6d 23h 47m 41s". */
+export function CountdownText({ left }: { left: number }) {
   const p = parts(left);
-  const cells: [number, string][] = [
-    [p.d, compact ? "d" : "days"],
-    [p.h, compact ? "h" : "hrs"],
-    [p.m, compact ? "m" : "min"],
-    [p.s, compact ? "s" : "sec"],
-  ];
   return (
-    <div className={`grid grid-cols-4 ${compact ? "gap-1.5" : "gap-2"}`} role="timer" aria-live="off" aria-label={`${p.d} days ${p.h} hours ${p.m} minutes left`}>
-      {cells.map(([v, label]) =>
-        compact ? (
-          <div key={label} className="flex items-baseline justify-center gap-0.5 rounded-xl bg-[#f3d9a4] py-1.5">
-            <span className="font-fm-serif text-[20px] leading-none tabular-nums">{String(v).padStart(2, "0")}</span>
-            <span className="text-[11px] font-semibold text-stone-600">{label}</span>
-          </div>
-        ) : (
-          <div key={label} className="rounded-2xl bg-white/70 py-2 text-center">
-            <p className="font-fm-serif text-[30px] leading-none tabular-nums">{String(v).padStart(2, "0")}</p>
-            <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-stone-600">{label}</p>
-          </div>
-        ),
-      )}
-    </div>
+    <span className="font-fm-serif tabular-nums text-stone-900" role="timer" aria-live="off" aria-label={`${p.d} days ${p.h} hours ${p.m} minutes left`}>
+      {`${p.d}d ${String(p.h).padStart(2, "0")}h ${String(p.m).padStart(2, "0")}m ${String(p.s).padStart(2, "0")}s`}
+    </span>
   );
 }
 
