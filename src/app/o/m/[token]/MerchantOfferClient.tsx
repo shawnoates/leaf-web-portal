@@ -213,7 +213,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
     if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   }, [form]);
 
-  const toggle = (k: string) => setWindows((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]));
+  // One night: picking it books it. More nights are booked from the dashboard.
+  const toggle = (k: string) => setWindows((prev) => (prev.length === 1 && prev[0] === k ? [] : [k]));
 
   const perRsvp = form?.billing?.model === "per_rsvp";
   // The free-night clock rides on the button so it's always in view.
@@ -229,7 +230,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   if (!nightTitle.trim()) missing.push("a name for the night");
   if (!perRsvp && hasSpace === null) missing.push("whether you have room");
   if (!windows.length && !otherWindows.trim()) missing.push("a date");
-  if (phoneDigits.length < 10) missing.push("a phone for the night");
+  if (phoneDigits.length > 0 && phoneDigits.length < 10) missing.push("a full phone number (or leave it blank)");
 
   const saveCardOnly = async () => {
     setBusy(true);
@@ -573,7 +574,19 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           )}
         </Section>
 
-        <Section n={2} total={steps} title="Pick your nights" sub={`${form.startTimeLabel}. Tick every week that works; we book one at a time.`}>
+        <Section
+          n={2}
+          total={steps}
+          title={accepted ? "Your nights" : perRsvp && form.billing?.firstNightFree ? "Pick your free night" : "Pick your night"}
+          sub={
+            accepted
+              ? "Book more nights from your dashboard."
+              : `${form.dateOptions[0]?.label.split(", ")[0] ? `${form.dateOptions[0].label.split(", ")[0]}s` : "Weekly"} at ${form.startTimeLabel}. Pick one; you can book more from your dashboard.`
+          }
+        >
+          {form.dateOptions.length === 0 && (
+            <p className="rounded-xl bg-stone-50 p-3 text-[14px] text-stone-600">No open nights right now. Tell us what works below and we&rsquo;ll find one.</p>
+          )}
           <div className="grid grid-cols-2 gap-2">
             {form.dateOptions.map((d) => {
               const on = windows.includes(d.dateKey);
@@ -594,7 +607,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               );
             })}
           </div>
-          <Field label="None of these? Tell us what works">
+          <Field label="None of these work? Tell us what does">
             <input value={otherWindows} onChange={(e) => setOtherWindows(e.target.value)} placeholder="e.g. Tuesdays in November" className={input} />
           </Field>
         </Section>
@@ -670,7 +683,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             <Field label="Who should they ask for?" hint="Whoever's usually on. Someone else on a given night? Just tell us.">
               <input value={contactName} onChange={(e) => setContactName(e.target.value)} autoComplete="name" className={input} />
             </Field>
-            <Field label="Their phone for the night">
+            <Field label="Phone for the night (optional)" hint="The main line is fine. Only your host uses it, to find you on the night.">
               <input
                 value={contactPhone}
                 onChange={(e) => setContactPhone(formatPhone(e.target.value))}

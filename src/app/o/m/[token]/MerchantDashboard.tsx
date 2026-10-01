@@ -147,7 +147,7 @@ function NightContact({ token, n }: { token: string; n: Night }) {
             <input
               value={phone}
               onChange={(e) => setPhone(formatPhone(e.target.value))}
-              placeholder="(555) 555-5555"
+              placeholder="Phone (optional)"
               type="tel"
               inputMode="tel"
               className={input}
