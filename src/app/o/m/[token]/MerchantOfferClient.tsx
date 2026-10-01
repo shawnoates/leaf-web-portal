@@ -25,6 +25,7 @@ import CardSetup, { type Card, type CardSetupHandle } from "./CardSetup";
 import NoticePrefs, { noticePayload, type Notices } from "./NoticePrefs";
 import { Brand, Choice, Closed, Field, Section, Shell, dollars, formatPhone, input, textarea } from "./ui";
 import NightPicker, { nightMeta, type Suggested } from "./NightPicker";
+import MerchantDashboard from "./MerchantDashboard";
 import FreeNightCountdown, { CountdownText, TYPICAL_RSVPS, useCountdown } from "./FreeNightCountdown";
 
 type DateOption = { dateKey: string; label: string };
@@ -150,6 +151,17 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const [card, setCard] = useState<Card | null>(null);
   const [useOwn, setUseOwn] = useState(false);
   const [notices, setNotices] = useState<Notices | null>(null);
+  // Merchants who said yes land on their dashboard; the form is one tap away.
+  const [view, setView] = useState<"dashboard" | "form">("dashboard");
+  const [noDashboard, setNoDashboard] = useState(false);
+  const showForm = useCallback(() => setView("form"), []);
+  const dashboardUnavailable = useCallback(() => {
+    setNoDashboard(true);
+    setView("form");
+  }, []);
+  useEffect(() => {
+    if (typeof window !== "undefined" && !window.location.hash) window.scrollTo(0, 0);
+  }, [view]);
   const cardRef = useRef<CardSetupHandle>(null);
 
   const load = useCallback(async () => {
@@ -320,26 +332,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
     );
   }
 
-  if (done) {
-    return (
-      <Shell>
-        <Brand neighborhood={form.neighborhood} />
-        <div className="mt-8 rounded-3xl bg-leaf-800 p-6 text-white">
-          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">{done.updated ? "Saved" : "You're in"}</p>
-          <h1 className="mt-2 font-fm-serif text-[36px] leading-[1.02]">
-            {done.updated ? "Your changes are saved." : done.bookedDate ? `See you ${done.bookedDate}.` : "Thanks! We'll confirm your date."}
-          </h1>
-          <p className="mt-3 text-[15px] leading-relaxed text-leaf-100">
-            {done.updated
-              ? "We'll use the new details from here on."
-              : done.bookedDate
-                ? `${form.calendarName} neighbors can start RSVPing soon. We'll send the count 2 hours before${
-                    perRsvp && form.billing?.firstNightFree ? ", and this first night is on us" : ""
-                  }.`
-                : "Those weeks already have someone, so you're first in line for the next opening. We'll be in touch."}
-          </p>
-        </div>
-        <div className="mt-4 space-y-4">
+  const accountSections = (
+    <>
           {perRsvp && (
             <section id="card" className="scroll-mt-6 rounded-3xl bg-white p-5 shadow-sm">
               <h2 className="font-fm-serif text-[26px] text-stone-900">Card on file</h2>
@@ -367,10 +361,50 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             </section>
           )}
           {!perRsvp && Number(price) > 0 && <PayoutSetup token={token} />}
+    </>
+  );
+
+  if (done) {
+    return (
+      <Shell>
+        <Brand neighborhood={form.neighborhood} />
+        <div className="mt-8 rounded-3xl bg-leaf-800 p-6 text-white">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">{done.updated ? "Saved" : "You're in"}</p>
+          <h1 className="mt-2 font-fm-serif text-[36px] leading-[1.02]">
+            {done.updated ? "Your changes are saved." : done.bookedDate ? `See you ${done.bookedDate}.` : "Thanks! We'll confirm your date."}
+          </h1>
+          <p className="mt-3 text-[15px] leading-relaxed text-leaf-100">
+            {done.updated
+              ? "We'll use the new details from here on."
+              : done.bookedDate
+                ? `${form.calendarName} neighbors can start RSVPing soon. We'll send the count 2 hours before${
+                    perRsvp && form.billing?.firstNightFree ? ", and this first night is on us" : ""
+                  }.`
+                : "Those weeks already have someone, so you're first in line for the next opening. We'll be in touch."}
+          </p>
+        </div>
+        <div className="mt-4 space-y-4">
+          {accountSections}
           {error && <p className="text-[14px] text-red-600">{error}</p>}
+          {!noDashboard && (
+            <button
+              type="button"
+              onClick={() => {
+                setDone(null);
+                setView("dashboard");
+              }}
+              className="h-12 w-full rounded-xl border border-stone-300 text-[15px] font-semibold text-stone-800"
+            >
+              See your nights
+            </button>
+          )}
         </div>
       </Shell>
     );
+  }
+
+  if (form.state === "accepted" && view === "dashboard") {
+    return <MerchantDashboard token={token} onEdit={showForm} onUnavailable={dashboardUnavailable} account={accountSections} />;
   }
 
   const accepted = form.state === "accepted";
@@ -381,6 +415,11 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   return (
     <Shell>
       <Brand neighborhood={form.neighborhood} />
+      {accepted && !noDashboard && (
+        <button type="button" onClick={() => setView("dashboard")} className="mt-4 px-1 text-[15px] font-semibold text-leaf-700">
+          ← Back to your nights
+        </button>
+      )}
 
       <header className="mt-8 px-1">
         <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">{accepted ? "Your Leaf nights" : "An invitation from Leaf"}</p>
