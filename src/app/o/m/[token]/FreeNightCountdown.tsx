@@ -33,7 +33,7 @@ export function useCountdown(deadline: string | null | undefined, active: boolea
 export function CountdownText({ left }: { left: number }) {
   const p = parts(left);
   return (
-    <span className="font-fm-serif tabular-nums text-stone-900" role="timer" aria-live="off" aria-label={`${p.d} days ${p.h} hours ${p.m} minutes left`}>
+    <span className="font-fm-serif tabular-nums text-red-700" role="timer" aria-live="off" aria-label={`${p.d} days ${p.h} hours ${p.m} minutes left`}>
       {`${p.d}d ${String(p.h).padStart(2, "0")}h ${String(p.m).padStart(2, "0")}m ${String(p.s).padStart(2, "0")}s`}
     </span>
   );

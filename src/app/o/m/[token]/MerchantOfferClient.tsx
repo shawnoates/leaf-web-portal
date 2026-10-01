@@ -586,6 +586,28 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               Hosted night
             </Choice>
           </div>
+          {merchantHosts === true && (
+            <div className="rounded-2xl bg-leaf-50 p-4">
+              <p className="font-fm-serif text-[22px] leading-tight text-stone-900">Meet your new regulars</p>
+              <p className="mt-1 text-[14px] leading-snug text-stone-600">
+                Say hi at the door and show them to their table. That first hello is how a room of neighbors turns into faces you see every week.
+              </p>
+              <ul className="mt-3 space-y-2 text-[14px] leading-snug text-stone-700">
+                <li className="flex gap-2.5">
+                  <span aria-hidden className="text-leaf-600">●</span>
+                  <span>
+                    <strong className="font-semibold text-stone-900">Two minutes, not a shift.</strong> We send the invites, the RSVPs and the count.
+                  </span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span aria-hidden className="text-leaf-600">●</span>
+                  <span>
+                    <strong className="font-semibold text-stone-900">Learn a few names.</strong> People come back to places that know them.
+                  </span>
+                </li>
+              </ul>
+            </div>
+          )}
           {merchantHosts === false && (
             <div className="overflow-hidden rounded-2xl bg-leaf-50">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -623,10 +645,10 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             </div>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Your name">
+            <Field label="Who should they ask for?" hint="Whoever's usually on. Someone else on a given night? Just tell us.">
               <input value={contactName} onChange={(e) => setContactName(e.target.value)} autoComplete="name" className={input} />
             </Field>
-            <Field label="Phone for the night">
+            <Field label="Their phone for the night">
               <input
                 value={contactPhone}
                 onChange={(e) => setContactPhone(formatPhone(e.target.value))}
