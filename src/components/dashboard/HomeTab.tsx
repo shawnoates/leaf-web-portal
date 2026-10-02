@@ -487,6 +487,11 @@ export default function HomeTab({
               src ? `${src.follower_count} follower${src.follower_count === 1 ? "" : "s"} on ${src.name}` : null,
             ].filter(Boolean).join(" · ")}
           </p>
+          {promo.plan.money_line && (
+            <p className="text-[12px] text-amber-900 bg-amber-50 rounded-lg px-2.5 py-1.5 mt-1.5 leading-relaxed">
+              <b>Collects money.</b> {promo.plan.money_line}
+            </p>
+          )}
           {promo.note && (
             <p className="text-[12px] text-zinc-600 leading-relaxed mt-1.5 line-clamp-2">“{promo.note}”</p>
           )}

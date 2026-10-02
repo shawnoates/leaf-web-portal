@@ -143,6 +143,9 @@ export interface PromotionPlanSummary {
   image?: string | null;
   rsvp_count: number;
   require_approval?: boolean;
+  /** Set when the plan collects money peer to peer (the host's Venmo etc.):
+   *  one sentence for the owner deciding whether to add it. */
+  money_line?: string | null;
 }
 
 export interface PromotionCalendarSummary {

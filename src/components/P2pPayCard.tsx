@@ -63,6 +63,8 @@ type Payment = {
   p2pPayment: { amountCents: number | null; ticketCount: number | null; payByAt: string | null } | null;
   split?: Split | null;
   hostFirstName?: string;
+  /** The guest came through another calendar: the host's own calendar. */
+  hostingFrom?: string | null;
   seat?: Seat | null;
   note?: string;
   options?: PayOption[];
@@ -180,6 +182,10 @@ export default function P2pPayCard({
   const amountCents = seat?.amountCents ?? data.p2pPayment.amountCents ?? split?.shareCents ?? 0;
   const amount = money(amountCents);
   const brand = accent ? { background: accent, borderColor: accent } : undefined;
+  // Cross-promoted: say whose plan this is, so the guest knows who they're paying.
+  const fromLine = data.hostingFrom
+    ? <p className="p2p-from">{Host} is hosting this from {data.hostingFrom}.</p>
+    : null;
 
   // A seat we can't see: no session on this browser. The texted link signs
   // them in, so point there rather than asking for a phone again.
@@ -200,6 +206,7 @@ export default function P2pPayCard({
     return (
       <div className="p2p">
         <style>{CSS}</style>
+        {fromLine}
         {split.headcount < split.minHeadcount ? (
           // Below the minimum the running share is above the range guests were
           // shown; they only pay that if the host locks anyway and tells them.
@@ -243,6 +250,7 @@ export default function P2pPayCard({
     return (
       <div className="p2p">
         <style>{CSS}</style>
+        {fromLine}
         <p className="p2p-h">Paid · waiting on {host} to confirm</p>
         <p className="p2p-sub">
           You sent {amount}{seat.method ? ` on ${LABELS[seat.method]}` : ""}. Your spot is safe while you wait
@@ -270,6 +278,7 @@ export default function P2pPayCard({
   return (
     <div className="p2p">
       <style>{CSS}</style>
+      {fromLine}
       <p className="p2p-h">Pay {host} {amount}</p>
       {split?.locked && (
         <p className="p2p-sub">Your share of {money(split.totalCents)}, split {split.headcount} ways.</p>
@@ -387,6 +396,7 @@ const CSS = `
 .p2p-loading{min-height:120px;background:#faf9f7}
 .p2p-done{background:#f3f7f5;border-color:rgba(37,58,51,.3)}
 .p2p-h{font-size:16px;font-weight:600;margin:0}
+.p2p-from{margin:0 0 6px;font-size:11.5px;color:#8b8578}
 .p2p-sub{color:#6f6a5f;margin:4px 0 0}
 .p2p-warn{color:#9a3412;background:#fff7ed;border-radius:8px;padding:8px 10px;margin:8px 0 0}
 .p2p-ref{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding:8px 10px;background:#faf9f7;border-radius:8px;color:#6f6a5f;font-size:12px}

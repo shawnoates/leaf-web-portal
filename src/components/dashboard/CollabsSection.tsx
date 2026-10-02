@@ -198,6 +198,11 @@ export default function CollabsSection({
                           multiCal && p.target_calendar ? `to ${p.target_calendar.name}` : null,
                         ].filter(Boolean).join(" · ")}
                       </p>
+                      {p.plan.money_line && (
+                        <p className="text-[12px] text-amber-900 bg-amber-50 rounded-lg px-2.5 py-1.5 mt-1.5 leading-relaxed">
+                          <b>Collects money.</b> {p.plan.money_line}
+                        </p>
+                      )}
                     </div>
                     {p.status === "pending" ? (
                       <div className="flex gap-2 shrink-0">
