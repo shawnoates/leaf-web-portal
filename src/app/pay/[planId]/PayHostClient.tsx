@@ -5,7 +5,7 @@ import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
 
-type Status = "unpaid" | "claimed" | "confirmed" | "expired";
+type Status = "pending_lock" | "unpaid" | "claimed" | "confirmed" | "expired";
 type Method = "venmo" | "cashapp" | "paypal" | "zelle";
 
 type Guest = {
@@ -23,8 +23,28 @@ type Guest = {
   notReceived: boolean;
 };
 
+/** "Split a total": the share comes from the headcount, fixed when it locks. */
+type Split = {
+  totalCents: number;
+  minHeadcount: number;
+  maxHeadcount: number;
+  hostInSplit: boolean;
+  lowCents: number;
+  highCents: number;
+  locked: boolean;
+  lockedHeadcount: number | null;
+  shareCents: number;
+  headcount: number;
+  belowMin: boolean;
+  autoLockAt: string | null;
+};
+
+type LockPreview = { needsConfirm: true; headcount: number; guests: number; shareCents: number; belowMin: boolean };
+
 type Roster = {
-  p2pPayment: { amountCents: number; ticketCount: number; hostHasTicket: boolean } | null;
+  p2pPayment: { mode?: "fixed" | "split"; amountCents?: number | null; ticketCount?: number; hostHasTicket?: boolean } | null;
+  split?: Split | null;
+  canLock?: boolean;
   title?: string;
   startsAt?: string | null;
   capacity?: number | null;
@@ -58,6 +78,7 @@ function when(iso: string): string {
 }
 
 function statusLine(g: Guest): string {
+  if (g.status === "pending_lock") return "In · pays once you lock the split";
   if (g.status === "confirmed") return g.confirmedBy === "auto" ? "Paid · confirmed automatically" : "Paid";
   if (g.status === "claimed") {
     return `Says they paid${g.method ? ` on ${LABELS[g.method]}` : ""}${g.autoConfirmAt ? ` · confirms itself ${when(g.autoConfirmAt)}` : ""}`;
@@ -156,6 +177,29 @@ export default function PayHostClient({
     }
   };
 
+  // Split: lock the headcount. Below the minimum the server answers with
+  // the higher share first, and this asks before locking with force.
+  const [lockAsk, setLockAsk] = useState<LockPreview | null>(null);
+  const lock = async (force = false) => {
+    setBusyId("lock");
+    setError(null);
+    try {
+      const r = (await Parse.Cloud.run("lockP2pSplit", params({ eventGroupId: planId, force }))) as
+        LockPreview | { locked: true; shareCents: number; headcount: number; guests: number };
+      if ("needsConfirm" in r) {
+        setLockAsk(r);
+      } else {
+        setLockAsk(null);
+        setToast(`Locked: ${money(r.shareCents)} each, ${r.headcount} people. We told ${r.guests} ${r.guests === 1 ? "guest" : "guests"} what to pay.`);
+        void load();
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't lock the split.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const focus = useMemo(
     () => (confirmId && roster ? roster.guests.find((g) => g.eventNotificationId === confirmId) || null : null),
     [confirmId, roster],
@@ -189,7 +233,9 @@ export default function PayHostClient({
     const collected = roster.confirmedCents || 0;
     const target = roster.toCollectCents || 0;
     const pct = target ? Math.min(100, Math.round((collected / target) * 100)) : 0;
-    const order: Record<Status, number> = { claimed: 0, unpaid: 1, confirmed: 2, expired: 3 };
+    const order: Record<Status, number> = { claimed: 0, unpaid: 1, pending_lock: 2, confirmed: 3, expired: 4 };
+    const split = roster.split || null;
+    const waiting = guests.filter((g) => g.status === "pending_lock").length;
     const sorted = [...guests].sort((a, b) => order[a.status] - order[b.status]);
 
     body = (
@@ -215,16 +261,61 @@ export default function PayHostClient({
           </div>
           <div className="ph-bar"><span style={{ width: `${pct}%` }} /></div>
           <p className="ph-muted ph-small">
-            {money(roster.p2pPayment.amountCents)} a spot · you spent {money(roster.spentCents || 0)}
+            {split
+              ? `${money(split.shareCents)} each${split.locked ? `, ${split.headcount} people` : " right now"} · you spent ${money(roster.spentCents || 0)}`
+              : `${money(roster.p2pPayment.amountCents || 0)} a spot · you spent ${money(roster.spentCents || 0)}`}
             {(roster.claimedCents || 0) > 0 ? ` · ${money(roster.claimedCents || 0)} waiting on you` : ""}
           </p>
           <div className="ph-chips">
-            <span>{confirmed} paid</span>
-            <span className={claimed ? "warn" : ""}>{claimed} to confirm</span>
-            <span>{unpaid} unpaid</span>
-            <span>{open} open</span>
+            {split && !split.locked ? (
+              <>
+                <span>{split.headcount} in{split.hostInSplit ? " (with you)" : ""}</span>
+                <span className={split.belowMin ? "warn" : ""}>needs {split.minHeadcount}</span>
+                <span>room for {split.maxHeadcount}</span>
+              </>
+            ) : (
+              <>
+                <span>{confirmed} paid</span>
+                <span className={claimed ? "warn" : ""}>{claimed} to confirm</span>
+                <span>{unpaid} unpaid</span>
+                <span>{open} open</span>
+              </>
+            )}
           </div>
         </div>
+
+        {split && !split.locked && (
+          <div className="ph-lock">
+            <p className="ph-lock-h">
+              Splitting {money(split.totalCents)} · {money(split.shareCents)} each with {split.headcount} people
+            </p>
+            <p className="ph-muted ph-small">
+              Guests pay once you lock the headcount: {money(split.lowCents)} each if {split.maxHeadcount} come,
+              {" "}{money(split.highCents)} at {split.minHeadcount}.
+              {split.autoLockAt ? ` It locks on its own ${when(split.autoLockAt)}${split.belowMin ? " — unless fewer than " + split.minHeadcount + " are in, then we'll ask you" : ""}.` : ""}
+              {" "}Locking closes RSVPs at that headcount.
+            </p>
+            {lockAsk ? (
+              <div className="ph-lock-ask">
+                <p>
+                  Only {lockAsk.headcount} of the {split.minHeadcount} people you needed. Locking now makes it
+                  {" "}<b>{money(lockAsk.shareCents)} each</b> — more than the {money(split.highCents)} guests saw.
+                  We&apos;ll tell them before they pay.
+                </p>
+                <div className="ph-row-actions">
+                  <button className="ph-btn primary sm" disabled={busyId === "lock"} onClick={() => lock(true)}>Lock at {money(lockAsk.shareCents)} each</button>
+                  <button className="ph-btn ghost sm" disabled={busyId === "lock"} onClick={() => setLockAsk(null)}>Not yet</button>
+                </div>
+                <p className="ph-muted ph-small">To call it off, cancel the plan from the plan page.</p>
+              </div>
+            ) : (
+              <button className="ph-btn primary wide" disabled={!roster.canLock || busyId === "lock"} onClick={() => lock(false)}>
+                {roster.canLock ? `Lock at ${split.headcount} people · ${money(split.shareCents)} each` : "Lock once someone joins"}
+              </button>
+            )}
+            {waiting > 0 && <p className="ph-muted ph-small">{waiting} {waiting === 1 ? "guest is" : "guests are"} waiting to hear their share.</p>}
+          </div>
+        )}
 
         {unpaid > 0 && (
           <button className="ph-btn ghost wide" disabled={!roster.canNudge || busyId === "nudge"} onClick={nudge}>
@@ -288,9 +379,14 @@ export default function PayHostClient({
 function Setup({ planId, roster, onDone }: { planId: string; roster: Roster; onDone: () => void }) {
   const [handles, setHandles] = useState<PayHandles | null | undefined>(undefined);
   const [editingHandles, setEditingHandles] = useState(false);
+  const [mode, setMode] = useState<"fixed" | "split">("fixed");
   const [price, setPrice] = useState("");
   const [spots, setSpots] = useState(roster.capacity ? String(roster.capacity + 1) : "");
   const [mine, setMine] = useState(true);
+  // Split a total
+  const [total, setTotal] = useState("");
+  const [minPeople, setMinPeople] = useState("");
+  const [maxPeople, setMaxPeople] = useState(roster.capacity ? String(roster.capacity + 1) : "");
   const [hold, setHold] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -304,18 +400,25 @@ function Setup({ planId, roster, onDone }: { planId: string; roster: Roster; onD
   const cents = Math.round(parseFloat(price || "0") * 100);
   const count = parseInt(spots || "0", 10);
   const guestSpots = count - (mine ? 1 : 0);
+  const totalCents = Math.round(parseFloat(total || "0") * 100);
+  const minN = parseInt(minPeople || "0", 10);
+  const maxN = parseInt(maxPeople || "0", 10);
+  const splitOk = totalCents >= 100 && minN >= 2 && maxN >= minN && maxN - (mine ? 1 : 0) >= 1;
+  const ready = mode === "split" ? splitOk : cents >= 100 && guestSpots >= 1;
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await Parse.Cloud.run("setPlanP2pPayment", {
-        eventGroupId: planId,
-        amountCents: cents,
-        ticketCount: count,
-        hostHasTicket: mine,
-        holdHours: hold ? Number(hold) : null,
-      });
+      await Parse.Cloud.run("setPlanP2pPayment", mode === "split"
+        ? {
+          eventGroupId: planId, mode: "split", totalCents, minHeadcount: minN, maxHeadcount: maxN,
+          hostInSplit: mine, holdHours: hold ? Number(hold) : null,
+        }
+        : {
+          eventGroupId: planId, amountCents: cents, ticketCount: count, hostHasTicket: mine,
+          holdHours: hold ? Number(hold) : null,
+        });
       onDone();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't turn this on.");
@@ -343,6 +446,43 @@ function Setup({ planId, roster, onDone }: { planId: string; roster: Roster; onD
     <div className="ph-setup">
       <p className="ph-setup-h">Collect money for this plan</p>
       <p className="ph-muted">You bought the tickets or booked the spot; everyone who joins pays you back.</p>
+      <div className="ph-seg" role="radiogroup" aria-label="How guests pay">
+        <button role="radio" aria-checked={mode === "fixed"} className={mode === "fixed" ? "on" : ""} onClick={() => setMode("fixed")}>
+          Price per spot<small>Tickets, a set price</small>
+        </button>
+        <button role="radio" aria-checked={mode === "split"} className={mode === "split" ? "on" : ""} onClick={() => setMode("split")}>
+          Split a total<small>A court, a table — depends on headcount</small>
+        </button>
+      </div>
+      {mode === "split" ? (
+        <>
+          <label className="ph-field">
+            <span>Total you paid</span>
+            <div className="ph-money"><b>$</b><input inputMode="decimal" value={total} placeholder="120" onChange={(e) => setTotal(e.target.value.replace(/[^\d.]/g, "").slice(0, 8))} /></div>
+          </label>
+          <div className="ph-grid">
+            <label className="ph-field">
+              <span>Fewest people</span>
+              <input inputMode="numeric" value={minPeople} placeholder="4" onChange={(e) => setMinPeople(e.target.value.replace(/\D/g, "").slice(0, 3))} />
+            </label>
+            <label className="ph-field">
+              <span>Most people</span>
+              <input inputMode="numeric" value={maxPeople} placeholder="8" onChange={(e) => setMaxPeople(e.target.value.replace(/\D/g, "").slice(0, 3))} />
+            </label>
+          </div>
+          <label className="ph-check">
+            <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} />
+            <span>Count me in the split</span>
+          </label>
+          {splitOk && (
+            <p className="ph-calc">
+              {money(Math.ceil(totalCents / maxN))}–{money(Math.ceil(totalCents / minN))} each, depending on how many come.
+              It locks a day before the plan, or when you lock it.
+            </p>
+          )}
+        </>
+      ) : (
+      <>
       <div className="ph-grid">
         <label className="ph-field">
           <span>Price per spot</span>
@@ -362,8 +502,12 @@ function Setup({ planId, roster, onDone }: { planId: string; roster: Roster; onD
           {guestSpots} {guestSpots === 1 ? "spot" : "spots"} for guests · you&apos;ll collect {money(cents * guestSpots)} of the {money(cents * count)} you spent
         </p>
       )}
+      </>
+      )}
       {(roster.going || 0) > 0 && (
-        <p className="ph-muted ph-small">{roster.going} already going will be asked to pay too.</p>
+        <p className="ph-muted ph-small">
+          {roster.going} already going will be asked to pay too{mode === "split" ? " once it locks" : ""}.
+        </p>
       )}
       <label className="ph-field">
         <span>Hold a spot while they pay</span>
@@ -376,7 +520,7 @@ function Setup({ planId, roster, onDone }: { planId: string; roster: Roster; onD
         <button className="ph-link" onClick={() => setEditingHandles(true)}>Edit</button>
       </div>
       {error && <p className="ph-err">{error}</p>}
-      <button className="ph-btn primary wide" disabled={busy || !(cents >= 100) || !(guestSpots >= 1)} onClick={submit}>
+      <button className="ph-btn primary wide" disabled={busy || !ready} onClick={submit}>
         {busy ? "Turning on…" : "Start collecting"}
       </button>
     </div>
@@ -439,5 +583,12 @@ const CSS = `
 .ph-check{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
 .ph-calc{font-size:13px;background:#f3f7f5;color:#253a33;border-radius:8px;padding:8px 10px}
 .ph-paidto{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:#6f6a5f;background:#faf9f7;border-radius:8px;padding:9px 11px}
-@media (max-width:420px){.ph-grid{grid-template-columns:1fr}}
+.ph-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ph-seg button{display:grid;gap:2px;text-align:left;border:1px solid rgba(0,0,0,.15);border-radius:10px;background:#fff;padding:10px 12px;font:inherit;font-size:13px;font-weight:600;color:#17150f;cursor:pointer}
+.ph-seg button small{font-size:11.5px;font-weight:400;color:#8b8578}
+.ph-seg button.on{border-color:#17150f;background:#faf9f7;box-shadow:inset 0 0 0 1px #17150f}
+.ph-lock{background:#fff;border:1px solid rgba(0,0,0,.09);border-radius:14px;padding:16px;display:grid;gap:10px}
+.ph-lock-h{font-size:15px;font-weight:600}
+.ph-lock-ask{background:#fff7ed;border-radius:10px;padding:12px;display:grid;gap:8px;font-size:13px;color:#7c2d12}
+@media (max-width:420px){.ph-grid{grid-template-columns:1fr}.ph-seg{grid-template-columns:1fr}}
 `;

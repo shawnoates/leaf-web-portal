@@ -367,6 +367,16 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   const collectCents = Math.round(parseFloat(collectPrice || "0") * 100);
   const collectCount = parseInt(collectSpots || "0", 10);
   const collectGuestSpots = collectCount - (spotIsMine ? 1 : 0);
+  // "split": a total (a court) divided by however many come, locked later.
+  const [collectMode, setCollectMode] = useState<"fixed" | "split">("fixed");
+  const [splitTotal, setSplitTotal] = useState("");
+  const [splitMin, setSplitMin] = useState("");
+  const [splitMax, setSplitMax] = useState("");
+  const splitting = collecting && collectMode === "split";
+  const splitTotalCents = Math.round(parseFloat(splitTotal || "0") * 100);
+  const splitMinN = parseInt(splitMin || "0", 10);
+  const splitMaxN = parseInt(splitMax || "0", 10);
+  const splitGuestSpots = splitMaxN - (spotIsMine ? 1 : 0);
   const hostedRuleOptions = useMemo<RuleOption[]>(() => {
     const out: RuleOption[] = [];
     if (!hostIsOther) {
@@ -1103,7 +1113,15 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
 
     // A follower-hosted series may leave the first date to its host.
     if (!date && !hostIsOther) return;
-    if (collecting) {
+    if (splitting) {
+      const problem = !(splitTotalCents >= 100) ? "Enter the total you paid."
+        : !(splitMinN >= 2) ? "A split needs at least 2 people."
+        : !(splitMaxN >= splitMinN) ? "The most people must be at least the fewest."
+        : splitGuestSpots < 1 ? "There's no room left for guests."
+        : !payHandles ? "Add how guests should pay you."
+        : null;
+      if (problem) { alert(problem); return; }
+    } else if (collecting) {
       const problem = !(collectCents >= 100) ? "Price per spot must be at least $1."
         : !(collectCount >= 1) ? "How many tickets or spots do you have?"
         : collectGuestSpots < 1 ? "With one spot for you, there are none left for guests."
@@ -1297,7 +1315,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
           date: `${date}T${time || "12:00"}:00${tzSuffix}`,
           time: time || null,
-          capacity: collecting ? collectGuestSpots : capacity ? parseInt(capacity) : null,
+          capacity: splitting ? splitGuestSpots : collecting ? collectGuestSpots : capacity ? parseInt(capacity) : null,
           isHosted,
           imageBase64: imageBase64 || undefined,
           imageUrl: !imageBase64 ? (selectedImageUrl || prefill?.imageUrl || undefined) : undefined,
@@ -1318,12 +1336,15 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
         // standing and says where to retry.
         if (collecting && created?.type !== "idea" && created?.eventGroupId) {
           try {
-            await Parse.Cloud.run("setPlanP2pPayment", {
-              eventGroupId: created.eventGroupId,
-              amountCents: collectCents,
-              ticketCount: collectCount,
-              hostHasTicket: spotIsMine,
-            });
+            await Parse.Cloud.run("setPlanP2pPayment", splitting
+              ? {
+                eventGroupId: created.eventGroupId, mode: "split", totalCents: splitTotalCents,
+                minHeadcount: splitMinN, maxHeadcount: splitMaxN, hostInSplit: spotIsMine,
+              }
+              : {
+                eventGroupId: created.eventGroupId, amountCents: collectCents,
+                ticketCount: collectCount, hostHasTicket: spotIsMine,
+              });
           } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : "Collecting money didn't turn on.";
             alert(`Plan created, but collecting money didn't turn on: ${msg} Turn it on from the plan's Payments page.`);
@@ -2221,6 +2242,69 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
               </div>
               {collect && (
                 <>
+                  <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="How guests pay">
+                    {(["fixed", "split"] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        role="radio"
+                        aria-checked={collectMode === m}
+                        onClick={() => setCollectMode(m)}
+                        className={`text-left rounded-lg border px-3 py-2 text-xs font-medium ${collectMode === m ? "border-zinc-900 bg-zinc-50 text-zinc-900" : "border-zinc-200 text-zinc-500"}`}
+                      >
+                        {m === "fixed" ? "Price per spot" : "Split a total"}
+                        <span className="block font-normal text-[11px] text-zinc-400">{m === "fixed" ? "Tickets, a set price" : "A court — depends on headcount"}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {collectMode === "split" ? (
+                    <>
+                      <div className="flex gap-4">
+                        <div className="flex-1">
+                          <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Total paid</label>
+                          <input
+                            inputMode="decimal"
+                            value={splitTotal}
+                            onChange={(e) => setSplitTotal(e.target.value.replace(/[^\d.]/g, "").slice(0, 8))}
+                            className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                            placeholder="$120"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Fewest</label>
+                          <input
+                            inputMode="numeric"
+                            value={splitMin}
+                            onChange={(e) => setSplitMin(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                            className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                            placeholder="4"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Most</label>
+                          <input
+                            inputMode="numeric"
+                            value={splitMax}
+                            onChange={(e) => setSplitMax(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                            className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                            placeholder="8"
+                          />
+                        </div>
+                      </div>
+                      <label className="flex items-center gap-2 text-xs text-zinc-600 cursor-pointer select-none">
+                        <input type="checkbox" checked={spotIsMine} onChange={(e) => setSpotIsMine(e.target.checked)} className="w-4 h-4 accent-zinc-900" />
+                        Count me in the split
+                      </label>
+                      {splitTotalCents >= 100 && splitMinN >= 2 && splitMaxN >= splitMinN && (
+                        <p className="text-xs text-emerald-900 bg-emerald-50 rounded-lg px-3 py-2">
+                          ${(Math.ceil(splitTotalCents / splitMaxN) / 100).toFixed(Math.ceil(splitTotalCents / splitMaxN) % 100 ? 2 : 0)}–$
+                          {(Math.ceil(splitTotalCents / splitMinN) / 100).toFixed(Math.ceil(splitTotalCents / splitMinN) % 100 ? 2 : 0)} each,
+                          {" "}depending on how many come. Locks a day before, or when you lock it.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                  <>
                   <div className="flex gap-4">
                     <div className="flex-1">
                       <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Price per spot</label>
@@ -2252,6 +2336,8 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
                       {collectGuestSpots} {collectGuestSpots === 1 ? "spot" : "spots"} for guests · a full plan pays you back $
                       {((collectCents * collectGuestSpots) / 100).toFixed((collectCents * collectGuestSpots) % 100 ? 2 : 0)}
                     </p>
+                  )}
+                  </>
                   )}
                   {payHandles === undefined ? null : !payHandles || editingHandles ? (
                     <div className="border border-zinc-200 rounded-xl p-3">

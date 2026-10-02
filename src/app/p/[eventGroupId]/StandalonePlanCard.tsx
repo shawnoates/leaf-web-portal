@@ -9,6 +9,7 @@ import HostIntroInline from "@/components/HostIntroInline";
 import { introVideoFrame } from "@/lib/intro-video-frame";
 import PlanWhen from "./PlanWhen";
 import StandalonePlanRsvp from "./StandalonePlanRsvp";
+import type { P2pSplitSummary } from "@/lib/p2p";
 
 type Variant = "standalone" | "copy" | "privateCalendar";
 
@@ -61,6 +62,7 @@ type Props = {
   capacity: number | null;
   /** Host collects peer to peer: price per spot, paid to them after RSVP. */
   p2pAmountCents?: number | null;
+  p2pSplit?: P2pSplitSummary | null;
   // RSVP closes at start time; replaces the button with a disabled state.
   rsvpClosed: boolean;
   // Set when /p/<id>?rsvp=1 — the visitor was bounced back from
@@ -89,6 +91,7 @@ export default function StandalonePlanCard({
   rsvpCount,
   capacity,
   p2pAmountCents = null,
+  p2pSplit = null,
   rsvpClosed,
   autoOpenRsvp,
 }: Props) {
@@ -297,6 +300,7 @@ export default function StandalonePlanCard({
                 }
                 requireApproval={requireApproval}
                 p2pAmountCents={p2pAmountCents}
+                p2pSplit={p2pSplit}
                 isFull={isFull}
                 rsvpClosed={rsvpClosed}
                 autoOpenRsvp={autoOpenRsvp}

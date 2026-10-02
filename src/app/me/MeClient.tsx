@@ -6,6 +6,7 @@ import { CalendarPlus, Heart, Repeat } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import HostIdeaModal from "@/components/HostIdeaModal";
 import P2pPayCard from "@/components/P2pPayCard";
+import { collectsMoney, type P2pSplitSummary } from "@/lib/p2p";
 import { HostIntroPlayer } from "@/components/HostIntroTile";
 import CommunityQualifierCard, {
   type QualifierCalendar,
@@ -117,6 +118,8 @@ interface Plan {
   /** The host collects this much per spot, peer to peer (Venmo, Cash App,
    *  PayPal, Zelle). The seat's own payment state comes from getP2pPayment. */
   p2pAmountCents?: number | null;
+  /** The host splits a total between however many come (until it locks). */
+  p2pSplit?: P2pSplitSummary | null;
   /** A seat opened and the server offered it to this viewer (rsvpState is
    *  "waitlisted"). First to claim wins — see claimWaitlistSpot. */
   waitlistOffered?: boolean;
@@ -1343,7 +1346,7 @@ function Hero({
         </div>
       )}
       <HeroActions plan={plan} onRsvp={onRsvp} />
-      {plan.rsvpState === "going" && (plan.p2pAmountCents ?? 0) > 0 && (
+      {plan.rsvpState === "going" && collectsMoney(plan.p2pAmountCents, plan.p2pSplit) && (
         <div className="hero-pay"><P2pPayCard planId={plan.id} /></div>
       )}
     </section>
@@ -2651,7 +2654,7 @@ function PlanModal({
               <a className="btn ghost" href={dir} target="_blank" rel="noopener noreferrer">Getting there</a>
             )}
           </div>
-          {plan.rsvpState === "going" && (plan.p2pAmountCents ?? 0) > 0 && (
+          {plan.rsvpState === "going" && collectsMoney(plan.p2pAmountCents, plan.p2pSplit) && (
             <div style={{ marginTop: 14 }}><P2pPayCard planId={plan.id} /></div>
           )}
           <Thread plan={plan} />
@@ -2674,7 +2677,7 @@ function PlanModal({
             {/* Host side of peer-to-peer payments: the roster, or setting it up. */}
             {(viewerHosts(plan) || plan.viewerIsOwner) && (
               <Link href={`/pay/${plan.id}`} className="btn ghost">
-                {(plan.p2pAmountCents ?? 0) > 0 ? "Payments" : "Collect money"}
+                {collectsMoney(plan.p2pAmountCents, plan.p2pSplit) ? "Payments" : "Collect money"}
               </Link>
             )}
           </div>

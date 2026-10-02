@@ -101,6 +101,10 @@ export interface NewPlanDraftSnapshot {
   price?: string;
   spots?: string;
   spotIsMine?: boolean;
+  collectMode?: "fixed" | "split";
+  total?: string;
+  minPeople?: string;
+  maxPeople?: string;
 }
 
 export default function NewPlanModal({
@@ -164,6 +168,11 @@ export default function NewPlanModal({
   const [price, setPrice] = useState(restore?.price ?? "");
   const [spots, setSpots] = useState(restore?.spots ?? "");
   const [spotIsMine, setSpotIsMine] = useState(restore?.spotIsMine ?? true);
+  // "split": a total (a court) divided by however many come, locked later.
+  const [collectMode, setCollectMode] = useState<"fixed" | "split">(restore?.collectMode ?? "fixed");
+  const [total, setTotal] = useState(restore?.total ?? "");
+  const [minPeople, setMinPeople] = useState(restore?.minPeople ?? "");
+  const [maxPeople, setMaxPeople] = useState(restore?.maxPeople ?? "");
   // undefined = not fetched yet; null = none saved.
   const [handles, setHandles] = useState<PayHandles | null | undefined>(undefined);
   const [editingHandles, setEditingHandles] = useState(false);
@@ -176,6 +185,11 @@ export default function NewPlanModal({
   const priceCents = Math.round(parseFloat(price || "0") * 100);
   const spotCount = parseInt(spots || "0", 10);
   const guestSpots = spotCount - (spotIsMine ? 1 : 0);
+  const splitting = collect && collectMode === "split";
+  const totalCents = Math.round(parseFloat(total || "0") * 100);
+  const minN = parseInt(minPeople || "0", 10);
+  const maxN = parseInt(maxPeople || "0", 10);
+  const splitGuestSpots = maxN - (spotIsMine ? 1 : 0);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverBase64, setCoverBase64] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -367,7 +381,13 @@ export default function NewPlanModal({
     if (!collect && capacity.trim() && (!/^\d+$/.test(capacity.trim()) || Number(capacity) < 1)) {
       next.capacity = "Capacity must be 1 or more.";
     }
-    if (collect) {
+    if (splitting) {
+      if (!(totalCents >= 100)) next.collect = "Enter the total you paid.";
+      else if (!(minN >= 2)) next.collect = "A split needs at least 2 people.";
+      else if (!(maxN >= minN)) next.collect = "The most people must be at least the fewest.";
+      else if (splitGuestSpots < 1) next.collect = "There's no room left for guests.";
+      else if (!handles) next.collect = "Add how guests should pay you.";
+    } else if (collect) {
       if (!(priceCents >= 100)) next.collect = "Price per spot must be at least $1.";
       else if (!(spotCount >= 1)) next.collect = "How many tickets or spots do you have?";
       else if (guestSpots < 1) next.collect = "With one spot for you, there are none left for guests.";
@@ -396,7 +416,7 @@ export default function NewPlanModal({
         description: description.trim() || undefined,
         venue: venuePayload,
         time: startTime,
-        capacity: collect ? guestSpots : capacity.trim() ? parseInt(capacity, 10) : null,
+        capacity: splitting ? splitGuestSpots : collect ? guestSpots : capacity.trim() ? parseInt(capacity, 10) : null,
         imageBase64: coverBase64 || undefined,
         hostNote: hostNote.trim() || undefined,
         hideVenueUntilRsvp: hideVenue,
@@ -416,9 +436,9 @@ export default function NewPlanModal({
       let collectError: string | null = null;
       if (collect && eventGroupId) {
         try {
-          await Parse.Cloud.run("setPlanP2pPayment", {
-            eventGroupId, amountCents: priceCents, ticketCount: spotCount, hostHasTicket: spotIsMine,
-          });
+          await Parse.Cloud.run("setPlanP2pPayment", splitting
+            ? { eventGroupId, mode: "split", totalCents, minHeadcount: minN, maxHeadcount: maxN, hostInSplit: spotIsMine }
+            : { eventGroupId, amountCents: priceCents, ticketCount: spotCount, hostHasTicket: spotIsMine });
         } catch (e: unknown) {
           collectError = e instanceof Error ? e.message : "Collecting money didn't turn on.";
         }
@@ -459,6 +479,7 @@ export default function NewPlanModal({
         prompt, draftApplied, title, description, date, time,
         venueQuery, venue, capacity, hostNote, postTo,
         hideVenue, requireApproval, collect, price, spots, spotIsMine,
+        collectMode, total, minPeople, maxPeople,
       };
       try { sessionStorage.setItem(ME_PLAN_DRAFT_KEY, JSON.stringify(snapshot)); } catch { /* ignore */ }
       const returnUrl = new URL(window.location.href);
@@ -620,6 +641,62 @@ export default function NewPlanModal({
       />
       {collect && (
         <div className="np-collect-body">
+          <div className="np-seg" role="radiogroup" aria-label="How guests pay">
+            <button type="button" role="radio" aria-checked={collectMode === "fixed"} className={collectMode === "fixed" ? "on" : ""} onClick={() => setCollectMode("fixed")}>
+              PRICE PER SPOT
+            </button>
+            <button type="button" role="radio" aria-checked={collectMode === "split"} className={collectMode === "split" ? "on" : ""} onClick={() => setCollectMode("split")}>
+              SPLIT A TOTAL
+            </button>
+          </div>
+          {collectMode === "split" ? (
+            <>
+              <div className="np-row">
+                <div className="np-col">
+                  <div className="np-label sm">TOTAL YOU PAID</div>
+                  <input
+                    className="np-under"
+                    inputMode="decimal"
+                    value={total}
+                    placeholder="$120"
+                    onChange={(e) => setTotal(e.target.value.replace(/[^\d.]/g, "").slice(0, 8))}
+                  />
+                </div>
+                <div className="np-col">
+                  <div className="np-label sm">FEWEST</div>
+                  <input
+                    className="np-under"
+                    inputMode="numeric"
+                    value={minPeople}
+                    placeholder="4"
+                    onChange={(e) => setMinPeople(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                  />
+                </div>
+                <div className="np-col">
+                  <div className="np-label sm">MOST</div>
+                  <input
+                    className="np-under"
+                    inputMode="numeric"
+                    value={maxPeople}
+                    placeholder="8"
+                    onChange={(e) => setMaxPeople(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                  />
+                </div>
+              </div>
+              <label className="np-mine">
+                <input type="checkbox" checked={spotIsMine} onChange={(e) => setSpotIsMine(e.target.checked)} />
+                Count me in the split
+              </label>
+              {totalCents >= 100 && minN >= 2 && maxN >= minN && (
+                <div className="np-collect-calc">
+                  ${(Math.ceil(totalCents / maxN) / 100).toFixed(Math.ceil(totalCents / maxN) % 100 ? 2 : 0)}–$
+                  {(Math.ceil(totalCents / minN) / 100).toFixed(Math.ceil(totalCents / minN) % 100 ? 2 : 0)} each,
+                  {" "}depending on how many come. Locks a day before, or when you lock it.
+                </div>
+              )}
+            </>
+          ) : (
+          <>
           <div className="np-row">
             <div className="np-col">
               <div className="np-label sm">PRICE PER SPOT</div>
@@ -651,6 +728,8 @@ export default function NewPlanModal({
               {guestSpots} {guestSpots === 1 ? "spot" : "spots"} for guests at ${(priceCents / 100).toFixed(priceCents % 100 ? 2 : 0)}
               {" "}· full plan pays you back ${((priceCents * guestSpots) / 100).toFixed((priceCents * guestSpots) % 100 ? 2 : 0)}
             </div>
+          )}
+          </>
           )}
           {handles === undefined ? null : !handles || editingHandles ? (
             <div className="np-handles">
@@ -1033,6 +1112,9 @@ const NP_CSS = `
 .np-side{width:264px;flex:none}
 .np-row{display:flex;gap:14px}
 .np-collect-body{display:grid;gap:12px;margin-top:10px}
+.np-seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.np-seg button{border:1px solid rgba(0,0,0,.18);background:#fff;border-radius:8px;padding:8px 10px;font-size:10.5px;font-weight:600;letter-spacing:.1em;color:var(--muted);cursor:pointer}
+.np-seg button.on{border-color:var(--ink);color:var(--ink);background:#faf9f7}
 .np-mine{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--body);cursor:pointer}
 .np-collect-calc{font-size:12px;color:#253a33;background:#f3f7f5;border-radius:8px;padding:7px 10px}
 .np-handles{border:1px solid rgba(0,0,0,.09);border-radius:10px;padding:12px}

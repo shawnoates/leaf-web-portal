@@ -34,7 +34,7 @@ type PayOption = {
 
 type Seat = {
   eventNotificationId: string;
-  status: "unpaid" | "claimed" | "confirmed" | "expired" | null;
+  status: "pending_lock" | "unpaid" | "claimed" | "confirmed" | "expired" | null;
   amountCents: number | null;
   ref: string | null;
   method: Method | null;
@@ -46,8 +46,22 @@ type Seat = {
   canRemindHost: boolean;
 };
 
+/** "Split a total": the share comes from the headcount, fixed when it locks. */
+type Split = {
+  totalCents: number;
+  minHeadcount: number;
+  maxHeadcount: number;
+  lowCents: number;
+  highCents: number;
+  locked: boolean;
+  shareCents: number;
+  headcount: number;
+  autoLockAt: string | null;
+};
+
 type Payment = {
-  p2pPayment: { amountCents: number; ticketCount: number; payByAt: string | null } | null;
+  p2pPayment: { amountCents: number | null; ticketCount: number | null; payByAt: string | null } | null;
+  split?: Split | null;
   hostFirstName?: string;
   seat?: Seat | null;
   note?: string;
@@ -162,7 +176,9 @@ export default function P2pPayCard({
   const host = named || "the host";
   const Host = named || "The host";
   const options = data.options || [];
-  const amount = money(seat?.amountCents ?? data.p2pPayment.amountCents);
+  const split = data.split || null;
+  const amountCents = seat?.amountCents ?? data.p2pPayment.amountCents ?? split?.shareCents ?? 0;
+  const amount = money(amountCents);
   const brand = accent ? { background: accent, borderColor: accent } : undefined;
 
   // A seat we can't see: no session on this browser. The texted link signs
@@ -171,8 +187,42 @@ export default function P2pPayCard({
     return (
       <div className="p2p">
         <style>{CSS}</style>
-        <p className="p2p-h">{amount} per spot, paid to {host}</p>
+        <p className="p2p-h">
+          {split && !split.locked ? `${money(split.lowCents)}–${money(split.highCents)} each` : `${amount} per spot`}, paid to {host}
+        </p>
         <p className="p2p-sub">Open the link Leaf texted you to see how to pay.</p>
+      </div>
+    );
+  }
+
+  // A split that hasn't locked: the seat is held and nothing is owed yet.
+  if (seat.status === "pending_lock" && split) {
+    return (
+      <div className="p2p">
+        <style>{CSS}</style>
+        {split.headcount < split.minHeadcount ? (
+          // Below the minimum the running share is above the range guests were
+          // shown; they only pay that if the host locks anyway and tells them.
+          <>
+            <p className="p2p-h">Your share: {money(split.lowCents)}–{money(split.highCents)}</p>
+            <p className="p2p-sub">
+              {Host} is splitting {money(split.totalCents)} between {split.minHeadcount}–{split.maxHeadcount} people.
+              {" "}{split.headcount} in so far — {split.minHeadcount - split.headcount} more to make it happen.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="p2p-h">Your share so far: {money(split.shareCents)}</p>
+            <p className="p2p-sub">
+              {Host} is splitting {money(split.totalCents)} between everyone who comes — {split.headcount} so far, so it&apos;s{" "}
+              {money(split.shareCents)} each. The more people join, the less each pays (as low as {money(split.lowCents)}).
+            </p>
+          </>
+        )}
+        <p className="p2p-sub">
+          You&apos;ll pay once {host} sets the headcount
+          {split.autoLockAt ? <> — by <b>{when(split.autoLockAt)}</b> at the latest</> : null}. Your spot is held until then.
+        </p>
       </div>
     );
   }
@@ -221,6 +271,9 @@ export default function P2pPayCard({
     <div className="p2p">
       <style>{CSS}</style>
       <p className="p2p-h">Pay {host} {amount}</p>
+      {split?.locked && (
+        <p className="p2p-sub">Your share of {money(split.totalCents)}, split {split.headcount} ways.</p>
+      )}
       {seat.notReceived ? (
         <p className="p2p-warn">
           {`${Host} couldn\u2019t find your payment. Check you sent it to the account below.`}

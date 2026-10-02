@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import P2pPayCard from "@/components/P2pPayCard";
+import { collectsMoney, p2pPriceLine, type P2pSplitSummary } from "@/lib/p2p";
 import { track } from "@/lib/track";
 import {
   setVerifiedUserCookie,
@@ -58,6 +59,7 @@ type Props = {
   requireApproval: boolean;
   /** Host collects peer to peer: the success step shows how to pay them. */
   p2pAmountCents?: number | null;
+  p2pSplit?: P2pSplitSummary | null;
   /** A host hello was on the page when this RSVP happened. Reported with
    *  the event so the watch → RSVP funnel can tell those plans apart. */
   hadIntroVideo?: boolean;
@@ -116,6 +118,7 @@ export default function StandalonePlanRsvp({
   location,
   requireApproval,
   p2pAmountCents = null,
+  p2pSplit = null,
   hadIntroVideo,
   isFull,
   rsvpClosed,
@@ -169,6 +172,7 @@ export default function StandalonePlanRsvp({
           location={location}
           requireApproval={requireApproval}
           p2pAmountCents={p2pAmountCents}
+          p2pSplit={p2pSplit}
           hadIntroVideo={hadIntroVideo}
           isFull={isFull}
           onClose={() => setOpen(false)}
@@ -187,12 +191,14 @@ function RsvpModal({
   location,
   requireApproval,
   p2pAmountCents,
+  p2pSplit,
   hadIntroVideo,
   isFull,
   onClose,
   onLocationRevealed,
 }: {
   p2pAmountCents: number | null;
+  p2pSplit: P2pSplitSummary | null;
   hadIntroVideo?: boolean;
   eventGroupId: string;
   planTitle: string;
@@ -213,7 +219,7 @@ function RsvpModal({
   const [revealedAddress, setRevealedAddress] = useState<string | null>(
     location?.address ?? null
   );
-  const collectsP2p = (p2pAmountCents ?? 0) > 0;
+  const collectsP2p = collectsMoney(p2pAmountCents, p2pSplit);
   const cached = getVerifiedUserCookie();
   const [name, setName] = useState(cached?.name ?? "");
   const [phone, setPhone] = useState(cached?.phone ?? "");
@@ -462,10 +468,7 @@ function RsvpModal({
                 </div>
               ) : null}
               {collectsP2p ? (
-                <p className="text-sm text-zinc-700">
-                  ${((p2pAmountCents ?? 0) / 100).toFixed((p2pAmountCents ?? 0) % 100 ? 2 : 0)} per spot, paid to the
-                  host directly. Your spot is held while you pay.
-                </p>
+                <p className="text-sm text-zinc-700">{p2pPriceLine(p2pAmountCents, p2pSplit)}</p>
               ) : null}
               <button
                 type="submit"
@@ -525,7 +528,7 @@ function RsvpModal({
                     : isHostResult
                       ? "Open the Plan Chat in Leaf to coordinate with your attendees."
                       : collectsP2p
-                        ? "Pay the host below to keep it."
+                        ? (p2pSplit ? "You\u2019ll pay your share once the headcount is set." : "Pay the host below to keep it.")
                         : "Coordinate with the group. Join the Plan Chat."}
               </p>
             </div>

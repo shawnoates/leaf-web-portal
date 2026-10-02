@@ -39,6 +39,7 @@ import { fetchVenuePhotoUrl } from "@/lib/google-places";
 import PlanAddonStack from "@/components/PlanAddonStack";
 import PaidRsvp from "@/components/PaidRsvp";
 import P2pPayCard from "@/components/P2pPayCard";
+import { collectsMoney, p2pPriceLine, parseP2pSplit, type P2pSplitSummary } from "@/lib/p2p";
 import HlsVideo from "@/components/HlsVideo";
 import { introVideoFrame } from "@/lib/intro-video-frame";
 import HostIntroTile, { type HostIntro } from "@/components/HostIntroTile";
@@ -185,6 +186,8 @@ interface Plan {
   bookingFeeCents?: number | null;
   /** Host collects peer to peer (Venmo/Cash App/PayPal/Zelle): price per spot. */
   p2pAmountCents?: number | null;
+  /** Host splits a total between however many come; set until it locks. */
+  p2pSplit?: P2pSplitSummary | null;
   addons?: {
     objectId: string;
     frameworkSlug: string;
@@ -849,7 +852,7 @@ function RsvpModal({
   // verified session, never to a phone number typed in.
   const paidTicket = (plan.ticketPriceCents ?? 0) > 0;
   // Host collects peer to peer: the RSVP holds a seat, then the pay card shows.
-  const collectsP2p = (plan.p2pAmountCents ?? 0) > 0;
+  const collectsP2p = collectsMoney(plan.p2pAmountCents, plan.p2pSplit);
   const verify = usePhoneVerify(paidTicket ? { requireSession: true } : undefined);
   const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
   const [errorMsg, setErrorMsg] = useState("");
@@ -1059,11 +1062,8 @@ function RsvpModal({
                   {(plan.bookingFeeCents ?? 0) > 0 ? ` + $${((plan.bookingFeeCents ?? 0) / 100).toFixed(2)} booking fee` : ""}
                 </p>
               )}
-              {(plan.p2pAmountCents ?? 0) > 0 && (
-                <p className="text-sm text-zinc-700">
-                  ${((plan.p2pAmountCents ?? 0) / 100).toFixed((plan.p2pAmountCents ?? 0) % 100 ? 2 : 0)} per spot, paid to the host
-                  directly. Your spot is held while you pay.
-                </p>
+              {collectsP2p && (
+                <p className="text-sm text-zinc-700">{p2pPriceLine(plan.p2pAmountCents, plan.p2pSplit)}</p>
               )}
               <PhoneVerifyFields verify={verify} onSendOTP={verify.sendOTP} />
               {verify.isVerified && (
@@ -1166,7 +1166,7 @@ function RsvpModal({
                   : isPendingResult
                     ? "You\u0027ll receive a text when your request is approved."
                     : collectsP2p
-                      ? "Pay the host below to keep it."
+                      ? (plan.p2pSplit ? "You\u2019ll pay your share once the headcount is set." : "Pay the host below to keep it.")
                       : "Coordinate with the group. Join the Plan Chat."}
               </p>
             </div>
@@ -3235,6 +3235,7 @@ export default function OrgCalendarPage() {
         ticketPriceCents: typeof p.ticketPriceCents === "number" ? p.ticketPriceCents : null,
         bookingFeeCents: typeof p.bookingFeeCents === "number" ? p.bookingFeeCents : null,
         p2pAmountCents: typeof p.p2pAmountCents === "number" ? p.p2pAmountCents : null,
+        p2pSplit: parseP2pSplit(p.p2pSplit),
         isPoll: p.isPoll as boolean || false,
         pollOptionCount: (p.pollOptionCount as number) || 0,
         pollVoteCount: (p.pollVoteCount as number) || 0,
@@ -6372,7 +6373,7 @@ export default function OrgCalendarPage() {
                   />
                 )}
                 {/* Peer-to-peer collection: a guest holding a seat pays the host here. */}
-                {rsvpedPlanIds.has(selectedEvent.id) && (selectedEvent.p2pAmountCents ?? 0) > 0 && (
+                {rsvpedPlanIds.has(selectedEvent.id) && collectsMoney(selectedEvent.p2pAmountCents, selectedEvent.p2pSplit) && (
                   <div className="mt-4">
                     <P2pPayCard planId={selectedEvent.id} accent={org.brandColor || undefined} />
                   </div>
