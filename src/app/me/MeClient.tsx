@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CalendarPlus, Heart, Repeat } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import HostIdeaModal from "@/components/HostIdeaModal";
+import P2pPayCard from "@/components/P2pPayCard";
 import { HostIntroPlayer } from "@/components/HostIntroTile";
 import CommunityQualifierCard, {
   type QualifierCalendar,
@@ -113,6 +114,9 @@ interface Plan {
   attendeeCount: number;
   requireApproval?: boolean;
   capacity?: number | null;
+  /** The host collects this much per spot, peer to peer (Venmo, Cash App,
+   *  PayPal, Zelle). The seat's own payment state comes from getP2pPayment. */
+  p2pAmountCents?: number | null;
   /** A seat opened and the server offered it to this viewer (rsvpState is
    *  "waitlisted"). First to claim wins — see claimWaitlistSpot. */
   waitlistOffered?: boolean;
@@ -1339,6 +1343,9 @@ function Hero({
         </div>
       )}
       <HeroActions plan={plan} onRsvp={onRsvp} />
+      {plan.rsvpState === "going" && (plan.p2pAmountCents ?? 0) > 0 && (
+        <div className="hero-pay"><P2pPayCard planId={plan.id} /></div>
+      )}
     </section>
   );
 }
@@ -2644,6 +2651,9 @@ function PlanModal({
               <a className="btn ghost" href={dir} target="_blank" rel="noopener noreferrer">Getting there</a>
             )}
           </div>
+          {plan.rsvpState === "going" && (plan.p2pAmountCents ?? 0) > 0 && (
+            <div style={{ marginTop: 14 }}><P2pPayCard planId={plan.id} /></div>
+          )}
           <Thread plan={plan} />
           <div className="modal-links">
             {canChat(plan) && (
@@ -2840,6 +2850,7 @@ const CSS = `
 .leafme .hero-actions{display:flex;gap:8px;flex-wrap:wrap;padding:12px 14px;
   border-top:1px solid var(--rule);background:var(--recessed)}
 .leafme .hero-actions.flat{padding:0;border-top:0;background:none;margin-top:18px}
+.leafme .hero-pay{padding:0 14px 14px}
 .leafme .chat-label{white-space:nowrap}
 
 /* ---- Series host invitation ---- */

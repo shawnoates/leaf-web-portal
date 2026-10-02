@@ -38,6 +38,7 @@ import { isVenueBlacklisted } from "@/lib/venue-blacklist";
 import { fetchVenuePhotoUrl } from "@/lib/google-places";
 import PlanAddonStack from "@/components/PlanAddonStack";
 import PaidRsvp from "@/components/PaidRsvp";
+import P2pPayCard from "@/components/P2pPayCard";
 import HlsVideo from "@/components/HlsVideo";
 import { introVideoFrame } from "@/lib/intro-video-frame";
 import HostIntroTile, { type HostIntro } from "@/components/HostIntroTile";
@@ -182,6 +183,8 @@ interface Plan {
   /** Offer Pipeline paid tickets: RSVPing means paying price + booking fee. */
   ticketPriceCents?: number | null;
   bookingFeeCents?: number | null;
+  /** Host collects peer to peer (Venmo/Cash App/PayPal/Zelle): price per spot. */
+  p2pAmountCents?: number | null;
   addons?: {
     objectId: string;
     frameworkSlug: string;
@@ -845,6 +848,8 @@ function RsvpModal({
   // A paid night needs the one-time code: the server only sells a ticket to a
   // verified session, never to a phone number typed in.
   const paidTicket = (plan.ticketPriceCents ?? 0) > 0;
+  // Host collects peer to peer: the RSVP holds a seat, then the pay card shows.
+  const collectsP2p = (plan.p2pAmountCents ?? 0) > 0;
   const verify = usePhoneVerify(paidTicket ? { requireSession: true } : undefined);
   const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
   const [errorMsg, setErrorMsg] = useState("");
@@ -1054,6 +1059,12 @@ function RsvpModal({
                   {(plan.bookingFeeCents ?? 0) > 0 ? ` + $${((plan.bookingFeeCents ?? 0) / 100).toFixed(2)} booking fee` : ""}
                 </p>
               )}
+              {(plan.p2pAmountCents ?? 0) > 0 && (
+                <p className="text-sm text-zinc-700">
+                  ${((plan.p2pAmountCents ?? 0) / 100).toFixed((plan.p2pAmountCents ?? 0) % 100 ? 2 : 0)} per spot, paid to the host
+                  directly. Your spot is held while you pay.
+                </p>
+              )}
               <PhoneVerifyFields verify={verify} onSendOTP={verify.sendOTP} />
               {verify.isVerified && (
                 <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -1147,14 +1158,16 @@ function RsvpModal({
             </div>
             <div>
               <h4 className="text-2xl font-light mb-2">
-                {isWaitlistResult ? "You\u0027re on the waitlist!" : isPendingResult ? "Request Sent!" : "You\u0027re in!"}
+                {isWaitlistResult ? "You\u0027re on the waitlist!" : isPendingResult ? "Request Sent!" : collectsP2p ? "Your spot is held" : "You\u0027re in!"}
               </h4>
               <p className="text-sm text-zinc-500 max-w-xs mx-auto">
                 {isWaitlistResult
                   ? "You\u0027ll receive a text the moment a spot opens up."
                   : isPendingResult
                     ? "You\u0027ll receive a text when your request is approved."
-                    : "Coordinate with the group. Join the Plan Chat."}
+                    : collectsP2p
+                      ? "Pay the host below to keep it."
+                      : "Coordinate with the group. Join the Plan Chat."}
               </p>
             </div>
 
@@ -1163,6 +1176,15 @@ function RsvpModal({
                 waitlist place has nothing to attach a purchase to yet, and
                 charging for a coffee at a plan you may not get into is the one
                 version of this that would be indefensible. */}
+            {!isPendingResult && !isWaitlistResult && collectsP2p && (
+              <P2pPayCard
+                planId={plan.id}
+                eventNotificationId={notificationId}
+                phoneNumber={verify.phone}
+                accent={brandColor}
+              />
+            )}
+
             {!isPendingResult && !isWaitlistResult && (
               <PlanAddonStack
                 eventGroupId={plan.id}
@@ -3212,6 +3234,7 @@ export default function OrgCalendarPage() {
         requireApproval: p.requireApproval as boolean || false,
         ticketPriceCents: typeof p.ticketPriceCents === "number" ? p.ticketPriceCents : null,
         bookingFeeCents: typeof p.bookingFeeCents === "number" ? p.bookingFeeCents : null,
+        p2pAmountCents: typeof p.p2pAmountCents === "number" ? p.p2pAmountCents : null,
         isPoll: p.isPoll as boolean || false,
         pollOptionCount: (p.pollOptionCount as number) || 0,
         pollVoteCount: (p.pollVoteCount as number) || 0,
@@ -6347,6 +6370,12 @@ export default function OrgCalendarPage() {
                       detailScrollRef.current?.scrollTo({ top: 0 });
                     }}
                   />
+                )}
+                {/* Peer-to-peer collection: a guest holding a seat pays the host here. */}
+                {rsvpedPlanIds.has(selectedEvent.id) && (selectedEvent.p2pAmountCents ?? 0) > 0 && (
+                  <div className="mt-4">
+                    <P2pPayCard planId={selectedEvent.id} accent={org.brandColor || undefined} />
+                  </div>
                 )}
                 {/* Add to Calendar — only on real plans (not polls), only when we have a date,
                     and only when the viewer is actually attending or hosting (otherwise it's
