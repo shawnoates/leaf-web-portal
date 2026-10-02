@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
+import P2pPayCard from "@/components/P2pPayCard";
 import { track } from "@/lib/track";
 import {
   setVerifiedUserCookie,
@@ -55,6 +56,8 @@ type Props = {
   // via onLocationRevealed.
   location: { name: string | null; address: string | null; timezone: string | null } | null;
   requireApproval: boolean;
+  /** Host collects peer to peer: the success step shows how to pay them. */
+  p2pAmountCents?: number | null;
   /** A host hello was on the page when this RSVP happened. Reported with
    *  the event so the watch → RSVP funnel can tell those plans apart. */
   hadIntroVideo?: boolean;
@@ -112,6 +115,7 @@ export default function StandalonePlanRsvp({
   expiryDate,
   location,
   requireApproval,
+  p2pAmountCents = null,
   hadIntroVideo,
   isFull,
   rsvpClosed,
@@ -164,6 +168,7 @@ export default function StandalonePlanRsvp({
           expiryDate={expiryDate}
           location={location}
           requireApproval={requireApproval}
+          p2pAmountCents={p2pAmountCents}
           hadIntroVideo={hadIntroVideo}
           isFull={isFull}
           onClose={() => setOpen(false)}
@@ -181,11 +186,13 @@ function RsvpModal({
   expiryDate,
   location,
   requireApproval,
+  p2pAmountCents,
   hadIntroVideo,
   isFull,
   onClose,
   onLocationRevealed,
 }: {
+  p2pAmountCents: number | null;
   hadIntroVideo?: boolean;
   eventGroupId: string;
   planTitle: string;
@@ -206,6 +213,7 @@ function RsvpModal({
   const [revealedAddress, setRevealedAddress] = useState<string | null>(
     location?.address ?? null
   );
+  const collectsP2p = (p2pAmountCents ?? 0) > 0;
   const cached = getVerifiedUserCookie();
   const [name, setName] = useState(cached?.name ?? "");
   const [phone, setPhone] = useState(cached?.phone ?? "");
@@ -453,6 +461,12 @@ function RsvpModal({
                   <p className="text-xs text-zinc-400 text-right mt-0.5">{rsvpNote.length}/200</p>
                 </div>
               ) : null}
+              {collectsP2p ? (
+                <p className="text-sm text-zinc-700">
+                  ${((p2pAmountCents ?? 0) / 100).toFixed((p2pAmountCents ?? 0) % 100 ? 2 : 0)} per spot, paid to the
+                  host directly. Your spot is held while you pay.
+                </p>
+              ) : null}
               <button
                 type="submit"
                 disabled={formStep === "submitting" || !isVerified || !name}
@@ -499,7 +513,9 @@ function RsvpModal({
                     ? "Request Sent!"
                     : isHostResult
                       ? "You’re hosting this plan"
-                      : "You’re in!"}
+                      : collectsP2p
+                        ? "Your spot is held"
+                        : "You’re in!"}
               </h4>
               <p className="text-sm text-zinc-500 max-w-xs mx-auto">
                 {isWaitlistResult
@@ -508,9 +524,17 @@ function RsvpModal({
                     ? "You’ll receive a text when your request is approved."
                     : isHostResult
                       ? "Open the Plan Chat in Leaf to coordinate with your attendees."
-                      : "Coordinate with the group. Join the Plan Chat."}
+                      : collectsP2p
+                        ? "Pay the host below to keep it."
+                        : "Coordinate with the group. Join the Plan Chat."}
               </p>
             </div>
+
+            {/* No web session is minted on this page, so the card authenticates
+                with the RSVP id + the phone just verified. */}
+            {collectsP2p && !isPendingResult && !isHostResult && notificationId ? (
+              <P2pPayCard planId={eventGroupId} eventNotificationId={notificationId} phoneNumber={phone} />
+            ) : null}
 
             {!isPendingResult && notificationId ? (
               <button

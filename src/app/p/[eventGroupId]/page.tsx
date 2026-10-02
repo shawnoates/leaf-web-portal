@@ -55,6 +55,8 @@ type PlanShareInfo = {
   requireApproval: boolean;
   rsvpCount: number;
   capacity: number | null;
+  /** Host collects peer to peer (Venmo/Cash App/PayPal/Zelle): price per spot. */
+  p2pAmountCents?: number | null;
   // Cross-promotion (only when the link carried a valid ?via=): the shared-
   // with calendar to bounce into, and its id for RSVP attribution.
   viaShareId?: string | null;
@@ -350,6 +352,7 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
       requireApproval={info.requireApproval}
       rsvpCount={info.rsvpCount ?? 0}
       capacity={info.capacity ?? null}
+      p2pAmountCents={info.p2pAmountCents ?? null}
       rsvpClosed={rsvpClosed}
       autoOpenRsvp={autoOpenRsvp && !rsvpClosed}
     />

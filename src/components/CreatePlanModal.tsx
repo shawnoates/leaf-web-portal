@@ -7,6 +7,7 @@ import { everyOtherMonth, hostCandidateNote, monthlyRuleOptionsForDate, NTH_LABE
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { getDefaultCoverForSeed } from "@/lib/default-covers";
 import VenueSearch from "@/components/VenueSearch";
+import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
 import { detectCity, primeGeoCity } from "@/lib/detectCity";
 import {
   ArrowRight,
@@ -344,6 +345,28 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   const [genericNth, setGenericNth] = useState(2);
   const [genericWeekday, setGenericWeekday] = useState(2);
   const hostIsOther = isHosted && recurring && seriesHostId !== "me";
+
+  // ---- Collect money (peer to peer: guests pay the host back directly) ----
+  // Only for a new single hosted plan: edits, polls, series and host-request
+  // approvals turn it on from the plan's /pay page instead. While on, spots
+  // replace capacity (capacity = spots minus the host's own).
+  const canCollect = isHosted && !recurring && !editMode && !hostRequestMode && !pollConvertMode;
+  const [collect, setCollect] = useState(false);
+  const [collectPrice, setCollectPrice] = useState("");
+  const [collectSpots, setCollectSpots] = useState("");
+  const [spotIsMine, setSpotIsMine] = useState(true);
+  const [payHandles, setPayHandles] = useState<PayHandles | null | undefined>(undefined);
+  const [editingHandles, setEditingHandles] = useState(false);
+  const collecting = canCollect && collect;
+  useEffect(() => {
+    if (!collecting || payHandles !== undefined) return;
+    Parse.Cloud.run("getMyPayHandles", {})
+      .then((r: { handles: PayHandles | null }) => setPayHandles(r.handles))
+      .catch(() => setPayHandles(null));
+  }, [collecting, payHandles]);
+  const collectCents = Math.round(parseFloat(collectPrice || "0") * 100);
+  const collectCount = parseInt(collectSpots || "0", 10);
+  const collectGuestSpots = collectCount - (spotIsMine ? 1 : 0);
   const hostedRuleOptions = useMemo<RuleOption[]>(() => {
     const out: RuleOption[] = [];
     if (!hostIsOther) {
@@ -1080,6 +1103,14 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
 
     // A follower-hosted series may leave the first date to its host.
     if (!date && !hostIsOther) return;
+    if (collecting) {
+      const problem = !(collectCents >= 100) ? "Price per spot must be at least $1."
+        : !(collectCount >= 1) ? "How many tickets or spots do you have?"
+        : collectGuestSpots < 1 ? "With one spot for you, there are none left for guests."
+        : !payHandles ? "Add how guests should pay you."
+        : null;
+      if (problem) { alert(problem); return; }
+    }
     // Cover image is optional in the drawer — the plan renders a placeholder
     // gradient seeded from the title when none is provided.
     setCreating(true);
@@ -1266,7 +1297,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           venue: selectedVenue ? { name: selectedVenue.name, address: selectedVenue.address, placeId: selectedVenue.placeId } : null,
           date: `${date}T${time || "12:00"}:00${tzSuffix}`,
           time: time || null,
-          capacity: capacity ? parseInt(capacity) : null,
+          capacity: collecting ? collectGuestSpots : capacity ? parseInt(capacity) : null,
           isHosted,
           imageBase64: imageBase64 || undefined,
           imageUrl: !imageBase64 ? (selectedImageUrl || prefill?.imageUrl || undefined) : undefined,
@@ -1283,6 +1314,21 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
         result = created?.type === "idea" || !isHosted
           ? { kind: "idea" }
           : { kind: "hosted", eventGroupId: created?.eventGroupId };
+        // Collecting is set once the plan exists; a failure leaves the plan
+        // standing and says where to retry.
+        if (collecting && created?.type !== "idea" && created?.eventGroupId) {
+          try {
+            await Parse.Cloud.run("setPlanP2pPayment", {
+              eventGroupId: created.eventGroupId,
+              amountCents: collectCents,
+              ticketCount: collectCount,
+              hostHasTicket: spotIsMine,
+            });
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "Collecting money didn't turn on.";
+            alert(`Plan created, but collecting money didn't turn on: ${msg} Turn it on from the plan's Payments page.`);
+          }
+        }
         // Only sync HOSTED plans — ideas don't have a fixed schedule to
         // put on the manager's calendar. Fire-and-forget: a 403 from
         // Google (token granted only freebusy pre-scope-upgrade) is
@@ -2141,7 +2187,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
             </>
           )}
 
-          {!isPoll && (
+          {!isPoll && !collecting && (
             <div>
               <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Capacity (optional)</label>
               <input
@@ -2152,6 +2198,77 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
                 placeholder="—"
                 min="1"
               />
+            </div>
+          )}
+
+          {canCollect && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between py-1">
+                <div>
+                  <p className="text-xs font-medium text-zinc-700">Collect money</p>
+                  <p className="text-xs text-zinc-400">You bought the tickets or booked the spot; guests pay you back on Venmo, Cash App, PayPal or Zelle</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={collect}
+                  aria-label="Collect money"
+                  onClick={() => setCollect(!collect)}
+                  className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ml-3 ${collect ? "bg-zinc-900" : "bg-zinc-200"}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${collect ? "left-5" : "left-0.5"}`} />
+                </button>
+              </div>
+              {collect && (
+                <>
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Price per spot</label>
+                      <input
+                        inputMode="decimal"
+                        value={collectPrice}
+                        onChange={(e) => setCollectPrice(e.target.value.replace(/[^\d.]/g, "").slice(0, 7))}
+                        className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                        placeholder="$60"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Tickets / spots</label>
+                      <input
+                        inputMode="numeric"
+                        value={collectSpots}
+                        onChange={(e) => setCollectSpots(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                        className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                        placeholder="8"
+                      />
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 text-xs text-zinc-600 cursor-pointer select-none">
+                    <input type="checkbox" checked={spotIsMine} onChange={(e) => setSpotIsMine(e.target.checked)} className="w-4 h-4 accent-zinc-900" />
+                    One of these is mine
+                  </label>
+                  {collectCents >= 100 && collectGuestSpots >= 1 && (
+                    <p className="text-xs text-emerald-900 bg-emerald-50 rounded-lg px-3 py-2">
+                      {collectGuestSpots} {collectGuestSpots === 1 ? "spot" : "spots"} for guests · a full plan pays you back $
+                      {((collectCents * collectGuestSpots) / 100).toFixed((collectCents * collectGuestSpots) % 100 ? 2 : 0)}
+                    </p>
+                  )}
+                  {payHandles === undefined ? null : !payHandles || editingHandles ? (
+                    <div className="border border-zinc-200 rounded-xl p-3">
+                      <PayHandlesForm
+                        initial={payHandles}
+                        onCancel={payHandles ? () => setEditingHandles(false) : undefined}
+                        onSaved={(h) => { setPayHandles(h); setEditingHandles(false); }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-3 text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2">
+                      <span>Paid to {describeHandles(payHandles)}</span>
+                      <button type="button" onClick={() => setEditingHandles(true)} className="underline text-zinc-400 hover:text-zinc-900">Edit</button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 

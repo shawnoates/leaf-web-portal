@@ -10,6 +10,7 @@ import {
   Check,
   Clock,
   Copy,
+  DollarSign,
   Link2,
   MessageCircle,
   Pencil,
@@ -1004,6 +1005,17 @@ export default function PlanDetailModal({
                 <Copy className="w-[15px] h-[15px]" />
                 Duplicate
               </button>
+              {/* Peer-to-peer payments: the /pay page sets collecting up, or shows
+                  who has paid once it's on. */}
+              {!plan.isPoll && (
+                <Link
+                  href={`/pay/${plan.objectId}`}
+                  className={`h-9 px-3 rounded-lg text-[13px] font-medium text-zinc-600 hover:bg-zinc-100 inline-flex items-center gap-1.5 no-underline transition-colors ${FOCUS_RING}`}
+                >
+                  <DollarSign className="w-[15px] h-[15px]" />
+                  Collect money
+                </Link>
+              )}
               <span aria-hidden="true" className="w-px h-5 bg-zinc-200 mx-1.5" />
               <button
                 type="button"

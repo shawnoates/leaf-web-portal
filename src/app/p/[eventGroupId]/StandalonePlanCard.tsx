@@ -59,6 +59,8 @@ type Props = {
   // "N going · M spots left" line and the full-plan state.
   rsvpCount: number;
   capacity: number | null;
+  /** Host collects peer to peer: price per spot, paid to them after RSVP. */
+  p2pAmountCents?: number | null;
   // RSVP closes at start time; replaces the button with a disabled state.
   rsvpClosed: boolean;
   // Set when /p/<id>?rsvp=1 — the visitor was bounced back from
@@ -86,6 +88,7 @@ export default function StandalonePlanCard({
   requireApproval,
   rsvpCount,
   capacity,
+  p2pAmountCents = null,
   rsvpClosed,
   autoOpenRsvp,
 }: Props) {
@@ -293,6 +296,7 @@ export default function StandalonePlanCard({
                     : null
                 }
                 requireApproval={requireApproval}
+                p2pAmountCents={p2pAmountCents}
                 isFull={isFull}
                 rsvpClosed={rsvpClosed}
                 autoOpenRsvp={autoOpenRsvp}
