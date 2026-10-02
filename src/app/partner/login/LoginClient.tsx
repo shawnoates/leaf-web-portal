@@ -5,15 +5,21 @@
  * dashboard. The answer is the same whether or not the email is on file.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { Brand, Field, Shell, input } from "@/app/o/m/[token]/ui";
+import { type RememberedPartner, forgetPartner, rememberedPartner } from "@/app/o/m/[token]/remember";
 
 export default function LoginClient() {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // This device has been to their dashboard before: offer it straight away.
+  const [known, setKnown] = useState<RememberedPartner | null>(null);
+  useEffect(() => {
+    setKnown(rememberedPartner());
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,8 +40,27 @@ export default function LoginClient() {
       <Brand />
       <div className="mt-8 rounded-3xl bg-white p-6 shadow-sm">
         <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-700">Your Leaf nights</p>
-        <h1 className="mt-2 font-fm-serif text-[34px] leading-[1.05] text-stone-900">Sign in</h1>
-        {sent ? (
+        <h1 className="mt-2 font-fm-serif text-[34px] leading-[1.05] text-stone-900">{known ? "Welcome back" : "Sign in"}</h1>
+        {known && !sent ? (
+          <>
+            <a
+              href={`/o/m/${known.token}`}
+              className="mt-4 flex h-14 w-full items-center justify-center rounded-2xl bg-leaf-800 text-[17px] font-semibold text-white"
+            >
+              {known.name ? `Continue as ${known.name}` : "Go to your dashboard"}
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                forgetPartner();
+                setKnown(null);
+              }}
+              className="mt-4 text-[15px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4"
+            >
+              Not you? Use a different email
+            </button>
+          </>
+        ) : sent ? (
           <>
             <p className="mt-3 text-[16px] leading-relaxed text-stone-700">{sent}</p>
             <p className="mt-2 text-[14px] leading-relaxed text-stone-500">It opens your dashboard: your nights, RSVPs, bookings and settings. No password needed.</p>

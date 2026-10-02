@@ -39,6 +39,13 @@ export default function MarketingFooter({ blurb }: { blurb: string }) {
           ]}
         />
         <FooterColumn
+          title="Local businesses"
+          links={[
+            { href: "/partner", label: "Host neighbors" },
+            { href: "/partner/login", label: "Business sign in" },
+          ]}
+        />
+        <FooterColumn
           title="Legal"
           links={[
             { href: "/terms-conditions", label: "Terms" },

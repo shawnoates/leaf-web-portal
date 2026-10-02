@@ -26,6 +26,7 @@ import NoticePrefs, { noticePayload, type Notices } from "./NoticePrefs";
 import { Brand, Choice, Closed, Field, Section, Shell, dollars, formatPhone, input, textarea } from "./ui";
 import NightPicker, { nightMeta, type Suggested } from "./NightPicker";
 import MerchantDashboard from "./MerchantDashboard";
+import { forgetPartner, rememberPartner } from "./remember";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 import FreeNightCountdown, { CountdownText, TYPICAL_RSVPS, useCountdown } from "./FreeNightCountdown";
@@ -173,6 +174,9 @@ export default function MerchantOfferClient({ token }: { token: string }) {
     try {
       const f = (await Parse.Cloud.run("getMerchantOfferForm", { token })) as Form;
       setForm(f);
+      // Keep a working link handy on this device; drop one that stopped working.
+      if (f.state === "sent" || f.state === "drafted" || f.state === "accepted") rememberPartner(token, f.merchantName || "");
+      else forgetPartner(token);
       if (f.state !== "unavailable") {
         const o = f.offer;
         const perRsvp = f.billing?.model === "per_rsvp";
@@ -201,6 +205,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
       }
     } catch {
       setForm({ state: "unavailable" } as Form);
+      forgetPartner(token);
     } finally {
       setLoading(false);
     }

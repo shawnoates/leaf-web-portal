@@ -36,6 +36,13 @@ export default function MarketingNav({ isLoggedIn }: { isLoggedIn: boolean }) {
             For organizations
           </Link>
           <Link
+            href="/partner"
+            className="hidden transition-colors hover:opacity-70 sm:block"
+            style={{ color: "var(--mkt-ink-2)" }}
+          >
+            For businesses
+          </Link>
+          <Link
             href="/dashboard"
             className="font-semibold transition-colors hover:opacity-70"
             style={{ color: "var(--mkt-ink)" }}

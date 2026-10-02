@@ -9,10 +9,11 @@
  * (/o/m/[token]) to pick nights and hold their first free night.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import { Brand, Field, Shell, formatPhone, input } from "@/app/o/m/[token]/ui";
+import { type RememberedPartner, forgetPartner, rememberedPartner } from "@/app/o/m/[token]/remember";
 
 type Place = { placeId: string; name: string; address: string; type: string };
 type Outcome = { outcome: "offer" | "known" | "no_calendar" | "no_week" | "thanks"; name?: string; token?: string };
@@ -20,6 +21,11 @@ type Outcome = { outcome: "offer" | "known" | "no_calendar" | "no_week" | "thank
 export default function PartnerClient() {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  // Been here before on this device: point them at their dashboard first.
+  const [known, setKnown] = useState<RememberedPartner | null>(null);
+  useEffect(() => {
+    setKnown(rememberedPartner());
+  }, []);
   const [results, setResults] = useState<Place[] | null>(null);
   const [picked, setPicked] = useState<Place | null>(null);
   const [contactName, setContactName] = useState("");
@@ -93,6 +99,26 @@ export default function PartnerClient() {
   return (
     <Shell>
       <Brand />
+      {known && (
+        <div className="mt-5 rounded-2xl bg-leaf-100 p-4">
+          <p className="text-[15px] text-leaf-900">{`Welcome back${known.name ? `, ${known.name}` : ""}.`}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-4">
+            <a href={`/o/m/${known.token}`} className="text-[15px] font-semibold text-leaf-800 underline decoration-leaf-400 underline-offset-4">
+              Go to your dashboard
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                forgetPartner();
+                setKnown(null);
+              }}
+              className="text-[13px] text-leaf-700"
+            >
+              Not you?
+            </button>
+          </div>
+        </div>
+      )}
 
       <header className="mt-8 px-1">
         <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">For local businesses</p>
