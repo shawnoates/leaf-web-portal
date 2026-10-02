@@ -13,7 +13,9 @@ import PayHostClient from "./PayHostClient";
 
 type PageProps = {
   params: Promise<{ planId: string }>;
-  searchParams: Promise<{ t?: string; confirm?: string }>;
+  // `u`/`vt`: the signed viewer pair the app adds (getP2pHostLink), traded
+  // for a web session like /me's — so setup works in the app's web view.
+  searchParams: Promise<{ t?: string; confirm?: string; u?: string; vt?: string }>;
 };
 
 export const metadata: Metadata = {
@@ -25,6 +27,13 @@ export const metadata: Metadata = {
 
 export default async function PayHostPage({ params, searchParams }: PageProps) {
   const { planId } = await params;
-  const { t, confirm } = await searchParams;
-  return <PayHostClient planId={planId} token={t || null} confirmId={confirm || null} />;
+  const { t, confirm, u, vt } = await searchParams;
+  return (
+    <PayHostClient
+      planId={planId}
+      token={t || null}
+      confirmId={confirm || null}
+      viewer={u && vt ? { userId: u, token: vt } : null}
+    />
+  );
 }

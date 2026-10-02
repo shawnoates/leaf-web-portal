@@ -66,7 +66,15 @@ function statusLine(g: Guest): string {
   return g.holdUntil ? `Hasn't paid · held until ${when(g.holdUntil)}` : "Hasn't paid";
 }
 
-export default function PayHostClient({ planId, token, confirmId }: { planId: string; token: string | null; confirmId: string | null }) {
+export default function PayHostClient({
+  planId, token, confirmId, viewer,
+}: {
+  planId: string;
+  token: string | null;
+  confirmId: string | null;
+  /** Signed viewer pair from the app's link: sign in as them first. */
+  viewer: { userId: string; token: string } | null;
+}) {
   const [roster, setRoster] = useState<Roster | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -88,7 +96,26 @@ export default function PayHostClient({ planId, token, confirmId }: { planId: st
     }
   }, [params, planId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    (async () => {
+      // Same trade /me makes for its digest links. A failure just leaves the
+      // page on the plan token: roster yes, setup no.
+      if (viewer && Parse.User.current()?.id !== viewer.userId) {
+        try {
+          const r = (await Parse.Cloud.run("getDashboardSession", viewer)) as { sessionToken?: string } | null;
+          if (r?.sessionToken?.startsWith("r:")) await Parse.User.become(r.sessionToken);
+        } catch { /* fall through to the token */ }
+      }
+      if (viewer) {
+        // Don't leave a sign-in link sitting in the address bar or history.
+        const url = new URL(window.location.href);
+        url.searchParams.delete("u");
+        url.searchParams.delete("vt");
+        window.history.replaceState(null, "", url.toString());
+      }
+      await load();
+    })();
+  }, [load, viewer]);
 
   useEffect(() => {
     if (!toast) return;
