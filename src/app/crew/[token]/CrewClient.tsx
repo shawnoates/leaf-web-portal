@@ -937,6 +937,8 @@ function CycleCard({
   const going = goingIds.map((id) => names[id] || "Someone");
   const closes = toDate(c.pollClosesAt);
   const settled = c.state === "locked" || c.state === "booked";
+  // Asked on the page itself: the app's web view has no confirm() dialog.
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const stateWord = { picking: "Picking", polling: "Voting", locked: "Locked in", booked: "Booked" }[c.state as string];
   const who = c.trigger === "member_proposal" ? `${names[c.hostId || ""] || "A member"}'s idea` : "Up next";
   const chosen = c.chosenOption ? dayParts(c.chosenOption.date) : null;
@@ -1114,6 +1116,29 @@ function CycleCard({
           )}
           {c.state === "booked" && (
             <p className="m-0 flex items-center gap-1.5 text-sm text-fm-ink-2"><Check size={16} aria-hidden /> Booked</p>
+          )}
+          {(c.isHost || isOwner) && (
+            confirmCancel ? (
+              <div className="flex flex-col gap-2.5 rounded-[18px] border border-fm-line px-4 py-3.5">
+                <p className="m-0 text-sm leading-snug text-fm-ink">
+                  Cancel {chosen ? `${chosen.dow} ${chosen.month} ${chosen.day}` : "this night"} for everyone? Leaf tells the people invited it&rsquo;s off.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button small disabled={busy !== null} onClick={() => onAct("cancelNight", () => run("cancelCrewNight", auth, { cycleId: c.cycleId }))}>
+                    {busy === "cancelNight" ? "Cancelling…" : "Yes, cancel it"}
+                  </Button>
+                  <Button small kind="ghost" disabled={busy !== null} onClick={() => setConfirmCancel(false)}>Keep it</Button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmCancel(true)}
+                className="min-h-11 w-fit text-sm text-fm-muted underline underline-offset-4 hover:text-fm-danger"
+              >
+                Cancel this night
+              </button>
+            )
           )}
         </>
       )}
