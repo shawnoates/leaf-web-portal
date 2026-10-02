@@ -134,6 +134,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const [form, setForm] = useState<Form | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  // ?preview=1: Shawn checking the page from the admin. Not counted as their open; nothing submits.
+  const [preview, setPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ bookedDate: string | null; benched: boolean; updated?: boolean } | null>(null);
   const [declining, setDeclining] = useState(false);
@@ -172,10 +174,13 @@ export default function MerchantOfferClient({ token }: { token: string }) {
 
   const load = useCallback(async () => {
     try {
-      const f = (await Parse.Cloud.run("getMerchantOfferForm", { token })) as Form;
+      const isPreview = new URLSearchParams(window.location.search).get("preview") === "1";
+      setPreview(isPreview);
+      const f = (await Parse.Cloud.run("getMerchantOfferForm", { token, preview: isPreview })) as Form;
       setForm(f);
+      if (isPreview) setView("form");
       // Keep a working link handy on this device; drop one that stopped working.
-      if (f.state === "sent" || f.state === "drafted" || f.state === "accepted") rememberPartner(token, f.merchantName || "");
+      else if (f.state === "sent" || f.state === "drafted" || f.state === "accepted") rememberPartner(token, f.merchantName || "");
       else forgetPartner(token);
       if (f.state !== "unavailable") {
         const o = f.offer;
@@ -252,6 +257,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   };
 
   const submit = async () => {
+    if (preview) return;
     if (missing.length) {
       setError(`Add ${missing.join(", ")}.`);
       return;
@@ -307,6 +313,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   };
 
   const decline = async () => {
+    if (preview) return;
     setBusy(true);
     try {
       await Parse.Cloud.run("submitMerchantOfferForm", { token, accept: false, declineReason });
@@ -455,8 +462,13 @@ export default function MerchantOfferClient({ token }: { token: string }) {
 
   return (
     <Shell>
+      {preview && (
+        <p className="mt-3 rounded-xl bg-amber-100 px-3 py-2 text-[13px] font-medium text-amber-900">
+          {`Preview of ${form.merchantName ? `${form.merchantName}\u2019s` : "their"} page. Opening it here doesn\u2019t count as them opening it, and nothing can be submitted.`}
+        </p>
+      )}
       <Brand neighborhood={form.neighborhood} />
-      {accepted && !noDashboard && (
+      {accepted && !noDashboard && !preview && (
         <button type="button" onClick={() => setView("dashboard")} className="mt-4 px-1 text-[15px] font-semibold text-leaf-700">
           ← Back to your nights
         </button>
@@ -741,7 +753,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
                 <button
                   type="button"
                   onClick={decline}
-                  disabled={busy}
+                  disabled={busy || preview}
                   className="h-12 w-full rounded-xl border border-stone-300 text-[15px] font-semibold text-stone-700 disabled:opacity-50"
                 >
                   Not for us right now
@@ -764,7 +776,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           <button
             type="button"
             onClick={submit}
-            disabled={busy}
+            disabled={busy || preview}
             className="h-14 w-full rounded-2xl bg-leaf-800 text-[17px] font-semibold text-white shadow-sm transition-opacity active:opacity-90 disabled:opacity-50"
           >
             {busy ? (
