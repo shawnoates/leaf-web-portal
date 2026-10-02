@@ -2671,6 +2671,12 @@ function PlanModal({
                 View on calendar ↗
               </Link>
             )}
+            {/* Host side of peer-to-peer payments: the roster, or setting it up. */}
+            {(viewerHosts(plan) || plan.viewerIsOwner) && (
+              <Link href={`/pay/${plan.id}`} className="btn ghost">
+                {(plan.p2pAmountCents ?? 0) > 0 ? "Payments" : "Collect money"}
+              </Link>
+            )}
           </div>
         </div>
       </div>

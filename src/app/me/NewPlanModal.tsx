@@ -7,6 +7,7 @@ import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { detectCity } from "@/lib/detectCity";
 import { zoneOffsetSuffix } from "@/lib/wall-clock";
 import { APP_LINK_URL } from "@/lib/site";
+import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
 
 // ============================================================================
 // New plan — the quick-create flow reached from "+ New plan" (top bar / sticky
@@ -96,6 +97,10 @@ export interface NewPlanDraftSnapshot {
   postTo?: string;
   hideVenue?: boolean;
   requireApproval?: boolean;
+  collect?: boolean;
+  price?: string;
+  spots?: string;
+  spotIsMine?: boolean;
 }
 
 export default function NewPlanModal({
@@ -152,6 +157,25 @@ export default function NewPlanModal({
   );
   const [hideVenue, setHideVenue] = useState(restore?.hideVenue ?? true);
   const [requireApproval, setRequireApproval] = useState(restore?.requireApproval ?? false);
+  // ---- Collect money (peer to peer: guests pay the host back directly) ----
+  // The host bought N tickets / booked the court; each guest owes `price`.
+  // Spots replace capacity while this is on: capacity = spots minus theirs.
+  const [collect, setCollect] = useState(restore?.collect ?? false);
+  const [price, setPrice] = useState(restore?.price ?? "");
+  const [spots, setSpots] = useState(restore?.spots ?? "");
+  const [spotIsMine, setSpotIsMine] = useState(restore?.spotIsMine ?? true);
+  // undefined = not fetched yet; null = none saved.
+  const [handles, setHandles] = useState<PayHandles | null | undefined>(undefined);
+  const [editingHandles, setEditingHandles] = useState(false);
+  useEffect(() => {
+    if (!collect || handles !== undefined) return;
+    Parse.Cloud.run("getMyPayHandles", {})
+      .then((r: { handles: PayHandles | null }) => setHandles(r.handles))
+      .catch(() => setHandles(null));
+  }, [collect, handles]);
+  const priceCents = Math.round(parseFloat(price || "0") * 100);
+  const spotCount = parseInt(spots || "0", 10);
+  const guestSpots = spotCount - (spotIsMine ? 1 : 0);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverBase64, setCoverBase64] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -340,8 +364,14 @@ export default function NewPlanModal({
     if (!date) next.date = "Pick a day.";
     else if (daysOut(date) < 0) next.date = "That date has already passed.";
     if (!time) next.time = "Pick a start time.";
-    if (capacity.trim() && (!/^\d+$/.test(capacity.trim()) || Number(capacity) < 1)) {
+    if (!collect && capacity.trim() && (!/^\d+$/.test(capacity.trim()) || Number(capacity) < 1)) {
       next.capacity = "Capacity must be 1 or more.";
+    }
+    if (collect) {
+      if (!(priceCents >= 100)) next.collect = "Price per spot must be at least $1.";
+      else if (!(spotCount >= 1)) next.collect = "How many tickets or spots do you have?";
+      else if (guestSpots < 1) next.collect = "With one spot for you, there are none left for guests.";
+      else if (!handles) next.collect = "Add how guests should pay you.";
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -366,7 +396,7 @@ export default function NewPlanModal({
         description: description.trim() || undefined,
         venue: venuePayload,
         time: startTime,
-        capacity: capacity.trim() ? parseInt(capacity, 10) : null,
+        capacity: collect ? guestSpots : capacity.trim() ? parseInt(capacity, 10) : null,
         imageBase64: coverBase64 || undefined,
         hostNote: hostNote.trim() || undefined,
         hideVenueUntilRsvp: hideVenue,
@@ -380,6 +410,19 @@ export default function NewPlanModal({
         clientTimeZone: tz,
       })) as { eventGroupId?: string };
       const eventGroupId: string | null = res?.eventGroupId || null;
+
+      // Collecting is set after the plan exists. If it fails the plan still
+      // stands; say so, and point at the plan's Payments page to retry.
+      let collectError: string | null = null;
+      if (collect && eventGroupId) {
+        try {
+          await Parse.Cloud.run("setPlanP2pPayment", {
+            eventGroupId, amountCents: priceCents, ticketCount: spotCount, hostHasTicket: spotIsMine,
+          });
+        } catch (e: unknown) {
+          collectError = e instanceof Error ? e.message : "Collecting money didn't turn on.";
+        }
+      }
 
       // Sync is a bonus, never a gate — a Google failure can't fail the plan.
       if (eventGroupId && googleConnected) {
@@ -399,6 +442,9 @@ export default function NewPlanModal({
         inviteUrl: eventGroupId ? `${APP_LINK_URL}/p/${eventGroupId}` : null,
         title: title.trim(),
       });
+      if (collectError) {
+        setErrors({ form: `Plan created, but collecting money didn't turn on: ${collectError} You can turn it on from the plan's Payments page.` });
+      }
     } catch (e: unknown) {
       setErrors({ form: e instanceof Error ? e.message : "Couldn't create the plan." });
     } finally {
@@ -412,7 +458,7 @@ export default function NewPlanModal({
       const snapshot: NewPlanDraftSnapshot = {
         prompt, draftApplied, title, description, date, time,
         venueQuery, venue, capacity, hostNote, postTo,
-        hideVenue, requireApproval,
+        hideVenue, requireApproval, collect, price, spots, spotIsMine,
       };
       try { sessionStorage.setItem(ME_PLAN_DRAFT_KEY, JSON.stringify(snapshot)); } catch { /* ignore */ }
       const returnUrl = new URL(window.location.href);
@@ -561,6 +607,69 @@ export default function NewPlanModal({
       </div>
       {errors.capacity && <div className="np-err">{errors.capacity}</div>}
     </>
+  );
+
+  const collectBlock = (
+    <div className="np-collect">
+      <Toggle
+        label="Collect money"
+        helper="You bought the tickets or booked the spot; guests pay you back on Venmo, Cash App, PayPal or Zelle"
+        on={collect}
+        onChange={setCollect}
+        big={narrow}
+      />
+      {collect && (
+        <div className="np-collect-body">
+          <div className="np-row">
+            <div className="np-col">
+              <div className="np-label sm">PRICE PER SPOT</div>
+              <input
+                className="np-under"
+                inputMode="decimal"
+                value={price}
+                placeholder="$60"
+                onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, "").slice(0, 7))}
+              />
+            </div>
+            <div className="np-col">
+              <div className="np-label sm">TICKETS / SPOTS</div>
+              <input
+                className="np-under"
+                inputMode="numeric"
+                value={spots}
+                placeholder="8"
+                onChange={(e) => setSpots(e.target.value.replace(/\D/g, "").slice(0, 3))}
+              />
+            </div>
+          </div>
+          <label className="np-mine">
+            <input type="checkbox" checked={spotIsMine} onChange={(e) => setSpotIsMine(e.target.checked)} />
+            One of these is mine
+          </label>
+          {priceCents >= 100 && guestSpots >= 1 && (
+            <div className="np-collect-calc">
+              {guestSpots} {guestSpots === 1 ? "spot" : "spots"} for guests at ${(priceCents / 100).toFixed(priceCents % 100 ? 2 : 0)}
+              {" "}· full plan pays you back ${((priceCents * guestSpots) / 100).toFixed((priceCents * guestSpots) % 100 ? 2 : 0)}
+            </div>
+          )}
+          {handles === undefined ? null : !handles || editingHandles ? (
+            <div className="np-handles">
+              <PayHandlesForm
+                initial={handles}
+                onCancel={handles ? () => setEditingHandles(false) : undefined}
+                onSaved={(h) => { setHandles(h); setEditingHandles(false); }}
+              />
+            </div>
+          ) : (
+            <div className="np-paidto">
+              <span>Paid to {describeHandles(handles)}</span>
+              <button type="button" onClick={() => setEditingHandles(true)}>Edit</button>
+            </div>
+          )}
+        </div>
+      )}
+      {errors.collect && <div className="np-err">{errors.collect}</div>}
+    </div>
   );
 
   const toggleRows = (
@@ -740,7 +849,7 @@ export default function NewPlanModal({
                 >
                   <span>
                     <span className="np-group-t">More options</span>
-                    <span className="np-group-s">Description · cover image · capacity · host note</span>
+                    <span className="np-group-s">Description · cover · capacity · collect money · host note</span>
                   </span>
                   <span className="np-chev">{moreOpen ? "⌃" : "⌄"}</span>
                 </button>
@@ -754,7 +863,8 @@ export default function NewPlanModal({
                       onChange={(e) => { touch("description"); setDescription(e.target.value); }}
                     />
                     <div style={{ marginTop: 18 }}>{coverDrop}</div>
-                    <div style={{ marginTop: 18 }}>{capacityRow}</div>
+                    {!collect && <div style={{ marginTop: 18 }}>{capacityRow}</div>}
+                    <div style={{ marginTop: 18 }}>{collectBlock}</div>
                     <div className="np-label" style={{ marginTop: 18 }}>HOST NOTE</div>
                     <textarea
                       className="np-box sm"
@@ -805,7 +915,8 @@ export default function NewPlanModal({
                   </div>
                   <div className="np-side">
                     {coverDrop}
-                    <div style={{ marginTop: 14 }}>{capacityRow}</div>
+                    {!collect && <div style={{ marginTop: 14 }}>{capacityRow}</div>}
+                    <div style={{ marginTop: 14 }}>{collectBlock}</div>
                     <div className="np-label sm" style={{ marginTop: 18 }}>HOST NOTE</div>
                     <textarea
                       className="np-box sm"
@@ -921,6 +1032,12 @@ const NP_CSS = `
 .np-main{flex:1 1 0;min-width:0}
 .np-side{width:264px;flex:none}
 .np-row{display:flex;gap:14px}
+.np-collect-body{display:grid;gap:12px;margin-top:10px}
+.np-mine{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--body);cursor:pointer}
+.np-collect-calc{font-size:12px;color:#253a33;background:#f3f7f5;border-radius:8px;padding:7px 10px}
+.np-handles{border:1px solid rgba(0,0,0,.09);border-radius:10px;padding:12px}
+.np-paidto{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--body);background:#faf9f7;border-radius:8px;padding:8px 10px}
+.np-paidto button{border:0;background:none;color:var(--muted);text-decoration:underline;cursor:pointer;font:inherit;padding:0}
 .np-col{flex:1 1 0;min-width:0}
 .np-col-time{width:104px;flex:none}
 
