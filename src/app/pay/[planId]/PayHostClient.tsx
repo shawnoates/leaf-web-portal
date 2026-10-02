@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
+import ReceiptForwarding from "@/components/p2p/ReceiptForwarding";
 
 type Status = "pending_lock" | "unpaid" | "claimed" | "confirmed" | "expired";
 type Method = "venmo" | "cashapp" | "paypal" | "zelle";
@@ -23,6 +24,8 @@ type Guest = {
   notReceived: boolean;
   /** Dropout swap: this guest pays back the guest who left, not you. */
   paysTo?: string | null;
+  /** A forwarded receipt that looks like this seat's payment. */
+  receipt?: string | null;
 };
 
 /** "Split a total": the share comes from the headcount, fixed when it locks. */
@@ -43,7 +46,11 @@ type Split = {
 
 type LockPreview = { needsConfirm: true; headcount: number; guests: number; shareCents: number; belowMin: boolean };
 
+/** Where the host forwards receipts to have them matched automatically. */
+type Inbound = { address: string; forwardCode: string | null; lastReceiptAt: string | null };
+
 type Roster = {
+  inbound?: Inbound | null;
   p2pPayment: { mode?: "fixed" | "split"; amountCents?: number | null; ticketCount?: number; hostHasTicket?: boolean } | null;
   split?: Split | null;
   canLock?: boolean;
@@ -80,6 +87,7 @@ function when(iso: string): string {
 }
 
 function statusLine(g: Guest): string {
+  if (g.receipt && g.status !== "confirmed") return `${g.receipt} — confirm it's theirs`;
   const base = statusLineFor(g);
   return g.paysTo ? `${base} · pays ${g.paysTo} back (their old seat)` : base;
 }
@@ -330,6 +338,8 @@ export default function PayHostClient({
           </button>
         )}
 
+        {roster.inbound && <ReceiptForwarding inbound={roster.inbound} />}
+
         {sorted.length === 0 ? (
           <p className="ph-muted ph-none">Nobody has taken a spot yet.</p>
         ) : (
@@ -351,7 +361,10 @@ export default function PayHostClient({
                       <button className="ph-btn ghost sm" disabled={busyId === g.eventNotificationId} onClick={() => act("markP2pNotReceived", g)}>Not received</button>
                     </>
                   )}
-                  {!g.paysTo && g.status === "unpaid" && (
+                  {!g.paysTo && g.status === "unpaid" && g.receipt && (
+                    <button className="ph-btn primary sm" disabled={busyId === g.eventNotificationId} onClick={() => act("confirmP2pPayment", g)}>Confirm</button>
+                  )}
+                  {!g.paysTo && g.status === "unpaid" && !g.receipt && (
                     <button className="ph-btn ghost sm" title="Paid you some other way, like cash" disabled={busyId === g.eventNotificationId} onClick={() => act("confirmP2pPayment", g)}>Mark paid</button>
                   )}
                   {!g.paysTo && g.status === "confirmed" && (

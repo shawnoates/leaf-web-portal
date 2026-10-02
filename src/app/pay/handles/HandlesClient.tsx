@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
+import ReceiptForwarding, { type Inbound } from "@/components/p2p/ReceiptForwarding";
 
 export default function HandlesClient({ viewer }: { viewer: { userId: string; token: string } | null }) {
   // undefined = loading; null = signed out or none saved (see `signedIn`).
   const [handles, setHandles] = useState<PayHandles | null | undefined>(undefined);
   const [signedIn, setSignedIn] = useState(true);
   const [saved, setSaved] = useState(false);
+  // Their private address for forwarding payment receipts.
+  const [inbound, setInbound] = useState<Inbound | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -34,6 +37,7 @@ export default function HandlesClient({ viewer }: { viewer: { userId: string; to
       try {
         const r = (await Parse.Cloud.run("getMyPayHandles", {})) as { handles: PayHandles | null };
         setHandles(r.handles);
+        Parse.Cloud.run("getP2pInbound", {}).then((i: Inbound) => setInbound(i)).catch(() => {});
       } catch {
         setHandles(null);
       }
@@ -60,6 +64,7 @@ export default function HandlesClient({ viewer }: { viewer: { userId: string; to
             <PayHandlesForm initial={handles} onSaved={(h) => { setHandles(h); setSaved(true); }} />
           )}
         </div>
+        {inbound && handles && <div className="ph2-fwd"><ReceiptForwarding inbound={inbound} /></div>}
       </div>
     </main>
   );
@@ -75,4 +80,5 @@ const CSS = `
 .ph2-h{font-size:17px;font-weight:600}
 .ph2-muted{color:#6f6a5f;font-size:13px}
 .ph2-muted a{text-decoration:underline}
+.ph2-fwd{margin-top:14px}
 `;
