@@ -65,6 +65,9 @@ type Payment = {
   hostFirstName?: string;
   /** The guest came through another calendar: the host's own calendar. */
   hostingFrom?: string | null;
+  /** Dropout swap: this seat was someone else's paid seat, so this guest pays
+   *  them back (hostFirstName is then the dropper) instead of the host. */
+  resale?: { sellerName: string; hostName?: string } | null;
   seat?: Seat | null;
   note?: string;
   options?: PayOption[];
@@ -183,9 +186,11 @@ export default function P2pPayCard({
   const amount = money(amountCents);
   const brand = accent ? { background: accent, borderColor: accent } : undefined;
   // Cross-promoted: say whose plan this is, so the guest knows who they're paying.
-  const fromLine = data.hostingFrom
-    ? <p className="p2p-from">{Host} is hosting this from {data.hostingFrom}.</p>
-    : null;
+  const fromLine = data.resale
+    ? <p className="p2p-from">{data.resale.sellerName} gave up this seat, so you&apos;re paying them back instead of {data.resale.hostName ? `${data.resale.hostName[0].toUpperCase()}${data.resale.hostName.slice(1)}` : "the host"}.</p>
+    : data.hostingFrom
+      ? <p className="p2p-from">{Host} is hosting this from {data.hostingFrom}.</p>
+      : null;
 
   // A seat we can't see: no session on this browser. The texted link signs
   // them in, so point there rather than asking for a phone again.

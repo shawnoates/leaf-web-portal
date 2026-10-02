@@ -21,6 +21,8 @@ type Guest = {
   autoConfirmAt: string | null;
   confirmedBy: "host" | "auto" | null;
   notReceived: boolean;
+  /** Dropout swap: this guest pays back the guest who left, not you. */
+  paysTo?: string | null;
 };
 
 /** "Split a total": the share comes from the headcount, fixed when it locks. */
@@ -78,6 +80,11 @@ function when(iso: string): string {
 }
 
 function statusLine(g: Guest): string {
+  const base = statusLineFor(g);
+  return g.paysTo ? `${base} · pays ${g.paysTo} back (their old seat)` : base;
+}
+
+function statusLineFor(g: Guest): string {
   if (g.status === "pending_lock") return "In · pays once you lock the split";
   if (g.status === "confirmed") return g.confirmedBy === "auto" ? "Paid · confirmed automatically" : "Paid";
   if (g.status === "claimed") {
@@ -337,16 +344,17 @@ export default function PayHostClient({
                   <p className={`ph-st ${g.status}`}>{statusLine(g)}</p>
                 </div>
                 <div className="ph-row-actions">
-                  {g.status === "claimed" && (
+                  {/* A swapped seat pays the guest who left; they confirm it. */}
+                  {!g.paysTo && g.status === "claimed" && (
                     <>
                       <button className="ph-btn primary sm" disabled={busyId === g.eventNotificationId} onClick={() => act("confirmP2pPayment", g)}>Confirm</button>
                       <button className="ph-btn ghost sm" disabled={busyId === g.eventNotificationId} onClick={() => act("markP2pNotReceived", g)}>Not received</button>
                     </>
                   )}
-                  {g.status === "unpaid" && (
+                  {!g.paysTo && g.status === "unpaid" && (
                     <button className="ph-btn ghost sm" title="Paid you some other way, like cash" disabled={busyId === g.eventNotificationId} onClick={() => act("confirmP2pPayment", g)}>Mark paid</button>
                   )}
-                  {g.status === "confirmed" && (
+                  {!g.paysTo && g.status === "confirmed" && (
                     <button className="ph-link" disabled={busyId === g.eventNotificationId} onClick={() => act("markP2pNotReceived", g)}>Not received?</button>
                   )}
                 </div>
