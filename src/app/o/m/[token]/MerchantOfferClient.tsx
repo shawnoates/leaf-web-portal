@@ -36,6 +36,10 @@ type DateOption = { dateKey: string; label: string };
 type Form = {
   state: "drafted" | "sent" | "accepted" | "declined" | "expired" | "unavailable";
   merchantName: string;
+  /** Their own Google photo, saved by Leaf; shown at the top. */
+  photoUrl?: string | null;
+  /** Google requires the photographer's name next to it. */
+  photoCredit?: { name: string; uri: string } | null;
   calendarName: string;
   neighborhood: string;
   calendarUrl: string | null;
@@ -468,6 +472,25 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         </p>
       )}
       <Brand neighborhood={form.neighborhood} />
+      {form.photoUrl && (
+        <figure className="mt-5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={form.photoUrl} alt={form.merchantName} className="h-44 w-full rounded-2xl object-cover sm:h-56" />
+          {form.photoCredit?.name && (
+            <figcaption className="mt-1 px-1 text-right text-[11px] text-stone-400">
+              Photo:{" "}
+              {form.photoCredit.uri ? (
+                <a href={form.photoCredit.uri} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                  {form.photoCredit.name}
+                </a>
+              ) : (
+                form.photoCredit.name
+              )}{" "}
+              on Google
+            </figcaption>
+          )}
+        </figure>
+      )}
       {accepted && !noDashboard && !preview && (
         <button type="button" onClick={() => setView("dashboard")} className="mt-4 px-1 text-[15px] font-semibold text-leaf-700">
           ← Back to your nights
