@@ -1107,13 +1107,21 @@ function CycleCard({
             })}
           </div>
 
-          {c.isHost && c.state === "locked" && !c.venue?.fixed && (
-            <div className="flex items-center gap-3 rounded-[18px] bg-fm-card px-4 py-3.5">
-              <p className="m-0 flex-1 text-sm leading-snug text-fm-ink-2">You&rsquo;re booking this one. Tap when it&rsquo;s done and Leaf tells everyone.</p>
-              <Button kind="ghost" small disabled={busy !== null} onClick={() => onAct("booked", () => run("markCrewBooked", auth, { cycleId: c.cycleId }))}>
-                Booked
-              </Button>
+          {c.isHost && c.state === "locked" && !c.venue?.fixed && !c.noBookingNeeded && (
+            <div className="flex flex-col gap-3 rounded-[18px] bg-fm-card px-4 py-3.5">
+              <p className="m-0 text-sm leading-snug text-fm-ink-2">You&rsquo;re booking this one. Tap when it&rsquo;s done and Leaf tells everyone.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button kind="ghost" small disabled={busy !== null} onClick={() => onAct("booked", () => run("markCrewBooked", auth, { cycleId: c.cycleId }))}>
+                  Booked
+                </Button>
+                <Button kind="ghost" small disabled={busy !== null} onClick={() => onAct("nobook", () => run("markCrewNoBooking", auth, { cycleId: c.cycleId }))}>
+                  No booking needed
+                </Button>
+              </div>
             </div>
+          )}
+          {c.isHost && c.state === "locked" && c.noBookingNeeded && (
+            <p className="m-0 text-sm text-fm-muted">No booking needed. Leaf won&rsquo;t remind you about it.</p>
           )}
           {c.state === "booked" && (
             <p className="m-0 flex items-center gap-1.5 text-sm text-fm-ink-2"><Check size={16} aria-hidden /> Booked</p>
