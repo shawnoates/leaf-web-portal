@@ -74,9 +74,15 @@ export type IntroVideoInfo = {
 export type IntroVideoSource =
   | { kind: "offer"; token: string }
   | { kind: "plan"; eventGroupId: string }
-  | { kind: "checklist"; notificationId: string };
+  | { kind: "checklist"; notificationId: string }
+  /** A business that runs its own nights, from its Leaf page: one hello for all of them. */
+  | { kind: "merchant"; token: string };
 
 function fnsFor(source: IntroVideoSource) {
+  if (source.kind === "merchant") {
+    const base = { token: source.token };
+    return { create: "createMerchantIntroUpload", finalize: "finalizeMerchantIntroUpload", remove: "removeMerchantIntroVideo", base };
+  }
   if (source.kind === "offer") {
     const base = { token: source.token };
     return { create: "createHostIntroUpload", finalize: "finalizeHostIntroUpload", remove: "removeHostIntroVideo", base };
