@@ -27,7 +27,7 @@ import CommunityTab, { type CommunitySegment } from "@/components/dashboard/Comm
 import NudgeModal from "@/components/dashboard/NudgeModal";
 import CreateCalendarModal from "@/components/dashboard/CreateCalendarModal";
 import SeriesHostModal, { type SeriesLimit } from "@/components/dashboard/SeriesHostModal";
-import P2pIntroModal, { P2P_INTRO_SEEN_KEY } from "@/components/dashboard/P2pIntroModal";
+import P2pIntroModal from "@/components/dashboard/P2pIntroModal";
 import { seriesCountsTowardLimit, type SeriesSummary } from "@/lib/series";
 import GrowPerformance from "@/components/dashboard/GrowPerformance";
 import SharePlanSheet from "@/components/dashboard/SharePlanSheet";
@@ -1259,26 +1259,34 @@ export default function OrgDashboardPage() {
     dashboard && (dashboard.isOwner || dashboard.calendars.some((c) => c.role === "Host")),
   );
 
-  // Peer-to-peer payments intro: once per browser, for whoever runs the
-  // calendar, a moment after the dashboard settles and never over another
-  // modal. `?p2pIntro=1` shows it again (for a demo or a support thread).
+  // Peer-to-peer payments intro, per account: the server says whether it's
+  // due (once a month until they first collect on a plan). Shown a moment
+  // after the dashboard settles, never over another modal. `?p2pIntro=1`
+  // shows it regardless (for a demo or a support thread).
   const [showP2pIntro, setShowP2pIntro] = useState(false);
+  const [p2pIntroDue, setP2pIntroDue] = useState(false);
   const p2pIntroShown = useRef(false);
   const anotherModalOpen = showCreatePlanModal || showSubscription || showAddCalendar || showPhoneModal || Boolean(nudgeFor?.length);
   useEffect(() => {
-    if (!canHostSeries || anotherModalOpen || p2pIntroShown.current) return;
+    if (!canHostSeries) return;
     let forced = false;
-    try {
-      forced = new URLSearchParams(window.location.search).get("p2pIntro") === "1";
-      if (!forced && localStorage.getItem(P2P_INTRO_SEEN_KEY)) return;
-    } catch { return; }
+    try { forced = new URLSearchParams(window.location.search).get("p2pIntro") === "1"; } catch { /* no window */ }
+    if (forced) { setP2pIntroDue(true); return; }
+    let cancelled = false;
+    Parse.Cloud.run("getP2pIntro", {})
+      .then((r: { show?: boolean }) => { if (!cancelled && r?.show) setP2pIntroDue(true); })
+      .catch(() => { /* not shown is fine */ });
+    return () => { cancelled = true; };
+  }, [canHostSeries]);
+  useEffect(() => {
+    if (!p2pIntroDue || anotherModalOpen || p2pIntroShown.current) return;
     const t = setTimeout(() => {
       p2pIntroShown.current = true;
       setShowP2pIntro(true);
-      try { localStorage.setItem(P2P_INTRO_SEEN_KEY, new Date().toISOString()); } catch { /* private mode */ }
-    }, forced ? 0 : 1200);
+      Parse.Cloud.run("markP2pIntroSeen", {}).catch(() => {});
+    }, 1200);
     return () => clearTimeout(t);
-  }, [canHostSeries, anotherModalOpen]);
+  }, [p2pIntroDue, anotherModalOpen]);
 
   // Home NEEDS YOU prompt cards. Both open the same composer the Community
   // tab uses; the server addresses the send by the membership id it handed

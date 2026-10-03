@@ -10,8 +10,6 @@ import { Check, Clock, Repeat, Users, Wallet, X } from "lucide-react";
  * with "Collect money" already on; price-per-spot or split is chosen there.
  */
 
-export const P2P_INTRO_SEEN_KEY = "leaf_p2p_intro_seen_v1";
-
 const METHODS = ["Venmo", "Cash App", "PayPal", "Zelle"];
 // Pickleball, to match the sample roster laid over it.
 const PHOTO = { url: "/p2p-intro-pickleball.jpg", alt: "Friends cheering on a pickleball court at dusk" };
