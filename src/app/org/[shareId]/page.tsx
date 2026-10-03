@@ -5067,6 +5067,11 @@ export default function OrgCalendarPage() {
                               <Check className="w-3 h-3" /> Attending
                             </span>
                           ) : null}
+                          {p2pPriceShort(plan.p2pAmountCents, plan.p2pSplit) && (
+                            <span className="text-xs font-bold uppercase tracking-widest text-zinc-900 flex items-center gap-1.5">
+                              <Wallet className="w-3.5 h-3.5" /> {p2pPriceShort(plan.p2pAmountCents, plan.p2pSplit)}
+                            </span>
+                          )}
                         </div>
                         <div className="flex flex-col sm:flex-row gap-4">
                           {/* "View Details" for everyone — RSVP'd, hosting, pending, or new.
