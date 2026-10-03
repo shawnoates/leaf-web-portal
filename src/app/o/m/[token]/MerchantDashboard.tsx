@@ -375,7 +375,6 @@ export default function MerchantDashboard({
           ) : (
             d.calendarName
           )}
-          {d.weekdayLabel ? ` · ${d.weekdayLabel} at ${d.startTimeLabel}` : ""}
         </p>
         <div className={`mt-5 grid gap-3 ${perRsvp ? "grid-cols-4" : "grid-cols-3"}`}>
           <Stat value={d.totals.upcoming} label="coming up" />
@@ -419,7 +418,9 @@ export default function MerchantDashboard({
               {d.requests.map((q) => (
                 <p key={q.id} className="text-[15px] text-stone-700">
                   <span className="font-semibold text-stone-900">{q.kind === "first" ? `Your first ${q.label.replace(/s( \u00b7.*)?$/, "")}` : q.label}</span>
-                  <span className="block text-[13px] text-stone-500">We&rsquo;ll confirm the date and time within a day.</span>
+                  <span className="block text-[13px] text-stone-500">
+                    We&rsquo;ll confirm the date and time with you within a day. Nothing is booked until then.
+                  </span>
                 </p>
               ))}
             </div>

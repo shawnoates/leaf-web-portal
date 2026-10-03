@@ -513,7 +513,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         <p className="mt-4 text-[16px] leading-relaxed text-stone-600">
           {perRsvp
             ? `We bring ${form.headcount} neighbors from ${theCalendar(form.calendarName)} calendar to you, on your slowest day.`
-            : `A taster for ${form.headcount} neighbors on ${theCalendar(form.calendarName)} calendar at ${form.startTimeLabel}. Leaf keeps 10% of tickets.`}{" "}
+            : `A taster for ${form.headcount} neighbors on ${theCalendar(form.calendarName)} calendar, on a day that suits you. Leaf keeps 10% of tickets.`}{" "}
           {form.calendarUrl && (
             <a href={form.calendarUrl} target="_blank" rel="noreferrer" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
               See the calendar
@@ -560,7 +560,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               setDescription={setDescription}
               merchantName={form.merchantName}
               meta={nightMeta({
-                startTimeLabel: accepted ? form.startTimeLabel : "",
+                // The time is set with them per night, not the calendar's default.
+                startTimeLabel: "",
                 durationMin: Number(durationMin) || suggested.durationMin,
                 headcount: form.headcount,
                 priceCents: perRsvp ? 0 : Math.round(Number(price || 0) * 100),
