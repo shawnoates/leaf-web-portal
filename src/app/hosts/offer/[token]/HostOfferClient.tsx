@@ -108,10 +108,17 @@ type OfferAddon = {
   maxCents: number;
   suggestedCents: number;
   chosen: boolean;
+  // Turned off after guests had ordered: no new orders, still to hand out.
+  closed?: boolean;
   priceCents: number | null;
 };
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2).replace(/\.00$/, "")}`;
+
+/** Ticks and prices as typed: everything ticked on a live offer, what the host chose once accepted. */
+const seedAddonPick = (o: { state: string; addons?: OfferAddon[] }) => Object.fromEntries((o.addons || []).map((a) => [
+  a.slug, { on: o.state === "accepted" ? a.chosen : true, price: String(((a.priceCents ?? a.suggestedCents) / 100)) },
+]));
 
 const card =
   "rounded-2xl border border-zinc-200 bg-white p-6";
@@ -218,6 +225,8 @@ export default function HostOfferClient({ token }: { token: string }) {
   const [addonHandles, setAddonHandles] = useState<PayHandles | null>(null);
   const [handlesTouched, setHandlesTouched] = useState(false);
   const [editingHandles, setEditingHandles] = useState(false);
+  const [addonSaving, setAddonSaving] = useState(false);
+  const [addonNote, setAddonNote] = useState<{ ok: boolean; text: string } | null>(null);
 
   // Phone: required to accept. Missing → typed here; present → shown by its
   // last four and confirmable, with a Change link.
@@ -234,9 +243,7 @@ export default function HostOfferClient({ token }: { token: string }) {
     try {
       const r = (await Parse.Cloud.run("getHostOffer", { token })) as Offer;
       setOffer(r);
-      setAddonPick((prev) => Object.keys(prev).length ? prev : Object.fromEntries((r.addons || []).map((a) => [
-        a.slug, { on: true, price: String(((a.priceCents ?? a.suggestedCents) / 100)) },
-      ])));
+      setAddonPick((prev) => Object.keys(prev).length ? prev : seedAddonPick(r));
       setAddonHandles((prev) => prev ?? r.payHandles?.handles ?? null);
       setPaymentSaved(r.hasPaymentDetails);
       return r;
@@ -252,6 +259,37 @@ export default function HostOfferClient({ token }: { token: string }) {
     load();
   }, [load]);
 
+  const pickedAddons = () => (offer?.addons || []).filter((a) => addonPick[a.slug]?.on).map((a) => ({
+    slug: a.slug,
+    priceCents: Math.round(parseFloat(addonPick[a.slug].price || "0") * 100),
+  }));
+
+  // After accepting: change which add-ons are sold, and at what price.
+  const saveAddons = async () => {
+    const chosen = pickedAddons();
+    if (chosen.length && !addonHandles) {
+      setAddonNote({ ok: false, text: "Add how guests pay you for add-ons — or untick them." });
+      return;
+    }
+    setAddonSaving(true);
+    setAddonNote(null);
+    try {
+      const r = (await Parse.Cloud.run("setHostOfferAddons", {
+        token,
+        addons: chosen,
+        payHandles: chosen.length && (handlesTouched || !offer?.payHandles?.saved) ? addonHandles : undefined,
+      })) as { addons: OfferAddon[]; payHandles: Offer["payHandles"] };
+      setOffer((o) => (o ? { ...o, addons: r.addons, payHandles: r.payHandles } : o));
+      setAddonPick(seedAddonPick({ state: "accepted", addons: r.addons }));
+      setHandlesTouched(false);
+      setAddonNote({ ok: true, text: "Saved. New prices apply to orders from now on." });
+    } catch (e) {
+      setAddonNote({ ok: false, text: e instanceof Error ? e.message : "Couldn't save that." });
+    } finally {
+      setAddonSaving(false);
+    }
+  };
+
   const accept = async () => {
     if (!agreed) {
       setError("Please read the hosting agreement and tick the box first.");
@@ -263,10 +301,7 @@ export default function HostOfferClient({ token }: { token: string }) {
       setError("Add a mobile number so we can reach you on the day.");
       return;
     }
-    const chosenAddons = (offer?.addons || []).filter((a) => addonPick[a.slug]?.on).map((a) => ({
-      slug: a.slug,
-      priceCents: Math.round(parseFloat(addonPick[a.slug].price || "0") * 100),
-    }));
+    const chosenAddons = pickedAddons();
     if (chosenAddons.length && !addonHandles) {
       setError("Add how guests pay you for add-ons — or untick them.");
       return;
@@ -455,6 +490,80 @@ export default function HostOfferClient({ token }: { token: string }) {
       />
     );
   }
+
+
+  // The add-on picker: on the offer before accepting, and on the accepted page
+  // to change it afterwards.
+  const addonPicker = (
+    <>
+      <p className="text-[14px] font-medium text-leaf-900">Add-ons guests can buy</p>
+          <p className="mt-1 text-[13px] leading-snug text-zinc-600">
+            Pick the ones you&rsquo;ll handle and set your price. Guests pay you directly and you keep all of it.
+          </p>
+          <div className="mt-3 space-y-3">
+            {offer.addons!.map((a) => {
+              const pick = addonPick[a.slug] || { on: false, price: "" };
+              const set = (patch: Partial<typeof pick>) => setAddonPick((p) => ({ ...p, [a.slug]: { ...pick, ...patch } }));
+              return (
+                <div key={a.slug} className={`rounded-lg border p-3 ${pick.on ? "border-leaf-800" : "border-zinc-200"}`}>
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input type="checkbox" checked={pick.on} onChange={(e) => set({ on: e.target.checked })} className="mt-1 h-4 w-4" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14px] font-medium text-zinc-900">{a.title}</span>
+                      {a.description && <span className="block text-[13px] text-zinc-600">{a.description}</span>}
+                      {a.taskLine && <span className="mt-1 block text-[12px] text-zinc-500">You&rsquo;ll: {a.taskLine}</span>}
+                      {a.closed && !pick.on && (
+                        <span className="mt-1 block text-[12px] text-amber-700">
+                          Off for new orders. Guests who already paid are still on your checklist.
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                  {pick.on && (
+                    <div className="mt-2 flex items-center gap-2 pl-7">
+                      <span className="text-[13px] text-zinc-500">$</span>
+                      <input
+                        className={`${inputClass} w-24`}
+                        inputMode="decimal"
+                        aria-label={`Price for ${a.title}`}
+                        value={pick.price}
+                        onChange={(e) => set({ price: e.target.value.replace(/[^\d.]/g, "").slice(0, 6) })}
+                        onBlur={() => {
+                          const c = Math.round(parseFloat(pick.price || "0") * 100);
+                          const clamped = Math.min(Math.max(Math.round(c / 50) * 50 || a.suggestedCents, a.minCents), a.maxCents);
+                          set({ price: String(clamped / 100) });
+                        }}
+                      />
+                      <span className="text-[12px] text-zinc-500">each · {dollars(a.minCents)}–{dollars(a.maxCents)}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {Object.values(addonPick).some((p) => p.on) && (
+            <div className="mt-4">
+              <p className="text-[13px] font-medium text-leaf-900">How guests pay you</p>
+              {addonHandles && !editingHandles ? (
+                <div className="mt-1.5 flex items-center justify-between gap-3 rounded-lg bg-zinc-50 px-3 py-2 text-[13px] text-zinc-700">
+                  <span>{describeHandles(addonHandles)}</span>
+                  <button type="button" className="underline text-leaf-800" onClick={() => setEditingHandles(true)}>Edit</button>
+                </div>
+              ) : (
+                <div className="mt-2">
+                  <PayHandlesForm
+                    initial={addonHandles}
+                    saveLabel="Use these"
+                    onCancel={addonHandles ? () => setEditingHandles(false) : undefined}
+                    onSaved={() => {}}
+                    onSubmit={(h) => { setAddonHandles(h); setHandlesTouched(true); setEditingHandles(false); }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+    </>
+  );
 
   // ── Accepted ─────────────────────────────────────────────────────────────
   if (offer.state === "accepted") {
@@ -704,6 +813,23 @@ export default function HostOfferClient({ token }: { token: string }) {
           </div>
         )}
 
+        {(offer.addons?.length ?? 0) > 0 && (
+          <div className={`${card} mt-6`}>
+            {addonPicker}
+            <button
+              type="button"
+              onClick={saveAddons}
+              disabled={addonSaving}
+              className={`${btnPrimary} mt-4`}
+            >
+              {addonSaving ? "Saving…" : "Save add-ons"}
+            </button>
+            {addonNote && (
+              <p className={`mt-2 text-[13px] ${addonNote.ok ? "text-leaf-800" : "text-red-600"}`}>{addonNote.text}</p>
+            )}
+          </div>
+        )}
+
         {/* Payment comes AFTER acceptance, never as a gate in front of it. */}
         {!paymentSaved ? (
           <div className={`${card} mt-6`}>
@@ -943,69 +1069,7 @@ export default function HostOfferClient({ token }: { token: string }) {
       )}
 
       {(offer.addons?.length ?? 0) > 0 && (
-        <div className="mt-4 rounded-xl border border-zinc-200 p-4">
-          <p className="text-[14px] font-medium text-leaf-900">Add-ons guests can buy</p>
-          <p className="mt-1 text-[13px] leading-snug text-zinc-600">
-            Pick the ones you&rsquo;ll handle and set your price. Guests pay you directly and you keep all of it.
-          </p>
-          <div className="mt-3 space-y-3">
-            {offer.addons!.map((a) => {
-              const pick = addonPick[a.slug] || { on: false, price: "" };
-              const set = (patch: Partial<typeof pick>) => setAddonPick((p) => ({ ...p, [a.slug]: { ...pick, ...patch } }));
-              return (
-                <div key={a.slug} className={`rounded-lg border p-3 ${pick.on ? "border-leaf-800" : "border-zinc-200"}`}>
-                  <label className="flex cursor-pointer items-start gap-3">
-                    <input type="checkbox" checked={pick.on} onChange={(e) => set({ on: e.target.checked })} className="mt-1 h-4 w-4" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[14px] font-medium text-zinc-900">{a.title}</span>
-                      {a.description && <span className="block text-[13px] text-zinc-600">{a.description}</span>}
-                      {a.taskLine && <span className="mt-1 block text-[12px] text-zinc-500">You&rsquo;ll: {a.taskLine}</span>}
-                    </span>
-                  </label>
-                  {pick.on && (
-                    <div className="mt-2 flex items-center gap-2 pl-7">
-                      <span className="text-[13px] text-zinc-500">$</span>
-                      <input
-                        className={`${inputClass} w-24`}
-                        inputMode="decimal"
-                        aria-label={`Price for ${a.title}`}
-                        value={pick.price}
-                        onChange={(e) => set({ price: e.target.value.replace(/[^\d.]/g, "").slice(0, 6) })}
-                        onBlur={() => {
-                          const c = Math.round(parseFloat(pick.price || "0") * 100);
-                          const clamped = Math.min(Math.max(Math.round(c / 50) * 50 || a.suggestedCents, a.minCents), a.maxCents);
-                          set({ price: String(clamped / 100) });
-                        }}
-                      />
-                      <span className="text-[12px] text-zinc-500">each · {dollars(a.minCents)}–{dollars(a.maxCents)}</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {Object.values(addonPick).some((p) => p.on) && (
-            <div className="mt-4">
-              <p className="text-[13px] font-medium text-leaf-900">How guests pay you</p>
-              {addonHandles && !editingHandles ? (
-                <div className="mt-1.5 flex items-center justify-between gap-3 rounded-lg bg-zinc-50 px-3 py-2 text-[13px] text-zinc-700">
-                  <span>{describeHandles(addonHandles)}</span>
-                  <button type="button" className="underline text-leaf-800" onClick={() => setEditingHandles(true)}>Edit</button>
-                </div>
-              ) : (
-                <div className="mt-2">
-                  <PayHandlesForm
-                    initial={addonHandles}
-                    saveLabel="Use these"
-                    onCancel={addonHandles ? () => setEditingHandles(false) : undefined}
-                    onSaved={() => {}}
-                    onSubmit={(h) => { setAddonHandles(h); setHandlesTouched(true); setEditingHandles(false); }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <div className="mt-4 rounded-xl border border-zinc-200 p-4">{addonPicker}</div>
       )}
 
       <div className="mt-4 rounded-xl border border-zinc-200 p-4">

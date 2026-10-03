@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * A Mux HLS stream in a plain <video>. Safari plays HLS natively; everything
- * else gets hls.js, loaded only when needed. When playback can't be set up
+ * A Mux HLS stream in a plain <video>, played through hls.js wherever Media
+ * Source exists; native HLS only where it doesn't. When playback can't be set up
  * the poster stays as a plain image, so the layout never collapses.
  *
  * Shared by the plan hero (/p/<id>), the host intro on the org page and the
@@ -45,17 +45,18 @@ export default function HlsVideo({
     const video = ref.current;
     if (!video || !src) return;
     setPlayable(true);
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = src;
-      return;
-    }
+    // hls.js first, native only where it can't run (older iPhones). Chrome
+    // now answers "maybe" to canPlayType for HLS, so checking native first
+    // handed Chrome a stream its own player then rejected (MEDIA_ERR 4).
+    const nativeHls = Boolean(video.canPlayType("application/vnd.apple.mpegurl"));
     let cancelled = false;
     let hls: { destroy: () => void } | null = null;
     import("hls.js")
       .then(({ default: Hls }) => {
         if (cancelled) return;
         if (!Hls.isSupported()) {
-          setPlayable(false);
+          if (nativeHls) video.src = src;
+          else setPlayable(false);
           return;
         }
         const instance = new Hls();
@@ -66,7 +67,11 @@ export default function HlsVideo({
         instance.loadSource(src);
         instance.attachMedia(video);
       })
-      .catch(() => setPlayable(false));
+      .catch(() => {
+        if (cancelled) return;
+        if (nativeHls) video.src = src;
+        else setPlayable(false);
+      });
     return () => {
       cancelled = true;
       hls?.destroy();

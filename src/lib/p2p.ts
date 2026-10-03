@@ -35,6 +35,17 @@ export function p2pPriceLine(amountCents: number | null | undefined, split: P2pS
   return null;
 }
 
+/** The price in a few words, for a plan's meta row: "$25 a spot" or "$15–$25 each". */
+export function p2pPriceShort(amountCents: number | null | undefined, split: P2pSplitSummary | null | undefined): string | null {
+  if (split) {
+    return split.lowCents === split.highCents
+      ? `${p2pMoney(split.lowCents)} each`
+      : `${p2pMoney(split.lowCents)}–${p2pMoney(split.highCents)} each`;
+  }
+  if ((amountCents ?? 0) > 0) return `${p2pMoney(amountCents!)} a spot`;
+  return null;
+}
+
 export function parseP2pSplit(v: unknown): P2pSplitSummary | null {
   if (!v || typeof v !== "object") return null;
   const s = v as Record<string, unknown>;

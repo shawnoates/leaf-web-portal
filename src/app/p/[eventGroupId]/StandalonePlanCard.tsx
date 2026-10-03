@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Lock, MapPin } from "lucide-react";
+import { Lock, MapPin, Wallet } from "lucide-react";
 import PlanHeroMedia from "./PlanHeroMedia";
 import HlsVideo from "@/components/HlsVideo";
 import HostIntroInline from "@/components/HostIntroInline";
 import { introVideoFrame } from "@/lib/intro-video-frame";
 import PlanWhen from "./PlanWhen";
 import StandalonePlanRsvp from "./StandalonePlanRsvp";
-import type { P2pSplitSummary } from "@/lib/p2p";
+import { p2pPriceShort, type P2pSplitSummary } from "@/lib/p2p";
 
 type Variant = "standalone" | "copy" | "privateCalendar";
 
@@ -171,6 +171,13 @@ export default function StandalonePlanCard({
 
           {hostName ? (
             <div className="text-sm text-zinc-500">Hosted by {hostName}</div>
+          ) : null}
+
+          {variant !== "copy" && p2pPriceShort(p2pAmountCents, p2pSplit) ? (
+            <div className="flex items-center gap-1.5 text-sm text-zinc-900">
+              <Wallet className="w-3.5 h-3.5" />
+              <span>{p2pPriceShort(p2pAmountCents, p2pSplit)}, paid to the host</span>
+            </div>
           ) : null}
 
           {variant !== "copy" && (rsvpCount > 0 || capacity != null) ? (

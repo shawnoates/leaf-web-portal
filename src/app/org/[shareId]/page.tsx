@@ -39,7 +39,7 @@ import { fetchVenuePhotoUrl } from "@/lib/google-places";
 import PlanAddonStack from "@/components/PlanAddonStack";
 import PaidRsvp from "@/components/PaidRsvp";
 import P2pPayCard from "@/components/P2pPayCard";
-import { collectsMoney, p2pPriceLine, parseP2pSplit, type P2pSplitSummary } from "@/lib/p2p";
+import { collectsMoney, p2pPriceLine, p2pPriceShort, parseP2pSplit, type P2pSplitSummary } from "@/lib/p2p";
 import HlsVideo from "@/components/HlsVideo";
 import { introVideoFrame } from "@/lib/intro-video-frame";
 import HostIntroTile, { type HostIntro } from "@/components/HostIntroTile";
@@ -72,6 +72,7 @@ import {
   Sun,
   Cloud,
   CloudRain,
+  Wallet,
 } from "lucide-react";
 
 
@@ -6005,6 +6006,13 @@ export default function OrgCalendarPage() {
                         )}
                       </span>
                     </>
+                  )}
+                  {/* The price, before anyone RSVPs — the full "paid to the host" sentence is in the RSVP step. */}
+                  {p2pPriceShort(selectedEvent.p2pAmountCents, selectedEvent.p2pSplit) && (
+                    <span className="flex items-center gap-2 whitespace-nowrap text-zinc-900 font-normal">
+                      <Wallet className="w-4 h-4 flex-shrink-0" />
+                      {p2pPriceShort(selectedEvent.p2pAmountCents, selectedEvent.p2pSplit)}
+                    </span>
                   )}
                 </div>
               </div>
