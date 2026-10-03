@@ -131,6 +131,9 @@ export interface CreatePlanPrefill {
    *  real key; `index` is the fallback for calendars minted before uids. */
   aiSourceEventUid?: string | null;
   aiSourceEventIndex?: number;
+  /** Open with "Collect money" already on, in this mode — the dashboard's
+   *  peer-to-peer intro opens the drawer this way. */
+  collectMode?: "fixed" | "split";
 }
 
 interface CreatePlanModalProps {
@@ -351,7 +354,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   // approvals turn it on from the plan's /pay page instead. While on, spots
   // replace capacity (capacity = spots minus the host's own).
   const canCollect = isHosted && !recurring && !editMode && !hostRequestMode && !pollConvertMode;
-  const [collect, setCollect] = useState(false);
+  const [collect, setCollect] = useState(Boolean(prefill?.collectMode));
   const [collectPrice, setCollectPrice] = useState("");
   const [collectSpots, setCollectSpots] = useState("");
   const [spotIsMine, setSpotIsMine] = useState(true);
@@ -368,7 +371,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   const collectCount = parseInt(collectSpots || "0", 10);
   const collectGuestSpots = collectCount - (spotIsMine ? 1 : 0);
   // "split": a total (a court) divided by however many come, locked later.
-  const [collectMode, setCollectMode] = useState<"fixed" | "split">("fixed");
+  const [collectMode, setCollectMode] = useState<"fixed" | "split">(prefill?.collectMode || "fixed");
   const [splitTotal, setSplitTotal] = useState("");
   const [splitMin, setSplitMin] = useState("");
   const [splitMax, setSplitMax] = useState("");

@@ -27,6 +27,7 @@ import CommunityTab, { type CommunitySegment } from "@/components/dashboard/Comm
 import NudgeModal from "@/components/dashboard/NudgeModal";
 import CreateCalendarModal from "@/components/dashboard/CreateCalendarModal";
 import SeriesHostModal, { type SeriesLimit } from "@/components/dashboard/SeriesHostModal";
+import P2pIntroModal, { P2P_INTRO_SEEN_KEY } from "@/components/dashboard/P2pIntroModal";
 import { seriesCountsTowardLimit, type SeriesSummary } from "@/lib/series";
 import GrowPerformance from "@/components/dashboard/GrowPerformance";
 import SharePlanSheet from "@/components/dashboard/SharePlanSheet";
@@ -1257,6 +1258,27 @@ export default function OrgDashboardPage() {
   const canHostSeries = Boolean(
     dashboard && (dashboard.isOwner || dashboard.calendars.some((c) => c.role === "Host")),
   );
+
+  // Peer-to-peer payments intro: once per browser, for whoever runs the
+  // calendar, a moment after the dashboard settles and never over another
+  // modal. `?p2pIntro=1` shows it again (for a demo or a support thread).
+  const [showP2pIntro, setShowP2pIntro] = useState(false);
+  const p2pIntroShown = useRef(false);
+  const anotherModalOpen = showCreatePlanModal || showSubscription || showAddCalendar || showPhoneModal || Boolean(nudgeFor?.length);
+  useEffect(() => {
+    if (!canHostSeries || anotherModalOpen || p2pIntroShown.current) return;
+    let forced = false;
+    try {
+      forced = new URLSearchParams(window.location.search).get("p2pIntro") === "1";
+      if (!forced && localStorage.getItem(P2P_INTRO_SEEN_KEY)) return;
+    } catch { return; }
+    const t = setTimeout(() => {
+      p2pIntroShown.current = true;
+      setShowP2pIntro(true);
+      try { localStorage.setItem(P2P_INTRO_SEEN_KEY, new Date().toISOString()); } catch { /* private mode */ }
+    }, forced ? 0 : 1200);
+    return () => clearTimeout(t);
+  }, [canHostSeries, anotherModalOpen]);
 
   // Home NEEDS YOU prompt cards. Both open the same composer the Community
   // tab uses; the server addresses the send by the membership id it handed
@@ -2791,6 +2813,17 @@ export default function OrgDashboardPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {showP2pIntro && (
+        <P2pIntroModal
+          onClose={() => setShowP2pIntro(false)}
+          onStart={() => {
+            setShowP2pIntro(false);
+            setCreatePlanPrefill({ mode: "plan", collectMode: "fixed" });
+            setShowCreatePlanModal(true);
+          }}
+        />
       )}
 
       {/* Nudge follower(s) */}
