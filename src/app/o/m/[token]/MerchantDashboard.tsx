@@ -8,7 +8,7 @@
 
 import { type ReactNode, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
-import { Brand, Shell, dollars, formatPhone } from "./ui";
+import { Brand, BusinessPhoto, Shell, dollars, formatPhone } from "./ui";
 import MerchantHello from "./MerchantHello";
 
 type Phase = "pending" | "confirmed" | "now" | "past" | "cancelled";
@@ -46,6 +46,9 @@ type Night = {
 export type Dashboard = {
   state: string;
   merchantName: string;
+  /** Their own Google photo, saved by Leaf. */
+  photoUrl?: string | null;
+  photoCredit?: { name: string; uri: string } | null;
   calendarName: string;
   calendarUrl: string | null;
   neighborhood: string;
@@ -376,6 +379,7 @@ export default function MerchantDashboard({
       )}
       <div inert={preview || undefined}>
       <Brand neighborhood={d.neighborhood} />
+      <BusinessPhoto url={d.photoUrl} credit={d.photoCredit} name={d.merchantName} />
 
       <div className="mt-6 rounded-3xl bg-leaf-800 p-6 text-white">
         <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Your Leaf nights</p>

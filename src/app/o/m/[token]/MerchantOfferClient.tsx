@@ -23,7 +23,7 @@ import Parse from "@/lib/parse-client";
 import PayoutSetup from "./PayoutSetup";
 import CardSetup, { type Card, type CardSetupHandle } from "./CardSetup";
 import NoticePrefs, { noticePayload, type Notices } from "./NoticePrefs";
-import { Brand, Choice, Closed, Field, Section, Shell, dollars, formatPhone, input, textarea } from "./ui";
+import { Brand, BusinessPhoto, Choice, Closed, Field, Section, Shell, dollars, formatPhone, input, textarea } from "./ui";
 import NightPicker, { nightMeta, type Suggested } from "./NightPicker";
 import MerchantDashboard from "./MerchantDashboard";
 import { forgetPartner, rememberPartner } from "./remember";
@@ -476,25 +476,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         </p>
       )}
       <Brand neighborhood={form.neighborhood} />
-      {form.photoUrl && (
-        <figure className="mt-5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={form.photoUrl} alt={form.merchantName} className="h-44 w-full rounded-2xl object-cover sm:h-56" />
-          {form.photoCredit?.name && (
-            <figcaption className="mt-1 px-1 text-right text-[11px] text-stone-400">
-              Photo:{" "}
-              {form.photoCredit.uri ? (
-                <a href={form.photoCredit.uri} target="_blank" rel="noreferrer" className="underline underline-offset-2">
-                  {form.photoCredit.name}
-                </a>
-              ) : (
-                form.photoCredit.name
-              )}{" "}
-              on Google
-            </figcaption>
-          )}
-        </figure>
-      )}
+      <BusinessPhoto url={form.photoUrl} credit={form.photoCredit} name={form.merchantName} />
       {accepted && !noDashboard && !preview && (
         <button type="button" onClick={() => setView("dashboard")} className="mt-4 px-1 text-[15px] font-semibold text-leaf-700">
           ← Back to your nights

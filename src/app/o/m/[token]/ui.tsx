@@ -77,6 +77,30 @@ export function Shell({ children }: { children: ReactNode }) {
   );
 }
 
+/** The business's own Google photo, under the logo, with the credit Google requires. */
+export function BusinessPhoto({ url, credit, name }: { url?: string | null; credit?: { name: string; uri: string } | null; name: string }) {
+  if (!url) return null;
+  return (
+    <figure className="mt-5">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt={name} className="h-44 w-full rounded-2xl object-cover sm:h-56" />
+      {credit?.name && (
+        <figcaption className="mt-1 px-1 text-right text-[11px] text-stone-400">
+          Photo:{" "}
+          {credit.uri ? (
+            <a href={credit.uri} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+              {credit.name}
+            </a>
+          ) : (
+            credit.name
+          )}{" "}
+          on Google
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
 export function Brand({ neighborhood }: { neighborhood?: string }) {
   return (
     <div className="flex items-center justify-between px-1">
