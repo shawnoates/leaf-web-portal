@@ -18,6 +18,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
+import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
 import { IMAGE_ACCEPT, processImageFile } from "@/lib/image-utils";
 import HostIntroVideoCard, { type IntroVideoInfo } from "@/components/HostIntroVideoCard";
 import HostedNightReport from "./HostedNightReport";
@@ -91,7 +92,26 @@ type Offer = {
   videoDeadlineHours?: number;
   /** The video card's state + script; only on an accepted offer. */
   video?: IntroVideoInfo | null;
+  /** Suggested add-ons the host picks from, priced within each band. */
+  addons?: OfferAddon[];
+  /** Where guests pay the host for add-ons: saved, or prefilled from payout details. */
+  payHandles?: { handles: PayHandles | null; saved: boolean };
 };
+
+type OfferAddon = {
+  slug: string;
+  title: string;
+  description: string;
+  taskLine: string | null;
+  imageUrl: string | null;
+  minCents: number;
+  maxCents: number;
+  suggestedCents: number;
+  chosen: boolean;
+  priceCents: number | null;
+};
+
+const dollars = (c: number) => `$${(c / 100).toFixed(2).replace(/\.00$/, "")}`;
 
 const card =
   "rounded-2xl border border-zinc-200 bg-white p-6";
@@ -192,6 +212,13 @@ export default function HostOfferClient({ token }: { token: string }) {
   const [agreed, setAgreed] = useState(false);
   const [showAgreement, setShowAgreement] = useState(false);
 
+  // Add-ons: which suggestions to sell and at what price (dollars, as typed),
+  // plus where guests pay. Seeded from the offer once it loads.
+  const [addonPick, setAddonPick] = useState<Record<string, { on: boolean; price: string }>>({});
+  const [addonHandles, setAddonHandles] = useState<PayHandles | null>(null);
+  const [handlesTouched, setHandlesTouched] = useState(false);
+  const [editingHandles, setEditingHandles] = useState(false);
+
   // Phone: required to accept. Missing → typed here; present → shown by its
   // last four and confirmable, with a Change link.
   const [phone, setPhone] = useState("");
@@ -207,6 +234,10 @@ export default function HostOfferClient({ token }: { token: string }) {
     try {
       const r = (await Parse.Cloud.run("getHostOffer", { token })) as Offer;
       setOffer(r);
+      setAddonPick((prev) => Object.keys(prev).length ? prev : Object.fromEntries((r.addons || []).map((a) => [
+        a.slug, { on: true, price: String(((a.priceCents ?? a.suggestedCents) / 100)) },
+      ])));
+      setAddonHandles((prev) => prev ?? r.payHandles?.handles ?? null);
       setPaymentSaved(r.hasPaymentDetails);
       return r;
     } catch {
@@ -232,6 +263,14 @@ export default function HostOfferClient({ token }: { token: string }) {
       setError("Add a mobile number so we can reach you on the day.");
       return;
     }
+    const chosenAddons = (offer?.addons || []).filter((a) => addonPick[a.slug]?.on).map((a) => ({
+      slug: a.slug,
+      priceCents: Math.round(parseFloat(addonPick[a.slug].price || "0") * 100),
+    }));
+    if (chosenAddons.length && !addonHandles) {
+      setError("Add how guests pay you for add-ons — or untick them.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -241,6 +280,9 @@ export default function HostOfferClient({ token }: { token: string }) {
         agreementVersion: offer?.agreementVersion,
         phone: needsPhone ? phone.trim() : undefined,
         smsConsent: smsConsentTick || undefined,
+        // Always sent when the offer has suggestions, so unticked ones stay off.
+        addons: offer?.addons?.length ? chosenAddons : undefined,
+        payHandles: chosenAddons.length && (handlesTouched || !offer?.payHandles?.saved) ? addonHandles : undefined,
       });
       setPaymentSaved(Boolean(r.hasPaymentDetails));
       setView("done");
@@ -897,6 +939,72 @@ export default function HostOfferClient({ token }: { token: string }) {
           <p className="mt-1.5 whitespace-pre-line text-[14px] leading-relaxed text-zinc-700">
             {offer.instructions}
           </p>
+        </div>
+      )}
+
+      {(offer.addons?.length ?? 0) > 0 && (
+        <div className="mt-4 rounded-xl border border-zinc-200 p-4">
+          <p className="text-[14px] font-medium text-leaf-900">Add-ons guests can buy</p>
+          <p className="mt-1 text-[13px] leading-snug text-zinc-600">
+            Pick the ones you&rsquo;ll handle and set your price. Guests pay you directly and you keep all of it.
+          </p>
+          <div className="mt-3 space-y-3">
+            {offer.addons!.map((a) => {
+              const pick = addonPick[a.slug] || { on: false, price: "" };
+              const set = (patch: Partial<typeof pick>) => setAddonPick((p) => ({ ...p, [a.slug]: { ...pick, ...patch } }));
+              return (
+                <div key={a.slug} className={`rounded-lg border p-3 ${pick.on ? "border-leaf-800" : "border-zinc-200"}`}>
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input type="checkbox" checked={pick.on} onChange={(e) => set({ on: e.target.checked })} className="mt-1 h-4 w-4" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14px] font-medium text-zinc-900">{a.title}</span>
+                      {a.description && <span className="block text-[13px] text-zinc-600">{a.description}</span>}
+                      {a.taskLine && <span className="mt-1 block text-[12px] text-zinc-500">You&rsquo;ll: {a.taskLine}</span>}
+                    </span>
+                  </label>
+                  {pick.on && (
+                    <div className="mt-2 flex items-center gap-2 pl-7">
+                      <span className="text-[13px] text-zinc-500">$</span>
+                      <input
+                        className={`${inputClass} w-24`}
+                        inputMode="decimal"
+                        aria-label={`Price for ${a.title}`}
+                        value={pick.price}
+                        onChange={(e) => set({ price: e.target.value.replace(/[^\d.]/g, "").slice(0, 6) })}
+                        onBlur={() => {
+                          const c = Math.round(parseFloat(pick.price || "0") * 100);
+                          const clamped = Math.min(Math.max(Math.round(c / 50) * 50 || a.suggestedCents, a.minCents), a.maxCents);
+                          set({ price: String(clamped / 100) });
+                        }}
+                      />
+                      <span className="text-[12px] text-zinc-500">each · {dollars(a.minCents)}–{dollars(a.maxCents)}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {Object.values(addonPick).some((p) => p.on) && (
+            <div className="mt-4">
+              <p className="text-[13px] font-medium text-leaf-900">How guests pay you</p>
+              {addonHandles && !editingHandles ? (
+                <div className="mt-1.5 flex items-center justify-between gap-3 rounded-lg bg-zinc-50 px-3 py-2 text-[13px] text-zinc-700">
+                  <span>{describeHandles(addonHandles)}</span>
+                  <button type="button" className="underline text-leaf-800" onClick={() => setEditingHandles(true)}>Edit</button>
+                </div>
+              ) : (
+                <div className="mt-2">
+                  <PayHandlesForm
+                    initial={addonHandles}
+                    saveLabel="Use these"
+                    onCancel={addonHandles ? () => setEditingHandles(false) : undefined}
+                    onSaved={() => {}}
+                    onSubmit={(h) => { setAddonHandles(h); setHandlesTouched(true); setEditingHandles(false); }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

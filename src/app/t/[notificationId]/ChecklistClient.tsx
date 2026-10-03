@@ -96,8 +96,87 @@ export type HostChecklist = {
   introVideo?: IntroVideoInfo | null;
   /** Where exactly to meet, as it stands on the plan. */
   meetingSpot?: string | null;
+  /** Add-on orders guests pay this host for directly (addon-purchase.js). */
+  addonOrders?: AddonOrder[];
   tasks: HostTask[];
 };
+
+type AddonOrder = {
+  orderId: string;
+  status: "unpaid" | "claimed" | "paid";
+  ref: string;
+  totalCents: number;
+  buyerName: string;
+  method: "venmo" | "cashapp" | "paypal" | "zelle" | null;
+  autoConfirmAt: string | null;
+  items: { title: string; quantity: number }[];
+};
+
+const ADDON_METHOD: Record<string, string> = { venmo: "Venmo", cashapp: "Cash App", paypal: "PayPal", zelle: "Zelle" };
+
+/**
+ * Add-on orders on the host's checklist: who ordered what, and Confirm /
+ * Not received once they say they've paid. The seat id in this page's link
+ * is what authorizes the host, as it does for the rest of the checklist.
+ */
+function AddonOrders({ orders, notificationId, onChanged }: {
+  orders: AddonOrder[];
+  notificationId: string;
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const act = async (fn: "confirmAddonOrder" | "markAddonOrderNotReceived", orderId: string) => {
+    setBusy(orderId);
+    setErr(null);
+    try {
+      await Parse.Cloud.run(fn, { orderId, notificationId });
+      onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "That didn't work.");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const money = (c: number) => `$${(c / 100).toFixed(2).replace(/\.00$/, "")}`;
+  const order = { claimed: 0, unpaid: 1, paid: 2 } as const;
+  const sorted = [...orders].sort((a, b) => order[a.status] - order[b.status]);
+  return (
+    <section className="px-5 pt-5 pb-4 border-b border-zinc-100">
+      <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400">Add-on orders</p>
+      <p className="mt-1 text-[13px] text-zinc-500">Guests pay you directly. Confirm when the money arrives — look for the code in the note.</p>
+      <ul className="mt-3 space-y-2">
+        {sorted.map((o) => (
+          <li key={o.orderId} className="rounded-lg border border-zinc-200 px-3 py-2.5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[14px] font-medium text-zinc-900">
+                  {o.buyerName} · {o.items.map((i) => `${i.quantity > 1 ? `${i.quantity} × ` : ""}${i.title}`).join(", ")}
+                </p>
+                <p className={`text-[12px] ${o.status === "claimed" ? "text-amber-700" : o.status === "paid" ? "text-emerald-700" : "text-zinc-500"}`}>
+                  {o.status === "paid" ? `Paid ${money(o.totalCents)} ✓`
+                    : o.status === "claimed" ? `Says they paid ${money(o.totalCents)}${o.method ? ` on ${ADDON_METHOD[o.method]}` : ""} · ${o.ref}`
+                      : `Ordered · ${money(o.totalCents)} not paid yet`}
+                </p>
+              </div>
+              {o.status !== "paid" ? (
+                <button type="button" disabled={busy === o.orderId} onClick={() => act("confirmAddonOrder", o.orderId)}
+                  className="shrink-0 rounded-full bg-zinc-900 px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50">
+                  {o.status === "claimed" ? "Confirm" : "Mark paid"}
+                </button>
+              ) : null}
+            </div>
+            {o.status !== "unpaid" && (
+              <button type="button" disabled={busy === o.orderId} onClick={() => act("markAddonOrderNotReceived", o.orderId)}
+                className="mt-1 text-[12px] text-zinc-400 underline">Not received?</button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {err && <p className="mt-2 text-[12px] text-red-600">{err}</p>}
+    </section>
+  );
+}
 
 function formatDate(iso: string | null): string | null {
   if (!iso) return null;
@@ -762,6 +841,10 @@ export default function ChecklistClient({
               />
             </div>
           </section>
+        )}
+
+        {!data.cancelled && (data.addonOrders?.length ?? 0) > 0 && (
+          <AddonOrders orders={data.addonOrders!} notificationId={notificationId} onChanged={refresh} />
         )}
 
         <ul className="mt-1">

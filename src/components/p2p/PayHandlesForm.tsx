@@ -71,11 +71,16 @@ export default function PayHandlesForm({
   onSaved,
   onCancel,
   saveLabel = "Save",
+  onSubmit,
 }: {
   initial?: PayHandles | null;
   onSaved: (handles: PayHandles) => void;
   onCancel?: () => void;
   saveLabel?: string;
+  /** Instead of saving to the signed-in account: hand the values back (a
+   *  roster host accepting by link has no session; the server checks them
+   *  when the offer is accepted). */
+  onSubmit?: (values: PayHandles) => void;
 }) {
   const [v, setV] = useState<PayHandles>({
     venmo: initial?.venmo || "",
@@ -88,6 +93,13 @@ export default function PayHandlesForm({
   const [error, setError] = useState<string | null>(null);
 
   const save = async () => {
+    if (onSubmit) {
+      const has = ["venmo", "cashapp", "paypal", "zelle"].some((k) => String(v[k as keyof PayHandles] || "").trim());
+      if (!has) { setError("Add at least one way to get paid."); return; }
+      if (v.zelle?.trim() && !v.zelleName?.trim()) { setError("Add the name on your bank account so guests can check it in Zelle."); return; }
+      onSubmit(v);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
