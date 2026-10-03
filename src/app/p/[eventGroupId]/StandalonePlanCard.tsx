@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Lock, MapPin, Wallet } from "lucide-react";
 import PlanHeroMedia from "./PlanHeroMedia";
+import { OnlyOnLeafLine, OnlyOnLeafPill, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
 import HlsVideo from "@/components/HlsVideo";
 import HostIntroInline from "@/components/HostIntroInline";
 import { introVideoFrame } from "@/lib/intro-video-frame";
@@ -52,6 +53,8 @@ type Props = {
   } | null;
   calendarName: string | null;
   calendarProfilePhoto: string | null;
+  /** A night a business made for Leaf: "Only on Leaf" on the photo and under the title. */
+  onlyOnLeaf?: OnlyOnLeafInfo;
   // Only present when variant === "privateCalendar"
   shareId: string | null;
   // Affects "Count me in" vs "Request to Attend" button copy
@@ -86,6 +89,7 @@ export default function StandalonePlanCard({
   rosterHost,
   calendarName,
   calendarProfilePhoto,
+  onlyOnLeaf = null,
   shareId,
   requireApproval,
   rsvpCount,
@@ -115,10 +119,14 @@ export default function StandalonePlanCard({
   return (
     <div className="min-h-dvh bg-zinc-50 px-4 py-6 md:py-10 flex flex-col justify-center items-center gap-5">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm overflow-hidden">
-        <PlanHeroMedia image={image} videoUrl={videoUrl} />
+        <div className="relative">
+          <PlanHeroMedia image={image} videoUrl={videoUrl} />
+          {onlyOnLeaf && <OnlyOnLeafPill />}
+        </div>
         <div className={`p-6 space-y-4 ${blurDetails ? "blur-[2px] select-none pointer-events-none" : ""}`}>
           <div className="space-y-1">
             <h1 className="text-xl font-semibold text-zinc-900">{title}</h1>
+            <OnlyOnLeafLine info={onlyOnLeaf} />
             {calendarName && variant === "privateCalendar" ? (
               <div className="flex items-center gap-2 text-sm text-zinc-500">
                 {calendarProfilePhoto ? (

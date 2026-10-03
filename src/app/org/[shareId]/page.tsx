@@ -74,6 +74,7 @@ import {
   CloudRain,
   Wallet,
 } from "lucide-react";
+import { OnlyOnLeafLine, OnlyOnLeafPill, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
 
 
 // --- Types ---
@@ -94,6 +95,8 @@ interface Plan {
   image: string;
   hostId: string | null;
   hostName: string;
+  /** A night a business made for Leaf: the "Only on Leaf" pill and line. */
+  onlyOnLeaf?: OnlyOnLeafInfo;
   /** Who the "Your host" card names: a business host's contact (first name), else hostName. */
   hostCardName?: string;
   hostAvatar: string | null;
@@ -3250,6 +3253,7 @@ export default function OrgCalendarPage() {
         leafHostChatUnread:
           typeof p.leafHostChatUnread === "number" ? p.leafHostChatUnread : 0,
         promotedFrom: (p.promotedFrom as Plan["promotedFrom"]) ?? null,
+        onlyOnLeaf: (p.onlyOnLeaf as OnlyOnLeafInfo) ?? null,
         addons: Array.isArray(p.addons)
           ? (p.addons as Record<string, unknown>[]).map((a) => ({
               objectId: a.objectId as string,
@@ -4829,6 +4833,7 @@ export default function OrgCalendarPage() {
                       <Calendar className="w-16 h-16 text-zinc-300" />
                     </div>
                   )}
+                  {plan.onlyOnLeaf && <OnlyOnLeafPill color={org.brandColor} />}
                   {/* The host's hello, on the photo. A sibling of the image,
                       so it doesn't ride the hover zoom; it swallows its own
                       clicks so the cover's click (open the sheet) stays put. */}
@@ -5930,6 +5935,7 @@ export default function OrgCalendarPage() {
                 <h2 className="text-4xl md:text-5xl font-light tracking-tighter">
                   {selectedEvent.title}
                 </h2>
+                <OnlyOnLeafLine info={selectedEvent.onlyOnLeaf} color={org.brandColor} />
                 {/* Host line mirrors the card's precedence (see ~2689): a
                     virtual host or Leaf-host persona overrides the raw
                     hostName. Without this the modal showed the underlying

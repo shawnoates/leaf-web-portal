@@ -19,6 +19,8 @@ type PlanShareInfo = {
   // Preferred over `image`, which for imported plans is a thumbnail with a
   // play button burned in. Optional until the server ships it.
   heroImage?: string | null;
+  /** A night a business made for Leaf. */
+  onlyOnLeaf?: { with: string | null } | null;
   // The invitation video's HLS stream, when the plan has one.
   videoUrl?: string | null;
   expiryDate: string | null;
@@ -349,6 +351,7 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
       rosterHost={info.rosterHost ?? null}
       calendarName={info.calendarName}
       calendarProfilePhoto={info.calendarProfilePhoto}
+      onlyOnLeaf={info.onlyOnLeaf ?? null}
       shareId={info.shareId}
       requireApproval={info.requireApproval}
       rsvpCount={info.rsvpCount ?? 0}

@@ -5,10 +5,12 @@ import { useParams } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import { SITE_URL } from "@/lib/site";
 import { Users, Calendar, ArrowUpRight, Loader2, Vote } from "lucide-react";
+import { OnlyOnLeafPill, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
 
 // --- Types ---
 
 interface Plan {
+  onlyOnLeaf?: OnlyOnLeafInfo;
   id: string;
   title: string;
   date: string;
@@ -83,6 +85,7 @@ export default function EmbedCalendarPage() {
         description: p.description || "",
         image: p.image || "",
         hostName: p.host?.name || "Community Member",
+        onlyOnLeaf: (p.onlyOnLeaf as OnlyOnLeafInfo) ?? null,
         attendeeCount: p.rsvpCount || 0,
         location: p.location
           ? { name: p.location.name || "", address: p.location.address || "" }
@@ -179,8 +182,9 @@ export default function EmbedCalendarPage() {
                 href={cardHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full md:w-3/5 aspect-[16/10] overflow-hidden bg-zinc-100 shadow-sm block"
+                className="relative w-full md:w-3/5 aspect-[16/10] overflow-hidden bg-zinc-100 shadow-sm block"
               >
+                {plan.onlyOnLeaf && <OnlyOnLeafPill color={data.brandColor} />}
                 {plan.image ? (
                   <img
                     src={plan.image}
