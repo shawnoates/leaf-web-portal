@@ -93,6 +93,8 @@ interface Plan {
   image: string;
   hostId: string | null;
   hostName: string;
+  /** Who the "Your host" card names: a business host's contact (first name), else hostName. */
+  hostCardName?: string;
   hostAvatar: string | null;
   // True when `host*` describes an accepted roster host (EventGroup.assignedHost),
   // not the owner in `hostUser`/`user`. The owner still owns the EventGroup.
@@ -3184,6 +3186,7 @@ export default function OrgCalendarPage() {
         // left off rather than guessing a name ("Community Member") or telling
         // guests the seat is empty while Leaf is still filling it.
         hostName: (p.host as Record<string, string>)?.name || "",
+        hostCardName: (p.host as Record<string, string>)?.contactName || (p.host as Record<string, string>)?.name || "",
         hostAvatar: (p.host as Record<string, string>)?.profilePictureUrl || null,
         hasRosterHost: Boolean((p.host as Record<string, unknown>)?.isRosterHost),
         hostBio: ((p.host as Record<string, unknown>)?.bio as string) || null,
@@ -6049,7 +6052,7 @@ export default function OrgCalendarPage() {
                     ) : null}
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-zinc-900">
-                        Your host, {selectedEvent.hostName}
+                        Your host, {selectedEvent.hostCardName || selectedEvent.hostName}
                       </p>
                       {selectedEvent.hostBio && (
                         <p className="mt-0.5 text-sm text-zinc-600 whitespace-pre-wrap">
