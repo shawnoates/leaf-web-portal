@@ -1121,7 +1121,7 @@ function CycleCard({
             confirmCancel ? (
               <div className="flex flex-col gap-2.5 rounded-[18px] border border-fm-line px-4 py-3.5">
                 <p className="m-0 text-sm leading-snug text-fm-ink">
-                  Cancel {chosen ? `${chosen.dow} ${chosen.month} ${chosen.day}` : "this night"} for everyone? Leaf tells the people invited it&rsquo;s off.
+                  {`Cancel ${chosen ? `${chosen.dow} ${chosen.month} ${chosen.day}` : "this night"} for everyone? Leaf tells the people invited it\u2019s off.`}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button small disabled={busy !== null} onClick={() => onAct("cancelNight", () => run("cancelCrewNight", auth, { cycleId: c.cycleId }))}>
