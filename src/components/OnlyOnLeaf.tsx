@@ -1,4 +1,3 @@
-import { Leaf } from "lucide-react";
 
 /**
  * "Only on Leaf": a night a local business made for Leaf neighbors (the offer
@@ -15,7 +14,9 @@ export function OnlyOnLeafPill({ color }: { color?: string | null }) {
       className="pointer-events-none absolute left-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-white shadow-sm"
       style={{ backgroundColor: color || "#18181b" }}
     >
-      <Leaf className="h-3.5 w-3.5" aria-hidden="true" />
+      {/* The Leaf mark, white on the pill. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/leaf-mark-tight.png" alt="" aria-hidden="true" className="h-3 w-auto brightness-0 invert" />
       Only on Leaf
     </span>
   );
@@ -24,8 +25,9 @@ export function OnlyOnLeafPill({ color }: { color?: string | null }) {
 export function OnlyOnLeafLine({ info, color, className = "" }: { info: OnlyOnLeafInfo; color?: string | null; className?: string }) {
   if (!info) return null;
   return (
-    <p className={`flex items-center gap-1.5 text-sm font-medium ${className}`} style={{ color: color || "#18181b" }}>
-      <Leaf className="h-4 w-4 shrink-0" aria-hidden="true" />
+    <p className={`flex items-start gap-1.5 text-sm font-medium ${className}`} style={{ color: color || "#18181b" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/leaf-mark-tight.png" alt="" aria-hidden="true" className="mt-[3px] h-3.5 w-auto shrink-0" />
       <span>
         Only on Leaf{info.with ? ` · made with ${info.with} for neighbors` : " · made for neighbors"}
       </span>
