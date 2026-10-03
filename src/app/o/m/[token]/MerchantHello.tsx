@@ -19,7 +19,16 @@ function playsOn(nights: { dateLabel: string; title: string }[]): string {
   return `Plays on ${first.dateLabel}${what}${more}.`;
 }
 
-export default function MerchantHello({ token, nights = [] }: { token: string; nights?: { dateLabel: string; title: string }[] }) {
+export default function MerchantHello({
+  token,
+  nights = [],
+  inline = false,
+}: {
+  token: string;
+  nights?: { dateLabel: string; title: string }[];
+  /** Inside the Coming up card: a section under the nights, not a card of its own. */
+  inline?: boolean;
+}) {
   const [video, setVideo] = useState<IntroVideoInfo | null>(null);
 
   const fetchVideo = useCallback(
@@ -41,13 +50,25 @@ export default function MerchantHello({ token, nights = [] }: { token: string; n
   }, [fetchVideo]);
 
   if (!video || !video.available) return null;
+  const body = (
+    <div className="mt-3">
+      <HostIntroVideoCard source={{ kind: "merchant", token }} video={video} timeZone={null} planStarted={false} onChanged={load} scriptCollapsed />
+    </div>
+  );
+  if (inline) {
+    return (
+      <div id="hello" className="mt-5 scroll-mt-6 border-t border-stone-200 pt-5">
+        <h3 className="text-[17px] font-semibold text-stone-900">Say hello to your neighbors</h3>
+        <p className="mt-1 text-[15px] text-stone-600">{playsOn(nights)}</p>
+        {body}
+      </div>
+    );
+  }
   return (
     <section id="hello" className="scroll-mt-6 rounded-3xl bg-white p-5 shadow-sm">
       <h2 className="font-fm-serif text-[26px] leading-tight text-stone-900">Say hello to your neighbors</h2>
       <p className="mt-1 text-[15px] text-stone-600">{playsOn(nights)}</p>
-      <div className="mt-3">
-        <HostIntroVideoCard source={{ kind: "merchant", token }} video={video} timeZone={null} planStarted={false} onChanged={load} scriptCollapsed />
-      </div>
+      {body}
     </section>
   );
 }

@@ -9,7 +9,6 @@
 import { type ReactNode, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { Brand, Shell, dollars, formatPhone } from "./ui";
-import PayoutSetup from "./PayoutSetup";
 import MerchantHello from "./MerchantHello";
 
 type Phase = "pending" | "confirmed" | "now" | "past" | "cancelled";
@@ -416,6 +415,8 @@ export default function MerchantDashboard({
               <p className="text-[15px] text-stone-600">Nothing on the books right now. Pick more nights and we&rsquo;ll fill them.</p>
             )}
           </div>
+          {/* Their hello plays on these nights, so it lives with them. */}
+          <MerchantHello token={token} nights={d.upcoming.map((n) => ({ dateLabel: n.dateLabel, title: n.title }))} inline />
           <button
             type="button"
             onClick={onEdit}
@@ -425,8 +426,6 @@ export default function MerchantDashboard({
           </button>
         </Card>
 
-        {/* Their hello plays on these nights, so it sits right under them. */}
-        <MerchantHello token={token} nights={d.upcoming.map((n) => ({ dateLabel: n.dateLabel, title: n.title }))} />
 
         {d.requests && d.requests.length > 0 && (
           <Card>
@@ -501,9 +500,6 @@ export default function MerchantDashboard({
           </Card>
         )}
 
-        {/* Ticketed nights: Leaf sends them ticket sales after the night. Signed-up
-            merchants land here, not on the form, so the payout setup lives here too. */}
-        {!perRsvp && <PayoutSetup token={token} />}
 
 
         {account}
