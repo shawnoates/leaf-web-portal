@@ -151,7 +151,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
 
   const joined = members.filter((m) => m.status === "in");
   const invited = members.filter((m) => m.status === "invited");
-  const canStart = open.length < 2 && !open.some((c) => c.state === "picking" && !c.waitingForQuorum);
+  // Nothing new starts while Friend Mode is off (the toggle, or Do it again).
+  const canStart = crew.enabled !== false && open.length < 2 && !open.some((c) => c.state === "picking" && !c.waitingForQuorum);
   const [first, second] = splitName(crew.name);
   const summary = [`${joined.length} in`, invited.length ? `${invited.length} invited` : null, cadenceLabel(crew).toLowerCase(), crew.status === "paused" ? "paused" : null]
     .filter(Boolean)
@@ -339,11 +340,11 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               {canStart && !proposing && !fixedPlace && <div className="flex gap-2">{startButtons}</div>}
             </div>
 
-            {open.length === 0 && (
+            {open.length === 0 && !crew.lastOneTime && (
               <Card>
                 <Eyebrow>Nothing being planned</Eyebrow>
                 <p className="mt-3 text-[15px] leading-relaxed text-fm-ink-2">
-                  {crew.oneTime ? "Leaf starts planning the night as soon as enough people are in." : `Leaf starts the next night on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()}). Got a place and a date in mind? Say so below.`}
+                  {crew.enabled === false ? "Friend Mode is off, so Leaf isn't planning anything for this crew." : crew.oneTime ? "Leaf starts planning the night as soon as enough people are in." : `Leaf starts the next night on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()}). Got a place and a date in mind? Say so below.`}
                 </p>
               </Card>
             )}
