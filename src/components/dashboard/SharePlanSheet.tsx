@@ -100,6 +100,10 @@ const hintOf = (t: Target): string => {
   return t.autoAccept ? "Your calendar" : "Nearby";
 };
 
+// Another owner's calendar with no followers reaches no one — leave it out of
+// the suggestions and search. (One already holding this plan stays visible.)
+const listable = (t: Target): boolean => t.followerCount > 0 || t.status != null;
+
 const isFar = (t: Target): boolean => t.distanceMiles != null && t.distanceMiles >= FAR_MILES;
 
 const metaOf = (t: Target): string =>
@@ -249,7 +253,7 @@ export default function SharePlanSheet({
   // ---- Lists -----------------------------------------------------------
   const targets = useMemo(() => data?.targets ?? [], [data]);
   const owned = useMemo(() => targets.filter((t) => t.autoAccept), [targets]);
-  const nonOwned = useMemo(() => targets.filter((t) => !t.autoAccept), [targets]);
+  const nonOwned = useMemo(() => targets.filter((t) => !t.autoAccept && listable(t)), [targets]);
 
   const byId = useMemo(() => {
     const m = new Map<string, Target>();
@@ -262,7 +266,7 @@ export default function SharePlanSheet({
   const suggested = useMemo(() => {
     const ids = data?.suggested;
     const base = ids && ids.length
-      ? ids.map((id) => byId.get(id)).filter((t): t is Target => Boolean(t))
+      ? ids.map((id) => byId.get(id)).filter((t): t is Target => t != null && listable(t))
       : nonOwned.slice(0, SUGGESTED_COUNT);
     const extras = [...picked.values()].filter((t) => !base.some((b) => b.calendarId === t.calendarId));
     return [...base, ...extras];
@@ -313,7 +317,7 @@ export default function SharePlanSheet({
       const seen = new Set<string>();
       const merged: Target[] = [];
       for (const t of [...local, ...remote]) {
-        if (seen.has(t.calendarId) || t.autoAccept) continue;
+        if (seen.has(t.calendarId) || t.autoAccept || !listable(t)) continue;
         seen.add(t.calendarId);
         merged.push(t);
       }
