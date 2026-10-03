@@ -299,6 +299,7 @@ export default function MerchantDashboard({
   onUnavailable,
   account,
   welcome = null,
+  preview = false,
 }: {
   token: string;
   onEdit: () => void;
@@ -307,6 +308,8 @@ export default function MerchantDashboard({
   account: ReactNode;
   /** What just happened (after Hold), shown at the top. */
   welcome?: string | null;
+  /** ?preview=1: Shawn seeing what they see. Shown as is, nothing clickable. */
+  preview?: boolean;
 }) {
   const [d, setD] = useState<Dashboard | null>(null);
   const [reload, setReload] = useState(0);
@@ -364,6 +367,15 @@ export default function MerchantDashboard({
   const perRsvp = d.model === "per_rsvp";
   return (
     <Shell>
+      {preview && (
+        <p className="mt-3 rounded-xl bg-amber-100 px-3 py-2 text-[13px] font-medium text-amber-900">
+          {`Preview of ${d.merchantName}\u2019s dashboard, what they see when they open their link. Nothing here can be changed. `}
+          <button type="button" onClick={onEdit} className="underline underline-offset-2">
+            See their form
+          </button>
+        </p>
+      )}
+      <div inert={preview || undefined}>
       <Brand neighborhood={d.neighborhood} />
 
       <div className="mt-6 rounded-3xl bg-leaf-800 p-6 text-white">
@@ -515,6 +527,7 @@ export default function MerchantDashboard({
           </a>
           .
         </p>
+      </div>
       </div>
     </Shell>
   );

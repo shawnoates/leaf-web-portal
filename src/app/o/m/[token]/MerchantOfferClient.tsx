@@ -182,9 +182,11 @@ export default function MerchantOfferClient({ token }: { token: string }) {
       setPreview(isPreview);
       const f = (await Parse.Cloud.run("getMerchantOfferForm", { token, preview: isPreview })) as Form;
       setForm(f);
-      if (isPreview) setView("form");
       // Keep a working link handy on this device; drop one that stopped working.
-      else if (f.state === "sent" || f.state === "drafted" || f.state === "accepted") rememberPartner(token, f.merchantName || "");
+      // A preview is Shawn's device, not theirs: leave it alone.
+      if (isPreview) {
+        // they land on their dashboard, so the preview does too
+      } else if (f.state === "sent" || f.state === "drafted" || f.state === "accepted") rememberPartner(token, f.merchantName || "");
       else forgetPartner(token);
       if (f.state !== "unavailable") {
         const o = f.offer;
@@ -456,7 +458,9 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   }
 
   if (form.state === "accepted" && view === "dashboard") {
-    return <MerchantDashboard token={token} onEdit={showForm} onUnavailable={dashboardUnavailable} account={accountSections} welcome={welcome} />;
+    return (
+      <MerchantDashboard token={token} onEdit={showForm} onUnavailable={dashboardUnavailable} account={accountSections} welcome={welcome} preview={preview} />
+    );
   }
 
   const accepted = form.state === "accepted";
