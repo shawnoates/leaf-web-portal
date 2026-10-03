@@ -5067,12 +5067,14 @@ export default function OrgCalendarPage() {
                               <Check className="w-3 h-3" /> Attending
                             </span>
                           ) : null}
-                          {p2pPriceShort(plan.p2pAmountCents, plan.p2pSplit) && (
-                            <span className="text-xs font-bold uppercase tracking-widest text-zinc-900 flex items-center gap-1.5">
-                              <Wallet className="w-3.5 h-3.5" /> {p2pPriceShort(plan.p2pAmountCents, plan.p2pSplit)}
-                            </span>
-                          )}
                         </div>
+                        {p2pPriceShort(plan.p2pAmountCents, plan.p2pSplit) && (
+                          // Under the attending count, icon centred on the avatar so the two read as one block.
+                          <p className="-mt-3 flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-zinc-900">
+                            <span className="flex w-8 justify-center"><Wallet className="w-3.5 h-3.5" /></span>
+                            {p2pPriceShort(plan.p2pAmountCents, plan.p2pSplit)}
+                          </p>
+                        )}
                         <div className="flex flex-col sm:flex-row gap-4">
                           {/* "View Details" for everyone — RSVP'd, hosting, pending, or new.
                               The modal handles state-specific actions (Join Plan Chat for
