@@ -5915,7 +5915,8 @@ export default function OrgCalendarPage() {
               <Plus className="w-8 h-8 rotate-45" />
             </button>
 
-            <div className="hidden md:block w-1/2 h-full bg-zinc-100">
+            <div className="relative hidden md:block w-1/2 h-full bg-zinc-100">
+              {selectedEvent.onlyOnLeaf && <OnlyOnLeafPill color={org.brandColor} />}
               {selectedEvent.image ? (
                 <FittedImage src={selectedEvent.image} />
               ) : (
