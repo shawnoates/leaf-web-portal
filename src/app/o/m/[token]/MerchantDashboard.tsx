@@ -9,6 +9,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { Brand, Shell, dollars, formatPhone } from "./ui";
+import PayoutSetup from "./PayoutSetup";
 
 type Phase = "pending" | "confirmed" | "now" | "past" | "cancelled";
 type Night = {
@@ -483,6 +484,10 @@ export default function MerchantDashboard({
             </p>
           </Card>
         )}
+
+        {/* Ticketed nights: Leaf sends them ticket sales after the night. Signed-up
+            merchants land here, not on the form, so the payout setup lives here too. */}
+        {!perRsvp && <PayoutSetup token={token} />}
 
         {account}
 
