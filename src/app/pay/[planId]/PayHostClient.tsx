@@ -26,7 +26,24 @@ type Guest = {
   paysTo?: string | null;
   /** A forwarded receipt that looks like this seat's payment. */
   receipt?: string | null;
+  /** People they're bringing; each is a seat. */
+  plusOnes?: string[];
 };
+
+/** The plan's collecting settings, as setPlanP2pPayment stored them. */
+type P2pConfig = {
+  mode?: "fixed" | "split";
+  amountCents?: number | null;
+  ticketCount?: number;
+  hostHasTicket?: boolean;
+  totalCents?: number;
+  minHeadcount?: number;
+  maxHeadcount?: number;
+  hostInSplit?: boolean;
+  holdHours?: number | null;
+};
+
+const people = (n: number) => `${n} ${n === 1 ? "person" : "people"}`;
 
 /** "Split a total": the share comes from the headcount, fixed when it locks. */
 type Split = {
@@ -51,7 +68,11 @@ type Inbound = { address: string; forwardCode: string | null; lastReceiptAt: str
 
 type Roster = {
   inbound?: Inbound | null;
-  p2pPayment: { mode?: "fixed" | "split"; amountCents?: number | null; ticketCount?: number; hostHasTicket?: boolean } | null;
+  p2pPayment: P2pConfig | null;
+  /** Signed-in manager and not a locked split: may change or stop collecting. */
+  canEdit?: boolean;
+  /** Someone has said they paid or been confirmed: price and mode are fixed. */
+  hasPayments?: boolean;
   split?: Split | null;
   canLock?: boolean;
   title?: string;
@@ -195,6 +216,8 @@ export default function PayHostClient({
   // Split: lock the headcount. Below the minimum the server answers with
   // the higher share first, and this asks before locking with force.
   const [lockAsk, setLockAsk] = useState<LockPreview | null>(null);
+  // Changing the settings after setup: the setup form, filled in.
+  const [editing, setEditing] = useState(false);
   const lock = async (force = false) => {
     setBusyId("lock");
     setError(null);
@@ -252,8 +275,18 @@ export default function PayHostClient({
     const split = roster.split || null;
     const waiting = guests.filter((g) => g.status === "pending_lock").length;
     const sorted = [...guests].sort((a, b) => order[a.status] - order[b.status]);
+    const openSplit = split && !split.locked ? split : null;
 
-    body = (
+    body = editing ? (
+      <Setup
+        planId={planId}
+        roster={roster}
+        existing={roster.p2pPayment}
+        hasPayments={Boolean(roster.hasPayments)}
+        onCancel={() => setEditing(false)}
+        onDone={(msg) => { setEditing(false); if (msg) setToast(msg); void load(); }}
+      />
+    ) : (
       <>
         {focus && focus.status === "claimed" && (
           <div className="ph-focus">
@@ -270,15 +303,30 @@ export default function PayHostClient({
         )}
 
         <div className="ph-sum">
-          <div className="ph-sum-top">
-            <span className="ph-big">{money(collected)}</span>
-            <span className="ph-muted"> of {money(target)} collected</span>
-          </div>
-          <div className="ph-bar"><span style={{ width: `${pct}%` }} /></div>
+          {roster.canEdit && <button className="ph-link ph-edit" onClick={() => setEditing(true)}>Edit</button>}
+          {openSplit ? (
+            // Nothing is owed until the split locks: show what's being split.
+            <div className="ph-sum-top">
+              <span className="ph-big">{money(openSplit.totalCents)}</span>
+              <span className="ph-muted"> to split</span>
+            </div>
+          ) : (
+            <>
+              <div className="ph-sum-top">
+                <span className="ph-big">{money(collected)}</span>
+                <span className="ph-muted"> of {money(target)} collected</span>
+              </div>
+              <div className="ph-bar"><span style={{ width: `${pct}%` }} /></div>
+            </>
+          )}
           <p className="ph-muted ph-small">
-            {split
-              ? `${money(split.shareCents)} each${split.locked ? `, ${split.headcount} people` : " right now"} · you spent ${money(roster.spentCents || 0)}`
-              : `${money(roster.p2pPayment.amountCents || 0)} a spot · you spent ${money(roster.spentCents || 0)}`}
+            {openSplit
+              ? openSplit.belowMin
+                ? `${money(openSplit.lowCents)}–${money(openSplit.highCents)} each once ${openSplit.minHeadcount}+ are in`
+                : `${money(openSplit.shareCents)} each with ${people(openSplit.headcount)} right now`
+              : split
+                ? `${money(split.shareCents)} each, ${people(split.headcount)} · you spent ${money(roster.spentCents || 0)}`
+                : `${money(roster.p2pPayment.amountCents || 0)} a spot · you spent ${money(roster.spentCents || 0)}`}
             {(roster.claimedCents || 0) > 0 ? ` · ${money(roster.claimedCents || 0)} waiting on you` : ""}
           </p>
           <div className="ph-chips">
@@ -302,7 +350,9 @@ export default function PayHostClient({
         {split && !split.locked && (
           <div className="ph-lock">
             <p className="ph-lock-h">
-              Splitting {money(split.totalCents)} · {money(split.shareCents)} each with {split.headcount} people
+              {split.belowMin
+                ? `Splitting ${money(split.totalCents)} between ${split.minHeadcount}–${split.maxHeadcount} people`
+                : `Splitting ${money(split.totalCents)} · ${money(split.shareCents)} each with ${people(split.headcount)}`}
             </p>
             <p className="ph-muted ph-small">
               Guests pay once you lock the headcount: {money(split.lowCents)} each if {split.maxHeadcount} come,
@@ -325,7 +375,7 @@ export default function PayHostClient({
               </div>
             ) : (
               <button className="ph-btn primary wide" disabled={!roster.canLock || busyId === "lock"} onClick={() => lock(false)}>
-                {roster.canLock ? `Lock at ${split.headcount} people · ${money(split.shareCents)} each` : "Lock once someone joins"}
+                {roster.canLock ? `Lock at ${people(split.headcount)} · ${money(split.shareCents)} each` : "Lock once someone joins"}
               </button>
             )}
             {waiting > 0 && <p className="ph-muted ph-small">{waiting} {waiting === 1 ? "guest is" : "guests are"} waiting to hear their share.</p>}
@@ -350,7 +400,10 @@ export default function PayHostClient({
                   {g.photoUrl ? <img src={g.photoUrl} alt="" /> : <span>{g.name.slice(0, 1).toUpperCase()}</span>}
                 </div>
                 <div className="ph-who">
-                  <p className="ph-name">{g.name}</p>
+                  <p className="ph-name">
+                    {g.name}{(g.plusOnes?.length ?? 0) > 0 && <span className="ph-plus"> +{g.plusOnes!.length}</span>}
+                  </p>
+                  {(g.plusOnes?.length ?? 0) > 0 && <p className="ph-st">with {g.plusOnes!.join(", ")}</p>}
                   <p className={`ph-st ${g.status}`}>{statusLine(g)}</p>
                 </div>
                 <div className="ph-row-actions">
@@ -397,18 +450,32 @@ export default function PayHostClient({
 
 // ---- Setup: turn on collecting for a plan ----------------------------------
 
-function Setup({ planId, roster, onDone }: { planId: string; roster: Roster; onDone: () => void }) {
+const dollarsField = (cents?: number | null) => (cents ? String(cents / 100) : "");
+
+function Setup({
+  planId, roster, onDone, existing = null, hasPayments = false, onCancel,
+}: {
+  planId: string;
+  roster: Roster;
+  onDone: (message?: string) => void;
+  /** Editing: the current settings to start from. */
+  existing?: P2pConfig | null;
+  /** Someone has paid: the mode and the price can't change any more. */
+  hasPayments?: boolean;
+  onCancel?: () => void;
+}) {
   const [handles, setHandles] = useState<PayHandles | null | undefined>(undefined);
   const [editingHandles, setEditingHandles] = useState(false);
-  const [mode, setMode] = useState<"fixed" | "split">("fixed");
-  const [price, setPrice] = useState("");
-  const [spots, setSpots] = useState(roster.capacity ? String(roster.capacity + 1) : "");
-  const [mine, setMine] = useState(true);
+  const [mode, setMode] = useState<"fixed" | "split">(existing?.mode === "split" ? "split" : "fixed");
+  const [price, setPrice] = useState(dollarsField(existing?.mode !== "split" ? existing?.amountCents : null));
+  const [spots, setSpots] = useState(existing?.ticketCount ? String(existing.ticketCount) : roster.capacity ? String(roster.capacity + 1) : "");
+  const [mine, setMine] = useState(existing ? (existing.mode === "split" ? existing.hostInSplit !== false : existing.hostHasTicket !== false) : true);
   // Split a total
-  const [total, setTotal] = useState("");
-  const [minPeople, setMinPeople] = useState("");
-  const [maxPeople, setMaxPeople] = useState(roster.capacity ? String(roster.capacity + 1) : "");
-  const [hold, setHold] = useState("");
+  const [total, setTotal] = useState(dollarsField(existing?.totalCents));
+  const [minPeople, setMinPeople] = useState(existing?.minHeadcount ? String(existing.minHeadcount) : "");
+  const [maxPeople, setMaxPeople] = useState(existing?.maxHeadcount ? String(existing.maxHeadcount) : roster.capacity ? String(roster.capacity + 1) : "");
+  const [hold, setHold] = useState(existing?.holdHours ? String(existing.holdHours) : "");
+  const priceLocked = Boolean(existing && hasPayments);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -440,9 +507,24 @@ function Setup({ planId, roster, onDone }: { planId: string; roster: Roster; onD
           eventGroupId: planId, amountCents: cents, ticketCount: count, hostHasTicket: mine,
           holdHours: hold ? Number(hold) : null,
         });
-      onDone();
+      onDone(existing ? "Saved." : undefined);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't turn this on.");
+      setError(e instanceof Error ? e.message : existing ? "Couldn't save." : "Couldn't turn this on.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Stop collecting: only while nobody has paid (the server refuses after).
+  const stop = async () => {
+    if (!window.confirm("Stop collecting money for this plan? Guests holding a spot won't owe anything.")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await Parse.Cloud.run("setPlanP2pPayment", { eventGroupId: planId, off: true });
+      onDone("Stopped collecting.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't stop collecting.");
     } finally {
       setBusy(false);
     }
@@ -465,8 +547,13 @@ function Setup({ planId, roster, onDone }: { planId: string; roster: Roster; onD
 
   return (
     <div className="ph-setup">
-      <p className="ph-setup-h">Collect money for this plan</p>
-      <p className="ph-muted">You bought the tickets or booked the spot; everyone who joins pays you back.</p>
+      <p className="ph-setup-h">{existing ? "Change how you collect" : "Collect money for this plan"}</p>
+      <p className="ph-muted">
+        {priceLocked
+          ? "Someone has already paid, so the price and how it's split stay as they are. You can still change spots and the hold."
+          : "You bought the tickets or booked the spot; everyone who joins pays you back."}
+      </p>
+      <fieldset className="ph-fs" disabled={priceLocked}>
       <div className="ph-seg" role="radiogroup" aria-label="How guests pay">
         <button role="radio" aria-checked={mode === "fixed"} className={mode === "fixed" ? "on" : ""} onClick={() => setMode("fixed")}>
           Price per spot<small>Tickets, a set price</small>
@@ -475,11 +562,12 @@ function Setup({ planId, roster, onDone }: { planId: string; roster: Roster; onD
           Split a total<small>A court, a table — depends on headcount</small>
         </button>
       </div>
+      </fieldset>
       {mode === "split" ? (
         <>
           <label className="ph-field">
             <span>Total you paid</span>
-            <div className="ph-money"><b>$</b><input inputMode="decimal" value={total} placeholder="120" onChange={(e) => setTotal(e.target.value.replace(/[^\d.]/g, "").slice(0, 8))} /></div>
+            <div className="ph-money"><b>$</b><input inputMode="decimal" value={total} placeholder="120" disabled={priceLocked} onChange={(e) => setTotal(e.target.value.replace(/[^\d.]/g, "").slice(0, 8))} /></div>
           </label>
           <div className="ph-grid">
             <label className="ph-field">
@@ -507,7 +595,7 @@ function Setup({ planId, roster, onDone }: { planId: string; roster: Roster; onD
       <div className="ph-grid">
         <label className="ph-field">
           <span>Price per spot</span>
-          <div className="ph-money"><b>$</b><input inputMode="decimal" value={price} placeholder="60" onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, "").slice(0, 7))} /></div>
+          <div className="ph-money"><b>$</b><input inputMode="decimal" value={price} placeholder="60" disabled={priceLocked} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, "").slice(0, 7))} /></div>
         </label>
         <label className="ph-field">
           <span>Tickets / spots you have</span>
@@ -542,8 +630,14 @@ function Setup({ planId, roster, onDone }: { planId: string; roster: Roster; onD
       </div>
       {error && <p className="ph-err">{error}</p>}
       <button className="ph-btn primary wide" disabled={busy || !ready} onClick={submit}>
-        {busy ? "Turning on…" : "Start collecting"}
+        {busy ? (existing ? "Saving…" : "Turning on…") : existing ? "Save changes" : "Start collecting"}
       </button>
+      {existing && (
+        <div className="ph-setup-foot">
+          {onCancel && <button className="ph-btn ghost" disabled={busy} onClick={onCancel}>Cancel</button>}
+          {!hasPayments && <button className="ph-link ph-stop" disabled={busy} onClick={stop}>Stop collecting</button>}
+        </div>
+      )}
     </div>
   );
 }
@@ -604,6 +698,14 @@ const CSS = `
 .ph-check{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
 .ph-calc{font-size:13px;background:#f3f7f5;color:#253a33;border-radius:8px;padding:8px 10px}
 .ph-paidto{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:#6f6a5f;background:#faf9f7;border-radius:8px;padding:9px 11px}
+.ph-sum{position:relative}
+.ph-plus{color:#6f6a5f;font-weight:400}
+.ph-edit{position:absolute;top:14px;right:16px;font-size:12.5px}
+.ph-fs{border:0;margin:0;padding:0;min-width:0}
+.ph-fs:disabled .ph-seg button{opacity:.55;cursor:default}
+.ph-field input:disabled{background:#faf9f7;color:#8b8578}
+.ph-setup-foot{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ph-stop{color:#b91c1c !important}
 .ph-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .ph-seg button{display:grid;gap:2px;text-align:left;border:1px solid rgba(0,0,0,.15);border-radius:10px;background:#fff;padding:10px 12px;font:inherit;font-size:13px;font-weight:600;color:#17150f;cursor:pointer}
 .ph-seg button small{font-size:11.5px;font-weight:400;color:#8b8578}

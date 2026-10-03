@@ -44,6 +44,9 @@ type Seat = {
   confirmedBy: "host" | "auto" | null;
   notReceived: boolean;
   canRemindHost: boolean;
+  /** People this guest is bringing (named, not on Leaf); each pays a seat. */
+  plusOnes?: string[];
+  canEditPlusOnes?: boolean;
 };
 
 /** "Split a total": the share comes from the headcount, fixed when it locks. */
@@ -65,6 +68,7 @@ type Payment = {
   hostFirstName?: string;
   /** The guest came through another calendar: the host's own calendar. */
   hostingFrom?: string | null;
+  maxPlusOnes?: number;
   /** Dropout swap: this seat was someone else's paid seat, so this guest pays
    *  them back (hostFirstName is then the dropper) instead of the host. */
   resale?: { sellerName: string; hostName?: string } | null;
@@ -95,6 +99,59 @@ async function copy(text: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * "Bringing anyone?" — named plus-ones on a plan that collects money. Each
+ * is a seat and pays the same; the server checks seats and redoes the amount.
+ */
+function PlusOnes({ initial, max, busy, onSave }: {
+  initial: string[];
+  max: number;
+  busy: boolean;
+  onSave: (names: string[]) => void;
+}) {
+  const [names, setNames] = useState<string[]>(initial);
+  const [open, setOpen] = useState(initial.length > 0);
+  const dirty = names.join("\u0000") !== initial.join("\u0000");
+  const ready = names.every((n) => n.trim());
+  if (!open) {
+    return (
+      <button type="button" className="p2p-link p2p-plus-open" onClick={() => { setOpen(true); if (!names.length) setNames([""]); }}>
+        Bringing anyone? Add kids or friends who aren&apos;t on Leaf
+      </button>
+    );
+  }
+  return (
+    <div className="p2p-plus">
+      <p className="p2p-plus-h">Bringing anyone?</p>
+      <p className="p2p-sub">Each person takes a spot and pays the same as you.</p>
+      {names.map((n, i) => (
+        <div key={i} className="p2p-plus-row">
+          <input
+            value={n}
+            placeholder="Their name"
+            maxLength={40}
+            aria-label={`Person ${i + 1}`}
+            onChange={(e) => setNames((p) => p.map((x, j) => (j === i ? e.target.value : x)))}
+          />
+          <button type="button" className="p2p-link" aria-label={`Remove ${n || "person"}`}
+            onClick={() => setNames((p) => p.filter((_, j) => j !== i))}>Remove</button>
+        </div>
+      ))}
+      <div className="p2p-plus-actions">
+        {names.length < max && (
+          <button type="button" className="p2p-link" onClick={() => setNames((p) => [...p, ""])}>+ Add a person</button>
+        )}
+        {dirty && (
+          <button type="button" className="p2p-btn ghost sm" disabled={busy || !ready}
+            onClick={() => onSave(names.map((x) => x.trim()))}>
+            {busy ? "Saving…" : "Save"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function P2pPayCard({
@@ -171,6 +228,20 @@ export default function P2pPayCard({
     }
   };
 
+  const savePlusOnes = async (names: string[]) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = (await Parse.Cloud.run("setP2pPlusOnes", { ...auth(), names })) as { seat?: Seat; options?: PayOption[] };
+      setData((d) => (d ? { ...d, seat: r.seat ?? d.seat, options: r.options?.length ? r.options : d.options } : d));
+      setToast(names.length ? `Saved — ${names.length + 1} of you.` : "Saved.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (failed) return null;
   if (!data) return <div className="p2p p2p-loading" aria-busy="true"><style>{CSS}</style></div>;
   if (!data.p2pPayment) return null;
@@ -235,6 +306,11 @@ export default function P2pPayCard({
           You&apos;ll pay once {host} sets the headcount
           {split.autoLockAt ? <> — by <b>{when(split.autoLockAt)}</b> at the latest</> : null}. Your spot is held until then.
         </p>
+        {seat.canEditPlusOnes && (
+          <PlusOnes initial={seat.plusOnes || []} max={data.maxPlusOnes ?? 4} busy={busy} onSave={savePlusOnes} />
+        )}
+        {error && <p className="p2p-err">{error}</p>}
+        {toast && <p className="p2p-toast" role="status">{toast}</p>}
       </div>
     );
   }
@@ -284,7 +360,10 @@ export default function P2pPayCard({
     <div className="p2p">
       <style>{CSS}</style>
       {fromLine}
-      <p className="p2p-h">Pay {host} {amount}</p>
+      <p className="p2p-h">
+        Pay {host} {amount}
+        {(seat.plusOnes?.length ?? 0) > 0 && <span className="p2p-party"> · you + {seat.plusOnes!.length}</span>}
+      </p>
       {split?.locked && (
         <p className="p2p-sub">Your share of {money(split.totalCents)}, split {split.headcount} ways.</p>
       )}
@@ -359,6 +438,10 @@ export default function P2pPayCard({
 
       {paypalHint && <p className="p2p-hint">{paypalHint}</p>}
 
+      {seat.canEditPlusOnes && (
+        <PlusOnes initial={seat.plusOnes || []} max={data.maxPlusOnes ?? 4} busy={busy} onSave={savePlusOnes} />
+      )}
+
       {picking ? (
         <div className="p2p-pick">
           <span>Which app did you use?</span>
@@ -402,6 +485,14 @@ const CSS = `
 .p2p-done{background:#f3f7f5;border-color:rgba(37,58,51,.3)}
 .p2p-h{font-size:16px;font-weight:600;margin:0}
 .p2p-from{margin:0 0 6px;font-size:11.5px;color:#8b8578}
+.p2p-party{font-weight:400;color:#6f6a5f;font-size:14px}
+.p2p-plus-open{display:block;margin-top:12px;text-align:left}
+.p2p-plus{margin-top:12px;padding:12px;border-radius:10px;background:#faf9f7;display:grid;gap:8px}
+.p2p-plus-h{margin:0;font-size:13.5px;font-weight:600}
+.p2p-plus-row{display:flex;gap:10px;align-items:center}
+.p2p-plus-row input{flex:1;min-width:0;border:1px solid rgba(0,0,0,.15);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;background:#fff;color:#17150f}
+.p2p-plus-row input:focus{outline:none;border-color:#17150f}
+.p2p-plus-actions{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .p2p-sub{color:#6f6a5f;margin:4px 0 0}
 .p2p-warn{color:#9a3412;background:#fff7ed;border-radius:8px;padding:8px 10px;margin:8px 0 0}
 .p2p-ref{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding:8px 10px;background:#faf9f7;border-radius:8px;color:#6f6a5f;font-size:12px}
