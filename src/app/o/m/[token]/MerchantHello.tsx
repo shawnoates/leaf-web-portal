@@ -11,7 +11,15 @@ import { useCallback, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import HostIntroVideoCard, { type IntroVideoInfo } from "@/components/HostIntroVideoCard";
 
-export default function MerchantHello({ token }: { token: string }) {
+function playsOn(nights: { dateLabel: string; title: string }[]): string {
+  if (!nights.length) return "One hello plays on every night you host.";
+  const first = nights[0];
+  const what = first.title ? ` \u00b7 ${first.title.charAt(0).toUpperCase()}${first.title.slice(1)}` : "";
+  const more = nights.length > 1 ? `, and ${nights.length - 1} more night${nights.length === 2 ? "" : "s"}` : "";
+  return `Plays on ${first.dateLabel}${what}${more}.`;
+}
+
+export default function MerchantHello({ token, nights = [] }: { token: string; nights?: { dateLabel: string; title: string }[] }) {
   const [video, setVideo] = useState<IntroVideoInfo | null>(null);
 
   const fetchVideo = useCallback(
@@ -36,9 +44,9 @@ export default function MerchantHello({ token }: { token: string }) {
   return (
     <section id="hello" className="scroll-mt-6 rounded-3xl bg-white p-5 shadow-sm">
       <h2 className="font-fm-serif text-[26px] leading-tight text-stone-900">Say hello to your neighbors</h2>
-      <p className="mt-1 text-[15px] text-stone-600">One hello plays on every night you host.</p>
+      <p className="mt-1 text-[15px] text-stone-600">{playsOn(nights)}</p>
       <div className="mt-3">
-        <HostIntroVideoCard source={{ kind: "merchant", token }} video={video} timeZone={null} planStarted={false} onChanged={load} embedded scriptCollapsed />
+        <HostIntroVideoCard source={{ kind: "merchant", token }} video={video} timeZone={null} planStarted={false} onChanged={load} scriptCollapsed />
       </div>
     </section>
   );

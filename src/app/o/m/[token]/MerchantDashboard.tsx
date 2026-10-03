@@ -425,6 +425,9 @@ export default function MerchantDashboard({
           </button>
         </Card>
 
+        {/* Their hello plays on these nights, so it sits right under them. */}
+        <MerchantHello token={token} nights={d.upcoming.map((n) => ({ dateLabel: n.dateLabel, title: n.title }))} />
+
         {d.requests && d.requests.length > 0 && (
           <Card>
             <H2>Waiting on us</H2>
@@ -502,7 +505,6 @@ export default function MerchantDashboard({
             merchants land here, not on the form, so the payout setup lives here too. */}
         {!perRsvp && <PayoutSetup token={token} />}
 
-        <MerchantHello token={token} />
 
         {account}
 

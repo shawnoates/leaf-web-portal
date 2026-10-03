@@ -47,7 +47,7 @@ function CounterCard({ p }: { p: Page }) {
   return (
     <div className="placard-print placard-counter mx-auto flex flex-col items-center justify-between bg-white text-center" style={{ width: "4in", height: "6in", padding: "0.35in", color: INK }}>
       <div>
-        <p style={{ fontSize: "20pt", fontWeight: 700, lineHeight: 1.15 }}>{p.headline}</p>
+        <p style={{ fontSize: "18pt", fontWeight: 700, lineHeight: 1.15 }}>{p.headline}</p>
         <p style={{ fontSize: "10pt", marginTop: "0.12in", color: "#3f4f49" }}>{p.examples}</p>
       </div>
       <div>
