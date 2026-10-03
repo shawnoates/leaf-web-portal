@@ -11,21 +11,11 @@ import { useCallback, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import HostIntroVideoCard, { type IntroVideoInfo } from "@/components/HostIntroVideoCard";
 
-function playsOn(nights: { dateLabel: string; title: string }[]): string {
-  if (!nights.length) return "One hello plays on every night you host.";
-  const first = nights[0];
-  const what = first.title ? ` \u00b7 ${first.title.charAt(0).toUpperCase()}${first.title.slice(1)}` : "";
-  const more = nights.length > 1 ? `, and ${nights.length - 1} more night${nights.length === 2 ? "" : "s"}` : "";
-  return `Plays on ${first.dateLabel}${what}${more}.`;
-}
-
 export default function MerchantHello({
   token,
-  nights = [],
   inline = false,
 }: {
   token: string;
-  nights?: { dateLabel: string; title: string }[];
   /** Inside the Coming up card: a section under the nights, not a card of its own. */
   inline?: boolean;
 }) {
@@ -59,7 +49,6 @@ export default function MerchantHello({
     return (
       <div id="hello" className="mt-5 scroll-mt-6 border-t border-stone-200 pt-5">
         <h3 className="text-[17px] font-semibold text-stone-900">Say hello to your neighbors</h3>
-        <p className="mt-1 text-[15px] text-stone-600">{playsOn(nights)}</p>
         {body}
       </div>
     );
@@ -67,7 +56,6 @@ export default function MerchantHello({
   return (
     <section id="hello" className="scroll-mt-6 rounded-3xl bg-white p-5 shadow-sm">
       <h2 className="font-fm-serif text-[26px] leading-tight text-stone-900">Say hello to your neighbors</h2>
-      <p className="mt-1 text-[15px] text-stone-600">{playsOn(nights)}</p>
       {body}
     </section>
   );

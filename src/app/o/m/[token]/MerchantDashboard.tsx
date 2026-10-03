@@ -260,7 +260,7 @@ function PastNight({ n }: { n: Night }) {
           {(r.regulars.followsFromNight != null || r.regulars.returning != null) && (
             <p className="mt-1 text-[13px] text-stone-600">
               {[
-                r.regulars.followsFromNight != null ? `${r.regulars.followsFromNight} followed the calendar from your table card` : null,
+                r.regulars.followsFromNight != null ? `${r.regulars.followsFromNight} followed the calendar from your counter card` : null,
                 r.regulars.returning != null ? `${r.regulars.returning} came back for another night` : null,
               ]
                 .filter(Boolean)
@@ -415,8 +415,6 @@ export default function MerchantDashboard({
               <p className="text-[15px] text-stone-600">Nothing on the books right now. Pick more nights and we&rsquo;ll fill them.</p>
             )}
           </div>
-          {/* Their hello plays on these nights, so it lives with them. */}
-          <MerchantHello token={token} nights={d.upcoming.map((n) => ({ dateLabel: n.dateLabel, title: n.title }))} inline />
           <button
             type="button"
             onClick={onEdit}
@@ -424,6 +422,8 @@ export default function MerchantDashboard({
           >
             Change your nights or details
           </button>
+          {/* Their hello plays on these nights, so it lives with them. */}
+          <MerchantHello token={token} inline />
         </Card>
 
 
@@ -506,8 +506,8 @@ export default function MerchantDashboard({
 
         {d.placardUrl && (
           <Card>
-            <H2>Your table card</H2>
-            <p className="mt-2 text-[15px] leading-relaxed text-stone-600">A card with a QR code for the table, so guests can follow the calendar.</p>
+            <H2>Your counter card</H2>
+            <p className="mt-2 text-[15px] leading-relaxed text-stone-600">A card with a QR code for your counter, so neighbors who stop by can find your nights and the calendar.</p>
             <a
               href={d.placardUrl}
               className="mt-3 inline-block text-[15px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4"
