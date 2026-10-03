@@ -346,13 +346,23 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 <p className="mt-3 text-[15px] leading-relaxed text-fm-ink-2">
                   {crew.enabled === false ? "Friend Mode is off, so Leaf isn't planning anything for this crew." : crew.oneTime ? "Leaf starts planning the night as soon as enough people are in." : `Leaf starts the next night on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()}). Got a place and a date in mind? Say so below.`}
                 </p>
+                {me.isOwner && crew.enabled !== false && !crew.oneTime && crew.nextRoundAt && (
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <span className="text-sm text-fm-muted">
+                      Next round starts around {new Date(crew.nextRoundAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}.
+                    </span>
+                    <Button small kind="ghost" disabled={busy !== null} onClick={() => act("skip", () => run("skipCrewRound", auth, { calendarId: crew.id }))}>
+                      {busy === "skip" ? "Skipping…" : "Skip the next one"}
+                    </Button>
+                  </div>
+                )}
               </Card>
             )}
 
             {open.length > 0 && (
               <div className={`grid gap-3 lg:gap-4 ${open.length > 1 ? "lg:grid-cols-2" : ""}`}>
                 {open.map((c) => (
-                  <CycleCard key={c.cycleId} cycle={c} names={names} members={members} busy={busy} onAct={act} auth={auth} quorum={crew.quorum} joined={joined.length} calendarSynced={Boolean(me.calendarSynced)} onConnectCalendar={connectCalendar} hostRotation={Boolean(crew.hostRotation)} isOwner={me.isOwner} />
+                  <CycleCard key={c.cycleId} cycle={c} names={names} members={members} busy={busy} onAct={act} auth={auth} quorum={crew.quorum} joined={joined.length} calendarSynced={Boolean(me.calendarSynced)} onConnectCalendar={connectCalendar} hostRotation={Boolean(crew.hostRotation)} isOwner={me.isOwner} canSkip={me.isOwner && !crew.oneTime && crew.enabled !== false} crewId={crew.id} />
                 ))}
               </div>
             )}
@@ -890,7 +900,7 @@ function MemberRow({ m, note }: { m: Member; note?: string }) {
 }
 
 function CycleCard({
-  cycle: c, names, members, busy, onAct, auth, quorum, joined, calendarSynced, onConnectCalendar, hostRotation = false, isOwner = false,
+  cycle: c, names, members, busy, onAct, auth, quorum, joined, calendarSynced, onConnectCalendar, hostRotation = false, isOwner = false, canSkip = false, crewId = "",
 }: {
   cycle: CycleView;
   names: Record<string, string>;
@@ -907,6 +917,9 @@ function CycleCard({
   hostRotation?: boolean;
   /** The crew's owner: may answer a combine offer like the round's host. */
   isOwner?: boolean;
+  /** The organizer of a recurring crew: may skip a round being planned. */
+  canSkip?: boolean;
+  crewId?: string;
 }) {
   // Not voted yet: start from the dates their calendar says they're free.
   // Nothing pre-ticked: Leaf already picked these dates around everyone's
@@ -940,6 +953,7 @@ function CycleCard({
   const settled = c.state === "locked" || c.state === "booked";
   // Asked on the page itself: the app's web view has no confirm() dialog.
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmSkip, setConfirmSkip] = useState(false);
   const stateWord = { picking: "Picking", polling: "Voting", locked: "Locked in", booked: "Booked" }[c.state as string];
   const who = c.trigger === "member_proposal" ? `${names[c.hostId || ""] || "A member"}'s idea` : "Up next";
   const chosen = c.chosenOption ? dayParts(c.chosenOption.date) : null;
@@ -1068,6 +1082,23 @@ function CycleCard({
         </>
       )}
 
+      {canSkip && (c.state === "polling" || c.state === "picking") && (
+        confirmSkip ? (
+          <div className="flex flex-col gap-2.5 rounded-[18px] border border-fm-line px-4 py-3.5">
+            <p className="m-0 text-sm leading-snug text-fm-ink">{"Skip this round? Leaf tells the crew and picks it back up next time."}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button small disabled={busy !== null} onClick={() => onAct("skip", () => run("skipCrewRound", auth, { calendarId: crewId }))}>
+                {busy === "skip" ? "Skipping…" : "Yes, skip it"}
+              </Button>
+              <Button small kind="ghost" disabled={busy !== null} onClick={() => setConfirmSkip(false)}>Keep it</Button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setConfirmSkip(true)} className="min-h-11 w-fit text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink">
+            Skip this one
+          </button>
+        )
+      )}
       {settled && (
         <>
           <div className="flex items-center gap-2.5">

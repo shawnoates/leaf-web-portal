@@ -119,6 +119,8 @@ export type CrewPage = {
     fixedPlace?: { label: string; address: string | null } | null;
     /** Each round Leaf starts goes to the next member to host. */
     hostRotation?: boolean;
+    /** When Leaf starts the next round on its own (recurring crews that are on). */
+    nextRoundAt?: string | null;
     /** A one-time crew after its night: offer "Do it again?". */
     lastOneTime?: { happened: boolean; venue: string | null; at: string | { iso: string } | null } | null;
   };
