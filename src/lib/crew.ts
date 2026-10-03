@@ -242,6 +242,8 @@ export type TellLeafResult = {
   avoidDays?: number[];
   /** "HH:mm" the member wants nights to start ("daytime" reads as 12:00). */
   preferTime?: string | null;
+  /** Asked for good weather ("on a nice day"): Leaf checks the forecast. */
+  weather?: "nice" | null;
   /** When a start can fall, "HH:mm" each end; either may be missing. */
   timeWindow?: { earliest: string | null; latest: string | null } | null;
   dislikedAdded?: number;
@@ -282,12 +284,13 @@ export function tellLeafReceipt(r: TellLeafResult): string {
     ? `I'll aim for ${listDays(r.preferDays)}${at ? `, ${at}` : ""}`
     : at ? `I'll aim for nights ${at}` : "";
   const avoid = r.avoidDays?.length ? `I'll steer clear of ${listDays(r.avoidDays)}` : "";
-  const both = [prefer, avoid].filter(Boolean).join(", and ");
+  const sky = r.weather === "nice" ? "I'll check the forecast and go for a dry, nice day" : "";
+  const both = [prefer, avoid, sky].filter(Boolean).join(", and ");
   const round = r.pollDates === "refreshed"
     ? " New dates are up for this round."
     : r.pollDates === "others_voted"
       ? " People already voted on this round's dates, so it starts with the next one."
       : "";
-  if (both) return `Got it — ${both}.${round}`;
+  if (both) return `Got it: ${both}.${round}`;
   return `Got it. Thanks.${round}`;
 }
