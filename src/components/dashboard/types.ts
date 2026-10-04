@@ -4,6 +4,8 @@
 // here so the place components (HomeTab, CommunityTab, …) can type their props
 // without importing the 3k-line page module.
 
+import type { RequestedP2p } from "@/components/p2p/CollectAskFields";
+
 export interface CalActivePlan {
   objectId: string;
   calendarId?: string;
@@ -302,6 +304,8 @@ export interface OrgDashboard {
     requestedCapacity: number | null;
     requestedRequireApproval: boolean;
     requestedAt: string | null;
+    /** What the requester asked to collect from guests (paid to them), if anything. */
+    requestedP2p?: RequestedP2p | null;
   }[];
   pendingRsvpRequests: {
     notificationId: string;

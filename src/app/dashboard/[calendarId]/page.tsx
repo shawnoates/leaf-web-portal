@@ -1123,6 +1123,8 @@ export default function OrgDashboardPage() {
         capacity: req.requestedCapacity != null ? String(req.requestedCapacity) : "",
         imageUrl: req.image || null,
         requireApproval: req.requestedRequireApproval,
+        requestedP2p: req.requestedP2p ?? null,
+        requesterName: req.requesterName,
       });
       setEditingHostRequestId(req.planId);
       setEditingHostRequestCalendarId(req.calendarId);

@@ -39,6 +39,8 @@ import { fetchVenuePhotoUrl } from "@/lib/google-places";
 import PlanAddonStack from "@/components/PlanAddonStack";
 import PaidRsvp from "@/components/PaidRsvp";
 import P2pPayCard from "@/components/P2pPayCard";
+import CollectAskFields, { EMPTY_COLLECT_ASK, collectAskPayload, type CollectAsk } from "@/components/p2p/CollectAskFields";
+import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
 import { collectsMoney, p2pPriceLine, p2pPriceShort, parseP2pSplit, type P2pSplitSummary } from "@/lib/p2p";
 import HlsVideo from "@/components/HlsVideo";
 import { introVideoFrame } from "@/lib/intro-video-frame";
@@ -2063,7 +2065,22 @@ export default function OrgCalendarPage() {
   const [unsplashLoading, setUnsplashLoading] = useState(false);
   const [customEmail, setCustomEmail] = useState("");
   const [customRequireApproval, setCustomRequireApproval] = useState(false);
+  // Collecting money on a requested plan: asked for here, approved with the
+  // plan by the calendar, paid to whoever asked. Deciding where money goes
+  // needs a real session, not the remembered-phone cookie.
+  const [customCollect, setCustomCollect] = useState<CollectAsk>(EMPTY_COLLECT_ASK);
+  const [customHandles, setCustomHandles] = useState<PayHandles | null | undefined>(undefined);
+  const [customHandlesTouched, setCustomHandlesTouched] = useState(false);
+  const [customEditingHandles, setCustomEditingHandles] = useState(false);
+  const [customCollectError, setCustomCollectError] = useState<string | null>(null);
   const customVerify = usePhoneVerify();
+  const customSession = customVerify.sessionToken || Parse.User.current()?.getSessionToken() || null;
+  useEffect(() => {
+    if (!customCollect.on || !customSession || customHandles !== undefined) return;
+    Parse.Cloud.run("getMyPayHandles", {}, { sessionToken: customSession })
+      .then((r: { handles: PayHandles | null }) => setCustomHandles(r.handles))
+      .catch(() => setCustomHandles(null));
+  }, [customCollect.on, customSession, customHandles]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const ctaSectionRef = useRef<HTMLDivElement>(null);
   const [showFollowModal, setShowFollowModal] = useState(false);
@@ -4040,6 +4057,11 @@ export default function OrgCalendarPage() {
     if (!isOwnerOrHost && !customVerify.isVerified) return;
     if (!selectedVenue) return;
     if (!customTitle.trim() || !customDescription.trim()) return;
+    const collectAsk = collectAskPayload(customCollect);
+    if (collectAsk.error) { setCustomCollectError(collectAsk.error); return; }
+    if (collectAsk.p2p && !customSession) { setCustomCollectError("Confirm your phone by text to collect money."); return; }
+    if (collectAsk.p2p && !customHandles) { setCustomCollectError("Add how you get paid (Venmo, Cash App, PayPal or Zelle)."); return; }
+    setCustomCollectError(null);
 
     setCustomSubmitting(true);
 
@@ -4071,15 +4093,18 @@ export default function OrgCalendarPage() {
           photoUrl: selectedVenue.photoUrl,
           rating: selectedVenue.rating,
         },
-        capacity: customCapacity ? parseInt(customCapacity, 10) : undefined,
+        capacity: !collectAsk.p2p && customCapacity ? parseInt(customCapacity, 10) : undefined,
         hostNote: hostNote.trim() || undefined,
+        p2p: collectAsk.p2p || undefined,
+        payHandles: collectAsk.p2p && customHandlesTouched ? customHandles : undefined,
         imageUrl: selectedImageUrl || undefined,
         // Link back to the starter card this was opened from, so the server
         // can stamp it and /org stops rendering the suggestion beside the plan
         // it became. Undefined for a from-scratch plan.
         aiSourceEventIndex: customPrefillAiSource?.index,
         aiSourceEventUid: customPrefillAiSource?.uid ?? undefined,
-      });
+      // Collecting runs as the signed-in asker (the server pays whoever asked).
+      }, collectAsk.p2p && customSession ? { sessionToken: customSession } : undefined);
       if (!isOwnerOrHost) {
         setVerifiedUserCookie(customVerify.name, customVerify.phone);
       }
@@ -7298,7 +7323,7 @@ export default function OrgCalendarPage() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {!customCollect.on && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <label className="text-xs tracking-wider uppercase font-bold">
                           Capacity <span className="text-zinc-400 normal-case">(optional)</span>
@@ -7313,7 +7338,7 @@ export default function OrgCalendarPage() {
                           className="w-full border-b border-zinc-300 py-3 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors"
                         />
                       </div>
-                    </div>
+                    </div>}
 
                     <div className="space-y-2">
                       <label className="text-xs tracking-wider uppercase font-bold">
@@ -7348,6 +7373,39 @@ export default function OrgCalendarPage() {
                         </div>
                       </>
                     )}
+
+                    <CollectAskFields
+                      value={customCollect}
+                      onChange={(v) => { setCustomCollect(v); setCustomCollectError(null); }}
+                      subtitle={org.isOwner || org.isHost
+                        ? "Guests pay you back directly on Venmo, Cash App, PayPal or Zelle. No fees."
+                        : `Guests pay you back directly on Venmo, Cash App, PayPal or Zelle. ${org.name || "The calendar"} approves the price with your plan.`}
+                    >
+                      {!customSession ? (
+                        <div className="text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+                          <span>Confirm your phone by text to collect money.</span>
+                          {customVerify.isVerified && (
+                            <button type="button" onClick={customVerify.reset} className="underline text-zinc-900 shrink-0">Text me a code</button>
+                          )}
+                        </div>
+                      ) : customHandles === undefined ? null : !customHandles || customEditingHandles ? (
+                        <div className="border border-zinc-200 rounded-xl p-3">
+                          <PayHandlesForm
+                            initial={customHandles}
+                            saveLabel="Use these"
+                            onCancel={customHandles ? () => setCustomEditingHandles(false) : undefined}
+                            onSaved={() => {}}
+                            onSubmit={(h) => { setCustomHandles(h); setCustomHandlesTouched(true); setCustomEditingHandles(false); }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-3 text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2">
+                          <span>Paid to {describeHandles(customHandles)}</span>
+                          <button type="button" onClick={() => setCustomEditingHandles(true)} className="underline text-zinc-400 hover:text-zinc-900">Edit</button>
+                        </div>
+                      )}
+                    </CollectAskFields>
+                    {customCollectError && <p className="text-xs text-red-600 -mt-3">{customCollectError}</p>}
 
                     <div className="flex items-center justify-between py-1">
                       <div>

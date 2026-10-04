@@ -8,6 +8,7 @@ import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { getDefaultCoverForSeed } from "@/lib/default-covers";
 import VenueSearch from "@/components/VenueSearch";
 import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
+import CollectAskFields, { collectAskFrom, collectAskPayload, type CollectAsk, type RequestedP2p } from "@/components/p2p/CollectAskFields";
 import { detectCity, primeGeoCity } from "@/lib/detectCity";
 import {
   ArrowRight,
@@ -134,6 +135,9 @@ export interface CreatePlanPrefill {
   /** Open with "Collect money" already on, in this mode — the dashboard's
    *  peer-to-peer intro opens the drawer this way. */
   collectMode?: "fixed" | "split";
+  /** Reviewing a host request that asked to collect money (paid to them). */
+  requestedP2p?: RequestedP2p | null;
+  requesterName?: string;
 }
 
 interface CreatePlanModalProps {
@@ -372,6 +376,10 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   const collectGuestSpots = collectCount - (spotIsMine ? 1 : 0);
   // "split": a total (a court) divided by however many come, locked later.
   const [collectMode, setCollectMode] = useState<"fixed" | "split">(prefill?.collectMode || "fixed");
+  // A host request that asked to collect: the calendar can change the price
+  // or approve without collecting. Saved with the approval, paid to the asker.
+  const [requestCollect, setRequestCollect] = useState<CollectAsk>(() => collectAskFrom(prefill?.requestedP2p));
+  const reviewsCollecting = Boolean(hostRequestMode && prefill?.requestedP2p);
   const [splitTotal, setSplitTotal] = useState("");
   const [splitMin, setSplitMin] = useState("");
   const [splitMax, setSplitMax] = useState("");
@@ -1181,9 +1189,12 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
         // Two-step: commit edits to the source EventDetail/EventGroup first,
         // then approve. Keeps approveHostRequest focused on the link-and-notify
         // flow and removes the override-application branch from approval.
+        const askedCollect = reviewsCollecting ? collectAskPayload(requestCollect) : null;
+        if (askedCollect?.error) throw new Error(askedCollect.error);
         await Parse.Cloud.run("updateHostRequestPlan", {
           calendarPlanId: hostRequestId,
           edits: {
+            ...(askedCollect ? { p2p: askedCollect.p2p } : {}),
             title,
             description,
             date: `${date}T${time || "12:00"}:00${tzSuffix}`,
@@ -2359,6 +2370,17 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
                 </>
               )}
             </div>
+          )}
+
+          {reviewsCollecting && (
+            <CollectAskFields
+              value={requestCollect}
+              onChange={setRequestCollect}
+              self={false}
+              subtitle={`${prefill?.requesterName || "The host"} asked to collect. Guests pay them directly, with no buyer protection. Change the price, or turn it off to approve without collecting.`}
+            >
+              <p className="text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2">Paid to {prefill?.requesterName || "the host"}</p>
+            </CollectAskFields>
           )}
 
           {isHosted && (

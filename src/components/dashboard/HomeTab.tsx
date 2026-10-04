@@ -1,5 +1,6 @@
 "use client";
 
+import { collectAskLine } from "@/components/p2p/CollectAskFields";
 import { useMemo } from "react";
 import { Calendar, Lock, Plus, Send } from "lucide-react";
 import type { OrgAnalytics } from "@/components/analytics/types";
@@ -563,6 +564,12 @@ export default function HomeTab({
               ` · ${new Date(req.requestedDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`}
             {req.calendarName && ` · ${req.calendarName}`}
           </p>
+          {/* Collecting is approved with the plan, so the price is on the card. */}
+          {collectAskLine(req.requestedP2p) && (
+            <p className="text-[11px] text-emerald-800 mt-0.5">
+              {collectAskLine(req.requestedP2p)}, paid to {req.requesterName}
+            </p>
+          )}
           {/* A swapped venue is the part of a request most worth a second look,
               and it used to be invisible until the owner opened Edit. Keeping
               the suggested venue is the quiet case, so it stays unemphasized. */}
