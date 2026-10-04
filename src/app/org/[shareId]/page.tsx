@@ -1429,6 +1429,9 @@ function usePhoneVerify(options?: { requireSession?: boolean }) {
     try {
       const result = await Parse.Cloud.run("verifyOTP", { phone: `+1${digits}`, code });
       if (result && typeof result === "object" && result.sessionToken) {
+        // The session is the proof the server checks; the cookie only
+        // remembers name + phone for the next form.
+        await Parse.User.become(result.sessionToken as string);
         setStep("verified");
         setSessionToken(result.sessionToken as string);
         setVerifiedUserCookie(name, phone);

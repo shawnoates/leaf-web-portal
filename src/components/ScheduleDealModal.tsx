@@ -115,6 +115,7 @@ export default function ScheduleDealModal({
         code,
       });
       if (result && typeof result === "object" && "sessionToken" in result) {
+        await Parse.User.become((result as { sessionToken: string }).sessionToken);
         setStep("verified");
         setVerifiedUserCookie(name, phone);
       } else {

@@ -268,6 +268,7 @@ function RsvpModal({
         code,
       })) as { sessionToken?: string } | null | undefined;
       if (result && result.sessionToken) {
+        await Parse.User.become(result.sessionToken);
         setStep("verified");
         setVerifiedUserCookie(name, phone);
       } else {
