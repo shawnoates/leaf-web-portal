@@ -100,7 +100,7 @@ export default function P2pIntroModal({
           </p>
 
           <ul className="mt-3.5 space-y-2">
-            <Point icon={<Wallet className="w-3.5 h-3.5" />}>A price per spot, or split a total like a court</Point>
+            <Point icon={<Wallet className="w-3.5 h-3.5" />}>A price per spot, or split a shared cost</Point>
             <Point icon={<Users className="w-3.5 h-3.5" />}>Spots are held while guests pay, with reminders</Point>
             <Point icon={<Repeat className="w-3.5 h-3.5" />}>Dropouts covered: the next guest pays them back</Point>
           </ul>

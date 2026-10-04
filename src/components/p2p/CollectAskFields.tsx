@@ -140,7 +140,7 @@ export default function CollectAskFields({
                 className={`text-left rounded-lg border px-3 py-2 text-xs font-medium ${value.mode === m ? "border-zinc-900 bg-zinc-50 text-zinc-900" : "border-zinc-200 text-zinc-500"}`}
               >
                 {m === "fixed" ? "Price per spot" : "Split a total"}
-                <span className="block font-normal text-[11px] text-zinc-400">{m === "fixed" ? "Tickets, a set price" : "A court — depends on headcount"}</span>
+                <span className="block font-normal text-[11px] text-zinc-400">{m === "fixed" ? "Tickets, a set price" : "A shared cost — divided by who comes"}</span>
               </button>
             ))}
           </div>

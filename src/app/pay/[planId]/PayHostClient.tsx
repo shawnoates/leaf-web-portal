@@ -559,7 +559,7 @@ function Setup({
           Price per spot<small>Tickets, a set price</small>
         </button>
         <button role="radio" aria-checked={mode === "split"} className={mode === "split" ? "on" : ""} onClick={() => setMode("split")}>
-          Split a total<small>A court, a table — depends on headcount</small>
+          Split a total<small>A shared cost — divided by who comes</small>
         </button>
       </div>
       </fieldset>
