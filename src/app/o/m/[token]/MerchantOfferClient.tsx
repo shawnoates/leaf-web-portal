@@ -470,8 +470,9 @@ export default function MerchantOfferClient({ token }: { token: string }) {
 
   const accepted = form.state === "accepted";
   const steps = (perRsvp ? 4 : 3) + (notices ? 1 : 0);
-  const cta = accepted ? "Save changes" : perRsvp && form.billing?.firstNightFree ? "Hold my free night" : "Count me in";
-  const freeWorth = perRsvp && !accepted && form.billing?.firstNightFree ? dollars((form.billing?.rsvpFeeCents ?? 600) * TYPICAL_RSVPS) : null;
+  const withHost = merchantHosts === false && hostFee ? ` + ${hostFee} host` : "";
+  const cta = accepted ? "Save changes" : perRsvp && form.billing?.firstNightFree ? `Hold my free night${withHost}` : "Count me in";
+  const freeWorth = perRsvp && !accepted && !withHost && form.billing?.firstNightFree ? dollars((form.billing?.rsvpFeeCents ?? 600) * TYPICAL_RSVPS) : null;
 
   return (
     <Shell>
