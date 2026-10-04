@@ -270,7 +270,13 @@ interface HostInvite {
   invitedAt: string | null;
 }
 interface Dashboard {
-  person: { firstName: string; ownsCalendars: boolean; pendingReviewCount: number };
+  person: {
+    firstName: string;
+    ownsCalendars: boolean;
+    pendingReviewCount: number;
+    /** How the weekly digest reaches them; absent on older servers. */
+    digestChannel?: "sms" | "email" | "none";
+  };
   greeting?: { weather: Weather | null };
   needsHost?: NeedsHost;
   pendingRecaps?: PendingRecap[]; // may be absent while the server side ships
@@ -1153,7 +1159,7 @@ function DashboardView({
             </div>
           )}
 
-          {!hasRail && <TextsCard inCrew={crews.length > 0} />}
+          {!hasRail && <TextsCard inCrew={crews.length > 0} channel={data.person.digestChannel} />}
         </div>
 
         {hasRail && (
@@ -1174,7 +1180,7 @@ function DashboardView({
               <PlacesRail probes={places} onAnswered={(id) => setPopupAnsweredId(id)} />
             )}
             {rail && rail.tier2.length > 0 && <CalendarsRail rows={rail.tier2} />}
-            <TextsCard inCrew={crews.length > 0} />
+            <TextsCard inCrew={crews.length > 0} channel={data.person.digestChannel} />
           </aside>
         )}
       </main>
@@ -2245,7 +2251,15 @@ function PlacesRail({
 }
 
 // ---- Texts / notification card --------------------------------------------
-function TextsCard({ inCrew = false }: { inCrew?: boolean }) {
+function TextsCard({ inCrew = false, channel }: { inCrew?: boolean; channel?: "sms" | "email" | "none" }) {
+  // Email followers (Google / email code, no phone) get the digest by email.
+  if (channel === "email") {
+    return (
+      <div className="texts">
+        <p>At most one email a week, when there&apos;s something new on your calendars.</p>
+      </div>
+    );
+  }
   return (
     <div className="texts">
       <p>

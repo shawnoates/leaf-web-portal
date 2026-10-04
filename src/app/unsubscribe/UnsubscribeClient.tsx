@@ -5,7 +5,7 @@ import Parse from "@/lib/parse-client";
 import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 type Status = "confirm" | "working" | "done" | "error";
-type Mode = "muteChat" | "unfollowCalendar" | "ownerDrip" | "digest";
+type Mode = "muteChat" | "unfollowCalendar" | "ownerDrip" | "weeklyDigest" | "digest";
 
 export default function UnsubscribeClient({
   userId,
@@ -26,19 +26,23 @@ export default function UnsubscribeClient({
   const mode: Mode =
     kind === "owner-drip"
       ? "ownerDrip"
+      : kind === "weekly-digest"
+        ? "weeklyDigest"
       : eventGroupId
         ? "muteChat"
         : calendarId
           ? "unfollowCalendar"
           : "digest";
 
-  // Organizer emails (k=owner-drip) unsubscribe on a button, not on load:
-  // mail security scanners open every link in a message, and firing on load
-  // would opt organizers out of email they never asked to stop. The other
-  // modes keep their one-click behavior.
-  const [status, setStatus] = useState<Status>(mode === "ownerDrip" ? "confirm" : "working");
+  // Organizer emails (k=owner-drip) and the weekly digest email
+  // (k=weekly-digest) unsubscribe on a button, not on load: mail security
+  // scanners open every link in a message, and firing on load would opt
+  // people out of email they never asked to stop. The other modes keep their
+  // one-click behavior.
+  const needsConfirm = mode === "ownerDrip" || mode === "weeklyDigest";
+  const [status, setStatus] = useState<Status>(needsConfirm ? "confirm" : "working");
   const [errorMsg, setErrorMsg] = useState<string>("");
-  const [confirmed, setConfirmed] = useState(mode !== "ownerDrip");
+  const [confirmed, setConfirmed] = useState(!needsConfirm);
 
   useEffect(() => {
     if (!userId || !token) {
@@ -55,7 +59,9 @@ export default function UnsubscribeClient({
           ? Parse.Cloud.run("unfollowCalendarFromEmail", { userId, calendarId, token })
           : mode === "ownerDrip"
             ? Parse.Cloud.run("unsubscribeFromOwnerDrip", { userId, token })
-            : Parse.Cloud.run("unsubscribeFromDigest", { userId, token });
+            : mode === "weeklyDigest"
+              ? Parse.Cloud.run("unsubscribeWeeklyDigestEmail", { userId, token })
+              : Parse.Cloud.run("unsubscribeFromDigest", { userId, token });
 
     call
       .then(() => setStatus("done"))
@@ -76,6 +82,11 @@ export default function UnsubscribeClient({
         return {
           title: "You're unsubscribed",
           body: "You won't receive Leaf emails for calendar organizers anymore. This doesn't change your chat digest or any calendar you follow.",
+        };
+      case "weeklyDigest":
+        return {
+          title: "You're unsubscribed",
+          body: "You won't get the weekly email about your calendars anymore. You're still following them — your plans are always at joinleaf.com/me.",
         };
       case "unfollowCalendar":
         return {
@@ -102,10 +113,14 @@ export default function UnsubscribeClient({
       <div className="max-w-md w-full bg-white border border-zinc-200 rounded-xl p-8 text-center space-y-4">
         {status === "confirm" && (
           <>
-            <h1 className="text-lg font-medium">Unsubscribe from organizer emails?</h1>
+            <h1 className="text-lg font-medium">
+              {mode === "weeklyDigest" ? "Stop the weekly email?" : "Unsubscribe from organizer emails?"}
+            </h1>
             <p className="text-sm text-zinc-500">
-              You&apos;ll stop getting emails from Leaf about running your calendar. Your chat digest and
-              any calendar you follow aren&apos;t affected.
+              {mode === "weeklyDigest"
+                ? "You'll stop getting the weekly email about plans on your calendars. You'll still follow them."
+                : <>You&apos;ll stop getting emails from Leaf about running your calendar. Your chat digest and
+              any calendar you follow aren&apos;t affected.</>}
             </p>
             <button
               onClick={() => setConfirmed(true)}

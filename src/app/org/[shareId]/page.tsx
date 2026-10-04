@@ -1760,22 +1760,39 @@ function FollowModal({
     [intro, onClose, interest],
   );
 
+  // Signed in without a phone (Google, or an email code): follow as that
+  // account, no phone needed. A session WITH a phone goes through the phone
+  // form, which already shows it as verified.
+  const [noPhoneUser, setNoPhoneUser] = useState<{ name: string } | null>(() => {
+    const u = Parse.User.current();
+    if (!u || u.get("phone")) return null;
+    return { name: String(u.get("full_name") || u.get("name") || u.get("email") || "") };
+  });
+  const [googleError, setGoogleError] = useState("");
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!verify.isVerified) return;
+    await follow({ name: verify.name, phone: verify.phone });
+  };
+
+  /** `phone` is "" for a signed-in account without one. */
+  const follow = async ({ name, phone }: { name: string; phone: string }) => {
     setFormStep("submitting");
     try {
+      const digits = phone.replace(/\D/g, "");
       const followResult = (await Parse.Cloud.run("followCalendarViaWeb", {
         calendarId,
-        name: verify.name,
-        phoneNumber: verify.phone.replace(/\D/g, ""),
+        ...(digits ? { name, phoneNumber: digits } : {}),
         source: followSource(calendarId),
       })) as { pending?: boolean; userId?: string; buildingIntro?: ShareKitPayload | null };
-      setFollowerCookie(calendarId, verify.name, verify.phone);
-      setVerifiedUserCookie(verify.name, verify.phone);
-      localStorage.setItem("leaf_follower_phone", verify.phone.replace(/\D/g, ""));
+      if (digits) {
+        setFollowerCookie(calendarId, name, phone);
+        setVerifiedUserCookie(name, phone);
+        localStorage.setItem("leaf_follower_phone", digits);
+      }
       if (followResult.pending) {
-        onFollowed(verify.name, verify.phone, true);
+        onFollowed(name, phone, true);
         setFormStep("pending");
         return;
       }
@@ -1796,7 +1813,7 @@ function FollowModal({
       // parent's onFollowed replays a held tap, so a bumped count can't
       // reorder the list it is about to show.
       const items = interest?.take("follow_modal") ?? null;
-      onFollowed(verify.name, verify.phone, false, ask, !!items || !!ask);
+      onFollowed(name, phone, false, ask, !!items || !!ask);
       setIntro(ask);
       if (items) {
         setInterestItems(items);
@@ -1871,6 +1888,39 @@ function FollowModal({
                   : "Get notified about new plans and events."}
               </p>
             </div>
+            {noPhoneUser ? (
+              <button
+                type="button"
+                disabled={formStep === "submitting"}
+                onClick={() => follow({ name: noPhoneUser.name, phone: "" })}
+                className="w-full text-white py-3 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: brandColor || "#18181b" }}
+              >
+                {formStep === "submitting" ? "Following..." : `Follow${noPhoneUser.name ? ` as ${noPhoneUser.name}` : ""}`}
+              </button>
+            ) : !verify.isVerified ? (
+              <div className="space-y-2">
+                {/* No phone needed: a Google account follows and gets the
+                    weekly digest by email. Shown only with no session, so
+                    the button's "already signed in" auto-callback can't
+                    follow on open. */}
+                <GoogleSignInButton
+                  onSignIn={(u) => {
+                    const user = u as unknown as Parse.User;
+                    const name = String(user?.get?.("full_name") || user?.get?.("name") || "");
+                    if (user?.get?.("phone")) { window.location.reload(); return; }
+                    setNoPhoneUser({ name });
+                    void follow({ name, phone: "" });
+                  }}
+                  onError={(msg) => setGoogleError(msg)}
+                />
+                {googleError && <p className="text-xs text-red-600">{googleError}</p>}
+                <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-zinc-400">
+                  <span className="h-px flex-1 bg-zinc-200" />or use your phone<span className="h-px flex-1 bg-zinc-200" />
+                </div>
+              </div>
+            ) : null}
+            {!noPhoneUser && (
             <form onSubmit={handleSubmit} className="space-y-4">
               <PhoneVerifyFields verify={verify} />
               <button
@@ -1888,6 +1938,7 @@ function FollowModal({
                 )}
               </button>
             </form>
+            )}
           </div>
         ) : formStep === "intro" && intro ? (
           <ShareKitPrompt
