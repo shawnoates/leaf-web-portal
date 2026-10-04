@@ -7,6 +7,7 @@ import { APP_LINK_URL, SITE_URL } from "@/lib/site";
 import Link from "next/link";
 import { CrossPromoEyebrow } from "@/components/CrossPromoBadge";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
+import { useEmailCodeSignIn } from "@/lib/email-code";
 import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
@@ -1769,6 +1770,9 @@ function FollowModal({
     return { name: String(u.get("full_name") || u.get("name") || u.get("email") || "") };
   });
   const [googleError, setGoogleError] = useState("");
+  // Third way in: an emailed code, for people with neither Google nor a
+  // phone they want to give.
+  const [emailMode, setEmailMode] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1828,6 +1832,11 @@ function FollowModal({
       setFormStep("error");
     }
   };
+
+  const emailSignIn = useEmailCodeSignIn(async (who) => {
+    setNoPhoneUser({ name: who.name });
+    await follow({ name: who.name, phone: "" });
+  });
 
   // The share kit step swaps the card chrome: full-bleed header band, spec
   // radii and scrim, and the scrim itself dismisses (never on the phone form,
@@ -1915,12 +1924,72 @@ function FollowModal({
                   onError={(msg) => setGoogleError(msg)}
                 />
                 {googleError && <p className="text-xs text-red-600">{googleError}</p>}
-                <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-zinc-400">
-                  <span className="h-px flex-1 bg-zinc-200" />or use your phone<span className="h-px flex-1 bg-zinc-200" />
-                </div>
+                {emailMode ? (
+                  <div className="space-y-2 pt-1">
+                    {emailSignIn.step === "email" ? (
+                      <div className="flex gap-2">
+                        <input
+                          type="email"
+                          autoFocus
+                          value={emailSignIn.email}
+                          onChange={(e) => emailSignIn.setEmail(e.target.value)}
+                          placeholder="you@example.com"
+                          className="flex-1 border-b border-zinc-300 py-2 text-sm outline-none focus:border-zinc-900"
+                        />
+                        <button
+                          type="button"
+                          disabled={emailSignIn.busy}
+                          onClick={emailSignIn.sendCode}
+                          className="px-3 text-xs font-bold uppercase tracking-widest bg-zinc-100 hover:bg-zinc-200 disabled:opacity-50"
+                        >
+                          {emailSignIn.busy ? "Sending…" : "Email code"}
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs text-zinc-500">We emailed a code to {emailSignIn.email}.</p>
+                        <div className="flex gap-2">
+                          <input
+                            inputMode="numeric"
+                            autoFocus
+                            value={emailSignIn.code}
+                            onChange={(e) => emailSignIn.setCode(e.target.value)}
+                            placeholder="000000"
+                            className="flex-1 border-b border-zinc-300 py-2 text-sm tracking-widest outline-none focus:border-zinc-900"
+                          />
+                          <button
+                            type="button"
+                            disabled={emailSignIn.busy}
+                            onClick={emailSignIn.verify}
+                            className="px-3 text-xs font-bold uppercase tracking-widest text-white disabled:opacity-50"
+                            style={{ backgroundColor: brandColor || "#18181b" }}
+                          >
+                            {emailSignIn.busy ? "Checking…" : "Follow"}
+                          </button>
+                        </div>
+                        <button type="button" onClick={emailSignIn.restart} className="text-xs text-zinc-500 underline">
+                          Use a different email
+                        </button>
+                      </>
+                    )}
+                    {emailSignIn.error && <p className="text-xs text-red-600">{emailSignIn.error}</p>}
+                    <button type="button" onClick={() => setEmailMode(false)} className="text-xs text-zinc-500 underline">
+                      Use my phone instead
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => setEmailMode(true)} className="text-xs text-zinc-500 underline">
+                      No Google? Email me a code
+                    </button>
+                    <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-zinc-400">
+                      <span className="h-px flex-1 bg-zinc-200" />or use your phone<span className="h-px flex-1 bg-zinc-200" />
+                    </div>
+                  </>
+                )}
               </div>
             ) : null}
-            {!noPhoneUser && (
+            {!noPhoneUser && !emailMode && (
             <form onSubmit={handleSubmit} className="space-y-4">
               <PhoneVerifyFields verify={verify} />
               <button

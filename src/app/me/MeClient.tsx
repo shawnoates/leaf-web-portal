@@ -18,6 +18,7 @@ import RecapPopup from "@/components/recap/RecapPopup";
 import CalendarPromoBanner from "@/components/CalendarPromoBanner";
 import NamePrompt from "@/components/NamePrompt";
 import { setVerifiedUserCookie } from "@/lib/verified-user";
+import { useEmailCodeSignIn } from "@/lib/email-code";
 import { AUDIENCE_COHORT_LABELS } from "@/lib/audience-cohorts";
 import NewPlanModal, {
   LINK_ONLY,
@@ -2708,6 +2709,9 @@ function Spinner() {
 
 // ---- OTP fallback ----------------------------------------------------------
 function OtpModal({ onVerified }: { onVerified: () => void | Promise<void> }) {
+  // Followers who signed up with email (Google or a code) have no phone here.
+  const [useEmail, setUseEmail] = useState(false);
+  const emailSignIn = useEmailCodeSignIn(async () => { await onVerified(); });
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
@@ -2746,6 +2750,29 @@ function OtpModal({ onVerified }: { onVerified: () => void | Promise<void> }) {
       <div className="otp-card">
         <div className="eyebrow" style={{ marginBottom: 10 }}>Your plans · Leaf</div>
         <h1 className="greet-h" style={{ fontSize: 26, marginBottom: 6 }}>See your week</h1>
+        {useEmail ? (
+          <>
+            <p className="otp-sub">
+              {emailSignIn.step === "email" ? "Enter the email on your Leaf account." : `Code sent to ${emailSignIn.email}`}
+            </p>
+            {emailSignIn.step === "email" ? (
+              <>
+                <input className="otp-in" type="email" value={emailSignIn.email} autoFocus placeholder="you@example.com" onChange={(e) => emailSignIn.setEmail(e.target.value)} />
+                {emailSignIn.error && <p className="otp-err">{emailSignIn.error}</p>}
+                <button className="btn primary wide" disabled={emailSignIn.busy} onClick={emailSignIn.sendCode}>{emailSignIn.busy ? "Sending…" : "Email me a code"}</button>
+              </>
+            ) : (
+              <>
+                <input className="otp-in" inputMode="numeric" value={emailSignIn.code} autoFocus placeholder="Code" onChange={(e) => emailSignIn.setCode(e.target.value)} />
+                {emailSignIn.error && <p className="otp-err">{emailSignIn.error}</p>}
+                <button className="btn primary wide" disabled={emailSignIn.busy} onClick={emailSignIn.verify}>{emailSignIn.busy ? "Verifying…" : "See my plans"}</button>
+                <button className="linkbtn" style={{ marginTop: 12 }} onClick={emailSignIn.restart}>Use a different email</button>
+              </>
+            )}
+            <button className="linkbtn" style={{ marginTop: 12 }} onClick={() => setUseEmail(false)}>Use my phone instead</button>
+          </>
+        ) : (
+        <>
         <p className="otp-sub">
           {step === "phone" ? "Enter the phone on your Leaf account." : `Code sent to +1 ${phone}`}
         </p>
@@ -2762,6 +2789,9 @@ function OtpModal({ onVerified }: { onVerified: () => void | Promise<void> }) {
             <button className="btn primary wide" disabled={busy} onClick={submit}>{busy ? "Verifying…" : "See my plans"}</button>
             <button className="linkbtn" style={{ marginTop: 12 }} onClick={() => setStep("phone")}>Use a different number</button>
           </>
+        )}
+        <button className="linkbtn" style={{ marginTop: 12 }} onClick={() => setUseEmail(true)}>Use email instead</button>
+        </>
         )}
       </div>
     </div>
