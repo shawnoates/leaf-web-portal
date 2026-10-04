@@ -34,6 +34,8 @@ import FreeNightCountdown, { CountdownText, TYPICAL_RSVPS, useCountdown } from "
 type DateOption = { dateKey: string; label: string };
 
 type Form = {
+  /** What a Leaf host costs for a night (Hosted night). */
+  leafHostFeeCents?: number;
   state: "drafted" | "sent" | "accepted" | "declined" | "expired" | "unavailable";
   merchantName: string;
   /** Their own Google photo, saved by Leaf; shown at the top. */
@@ -235,6 +237,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
 
 
   const perRsvp = form?.billing?.model === "per_rsvp";
+  // "$99": what a Leaf host costs, shown on the Hosted night choice.
+  const hostFee = form?.leafHostFeeCents ? `$${Math.round(form.leafHostFeeCents / 100)}` : null;
   // The free-night clock rides on the button so it's always in view.
   const freeLeft = useCountdown(
     form?.billing?.freeNightDeadline,
@@ -392,6 +396,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
                   onSaved={setCard}
                   feeCents={form.billing?.rsvpFeeCents ?? 600}
                   firstNightFree={Boolean(form.billing?.firstNightFree)}
+                  hostFeeCents={form.leafHostFeeCents ?? 0}
                 />
               </div>
               {card === null && (
@@ -641,7 +646,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               We will
             </Choice>
             <Choice on={merchantHosts === false} onClick={() => setMerchantHosts(false)}>
-              Hosted night
+              {`Hosted night${hostFee ? ` \u00b7 ${hostFee}` : ""}`}
             </Choice>
           </div>
           {merchantHosts === true && (
@@ -677,7 +682,9 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               />
               <div className="p-4">
               <p className="font-fm-serif text-[22px] leading-tight text-stone-900">Hosted night</p>
-              <p className="mt-1 text-[14px] leading-snug text-stone-600">A Leaf host runs the night, then you get:</p>
+              <p className="mt-1 text-[14px] leading-snug text-stone-600">
+                {`A Leaf host runs the night${hostFee ? ` for ${hostFee}, ${perRsvp ? "added to that night\u2019s bill" : "taken from your ticket payout"}` : ""}. Then you get:`}
+              </p>
               <ul className="mt-3 space-y-2 text-[14px] leading-snug text-stone-700">
                 <li className="flex gap-2.5">
                   <span aria-hidden className="text-leaf-600">●</span>
@@ -735,6 +742,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
                   onSaved={setCard}
                   feeCents={form.billing?.rsvpFeeCents ?? 600}
                   firstNightFree={Boolean(form.billing?.firstNightFree)}
+                  hostFeeCents={form.leafHostFeeCents ?? 0}
                 />
           </Section>
         )}

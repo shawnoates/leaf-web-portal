@@ -17,9 +17,9 @@ const BRAND: Record<string, string> = { visa: "Visa", mastercard: "Mastercard", 
 
 const CardSetup = forwardRef<
   CardSetupHandle,
-  { token: string; card: Card | null; onSaved: (c: Card) => void; feeCents?: number; firstNightFree?: boolean }
+  { token: string; card: Card | null; onSaved: (c: Card) => void; feeCents?: number; firstNightFree?: boolean; hostFeeCents?: number }
 >(
-  function CardSetup({ token, card, onSaved, feeCents = 600, firstNightFree = false }, ref) {
+  function CardSetup({ token, card, onSaved, feeCents = 600, firstNightFree = false, hostFeeCents = 0 }, ref) {
     const fee = `$${Number.isInteger(feeCents / 100) ? feeCents / 100 : (feeCents / 100).toFixed(2)}`;
     const [editing, setEditing] = useState(!card);
     const [ready, setReady] = useState(false);
@@ -103,9 +103,9 @@ const CardSetup = forwardRef<
         {error && <p className="mt-2 text-[14px] text-red-600">{error}</p>}
         {/* Consent for charges made later, when the merchant isn't here (off-session). */}
         <p className="mt-3 text-[13px] leading-snug text-stone-600">
-          {`By saving your card, you authorize Leaf to charge it ${fee} per RSVP after each Leaf night at your place, counted 2 hours before the night and never more than you seat. ${
-            firstNightFree ? "Your first night is free. " : ""
-          }Nights with fewer than 5 RSVPs cost nothing. Nothing is charged today. You can remove your card or stop anytime by replying to Shawn. `}
+          {`By saving your card, you authorize Leaf to charge it ${fee} per RSVP after each Leaf night at your place, counted 2 hours before the night and never more than you seat${
+            hostFeeCents > 0 ? `, plus $${Math.round(hostFeeCents / 100)} for any night you ask a Leaf host to run` : ""
+          }. ${firstNightFree ? `Your first night's RSVPs are free. ` : ""}Nights with fewer than 5 RSVPs cost nothing. Nothing is charged today. You can remove your card or stop anytime by replying to Shawn. `}
           <a href="/terms-conditions" target="_blank" className="underline">
             Terms
           </a>
