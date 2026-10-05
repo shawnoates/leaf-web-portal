@@ -14,7 +14,7 @@
  */
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
 import { useIsLoggedIn } from "@/components/marketing/useMarketingSession";
 import { trackMarketingEvent } from "@/components/marketing/analytics";
@@ -70,7 +70,6 @@ export default function FriendsClient() {
             <p className="m-0 max-w-xl text-lg leading-relaxed text-fm-ink-2">
               Leaf picks a night that works around everyone&rsquo;s calendars, picks the place, and asks who&rsquo;s in. <span className="text-fm-ink">Then it does it again on your crew&rsquo;s rhythm, every week or every month,</span> so nobody has to be the planner. Friends join from a link and answer by text.
             </p>
-            <TextThread />
           </div>
           <div id="start" className="scroll-mt-24">
             <StartCrewForm />
@@ -94,6 +93,21 @@ export default function FriendsClient() {
               </li>
             ))}
           </ul>
+        </section>
+
+        <section className="border-t border-fm-line-dim py-16 lg:py-20">
+          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:gap-16">
+            <div className="flex flex-col gap-4">
+              <span className="font-fm-mono text-xs uppercase tracking-[0.12em] text-fm-accent">By text, no app</span>
+              <h2 className="m-0 font-fm-serif text-[44px] font-normal leading-[1.02] lg:text-[56px]">
+                Your friends just <span className="italic">text back.</span>
+              </h2>
+              <p className="m-0 max-w-lg text-[17px] leading-relaxed text-fm-ink-2">
+                Leaf asks which dates work, everyone replies with numbers, and the night locks itself. App users get the same thing as a notification.
+              </p>
+            </div>
+            <TextThread />
+          </div>
         </section>
 
         <section id="how" className="scroll-mt-20 border-t border-fm-line-dim py-16 lg:py-20">
@@ -190,15 +204,17 @@ function FriendModeNav({ isLoggedIn }: { isLoggedIn: boolean }) {
           <span className="font-fm-mono text-xs uppercase tracking-[0.12em] text-fm-accent">Friend Mode</span>
         </Link>
         <div className="flex items-center gap-6">
-          <a href="#how" className={link}>How it works</a>
-          <a href="#faq" className={link}>FAQs</a>
           <Link href="/" className={link}>Create a calendar</Link>
           <Link href="/me" className="text-sm font-semibold text-fm-ink transition-colors hover:text-fm-accent">
             {isLoggedIn ? "My crews" : "Log in"}
           </Link>
           <a
             href="#start"
-            onClick={() => trackMarketingEvent("friend_mode_cta_click", { surface: "friends_page_nav" })}
+            onClick={() => {
+              trackMarketingEvent("friend_mode_cta_click", { surface: "friends_page_nav" });
+              // After the jump, put the cursor in the crew name.
+              setTimeout(() => document.getElementById("crew-name")?.focus({ preventScroll: true }), 400);
+            }}
             className="flex h-9 items-center rounded-full bg-fm-accent px-4 text-sm font-bold text-fm-canvas"
           >
             Start a crew
@@ -209,17 +225,62 @@ function FriendModeNav({ isLoggedIn }: { isLoggedIn: boolean }) {
   );
 }
 
-/** The hero's example: Leaf's date poll and a friend's reply, as a text thread. */
+const THREAD = [
+  { from: "leaf", text: "Thursday dinners: next night is at Sal\u2019s, from Jess\u2019s list. Which dates work?" },
+  { from: "leaf", text: "1) Thu 10/9  2) Sat 10/11  3) Tue 10/14, all 7pm. Reply with numbers." },
+  { from: "me", text: "1 3" },
+  { from: "leaf", text: "Locked: Thu 10/9, 7pm at Sal\u2019s. 5 of you are in." },
+] as const;
+const BUBBLE_MS = 1400;
+const HOLD_MS = 3200;
+
+/**
+ * Leaf's date poll and a friend's reply, one bubble at a time: each fades in,
+ * the whole thread holds, fades out, and starts over. With reduced motion it
+ * just shows the thread.
+ */
 function TextThread() {
-  const leaf = "max-w-[85%] self-start rounded-[20px] rounded-bl-md bg-fm-card px-4 py-2.5 text-[15px] leading-snug text-fm-ink";
-  const me = "max-w-[85%] self-end rounded-[20px] rounded-br-md bg-fm-accent px-4 py-2.5 text-[15px] font-semibold leading-snug text-fm-canvas";
+  const [shown, setShown] = useState(0);
+  const [leaving, setLeaving] = useState(false);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      timer = setTimeout(() => setShown(THREAD.length), 0);
+      return () => clearTimeout(timer);
+    }
+    let n = 0;
+    const tick = () => {
+      if (n < THREAD.length) {
+        n += 1;
+        setLeaving(false);
+        setShown(n);
+        timer = setTimeout(tick, n === THREAD.length ? HOLD_MS : BUBBLE_MS);
+      } else {
+        setLeaving(true);
+        n = 0;
+        timer = setTimeout(() => { setShown(0); tick(); }, 700);
+      }
+    };
+    timer = setTimeout(tick, 400);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const leaf = "self-start rounded-[20px] rounded-bl-md bg-fm-card text-fm-ink";
+  const me = "self-end rounded-[20px] rounded-br-md bg-fm-accent font-semibold text-fm-canvas";
   return (
-    <figure className="m-0 flex max-w-md flex-col gap-1.5" aria-label="An example text thread with Leaf">
+    <figure className="m-0 flex min-h-[300px] w-full max-w-md flex-col gap-1.5 justify-self-center" aria-label="An example text thread with Leaf">
       <figcaption className="mb-1 self-center font-fm-mono text-[11px] uppercase tracking-[0.1em] text-fm-muted">Leaf · Text message</figcaption>
-      <p className={`m-0 ${leaf}`}>Thursday dinners: next night is at Sal&rsquo;s, from Jess&rsquo;s list. Which dates work?</p>
-      <p className={`m-0 ${leaf}`}>1) Thu 10/9 &nbsp;2) Sat 10/11 &nbsp;3) Tue 10/14, all 7pm. Reply with numbers.</p>
-      <p className={`m-0 ${me}`}>1 3</p>
-      <p className={`m-0 mt-2 ${leaf}`}>Locked: Thu 10/9, 7pm at Sal&rsquo;s. 5 of you are in.</p>
+      {THREAD.map((b, i) => (
+        <p
+          key={i}
+          className={`m-0 max-w-[85%] px-4 py-2.5 text-[15px] leading-snug transition-all duration-500 ease-out ${b.from === "me" ? me : leaf} ${i === THREAD.length - 1 ? "mt-2" : ""} ${
+            i < shown && !leaving ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
+          }`}
+        >
+          {b.text}
+        </p>
+      ))}
     </figure>
   );
 }
