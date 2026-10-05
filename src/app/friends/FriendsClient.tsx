@@ -15,7 +15,6 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import MarketingNav from "@/components/marketing/MarketingNav";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
 import { useIsLoggedIn } from "@/components/marketing/useMarketingSession";
 import { trackMarketingEvent } from "@/components/marketing/analytics";
@@ -47,15 +46,11 @@ export default function FriendsClient() {
 
   return (
     <div className="mkt min-h-screen">
-      {/* The site nav stays light; everything below it is the dark Friend Mode palette. */}
-      <MarketingNav isLoggedIn={isLoggedIn} />
       <div className="fm font-fm-sans">
+        <FriendModeNav isLoggedIn={isLoggedIn} />
         <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-16 lg:pb-24 lg:pt-20">
           <div className="flex flex-col gap-6">
-            <div className="flex items-center gap-2.5">
-              <FriendModeIcon size={28} />
-              <span className="font-fm-mono text-xs uppercase tracking-[0.12em] text-fm-accent">Friend Mode on Leaf</span>
-            </div>
+            <FriendModeIcon size={40} title="Friend Mode" />
             <h1 className="m-0 font-fm-serif text-[52px] font-normal leading-[0.98] tracking-[-0.01em] sm:text-[72px] lg:text-[84px]">
               Your friends, <span className="italic text-fm-accent">actually</span> seeing each other.
             </h1>
@@ -75,7 +70,7 @@ export default function FriendsClient() {
           </div>
         </section>
 
-        <section className="border-t border-fm-line-dim py-16 lg:py-20">
+        <section id="how" className="scroll-mt-20 border-t border-fm-line-dim py-16 lg:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <h2 className="m-0 font-fm-serif text-[40px] font-normal leading-tight lg:text-[52px]">How a night comes together</h2>
             <ol className="m-0 mt-8 grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
@@ -90,7 +85,7 @@ export default function FriendsClient() {
           </div>
         </section>
 
-        <section className="border-t border-fm-line-dim py-16 lg:py-20">
+        <section id="pulse" className="scroll-mt-20 border-t border-fm-line-dim py-16 lg:py-20">
           <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,640px)] lg:gap-14">
             <div className="flex flex-col gap-4">
               <span className="font-fm-mono text-xs uppercase tracking-[0.12em] text-fm-accent">New · Crew Pulse</span>
@@ -119,7 +114,7 @@ export default function FriendsClient() {
           </div>
         </section>
 
-        <section className="border-t border-fm-line-dim py-16">
+        <section id="faq" className="scroll-mt-20 border-t border-fm-line-dim py-16">
           <div className="mx-auto max-w-3xl px-4 sm:px-6">
             <h2 className="m-0 font-fm-serif text-[36px] font-normal leading-tight">Questions</h2>
             <dl className="m-0 mt-6 divide-y divide-fm-line-dim">
@@ -147,5 +142,39 @@ export default function FriendsClient() {
         <MarketingFooter blurb="Leaf finds the night. You show up." />
       </div>
     </div>
+  );
+}
+
+/**
+ * The page's own header, on the page's dark ground: Friend Mode's sections
+ * and a way into your crews, not the site's pricing and business links.
+ */
+function FriendModeNav({ isLoggedIn }: { isLoggedIn: boolean }) {
+  const link = "hidden text-sm text-fm-ink-2 transition-colors hover:text-fm-ink md:block";
+  return (
+    <nav className="sticky top-0 z-20 border-b border-fm-line-dim bg-fm-canvas/95 backdrop-blur">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <Link href="/" className="flex items-center gap-2" aria-label="Leaf home">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/leaf-logo-white.svg" alt="" className="h-[18px] sm:h-5" />
+          <span className="font-fm-mono text-xs uppercase tracking-[0.12em] text-fm-accent">Friend Mode</span>
+        </Link>
+        <div className="flex items-center gap-6">
+          <a href="#how" className={link}>How it works</a>
+          <a href="#pulse" className={link}>Crew Pulse</a>
+          <a href="#faq" className={link}>Questions</a>
+          <Link href="/me" className="text-sm font-semibold text-fm-ink transition-colors hover:text-fm-accent">
+            {isLoggedIn ? "My crews" : "Log in"}
+          </Link>
+          <a
+            href="#start"
+            onClick={() => trackMarketingEvent("friend_mode_cta_click", { surface: "friends_page_nav" })}
+            className="flex h-9 items-center rounded-full bg-fm-accent px-4 text-sm font-bold text-fm-canvas"
+          >
+            Start a crew
+          </a>
+        </div>
+      </div>
+    </nav>
   );
 }
