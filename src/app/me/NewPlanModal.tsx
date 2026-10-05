@@ -8,6 +8,7 @@ import { detectCity } from "@/lib/detectCity";
 import { zoneOffsetSuffix } from "@/lib/wall-clock";
 import { APP_LINK_URL } from "@/lib/site";
 import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
+import FriendInviteCard from "@/components/FriendInviteCard";
 
 // ============================================================================
 // New plan — the quick-create flow reached from "+ New plan" (top bar / sticky
@@ -856,6 +857,11 @@ export default function NewPlanModal({
                     Text it to whoever you want there. They tap Count me in — no account,
                     no app.
                   </p>
+                  {created.eventGroupId ? (
+                    <div className="mt-4">
+                      <FriendInviteCard eventGroupId={created.eventGroupId} variant="host" />
+                    </div>
+                  ) : null}
                 </>
               ) : (
                 <p className="np-done-foot">It&rsquo;s on your calendar.</p>

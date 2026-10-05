@@ -40,6 +40,9 @@ import { fetchVenuePhotoUrl } from "@/lib/google-places";
 import PlanAddonStack from "@/components/PlanAddonStack";
 import PaidRsvp from "@/components/PaidRsvp";
 import P2pPayCard from "@/components/P2pPayCard";
+import FriendInviteCard from "@/components/FriendInviteCard";
+import PlanInviteBanner from "@/components/PlanInviteBanner";
+import { inviteCodeFor } from "@/lib/plan-invite";
 import CollectAskFields, { EMPTY_COLLECT_ASK, collectAskPayload, type CollectAsk } from "@/components/p2p/CollectAskFields";
 import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
 import { collectsMoney, p2pPriceLine, p2pPriceShort, parseP2pSplit, type P2pSplitSummary } from "@/lib/p2p";
@@ -971,6 +974,8 @@ function RsvpModal({
         // Cross-promotion attribution: this RSVP came through the calendar
         // the plan was shared with, not the one that hosts it.
         viaCalendarId: plan.promotedFrom && calendarId ? calendarId : undefined,
+        // A friend's personal link (?i=): credits them and claims their hold.
+        inviteCode: inviteCodeFor(plan.id),
       }) as { eventNotificationId?: string; alreadyRsvpd?: boolean; pendingApproval?: boolean; waitlisted?: boolean } | null | undefined;
       console.log("[RSVP] result:", result);
       // Closes the watch → RSVP funnel: on its own it is just an RSVP, but
@@ -1204,6 +1209,12 @@ function RsvpModal({
                 phoneNumber={verify.phone}
                 accent={brandColor}
               />
+            )}
+
+            {/* Direct invites: the moment someone says yes is when a
+                personal "come with me" text is easiest to send. */}
+            {!isPendingResult && !isWaitlistResult && (
+              <FriendInviteCard eventGroupId={plan.id} limitedSpots={plan.capacity != null} accent={brandColor} />
             )}
 
             {!isPendingResult && !isWaitlistResult && (
@@ -6234,6 +6245,7 @@ export default function OrgCalendarPage() {
 
             <div ref={detailScrollRef} className="flex-1 overflow-y-auto p-8 md:p-16 space-y-12">
               <div className="space-y-4">
+                <PlanInviteBanner planId={selectedEvent.id} className="mr-10" />
                 {selectedEvent.promotedFrom && (
                   <div className="flex">
                     <CrossPromoEyebrow source={selectedEvent.promotedFrom} />

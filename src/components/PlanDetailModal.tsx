@@ -25,6 +25,7 @@ import PlanAttendeeList, { isPendingStatus } from "./PlanAttendeeList";
 import { CrossPromoEyebrow } from "./CrossPromoBadge";
 import PlanIntroSection from "./PlanIntroSection";
 import FittedImage from "./FittedImage";
+import FriendInviteCard from "./FriendInviteCard";
 
 const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2";
@@ -500,6 +501,8 @@ export default function PlanDetailModal({
   };
 
   const canShare = !!onShare && !plan.isPoll && !isPromoted && (!plan.date || new Date(plan.date).getTime() > Date.now());
+  // "Text people yourself": personal invites from the host's own phone.
+  const canInvite = !plan.isPoll && !isPromoted && (!plan.date || new Date(plan.date).getTime() > Date.now());
   const primaryActionCount = (plan.isPoll ? 0 : 1) + (canShare ? 1 : 0);
 
   return (
@@ -882,6 +885,11 @@ export default function PlanDetailModal({
           ) : (
             // Non-poll branch — attendees list
             <div>
+              {canInvite && (
+                <div className="mb-6">
+                  <FriendInviteCard eventGroupId={plan.objectId} variant="host" limitedSpots={plan.capacity != null} />
+                </div>
+              )}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-baseline min-w-0">
                   <h4 className="text-[15px] font-semibold text-zinc-900">Attendees</h4>

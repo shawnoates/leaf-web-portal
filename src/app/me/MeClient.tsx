@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { CalendarPlus, Heart, Repeat } from "lucide-react";
 import Parse from "@/lib/parse-client";
+import { inviteCodeFor } from "@/lib/plan-invite";
 import HostIdeaModal from "@/components/HostIdeaModal";
 import P2pPayCard from "@/components/P2pPayCard";
 import { collectsMoney, type P2pSplitSummary } from "@/lib/p2p";
@@ -1791,7 +1792,7 @@ function HeroActions({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: Rsv
       : "going";
     onRsvp(plan.id, target);
     try {
-      const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: next, viaCalendarId: plan.promotedFrom?.viaCalendarId || undefined });
+      const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: next, viaCalendarId: plan.promotedFrom?.viaCalendarId || undefined, inviteCode: inviteCodeFor(plan.id) });
       if (res?.rsvpState && res.rsvpState !== target) onRsvp(plan.id, res.rsvpState as RsvpState);
     } catch {
       onRsvp(plan.id, prev);
@@ -1967,7 +1968,7 @@ function AttendCta({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: RsvpS
     const target: RsvpState = full ? "waitlisted" : plan.requireApproval ? "pending" : "going";
     onRsvp(plan.id, target);
     try {
-      const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: "going", viaCalendarId: plan.promotedFrom?.viaCalendarId || undefined });
+      const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: "going", viaCalendarId: plan.promotedFrom?.viaCalendarId || undefined, inviteCode: inviteCodeFor(plan.id) });
       if (res?.rsvpState && res.rsvpState !== target) onRsvp(plan.id, res.rsvpState as RsvpState);
     } catch {
       onRsvp(plan.id, prev);
@@ -2619,7 +2620,7 @@ function AttendButtons({
       : "going";
     onRsvp(plan.id, target);
     try {
-      const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: next, viaCalendarId: plan.promotedFrom?.viaCalendarId || undefined });
+      const res = await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: next, viaCalendarId: plan.promotedFrom?.viaCalendarId || undefined, inviteCode: inviteCodeFor(plan.id) });
       if (res?.rsvpState && res.rsvpState !== target) onRsvp(plan.id, res.rsvpState as RsvpState);
     } catch {
       onRsvp(plan.id, prev);
