@@ -48,12 +48,12 @@ const EXAMPLE_PROMPTS = [
   "Family fun this month",
 ];
 
-// Mirrors COHORT_ROTATION_EXCLUDED_ORG_TYPES in the server's
-// audience-cohorts.js. createCalendarUnderOrg derives cohortSpread from the
-// calendar's effective orgType; the preview has to send the same value or it
-// lands in a different cache namespace and the created calendar gets a
+// Mirrors COHORT_ROTATION_ORG_TYPES in the server's audience-cohorts.js.
+// createCalendarUnderOrg derives cohortSpread from the calendar's effective
+// orgType (or a neighborhood parent); the preview has to send the same value
+// or it lands in a different cache namespace and the created calendar gets a
 // different slate than the one shown here.
-const NO_COHORT_ORG_TYPES = ["school", "gym", "company", "brick_and_mortar"];
+const COHORT_ORG_TYPES = ["neighborhood", "apartment_complex"];
 
 // The server skips the starter seed for descriptions shorter than this.
 const MIN_PROMPT_LENGTH = 6;
@@ -231,7 +231,9 @@ export default function CreateCalendarModal({ organizationId, parentOrgType, onC
         originCity: origin.city,
         originLat: origin.lat ?? undefined,
         originLng: origin.lng ?? undefined,
-        cohortSpread: !NO_COHORT_ORG_TYPES.includes(effectiveOrgType),
+        cohortSpread:
+          COHORT_ORG_TYPES.includes(effectiveOrgType) ||
+          (parentOrgType || "").trim().toLowerCase() === "neighborhood",
       })) as GenerateResponse;
       if (run !== runRef.current) return;
       if (!result.ok || !result.calendar) {
