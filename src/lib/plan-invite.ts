@@ -84,6 +84,10 @@ export async function createPlanInvite(
 }
 
 export interface MyPlanInvite {
+  /** No name: one link sent to a group thread, never holding a seat. */
+  group?: boolean;
+  /** People who RSVP'd through this link. */
+  joined?: number;
   code: string;
   friendName: string | null;
   url: string;

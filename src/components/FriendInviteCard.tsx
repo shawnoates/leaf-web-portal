@@ -15,13 +15,15 @@ import {
 // ============================================================================
 // Direct invites (server: cloud/plan-invites.js).
 //
-// attendee: on the RSVP success screen, "Bring someone?" The guest names a
-// friend, gets a personal link plus a prefilled text, and sends it from their
-// own Messages app. On a plan with limited spots the friend's seat is held
-// for 24h (never past 3h before start).
+// attendee: on the RSVP success screen, "Bring someone?" The guest gets a
+// personal link plus a prefilled text and sends it from their own Messages
+// app — to one friend or a whole group chat. The name is optional: with one,
+// the text greets that person and, on a plan with limited spots, holds them a
+// seat for 24h (never past 3h before start); without one it's a group text
+// (one link, any number of people, never a held seat).
 //
-// host: "Text people yourself" in the host's plan tools. Same flow in the
-// host's voice, plus the list of people they've texted and whether each is in.
+// host: "Send direct invites" in the host's plan tools. Same flow in the
+// host's voice, plus each link they've sent and who came in through it.
 //
 // Two taps on purpose: the name tap mints the invite, then a real <a href=
 // "sms:"> opens Messages. Navigating to sms: right after an await is flaky on
@@ -79,15 +81,16 @@ export default function FriendInviteCard({
 
   const start = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Blank name = a group text: one link for a whole thread, no held seat.
     const name = friendName.trim();
-    if (!name || busy) return;
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
       const created = await createPlanInvite(eventGroupId, name, hostNotificationId);
       setInvite(created);
       setBody(created.smsBody);
-      track("plan_invite_created", { planId: eventGroupId, holdsSeat: created.holdsSeat, via: variant });
+      track("plan_invite_created", { planId: eventGroupId, holdsSeat: created.holdsSeat, via: variant, group: !name });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Couldn't make the invite. Try again.");
     } finally {
@@ -120,12 +123,13 @@ export default function FriendInviteCard({
   };
 
   const accentStyle = accent ? { backgroundColor: accent } : undefined;
-  const heading = isHost ? "Text people yourself" : "Bring someone?";
+  const heading = isHost ? "Send direct invites" : "Bring someone?";
   const sub = isHost
-    ? "A personal text from you gets more yeses than any link. Name someone and Leaf writes it; you send it from your phone."
+    ? "A text from you gets more yeses than any link. Leaf writes it; you send it to a friend or a group chat."
     : limitedSpots
-      ? "Text a friend. We'll hold a spot for them for 24 hours."
-      : "Text a friend a personal invite. It's more fun with someone you know.";
+      ? "Text your friends or a group chat. Add a name and we'll hold that person a spot for 24 hours."
+      : "Text your friends or a group chat. It's more fun with people you know.";
+  const named = friendName.trim();
 
   return (
     <div className={bare ? "text-left space-y-3" : "text-left border border-zinc-200 rounded-xl p-4 space-y-3"}>
@@ -162,26 +166,26 @@ export default function FriendInviteCard({
             type="text"
             value={friendName}
             onChange={(e) => setFriendName(e.target.value)}
-            placeholder="Friend's first name"
+            placeholder={limitedSpots ? "Name (optional, holds a spot)" : "Name (optional)"}
             maxLength={40}
             autoComplete="off"
-            aria-label="Friend's first name"
+            aria-label="Friend's first name, optional"
             className="flex-1 min-w-0 border-b border-zinc-300 py-2 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors"
           />
           <button
             type="submit"
-            disabled={!friendName.trim() || busy}
+            disabled={busy}
             className="flex items-center gap-1.5 bg-zinc-900 text-white px-4 py-2.5 text-xs uppercase tracking-wider font-bold rounded-lg disabled:opacity-40"
             style={accentStyle}
           >
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Next"}
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : named ? "Next" : "Write it"}
           </button>
         </form>
       ) : (
         <div className="space-y-3">
           {invite.holdsSeat && invite.expiresAt ? (
             <p className="text-xs font-bold text-emerald-700">
-              Spot held for {friendName.trim()} until {holdUntilLabel(invite.expiresAt)}
+              Spot held for {named} until {holdUntilLabel(invite.expiresAt)}
             </p>
           ) : null}
           <textarea
@@ -198,7 +202,7 @@ export default function FriendInviteCard({
               className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white py-3 text-xs uppercase tracking-wider font-bold rounded-lg"
               style={accentStyle}
             >
-              <MessageSquare className="w-4 h-4" /> Text {friendName.trim()}
+              <MessageSquare className="w-4 h-4" /> {named ? `Text ${named}` : "Open Messages"}
             </a>
             <button
               type="button"
@@ -211,7 +215,7 @@ export default function FriendInviteCard({
           </div>
           {sent.length > 0 ? (
             <button type="button" onClick={another} className="text-xs font-bold text-zinc-900 underline">
-              Invite someone else
+              Write another
             </button>
           ) : null}
         </div>
@@ -223,11 +227,17 @@ export default function FriendInviteCard({
         <ul className="divide-y divide-zinc-100 border-t border-zinc-100 pt-1">
           {mine.map((m) => (
             <li key={m.code} className="flex items-center justify-between py-2 text-sm">
-              <span className="text-zinc-900 truncate">{m.friendName || "Someone"}</span>
-              <span className={`text-xs font-bold ${m.status === "claimed" ? "text-emerald-700" : "text-zinc-400"}`}>
-                {STATUS_LABEL[m.status]}
-                {m.status === "open" && m.holdsSeat && m.expiresAt ? ` · held till ${holdUntilLabel(m.expiresAt)}` : ""}
-              </span>
+              <span className="text-zinc-900 truncate">{m.group ? "Group text" : m.friendName || "Someone"}</span>
+              {m.group ? (
+                <span className={`text-xs font-bold ${(m.joined ?? 0) > 0 ? "text-emerald-700" : "text-zinc-400"}`}>
+                  {(m.joined ?? 0) > 0 ? `${m.joined} in` : "Texted"}
+                </span>
+              ) : (
+                <span className={`text-xs font-bold ${m.status === "claimed" ? "text-emerald-700" : "text-zinc-400"}`}>
+                  {STATUS_LABEL[m.status]}
+                  {m.status === "open" && m.holdsSeat && m.expiresAt ? ` · held till ${holdUntilLabel(m.expiresAt)}` : ""}
+                </span>
+              )}
             </li>
           ))}
         </ul>

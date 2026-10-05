@@ -427,7 +427,7 @@ function Row({
                 className="inline-flex items-center gap-1.5 mt-2 text-[13px] font-medium text-white bg-zinc-900 rounded-lg px-3 py-1.5 transition-colors"
               >
                 <MessageSquare className="w-3.5 h-3.5" />
-                Text someone
+                Send invites
               </button>
             )}
             {task.sharePack?.shareKitUrl && (
