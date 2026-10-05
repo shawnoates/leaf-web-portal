@@ -18,7 +18,6 @@ import { useEffect } from "react";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
 import { useIsLoggedIn } from "@/components/marketing/useMarketingSession";
 import { trackMarketingEvent } from "@/components/marketing/analytics";
-import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
 import StartCrewForm from "@/components/crew/StartCrewForm";
 import CrewPulseCard from "@/components/crew/CrewPulseCard";
 import { SAMPLE_PULSE } from "@/lib/crew-pulse";
@@ -62,12 +61,9 @@ export default function FriendsClient() {
         <FriendModeNav isLoggedIn={isLoggedIn} />
         <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-16 lg:pb-24 lg:pt-20">
           <div className="flex flex-col gap-6">
-            <div className="flex flex-wrap items-center gap-3">
-              <FriendModeIcon size={40} title="Friend Mode" />
-              <span className="rounded-full border border-fm-line px-3 py-1 font-fm-mono text-[11px] uppercase tracking-[0.1em] text-fm-accent">
-                No app download · Free
-              </span>
-            </div>
+            <span className="self-start rounded-full border border-fm-line px-3 py-1 font-fm-mono text-[11px] uppercase tracking-[0.1em] text-fm-accent">
+              No app download · Free
+            </span>
             <h1 className="m-0 font-fm-serif text-[52px] font-normal leading-[0.98] tracking-[-0.01em] sm:text-[72px] lg:text-[84px]">
               Your friends, <span className="italic text-fm-accent">actually</span> seeing each other.
             </h1>
