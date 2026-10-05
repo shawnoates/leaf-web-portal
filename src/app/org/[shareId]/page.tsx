@@ -76,6 +76,7 @@ import {
   Cloud,
   CloudRain,
   Wallet,
+  Mail,
 } from "lucide-react";
 import { OnlyOnLeafLine, OnlyOnLeafPill, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
 
@@ -1436,12 +1437,14 @@ function usePhoneVerify(options?: { requireSession?: boolean }) {
         setStep("verified");
         setSessionToken(result.sessionToken as string);
         setVerifiedUserCookie(name, phone);
+        return true;
       } else {
         setError("Invalid code. Please try again.");
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Invalid code. Please try again.");
     } finally { setSending(false); }
+    return false;
   };
 
   const reset = () => {
@@ -1761,33 +1764,55 @@ function FollowModal({
     [intro, onClose, interest],
   );
 
-  // Signed in without a phone (Google, or an email code): follow as that
-  // account, no phone needed. A session WITH a phone goes through the phone
-  // form, which already shows it as verified.
-  const [noPhoneUser, setNoPhoneUser] = useState<{ name: string } | null>(() => {
+  // Who this browser is signed in as, if anyone. Drives what each tab shows:
+  // a verified phone or email is a one-tap Follow instead of a form.
+  const readSession = () => {
     const u = Parse.User.current();
-    if (!u || u.get("phone")) return null;
-    return { name: String(u.get("full_name") || u.get("name") || u.get("email") || "") };
-  });
+    if (!u) return null;
+    return {
+      phone: String(u.get("phone") || ""),
+      email: String(u.get("email") || ""),
+      name: String(u.get("full_name") || u.get("name") || ""),
+    };
+  };
+  const [session, setSession] = useState(readSession);
+  // "How should we reach you?" — the digest goes the way they pick
+  // (followCalendarViaWeb notify → digestPrefersEmail).
+  const [method, setMethod] = useState<"text" | "email">(() =>
+    Parse.User.current() && !Parse.User.current()?.get("phone") ? "email" : "text");
   const [googleError, setGoogleError] = useState("");
-  // Third way in: an emailed code, for people with neither Google nor a
-  // phone they want to give.
-  const [emailMode, setEmailMode] = useState(false);
+
+  /** Shared device: drop this browser's sign-in and start the sheet over. */
+  const notYou = async () => {
+    try { await Parse.User.logOut(); } catch { /* already signed out */ }
+    document.cookie = "leaf_verified_user=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+    try { localStorage.removeItem("leaf_follower_phone"); } catch { /* storage off */ }
+    setSession(null);
+    verify.reset();
+    verify.setName("");
+    verify.setPhone("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!verify.isVerified) return;
-    await follow({ name: verify.name, phone: verify.phone });
+    if (verify.step === "phone") { await verify.sendOTP(); return; }
+    if (verify.step === "code") {
+      if (await verify.verifyOTP()) await follow({ name: verify.name, phone: verify.phone, notify: "text" });
+      return;
+    }
+    await follow({ name: verify.name, phone: verify.phone, notify: "text" });
   };
 
-  /** `phone` is "" for a signed-in account without one. */
-  const follow = async ({ name, phone }: { name: string; phone: string }) => {
+  /** `phone` is "" when following by email (as the signed-in account). */
+  const follow = async ({ name, phone, notify }: { name: string; phone: string; notify: "text" | "email" }) => {
     setFormStep("submitting");
     try {
       const digits = phone.replace(/\D/g, "");
       const followResult = (await Parse.Cloud.run("followCalendarViaWeb", {
         calendarId,
-        ...(digits ? { name, phoneNumber: digits } : {}),
+        ...(name ? { name } : {}),
+        ...(digits ? { phoneNumber: digits } : {}),
+        notify,
         source: followSource(calendarId),
       })) as { pending?: boolean; userId?: string; buildingIntro?: ShareKitPayload | null };
       if (digits) {
@@ -1833,9 +1858,10 @@ function FollowModal({
     }
   };
 
+  const [emailName, setEmailName] = useState(() => session?.name || "");
   const emailSignIn = useEmailCodeSignIn(async (who) => {
-    setNoPhoneUser({ name: who.name });
-    await follow({ name: who.name, phone: "" });
+    setSession(readSession());
+    await follow({ name: who.name || emailName.trim(), phone: "", notify: "email" });
   });
 
   // The share kit step swaps the card chrome: full-bleed header band, spec
@@ -1869,7 +1895,7 @@ function FollowModal({
         className={
           kitStep
             ? "bg-white w-full md:max-w-[560px] rounded-t-3xl md:rounded-[20px] overflow-hidden relative flex flex-col max-h-[calc(100vh-72px)] md:max-h-[calc(100vh-64px)] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-[0_20px_60px_rgba(0,0,0,0.22)]"
-            : "bg-white w-full max-w-md rounded-t-2xl md:rounded-none p-8 relative"
+            : "bg-white w-full max-w-md rounded-t-3xl md:rounded-2xl px-6 pt-7 pb-8 md:p-8 relative max-h-[92vh] overflow-y-auto"
         }
         onClick={kitStep ? (e) => e.stopPropagation() : undefined}
       >
@@ -1886,127 +1912,219 @@ function FollowModal({
         )}
 
         {formStep === "form" || formStep === "submitting" ? (
-          <div className="space-y-6">
-            <div>
+          <div className="space-y-5">
+            <div className="pr-8">
               <h3 className="text-2xl font-light tracking-tight">
-                {isPrivate ? "Request to Follow" : "Follow"} {calendarName}
+                {isPrivate ? "Request to follow" : "Follow"} {calendarName}
               </h3>
               <p className="text-sm text-zinc-500 mt-1">
                 {isPrivate
-                  ? "This is a private calendar. The host will review your request."
-                  : "Get notified about new plans and events."}
+                  ? "It's a private calendar, so the host approves new followers."
+                  : "New plans and events, as they're posted."}
               </p>
             </div>
-            {noPhoneUser ? (
-              <button
-                type="button"
-                disabled={formStep === "submitting"}
-                onClick={() => follow({ name: noPhoneUser.name, phone: "" })}
-                className="w-full text-white py-3 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: brandColor || "#18181b" }}
-              >
-                {formStep === "submitting" ? "Following..." : `Follow${noPhoneUser.name ? ` as ${noPhoneUser.name}` : ""}`}
-              </button>
-            ) : !verify.isVerified ? (
-              <div className="space-y-2">
-                {/* No phone needed: a Google account follows and gets the
-                    weekly digest by email. Shown only with no session, so
-                    the button's "already signed in" auto-callback can't
-                    follow on open. */}
-                <GoogleSignInButton
-                  onSignIn={(u) => {
-                    const user = u as unknown as Parse.User;
-                    const name = String(user?.get?.("full_name") || user?.get?.("name") || "");
-                    if (user?.get?.("phone")) { window.location.reload(); return; }
-                    setNoPhoneUser({ name });
-                    void follow({ name, phone: "" });
-                  }}
-                  onError={(msg) => setGoogleError(msg)}
-                />
-                {googleError && <p className="text-xs text-red-600">{googleError}</p>}
-                {emailMode ? (
-                  <div className="space-y-2 pt-1">
-                    {emailSignIn.step === "email" ? (
-                      <div className="flex gap-2">
-                        <input
-                          type="email"
-                          autoFocus
-                          value={emailSignIn.email}
-                          onChange={(e) => emailSignIn.setEmail(e.target.value)}
-                          placeholder="you@example.com"
-                          className="flex-1 border-b border-zinc-300 py-2 text-sm outline-none focus:border-zinc-900"
-                        />
-                        <button
-                          type="button"
-                          disabled={emailSignIn.busy}
-                          onClick={emailSignIn.sendCode}
-                          className="px-3 text-xs font-bold uppercase tracking-widest bg-zinc-100 hover:bg-zinc-200 disabled:opacity-50"
-                        >
-                          {emailSignIn.busy ? "Sending…" : "Email code"}
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <p className="text-xs text-zinc-500">We emailed a code to {emailSignIn.email}.</p>
-                        <div className="flex gap-2">
-                          <input
-                            inputMode="numeric"
-                            autoFocus
-                            value={emailSignIn.code}
-                            onChange={(e) => emailSignIn.setCode(e.target.value)}
-                            placeholder="000000"
-                            className="flex-1 border-b border-zinc-300 py-2 text-sm tracking-widest outline-none focus:border-zinc-900"
-                          />
-                          <button
-                            type="button"
-                            disabled={emailSignIn.busy}
-                            onClick={emailSignIn.verify}
-                            className="px-3 text-xs font-bold uppercase tracking-widest text-white disabled:opacity-50"
-                            style={{ backgroundColor: brandColor || "#18181b" }}
-                          >
-                            {emailSignIn.busy ? "Checking…" : "Follow"}
-                          </button>
-                        </div>
-                        <button type="button" onClick={emailSignIn.restart} className="text-xs text-zinc-500 underline">
-                          Use a different email
-                        </button>
-                      </>
-                    )}
-                    {emailSignIn.error && <p className="text-xs text-red-600">{emailSignIn.error}</p>}
-                    <button type="button" onClick={() => setEmailMode(false)} className="text-xs text-zinc-500 underline">
-                      Use my phone instead
-                    </button>
+
+            {/* The one question the sheet asks. Each tab shows only its own
+                fields, and a single button that names the next step. */}
+            <div>
+              <p className="text-xs font-semibold text-zinc-700 mb-2">How should we reach you?</p>
+              <div role="tablist" className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-zinc-100">
+                {(["text", "email"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="tab"
+                    aria-selected={method === m}
+                    onClick={() => setMethod(m)}
+                    className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      method === m ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-800"
+                    }`}
+                  >
+                    {m === "text" ? <MessageCircle className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                    {m === "text" ? "Text me" : "Email me"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {method === "text" ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {verify.isVerified ? (
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 px-4 py-3">
+                    <span className="flex items-center gap-2 text-sm">
+                      <Check className="w-4 h-4 text-emerald-600" />
+                      {verify.phone}
+                    </span>
+                    <button type="button" onClick={notYou} className="text-xs text-zinc-500 underline">Not you?</button>
                   </div>
                 ) : (
                   <>
-                    <button type="button" onClick={() => setEmailMode(true)} className="text-xs text-zinc-500 underline">
-                      No Google? Email me a code
-                    </button>
-                    <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-zinc-400">
-                      <span className="h-px flex-1 bg-zinc-200" />or use your phone<span className="h-px flex-1 bg-zinc-200" />
-                    </div>
+                    <input
+                      type="text"
+                      value={verify.name}
+                      onChange={(e) => verify.setName(e.target.value)}
+                      placeholder="Your name"
+                      autoComplete="name"
+                      disabled={verify.step === "code"}
+                      className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-base focus:outline-none focus:border-zinc-900 disabled:bg-zinc-50 disabled:text-zinc-500"
+                    />
+                    {verify.step === "phone" ? (
+                      <input
+                        type="tel"
+                        value={verify.phone}
+                        onChange={(e) => verify.setPhone(formatPhoneNumber(e.target.value))}
+                        placeholder="Mobile number"
+                        autoComplete="tel-national"
+                        className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-base focus:outline-none focus:border-zinc-900"
+                      />
+                    ) : (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          autoFocus
+                          maxLength={6}
+                          value={verify.code}
+                          onChange={(e) => verify.setCode(e.target.value.replace(/\D/g, ""))}
+                          placeholder="6-digit code"
+                          className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-base tracking-[0.3em] focus:outline-none focus:border-zinc-900"
+                        />
+                        <p className="text-xs text-zinc-500">
+                          Sent to {verify.phone}.{" "}
+                          <button type="button" onClick={verify.reset} className="underline">Change number</button>
+                        </p>
+                      </div>
+                    )}
                   </>
                 )}
-              </div>
-            ) : null}
-            {!noPhoneUser && !emailMode && (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <PhoneVerifyFields verify={verify} />
-              <button
-                type="submit"
-                disabled={formStep === "submitting" || !verify.isVerified || !verify.name}
-                className="w-full text-white py-3 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: brandColor || "#18181b" }}
-              >
-                {formStep === "submitting" ? (
-                  <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                ) : isPrivate ? (
-                  "Request to Follow"
+                {verify.error && <p className="text-xs text-red-600">{verify.error}</p>}
+                <button
+                  type="submit"
+                  disabled={
+                    formStep === "submitting" || verify.sending ||
+                    (verify.step === "phone" && (!verify.name.trim() || verify.phone.replace(/\D/g, "").length < 10)) ||
+                    (verify.step === "code" && verify.code.length < 6)
+                  }
+                  className="w-full rounded-xl text-white py-3.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-40"
+                  style={{ backgroundColor: brandColor || "#18181b" }}
+                >
+                  {formStep === "submitting" || verify.sending ? (
+                    <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                  ) : verify.step === "phone" ? (
+                    "Text me a code"
+                  ) : verify.step === "code" ? (
+                    isPrivate ? "Confirm and request" : "Confirm and follow"
+                  ) : isPrivate ? "Request to follow" : "Follow"}
+                </button>
+                <p className="text-center text-xs text-zinc-400">At most one text a week. Reply STOP anytime.</p>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                {session?.email ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 px-4 py-3">
+                      <span className="flex items-center gap-2 text-sm min-w-0">
+                        <Check className="w-4 h-4 shrink-0 text-emerald-600" />
+                        <span className="truncate">{session.email}</span>
+                      </span>
+                      <button type="button" onClick={notYou} className="text-xs text-zinc-500 underline shrink-0">Not you?</button>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={formStep === "submitting"}
+                      onClick={() => follow({ name: session.name, phone: "", notify: "email" })}
+                      className="w-full rounded-xl text-white py-3.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-40"
+                      style={{ backgroundColor: brandColor || "#18181b" }}
+                    >
+                      {formStep === "submitting" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : isPrivate ? "Request to follow" : "Follow"}
+                    </button>
+                  </>
                 ) : (
-                  "Follow"
+                  <>
+                    <GoogleSignInButton
+                      fullWidth
+                      ignoreExistingSession
+                      onSignIn={(u) => {
+                        const user = u as unknown as Parse.User;
+                        setSession(readSession());
+                        const name = String(user?.get?.("full_name") || user?.get?.("name") || "");
+                        void follow({ name, phone: "", notify: "email" });
+                      }}
+                      onError={(msg) => setGoogleError(msg)}
+                    />
+                    {googleError && <p className="text-xs text-red-600">{googleError}</p>}
+                    <div className="flex items-center gap-3 text-xs text-zinc-400">
+                      <span className="h-px flex-1 bg-zinc-200" />or<span className="h-px flex-1 bg-zinc-200" />
+                    </div>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (emailSignIn.step === "email") void emailSignIn.sendCode();
+                        else void emailSignIn.verify();
+                      }}
+                      className="space-y-4"
+                    >
+                      {emailSignIn.step === "email" ? (
+                        <>
+                          <input
+                            type="text"
+                            value={emailName}
+                            onChange={(e) => setEmailName(e.target.value)}
+                            placeholder="Your name"
+                            autoComplete="name"
+                            className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-base focus:outline-none focus:border-zinc-900"
+                          />
+                          <input
+                            type="email"
+                            value={emailSignIn.email}
+                            onChange={(e) => emailSignIn.setEmail(e.target.value)}
+                            placeholder="Email address"
+                            autoComplete="email"
+                            className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-base focus:outline-none focus:border-zinc-900"
+                          />
+                        </>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            autoFocus
+                            maxLength={6}
+                            value={emailSignIn.code}
+                            onChange={(e) => emailSignIn.setCode(e.target.value)}
+                            placeholder="6-digit code"
+                            className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-base tracking-[0.3em] focus:outline-none focus:border-zinc-900"
+                          />
+                          <p className="text-xs text-zinc-500">
+                            Sent to {emailSignIn.email}.{" "}
+                            <button type="button" onClick={emailSignIn.restart} className="underline">Change email</button>
+                          </p>
+                        </div>
+                      )}
+                      {emailSignIn.error && <p className="text-xs text-red-600">{emailSignIn.error}</p>}
+                      <button
+                        type="submit"
+                        disabled={
+                          formStep === "submitting" || emailSignIn.busy ||
+                          (emailSignIn.step === "email" && (!emailName.trim() || !emailSignIn.email.includes("@"))) ||
+                          (emailSignIn.step === "code" && emailSignIn.code.length < 6)
+                        }
+                        className="w-full rounded-xl text-white py-3.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-40"
+                        style={{ backgroundColor: brandColor || "#18181b" }}
+                      >
+                        {formStep === "submitting" || emailSignIn.busy ? (
+                          <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                        ) : emailSignIn.step === "email" ? (
+                          "Email me a code"
+                        ) : isPrivate ? "Confirm and request" : "Confirm and follow"}
+                      </button>
+                    </form>
+                  </>
                 )}
-              </button>
-            </form>
+                <p className="text-center text-xs text-zinc-400">At most one email a week. Unsubscribe anytime.</p>
+              </div>
             )}
           </div>
         ) : formStep === "intro" && intro ? (

@@ -45,6 +45,12 @@ function loadGIS(): Promise<void> {
 interface GoogleSignInButtonProps {
   onSignIn: (user: typeof Parse.User) => void;
   onError: (error: string) => void;
+  /** Stretch to the container (Google caps its button at 400px). */
+  fullWidth?: boolean;
+  /** Only fire onSignIn after a real Google sign-in. Without this, an
+   *  existing Parse session calls onSignIn on mount — right for sign-in
+   *  pages, wrong where signing in also does something (the follow sheet). */
+  ignoreExistingSession?: boolean;
 }
 
 interface GoogleUser {
@@ -55,6 +61,8 @@ interface GoogleUser {
 export default function GoogleSignInButton({
   onSignIn,
   onError,
+  fullWidth = false,
+  ignoreExistingSession = false,
 }: GoogleSignInButtonProps) {
   const buttonRef = useRef<HTMLDivElement>(null);
   const [scriptReady, setScriptReady] = useState(false);
@@ -104,6 +112,7 @@ export default function GoogleSignInButton({
     }
 
     // Check for existing Parse session
+    if (ignoreExistingSession) return;
     try {
       const currentUser = Parse.User.current();
       if (currentUser) {
@@ -138,11 +147,13 @@ export default function GoogleSignInButton({
       size: "large",
       text: "continue_with",
       shape: "rectangular",
-      width: 320,
+      width: fullWidth
+        ? Math.max(200, Math.min(400, Math.floor(buttonRef.current.offsetWidth || 320)))
+        : 320,
     });
 
     setButtonRendered(true);
-  }, [scriptReady, buttonRendered, signedInUser, handleCredentialResponse]);
+  }, [scriptReady, buttonRendered, signedInUser, handleCredentialResponse, fullWidth]);
 
   if (signedInUser) {
     return (
