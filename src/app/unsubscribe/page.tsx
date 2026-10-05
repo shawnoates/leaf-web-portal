@@ -1,12 +1,13 @@
 import UnsubscribeClient from "./UnsubscribeClient";
 import HostOptOutClient from "./HostOptOutClient";
 import HostEmailOptOutClient from "./HostEmailOptOutClient";
+import MerchantEmailOptOutClient from "./MerchantEmailOptOutClient";
 
 export default async function UnsubscribePage({
   searchParams,
 }: {
   searchParams: Promise<{
-    u?: string; t?: string; g?: string; c?: string; k?: string; h?: string;
+    u?: string; t?: string; g?: string; c?: string; k?: string; h?: string; m?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -22,6 +23,10 @@ export default async function UnsubscribePage({
   // Admin-sent host updates. Also a button, not on load; see the component.
   if (params.k === "host-emails") {
     return <HostEmailOptOutClient hostId={params.h || ""} token={params.t || ""} />;
+  }
+  // Admin-sent merchant updates (merchants are OfferMerchant rows, `m`).
+  if (params.k === "merchant-emails") {
+    return <MerchantEmailOptOutClient merchantId={params.m || ""} token={params.t || ""} />;
   }
 
   return (
