@@ -43,9 +43,12 @@ export default function FriendInviteCard({
   variant = "attendee",
   limitedSpots = false,
   accent,
+  hostNotificationId,
 }: {
   eventGroupId: string;
   variant?: Variant;
+  /** Assigned host on the /t/<id> checklist (no session): their seat id. */
+  hostNotificationId?: string;
   /** The plan has a capacity, so the copy can promise a held seat. */
   limitedSpots?: boolean;
   accent?: string;
@@ -64,9 +67,9 @@ export default function FriendInviteCard({
   useEffect(() => {
     if (!isHost) return;
     let live = true;
-    listMyPlanInvites(eventGroupId).then((rows) => { if (live) setMine(rows); });
+    listMyPlanInvites(eventGroupId, hostNotificationId).then((rows) => { if (live) setMine(rows); });
     return () => { live = false; };
-  }, [isHost, eventGroupId, invite]);
+  }, [isHost, eventGroupId, hostNotificationId, invite]);
 
   const start = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +78,7 @@ export default function FriendInviteCard({
     setBusy(true);
     setError(null);
     try {
-      const created = await createPlanInvite(eventGroupId, name);
+      const created = await createPlanInvite(eventGroupId, name, hostNotificationId);
       setInvite(created);
       setBody(created.smsBody);
       track("plan_invite_created", { planId: eventGroupId, holdsSeat: created.holdsSeat, via: variant });

@@ -15,6 +15,7 @@ import {
 import Parse from "@/lib/parse-client";
 import { renderLinkedText } from "@/lib/linkify";
 import HostIntroVideoCard, { type IntroVideoInfo } from "@/components/HostIntroVideoCard";
+import FriendInviteCard from "@/components/FriendInviteCard";
 
 /** The checklist row that opens into the recorder (intro-video.js). */
 const INTRO_TASK_KEY = "record_intro";
@@ -845,6 +846,14 @@ export default function ChecklistClient({
 
         {!data.cancelled && (data.addonOrders?.length ?? 0) > 0 && (
           <AddonOrders orders={data.addonOrders!} notificationId={notificationId} onChanged={refresh} />
+        )}
+
+        {/* Direct invites, in the assigned host's own voice. The checklist link
+            is their credential (no session), as for the rest of this page. */}
+        {!data.cancelled && (!data.dateISO || new Date(data.dateISO).getTime() > Date.now()) && (
+          <section className="px-5 pt-5 pb-4 border-b border-zinc-100">
+            <FriendInviteCard eventGroupId={data.planId} variant="host" hostNotificationId={notificationId} />
+          </section>
         )}
 
         <ul className="mt-1">

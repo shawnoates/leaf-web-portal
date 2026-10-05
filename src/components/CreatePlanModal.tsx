@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import Parse from "@/lib/parse-client";
 import PlanIntroSection from "@/components/PlanIntroSection";
+import FriendInviteCard from "@/components/FriendInviteCard";
 import { everyOtherMonth, hostCandidateNote, monthlyRuleOptionsForDate, NTH_LABELS, WEEKDAY_NAMES, type RuleOption, type SeriesHostCandidate } from "@/lib/series";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { getDefaultCoverForSeed } from "@/lib/default-covers";
@@ -1453,15 +1454,18 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
         {helloPlanId && (
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
             <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg text-sm">
-              <Check className="w-4 h-4" /> Plan published. One more thing, while you&rsquo;re here.
+              <Check className="w-4 h-4" /> Plan published. Two quick things, while you&rsquo;re here.
             </div>
             <PlanIntroSection eventGroupId={helloPlanId} hostName="You" planStarted={false} />
+            {/* Direct invites: a personal text from the host is the best
+                first push a new plan gets (cloud/plan-invites.js). */}
+            <FriendInviteCard eventGroupId={helloPlanId} variant="host" />
             <button
               type="button"
               onClick={onClose}
               className="w-full text-center text-sm font-medium text-zinc-500 underline underline-offset-2"
             >
-              Not now
+              Done
             </button>
           </div>
         )}

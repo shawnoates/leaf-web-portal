@@ -67,8 +67,20 @@ export interface CreatedPlanInvite {
   smsBody: string;
 }
 
-export async function createPlanInvite(eventGroupId: string, friendName: string): Promise<CreatedPlanInvite> {
-  return (await Parse.Cloud.run("createPlanInvite", { eventGroupId, friendName })) as CreatedPlanInvite;
+/**
+ * `hostNotificationId`: an assigned host on the /t/<id> checklist has no
+ * session; their host-seat id is the credential, as for getHostChecklist.
+ */
+export async function createPlanInvite(
+  eventGroupId: string,
+  friendName: string,
+  hostNotificationId?: string,
+): Promise<CreatedPlanInvite> {
+  return (await Parse.Cloud.run("createPlanInvite", {
+    eventGroupId,
+    friendName,
+    ...(hostNotificationId ? { hostNotificationId } : {}),
+  })) as CreatedPlanInvite;
 }
 
 export interface MyPlanInvite {
@@ -81,9 +93,12 @@ export interface MyPlanInvite {
   createdAt: string;
 }
 
-export async function listMyPlanInvites(eventGroupId: string): Promise<MyPlanInvite[]> {
+export async function listMyPlanInvites(eventGroupId: string, hostNotificationId?: string): Promise<MyPlanInvite[]> {
   try {
-    const r = (await Parse.Cloud.run("listMyPlanInvites", { eventGroupId })) as { invites?: MyPlanInvite[] };
+    const r = (await Parse.Cloud.run("listMyPlanInvites", {
+      eventGroupId,
+      ...(hostNotificationId ? { hostNotificationId } : {}),
+    })) as { invites?: MyPlanInvite[] };
     return r?.invites ?? [];
   } catch {
     return [];
