@@ -277,6 +277,8 @@ interface Dashboard {
     pendingReviewCount: number;
     /** How the weekly digest reaches them; absent on older servers. */
     digestChannel?: "sms" | "email" | "none";
+    /** A verified email on any linked account; absent on older servers. */
+    hasEmail?: boolean;
   };
   greeting?: { weather: Weather | null };
   needsHost?: NeedsHost;
@@ -1160,7 +1162,12 @@ function DashboardView({
             </div>
           )}
 
-          {!hasRail && <TextsCard inCrew={crews.length > 0} channel={data.person.digestChannel} />}
+          {!hasRail && <TextsCard
+            inCrew={crews.length > 0}
+            channel={data.person.digestChannel}
+            canAddEmail={data.person.digestChannel === "sms" && data.person.hasEmail === false}
+            onEmailAdded={onRefresh}
+          />}
         </div>
 
         {hasRail && (
@@ -1181,7 +1188,12 @@ function DashboardView({
               <PlacesRail probes={places} onAnswered={(id) => setPopupAnsweredId(id)} />
             )}
             {rail && rail.tier2.length > 0 && <CalendarsRail rows={rail.tier2} />}
-            <TextsCard inCrew={crews.length > 0} channel={data.person.digestChannel} />
+            <TextsCard
+            inCrew={crews.length > 0}
+            channel={data.person.digestChannel}
+            canAddEmail={data.person.digestChannel === "sms" && data.person.hasEmail === false}
+            onEmailAdded={onRefresh}
+          />
           </aside>
         )}
       </main>
@@ -2252,7 +2264,15 @@ function PlacesRail({
 }
 
 // ---- Texts / notification card --------------------------------------------
-function TextsCard({ inCrew = false, channel }: { inCrew?: boolean; channel?: "sms" | "email" | "none" }) {
+function TextsCard({
+  inCrew = false, channel, canAddEmail = false, onEmailAdded,
+}: {
+  inCrew?: boolean;
+  channel?: "sms" | "email" | "none";
+  /** Text follower with no verified email: offer to add one. */
+  canAddEmail?: boolean;
+  onEmailAdded?: () => Promise<void>;
+}) {
   // Email followers (Google / email code, no phone) get the digest by email.
   if (channel === "email") {
     return (
@@ -2262,13 +2282,78 @@ function TextsCard({ inCrew = false, channel }: { inCrew?: boolean; channel?: "s
     );
   }
   return (
-    <div className="texts">
-      <p>
-        {inCrew
-          ? "At most one text a week from Leaf, plus texts from your crews when there's a night to plan."
-          : "At most one text a week, when there's something new. Plus a heads-up when something lands late."}
-      </p>
-      <Link className="btn ghost sm" href="/unsubscribe">Texts</Link>
+    <div className="texts wrap">
+      <div className="texts-row">
+        <p>
+          {inCrew
+            ? "At most one text a week from Leaf, plus texts from your crews when there's a night to plan."
+            : "At most one text a week, when there's something new. Plus a heads-up when something lands late."}
+        </p>
+        <Link className="btn ghost sm" href="/unsubscribe">Texts</Link>
+      </div>
+      {canAddEmail && <AddEmail onAdded={onEmailAdded} />}
+    </div>
+  );
+}
+
+/**
+ * "Add your email" for text followers. Same code flow as the email sign-in:
+ * the server adds the address to this account (or, if it already has its own
+ * account, links the two as one person). Then if they ever text STOP, the
+ * weekly note switches to email instead of stopping, and they can sign in to
+ * /me with either.
+ */
+function AddEmail({ onAdded }: { onAdded?: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [done, setDone] = useState(false);
+  const flow = useEmailCodeSignIn(async () => {
+    setDone(true);
+    await onAdded?.();
+  });
+  if (done) return <p className="texts-sub">Email added. Thanks!</p>;
+  if (!open) {
+    return (
+      <button className="linkbtn texts-sub" onClick={() => setOpen(true)}>
+        Add your email, so you can still hear from us if you stop texts.
+      </button>
+    );
+  }
+  return (
+    <div className="texts-email">
+      {flow.step === "email" ? (
+        <div className="texts-email-row">
+          <input
+            className="otp-in"
+            type="email"
+            autoFocus
+            placeholder="you@example.com"
+            value={flow.email}
+            onChange={(e) => flow.setEmail(e.target.value)}
+          />
+          <button className="btn ghost sm" disabled={flow.busy} onClick={flow.sendCode}>
+            {flow.busy ? "Sending…" : "Send code"}
+          </button>
+        </div>
+      ) : (
+        <>
+          <p className="texts-sub">We emailed a code to {flow.email}.</p>
+          <div className="texts-email-row">
+            <input
+              className="otp-in"
+              inputMode="numeric"
+              autoFocus
+              placeholder="Code"
+              value={flow.code}
+              onChange={(e) => flow.setCode(e.target.value)}
+            />
+            <button className="btn ghost sm" disabled={flow.busy} onClick={flow.verify}>
+              {flow.busy ? "Checking…" : "Add email"}
+            </button>
+          </div>
+          <button className="linkbtn texts-sub" onClick={flow.restart}>Use a different email</button>
+        </>
+      )}
+      {flow.error && <p className="otp-err">{flow.error}</p>}
     </div>
   );
 }
@@ -3115,6 +3200,13 @@ const CSS = `
 .leafme .texts{margin-top:22px;padding:13px 14px;background:var(--paper);border:1px solid var(--card);
   border-radius:10px;display:flex;align-items:center;gap:12px}
 .leafme .texts p{flex:1 1 auto;font-size:11.5px;line-height:1.45;color:var(--body)}
+.leafme .texts.wrap{flex-direction:column;align-items:stretch}
+.leafme .texts-row{display:flex;align-items:center;gap:12px}
+.leafme .texts-sub{font-size:11.5px;color:var(--body);text-align:left}
+.leafme button.texts-sub{text-decoration:underline}
+.leafme .texts-email{display:flex;flex-direction:column;gap:6px}
+.leafme .texts-email-row{display:flex;gap:8px;align-items:center}
+.leafme .texts-email-row .otp-in{margin-bottom:0;padding:8px 10px;font-size:14px}
 
 /* ---- Modals ---- */
 .leafme .modal-overlay{position:fixed;inset:0;z-index:60;background:rgba(23,21,15,.6);
