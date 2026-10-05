@@ -20,12 +20,12 @@ import MarketplaceTab, { type MarketplaceEvent, type OrgSettings } from "@/compo
 import CreatePlanModal, { type CreatePlanPrefill, NEW_PLAN_DRAFT_SESSION_KEY } from "@/components/CreatePlanModal";
 import PlanDetailModal from "@/components/PlanDetailModal";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import DashboardSidebar, { type DashboardSidebarProps } from "@/components/dashboard/DashboardSidebar";
 import CrewClient from "@/app/crew/[token]/CrewClient";
 import { CrewEmbed } from "@/components/crew/CrewShell";
 import StartCrewModal from "@/components/crew/StartCrewModal";
 import { useMyCrews } from "@/lib/my-crews";
-import DashboardBottomBar from "@/components/dashboard/DashboardBottomBar";
+import DashboardMobileMenu from "@/components/dashboard/DashboardMobileMenu";
 import HomeTab from "@/components/dashboard/HomeTab";
 import CommunityTab, { type CommunitySegment } from "@/components/dashboard/CommunityTab";
 import NudgeModal from "@/components/dashboard/NudgeModal";
@@ -1667,46 +1667,46 @@ export default function OrgDashboardPage() {
 
   // ── Render ──
 
+  const sidebarProps: DashboardSidebarProps = {
+    orgName: dashboard.name,
+    tierLabel: tierLabel,
+    logoUrl: dashboard.profilePhoto,
+    activeTab: activeTab,
+    needsYouCount: needsYouCount,
+    inboxUnread: inboxUnread,
+    calendars: dashboard.calendars,
+    selectedCalendarId: calendarsSelectedId ||
+      dashboard.calendars.find((c) => c.isPrimary)?.objectId ||
+      null,
+    isOwner: dashboard.isOwner,
+    onNavigate: setTab,
+    onSelectCalendar: (id) => {
+      setCalendarsSelectedId(id);
+      setTab("calendars");
+    },
+    onAddCalendar: () => {
+      const atLimit = !!(dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit);
+      if (atLimit) setShowSubscription(true);
+      else setShowAddCalendar(true);
+    },
+    onLogout: handleLogout,
+    crews: crews,
+    selectedCrewId: activeTab === "crew" ? selectedCrewId : null,
+    onSelectCrew: (id) => {
+      setSelectedCrewId(id);
+      setActiveTab("crew");
+      const next = new URLSearchParams(searchParams.toString());
+      next.set("tab", "crew");
+      next.set("crew", id);
+      router.replace(`/dashboard/${calendarId}?${next.toString()}`, { scroll: false });
+    },
+    onStartCrew: () => setShowStartCrew(true),
+  };
+
   return (
     <div className="min-h-screen bg-white lg:flex">
       {/* Desktop sidebar */}
-      <DashboardSidebar
-        orgName={dashboard.name}
-        tierLabel={tierLabel}
-        logoUrl={dashboard.profilePhoto}
-        activeTab={activeTab}
-        needsYouCount={needsYouCount}
-        inboxUnread={inboxUnread}
-        calendars={dashboard.calendars}
-        selectedCalendarId={
-          calendarsSelectedId ||
-          dashboard.calendars.find((c) => c.isPrimary)?.objectId ||
-          null
-        }
-        isOwner={dashboard.isOwner}
-        onNavigate={setTab}
-        onSelectCalendar={(id) => {
-          setCalendarsSelectedId(id);
-          setTab("calendars");
-        }}
-        onAddCalendar={() => {
-          const atLimit = !!(dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit);
-          if (atLimit) setShowSubscription(true);
-          else setShowAddCalendar(true);
-        }}
-        onLogout={handleLogout}
-        crews={crews}
-        selectedCrewId={activeTab === "crew" ? selectedCrewId : null}
-        onSelectCrew={(id) => {
-          setSelectedCrewId(id);
-          setActiveTab("crew");
-          const next = new URLSearchParams(searchParams.toString());
-          next.set("tab", "crew");
-          next.set("crew", id);
-          router.replace(`/dashboard/${calendarId}?${next.toString()}`, { scroll: false });
-        }}
-        onStartCrew={() => setShowStartCrew(true)}
-      />
+      <DashboardSidebar {...sidebarProps} />
       {showStartCrew && (
         <StartCrewModal
           onClose={() => { setShowStartCrew(false); void reloadCrews(); }}
@@ -1721,12 +1721,13 @@ export default function OrgDashboardPage() {
       )}
 
       {/* Content column */}
-      <div className="flex-1 min-w-0 flex flex-col pb-24 lg:pb-0">
+      <div className="flex-1 min-w-0 flex flex-col">
         {/* Concierge state banner (renders only when relevant) */}
         <ConciergeDashboardBanner calendarId={calendarId} />
 
         {/* Mobile header */}
         <header className="lg:hidden border-b border-zinc-100 px-4 py-3.5 flex items-center gap-3">
+          <DashboardMobileMenu {...sidebarProps} />
           {dashboard.profilePhoto ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -2767,11 +2768,6 @@ export default function OrgDashboardPage() {
         </main>
       </div>
 
-      {/* Mobile bottom bar */}
-      <DashboardBottomBar
-        activeTab={activeTab}
-        onNavigate={setTab}
-      />
 
       {/* ──────── MODALS ──────── */}
 

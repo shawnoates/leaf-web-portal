@@ -13,7 +13,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plus } from "lucide-react";
 import Parse from "@/lib/parse-client";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import DashboardSidebar, { type DashboardSidebarProps } from "@/components/dashboard/DashboardSidebar";
+import DashboardMobileMenu from "@/components/dashboard/DashboardMobileMenu";
 import LeafSignIn from "@/components/LeafSignIn";
 import CrewClient from "@/app/crew/[token]/CrewClient";
 import { CrewEmbed } from "@/components/crew/CrewShell";
@@ -67,31 +68,33 @@ function FriendsDashboard() {
 
   const name = String(user.get("full_name") || user.get("name") || "You");
 
+  const sidebarProps: DashboardSidebarProps = {
+    orgless: true,
+    orgName: name,
+    tierLabel: "Friend Mode",
+    logoUrl: null,
+    activeTab: "crew",
+    needsYouCount: 0,
+    inboxUnread: 0,
+    calendars: [],
+    selectedCalendarId: null,
+    isOwner: true,
+    onNavigate: () => {},
+    onSelectCalendar: () => {},
+    onAddCalendar: () => router.push("/"),
+    onLogout: async () => {
+      try { await Parse.User.logOut(); } catch { /* ignore */ }
+      router.push("/friends");
+    },
+    crews,
+    selectedCrewId,
+    onSelectCrew: openCrew,
+    onStartCrew: () => setShowStartCrew(true),
+  };
+
   return (
     <div className="min-h-screen bg-white lg:flex">
-      <DashboardSidebar
-        orgless
-        orgName={name}
-        tierLabel="Friend Mode"
-        logoUrl={null}
-        activeTab="crew"
-        needsYouCount={0}
-        inboxUnread={0}
-        calendars={[]}
-        selectedCalendarId={null}
-        isOwner
-        onNavigate={() => {}}
-        onSelectCalendar={() => {}}
-        onAddCalendar={() => router.push("/")}
-        onLogout={async () => {
-          try { await Parse.User.logOut(); } catch { /* ignore */ }
-          router.push("/friends");
-        }}
-        crews={crews}
-        selectedCrewId={selectedCrewId}
-        onSelectCrew={openCrew}
-        onStartCrew={() => setShowStartCrew(true)}
-      />
+      <DashboardSidebar {...sidebarProps} />
       {showStartCrew && (
         <StartCrewModal
           onClose={() => { setShowStartCrew(false); void reload(); }}
@@ -99,10 +102,19 @@ function FriendsDashboard() {
         />
       )}
 
-      <main className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1">
+      <header className="flex items-center gap-3 border-b border-zinc-100 px-4 py-3.5 lg:hidden">
+        <DashboardMobileMenu {...sidebarProps} />
+        <FriendModeIcon size={28} className="shrink-0" />
+        <div className="min-w-0 flex-1">
+          <p className="m-0 truncate text-sm font-semibold text-zinc-900">{name}</p>
+          <p className="m-0 text-[10px] text-zinc-400">Friend Mode</p>
+        </div>
+      </header>
+      <main className="min-w-0">
         {selectedCrewId ? (
           <div className="p-3 lg:p-6">
-            <button type="button" onClick={() => openCrew(null)} className="mb-3 flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 lg:hidden">
+            <button type="button" onClick={() => openCrew(null)} className="mb-3 flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900">
               <ArrowLeft className="h-4 w-4" aria-hidden /> All crews
             </button>
             <CrewEmbed>
@@ -160,6 +172,7 @@ function FriendsDashboard() {
           </div>
         )}
       </main>
+      </div>
     </div>
   );
 }

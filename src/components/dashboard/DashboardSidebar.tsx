@@ -13,10 +13,11 @@ import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
 
 // Persistent desktop sidebar (≥1024px) for the redesigned dashboard.
 // Carries the org switcher block, the five places, the calendar list, and the
-// footer (Settings / Help / Log out). Mobile gets DashboardBottomBar instead.
+// footer (Settings / Help / Log out). On phones the same sidebar slides out
+// from the header's menu button (DashboardMobileMenu, variant="drawer").
 
 // "calendars" is deliberately absent: on desktop the CALENDARS list below is
-// the navigation for that tab (mobile keeps it in DashboardBottomBar).
+// the navigation for that tab, on desktop and in the phone menu alike.
 const NAV_ITEMS: { id: DashboardTab; label: string; icon: typeof Calendar }[] = [
   { id: "home", label: "Home", icon: Calendar },
   { id: "community", label: "Community", icon: Users },
@@ -24,26 +25,7 @@ const NAV_ITEMS: { id: DashboardTab; label: string; icon: typeof Calendar }[] = 
   { id: "inbox", label: "Inbox", icon: Mail },
 ];
 
-export default function DashboardSidebar({
-  orgName,
-  tierLabel,
-  logoUrl,
-  activeTab,
-  needsYouCount,
-  inboxUnread,
-  calendars,
-  selectedCalendarId,
-  isOwner,
-  onNavigate,
-  onSelectCalendar,
-  onAddCalendar,
-  onLogout,
-  crews = [],
-  selectedCrewId = null,
-  onSelectCrew,
-  onStartCrew,
-  orgless = false,
-}: {
+export type DashboardSidebarProps = {
   orgName: string;
   tierLabel: string;
   logoUrl: string | null;
@@ -64,9 +46,39 @@ export default function DashboardSidebar({
   onStartCrew?: () => void;
   /** No calendar of their own (Friend Mode only): no org places, a way to make a calendar. */
   orgless?: boolean;
-}) {
+  /** "drawer": the phone's slide-out menu (always shown, full height). */
+  variant?: "desktop" | "drawer";
+};
+
+export default function DashboardSidebar({
+  orgName,
+  tierLabel,
+  logoUrl,
+  activeTab,
+  needsYouCount,
+  inboxUnread,
+  calendars,
+  selectedCalendarId,
+  isOwner,
+  onNavigate,
+  onSelectCalendar,
+  onAddCalendar,
+  onLogout,
+  crews = [],
+  selectedCrewId = null,
+  onSelectCrew,
+  onStartCrew,
+  orgless = false,
+  variant = "desktop",
+}: DashboardSidebarProps) {
   return (
-    <aside className="hidden lg:flex w-[232px] shrink-0 flex-col bg-zinc-50 border-r border-zinc-100 px-3.5 py-[18px] sticky top-0 h-screen overflow-y-auto">
+    <aside
+      className={
+        variant === "drawer"
+          ? "flex w-[280px] max-w-[85vw] h-full flex-col bg-zinc-50 px-3.5 py-[18px] overflow-y-auto"
+          : "hidden lg:flex w-[232px] shrink-0 flex-col bg-zinc-50 border-r border-zinc-100 px-3.5 py-[18px] sticky top-0 h-screen overflow-y-auto"
+      }
+    >
       {/* Org switcher block */}
       <div className="flex items-center gap-2.5 px-2 pb-4">
         {logoUrl ? (
