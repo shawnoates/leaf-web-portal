@@ -24,11 +24,23 @@ import CrewPulseCard from "@/components/crew/CrewPulseCard";
 import { SAMPLE_PULSE } from "@/lib/crew-pulse";
 
 const STEPS = [
-  { n: "01", title: "Start a crew", body: "Name it, pick how often, and send the link to the group chat. Friends join from the link, no app needed." },
-  { n: "02", title: "Leaf finds a night", body: "Leaf picks a place from your crew's book and a few dates that fit everyone's calendars, then asks who can make which." },
-  { n: "03", title: "It plans itself", body: "The date most people can make gets locked and invites go out. The organizer gets a link to book. Everyone gets a reminder that day." },
-  { n: "04", title: "It keeps going", body: "On your rhythm, the next round starts on its own. Leaf remembers what the crew liked and which nights never work." },
+  { n: "01", title: "Start a crew", photo: "/photo-row/kitchen-dinner.jpg", body: "Name it, pick how often, and send the link to the group chat. Friends join from the link, no app needed." },
+  { n: "02", title: "Leaf finds a night", photo: "/photo-row/trail-hike.jpg", body: "Leaf picks a place from your crew's book and a few dates that fit everyone's calendars, then asks who can make which." },
+  { n: "03", title: "It plans itself", photo: "/photo-row/restaurant-dinner.jpg", body: "The date most people can make gets locked and invites go out. The organizer gets a link to book. Everyone gets a reminder that day." },
+  { n: "04", title: "It keeps going", photo: "/photo-row/backyard-lunch.jpg", body: "On your rhythm, the next round starts on its own. Leaf remembers what the crew liked and which nights never work." },
 ];
+
+/** The fanned row under the hero: real-looking crews, each captioned like one on Leaf. */
+const CREWS = [
+  { photo: "/photo-row/bar-night.jpg", name: "Thursday drinks", pace: "Every week" },
+  { photo: "/photo-row/pickup-soccer.jpg", name: "Sunday pickup", pace: "Every week" },
+  { photo: "/photo-row/kitchen-dinner.jpg", name: "Supper club", pace: "Every month" },
+  { photo: "/photo-row/trail-hike.jpg", name: "Trail crew", pace: "Every 2 weeks" },
+  { photo: "/photo-row/restaurant-dinner.jpg", name: "Old roommates", pace: "Every month" },
+  { photo: "/photo-row/bike-ride.jpg", name: "River ride", pace: "Every 2 weeks" },
+  { photo: "/photo-row/skatepark.jpg", name: "Skate Saturdays", pace: "Every week" },
+];
+const FAN = [-6, 3, -2, 5, -4, 2, -3];
 
 const FAQ = [
   { q: "Do my friends need the app?", a: "No. Everything works on the web from their own link. App users get notifications, and anyone can choose to get texts instead." },
@@ -70,15 +82,38 @@ export default function FriendsClient() {
           </div>
         </section>
 
+        <section aria-label="Crews on Leaf" className="overflow-hidden pb-16 lg:pb-24">
+          <ul className="m-0 flex list-none justify-center gap-3 p-0 sm:gap-5">
+            {CREWS.map((c, i) => (
+              <li
+                key={c.name}
+                className={`relative w-32 shrink-0 overflow-hidden rounded-[22px] border border-fm-line-dim bg-fm-surface shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:w-40 ${i > 4 ? "hidden xl:block" : i > 2 ? "hidden md:block" : ""}`}
+                style={{ transform: `rotate(${FAN[i]}deg) translateY(${i % 2 ? 14 : 0}px)` }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={c.photo} alt="" loading="lazy" className="block aspect-[3/4] w-full object-cover" />
+                <div className="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-gradient-to-t from-black/80 to-transparent px-3 pb-3 pt-10">
+                  <span className="font-fm-serif text-[19px] leading-tight text-fm-ink">{c.name}</span>
+                  <span className="font-fm-mono text-[10px] uppercase tracking-[0.08em] text-fm-accent">{c.pace}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+
         <section id="how" className="scroll-mt-20 border-t border-fm-line-dim py-16 lg:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <h2 className="m-0 font-fm-serif text-[40px] font-normal leading-tight lg:text-[52px]">How a night comes together</h2>
             <ol className="m-0 mt-8 grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
               {STEPS.map((s) => (
-                <li key={s.n} className="flex flex-col gap-2 rounded-[28px] border border-fm-line-dim bg-fm-surface p-6">
-                  <span className="font-fm-mono text-xs text-fm-accent">{s.n}</span>
-                  <h3 className="m-0 font-fm-serif text-[28px] font-normal leading-tight">{s.title}</h3>
-                  <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">{s.body}</p>
+                <li key={s.n} className="flex flex-col overflow-hidden rounded-[28px] border border-fm-line-dim bg-fm-surface">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.photo} alt="" loading="lazy" className="block aspect-[4/3] w-full object-cover" />
+                  <div className="flex flex-col gap-2 p-6">
+                    <span className="font-fm-mono text-xs text-fm-accent">{s.n}</span>
+                    <h3 className="m-0 font-fm-serif text-[28px] font-normal leading-tight">{s.title}</h3>
+                    <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">{s.body}</p>
+                  </div>
                 </li>
               ))}
             </ol>
