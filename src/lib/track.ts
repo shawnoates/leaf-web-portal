@@ -34,7 +34,10 @@ export type WebEvent =
   | "plan_detail_full_alternative_tap"
   | "host_video_play"
   | "host_video_watched"
-  | "plan_rsvp_web";
+  | "plan_rsvp_web"
+  | "plan_invite_created"
+  | "plan_invite_sms_opened"
+  | "plan_invite_arrival";
 
 const ANON_COOKIE = "leaf_anon_id";
 

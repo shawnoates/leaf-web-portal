@@ -121,8 +121,35 @@ type PageProps = {
   // is recorded as a web event and otherwise ignored.
   // `via` is cross-promotion: the calendar whose page the link was copied
   // from. When an accepted promotion backs it, the redirect lands there.
-  searchParams: Promise<{ copy?: string; rsvp?: string; src?: string; via?: string }>;
+  // `i` is a personal invite code (cloud/plan-invites.js): a friend texted
+  // this link. It rides through the redirects so the RSVP is credited and a
+  // held seat is claimed, and it names the friend in the unfurl.
+  searchParams: Promise<{ copy?: string; rsvp?: string; src?: string; via?: string; i?: string }>;
 };
+
+const INVITE_CODE = /^[A-Za-z0-9]{4,16}$/;
+
+/** "&i=CODE" for a well-formed invite code, else "". */
+function inviteSuffix(i: string | undefined): string {
+  return i && INVITE_CODE.test(i) ? `&i=${encodeURIComponent(i)}` : "";
+}
+
+/** Who sent a personal invite link, for the unfurl title. Never throws. */
+async function fetchInviteHeadline(eventGroupId: string, i: string | undefined): Promise<string | null> {
+  if (!i || !INVITE_CODE.test(i)) return null;
+  try {
+    const r = (await Parse.Cloud.run("getPlanInvite", { code: i, eventGroupId })) as {
+      found?: boolean;
+      inviterFirstName?: string;
+      holdsSeat?: boolean;
+      status?: string;
+    } | null;
+    if (!r?.found || !r.inviterFirstName) return null;
+    return r.holdsSeat ? `${r.inviterFirstName} saved you a spot` : `${r.inviterFirstName} invited you`;
+  } catch {
+    return null;
+  }
+}
 
 function resolveMode(copyParam: string | undefined): ShareMode {
   return copyParam === "1" ? "copy" : "invite";
@@ -133,7 +160,7 @@ export async function generateMetadata({
   searchParams,
 }: PageProps): Promise<Metadata> {
   const { eventGroupId } = await params;
-  const { copy } = await searchParams;
+  const { copy, i } = await searchParams;
   const mode = resolveMode(copy);
   // No phone in generateMetadata — OG tags should reflect the public preview,
   // not the personalized landing. The page handler does the follower check.
@@ -148,7 +175,10 @@ export async function generateMetadata({
     };
   }
 
-  const title = info.title;
+  // A personal invite leads with the sender: in an iMessage bubble the title
+  // is the one line people read, and a friend's name is what gets the tap.
+  const inviteHeadline = mode === "invite" ? await fetchInviteHeadline(eventGroupId, i) : null;
+  const title = inviteHeadline ? `${inviteHeadline}: ${info.title}` : info.title;
   const descParts: string[] = [];
   if (info.host?.name) descParts.push(`Hosted by ${info.host.name}`);
   if (info.location?.name) descParts.push(info.location.name);
@@ -174,7 +204,7 @@ export async function generateMetadata({
   const canonicalUrl =
     mode === "copy"
       ? `${APP_LINK_URL}/p/${eventGroupId}?copy=1`
-      : `${APP_LINK_URL}/p/${eventGroupId}`;
+      : `${APP_LINK_URL}/p/${eventGroupId}${inviteHeadline && i ? `?i=${encodeURIComponent(i)}` : ""}`;
 
   return {
     title: `${title} · Leaf`,
@@ -225,7 +255,7 @@ function unfurlSized(url: string | null | undefined): string | null {
 
 export default async function PlanSharePage({ params, searchParams }: PageProps) {
   const { eventGroupId } = await params;
-  const { copy, rsvp, src, via } = await searchParams;
+  const { copy, rsvp, src, via, i } = await searchParams;
   const mode = resolveMode(copy);
   const autoOpenRsvp = rsvp === "1";
   const phoneNumber = await readViewerPhone();
@@ -253,7 +283,7 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
   // send them back there. Only public calendars can receive shares, so the
   // private-calendar scrim never applies on this branch.
   if (mode === "invite" && info.viaShareId) {
-    const destination = `/org/${info.viaShareId}?plan=${eventGroupId}`;
+    const destination = `/org/${info.viaShareId}?plan=${eventGroupId}${inviteSuffix(i)}`;
     return (
       <div
         style={{
@@ -282,7 +312,7 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
     );
   }
   if (mode === "invite" && info.shareId && !isPrivateForViewer) {
-    const destination = `/org/${info.shareId}?plan=${eventGroupId}`;
+    const destination = `/org/${info.shareId}?plan=${eventGroupId}${inviteSuffix(i)}`;
     return (
       <div
         style={{
