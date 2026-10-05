@@ -44,9 +44,15 @@ export default function FriendInviteCard({
   limitedSpots = false,
   accent,
   hostNotificationId,
+  suggestions,
+  bare = false,
 }: {
   eventGroupId: string;
   variant?: Variant;
+  /** Names to offer as one-tap fills (past guests on the checklist's invite row). */
+  suggestions?: string[];
+  /** Inside a row that already says what this is: no border, no heading. */
+  bare?: boolean;
   /** Assigned host on the /t/<id> checklist (no session): their seat id. */
   hostNotificationId?: string;
   /** The plan has a capacity, so the copy can promise a held seat. */
@@ -122,7 +128,8 @@ export default function FriendInviteCard({
       : "Text a friend a personal invite. It's more fun with someone you know.";
 
   return (
-    <div className="text-left border border-zinc-200 rounded-xl p-4 space-y-3">
+    <div className={bare ? "text-left space-y-3" : "text-left border border-zinc-200 rounded-xl p-4 space-y-3"}>
+      {!bare && (
       <div className="flex items-start gap-3">
         <span className="w-9 h-9 rounded-full bg-zinc-100 flex items-center justify-center flex-shrink-0">
           <UserPlus className="w-4 h-4 text-zinc-700" aria-hidden />
@@ -132,6 +139,22 @@ export default function FriendInviteCard({
           <p className="text-xs text-zinc-500 leading-relaxed">{sub}</p>
         </div>
       </div>
+      )}
+
+      {!invite && suggestions && suggestions.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {suggestions.map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => setFriendName(n.split(/\s+/)[0])}
+              className="text-xs font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-full px-2.5 py-1"
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {!invite ? (
         <form onSubmit={start} className="flex items-center gap-2">

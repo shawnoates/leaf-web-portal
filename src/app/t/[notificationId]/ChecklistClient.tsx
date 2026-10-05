@@ -21,6 +21,10 @@ import FriendInviteCard from "@/components/FriendInviteCard";
 const INTRO_TASK_KEY = "record_intro";
 /** The row that is an editor for EventGroup.meetingSpot (host-task-functions.js). */
 const MEETING_SPOT_TASK_KEY = "set_meeting_spot";
+// "Invite one more person — it's just you so far" (server: drive_signups).
+const INVITE_TASK_KEY = "drive_signups";
+// "Ask your guests to bring a friend": a draft for the plan chat (server: bring_a_friend).
+const BRING_FRIEND_TASK_KEY = "bring_a_friend";
 
 export type HostTask = {
   id: string;
@@ -303,16 +307,21 @@ function Row({
   task,
   busy,
   notificationId,
+  planId,
   onToggle,
   onSent,
 }: {
   task: HostTask;
   busy: boolean;
   notificationId: string;
+  planId: string;
   onToggle: (t: HostTask) => void;
   onSent: (taskId: string, sentAt: string) => void;
 }) {
   const done = task.status === "done";
+  // The invite row's personal-text kit opens in place under the row.
+  const [textKitOpen, setTextKitOpen] = useState(false);
+  const isInviteRow = task.key === INVITE_TASK_KEY;
 
   // The distinction the whole assistant rests on: a task whose booking window
   // hasn't opened is not late, it's not yet possible. Showing it as an overdue
@@ -404,15 +413,46 @@ function Row({
 
       {/* The kit is its own page: a preview, the caption, and one-tap targets
           need more room than a row. Nothing posts from Leaf either way. */}
-      {task.sharePack?.shareKitUrl && !done && (
+      {/* The invite row also offers a personal text (cloud/plan-invites.js):
+          one friend, one link, sent from the host's own phone — the row ticks
+          itself off when that friend RSVPs. */}
+      {!done && (task.sharePack?.shareKitUrl || isInviteRow) && (
         <div className="pl-12 pr-4 pb-3 -mt-1">
-          <a
-            href={task.sharePack.shareKitUrl}
-            className="inline-flex items-center gap-1.5 mt-2 text-[13px] font-medium text-white bg-zinc-900 rounded-lg px-3 py-1.5 transition-colors"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            Open the share kit
-          </a>
+          <div className="flex flex-wrap gap-2">
+            {isInviteRow && (
+              <button
+                type="button"
+                onClick={() => setTextKitOpen((o) => !o)}
+                aria-expanded={textKitOpen}
+                className="inline-flex items-center gap-1.5 mt-2 text-[13px] font-medium text-white bg-zinc-900 rounded-lg px-3 py-1.5 transition-colors"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                Text someone
+              </button>
+            )}
+            {task.sharePack?.shareKitUrl && (
+              <a
+                href={task.sharePack.shareKitUrl}
+                className={`inline-flex items-center gap-1.5 mt-2 text-[13px] font-medium rounded-lg px-3 py-1.5 transition-colors ${
+                  isInviteRow ? "text-zinc-900 bg-zinc-100 hover:bg-zinc-200" : "text-white bg-zinc-900"
+                }`}
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                Open the share kit
+              </a>
+            )}
+          </div>
+          {isInviteRow && textKitOpen && (
+            <div className="mt-3">
+              <FriendInviteCard
+                eventGroupId={planId}
+                variant="host"
+                hostNotificationId={notificationId}
+                suggestions={task.suggestedInvites?.map((p) => p.name)}
+                bare
+              />
+            </div>
+          )}
         </div>
       )}
     </li>
@@ -669,6 +709,7 @@ export default function ChecklistClient({
         task={t}
         busy={busyId === t.id}
         notificationId={notificationId}
+        planId={data?.planId ?? ""}
         onToggle={toggle}
         onSent={markSent}
       />
@@ -732,7 +773,13 @@ export default function ChecklistClient({
           ? {
               ...d,
               tasks: d.tasks.map((t) =>
-                t.id === taskId ? { ...t, draftSentAt: sentAt } : t,
+                t.id !== taskId
+                  ? t
+                  // The bring-a-friend message is the task: the server ticks
+                  // the row on send, and the page mirrors it without a refetch.
+                  : t.key === BRING_FRIEND_TASK_KEY
+                    ? { ...t, draftSentAt: sentAt, status: "done" }
+                    : { ...t, draftSentAt: sentAt },
               ),
             }
           : d,
@@ -850,7 +897,9 @@ export default function ChecklistClient({
 
         {/* Direct invites, in the assigned host's own voice. The checklist link
             is their credential (no session), as for the rest of this page. */}
-        {!data.cancelled && (!data.dateISO || new Date(data.dateISO).getTime() > Date.now()) && (
+        {/* Hidden while the open invite row carries the same kit as a pill. */}
+        {!data.cancelled && (!data.dateISO || new Date(data.dateISO).getTime() > Date.now())
+          && !listed.some((t) => t.key === INVITE_TASK_KEY && t.status !== "done") && (
           <section className="px-5 pt-5 pb-4 border-b border-zinc-100">
             <FriendInviteCard eventGroupId={data.planId} variant="host" hostNotificationId={notificationId} />
           </section>
