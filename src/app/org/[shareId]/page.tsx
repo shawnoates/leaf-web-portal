@@ -919,24 +919,34 @@ function RsvpModal({
     !followRequestPendingProp;
   const [alsoFollow, setAlsoFollow] = useState(true);
 
+  // Who RSVP'd and how they chose to be reached — the follow-along reuses it,
+  // so an email RSVP follows by email too.
+  const [contact, setContact] = useState<ContactChoice | null>(null);
+
   const handleFollowCalendar = async () => {
-    if (!calendarId || !verify.isVerified) return;
+    const who: ContactChoice | null = contact
+      ?? (verify.isVerified ? { name: verify.name, phone: verify.phone, notify: "text" } : null);
+    if (!calendarId || !who) return;
     setFollowError("");
     setFollowState("following");
     try {
+      const digits = who.phone.replace(/\D/g, "");
       const result = await Parse.Cloud.run("followCalendarViaWeb", {
         calendarId,
-        name: verify.name,
-        phoneNumber: verify.phone.replace(/\D/g, ""),
+        ...(who.name ? { name: who.name } : {}),
+        ...(digits ? { phoneNumber: digits } : {}),
+        notify: who.notify,
         source: followSource(calendarId),
       }) as { alreadyFollowing?: boolean; pending?: boolean } | null | undefined;
-      setFollowerCookie(calendarId, verify.name, verify.phone);
-      setVerifiedUserCookie(verify.name, verify.phone);
-      // Same identity the other follow paths leave behind, so the interest
-      // taps that follow this (see onFollowedCalendar) carry a phone.
-      try {
-        localStorage.setItem("leaf_follower_phone", verify.phone.replace(/\D/g, ""));
-      } catch { /* localStorage unavailable */ }
+      if (digits) {
+        setFollowerCookie(calendarId, who.name, who.phone);
+        setVerifiedUserCookie(who.name, who.phone);
+        // Same identity the other follow paths leave behind, so the interest
+        // taps that follow this (see onFollowedCalendar) carry a phone.
+        try {
+          localStorage.setItem("leaf_follower_phone", digits);
+        } catch { /* localStorage unavailable */ }
+      }
       const pending = result?.pending === true;
       setFollowState(pending ? "pending" : "done");
       onFollowedCalendar?.(pending);
@@ -946,14 +956,15 @@ function RsvpModal({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!verify.isVerified) return;
+  /** `who.phone` is "" for an email RSVP (as the signed-in account). */
+  const rsvp = async (who: ContactChoice) => {
+    setContact(who);
+    const digits = who.phone.replace(/\D/g, "");
     setFormStep("submitting");
     try {
       const result = await Parse.Cloud.run("rsvpToPlanViaWeb", {
-        phoneNumber: verify.phone.replace(/\D/g, ""),
-        name: verify.name,
+        ...(digits ? { phoneNumber: digits } : {}),
+        ...(who.name ? { name: who.name } : {}),
         eventGroupId: plan.id,
         rsvpNote: plan.requireApproval && rsvpNote.trim() ? rsvpNote.trim() : undefined,
         sharePhoneWithHost: sharePhone,
@@ -974,7 +985,7 @@ function RsvpModal({
         },
         calendarId ?? null,
       );
-      setVerifiedUserCookie(verify.name, verify.phone);
+      if (digits) setVerifiedUserCookie(who.name, who.phone);
       if (result?.eventNotificationId) {
         setNotificationId(result.eventNotificationId);
         // Mint a Parse session for the phone-user so /chat/[eventGroupId]
@@ -982,12 +993,15 @@ function RsvpModal({
         // the success state; they just won't be able to load the web chat
         // until they complete Google SSO from the JoinChatPicker.
         try {
-          const session = (await Parse.Cloud.run("getRsvpSession", {
-            eventNotificationId: result.eventNotificationId,
-            phoneNumber: verify.phone.replace(/\D/g, ""),
-          })) as { sessionToken?: string };
-          if (session?.sessionToken) {
-            await Parse.User.become(session.sessionToken);
+          // An email RSVP is already signed in as the account it RSVP'd as.
+          if (digits) {
+            const session = (await Parse.Cloud.run("getRsvpSession", {
+              eventNotificationId: result.eventNotificationId,
+              phoneNumber: digits,
+            })) as { sessionToken?: string };
+            if (session?.sessionToken) {
+              await Parse.User.become(session.sessionToken);
+            }
           }
         } catch (sessionErr) {
           console.warn("[RSVP] Could not mint chat session:", sessionErr);
@@ -1065,59 +1079,73 @@ function RsvpModal({
               />
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {paidTicket && (
-                <p className="text-sm text-zinc-700">
-                  ${((plan.ticketPriceCents ?? 0) / 100).toFixed((plan.ticketPriceCents ?? 0) % 100 ? 2 : 0)} ticket
-                  {(plan.bookingFeeCents ?? 0) > 0 ? ` + $${((plan.bookingFeeCents ?? 0) / 100).toFixed(2)} booking fee` : ""}
-                </p>
+            {paidTicket && (
+              <p className="text-sm text-zinc-700">
+                ${((plan.ticketPriceCents ?? 0) / 100).toFixed((plan.ticketPriceCents ?? 0) % 100 ? 2 : 0)} ticket
+                {(plan.bookingFeeCents ?? 0) > 0 ? ` + $${((plan.bookingFeeCents ?? 0) / 100).toFixed(2)} booking fee` : ""}
+              </p>
+            )}
+            {collectsP2p && (
+              <p className="text-sm text-zinc-700">{p2pPriceLine(plan.p2pAmountCents, plan.p2pSplit)}</p>
+            )}
+            <ContactStep
+              verify={verify}
+              brandColor={brandColor}
+              // Paid tickets check out against the phone-verified session.
+              allowEmail={!paidTicket}
+              actionLabel={planIsFull(plan) ? "Join the waitlist" : plan.requireApproval ? "Send request" : "Confirm RSVP"}
+              busy={formStep === "submitting"}
+              notes={{
+                text: "We'll text your confirmation and a reminder.",
+                email: "We'll email your confirmation and a reminder.",
+              }}
+              onConfirmed={(who) => rsvp(who)}
+              extras={({ method, verified }) => (
+                <>
+                  {plan.requireApproval && (
+                    <div>
+                      <label className="text-xs font-medium text-zinc-700 block mb-1">Note for the host (optional)</label>
+                      <textarea
+                        value={rsvpNote}
+                        onChange={(e) => setRsvpNote(e.target.value)}
+                        maxLength={200}
+                        rows={2}
+                        className="w-full rounded-xl border border-zinc-200 p-3 text-sm focus:outline-none focus:border-zinc-900 resize-none"
+                        placeholder="Tell the host a bit about yourself..."
+                      />
+                      <p className="text-xs text-zinc-400 text-right mt-0.5">{rsvpNote.length}/200</p>
+                    </div>
+                  )}
+                  {method === "text" && verified && (
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={sharePhone}
+                        onChange={(e) => setSharePhone(e.target.checked)}
+                        className="w-4 h-4 accent-zinc-900 rounded"
+                      />
+                      <span className="text-xs text-zinc-600">Share my phone number with the host</span>
+                    </label>
+                  )}
+                  {canOfferInlineFollow && (
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={alsoFollow}
+                        onChange={(e) => setAlsoFollow(e.target.checked)}
+                        className="w-4 h-4 accent-zinc-900 rounded"
+                      />
+                      <span className="text-xs text-zinc-600">
+                        {isPrivateCalendar
+                          ? `Also request to follow ${calendarName || "this calendar"}`
+                          : `Also follow ${calendarName || "this calendar"} for new plans`}
+                      </span>
+                    </label>
+                  )}
+                </>
               )}
-              {collectsP2p && (
-                <p className="text-sm text-zinc-700">{p2pPriceLine(plan.p2pAmountCents, plan.p2pSplit)}</p>
-              )}
-              <PhoneVerifyFields verify={verify} onSendOTP={verify.sendOTP} />
-              {verify.isVerified && (
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={sharePhone}
-                    onChange={(e) => setSharePhone(e.target.checked)}
-                    className="w-4 h-4 accent-zinc-900 rounded"
-                  />
-                  <span className="text-xs text-zinc-600">Share phone number with host</span>
-                </label>
-              )}
-              {verify.isVerified && canOfferInlineFollow && (
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={alsoFollow}
-                    onChange={(e) => setAlsoFollow(e.target.checked)}
-                    className="w-4 h-4 accent-zinc-900 rounded"
-                  />
-                  <span className="text-xs text-zinc-600">
-                    {isPrivateCalendar
-                      ? `Also request to follow ${calendarName || "this calendar"}`
-                      : `Also follow ${calendarName || "this calendar"} for new plans`}
-                  </span>
-                </label>
-              )}
-              {plan.requireApproval && (
-                <div>
-                  <label className="text-xs font-medium text-zinc-700 block mb-1">Note for the host (optional)</label>
-                  <textarea
-                    value={rsvpNote}
-                    onChange={(e) => setRsvpNote(e.target.value)}
-                    maxLength={200}
-                    rows={2}
-                    className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-none"
-                    placeholder="Tell the host a bit about yourself..."
-                  />
-                  <p className="text-xs text-zinc-400 text-right mt-0.5">{rsvpNote.length}/200</p>
-                </div>
-              )}
-              {paidTicket ? (
-                verify.isVerified && verify.sessionToken ? (
+              renderVerifiedAction={paidTicket ? () => (
+                verify.sessionToken ? (
                   <PaidRsvp
                     planId={plan.id}
                     sessionToken={verify.sessionToken}
@@ -1131,25 +1159,8 @@ function RsvpModal({
                     }}
                   />
                 ) : null
-              ) : (
-              <button
-                type="submit"
-                disabled={formStep === "submitting" || !verify.isVerified || !verify.name}
-                className="w-full text-white py-3.5 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-50"
-                style={{ backgroundColor: brandColor || "#18181b" }}
-              >
-                {formStep === "submitting" ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : planIsFull(plan) ? (
-                  <>Join Waitlist <ArrowRight className="w-4 h-4" /></>
-                ) : plan.requireApproval ? (
-                  <>Submit Request <ArrowRight className="w-4 h-4" /></>
-                ) : (
-                  <>Confirm RSVP <ArrowRight className="w-4 h-4" /></>
-                )}
-              </button>
-              )}
-            </form>
+              ) : undefined}
+            />
           </div>
         ) : formStep === "error" ? (
           <div className="py-8 text-center space-y-6">
@@ -1547,6 +1558,271 @@ function PhoneVerifyFields({ verify, onSendOTP }: { verify: ReturnType<typeof us
   );
 }
 
+// --- "How should we reach you?" (follow + RSVP sheets) ---
+//
+// One question, two tabs. Each tab shows only its own fields and one button
+// whose label names the next step: Text me a code → <action>; Email me a code
+// → <action>. Someone already signed in gets their number or address shown as
+// verified with a one-tap <action> and "Not you?" (signs this browser out, for
+// shared devices). onConfirmed fires once identity is settled, with the phone
+// ("" for email) and which channel they chose.
+
+type ContactChoice = { name: string; phone: string; notify: "text" | "email" };
+
+function readContactSession() {
+  const u = Parse.User.current();
+  if (!u) return null;
+  return {
+    phone: String(u.get("phone") || ""),
+    email: String(u.get("email") || ""),
+    name: String(u.get("full_name") || u.get("name") || ""),
+  };
+}
+
+function ContactStep({
+  verify,
+  brandColor,
+  actionLabel,
+  busy,
+  onConfirmed,
+  allowEmail = true,
+  notes,
+  extras,
+  renderVerifiedAction,
+}: {
+  verify: ReturnType<typeof usePhoneVerify>;
+  brandColor?: string;
+  /** What the final button does: "Follow", "Confirm RSVP", "Join waitlist"… */
+  actionLabel: string;
+  busy: boolean;
+  onConfirmed: (who: ContactChoice) => void | Promise<void>;
+  allowEmail?: boolean;
+  notes?: { text?: string; email?: string };
+  /** Extra fields above the final button (a note for the host, checkboxes). */
+  extras?: (state: { method: "text" | "email"; verified: boolean }) => React.ReactNode;
+  /** Replaces the final button once the phone is verified (paid tickets). */
+  renderVerifiedAction?: () => React.ReactNode;
+}) {
+  const [session, setSession] = useState(readContactSession);
+  const [method, setMethod] = useState<"text" | "email">(() =>
+    allowEmail && Parse.User.current() && !Parse.User.current()?.get("phone") ? "email" : "text");
+  const [googleError, setGoogleError] = useState("");
+  const [emailName, setEmailName] = useState(() => readContactSession()?.name || "");
+  const emailSignIn = useEmailCodeSignIn(async (who) => {
+    setSession(readContactSession());
+    await onConfirmed({ name: who.name || emailName.trim(), phone: "", notify: "email" });
+  });
+
+  const notYou = async () => {
+    try { await Parse.User.logOut(); } catch { /* already signed out */ }
+    document.cookie = "leaf_verified_user=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+    try { localStorage.removeItem("leaf_follower_phone"); } catch { /* storage off */ }
+    setSession(null);
+    verify.reset();
+    verify.setName("");
+    verify.setPhone("");
+  };
+
+  const submitText = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (verify.step === "phone") { await verify.sendOTP(); return; }
+    if (verify.step === "code") {
+      if (await verify.verifyOTP()) await onConfirmed({ name: verify.name, phone: verify.phone, notify: "text" });
+      return;
+    }
+    await onConfirmed({ name: verify.name, phone: verify.phone, notify: "text" });
+  };
+
+  const inputCls = "w-full rounded-xl border border-zinc-200 px-4 py-3 text-base focus:outline-none focus:border-zinc-900 disabled:bg-zinc-50 disabled:text-zinc-500";
+  const primaryCls = "w-full rounded-xl text-white py-3.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-40";
+  const primaryStyle = { backgroundColor: brandColor || "#18181b" };
+  const spinner = <Loader2 className="w-4 h-4 animate-spin mx-auto" />;
+  const verifiedRow = (label: string) => (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 px-4 py-3">
+      <span className="flex items-center gap-2 text-sm min-w-0">
+        <Check className="w-4 h-4 shrink-0 text-emerald-600" />
+        <span className="truncate">{label}</span>
+      </span>
+      <button type="button" onClick={notYou} className="text-xs text-zinc-500 underline shrink-0">Not you?</button>
+    </div>
+  );
+  const codeInput = (value: string, onChange: (v: string) => void, sentTo: string, onChangeTarget: () => void, targetWord: string) => (
+    <div className="space-y-2">
+      <input
+        type="text"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        autoFocus
+        maxLength={6}
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
+        placeholder="6-digit code"
+        className={`${inputCls} tracking-[0.3em]`}
+      />
+      <p className="text-xs text-zinc-500">
+        Sent to {sentTo}.{" "}
+        <button type="button" onClick={onChangeTarget} className="underline">Change {targetWord}</button>
+      </p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      {allowEmail && (
+        <div>
+          <p className="text-xs font-semibold text-zinc-700 mb-2">How should we reach you?</p>
+          <div role="tablist" className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-zinc-100">
+            {(["text", "email"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={method === m}
+                onClick={() => setMethod(m)}
+                className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  method === m ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-800"
+                }`}
+              >
+                {m === "text" ? <MessageCircle className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                {m === "text" ? "Text me" : "Email me"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {method === "text" ? (
+        <form onSubmit={submitText} className="space-y-4">
+          {verify.isVerified ? (
+            verifiedRow(verify.phone)
+          ) : (
+            <>
+              <input
+                type="text"
+                value={verify.name}
+                onChange={(e) => verify.setName(e.target.value)}
+                placeholder="Your name"
+                autoComplete="name"
+                disabled={verify.step === "code"}
+                className={inputCls}
+              />
+              {verify.step === "phone" ? (
+                <input
+                  type="tel"
+                  value={verify.phone}
+                  onChange={(e) => verify.setPhone(formatPhoneNumber(e.target.value))}
+                  placeholder="Mobile number"
+                  autoComplete="tel-national"
+                  className={inputCls}
+                />
+              ) : codeInput(verify.code, verify.setCode, verify.phone, verify.reset, "number")}
+            </>
+          )}
+          {verify.error && <p className="text-xs text-red-600">{verify.error}</p>}
+          {extras?.({ method: "text", verified: verify.isVerified })}
+          {verify.isVerified && renderVerifiedAction ? (
+            renderVerifiedAction()
+          ) : (
+            <button
+              type="submit"
+              disabled={
+                busy || verify.sending ||
+                (verify.step === "phone" && (!verify.name.trim() || verify.phone.replace(/\D/g, "").length < 10)) ||
+                (verify.step === "code" && verify.code.length < 6)
+              }
+              className={primaryCls}
+              style={primaryStyle}
+            >
+              {busy || verify.sending ? spinner : verify.step === "phone" ? "Text me a code" : actionLabel}
+            </button>
+          )}
+          {notes?.text && <p className="text-center text-xs text-zinc-400">{notes.text}</p>}
+        </form>
+      ) : (
+        <div className="space-y-4">
+          {session?.email ? (
+            <>
+              {verifiedRow(session.email)}
+              {extras?.({ method: "email", verified: true })}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onConfirmed({ name: session.name, phone: "", notify: "email" })}
+                className={primaryCls}
+                style={primaryStyle}
+              >
+                {busy ? spinner : actionLabel}
+              </button>
+            </>
+          ) : (
+            <>
+              <GoogleSignInButton
+                fullWidth
+                ignoreExistingSession
+                onSignIn={(u) => {
+                  const user = u as unknown as Parse.User;
+                  setSession(readContactSession());
+                  const name = String(user?.get?.("full_name") || user?.get?.("name") || "");
+                  void onConfirmed({ name, phone: "", notify: "email" });
+                }}
+                onError={(msg) => setGoogleError(msg)}
+              />
+              {googleError && <p className="text-xs text-red-600">{googleError}</p>}
+              <div className="flex items-center gap-3 text-xs text-zinc-400">
+                <span className="h-px flex-1 bg-zinc-200" />or<span className="h-px flex-1 bg-zinc-200" />
+              </div>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (emailSignIn.step === "email") void emailSignIn.sendCode();
+                  else void emailSignIn.verify();
+                }}
+                className="space-y-4"
+              >
+                {emailSignIn.step === "email" ? (
+                  <>
+                    <input
+                      type="text"
+                      value={emailName}
+                      onChange={(e) => setEmailName(e.target.value)}
+                      placeholder="Your name"
+                      autoComplete="name"
+                      className={inputCls}
+                    />
+                    <input
+                      type="email"
+                      value={emailSignIn.email}
+                      onChange={(e) => emailSignIn.setEmail(e.target.value)}
+                      placeholder="Email address"
+                      autoComplete="email"
+                      className={inputCls}
+                    />
+                  </>
+                ) : codeInput(emailSignIn.code, emailSignIn.setCode, emailSignIn.email, emailSignIn.restart, "email")}
+                {emailSignIn.error && <p className="text-xs text-red-600">{emailSignIn.error}</p>}
+                {extras?.({ method: "email", verified: false })}
+                <button
+                  type="submit"
+                  disabled={
+                    busy || emailSignIn.busy ||
+                    (emailSignIn.step === "email" && (!emailName.trim() || !emailSignIn.email.includes("@"))) ||
+                    (emailSignIn.step === "code" && emailSignIn.code.length < 6)
+                  }
+                  className={primaryCls}
+                  style={primaryStyle}
+                >
+                  {busy || emailSignIn.busy ? spinner : emailSignIn.step === "email" ? "Email me a code" : actionLabel}
+                </button>
+              </form>
+            </>
+          )}
+          {notes?.email && <p className="text-center text-xs text-zinc-400">{notes.email}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- Cancel RSVP Modal (requires OTP when user hasn't verified in this session) ---
 
 function CancelRsvpModal({
@@ -1764,45 +2040,6 @@ function FollowModal({
     [intro, onClose, interest],
   );
 
-  // Who this browser is signed in as, if anyone. Drives what each tab shows:
-  // a verified phone or email is a one-tap Follow instead of a form.
-  const readSession = () => {
-    const u = Parse.User.current();
-    if (!u) return null;
-    return {
-      phone: String(u.get("phone") || ""),
-      email: String(u.get("email") || ""),
-      name: String(u.get("full_name") || u.get("name") || ""),
-    };
-  };
-  const [session, setSession] = useState(readSession);
-  // "How should we reach you?" — the digest goes the way they pick
-  // (followCalendarViaWeb notify → digestPrefersEmail).
-  const [method, setMethod] = useState<"text" | "email">(() =>
-    Parse.User.current() && !Parse.User.current()?.get("phone") ? "email" : "text");
-  const [googleError, setGoogleError] = useState("");
-
-  /** Shared device: drop this browser's sign-in and start the sheet over. */
-  const notYou = async () => {
-    try { await Parse.User.logOut(); } catch { /* already signed out */ }
-    document.cookie = "leaf_verified_user=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
-    try { localStorage.removeItem("leaf_follower_phone"); } catch { /* storage off */ }
-    setSession(null);
-    verify.reset();
-    verify.setName("");
-    verify.setPhone("");
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (verify.step === "phone") { await verify.sendOTP(); return; }
-    if (verify.step === "code") {
-      if (await verify.verifyOTP()) await follow({ name: verify.name, phone: verify.phone, notify: "text" });
-      return;
-    }
-    await follow({ name: verify.name, phone: verify.phone, notify: "text" });
-  };
-
   /** `phone` is "" when following by email (as the signed-in account). */
   const follow = async ({ name, phone, notify }: { name: string; phone: string; notify: "text" | "email" }) => {
     setFormStep("submitting");
@@ -1857,12 +2094,6 @@ function FollowModal({
       setFormStep("error");
     }
   };
-
-  const [emailName, setEmailName] = useState(() => session?.name || "");
-  const emailSignIn = useEmailCodeSignIn(async (who) => {
-    setSession(readSession());
-    await follow({ name: who.name || emailName.trim(), phone: "", notify: "email" });
-  });
 
   // The share kit step swaps the card chrome: full-bleed header band, spec
   // radii and scrim, and the scrim itself dismisses (never on the phone form,
@@ -1924,208 +2155,17 @@ function FollowModal({
               </p>
             </div>
 
-            {/* The one question the sheet asks. Each tab shows only its own
-                fields, and a single button that names the next step. */}
-            <div>
-              <p className="text-xs font-semibold text-zinc-700 mb-2">How should we reach you?</p>
-              <div role="tablist" className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-zinc-100">
-                {(["text", "email"] as const).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    role="tab"
-                    aria-selected={method === m}
-                    onClick={() => setMethod(m)}
-                    className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      method === m ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-800"
-                    }`}
-                  >
-                    {m === "text" ? <MessageCircle className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
-                    {m === "text" ? "Text me" : "Email me"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {method === "text" ? (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {verify.isVerified ? (
-                  <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 px-4 py-3">
-                    <span className="flex items-center gap-2 text-sm">
-                      <Check className="w-4 h-4 text-emerald-600" />
-                      {verify.phone}
-                    </span>
-                    <button type="button" onClick={notYou} className="text-xs text-zinc-500 underline">Not you?</button>
-                  </div>
-                ) : (
-                  <>
-                    <input
-                      type="text"
-                      value={verify.name}
-                      onChange={(e) => verify.setName(e.target.value)}
-                      placeholder="Your name"
-                      autoComplete="name"
-                      disabled={verify.step === "code"}
-                      className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-base focus:outline-none focus:border-zinc-900 disabled:bg-zinc-50 disabled:text-zinc-500"
-                    />
-                    {verify.step === "phone" ? (
-                      <input
-                        type="tel"
-                        value={verify.phone}
-                        onChange={(e) => verify.setPhone(formatPhoneNumber(e.target.value))}
-                        placeholder="Mobile number"
-                        autoComplete="tel-national"
-                        className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-base focus:outline-none focus:border-zinc-900"
-                      />
-                    ) : (
-                      <div className="space-y-2">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          autoComplete="one-time-code"
-                          autoFocus
-                          maxLength={6}
-                          value={verify.code}
-                          onChange={(e) => verify.setCode(e.target.value.replace(/\D/g, ""))}
-                          placeholder="6-digit code"
-                          className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-base tracking-[0.3em] focus:outline-none focus:border-zinc-900"
-                        />
-                        <p className="text-xs text-zinc-500">
-                          Sent to {verify.phone}.{" "}
-                          <button type="button" onClick={verify.reset} className="underline">Change number</button>
-                        </p>
-                      </div>
-                    )}
-                  </>
-                )}
-                {verify.error && <p className="text-xs text-red-600">{verify.error}</p>}
-                <button
-                  type="submit"
-                  disabled={
-                    formStep === "submitting" || verify.sending ||
-                    (verify.step === "phone" && (!verify.name.trim() || verify.phone.replace(/\D/g, "").length < 10)) ||
-                    (verify.step === "code" && verify.code.length < 6)
-                  }
-                  className="w-full rounded-xl text-white py-3.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-40"
-                  style={{ backgroundColor: brandColor || "#18181b" }}
-                >
-                  {formStep === "submitting" || verify.sending ? (
-                    <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                  ) : verify.step === "phone" ? (
-                    "Text me a code"
-                  ) : verify.step === "code" ? (
-                    isPrivate ? "Confirm and request" : "Confirm and follow"
-                  ) : isPrivate ? "Request to follow" : "Follow"}
-                </button>
-                <p className="text-center text-xs text-zinc-400">At most one text a week. Reply STOP anytime.</p>
-              </form>
-            ) : (
-              <div className="space-y-4">
-                {session?.email ? (
-                  <>
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 px-4 py-3">
-                      <span className="flex items-center gap-2 text-sm min-w-0">
-                        <Check className="w-4 h-4 shrink-0 text-emerald-600" />
-                        <span className="truncate">{session.email}</span>
-                      </span>
-                      <button type="button" onClick={notYou} className="text-xs text-zinc-500 underline shrink-0">Not you?</button>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={formStep === "submitting"}
-                      onClick={() => follow({ name: session.name, phone: "", notify: "email" })}
-                      className="w-full rounded-xl text-white py-3.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-40"
-                      style={{ backgroundColor: brandColor || "#18181b" }}
-                    >
-                      {formStep === "submitting" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : isPrivate ? "Request to follow" : "Follow"}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <GoogleSignInButton
-                      fullWidth
-                      ignoreExistingSession
-                      onSignIn={(u) => {
-                        const user = u as unknown as Parse.User;
-                        setSession(readSession());
-                        const name = String(user?.get?.("full_name") || user?.get?.("name") || "");
-                        void follow({ name, phone: "", notify: "email" });
-                      }}
-                      onError={(msg) => setGoogleError(msg)}
-                    />
-                    {googleError && <p className="text-xs text-red-600">{googleError}</p>}
-                    <div className="flex items-center gap-3 text-xs text-zinc-400">
-                      <span className="h-px flex-1 bg-zinc-200" />or<span className="h-px flex-1 bg-zinc-200" />
-                    </div>
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (emailSignIn.step === "email") void emailSignIn.sendCode();
-                        else void emailSignIn.verify();
-                      }}
-                      className="space-y-4"
-                    >
-                      {emailSignIn.step === "email" ? (
-                        <>
-                          <input
-                            type="text"
-                            value={emailName}
-                            onChange={(e) => setEmailName(e.target.value)}
-                            placeholder="Your name"
-                            autoComplete="name"
-                            className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-base focus:outline-none focus:border-zinc-900"
-                          />
-                          <input
-                            type="email"
-                            value={emailSignIn.email}
-                            onChange={(e) => emailSignIn.setEmail(e.target.value)}
-                            placeholder="Email address"
-                            autoComplete="email"
-                            className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-base focus:outline-none focus:border-zinc-900"
-                          />
-                        </>
-                      ) : (
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            autoComplete="one-time-code"
-                            autoFocus
-                            maxLength={6}
-                            value={emailSignIn.code}
-                            onChange={(e) => emailSignIn.setCode(e.target.value)}
-                            placeholder="6-digit code"
-                            className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-base tracking-[0.3em] focus:outline-none focus:border-zinc-900"
-                          />
-                          <p className="text-xs text-zinc-500">
-                            Sent to {emailSignIn.email}.{" "}
-                            <button type="button" onClick={emailSignIn.restart} className="underline">Change email</button>
-                          </p>
-                        </div>
-                      )}
-                      {emailSignIn.error && <p className="text-xs text-red-600">{emailSignIn.error}</p>}
-                      <button
-                        type="submit"
-                        disabled={
-                          formStep === "submitting" || emailSignIn.busy ||
-                          (emailSignIn.step === "email" && (!emailName.trim() || !emailSignIn.email.includes("@"))) ||
-                          (emailSignIn.step === "code" && emailSignIn.code.length < 6)
-                        }
-                        className="w-full rounded-xl text-white py-3.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-40"
-                        style={{ backgroundColor: brandColor || "#18181b" }}
-                      >
-                        {formStep === "submitting" || emailSignIn.busy ? (
-                          <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                        ) : emailSignIn.step === "email" ? (
-                          "Email me a code"
-                        ) : isPrivate ? "Confirm and request" : "Confirm and follow"}
-                      </button>
-                    </form>
-                  </>
-                )}
-                <p className="text-center text-xs text-zinc-400">At most one email a week. Unsubscribe anytime.</p>
-              </div>
-            )}
+            <ContactStep
+              verify={verify}
+              brandColor={brandColor}
+              actionLabel={isPrivate ? "Request to follow" : "Follow"}
+              busy={formStep === "submitting"}
+              notes={{
+                text: "At most one text a week. Reply STOP anytime.",
+                email: "At most one email a week. Unsubscribe anytime.",
+              }}
+              onConfirmed={(who) => follow(who)}
+            />
           </div>
         ) : formStep === "intro" && intro ? (
           <ShareKitPrompt
