@@ -151,7 +151,7 @@ export default function FriendsClient() {
 
         <section id="faq" className="scroll-mt-20 border-t border-fm-line-dim py-16">
           <div className="mx-auto max-w-3xl px-4 sm:px-6">
-            <h2 className="m-0 font-fm-serif text-[36px] font-normal leading-tight">Questions</h2>
+            <h2 className="m-0 font-fm-serif text-[36px] font-normal leading-tight">FAQs</h2>
             <dl className="m-0 mt-6 divide-y divide-fm-line-dim">
               {FAQ.map((f) => (
                 <div key={f.q} className="py-4">
@@ -174,7 +174,7 @@ export default function FriendsClient() {
           </a>
         </section>
 
-        <MarketingFooter blurb="Leaf finds the night. You show up." />
+        <MarketingFooter blurb="Leaf finds the night. You show up." dark />
       </div>
     </div>
   );
@@ -197,7 +197,7 @@ function FriendModeNav({ isLoggedIn }: { isLoggedIn: boolean }) {
         <div className="flex items-center gap-6">
           <a href="#how" className={link}>How it works</a>
           <a href="#pulse" className={link}>Crew Pulse</a>
-          <a href="#faq" className={link}>Questions</a>
+          <a href="#faq" className={link}>FAQs</a>
           <Link href="/me" className="text-sm font-semibold text-fm-ink transition-colors hover:text-fm-accent">
             {isLoggedIn ? "My crews" : "Log in"}
           </Link>

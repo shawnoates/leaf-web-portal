@@ -3,23 +3,26 @@
 import Link from "next/link";
 import { allCredits } from "./photos";
 
-export default function MarketingFooter({ blurb }: { blurb: string }) {
+/** `dark`: on a dark page (Friend Mode's /friends) — white logo, light text. */
+export default function MarketingFooter({ blurb, dark = false }: { blurb: string; dark?: boolean }) {
+  const ink = dark ? "#F2F1EC" : "var(--mkt-ink)";
+  const ink3 = dark ? "#A3ACA6" : "var(--mkt-ink-3)";
   return (
     <footer
       className="px-5 py-10 sm:px-12"
       style={{
-        borderTop: "1px solid var(--mkt-line-section)",
-        color: "var(--mkt-ink-3)",
+        borderTop: `1px solid ${dark ? "#2E4038" : "var(--mkt-line-section)"}`,
+        color: ink3,
       }}
     >
       <div className="mx-auto grid max-w-[1440px] gap-8 text-[13px] sm:grid-cols-[2fr_1fr_1fr] sm:gap-6">
         <div className="flex flex-col gap-2.5">
           <div className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/leaf-logo-black.png" alt="Leaf" className="h-[18px]" />
+            <img src={dark ? "/leaf-logo-white.svg" : "/leaf-logo-black.png"} alt="Leaf" className="h-[18px]" />
             <span
               className="text-[16px] font-light uppercase tracking-[0.14em]"
-              style={{ color: "var(--mkt-ink)", opacity: 0.5 }}
+              style={{ color: ink, opacity: 0.5 }}
             >
               OS
             </span>
@@ -28,7 +31,7 @@ export default function MarketingFooter({ blurb }: { blurb: string }) {
         </div>
 
         <FooterColumn
-          title="Platform"
+          title="Platform" ink={ink}
           links={[
             { href: "/about", label: "About" },
             { href: "/personal", label: "For individuals" },
@@ -39,14 +42,14 @@ export default function MarketingFooter({ blurb }: { blurb: string }) {
           ]}
         />
         <FooterColumn
-          title="Local businesses"
+          title="Local businesses" ink={ink}
           links={[
             { href: "/partner", label: "Host neighbors" },
             { href: "/partner/login", label: "Business sign in" },
           ]}
         />
         <FooterColumn
-          title="Legal"
+          title="Legal" ink={ink}
           links={[
             { href: "/terms-conditions", label: "Terms" },
             { href: "/privacy-policy", label: "Privacy" },
@@ -59,7 +62,7 @@ export default function MarketingFooter({ blurb }: { blurb: string }) {
           wherever their photos are used. */}
       <div
         className="mx-auto mt-8 max-w-[1440px] text-[11px] leading-[1.6]"
-        style={{ color: "var(--mkt-ink-3)", opacity: 0.75 }}
+        style={{ color: ink3, opacity: 0.75 }}
       >
         Photography via{" "}
         <a
@@ -93,15 +96,17 @@ export default function MarketingFooter({ blurb }: { blurb: string }) {
 function FooterColumn({
   title,
   links,
+  ink,
 }: {
   title: string;
   links: { href: string; label: string }[];
+  ink: string;
 }) {
   return (
     <div className="flex flex-col gap-2">
       <div
         className="mkt-mono text-[11px] font-semibold uppercase tracking-[0.12em]"
-        style={{ color: "var(--mkt-ink)" }}
+        style={{ color: ink }}
       >
         {title}
       </div>
