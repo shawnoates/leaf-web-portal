@@ -83,9 +83,16 @@ function DashboardPageInner() {
       const result = await Parse.Cloud.run("getMyOrganizations");
       const organizations: OrgSummary[] = result.organizations || [];
 
-      // No orgs → setup
+      // No calendar of their own. Someone in Friend Mode (or arriving from
+      // /friends) gets the dashboard with just their crews; anyone else
+      // goes to calendar setup as before.
       if (organizations.length === 0) {
-        router.push("/organizations/setup");
+        let hasCrews = false;
+        try {
+          const fm = (await Parse.Cloud.run("getFriendModeHome")) as { crews?: unknown[] };
+          hasCrews = (fm?.crews?.length || 0) > 0;
+        } catch { /* fall through to setup */ }
+        router.push(hasCrews || searchParams.get("from") === "friends" ? "/dashboard/friends" : "/organizations/setup");
         return;
       }
 

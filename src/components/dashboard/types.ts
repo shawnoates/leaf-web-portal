@@ -338,7 +338,8 @@ export type DashboardTab =
   | "community"
   | "grow"
   | "inbox"
-  | "settings";
+  | "settings"
+  | "crew";
 
 export type GrowSection = "performance" | "marketplace" | "collabs" | "concierge";
 
@@ -477,4 +478,14 @@ export function rsvpCountForPerson(
     if (byPhone) return byPhone.size;
   }
   return map.get(`${prefix}${person.name.trim().toLowerCase()}`)?.size || 0;
+}
+
+/** A Friend Mode crew in the dashboard sidebar (getFriendModeHome's `crews`). */
+export interface DashboardCrew {
+  crewId: string;
+  name: string;
+  image?: string | null;
+  status: "active" | "paused" | "invited" | "off";
+  statusLine?: string | null;
+  isOwner?: boolean;
 }

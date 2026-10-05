@@ -211,7 +211,7 @@ function FriendModeNav({ isLoggedIn }: { isLoggedIn: boolean }) {
         <div className="flex items-center gap-6">
           <Link href="/" className={link}>Create a calendar</Link>
           {isLoggedIn ? (
-            <Link href="/me" className="text-sm font-semibold text-fm-ink transition-colors hover:text-fm-accent">My crews</Link>
+            <Link href="/dashboard?from=friends" className="text-sm font-semibold text-fm-ink transition-colors hover:text-fm-accent">Dashboard</Link>
           ) : (
             <button type="button" onClick={() => setSigningIn(true)} className="text-sm font-semibold text-fm-ink transition-colors hover:text-fm-accent">
               Log in
@@ -235,7 +235,7 @@ function FriendModeNav({ isLoggedIn }: { isLoggedIn: boolean }) {
   );
 }
 
-/** Log in from /friends: the same Leaf sign-in as everywhere, then your crews on /me. */
+/** Log in from /friends: the same Leaf sign-in as everywhere, then the dashboard (crews under Friend Mode). */
 function LogInSheet({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -254,7 +254,7 @@ function LogInSheet({ onClose }: { onClose: () => void }) {
             <X size={20} aria-hidden />
           </button>
         </div>
-        <LeafSignIn tone="dark" onSignedIn={() => { window.location.href = "/me"; }} />
+        <LeafSignIn tone="dark" onSignedIn={() => { window.location.href = "/dashboard?from=friends"; }} />
       </div>
     </div>
   );

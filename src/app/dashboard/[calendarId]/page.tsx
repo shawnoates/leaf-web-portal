@@ -21,6 +21,10 @@ import CreatePlanModal, { type CreatePlanPrefill, NEW_PLAN_DRAFT_SESSION_KEY } f
 import PlanDetailModal from "@/components/PlanDetailModal";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import CrewClient from "@/app/crew/[token]/CrewClient";
+import { CrewEmbed } from "@/components/crew/CrewShell";
+import StartCrewModal from "@/components/crew/StartCrewModal";
+import { useMyCrews } from "@/lib/my-crews";
 import DashboardBottomBar from "@/components/dashboard/DashboardBottomBar";
 import HomeTab from "@/components/dashboard/HomeTab";
 import CommunityTab, { type CommunitySegment } from "@/components/dashboard/CommunityTab";
@@ -129,7 +133,7 @@ const LEGACY_TAB_MAP: Record<string, DashboardTab> = {
 function normalizeTab(raw: string | null): DashboardTab {
   if (!raw) return "home";
   if (raw in LEGACY_TAB_MAP) return LEGACY_TAB_MAP[raw];
-  if (["home", "calendars", "community", "grow", "settings"].includes(raw)) {
+  if (["home", "calendars", "community", "grow", "settings", "crew"].includes(raw)) {
     return raw as DashboardTab;
   }
   return "home";
@@ -164,6 +168,10 @@ export default function OrgDashboardPage() {
   const dashboardCacheKey = `org_dashboard_cache_${calendarId}`;
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DashboardTab>(initialTab);
+  // Friend Mode: the person's crews, listed under Calendars; one opens in the main pane.
+  const { crews, reload: reloadCrews } = useMyCrews();
+  const [selectedCrewId, setSelectedCrewId] = useState<string | null>(searchParams.get("crew"));
+  const [showStartCrew, setShowStartCrew] = useState(false);
   const [growSection, setGrowSection] = useState<GrowSection>(
     rawInitialTab === "marketplace" ? "marketplace" : "performance",
   );
@@ -211,6 +219,7 @@ export default function OrgDashboardPage() {
       setActiveTab(tab);
       const next = new URLSearchParams(searchParams.toString());
       next.set("tab", tab);
+      if (tab !== "crew") next.delete("crew");
       router.replace(`/dashboard/${calendarId}?${next.toString()}`, { scroll: false });
     },
     [router, searchParams, calendarId],
@@ -1686,7 +1695,30 @@ export default function OrgDashboardPage() {
           else setShowAddCalendar(true);
         }}
         onLogout={handleLogout}
+        crews={crews}
+        selectedCrewId={activeTab === "crew" ? selectedCrewId : null}
+        onSelectCrew={(id) => {
+          setSelectedCrewId(id);
+          setActiveTab("crew");
+          const next = new URLSearchParams(searchParams.toString());
+          next.set("tab", "crew");
+          next.set("crew", id);
+          router.replace(`/dashboard/${calendarId}?${next.toString()}`, { scroll: false });
+        }}
+        onStartCrew={() => setShowStartCrew(true)}
       />
+      {showStartCrew && (
+        <StartCrewModal
+          onClose={() => { setShowStartCrew(false); void reloadCrews(); }}
+          onOpenCrew={(id) => {
+            setShowStartCrew(false);
+            void reloadCrews();
+            setSelectedCrewId(id);
+            setActiveTab("crew");
+            router.replace(`/dashboard/${calendarId}?tab=crew&crew=${id}`, { scroll: false });
+          }}
+        />
+      )}
 
       {/* Content column */}
       <div className="flex-1 min-w-0 flex flex-col pb-24 lg:pb-0">
@@ -1730,6 +1762,14 @@ export default function OrgDashboardPage() {
         </header>
 
         <main className="flex-1 min-w-0">
+          {/* ──────── FRIEND MODE CREW ──────── */}
+          {activeTab === "crew" && selectedCrewId && (
+            <div className="p-3 lg:p-6">
+              <CrewEmbed>
+                <CrewClient key={selectedCrewId} token={selectedCrewId} />
+              </CrewEmbed>
+            </div>
+          )}
           {/* ──────── HOME ──────── */}
           {activeTab === "home" && (
             <HomeTab

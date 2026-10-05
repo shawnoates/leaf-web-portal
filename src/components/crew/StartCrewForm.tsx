@@ -28,7 +28,10 @@ type Created = { crewId: string; link: string; inviteLink: string };
 const field = "h-12 w-full rounded-2xl border border-fm-line bg-fm-canvas px-4 text-base text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none";
 const primary = "flex h-12 w-full items-center justify-center gap-2 rounded-full bg-fm-accent px-6 text-[15px] font-bold text-fm-canvas transition hover:brightness-105 disabled:opacity-60";
 
-export default function StartCrewForm() {
+export default function StartCrewForm({ onOpenCrew }: {
+  /** In the dashboard: open the new crew there instead of leaving for its page. */
+  onOpenCrew?: (crewId: string) => void;
+} = {}) {
   const [step, setStep] = useState<Step>("crew");
   const [crewName, setCrewName] = useState("");
   const [pace, setPace] = useState(14);
@@ -177,7 +180,11 @@ export default function StartCrewForm() {
             </button>
           </div>
           <button type="button" className={primary} onClick={share}><Share size={16} aria-hidden /> Send the invite</button>
-          <a href={created.link} className="flex h-12 items-center justify-center rounded-full border border-fm-line text-[15px] font-semibold text-fm-ink hover:bg-fm-card">Open your crew page</a>
+          {onOpenCrew ? (
+            <button type="button" onClick={() => onOpenCrew(created.crewId)} className="flex h-12 items-center justify-center rounded-full border border-fm-line text-[15px] font-semibold text-fm-ink hover:bg-fm-card">Open your crew</button>
+          ) : (
+            <a href={created.link} className="flex h-12 items-center justify-center rounded-full border border-fm-line text-[15px] font-semibold text-fm-ink hover:bg-fm-card">Open your crew page</a>
+          )}
           {!hasPhone && (
             <div className="flex flex-col gap-2 rounded-2xl border border-fm-line-dim bg-fm-canvas p-4">
               {textsOn ? (

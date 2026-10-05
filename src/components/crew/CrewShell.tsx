@@ -11,7 +11,7 @@
  */
 
 import Link from "next/link";
-import { useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useSyncExternalStore, type ReactNode } from "react";
 import { FriendModeMark } from "@/components/crew/FriendModeGlyphs";
 import { crewHref, type CrewAuth } from "@/lib/crew";
 
@@ -28,8 +28,29 @@ export function useInApp() {
   );
 }
 
+/**
+ * Set by a page that shows a crew inside its own layout (the dashboard's
+ * Friend Mode section): the crew pages drop their full-screen frame and top
+ * bar and sit in the host's main area as a dark panel.
+ */
+const CrewEmbedded = createContext(false);
+export function CrewEmbed({ children }: { children: ReactNode }) {
+  return <CrewEmbedded.Provider value={true}>{children}</CrewEmbedded.Provider>;
+}
+export function useCrewEmbedded() {
+  return useContext(CrewEmbedded);
+}
+
 export function CrewShell({ children, wide = false, topBar }: { children: ReactNode; wide?: boolean; topBar?: ReactNode }) {
   const inApp = useInApp();
+  const embedded = useCrewEmbedded();
+  if (embedded) {
+    return (
+      <div className="fm min-h-full rounded-[28px] bg-fm-canvas font-fm-sans text-fm-ink">
+        <main className={`mx-auto px-5 pb-16 pt-6 ${wide ? "lg:px-10 lg:pt-10" : "max-w-lg"}`}>{children}</main>
+      </div>
+    );
+  }
   // `fm` keeps the older light-utility re-maps working for shared bits
   // (VenueSearch's dropdown, form fields) that aren't written in fm-* colors.
   return (
@@ -175,7 +196,8 @@ export function Avatar({ name, src, size = 32, invited, ring }: { name: string; 
 }
 
 export function Spinner({ label = "Loading…" }: { label?: string }) {
+  const embedded = useCrewEmbedded();
   return (
-    <div className="fm flex min-h-screen items-center justify-center bg-fm-canvas font-fm-sans text-sm text-fm-muted">{label}</div>
+    <div className={`fm flex items-center justify-center bg-fm-canvas font-fm-sans text-sm text-fm-muted ${embedded ? "min-h-[60vh] rounded-[28px]" : "min-h-screen"}`}>{label}</div>
   );
 }
