@@ -62,20 +62,19 @@ export default function FriendsClient() {
         <FriendModeNav isLoggedIn={isLoggedIn} />
         <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-16 lg:pb-24 lg:pt-20">
           <div className="flex flex-col gap-6">
-            <FriendModeIcon size={40} title="Friend Mode" />
+            <div className="flex flex-wrap items-center gap-3">
+              <FriendModeIcon size={40} title="Friend Mode" />
+              <span className="rounded-full border border-fm-line px-3 py-1 font-fm-mono text-[11px] uppercase tracking-[0.1em] text-fm-accent">
+                No app download · Free
+              </span>
+            </div>
             <h1 className="m-0 font-fm-serif text-[52px] font-normal leading-[0.98] tracking-[-0.01em] sm:text-[72px] lg:text-[84px]">
               Your friends, <span className="italic text-fm-accent">actually</span> seeing each other.
             </h1>
             <p className="m-0 max-w-xl text-lg leading-relaxed text-fm-ink-2">
-              Leaf picks a night that works around everyone&rsquo;s calendars, picks the place, and asks who&rsquo;s in. Nobody has to be the planner.
+              Leaf picks a night that works around everyone&rsquo;s calendars, picks the place, and asks who&rsquo;s in. Nobody has to be the planner, and nobody has to download anything: friends join from a link and answer by text.
             </p>
-            <div className="max-w-md rounded-2xl border border-fm-line-dim bg-fm-surface p-4">
-              <div className="text-xs text-fm-muted">A text from Leaf</div>
-              <p className="m-0 mt-1 text-[15px] leading-relaxed text-fm-ink">
-                Thursday dinners: next night at Sal&rsquo;s (from Jess&rsquo;s list). Which work? 1) Thu 10/9 2) Sat 10/11 3) Tue 10/14, 7pm. Reply with numbers, like 1 3.
-              </p>
-              <p className="m-0 mt-2 text-right text-[15px] text-fm-accent">1 3</p>
-            </div>
+            <TextThread />
           </div>
           <div id="start" className="scroll-mt-24">
             <StartCrewForm />
@@ -210,5 +209,20 @@ function FriendModeNav({ isLoggedIn }: { isLoggedIn: boolean }) {
         </div>
       </div>
     </nav>
+  );
+}
+
+/** The hero's example: Leaf's date poll and a friend's reply, as a text thread. */
+function TextThread() {
+  const leaf = "max-w-[85%] self-start rounded-[20px] rounded-bl-md bg-fm-card px-4 py-2.5 text-[15px] leading-snug text-fm-ink";
+  const me = "max-w-[85%] self-end rounded-[20px] rounded-br-md bg-fm-accent px-4 py-2.5 text-[15px] font-semibold leading-snug text-fm-canvas";
+  return (
+    <figure className="m-0 flex max-w-md flex-col gap-1.5" aria-label="An example text thread with Leaf">
+      <figcaption className="mb-1 self-center font-fm-mono text-[11px] uppercase tracking-[0.1em] text-fm-muted">Leaf · Text message</figcaption>
+      <p className={`m-0 ${leaf}`}>Thursday dinners: next night is at Sal&rsquo;s, from Jess&rsquo;s list. Which dates work?</p>
+      <p className={`m-0 ${leaf}`}>1) Thu 10/9 &nbsp;2) Sat 10/11 &nbsp;3) Tue 10/14, all 7pm. Reply with numbers.</p>
+      <p className={`m-0 ${me}`}>1 3</p>
+      <p className={`m-0 mt-2 ${leaf}`}>Locked: Thu 10/9, 7pm at Sal&rsquo;s. 5 of you are in.</p>
+    </figure>
   );
 }
