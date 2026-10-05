@@ -19,7 +19,7 @@ export default function MarketingFooter({ blurb, dark = false }: { blurb: string
         <div className="flex flex-col gap-2.5">
           <div className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={dark ? "/leaf-logo-white.svg" : "/leaf-logo-black.png"} alt="Leaf" className="h-[18px]" />
+            <img src={dark ? "/leaf-logo-white.svg" : "/leaf-logo-black.png"} alt="Leaf" className={`h-[18px] ${dark ? "brightness-0 invert" : ""}`} />
             <span
               className="text-[16px] font-light uppercase tracking-[0.14em]"
               style={{ color: ink, opacity: 0.5 }}
