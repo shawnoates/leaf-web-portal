@@ -191,7 +191,7 @@ function FriendModeNav({ isLoggedIn }: { isLoggedIn: boolean }) {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2" aria-label="Leaf home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/leaf-logo-white.svg" alt="" className="h-[18px] sm:h-5" />
+          <img src="/leaf-logo-white.svg" alt="" className="h-[18px] brightness-0 invert sm:h-5" />
           <span className="font-fm-mono text-xs uppercase tracking-[0.12em] text-fm-accent">Friend Mode</span>
         </Link>
         <div className="flex items-center gap-6">
