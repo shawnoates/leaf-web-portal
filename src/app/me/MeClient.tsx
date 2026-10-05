@@ -991,9 +991,14 @@ function DashboardView({
   const mapPins = useMemo<MapPin[]>(() => {
     const seen = new Set<string>();
     const pins: MapPin[] = [];
+    // "Your week": only plans in the next seven days. A pin for something a
+    // month out reads as this week's plan on a map with no dates on it.
+    const weekEnd = Date.now() + 7 * 86400000;
     for (const p of [data.nextPlan, ...data.plans]) {
       if (!p || seen.has(p.id)) continue;
       seen.add(p.id);
+      const at = p.date ? new Date(p.date).getTime() : NaN;
+      if (!Number.isFinite(at) || at > weekEnd) continue;
       if (typeof p.venueLat === "number" && typeof p.venueLng === "number") {
         pins.push({ id: p.id, lat: p.venueLat, lng: p.venueLng, title: p.title });
       }
