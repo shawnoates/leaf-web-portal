@@ -51,6 +51,8 @@ interface GoogleSignInButtonProps {
    *  existing Parse session calls onSignIn on mount — right for sign-in
    *  pages, wrong where signing in also does something (the follow sheet). */
   ignoreExistingSession?: boolean;
+  /** Google's button style: "filled_black" sits right on dark pages. */
+  theme?: "outline" | "filled_black";
 }
 
 interface GoogleUser {
@@ -63,6 +65,7 @@ export default function GoogleSignInButton({
   onError,
   fullWidth = false,
   ignoreExistingSession = false,
+  theme = "outline",
 }: GoogleSignInButtonProps) {
   const buttonRef = useRef<HTMLDivElement>(null);
   const [scriptReady, setScriptReady] = useState(false);
@@ -143,17 +146,17 @@ export default function GoogleSignInButton({
     });
 
     google.accounts.id.renderButton(buttonRef.current, {
-      theme: "outline",
+      theme,
       size: "large",
       text: "continue_with",
-      shape: "rectangular",
+      shape: theme === "filled_black" ? "pill" : "rectangular",
       width: fullWidth
         ? Math.max(200, Math.min(400, Math.floor(buttonRef.current.offsetWidth || 320)))
         : 320,
     });
 
     setButtonRendered(true);
-  }, [scriptReady, buttonRendered, signedInUser, handleCredentialResponse, fullWidth]);
+  }, [scriptReady, buttonRendered, signedInUser, handleCredentialResponse, fullWidth, theme]);
 
   if (signedInUser) {
     return (

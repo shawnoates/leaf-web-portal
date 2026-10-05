@@ -19,6 +19,8 @@ import MarketingFooter from "@/components/marketing/MarketingFooter";
 import { useIsLoggedIn } from "@/components/marketing/useMarketingSession";
 import { trackMarketingEvent } from "@/components/marketing/analytics";
 import StartCrewForm from "@/components/crew/StartCrewForm";
+import LeafSignIn from "@/components/LeafSignIn";
+import { X } from "lucide-react";
 import CrewPulseCard from "@/components/crew/CrewPulseCard";
 import { SAMPLE_PULSE } from "@/lib/crew-pulse";
 
@@ -195,7 +197,10 @@ export default function FriendsClient() {
  */
 function FriendModeNav({ isLoggedIn }: { isLoggedIn: boolean }) {
   const link = "hidden text-sm text-fm-ink-2 transition-colors hover:text-fm-ink md:block";
+  const [signingIn, setSigningIn] = useState(false);
   return (
+    <>
+    {signingIn && <LogInSheet onClose={() => setSigningIn(false)} />}
     <nav className="sticky top-0 z-20 border-b border-fm-line-dim bg-fm-canvas/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2" aria-label="Leaf home">
@@ -205,9 +210,13 @@ function FriendModeNav({ isLoggedIn }: { isLoggedIn: boolean }) {
         </Link>
         <div className="flex items-center gap-6">
           <Link href="/" className={link}>Create a calendar</Link>
-          <Link href="/me" className="text-sm font-semibold text-fm-ink transition-colors hover:text-fm-accent">
-            {isLoggedIn ? "My crews" : "Log in"}
-          </Link>
+          {isLoggedIn ? (
+            <Link href="/me" className="text-sm font-semibold text-fm-ink transition-colors hover:text-fm-accent">My crews</Link>
+          ) : (
+            <button type="button" onClick={() => setSigningIn(true)} className="text-sm font-semibold text-fm-ink transition-colors hover:text-fm-accent">
+              Log in
+            </button>
+          )}
           <a
             href="#start"
             onClick={() => {
@@ -222,6 +231,32 @@ function FriendModeNav({ isLoggedIn }: { isLoggedIn: boolean }) {
         </div>
       </div>
     </nav>
+    </>
+  );
+}
+
+/** Log in from /friends: the same Leaf sign-in as everywhere, then your crews on /me. */
+function LogInSheet({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Log in to Leaf" className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" onClick={onClose}>
+      <div className="w-full max-w-md rounded-t-[28px] border border-fm-line-dim bg-fm-surface p-6 sm:rounded-[28px]" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <h2 className="m-0 font-fm-serif text-[32px] font-normal leading-tight">Log in</h2>
+            <p className="m-0 text-sm text-fm-ink-2">Your Leaf account, the same one the app uses.</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-fm-line text-fm-ink hover:bg-fm-card">
+            <X size={20} aria-hidden />
+          </button>
+        </div>
+        <LeafSignIn tone="dark" onSignedIn={() => { window.location.href = "/me"; }} />
+      </div>
+    </div>
   );
 }
 

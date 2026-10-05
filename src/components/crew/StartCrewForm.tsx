@@ -1,17 +1,19 @@
 "use client";
 
 /**
- * Start a crew from the web in under a minute: name it, pick how often, verify
- * a phone number (the same one-time code the crew join page uses), and the
- * crew exists. The last step hands back the invite link to send the group and
- * the organizer's own crew page. Someone already signed in skips the phone.
+ * Start a crew from the web in under a minute: name it, pick how often, sign
+ * in (Google, email or phone: the same Leaf account the app and calendars
+ * use), and the crew exists. The last step hands back the invite link to
+ * send the group and the organizer's own crew page, plus texts for anyone
+ * who signed in without a phone, and calendar availability after Google.
+ * Someone already signed in skips sign-in.
  */
 
 import { useState } from "react";
-import { Check, Copy, Share } from "lucide-react";
+import { CalendarCheck, Check, Copy, Share } from "lucide-react";
 import Parse from "@/lib/parse-client";
-import { setVerifiedUserCookie } from "@/lib/verified-user";
 import { trackMarketingEvent } from "@/components/marketing/analytics";
+import LeafSignIn, { type SignInMethod } from "@/components/LeafSignIn";
 
 const PACES = [
   { days: 7, label: "Every week" },
@@ -20,7 +22,7 @@ const PACES = [
   { days: 0, label: "Just once" },
 ];
 
-type Step = "crew" | "phone" | "code" | "done";
+type Step = "crew" | "signin" | "done";
 type Created = { crewId: string; link: string; inviteLink: string };
 
 const field = "h-12 w-full rounded-2xl border border-fm-line bg-fm-canvas px-4 text-base text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none";
@@ -30,15 +32,14 @@ export default function StartCrewForm() {
   const [step, setStep] = useState<Step>("crew");
   const [crewName, setCrewName] = useState("");
   const [pace, setPace] = useState(14);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState<Created | null>(null);
   const [copied, setCopied] = useState(false);
-  const digits = phone.replace(/\D/g, "");
-  const e164 = `+1${digits.slice(-10)}`;
+  const [how, setHow] = useState<SignInMethod | null>(null);
+  const [hasPhone, setHasPhone] = useState(true);
+  const [textPhone, setTextPhone] = useState("");
+  const [textsOn, setTextsOn] = useState(false);
 
   const create = async () => {
     setBusy(true); setError("");
@@ -52,6 +53,7 @@ export default function StartCrewForm() {
         source: "landing",
       })) as Created;
       setCreated(r);
+      setHasPhone(Boolean(Parse.User.current()?.get("phone")));
       setStep("done");
       trackMarketingEvent("friend_mode_crew_created", { surface: "friends_page", oneTime: pace === 0 });
     } catch (e) {
@@ -66,39 +68,32 @@ export default function StartCrewForm() {
     setError("");
     trackMarketingEvent("friend_mode_cta_click", { surface: "friends_page_form" });
     if (Parse.User.current()) { await create(); return; }
-    setStep("phone");
+    setStep("signin");
   };
 
-  const sendCode = async () => {
-    if (!name.trim()) { setError("Your name, so your friends know who's inviting them."); return; }
-    if (digits.length < 10) { setError("Enter a 10-digit phone number."); return; }
+  const turnOnTexts = async () => {
+    if (!created) return;
+    const d = textPhone.replace(/\D/g, "");
+    if (d.length < 10) { setError("Enter a 10-digit phone number."); return; }
     setBusy(true); setError("");
     try {
-      await Parse.Cloud.run("requestOTP", { phone: e164 });
-      setStep("code");
+      await Parse.Cloud.run("setCrewTexts", { crewId: created.crewId, on: true, phone: `+1${d.slice(-10)}` });
+      setTextsOn(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't send the code.");
-    } finally {
-      setBusy(false);
-    }
+      setError(e instanceof Error ? e.message : "Couldn't turn on texts.");
+    } finally { setBusy(false); }
   };
 
-  const verify = async () => {
+  const connectCalendar = async () => {
+    if (!created) return;
     setBusy(true); setError("");
     try {
-      const r = (await Parse.Cloud.run("verifyOTP", { phone: e164, code })) as { sessionToken?: string } | string;
-      const token = typeof r === "object" && r?.sessionToken ? r.sessionToken : null;
-      if (!token) { setError("That code didn't work. Try again."); setBusy(false); return; }
-      await Parse.User.become(token);
-      setVerifiedUserCookie(name.trim(), phone);
-      const me = Parse.User.current();
-      if (me && !me.get("full_name")) { me.set("full_name", name.trim()); me.set("name", name.trim()); await me.save().catch(() => {}); }
+      const r = (await Parse.Cloud.run("createGoogleCalendarConnectUrl", { returnTo: created.link })) as { url: string };
+      window.location.href = r.url;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't verify that code.");
+      setError(e instanceof Error ? e.message : "Couldn't connect your calendar.");
       setBusy(false);
-      return;
     }
-    await create();
   };
 
   const inviteText = created ? `Join ${crewName.trim()} on Leaf. It finds a night that works for all of us: ${created.inviteLink}` : "";
@@ -147,36 +142,24 @@ export default function StartCrewForm() {
         </>
       )}
 
-      {step === "phone" && (
+      {step === "signin" && (
         <>
           <div className="flex flex-col gap-1">
             <span className="font-fm-mono text-[11px] uppercase tracking-[0.1em] text-fm-muted">Almost there</span>
-            <h2 className="m-0 font-fm-serif text-[32px] font-normal leading-tight">Who&rsquo;s organizing?</h2>
+            <h2 className="m-0 font-fm-serif text-[32px] font-normal leading-tight">Sign in to start {crewName.trim()}</h2>
+            <p className="m-0 text-sm text-fm-ink-2">Your Leaf account, the same one the app uses.</p>
           </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor="org-name" className="text-sm font-semibold text-fm-ink-2">Your name</label>
-            <input id="org-name" className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="First and last" autoComplete="name" />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor="org-phone" className="text-sm font-semibold text-fm-ink-2">Your phone</label>
-            <input id="org-phone" className={field} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 123-4567" inputMode="tel" autoComplete="tel-national" />
-          </div>
-          <button type="button" className={primary} onClick={sendCode} disabled={busy}>{busy ? "Sending…" : "Text me a code"}</button>
-          <p className="m-0 text-xs leading-relaxed text-fm-muted">We text a one-time code to sign you in. Leaf texts you about this crew&rsquo;s plans; reply STOP any time.</p>
+          {busy ? (
+            <p className="m-0 text-[15px] text-fm-ink-2">Starting your crew…</p>
+          ) : (
+            <LeafSignIn
+              tone="dark"
+              askName
+              phoneNote="Leaf texts you about this crew's plans. Reply STOP any time."
+              onSignedIn={async (_u, method) => { setHow(method); await create(); }}
+            />
+          )}
           <button type="button" className="self-start text-sm text-fm-muted underline" onClick={() => { setStep("crew"); setError(""); }}>Back</button>
-        </>
-      )}
-
-      {step === "code" && (
-        <>
-          <div className="flex flex-col gap-1">
-            <span className="font-fm-mono text-[11px] uppercase tracking-[0.1em] text-fm-muted">Check your texts</span>
-            <h2 className="m-0 font-fm-serif text-[32px] font-normal leading-tight">Enter the code</h2>
-            <p className="m-0 text-sm text-fm-ink-2">Sent to ({digits.slice(-10, -7)}) {digits.slice(-7, -4)}-{digits.slice(-4)}.</p>
-          </div>
-          <input className={`${field} text-center font-fm-mono tracking-[0.4em]`} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" inputMode="numeric" autoComplete="one-time-code" aria-label="Code" />
-          <button type="button" className={primary} onClick={verify} disabled={busy || code.length < 4}>{busy ? "Starting your crew…" : "Verify and start"}</button>
-          <button type="button" className="self-start text-sm text-fm-muted underline" onClick={() => { setStep("phone"); setCode(""); setError(""); }}>Use a different number</button>
         </>
       )}
 
@@ -195,6 +178,31 @@ export default function StartCrewForm() {
           </div>
           <button type="button" className={primary} onClick={share}><Share size={16} aria-hidden /> Send the invite</button>
           <a href={created.link} className="flex h-12 items-center justify-center rounded-full border border-fm-line text-[15px] font-semibold text-fm-ink hover:bg-fm-card">Open your crew page</a>
+          {!hasPhone && (
+            <div className="flex flex-col gap-2 rounded-2xl border border-fm-line-dim bg-fm-canvas p-4">
+              {textsOn ? (
+                <p className="m-0 flex items-center gap-2 text-sm text-fm-ink"><Check size={16} className="text-fm-accent" aria-hidden /> Texts are on. Leaf will text you about this crew.</p>
+              ) : (
+                <>
+                  <label htmlFor="crew-texts-phone" className="text-sm font-semibold text-fm-ink">Text me about this crew</label>
+                  <p className="m-0 text-xs leading-relaxed text-fm-muted">Date polls, the night that locks, and the booking link. Reply STOP any time.</p>
+                  <div className="flex gap-2">
+                    <input id="crew-texts-phone" className={`${field} h-11`} value={textPhone} onChange={(e) => setTextPhone(e.target.value)} placeholder="(555) 123-4567" inputMode="tel" autoComplete="tel-national" />
+                    <button type="button" onClick={turnOnTexts} disabled={busy} className="h-11 shrink-0 rounded-full bg-fm-ink px-4 text-sm font-bold text-fm-canvas disabled:opacity-60">Text me</button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          {how === "google" && (
+            <button type="button" onClick={connectCalendar} disabled={busy} className="flex items-center gap-3 rounded-2xl border border-fm-line-dim bg-fm-canvas p-4 text-left hover:bg-fm-card disabled:opacity-60">
+              <CalendarCheck size={20} className="shrink-0 text-fm-accent" aria-hidden />
+              <span className="flex flex-col">
+                <span className="text-sm font-semibold text-fm-ink">Connect your Google Calendar</span>
+                <span className="text-xs text-fm-muted">So Leaf only suggests nights you&rsquo;re free.</span>
+              </span>
+            </button>
+          )}
         </>
       )}
 

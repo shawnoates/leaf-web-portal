@@ -15,6 +15,7 @@ import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-use
 import { CrewShell, Card, Button } from "@/components/crew/CrewShell";
 import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
 import SeedPlaces from "@/components/crew/SeedPlaces";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 import { cadenceLabel } from "@/lib/crew";
 
 type Invite = {
@@ -187,6 +188,24 @@ export default function JoinCrewClient({ code }: { code: string }) {
             <p className="mb-0 pt-1 text-[11px] leading-snug text-zinc-500">
               By joining, you agree to get texts about this crew&rsquo;s plans. Up to 5 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.
             </p>
+            {!codeSent && (
+              <div className="border-t border-zinc-200 pt-3">
+                <p className="mb-2 mt-0 text-xs text-zinc-500">Already on Leaf? Sign in with Google instead.</p>
+                {/* Same Leaf account as the app and calendars. Joining then asks for a number only if the account has none. */}
+                <GoogleSignInButton
+                  fullWidth
+                  ignoreExistingSession
+                  onSignIn={(u) => {
+                    const user = u as unknown as Parse.User;
+                    setSignedIn(true);
+                    setHasPhone(Boolean(user?.get?.("phone")));
+                    setError("");
+                    void load();
+                  }}
+                  onError={(e) => setError(e)}
+                />
+              </div>
+            )}
           </div>
         ) : (
           <div className="mt-2">
