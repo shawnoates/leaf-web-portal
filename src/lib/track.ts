@@ -31,6 +31,7 @@ export type WebEvent =
   | "fm_intro_cta"
   | "fm_setup_started"
   | "fm_setup_completed"
+  | "crew_pulse_share"
   | "plan_detail_full_alternative_tap"
   | "host_video_play"
   | "host_video_watched"

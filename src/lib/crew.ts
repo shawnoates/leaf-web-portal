@@ -132,6 +132,24 @@ export type CrewPage = {
   open: CycleView[];
   past: { cycleId: string; venue: Venue | null; startsAt: string | { iso: string } | null; headcount: number; planId: string | null }[];
   book: BookSpot[];
+  /** Crew Pulse: rings, score and stats from the last 90 days (null if it couldn't be worked out). */
+  pulse?: CrewPulse | null;
+};
+
+/** Crew Pulse (server: crew-pulse.js). Rings are 0–1; a null ring doesn't apply (a one-time crew has no rhythm). */
+export type CrewPulse = {
+  windowDays: number;
+  /** Null until the crew's second night. */
+  score: number | null;
+  band: "on-fire" | "solid" | "drifting" | "warming-up" | "getting-going";
+  bandLabel: string;
+  /** Points since 30 days ago. */
+  trend: number | null;
+  rings: { showUp: number | null; keepItGoing: number | null; shareLoad: number | null };
+  ringDetail: { nightsInWindow: number; expectedNights: number | null; contributors: number; members: number };
+  stats: { nights: number; places: number; streak: number; mostAtOnce: number };
+  shoutOuts: { kind: "never-missed" | "most-spots" | "fastest-vote"; label: string; userId: string; name: string }[];
+  nudge: string | null;
 };
 
 export const RHYTHM_LABELS: Record<number, string> = {

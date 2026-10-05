@@ -22,6 +22,7 @@ import {
 } from "@/components/crew/CrewShell";
 import ProposeNight from "@/components/crew/ProposeNight";
 import SeedPlaces from "@/components/crew/SeedPlaces";
+import CrewPulseCard from "@/components/crew/CrewPulseCard";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
@@ -376,6 +377,10 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               />
             )}
           </section>
+
+          {data.pulse && data.pulse.stats.nights > 0 && (
+            <CrewPulseCard pulse={data.pulse} crewName={crew.name} shareToken={me.token || null} />
+          )}
 
           {me.needsPace && !paceDone && !crew.oneTime && (
             <section className="rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">

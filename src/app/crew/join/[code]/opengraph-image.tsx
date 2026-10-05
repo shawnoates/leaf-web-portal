@@ -1,7 +1,6 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { ImageResponse } from "next/og";
-import { SITE_HOST, SITE_URL } from "@/lib/site";
+import { SITE_HOST } from "@/lib/site";
+import { friendModeFonts } from "@/lib/og-fonts";
 import { fetchCrewInvite, firstName, paceLabel } from "./fetch-invite";
 
 // 1200x630 unfurl card for a crew's invite link (iMessage, WhatsApp, Slack).
@@ -26,28 +25,6 @@ const INK_2 = "#c9d1cb";
 const MUTED = "#a3aca6";
 const ACCENT = "#c8f25a";
 
-/**
- * The crew page's faces: Instrument Serif for the crew name, Manrope for the
- * rest. Read from the build's public folder, else fetched from the live
- * site. A face that can't load is left out rather than failing the card.
- */
-const fontCache = new Map<string, Promise<ArrayBuffer | null>>();
-function loadFont(file: string): Promise<ArrayBuffer | null> {
-  let p = fontCache.get(file);
-  if (!p) {
-    p = readFile(join(process.cwd(), "public/fonts", file))
-      .then((b) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer)
-      .catch(() => fetch(`${SITE_URL}/fonts/${file}`).then((r) => (r.ok ? r.arrayBuffer() : null)))
-      .catch(() => null)
-      .then((buf) => {
-        if (!buf) fontCache.delete(file); // try again next request
-        return buf;
-      });
-    fontCache.set(file, p);
-  }
-  return p;
-}
-
 function clip(text: string, max: number): string {
   return text.length > max ? text.slice(0, max - 1).trimEnd() + "…" : text;
 }
@@ -60,17 +37,7 @@ function nameSize(name: string): number {
 
 export default async function Image({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  const [invite, serif, sans, sansBold] = await Promise.all([
-    fetchCrewInvite(code),
-    loadFont("InstrumentSerif-Regular.ttf"),
-    loadFont("Manrope-400.woff"),
-    loadFont("Manrope-600.woff"),
-  ]);
-  const fonts = [
-    serif && { name: "Instrument Serif", data: serif, weight: 400 as const, style: "normal" as const },
-    sans && { name: "Manrope", data: sans, weight: 400 as const, style: "normal" as const },
-    sansBold && { name: "Manrope", data: sansBold, weight: 600 as const, style: "normal" as const },
-  ].filter((f): f is NonNullable<typeof f> => Boolean(f));
+  const [invite, { fonts, hasSerif: serif, hasSans: sans }] = await Promise.all([fetchCrewInvite(code), friendModeFonts()]);
 
   const name = clip(invite?.name || "A crew on Leaf", 40);
   const who = invite ? `${firstName(invite.ownerName)} invited you` : "You're invited";

@@ -1,12 +1,16 @@
 "use client";
 
 /**
- * /friends — Friend Mode, explained in one scroll.
+ * /friends: Friend Mode's landing page. One job: start a crew right here.
+ *
+ * The form (StartCrewForm) sits in the hero: name the crew, pick how often,
+ * verify a phone, and the crew exists with an invite link to send. Below it,
+ * how a night comes together, the Crew Pulse card on a sample crew, and the
+ * questions people ask. Calendar owners can still switch Friend Mode on from
+ * their dashboard; that's a line in the FAQ, not the main ask.
  *
  * Not built on MarketingPage: that page is shaped around "type a vibe, get a
- * calendar" (prompt hero, calendar grid, sticky generate bar), and none of
- * that is the ask here. This one has a single job: get a calendar owner to
- * turn Friend Mode on from their calendar in the dashboard.
+ * calendar", and none of that is the ask here.
  */
 
 import Link from "next/link";
@@ -16,118 +20,131 @@ import MarketingFooter from "@/components/marketing/MarketingFooter";
 import { useIsLoggedIn } from "@/components/marketing/useMarketingSession";
 import { trackMarketingEvent } from "@/components/marketing/analytics";
 import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
+import StartCrewForm from "@/components/crew/StartCrewForm";
+import CrewPulseCard from "@/components/crew/CrewPulseCard";
+import { SAMPLE_PULSE } from "@/lib/crew-pulse";
 
 const STEPS = [
-  { n: "01", title: "Turn it on", body: "Flip the Friend Mode switch on a calendar you own (up to 15 people), then invite your followers or share the invite link." },
-  { n: "02", title: "Leaf picks a night", body: "Every few weeks Leaf picks a place from your crew's book and asks everyone which dates work, by text or in the app." },
-  { n: "03", title: "It locks itself", body: "The night most people can make gets locked. Whoever's booking gets the link. Everyone gets a reminder the day of." },
-  { n: "04", title: "It learns", body: "Thumbs up or down the morning after. Leaf remembers what the crew liked and which nights never work." },
+  { n: "01", title: "Start a crew", body: "Name it, pick how often, and send the link to the group chat. Friends join from the link, no app needed." },
+  { n: "02", title: "Leaf finds a night", body: "Leaf picks a place from your crew's book and a few dates that fit everyone's calendars, then asks who can make which." },
+  { n: "03", title: "It plans itself", body: "The date most people can make gets locked and invites go out. The organizer gets a link to book. Everyone gets a reminder that day." },
+  { n: "04", title: "It keeps going", body: "On your rhythm, the next round starts on its own. Leaf remembers what the crew liked and which nights never work." },
 ];
 
-
 const FAQ = [
-  { q: "Do my friends need the app?", a: "No. Everything works on the web from their personal link. App users get notifications, and anyone can choose to get texts instead." },
-  { q: "Will Leaf spam my friends?", a: "No. Leaf only texts people who choose to get texts about the crew (it's never switched on for them), at most 5 a week, and anyone can reply STOP at any time." },
-  { q: "What if nobody can make it?", a: "Leaf tries the backup place and two new dates once. If that misses too, it skips this round and comes back on the next rhythm." },
-  { q: "Who books the table?", a: "Whoever started that night, or the person who started the crew. Leaf sends them a booking link and tells everyone once they reply BOOKED." },
-  { q: "How much does it cost?", a: "Nothing. Friend Mode is free for friends." },
-  { q: "Can anyone in the crew start a plan?", a: "Yes. Text PLAN or tap \"Plan something\" and Leaf finds a night. Or propose your own place and dates and Leaf runs the count." },
+  { q: "Do my friends need the app?", a: "No. Everything works on the web from their own link. App users get notifications, and anyone can choose to get texts instead." },
+  { q: "Will Leaf spam my friends?", a: "No. Leaf only texts people who choose texts about the crew, at most 5 a week, and anyone can reply STOP at any time." },
+  { q: "What if nobody can make it?", a: "Leaf tries a backup place and new dates once. If that misses too, it skips this round and comes back on the next one." },
+  { q: "Who books the table?", a: "Whoever's hosting that night, or the person who started the crew. Leaf sends them a booking link and tells everyone once it's booked." },
+  { q: "What's Crew Pulse?", a: "A fitness tracker for your friend group. Three rings: do people show up, does the crew keep its rhythm, and is more than one person doing the work. It appears on your crew page after the first night." },
+  { q: "I already run a calendar on Leaf. Can I use it?", a: "Yes. Switch Friend Mode on for your calendar from your dashboard (Friends and Community calendars with up to 15 people)." },
+  { q: "How much does it cost?", a: "Nothing. Friend Mode is free." },
 ];
 
 export default function FriendsClient() {
   const isLoggedIn = useIsLoggedIn();
   useEffect(() => { trackMarketingEvent("friend_mode_cta_view", { surface: "friends_page" }); }, []);
-  const cta = "/dashboard";
-  const onCta = () => trackMarketingEvent("friend_mode_cta_click", { surface: "friends_page" });
 
   return (
     <div className="mkt min-h-screen">
       {/* The site nav stays light; everything below it is the dark Friend Mode palette. */}
       <MarketingNav isLoggedIn={isLoggedIn} />
-      <div className="fm">
+      <div className="fm font-fm-sans">
+        <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-16 lg:pb-24 lg:pt-20">
+          <div className="flex flex-col gap-6">
+            <div className="flex items-center gap-2.5">
+              <FriendModeIcon size={28} />
+              <span className="font-fm-mono text-xs uppercase tracking-[0.12em] text-fm-accent">Friend Mode on Leaf</span>
+            </div>
+            <h1 className="m-0 font-fm-serif text-[52px] font-normal leading-[0.98] tracking-[-0.01em] sm:text-[72px] lg:text-[84px]">
+              Your friends, <span className="italic text-fm-accent">actually</span> seeing each other.
+            </h1>
+            <p className="m-0 max-w-xl text-lg leading-relaxed text-fm-ink-2">
+              Leaf picks a night that works around everyone&rsquo;s calendars, picks the place, and asks who&rsquo;s in. Nobody has to be the planner.
+            </p>
+            <div className="max-w-md rounded-2xl border border-fm-line-dim bg-fm-surface p-4">
+              <div className="text-xs text-fm-muted">A text from Leaf</div>
+              <p className="m-0 mt-1 text-[15px] leading-relaxed text-fm-ink">
+                Thursday dinners: next night at Sal&rsquo;s (from Jess&rsquo;s list). Which work? 1) Thu 10/9 2) Sat 10/11 3) Tue 10/14, 7pm. Reply with numbers, like 1 3.
+              </p>
+              <p className="m-0 mt-2 text-right text-[15px] text-fm-accent">1 3</p>
+            </div>
+          </div>
+          <div id="start" className="scroll-mt-24">
+            <StartCrewForm />
+          </div>
+        </section>
 
-      <section className="mx-auto max-w-3xl px-5 pb-16 pt-14 text-center">
-        <div className="flex items-center justify-center gap-2 text-xs font-medium uppercase tracking-wide text-leaf-600"><FriendModeIcon size={24} /> Friend Mode</div>
-        <div className="mt-6 flex justify-center"><FriendModeIcon size={96} title="Friend Mode" /></div>
-        <h1 className="mt-3 text-4xl font-semibold leading-tight text-leaf-900 sm:text-5xl">
-          Your friends, actually seeing each other.
-        </h1>
-        <p className="mx-auto mt-4 max-w-xl text-lg text-zinc-700">
-          Leaf finds a night that works for everyone and plans it. You add the people; nobody has to be the planner.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link href={cta} onClick={onCta} className="rounded-full bg-leaf-800 px-6 py-3 text-[15px] font-medium text-white hover:bg-leaf-700">
-            Turn it on for your calendar
-          </Link>
-          <span className="text-sm text-zinc-500">Free. Friends don&rsquo;t need the app.</span>
-        </div>
-        <div className="mx-auto mt-10 max-w-md rounded-2xl border border-zinc-200 bg-white p-4 text-left shadow-sm">
-          <div className="text-xs text-zinc-500">A text from Leaf</div>
-          <p className="mt-1 text-[15px] leading-relaxed text-leaf-900">
-            Thursday crew: next night at Sal&rsquo;s (from Jess&rsquo;s list). Which work? 1) Thu 10/9 2) Sat 10/11 3) Tue 10/14, 7pm. Reply with numbers (like 1 3) or OUT.
-          </p>
-          <p className="mt-2 text-right text-[15px] text-leaf-700">1 3</p>
-        </div>
-      </section>
+        <section className="border-t border-fm-line-dim py-16 lg:py-20">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <h2 className="m-0 font-fm-serif text-[40px] font-normal leading-tight lg:text-[52px]">How a night comes together</h2>
+            <ol className="m-0 mt-8 grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
+              {STEPS.map((s) => (
+                <li key={s.n} className="flex flex-col gap-2 rounded-[28px] border border-fm-line-dim bg-fm-surface p-6">
+                  <span className="font-fm-mono text-xs text-fm-accent">{s.n}</span>
+                  <h3 className="m-0 font-fm-serif text-[28px] font-normal leading-tight">{s.title}</h3>
+                  <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">{s.body}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
 
-      <section className="border-t border-zinc-100 bg-leaf-50/40 py-14">
-        <div className="mx-auto max-w-4xl px-5">
-          <h2 className="text-2xl font-semibold text-leaf-900">How it works</h2>
-          <ol className="mt-6 grid gap-6 sm:grid-cols-2">
-            {STEPS.map((s) => (
-              <li key={s.n} className="rounded-2xl border border-zinc-200 bg-white p-5">
-                <div className="text-xs font-medium text-leaf-600">{s.n}</div>
-                <h3 className="mt-1 text-lg font-semibold text-leaf-900">{s.title}</h3>
-                <p className="mt-2 text-[15px] leading-relaxed text-zinc-700">{s.body}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
+        <section className="border-t border-fm-line-dim py-16 lg:py-20">
+          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,640px)] lg:gap-14">
+            <div className="flex flex-col gap-4">
+              <span className="font-fm-mono text-xs uppercase tracking-[0.12em] text-fm-accent">New · Crew Pulse</span>
+              <h2 className="m-0 font-fm-serif text-[44px] font-normal leading-[1.02] lg:text-[56px]">
+                Your friend group gets <span className="italic">a fitness tracker.</span>
+              </h2>
+              <p className="m-0 max-w-lg text-[17px] leading-relaxed text-fm-ink-2">
+                Three rings: do people show up, does the crew keep its rhythm, and is more than one person doing the work. A score out of 100, shout-outs for the good stuff, and a card you can post.
+              </p>
+              <p className="m-0 text-sm text-fm-muted">Shown on a sample crew.</p>
+            </div>
+            <div aria-label="Sample Crew Pulse card">
+              <CrewPulseCard pulse={SAMPLE_PULSE} crewName="Thursday dinners" shareToken={null} />
+            </div>
+          </div>
+        </section>
 
-      <section className="py-14">
-        <div className="mx-auto max-w-4xl px-5">
-          <h2 className="text-2xl font-semibold text-leaf-900">Met someone at a Leaf plan?</h2>
-          <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-zinc-700">
-            Friend Mode is how a neighborhood calendar turns into a friend group. Anyone you&rsquo;ve been to a plan with can be added to your crew in a tap. They see your name, never your number, and only join if they say so.
-          </p>
-        </div>
-      </section>
+        <section id="texts" className="border-t border-fm-line-dim py-16">
+          <div className="mx-auto max-w-3xl px-4 sm:px-6">
+            <h2 className="m-0 font-fm-serif text-[36px] font-normal leading-tight">Texts are up to you</h2>
+            <p className="m-0 mt-3 text-[15px] leading-relaxed text-fm-ink-2">
+              Friend Mode works in the Leaf app and on the web. If you&rsquo;d rather get date polls and the night&rsquo;s details by text, say so when you join.
+              You can turn texts off any time on your crew page or by replying STOP.{" "}
+              <Link href="/friends/sms-consent" className="text-fm-ink underline">How text consent works</Link>
+            </p>
+          </div>
+        </section>
 
-      <section id="texts" className="border-t border-zinc-100 py-14">
-        <div className="mx-auto max-w-3xl px-5">
-          <h2 className="text-2xl font-semibold text-leaf-900">Texts are up to you</h2>
-          <p className="mt-2 text-[15px] leading-relaxed text-zinc-700">
-            Friend Mode works in the Leaf app and on the web. If you&rsquo;d rather get date polls and the night&rsquo;s details by
-            text, check &ldquo;Text me about this crew&rsquo;s plans&rdquo; when you join. It&rsquo;s never checked for you, and you can turn it off
-            any time on your crew page or by replying STOP.{" "}
-            <Link href="/friends/sms-consent" className="underline">How text consent works</Link>
-          </p>
-        </div>
-      </section>
+        <section className="border-t border-fm-line-dim py-16">
+          <div className="mx-auto max-w-3xl px-4 sm:px-6">
+            <h2 className="m-0 font-fm-serif text-[36px] font-normal leading-tight">Questions</h2>
+            <dl className="m-0 mt-6 divide-y divide-fm-line-dim">
+              {FAQ.map((f) => (
+                <div key={f.q} className="py-4">
+                  <dt className="text-[15px] font-semibold text-fm-ink">{f.q}</dt>
+                  <dd className="m-0 mt-1 text-[15px] leading-relaxed text-fm-ink-2">{f.a}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </section>
 
-      <section className="border-t border-zinc-100 py-14">
-        <div className="mx-auto max-w-3xl px-5">
-          <h2 className="text-2xl font-semibold text-leaf-900">Questions</h2>
-          <dl className="mt-6 divide-y divide-zinc-100">
-            {FAQ.map((f) => (
-              <div key={f.q} className="py-4">
-                <dt className="text-[15px] font-medium text-leaf-900">{f.q}</dt>
-                <dd className="mt-1 text-[15px] leading-relaxed text-zinc-700">{f.a}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </section>
+        <section className="border-t border-fm-line-dim bg-fm-surface py-16 text-center">
+          <h2 className="m-0 px-4 font-fm-serif text-[40px] font-normal leading-tight">Invite your people. Leaf does the rest.</h2>
+          <a
+            href="#start"
+            onClick={() => trackMarketingEvent("friend_mode_cta_click", { surface: "friends_page_footer" })}
+            className="mt-6 inline-flex h-12 items-center rounded-full bg-fm-accent px-7 text-[15px] font-bold text-fm-canvas"
+          >
+            Start a crew
+          </a>
+        </section>
 
-      <section className="py-14 text-center" style={{ background: "#253A33", color: "#F2F1EC" }}>
-        <h2 className="text-2xl font-semibold">Invite your people. Leaf does the rest.</h2>
-        <Link href={cta} onClick={onCta} className="mt-6 inline-block rounded-full px-6 py-3 text-[15px] font-medium" style={{ background: "#F2F1EC", color: "#253A33" }}>
-          Turn it on for your calendar
-        </Link>
-      </section>
-
-      <MarketingFooter blurb="Leaf finds the night. You show up." />
+        <MarketingFooter blurb="Leaf finds the night. You show up." />
       </div>
     </div>
   );
