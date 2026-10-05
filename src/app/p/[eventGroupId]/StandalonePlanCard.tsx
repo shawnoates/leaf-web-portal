@@ -10,6 +10,7 @@ import HostIntroInline from "@/components/HostIntroInline";
 import { introVideoFrame } from "@/lib/intro-video-frame";
 import PlanWhen from "./PlanWhen";
 import StandalonePlanRsvp from "./StandalonePlanRsvp";
+import PlanInviteBanner from "@/components/PlanInviteBanner";
 import { p2pPriceShort, type P2pSplitSummary } from "@/lib/p2p";
 
 type Variant = "standalone" | "copy" | "privateCalendar";
@@ -282,6 +283,7 @@ export default function StandalonePlanCard({
         </div>
 
         <div className="p-6 pt-0 space-y-3">
+          {variant !== "copy" ? <PlanInviteBanner planId={eventGroupId} /> : null}
           {variant === "privateCalendar" && shareId ? (
             <>
               <Link
@@ -317,6 +319,7 @@ export default function StandalonePlanCard({
                 p2pAmountCents={p2pAmountCents}
                 p2pSplit={p2pSplit}
                 isFull={isFull}
+                limitedSpots={capacity != null}
                 rsvpClosed={rsvpClosed}
                 autoOpenRsvp={autoOpenRsvp}
                 onLocationRevealed={(loc) => {

@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import P2pPayCard from "@/components/P2pPayCard";
+import FriendInviteCard from "@/components/FriendInviteCard";
+import { inviteCodeFor } from "@/lib/plan-invite";
 import { collectsMoney, p2pPriceLine, type P2pSplitSummary } from "@/lib/p2p";
 import { track } from "@/lib/track";
 import {
@@ -66,6 +68,8 @@ type Props = {
   // Capacity reached — the CTA becomes "Join the Waitlist" and the server
   // queues the RSVP as a waitlisted request instead of confirming it.
   isFull: boolean;
+  /** The plan has a capacity: the "Bring someone?" card can promise a held seat. */
+  limitedSpots?: boolean;
   // RSVP closes at start time; the CTA becomes a disabled state.
   rsvpClosed: boolean;
   // True when the visitor was bounced back from /open/p/<id>?rsvp=1
@@ -121,6 +125,7 @@ export default function StandalonePlanRsvp({
   p2pSplit = null,
   hadIntroVideo,
   isFull,
+  limitedSpots = false,
   rsvpClosed,
   autoOpenRsvp,
   onLocationRevealed,
@@ -175,6 +180,7 @@ export default function StandalonePlanRsvp({
           p2pSplit={p2pSplit}
           hadIntroVideo={hadIntroVideo}
           isFull={isFull}
+          limitedSpots={limitedSpots}
           onClose={() => setOpen(false)}
           onLocationRevealed={onLocationRevealed}
         />
@@ -194,6 +200,7 @@ function RsvpModal({
   p2pSplit,
   hadIntroVideo,
   isFull,
+  limitedSpots,
   onClose,
   onLocationRevealed,
 }: {
@@ -207,6 +214,7 @@ function RsvpModal({
   location: { name: string | null; address: string | null; timezone: string | null } | null;
   requireApproval: boolean;
   isFull: boolean;
+  limitedSpots: boolean;
   onClose: () => void;
   onLocationRevealed?: (loc: { name: string | null; address: string | null; meetingSpot?: string | null }) => void;
 }) {
@@ -292,6 +300,8 @@ function RsvpModal({
         eventGroupId,
         rsvpNote: requireApproval && rsvpNote.trim() ? rsvpNote.trim() : undefined,
         sharePhoneWithHost: sharePhone,
+        // A friend's personal link (?i=): credits them and claims their hold.
+        inviteCode: inviteCodeFor(eventGroupId),
       })) as
         | {
             eventNotificationId?: string;
@@ -538,6 +548,12 @@ function RsvpModal({
                 with the RSVP id + the phone just verified. */}
             {collectsP2p && !isPendingResult && !isHostResult && notificationId ? (
               <P2pPayCard planId={eventGroupId} eventNotificationId={notificationId} phoneNumber={phone} />
+            ) : null}
+
+            {/* Direct invites: the moment someone says yes is when a
+                personal "come with me" text is easiest to send. */}
+            {!isPendingResult && !isHostResult ? (
+              <FriendInviteCard eventGroupId={eventGroupId} limitedSpots={limitedSpots} />
             ) : null}
 
             {!isPendingResult && notificationId ? (
