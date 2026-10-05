@@ -280,6 +280,10 @@ interface Dashboard {
     digestChannel?: "sms" | "email" | "none";
     /** A verified email on any linked account; absent on older servers. */
     hasEmail?: boolean;
+    hasPhone?: boolean;
+    /** Texted STOP. */
+    textsOff?: boolean;
+    prefersEmail?: boolean;
   };
   greeting?: { weather: Weather | null };
   needsHost?: NeedsHost;
@@ -1168,12 +1172,7 @@ function DashboardView({
             </div>
           )}
 
-          {!hasRail && <TextsCard
-            inCrew={crews.length > 0}
-            channel={data.person.digestChannel}
-            canAddEmail={data.person.digestChannel === "sms" && data.person.hasEmail === false}
-            onEmailAdded={onRefresh}
-          />}
+          {!hasRail && <TextsCard inCrew={crews.length > 0} person={data.person} onChanged={onRefresh} />}
         </div>
 
         {hasRail && (
@@ -1194,12 +1193,7 @@ function DashboardView({
               <PlacesRail probes={places} onAnswered={(id) => setPopupAnsweredId(id)} />
             )}
             {rail && rail.tier2.length > 0 && <CalendarsRail rows={rail.tier2} />}
-            <TextsCard
-            inCrew={crews.length > 0}
-            channel={data.person.digestChannel}
-            canAddEmail={data.person.digestChannel === "sms" && data.person.hasEmail === false}
-            onEmailAdded={onRefresh}
-          />
+            <TextsCard inCrew={crews.length > 0} person={data.person} onChanged={onRefresh} />
           </aside>
         )}
       </main>
@@ -2270,96 +2264,145 @@ function PlacesRail({
 }
 
 // ---- Texts / notification card --------------------------------------------
-function TextsCard({
-  inCrew = false, channel, canAddEmail = false, onEmailAdded,
-}: {
-  inCrew?: boolean;
-  channel?: "sms" | "email" | "none";
-  /** Text follower with no verified email: offer to add one. */
-  canAddEmail?: boolean;
-  onEmailAdded?: () => Promise<void>;
-}) {
-  // Email followers (Google / email code, no phone) get the digest by email.
-  if (channel === "email") {
-    return (
-      <div className="texts">
-        <p>At most one email a week, when there&apos;s something new on your calendars.</p>
-      </div>
-    );
-  }
-  return (
-    <div className="texts wrap">
-      <div className="texts-row">
-        <p>
-          {inCrew
-            ? "At most one text a week from Leaf, plus texts from your crews when there's a night to plan."
-            : "At most one text a week, when there's something new. Plus a heads-up when something lands late."}
-        </p>
-        <Link className="btn ghost sm" href="/unsubscribe">Texts</Link>
-      </div>
-      {canAddEmail && <AddEmail onAdded={onEmailAdded} />}
-    </div>
-  );
+/** `?prefer=email` — from the "Rather get this by email?" text and the STOP
+ *  confirmation. Read once; the card opens straight into the email step. */
+function wantsEmailFromLink(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("prefer") === "email";
 }
 
 /**
- * "Add your email" for text followers. Same code flow as the email sign-in:
- * the server adds the address to this account (or, if it already has its own
- * account, links the two as one person). Then if they ever text STOP, the
- * weekly note switches to email instead of stopping, and they can sign in to
- * /me with either.
+ * "Weekly note by: Text · Email" — the footer card. Shows how the weekly
+ * note reaches them and lets them switch. Email with no confirmed address
+ * runs the email-code step first (it adds the address to this account, or
+ * links the account that already has it). Text needs a phone with texts on.
  */
-function AddEmail({ onAdded }: { onAdded?: () => Promise<void> }) {
-  const [open, setOpen] = useState(false);
-  const [done, setDone] = useState(false);
+function TextsCard({
+  inCrew = false, person, onChanged,
+}: {
+  inCrew?: boolean;
+  person: Dashboard["person"];
+  onChanged?: () => Promise<void>;
+}) {
+  const current: "text" | "email" | "none" =
+    person.digestChannel === "email" ? "email" : person.digestChannel === "sms" ? "text" : "none";
+  const [fromLink] = useState(wantsEmailFromLink);
+  const [addingEmail, setAddingEmail] = useState(() => fromLink && current !== "email" && person.hasEmail !== true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const choose = async (channel: "text" | "email") => {
+    setErr("");
+    if (channel === "email" && person.hasEmail !== true) { setAddingEmail(true); return; }
+    setBusy(true);
+    try {
+      await Parse.Cloud.run("setDigestPreference", { channel });
+      await onChanged?.();
+      setAddingEmail(false);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Couldn't change that. Try again.");
+    } finally { setBusy(false); }
+  };
+
+  // Arriving from the email offer: bring the card into view, and if they
+  // already have a confirmed address, just switch.
+  useEffect(() => {
+    if (!fromLink) return;
+    cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const url = new URL(window.location.href);
+    url.searchParams.delete("prefer");
+    window.history.replaceState(null, "", url.pathname + url.search);
+    if (current !== "email" && person.hasEmail === true) void choose("email");
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const flow = useEmailCodeSignIn(async () => {
-    setDone(true);
-    await onAdded?.();
+    try {
+      await Parse.Cloud.run("setDigestPreference", { channel: "email" });
+    } catch { /* the address is added either way; the toggle shows the result */ }
+    setAddingEmail(false);
+    await onChanged?.();
   });
-  if (done) return <p className="texts-sub">Email added. Thanks!</p>;
-  if (!open) {
-    return (
-      <button className="linkbtn texts-sub" onClick={() => setOpen(true)}>
-        Add your email, so you can still hear from us if you stop texts.
-      </button>
-    );
-  }
+
+  const textOk = person.hasPhone === true && person.textsOff !== true;
+  const blurb =
+    addingEmail
+      ? "Confirm your email and the weekly note switches to email."
+      : current === "email"
+      ? "At most one email a week, when there's something new on your calendars."
+      : current === "text"
+        ? inCrew
+          ? "At most one text a week from Leaf, plus texts from your crews when there's a night to plan."
+          : "At most one text a week, when there's something new. Plus a heads-up when something lands late."
+        : person.textsOff
+          ? "Texts are off. Get the weekly note by email instead."
+          : "Get a weekly note when there's something new on your calendars.";
+
   return (
-    <div className="texts-email">
-      {flow.step === "email" ? (
-        <div className="texts-email-row">
-          <input
-            className="otp-in"
-            type="email"
-            autoFocus
-            placeholder="you@example.com"
-            value={flow.email}
-            onChange={(e) => flow.setEmail(e.target.value)}
-          />
-          <button className="btn ghost sm" disabled={flow.busy} onClick={flow.sendCode}>
-            {flow.busy ? "Sending…" : "Send code"}
-          </button>
+    <div className="texts wrap" ref={cardRef}>
+      <div className="texts-row">
+        <span className="texts-label">Weekly note by</span>
+        <div className="texts-seg" role="tablist">
+          <button
+            role="tab"
+            aria-selected={current === "text"}
+            className={current === "text" && !addingEmail ? "on" : ""}
+            disabled={busy || !textOk || current === "text"}
+            title={textOk ? undefined : person.textsOff ? "Texts are off. Reply START to the Leaf number to turn them back on." : "No phone on this account"}
+            onClick={() => choose("text")}
+          >Text</button>
+          <button
+            role="tab"
+            aria-selected={current === "email"}
+            className={current === "email" || addingEmail ? "on" : ""}
+            disabled={busy || current === "email"}
+            onClick={() => choose("email")}
+          >Email</button>
         </div>
-      ) : (
-        <>
-          <p className="texts-sub">We emailed a code to {flow.email}.</p>
-          <div className="texts-email-row">
-            <input
-              className="otp-in"
-              inputMode="numeric"
-              autoFocus
-              placeholder="Code"
-              value={flow.code}
-              onChange={(e) => flow.setCode(e.target.value)}
-            />
-            <button className="btn ghost sm" disabled={flow.busy} onClick={flow.verify}>
-              {flow.busy ? "Checking…" : "Add email"}
-            </button>
-          </div>
-          <button className="linkbtn texts-sub" onClick={flow.restart}>Use a different email</button>
-        </>
+      </div>
+      <p>{blurb}</p>
+      {addingEmail && (
+        <div className="texts-email">
+          {flow.step === "email" ? (
+            <div className="texts-email-row">
+              <input
+                className="otp-in"
+                type="email"
+                autoFocus
+                placeholder="you@example.com"
+                value={flow.email}
+                onChange={(e) => flow.setEmail(e.target.value)}
+              />
+              <button className="btn ghost sm" disabled={flow.busy} onClick={flow.sendCode}>
+                {flow.busy ? "Sending…" : "Send code"}
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="texts-sub">We emailed a code to {flow.email}.</p>
+              <div className="texts-email-row">
+                <input
+                  className="otp-in"
+                  inputMode="numeric"
+                  autoFocus
+                  placeholder="Code"
+                  value={flow.code}
+                  onChange={(e) => flow.setCode(e.target.value)}
+                />
+                <button className="btn ghost sm" disabled={flow.busy} onClick={flow.verify}>
+                  {flow.busy ? "Checking…" : "Switch to email"}
+                </button>
+              </div>
+              <button className="linkbtn texts-sub" onClick={flow.restart}>Use a different email</button>
+            </>
+          )}
+          {flow.error && <p className="otp-err">{flow.error}</p>}
+          <button className="linkbtn texts-sub" onClick={() => setAddingEmail(false)}>Cancel</button>
+        </div>
       )}
-      {flow.error && <p className="otp-err">{flow.error}</p>}
+      {err && <p className="otp-err">{err}</p>}
     </div>
   );
 }
@@ -3207,12 +3250,19 @@ const CSS = `
   border-radius:10px;display:flex;align-items:center;gap:12px}
 .leafme .texts p{flex:1 1 auto;font-size:11.5px;line-height:1.45;color:var(--body)}
 .leafme .texts.wrap{flex-direction:column;align-items:stretch}
-.leafme .texts-row{display:flex;align-items:center;gap:12px}
+.leafme .texts-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.leafme .texts-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.leafme .texts-seg{display:inline-flex;padding:3px;border-radius:9px;background:var(--recessed);border:1px solid var(--line)}
+.leafme .texts-seg button{border:0;background:none;font:inherit;font-size:12px;font-weight:600;color:var(--body);padding:5px 12px;border-radius:7px;cursor:pointer}
+.leafme .texts-seg button.on{background:var(--paper);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.leafme .texts-seg button:disabled{cursor:default}
+.leafme .texts-seg button:disabled:not(.on){opacity:.45}
 .leafme .texts-sub{font-size:11.5px;color:var(--body);text-align:left}
 .leafme button.texts-sub{text-decoration:underline}
 .leafme .texts-email{display:flex;flex-direction:column;gap:6px}
 .leafme .texts-email-row{display:flex;gap:8px;align-items:center}
 .leafme .texts-email-row .otp-in{margin-bottom:0;padding:8px 10px;font-size:14px}
+.leafme .texts-email-row .btn{white-space:nowrap;flex:none}
 
 /* ---- Modals ---- */
 .leafme .modal-overlay{position:fixed;inset:0;z-index:60;background:rgba(23,21,15,.6);
