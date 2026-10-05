@@ -968,6 +968,7 @@ function RsvpModal({
       const result = await Parse.Cloud.run("rsvpToPlanViaWeb", {
         ...(digits ? { phoneNumber: digits } : {}),
         ...(who.name ? { name: who.name } : {}),
+        notify: who.notify,
         eventGroupId: plan.id,
         rsvpNote: plan.requireApproval && rsvpNote.trim() ? rsvpNote.trim() : undefined,
         sharePhoneWithHost: sharePhone,
@@ -1188,9 +1189,9 @@ function RsvpModal({
               </h4>
               <p className="text-sm text-zinc-500 max-w-xs mx-auto">
                 {isWaitlistResult
-                  ? "You\u0027ll receive a text the moment a spot opens up."
+                  ? `You\u0027ll get ${contact?.notify === "email" ? "an email" : "a text"} the moment a spot opens up.`
                   : isPendingResult
-                    ? "You\u0027ll receive a text when your request is approved."
+                    ? `You\u0027ll get ${contact?.notify === "email" ? "an email" : "a text"} when your request is approved.`
                     : collectsP2p
                       ? (plan.p2pSplit ? "You\u2019ll pay your share once the headcount is set." : "Pay the host below to keep it.")
                       : "Coordinate with the group. Join the Plan Chat."}
@@ -1615,6 +1616,16 @@ function ContactStep({
   renderVerifiedAction?: () => React.ReactNode;
 }) {
   const [session, setSession] = useState(readContactSession);
+  // The browser keeps its own copy of the signed-in account, which can lag
+  // (an old address after a merge). Refresh it so the verified row shows the
+  // address the confirmation will actually go to.
+  useEffect(() => {
+    const u = Parse.User.current();
+    if (!u) return;
+    let live = true;
+    u.fetch().then(() => { if (live) setSession(readContactSession()); }).catch(() => { /* keep the cached copy */ });
+    return () => { live = false; };
+  }, []);
   const [method, setMethod] = useState<"text" | "email">(() =>
     allowEmail && Parse.User.current() && !Parse.User.current()?.get("phone") ? "email" : "text");
   const [googleError, setGoogleError] = useState("");
