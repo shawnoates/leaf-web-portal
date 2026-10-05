@@ -68,7 +68,7 @@ export default function FriendsClient() {
               Your friends, <span className="italic text-fm-accent">actually</span> seeing each other.
             </h1>
             <p className="m-0 max-w-xl text-lg leading-relaxed text-fm-ink-2">
-              Leaf picks a night that works around everyone&rsquo;s calendars, picks the place, and asks who&rsquo;s in. Nobody has to be the planner, and nobody has to download anything: friends join from a link and answer by text.
+              Leaf picks a night that works around everyone&rsquo;s calendars, picks the place, and asks who&rsquo;s in. <span className="text-fm-ink">Then it does it again on your crew&rsquo;s rhythm, every week or every month,</span> so nobody has to be the planner. Friends join from a link and answer by text.
             </p>
             <TextThread />
           </div>
