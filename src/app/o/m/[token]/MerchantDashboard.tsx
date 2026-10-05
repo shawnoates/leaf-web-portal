@@ -58,6 +58,8 @@ export type Dashboard = {
   rsvpFeeCents: number;
   freeNight: { state: "open" | "granted" | "lapsed" | "used"; free: boolean };
   cardFailed: boolean;
+  /** Leaf balance (bars and restaurants): prepaid, reloads when low. */
+  credit?: Credit | null;
   placardUrl: string | null;
   upcoming: Night[];
   past: Night[];
@@ -73,6 +75,76 @@ export type Dashboard = {
   /** Nights they asked for that Leaf hasn't booked yet. */
   requests?: { id: string; kind: "first" | "rebook"; label: string }[];
 };
+
+type Credit = {
+  balanceCents: number;
+  autoReload: boolean;
+  reloadCents: number;
+  reloadBelowCents: number;
+  reloadFailed: boolean;
+  recent: { kind: "reload" | "night"; amountCents: number; balanceAfterCents: number; dateKey: string | null; at: string | null }[];
+};
+
+/** "Oct 12" from an ISO date or a YYYY-MM-DD key. */
+function shortDate(v: string | null) {
+  if (!v) return "";
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T12:00:00`) : new Date(v);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function LeafBalance({ token, credit, onChange }: { token: string; credit: Credit; onChange: (c: Credit) => void }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const toggle = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const r = (await Parse.Cloud.run("setMerchantAutoReload", { token, on: !credit.autoReload })) as { credit: Omit<Credit, "recent"> };
+      onChange({ ...credit, ...r.credit });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't change that");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <Card id="balance">
+      <H2>Leaf balance</H2>
+      <p className="mt-1 font-fm-serif text-[40px] leading-none text-stone-900">{dollars(credit.balanceCents)}</p>
+      <p className="mt-2 text-[15px] leading-relaxed text-stone-600">
+        {credit.autoReload
+          ? `Each night's RSVPs come out of your balance. When it drops under ${dollars(credit.reloadBelowCents)} and you have a night booked, we add ${dollars(credit.reloadCents)} from your card.`
+          : "Auto reload is off: each night is charged to your card after the night."}
+      </p>
+      {credit.reloadFailed && (
+        <a href="#card" className="mt-3 block rounded-xl bg-amber-50 p-3 text-[14px] text-amber-900 ring-1 ring-amber-200">
+          We couldn&rsquo;t add to your balance. <span className="font-semibold underline">Update your card</span>
+        </a>
+      )}
+      <label className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-stone-200 px-4 py-3">
+        <span className="text-[15px] font-semibold text-stone-800">
+          Auto reload
+          <span className="block text-[13px] font-normal text-stone-500">{`Adds ${dollars(credit.reloadCents)} when your balance drops under ${dollars(credit.reloadBelowCents)}`}</span>
+        </span>
+        <input type="checkbox" role="switch" checked={credit.autoReload} disabled={saving} onChange={toggle} className="h-6 w-6 accent-leaf-800" />
+      </label>
+      {error && <p className="mt-2 text-[14px] text-red-600">{error}</p>}
+      {credit.recent.length > 0 && (
+        <ul className="mt-4 divide-y divide-stone-100 text-[14px]">
+          {credit.recent.map((r, i) => (
+            <li key={i} className="flex items-baseline justify-between py-2">
+              <span className="text-stone-700">{r.kind === "reload" ? `Added ${shortDate(r.at)}` : `Night of ${shortDate(r.dateKey)}`}</span>
+              <span className={r.amountCents > 0 ? "font-semibold text-leaf-700" : "text-stone-700"}>
+                {r.amountCents > 0 ? "+" : "\u2212"}
+                {dollars(Math.abs(r.amountCents))}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
 
 const PHASE: Record<Exclude<Phase, "past" | "cancelled">, { label: string; tone: string }> = {
   now: { label: "Happening now", tone: "bg-emerald-600 text-white" },
@@ -367,6 +439,12 @@ export default function MerchantDashboard({
   }
 
   const perRsvp = d.model === "per_rsvp";
+  const credit = perRsvp ? d.credit ?? null : null;
+  // Booking a night they'll pay for (past the free one) tops up a low balance.
+  const bookingReloads = Boolean(
+    credit && credit.autoReload && credit.balanceCents < credit.reloadBelowCents
+      && (d.freeNight.state === "used" || d.freeNight.state === "lapsed" || d.totals.upcoming > 0),
+  );
   return (
     <Shell>
       {preview && (
@@ -471,6 +549,11 @@ export default function MerchantDashboard({
               </button>
             ))}
           </div>
+          {bookingReloads && credit && (
+            <p className="mt-3 text-[13px] text-stone-500">
+              {`When we confirm the night, we'll add ${dollars(credit.reloadCents)} to your Leaf balance from your card. The night's RSVPs come out of it.`}
+            </p>
+          )}
           {bookError && <p className="mt-2 text-[14px] text-red-600">{bookError}</p>}
           <button
             type="button"
@@ -497,12 +580,16 @@ export default function MerchantDashboard({
           <Card>
             <H2>How billing works</H2>
             <p className="mt-2 text-[15px] leading-relaxed text-stone-600">
-              {dollars(d.rsvpFeeCents)} per RSVP, counted 2 hours before and charged after the night, never more than you seat. Under 5 RSVPs costs
-              nothing.
+              {dollars(d.rsvpFeeCents)} per RSVP, counted 2 hours before, never more than you seat. Under 5 RSVPs costs nothing.
               {d.freeNight.state === "granted" ? " Your first night is free." : d.freeNight.state === "used" ? " Your free first night is used." : ""}
+              {credit?.autoReload
+                ? " After that, nights come out of your Leaf balance, and anything it doesn\u2019t cover goes to your card."
+                : " After that, each night is charged to your card after the night."}
             </p>
           </Card>
         )}
+
+        {credit && <LeafBalance token={token} credit={credit} onChange={(c) => setD({ ...d, credit: c })} />}
 
 
 

@@ -734,7 +734,11 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             total={steps}
             id="card"
             title="Hold it with a card"
-            sub={form.billing?.firstNightFree ? "Your first night is free. After that, we charge after each night." : "We charge after each night."}
+            sub={
+              form.billing?.firstNightFree
+                ? "Your first night is free. After that, nights come out of a Leaf balance that tops up $60 at a time from this card."
+                : "Nights come out of a Leaf balance that tops up $60 at a time from this card."
+            }
           >
             <CardSetup
                   ref={cardRef}
