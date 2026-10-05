@@ -7,19 +7,13 @@ import FriendInviteCard from "@/components/FriendInviteCard";
 import { inviteCodeFor } from "@/lib/plan-invite";
 import { collectsMoney, p2pPriceLine, type P2pSplitSummary } from "@/lib/p2p";
 import { track } from "@/lib/track";
+import { setVerifiedUserCookie } from "@/lib/verified-user";
+import { ContactStep, usePhoneVerify, type ContactChoice } from "@/components/ContactStep";
 import {
-  setVerifiedUserCookie,
-  getVerifiedUserCookie,
-} from "@/lib/verified-user";
-import {
-  ArrowRight,
   Calendar as CalendarIcon,
-  Check,
   CheckCircle2,
   Clock,
-  Loader2,
   MessageCircle,
-  Phone,
   X,
 } from "lucide-react";
 
@@ -105,13 +99,6 @@ function buildIcsHref(opts: {
   if (opts.locationAddress) sp.set("locationAddress", opts.locationAddress);
   if (opts.url) sp.set("url", opts.url);
   return `/api/ics?${sp.toString()}`;
-}
-
-function formatPhoneNumber(input: string): string {
-  const digits = input.replace(/\D/g, "").slice(0, 10);
-  if (digits.length < 4) return digits;
-  if (digits.length < 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
-  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
 export default function StandalonePlanRsvp({
@@ -228,16 +215,10 @@ function RsvpModal({
     location?.address ?? null
   );
   const collectsP2p = collectsMoney(p2pAmountCents, p2pSplit);
-  const cached = getVerifiedUserCookie();
-  const [name, setName] = useState(cached?.name ?? "");
-  const [phone, setPhone] = useState(cached?.phone ?? "");
-  const [code, setCode] = useState("");
-  const [step, setStep] = useState<"phone" | "code" | "verified">(
-    cached ? "verified" : "phone"
-  );
+  // Same contact step as the calendar page's sheets: Text me / Email me.
+  const verify = usePhoneVerify();
+  const [contact, setContact] = useState<ContactChoice | null>(null);
   const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [rsvpNote, setRsvpNote] = useState("");
   const [sharePhone, setSharePhone] = useState(true);
@@ -246,57 +227,16 @@ function RsvpModal({
   const [isHostResult, setIsHostResult] = useState(false);
   const [notificationId, setNotificationId] = useState<string | null>(null);
 
-  const isVerified = step === "verified";
-
-  const sendOTP = async () => {
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length < 10) {
-      setError("Please enter a valid phone number.");
-      return;
-    }
-    setSending(true);
-    setError("");
-    try {
-      await Parse.Cloud.run("requestOTP", { phone: `+1${digits}` });
-      setStep("code");
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to send code.");
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const verifyOTP = async () => {
-    const digits = phone.replace(/\D/g, "");
-    setSending(true);
-    setError("");
-    try {
-      const result = (await Parse.Cloud.run("verifyOTP", {
-        phone: `+1${digits}`,
-        code,
-      })) as { sessionToken?: string } | null | undefined;
-      if (result && result.sessionToken) {
-        await Parse.User.become(result.sessionToken);
-        setStep("verified");
-        setVerifiedUserCookie(name, phone);
-      } else {
-        setError("Invalid code. Please try again.");
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Invalid code. Please try again.");
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isVerified) return;
+  /** `who.phone` is "" for an email RSVP (as the signed-in account). */
+  const rsvp = async (who: ContactChoice) => {
+    setContact(who);
+    const digits = who.phone.replace(/\D/g, "");
     setFormStep("submitting");
     try {
       const result = (await Parse.Cloud.run("rsvpToPlanViaWeb", {
-        phoneNumber: phone.replace(/\D/g, ""),
-        name,
+        ...(digits ? { phoneNumber: digits } : {}),
+        ...(who.name ? { name: who.name } : {}),
+        notify: who.notify,
         eventGroupId,
         rsvpNote: requireApproval && rsvpNote.trim() ? rsvpNote.trim() : undefined,
         sharePhoneWithHost: sharePhone,
@@ -314,7 +254,7 @@ function RsvpModal({
           }
         | null
         | undefined;
-      setVerifiedUserCookie(name, phone);
+      if (digits) setVerifiedUserCookie(who.name, who.phone);
       // Closes the watch → RSVP funnel: joined to this browser's earlier
       // host_video_play on the same plan, it is what turns a play into a
       // path rather than a view count.
@@ -355,7 +295,7 @@ function RsvpModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-2xl p-8 md:p-12 relative my-0 md:my-8">
+      <div className="bg-white w-full max-w-md rounded-t-3xl md:rounded-2xl px-6 pt-7 pb-8 md:p-10 relative my-0 md:my-8">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-900"
@@ -365,138 +305,53 @@ function RsvpModal({
 
         {formStep === "form" || formStep === "submitting" ? (
           <div className="space-y-6">
-            <div>
+            <div className="pr-8">
               <h3 className="text-2xl font-light tracking-tight">
-                {isFull ? "Join the waitlist for" : requireApproval ? "Request to Attend" : "RSVP for"} {planTitle}
+                {isFull ? "Join the waitlist for" : requireApproval ? "Request to attend" : "RSVP for"} {planTitle}
               </h3>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2">
-                <label className="text-xs tracking-wider uppercase font-bold">Your Name</label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Full name"
-                  disabled={isVerified}
-                  className="w-full border-b border-zinc-300 py-3 text-lg font-light focus:outline-none focus:border-zinc-900 transition-colors disabled:text-zinc-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs tracking-wider uppercase font-bold">Phone Number</label>
-                {step === "phone" ? (
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center flex-1 border-b border-zinc-300 focus-within:border-zinc-900 transition-colors">
-                      <Phone className="w-4 h-4 text-zinc-400 mr-2" />
-                      <input
-                        type="tel"
-                        required
-                        value={phone}
-                        onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
-                        placeholder="555-555-5555"
-                        className="w-full py-3 text-lg font-light focus:outline-none"
+            {collectsP2p ? (
+              <p className="text-sm text-zinc-700">{p2pPriceLine(p2pAmountCents, p2pSplit)}</p>
+            ) : null}
+            <ContactStep
+              verify={verify}
+              actionLabel={isFull ? "Join the waitlist" : requireApproval ? "Send request" : "Confirm RSVP"}
+              busy={formStep === "submitting"}
+              notes={{
+                text: "We'll text your confirmation and a reminder.",
+                email: "We'll email your confirmation and a reminder.",
+              }}
+              onConfirmed={(who) => rsvp(who)}
+              extras={({ method, verified }) => (
+                <>
+                  {requireApproval ? (
+                    <div>
+                      <label className="text-xs font-medium text-zinc-700 block mb-1">Note for the host (optional)</label>
+                      <textarea
+                        value={rsvpNote}
+                        onChange={(e) => setRsvpNote(e.target.value)}
+                        maxLength={200}
+                        rows={2}
+                        className="w-full rounded-xl border border-zinc-200 p-3 text-sm focus:outline-none focus:border-zinc-900 resize-none"
+                        placeholder="Tell the host a bit about yourself..."
                       />
+                      <p className="text-xs text-zinc-400 text-right mt-0.5">{rsvpNote.length}/200</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={sendOTP}
-                      disabled={sending || phone.replace(/\D/g, "").length < 10 || !name}
-                      className="px-4 py-2.5 bg-zinc-900 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 whitespace-nowrap"
-                    >
-                      {sending ? "Sending..." : "Verify"}
-                    </button>
-                  </div>
-                ) : null}
-                {step === "code" ? (
-                  <div className="space-y-3">
-                    <p className="text-xs text-zinc-500">Enter the 6-digit code sent to {phone}</p>
-                    <div className="flex items-center gap-3">
+                  ) : null}
+                  {method === "text" && verified ? (
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={6}
-                        value={code}
-                        onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                        placeholder="000000"
-                        className="flex-1 border-b border-zinc-300 py-3 text-lg font-light tracking-[0.5em] text-center focus:outline-none focus:border-zinc-900 transition-colors"
+                        type="checkbox"
+                        checked={sharePhone}
+                        onChange={(e) => setSharePhone(e.target.checked)}
+                        className="w-4 h-4 accent-zinc-900 rounded"
                       />
-                      <button
-                        type="button"
-                        onClick={verifyOTP}
-                        disabled={sending || code.length < 6}
-                        className="px-4 py-2.5 bg-zinc-900 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 whitespace-nowrap"
-                      >
-                        {sending ? "Checking..." : "Confirm"}
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStep("phone");
-                        setCode("");
-                        setError("");
-                      }}
-                      className="text-xs text-zinc-400 hover:text-zinc-900 underline"
-                    >
-                      Change number
-                    </button>
-                  </div>
-                ) : null}
-                {step === "verified" ? (
-                  <div className="flex items-center gap-2 py-3">
-                    <Check className="w-4 h-4 text-emerald-600" />
-                    <span className="text-sm text-emerald-600 font-medium">{phone} verified</span>
-                  </div>
-                ) : null}
-                {error ? <p className="text-xs text-red-500 mt-1">{error}</p> : null}
-              </div>
-              {isVerified ? (
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={sharePhone}
-                    onChange={(e) => setSharePhone(e.target.checked)}
-                    className="w-4 h-4 accent-zinc-900 rounded"
-                  />
-                  <span className="text-xs text-zinc-600">Share phone number with host</span>
-                </label>
-              ) : null}
-              {requireApproval ? (
-                <div>
-                  <label className="text-xs font-medium text-zinc-700 block mb-1">
-                    Note for the host (optional)
-                  </label>
-                  <textarea
-                    value={rsvpNote}
-                    onChange={(e) => setRsvpNote(e.target.value)}
-                    maxLength={200}
-                    rows={2}
-                    className="w-full border border-zinc-200 rounded-lg p-3 text-sm font-light focus:outline-none focus:border-zinc-400 resize-none"
-                    placeholder="Tell the host a bit about yourself..."
-                  />
-                  <p className="text-xs text-zinc-400 text-right mt-0.5">{rsvpNote.length}/200</p>
-                </div>
-              ) : null}
-              {collectsP2p ? (
-                <p className="text-sm text-zinc-700">{p2pPriceLine(p2pAmountCents, p2pSplit)}</p>
-              ) : null}
-              <button
-                type="submit"
-                disabled={formStep === "submitting" || !isVerified || !name}
-                className="w-full bg-zinc-900 text-white py-3.5 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-50 rounded-lg"
-              >
-                {formStep === "submitting" ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : isFull ? (
-                  <>Join Waitlist <ArrowRight className="w-4 h-4" /></>
-                ) : requireApproval ? (
-                  <>Submit Request <ArrowRight className="w-4 h-4" /></>
-                ) : (
-                  <>Confirm RSVP <ArrowRight className="w-4 h-4" /></>
-                )}
-              </button>
-            </form>
+                      <span className="text-xs text-zinc-600">Share my phone number with the host</span>
+                    </label>
+                  ) : null}
+                </>
+              )}
+            />
           </div>
         ) : formStep === "error" ? (
           <div className="py-8 text-center space-y-6">
@@ -533,9 +388,9 @@ function RsvpModal({
               </h4>
               <p className="text-sm text-zinc-500 max-w-xs mx-auto">
                 {isWaitlistResult
-                  ? "You’ll receive a text the moment a spot opens up."
+                  ? `You\u2019ll get ${contact?.notify === "email" ? "an email" : "a text"} the moment a spot opens up.`
                   : isPendingResult
-                    ? "You’ll receive a text when your request is approved."
+                    ? `You\u2019ll get ${contact?.notify === "email" ? "an email" : "a text"} when your request is approved.`
                     : isHostResult
                       ? "Open the Plan Chat in Leaf to coordinate with your attendees."
                       : collectsP2p
@@ -544,10 +399,10 @@ function RsvpModal({
               </p>
             </div>
 
-            {/* No web session is minted on this page, so the card authenticates
-                with the RSVP id + the phone just verified. */}
+            {/* The card uses the session the contact step signed in with; the
+                phone is its fallback for a session-less browser. */}
             {collectsP2p && !isPendingResult && !isHostResult && notificationId ? (
-              <P2pPayCard planId={eventGroupId} eventNotificationId={notificationId} phoneNumber={phone} />
+              <P2pPayCard planId={eventGroupId} eventNotificationId={notificationId} phoneNumber={contact?.phone || null} />
             ) : null}
 
             {/* Direct invites: the moment someone says yes is when a
