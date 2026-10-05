@@ -196,6 +196,7 @@ function FriendModeNav({ isLoggedIn }: { isLoggedIn: boolean }) {
         <div className="flex items-center gap-6">
           <a href="#how" className={link}>How it works</a>
           <a href="#faq" className={link}>FAQs</a>
+          <Link href="/" className={link}>Create a calendar</Link>
           <Link href="/me" className="text-sm font-semibold text-fm-ink transition-colors hover:text-fm-accent">
             {isLoggedIn ? "My crews" : "Log in"}
           </Link>
