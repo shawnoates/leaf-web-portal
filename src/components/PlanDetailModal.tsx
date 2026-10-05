@@ -26,6 +26,7 @@ import { CrossPromoEyebrow } from "./CrossPromoBadge";
 import PlanIntroSection from "./PlanIntroSection";
 import FittedImage from "./FittedImage";
 import FriendInviteCard from "./FriendInviteCard";
+import { APP_LINK_URL } from "@/lib/site";
 
 const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2";
@@ -443,7 +444,26 @@ export default function PlanDetailModal({
   const sharingPhones = planRsvps
     .filter((r) => r.status === "Accepted" && r.sharePhoneWithHost && r.phone)
     .map((r) => r.phone as string);
-  const messageAllHref = `sms:&addresses=${sharingPhones.map((p) => encodeURIComponent(p)).join(",")}`;
+  // Prefilled with a bring-a-friend note while the plan is still ahead: the
+  // people already going are the best route to the people who aren't. Spots
+  // left are named only when the plan has a cap and room. Past plans open a
+  // blank thread (that message is logistics or a thank-you, not an invite).
+  const planUpcoming = !plan.date || new Date(plan.date).getTime() > Date.now();
+  const spotsLeft = plan.capacity != null ? Math.max(0, plan.capacity - goingCount) : null;
+  const bringAFriendNote = (() => {
+    const when = plan.date
+      ? ` on ${new Date(plan.date).toLocaleDateString("en-US", {
+        weekday: "short", month: "short", day: "numeric", ...(plan.timezone ? { timeZone: plan.timezone } : {}),
+      })}`
+      : "";
+    const via = plan.promotedFrom ? `?via=${calendarId}` : "";
+    const link = `${APP_LINK_URL}/p/${plan.objectId}${via}`;
+    const room = spotsLeft != null && spotsLeft > 0 ? ` There ${spotsLeft === 1 ? "is 1 spot" : `are ${spotsLeft} spots`} left.` : "";
+    return `Hi all! Can't wait for ${plan.title}${when}. Know someone who'd love it? Bring them along, just send them this link: ${link}${room}`;
+  })();
+  const messageAllHref =
+    `sms:&addresses=${sharingPhones.map((p) => encodeURIComponent(p)).join(",")}` +
+    (planUpcoming && !plan.isPoll ? `&body=${encodeURIComponent(bringAFriendNote)}` : "");
 
   const approveRsvp = async (r: { notificationId: string }) => {
     try {
