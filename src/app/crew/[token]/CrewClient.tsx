@@ -30,7 +30,7 @@ import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
   RHYTHM_LABELS, crewHref, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
-  type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult,
+  type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult,
 } from "@/lib/crew";
 
 export default function CrewClient({ token }: { token: string }) {
@@ -1041,8 +1041,29 @@ function CycleCard({
         <p className="m-0 text-[15px] text-fm-ink-2">
           {c.waitingForQuorum
             ? `${joined} of ${quorum} needed have joined. Leaf starts planning as soon as the rest say IN.`
-            : "Leaf is picking a place. You'll get the dates to vote on next."}
+            : c.placeSuggestion || !isOwner
+              ? "Waiting on a place. Once it's in the book, Leaf finds dates that work for everyone."
+              : "Leaf is picking a place. You'll get the dates to vote on next."}
         </p>
+      )}
+
+      {c.state === "picking" && c.placeSuggestion && (
+        <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-fm-line px-4 py-3.5">
+          <p className="m-0 min-w-0 flex-1 text-sm leading-snug text-fm-ink">
+            {c.placeSuggestion.why === "history" ? `Back to ${c.placeSuggestion.name}, like last time?` : `How about ${c.placeSuggestion.name}?`}
+            {c.placeSuggestion.address && <span className="block text-xs text-fm-muted">{c.placeSuggestion.address}</span>}
+          </p>
+          <Button
+            small
+            disabled={busy !== null}
+            onClick={() => onAct("addSuggested", () => run("addToCrewBook", auth, c.placeSuggestion!.locationId
+              ? { locationId: c.placeSuggestion!.locationId }
+              : { placeId: c.placeSuggestion!.placeId, venue: { name: c.placeSuggestion!.name, address: c.placeSuggestion!.address, lat: c.placeSuggestion!.lat, lng: c.placeSuggestion!.lng, placeId: c.placeSuggestion!.placeId } }))}
+          >
+            {busy === "addSuggested" ? "Adding…" : "Add it"}
+          </Button>
+          <Link href={crewHref(auth, "book")} className="text-sm text-fm-muted underline underline-offset-4">Somewhere else</Link>
+        </div>
       )}
 
       {c.state === "polling" && (
@@ -1228,7 +1249,64 @@ function CycleCard({
           )}
         </>
       )}
+      {c.state === "polling" && (c.isHost || isOwner) && (
+        <ChangePlace cycle={c} auth={auth} busy={busy} onAct={onAct} />
+      )}
     </Card>
+  );
+}
+
+/**
+ * Organizer or this round's host, while it's voting: switch the place to
+ * another one in the book. Dates and votes stay; Leaf tells the crew. When
+ * someone added a place before anyone voted, it's offered first.
+ */
+function ChangePlace({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: CrewAuth; busy: string | null; onAct: (key: string, fn: () => Promise<unknown>) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [book, setBook] = useState<BookSpot[] | null>(null);
+  const change = (spotId: string) => onAct("changePlace", () => run("changeCrewPlace", auth, { cycleId: c.cycleId, spotId }));
+  const show = async () => {
+    setOpen(true);
+    if (!book) {
+      const r = await run<{ shared: BookSpot[] }>("getCrewBook", auth).catch(() => ({ shared: [] as BookSpot[] }));
+      setBook(r.shared.filter((b) => !b.eventPassed && b.name !== c.venue?.name));
+    }
+  };
+  return (
+    <div className="flex flex-col gap-2.5">
+      {c.swapOffer && (
+        <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-fm-line px-4 py-3.5">
+          <p className="m-0 min-w-0 flex-1 text-sm text-fm-ink">{c.swapOffer.name} was just added. Nobody has voted yet. Use it instead?</p>
+          <Button small disabled={busy !== null} onClick={() => change(c.swapOffer!.spotId)}>{busy === "changePlace" ? "Switching…" : `Use ${c.swapOffer.name}`}</Button>
+        </div>
+      )}
+      {!open ? (
+        <button type="button" onClick={show} className="min-h-11 w-fit text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink">
+          Change the place
+        </button>
+      ) : (
+        <div className="flex flex-col gap-2 rounded-[18px] border border-fm-line p-3">
+          <Mono className="px-1 text-fm-muted">Pick from the book · same dates</Mono>
+          {!book ? (
+            <p className="m-0 px-1 text-sm text-fm-muted">Loading the book…</p>
+          ) : book.length === 0 ? (
+            <p className="m-0 px-1 text-sm text-fm-muted">Nothing else in the book yet. <Link href={crewHref(auth, "book")} className="underline">Add a place</Link></p>
+          ) : (
+            <ul className="m-0 flex list-none flex-col gap-1 p-0">
+              {book.map((b) => (
+                <li key={b.spotId}>
+                  <button type="button" disabled={busy !== null} onClick={() => change(b.spotId)} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-fm-card">
+                    <span className="min-w-0 truncate text-fm-ink">{b.name}</span>
+                    <span className="shrink-0 text-xs text-fm-muted">{b.neighborhood || b.category || ""}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <button type="button" onClick={() => setOpen(false)} className="w-fit px-1 text-xs text-fm-muted underline">Never mind</button>
+        </div>
+      )}
+    </div>
   );
 }
 

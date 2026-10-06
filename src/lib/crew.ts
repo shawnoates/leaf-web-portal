@@ -36,6 +36,10 @@ export type CycleView = {
   eventWindow?: { start: string; end: string; kind: "movie" | "event"; title: string | null } | null;
   /** A movie night's real showtime and booking link, by date. */
   showtimes?: Record<string, { time: string; bookingUrl: string | null }> | null;
+  /** Waiting on a place: where Leaf suggests (been there together, or fits the crew's name). */
+  placeSuggestion?: { name: string; address: string | null; locationId?: string; placeId?: string | null; lat?: number; lng?: number; why: "history" | "name" } | null;
+  /** Voting, nobody has voted, and a place was added since: offer it instead. */
+  swapOffer?: { spotId: string; name: string } | null;
   options: DateOption[];
   chosenOption: DateOption | null;
   startsAt: string | { iso: string } | null;
