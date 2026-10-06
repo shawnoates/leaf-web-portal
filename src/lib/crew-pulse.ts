@@ -55,3 +55,17 @@ export const SAMPLE_PULSE: CrewPulse = {
   ],
   nudge: null,
 };
+
+/** A crew with nothing to show yet: the card still shows, rings empty. */
+export const EMPTY_PULSE: CrewPulse = {
+  windowDays: 90,
+  score: null,
+  band: "getting-going",
+  bandLabel: "Warming up",
+  trend: null,
+  rings: { showUp: 0, keepItGoing: null, shareLoad: 0 },
+  ringDetail: { nightsInWindow: 0, expectedNights: null, contributors: 0, members: 0 },
+  stats: { nights: 0, places: 0, streak: 0, mostAtOnce: 0 },
+  shoutOuts: [],
+  nudge: null,
+};

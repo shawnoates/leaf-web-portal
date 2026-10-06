@@ -23,6 +23,7 @@ import {
 import ProposeNight from "@/components/crew/ProposeNight";
 import SeedPlaces from "@/components/crew/SeedPlaces";
 import CrewPulseCard from "@/components/crew/CrewPulseCard";
+import { EMPTY_PULSE } from "@/lib/crew-pulse";
 import CrewMoneyCard from "@/components/crew/CrewMoneyCard";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
@@ -408,9 +409,12 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             <CrewMoneyCard kind="after" split={split} auth={auth} onChange={setSplit} />
           )}
 
-          {data.pulse && (
-            <CrewPulseCard pulse={data.pulse} crewName={crew.name} shareToken={me.token || null} />
-          )}
+          {/* Always there: a new crew sees it warming up. */}
+          <CrewPulseCard
+            pulse={data.pulse && data.pulse.score == null ? { ...data.pulse, bandLabel: "Warming up" } : (data.pulse || EMPTY_PULSE)}
+            crewName={crew.name}
+            shareToken={me.token || null}
+          />
 
           {me.needsPace && !paceDone && !crew.oneTime && (
             <section className="rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
