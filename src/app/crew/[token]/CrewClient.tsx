@@ -409,13 +409,6 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             <CrewMoneyCard kind="after" split={split} auth={auth} onChange={setSplit} />
           )}
 
-          {/* Always there: a new crew sees it warming up. */}
-          <CrewPulseCard
-            pulse={data.pulse && data.pulse.score == null ? { ...data.pulse, bandLabel: "Warming up" } : (data.pulse || EMPTY_PULSE)}
-            crewName={crew.name}
-            shareToken={me.token || null}
-          />
-
           {me.needsPace && !paceDone && !crew.oneTime && (
             <section className="rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
               <label htmlFor="first-pace" className="block font-fm-serif text-[26px] leading-tight">How often for you?</label>
@@ -446,17 +439,6 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 </Button>
               </div>
               <p className="mb-0 mt-2 text-xs text-fm-muted">You can change it any time in your settings.</p>
-            </section>
-          )}
-
-          {me.needsSeed && !seedDone && (
-            <section className="rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
-              <SeedPlaces
-                auth={auth}
-                crewName={crew.name}
-                heading="Where would you go?"
-                onDone={() => { setSeedDone(true); void reload(); }}
-              />
             </section>
           )}
 
@@ -516,92 +498,109 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             </section>
           )}
 
-          <div className={`grid gap-10 ${past.length > 0 ? "lg:grid-cols-2 lg:gap-12" : ""}`}>
-            {past.length > 0 && (
-              <section>
-                <SectionTitle>Past nights</SectionTitle>
-                <ul className="mt-1.5 divide-y divide-fm-line-dim">
-                  {past.map((p) => {
-                    const d = toDate(p.startsAt);
-                    return (
-                      <li key={p.cycleId} className="flex items-center gap-4 py-3.5">
-                        <Mono className="w-14 shrink-0 text-xs text-fm-muted">{d ? d.toLocaleDateString("en-US", { month: "short", day: "2-digit" }) : ""}</Mono>
-                        <span className="min-w-0 flex-1 truncate text-base font-medium">{p.venue?.name || "A night out"}</span>
-                        <span className="text-[13px] text-fm-muted">{p.headcount} went</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            )}
-
-            <section className="flex flex-col gap-2.5 lg:max-w-[640px] lg:gap-3">
-              <SectionTitle>Tell Leaf</SectionTitle>
-              <p className="m-0 text-sm text-fm-muted">
-                Days that never work, places to avoid, anything. Only Leaf reads what you write; the crew sees the topics below with counts, never who said what.
-              </p>
-              {pills.length > 0 && me.status === "in" && (
-                <div className="flex flex-wrap gap-2" aria-label="What the crew has told Leaf">
-                  {(allPills ? pills : pills.slice(0, 6)).map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      aria-pressed={p.mine}
-                      disabled={busy !== null}
-                      title={p.mine ? "Tap to take back your +1" : "Tap to +1"}
-                      onClick={() => act("pill", () => run("toggleCrewPrefPill", auth, { pillId: p.id, on: !p.mine }))}
-                      className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 text-sm transition disabled:opacity-60 ${
-                        p.mine ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink hover:border-fm-ink-2"
-                      }`}
-                    >
-                      {p.mine && <Check size={14} strokeWidth={2.4} aria-hidden />}
-                      <span>{p.label}</span>
-                      <span className={p.mine ? "font-semibold" : "text-fm-muted"}>{p.count}</span>
-                    </button>
-                  ))}
-                  {!allPills && pills.length > 6 && (
-                    <button type="button" onClick={() => setAllPills(true)} className="inline-flex min-h-10 items-center rounded-full border border-fm-line px-3.5 text-sm text-fm-ink hover:border-fm-ink-2">
-                      +{pills.length - 6}
-                    </button>
-                  )}
-                </div>
-              )}
-              {noteSent ? (
-                <p className="m-0 flex items-center gap-1.5 text-sm text-fm-ink-2"><Check size={16} aria-hidden /> {noteSent}</p>
-              ) : (
-                <form
-                  className="flex h-14 items-center gap-2 rounded-full border border-fm-line bg-fm-surface pl-[18px] pr-1.5"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!note.trim()) return;
-                    act("note", async () => {
-                      const r = await run<TellLeafResult>("crewTellLeaf", auth, { text: note });
-                      // Read the days back: it's the only way someone catches
-                      // Leaf reading "Thursdays mostly" the wrong way round.
-                      setNoteSent(tellLeafReceipt(r));
-                    });
-                  }}
-                >
-                  <label htmlFor="tell-leaf" className="sr-only">Message to Leaf</label>
-                  <input
-                    id="tell-leaf"
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="e.g. Mondays never work for me"
-                    className="min-w-0 flex-1 border-0 !bg-transparent text-[15px] text-fm-ink outline-none"
-                  />
+          <section className="flex flex-col gap-2.5 lg:max-w-[640px] lg:gap-3">
+            <SectionTitle>Tell Leaf</SectionTitle>
+            <p className="m-0 text-sm text-fm-muted">
+              Days that never work, places to avoid, anything. Only Leaf reads what you write; the crew sees the topics below with counts, never who said what.
+            </p>
+            {pills.length > 0 && me.status === "in" && (
+              <div className="flex flex-wrap gap-2" aria-label="What the crew has told Leaf">
+                {(allPills ? pills : pills.slice(0, 6)).map((p) => (
                   <button
-                    type="submit"
-                    aria-label="Send to Leaf"
-                    disabled={busy !== null || !note.trim()}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-fm-ink text-fm-canvas disabled:opacity-40"
+                    key={p.id}
+                    type="button"
+                    aria-pressed={p.mine}
+                    disabled={busy !== null}
+                    title={p.mine ? "Tap to take back your +1" : "Tap to +1"}
+                    onClick={() => act("pill", () => run("toggleCrewPrefPill", auth, { pillId: p.id, on: !p.mine }))}
+                    className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 text-sm transition disabled:opacity-60 ${
+                      p.mine ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink hover:border-fm-ink-2"
+                    }`}
                   >
-                    <ArrowUp size={18} strokeWidth={2.2} aria-hidden />
+                    {p.mine && <Check size={14} strokeWidth={2.4} aria-hidden />}
+                    <span>{p.label}</span>
+                    <span className={p.mine ? "font-semibold" : "text-fm-muted"}>{p.count}</span>
                   </button>
-                </form>
-              )}
+                ))}
+                {!allPills && pills.length > 6 && (
+                  <button type="button" onClick={() => setAllPills(true)} className="inline-flex min-h-10 items-center rounded-full border border-fm-line px-3.5 text-sm text-fm-ink hover:border-fm-ink-2">
+                    +{pills.length - 6}
+                  </button>
+                )}
+              </div>
+            )}
+            {noteSent ? (
+              <p className="m-0 flex items-center gap-1.5 text-sm text-fm-ink-2"><Check size={16} aria-hidden /> {noteSent}</p>
+            ) : (
+              <form
+                className="flex h-14 items-center gap-2 rounded-full border border-fm-line bg-fm-surface pl-[18px] pr-1.5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!note.trim()) return;
+                  act("note", async () => {
+                    const r = await run<TellLeafResult>("crewTellLeaf", auth, { text: note });
+                    // Read the days back: it's the only way someone catches
+                    // Leaf reading "Thursdays mostly" the wrong way round.
+                    setNoteSent(tellLeafReceipt(r));
+                  });
+                }}
+              >
+                <label htmlFor="tell-leaf" className="sr-only">Message to Leaf</label>
+                <input
+                  id="tell-leaf"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="e.g. Mondays never work for me"
+                  className="min-w-0 flex-1 border-0 !bg-transparent text-[15px] text-fm-ink outline-none"
+                />
+                <button
+                  type="submit"
+                  aria-label="Send to Leaf"
+                  disabled={busy !== null || !note.trim()}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-fm-ink text-fm-canvas disabled:opacity-40"
+                >
+                  <ArrowUp size={18} strokeWidth={2.2} aria-hidden />
+                </button>
+              </form>
+            )}
+          </section>
+
+          {/* Always there: a new crew sees it warming up. */}
+          <CrewPulseCard
+            pulse={data.pulse && data.pulse.score == null ? { ...data.pulse, bandLabel: "Warming up" } : (data.pulse || EMPTY_PULSE)}
+            crewName={crew.name}
+            shareToken={me.token || null}
+          />
+
+          {me.needsSeed && !seedDone && (
+            <section className="rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
+              <SeedPlaces
+                auth={auth}
+                crewName={crew.name}
+                heading="Where would you go?"
+                onDone={() => { setSeedDone(true); void reload(); }}
+              />
             </section>
-          </div>
+          )}
+
+          {past.length > 0 && (
+            <section>
+              <SectionTitle>Past nights</SectionTitle>
+              <ul className="mt-1.5 divide-y divide-fm-line-dim">
+                {past.map((p) => {
+                  const d = toDate(p.startsAt);
+                  return (
+                    <li key={p.cycleId} className="flex items-center gap-4 py-3.5">
+                      <Mono className="w-14 shrink-0 text-xs text-fm-muted">{d ? d.toLocaleDateString("en-US", { month: "short", day: "2-digit" }) : ""}</Mono>
+                      <span className="min-w-0 flex-1 truncate text-base font-medium">{p.venue?.name || "A night out"}</span>
+                      <span className="text-[13px] text-fm-muted">{p.headcount} went</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
         </div>
 
         {/* Members (desktop). Personal settings live in the Settings pop-up. */}
