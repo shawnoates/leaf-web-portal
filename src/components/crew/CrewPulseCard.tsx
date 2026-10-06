@@ -129,7 +129,7 @@ export default function CrewPulseCard({ pulse, crewName, shareToken }: { pulse: 
         ) : (
           <p className="m-0 text-sm leading-relaxed text-fm-ink-2">
             {pulse.stats.nights === 0
-              ? "Your crew's fitness tracker. The rings start filling after your first night out, and the score shows up after the second."
+              ? "How well your crew actually hangs out. The rings start filling after your first night out, and the score shows up after the second."
               : "Your score shows up after the second night. The rings fill as people come, the crew keeps its rhythm, and more of you pitch in."}
           </p>
         )}

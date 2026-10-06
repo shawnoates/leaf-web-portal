@@ -48,7 +48,7 @@ const FAQ = [
   { q: "Will Leaf spam my friends?", a: "No. Leaf only texts people who choose texts about the crew, at most 5 a week, and anyone can reply STOP at any time." },
   { q: "What if nobody can make it?", a: "Leaf tries a backup place and new dates once. If that misses too, it skips this round and comes back on the next one." },
   { q: "Who books the table?", a: "Whoever's hosting that night, or the person who started the crew. Leaf sends them a booking link and tells everyone once it's booked." },
-  { q: "What's Crew Pulse?", a: "A fitness tracker for your friend group. Three rings: do people show up, does the crew keep its rhythm, and is more than one person doing the work. It appears on your crew page after the first night." },
+  { q: "What's Crew Pulse?", a: "A score for how well your friend group actually hangs out. Three rings: do people show up, does the crew keep its rhythm, and is more than one person doing the work. It's on every crew page, and the score shows up after your second night." },
   { q: "I already run a calendar on Leaf. Can I use it?", a: "Yes. Switch Friend Mode on for your calendar from your dashboard (Friends and Community calendars with up to 15 people)." },
   { q: "How much does it cost?", a: "Nothing. Friend Mode is free." },
 ];
@@ -136,10 +136,10 @@ export default function FriendsClient() {
             <div className="flex flex-col gap-4">
               <span className="font-fm-mono text-xs uppercase tracking-[0.12em] text-fm-accent">New · Crew Pulse</span>
               <h2 className="m-0 font-fm-serif text-[44px] font-normal leading-[1.02] lg:text-[56px]">
-                Your friend group gets <span className="italic">a fitness tracker.</span>
+                How often does your crew <span className="italic">actually</span> hang out?
               </h2>
               <p className="m-0 max-w-lg text-[17px] leading-relaxed text-fm-ink-2">
-                Three rings: do people show up, does the crew keep its rhythm, and is more than one person doing the work. A score out of 100, shout-outs for the good stuff, and a card you can post.
+                Crew Pulse scores your friend group on hanging out: do people show up, does the crew keep its rhythm, and is more than one person doing the planning. A score out of 100, shout-outs for the good stuff, and a card you can post.
               </p>
               <p className="m-0 text-sm text-fm-muted">Shown on a sample crew.</p>
             </div>
