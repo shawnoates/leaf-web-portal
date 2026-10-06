@@ -18,7 +18,7 @@ import { ArrowUp, Check, ChevronUp, Plus, Settings, UserPlus, X } from "lucide-r
 import Parse from "@/lib/parse-client";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import {
-  Avatar, Button, Card, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Mono, SectionTitle, Spinner, useInApp,
+  Avatar, Button, Card, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Mono, SectionTitle, Spinner, useInApp, useCrewEmbedded,
 } from "@/components/crew/CrewShell";
 import ProposeNight from "@/components/crew/ProposeNight";
 import SeedPlaces from "@/components/crew/SeedPlaces";
@@ -57,6 +57,7 @@ function splitName(name: string): [string, string | undefined] {
 }
 
 function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; reload: () => Promise<void> }) {
+  const embedded = useCrewEmbedded();
   const { crew, me, members, names, open, past, book } = data;
   // Money: the latest night's bill, and each set night's cost. Kept here so a
   // claim or "I paid" updates the card at once (the server returns the new view).
@@ -921,6 +922,22 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             </div>
           </div>
         </div>
+      )}
+
+      {/* Everyone here has other groups: the way to start one for them. In the
+          app, the /friends link opens its own Start a crew screen. Not inside
+          the dashboard, which has Start a crew in its sidebar. */}
+      {!embedded && (
+        <section className="mt-16 flex flex-col items-center gap-3 border-t border-fm-line-dim pt-10 text-center lg:mt-20">
+          <h2 className="m-0 font-fm-serif text-[30px] font-normal leading-tight lg:text-[36px]">Got another group you never see enough?</h2>
+          <p className="m-0 max-w-md text-[15px] text-fm-ink-2">Start a crew for them. Leaf finds the nights that work and keeps them coming.</p>
+          <a
+            href="/friends#start"
+            className="mt-2 inline-flex h-12 items-center rounded-full bg-fm-accent px-7 text-[15px] font-bold text-fm-canvas"
+          >
+            Start your own crew
+          </a>
+        </section>
       )}
     </CrewShell>
   );
