@@ -23,6 +23,7 @@ import {
 import ProposeNight from "@/components/crew/ProposeNight";
 import SeedPlaces from "@/components/crew/SeedPlaces";
 import CrewPulseCard from "@/components/crew/CrewPulseCard";
+import CrewMoneyCard from "@/components/crew/CrewMoneyCard";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
@@ -55,6 +56,11 @@ function splitName(name: string): [string, string | undefined] {
 
 function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; reload: () => Promise<void> }) {
   const { crew, me, members, names, open, past, book } = data;
+  // Money: the latest night's bill, and each set night's cost. Kept here so a
+  // claim or "I paid" updates the card at once (the server returns the new view).
+  const [split, setSplit] = useState(data.split ?? null);
+  const [costs, setCosts] = useState(data.costs ?? {});
+  useEffect(() => { setSplit(data.split ?? null); setCosts(data.costs ?? {}); }, [data]);
   const pills = data.prefPills || [];
   const [allPills, setAllPills] = useState(false);
   const [pace, setPace] = useState<string>(me.rhythmDays ? String(me.rhythmDays) : "");
@@ -363,7 +369,12 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             {open.length > 0 && (
               <div className={`grid gap-3 lg:gap-4 ${open.length > 1 ? "lg:grid-cols-2" : ""}`}>
                 {open.map((c) => (
-                  <CycleCard key={c.cycleId} cycle={c} names={names} members={members} busy={busy} onAct={act} auth={auth} quorum={crew.quorum} joined={joined.length} calendarSynced={Boolean(me.calendarSynced)} onConnectCalendar={connectCalendar} hostRotation={Boolean(crew.hostRotation)} isOwner={me.isOwner} canSkip={me.isOwner && !crew.oneTime && crew.enabled !== false} crewId={crew.id} />
+                  <div key={c.cycleId} className="flex flex-col gap-3">
+                    <CycleCard cycle={c} names={names} members={members} busy={busy} onAct={act} auth={auth} quorum={crew.quorum} joined={joined.length} calendarSynced={Boolean(me.calendarSynced)} onConnectCalendar={connectCalendar} hostRotation={Boolean(crew.hostRotation)} isOwner={me.isOwner} canSkip={me.isOwner && !crew.oneTime && crew.enabled !== false} crewId={crew.id} />
+                    {costs[c.cycleId] && (
+                      <CrewMoneyCard kind="cost" split={costs[c.cycleId]!} auth={auth} onChange={(next) => setCosts((m) => ({ ...m, [c.cycleId]: next }))} />
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -377,6 +388,10 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               />
             )}
           </section>
+
+          {split && (split.receipt || split.went) && (
+            <CrewMoneyCard kind="after" split={split} auth={auth} onChange={setSplit} />
+          )}
 
           {data.pulse && data.pulse.stats.nights > 0 && (
             <CrewPulseCard pulse={data.pulse} crewName={crew.name} shareToken={me.token || null} />

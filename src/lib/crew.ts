@@ -134,6 +134,42 @@ export type CrewPage = {
   book: BookSpot[];
   /** Crew Pulse: rings, score and stats from the last 90 days (null if it couldn't be worked out). */
   pulse?: CrewPulse | null;
+  /** Split the bill for the latest night that ended this week (null when there's none). */
+  split?: CrewSplit | null;
+  /** A set night's cost to collect, by cycle id. */
+  costs?: Record<string, CrewSplit | null>;
+};
+
+export type PayOption = { method: string; label: string; handle: string; url: string | null; hint?: string; recipientName?: string | null };
+
+/** A night's bill (server: crewSplitView in friend-mode-functions.js). Dollars, not cents. */
+export type CrewSplit = {
+  cycleId: string;
+  venue: string;
+  startsAt: string | { iso: string } | null;
+  went: boolean;
+  canAddCost?: boolean;
+  receipt: null | {
+    receiptId: string;
+    cost: { mode: "total" | "each"; cents: number; label: string | null } | null;
+    photo: string | null;
+    items: { index: number; name: string; quantity: number; totalPrice: number; mine: boolean; people: string[] }[];
+    subtotal: number;
+    tax: number;
+    tip: number;
+    total: number;
+    unclaimed: number;
+    tipIndex: number;
+    tipRates: number[];
+    payer: { userId: string; name: string } | null;
+    isPayer: boolean;
+    canEdit: boolean;
+    myShare: number;
+    myPaid: { at: string; method: string | null; confirmed: boolean } | null;
+    payOptions: PayOption[];
+    payerHasHandles: boolean;
+    people: { userId: string; name: string; share: number; paid: { at: string; method: string | null; confirmed: boolean } | null }[];
+  };
 };
 
 /** Crew Pulse (server: crew-pulse.js). Rings are 0–1; a null ring doesn't apply (a one-time crew has no rhythm). */
