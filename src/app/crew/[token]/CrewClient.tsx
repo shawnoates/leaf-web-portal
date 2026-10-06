@@ -1264,46 +1264,57 @@ function CycleCard({
 function ChangePlace({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: CrewAuth; busy: string | null; onAct: (key: string, fn: () => Promise<unknown>) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [book, setBook] = useState<BookSpot[] | null>(null);
-  const change = (spotId: string) => onAct("changePlace", () => run("changeCrewPlace", auth, { cycleId: c.cycleId, spotId }));
+  const [picked, setPicked] = useState<string | null>(null);
+  const change = async (spotId: string) => {
+    setPicked(spotId);
+    await onAct("changePlace", () => run("changeCrewPlace", auth, { cycleId: c.cycleId, spotId }));
+    // The card reloads with the new place; start fresh next time.
+    setPicked(null);
+    setOpen(false);
+    setBook(null);
+  };
   const show = async () => {
     setOpen(true);
     if (!book) {
       const r = await run<{ shared: BookSpot[] }>("getCrewBook", auth).catch(() => ({ shared: [] as BookSpot[] }));
-      setBook(r.shared.filter((b) => !b.eventPassed && b.name !== c.venue?.name));
+      setBook(r.shared.filter((b) => !b.eventPassed));
     }
   };
+  // Never offer the place it's already at.
+  const choices = (book || []).filter((b) => b.name !== c.venue?.name);
   return (
     <div className="flex flex-col gap-2.5">
       {c.swapOffer && (
         <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-fm-line px-4 py-3.5">
           <p className="m-0 min-w-0 flex-1 text-sm text-fm-ink">{c.swapOffer.name} was just added. Nobody has voted yet. Use it instead?</p>
-          <Button small disabled={busy !== null} onClick={() => change(c.swapOffer!.spotId)}>{busy === "changePlace" ? "Switching…" : `Use ${c.swapOffer.name}`}</Button>
+          <Button small disabled={busy !== null} onClick={() => void change(c.swapOffer!.spotId)}>{busy === "changePlace" ? "Switching…" : `Use ${c.swapOffer.name}`}</Button>
         </div>
       )}
       {!open ? (
-        <button type="button" onClick={show} className="min-h-11 w-fit text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink">
-          Change the place
-        </button>
+        <div><Button small kind="ghost" onClick={() => void show()}>Change the place</Button></div>
       ) : (
         <div className="flex flex-col gap-2 rounded-[18px] border border-fm-line p-3">
           <Mono className="px-1 text-fm-muted">Pick from the book · same dates</Mono>
           {!book ? (
             <p className="m-0 px-1 text-sm text-fm-muted">Loading the book…</p>
-          ) : book.length === 0 ? (
+          ) : choices.length === 0 ? (
             <p className="m-0 px-1 text-sm text-fm-muted">Nothing else in the book yet. <Link href={crewHref(auth, "book")} className="underline">Add a place</Link></p>
           ) : (
-            <ul className="m-0 flex list-none flex-col gap-1 p-0">
-              {book.map((b) => (
-                <li key={b.spotId}>
-                  <button type="button" disabled={busy !== null} onClick={() => change(b.spotId)} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-fm-card">
-                    <span className="min-w-0 truncate text-fm-ink">{b.name}</span>
-                    <span className="shrink-0 text-xs text-fm-muted">{b.neighborhood || b.category || ""}</span>
-                  </button>
+            <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+              {choices.map((b) => (
+                <li key={b.spotId} className="flex items-center gap-3 rounded-xl border border-fm-line-dim px-3 py-2.5">
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-[15px] text-fm-ink">{b.name}</span>
+                    {(b.neighborhood || b.category) && <span className="truncate text-xs text-fm-muted">{b.neighborhood || b.category}</span>}
+                  </span>
+                  <Button small disabled={busy !== null} onClick={() => void change(b.spotId)}>
+                    {picked === b.spotId ? "Switching…" : "Use this"}
+                  </Button>
                 </li>
               ))}
             </ul>
           )}
-          <button type="button" onClick={() => setOpen(false)} className="w-fit px-1 text-xs text-fm-muted underline">Never mind</button>
+          <button type="button" onClick={() => setOpen(false)} className="min-h-11 w-fit px-1 text-sm text-fm-muted underline underline-offset-4">Never mind</button>
         </div>
       )}
     </div>
