@@ -477,7 +477,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                      <a href={spotHref(s, inApp)} target={inApp ? undefined : "_blank"} rel="noreferrer" className="flex flex-col gap-2 lg:gap-2.5">
                       <div className="relative h-[148px] overflow-hidden rounded-[20px] border border-fm-line bg-fm-card lg:h-[168px] lg:rounded-[22px]">
                         <PlacePhoto
-                          src={s.photo}
+                          src={s.photo || s.plan?.imageUrl}
                           locationId={s.locationId}
                           fallback={<span aria-hidden className="absolute bottom-2.5 left-3 font-fm-serif text-[44px] leading-[0.8] text-fm-line lg:text-[52px]">{s.name.charAt(0)}</span>}
                         />
@@ -488,7 +488,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                       </div>
                       <div>
                         <div className="truncate text-[15px] font-semibold lg:text-base">{s.name}</div>
-                        <div className="truncate text-[13px] text-fm-muted">{[s.neighborhood, s.triedAt ? "tried" : null].filter(Boolean).join(" · ") || s.category}</div>
+                        <div className="truncate text-[13px] text-fm-muted">{s.plan?.title || [s.neighborhood, s.triedAt ? "tried" : null].filter(Boolean).join(" · ") || s.category}</div>
                       </div>
                      </a>
                     </li>

@@ -278,7 +278,7 @@ function SpotItem({ s, busy, act, auth, isOwner }: {
     <li className={`flex items-center gap-3.5 py-3.5 lg:flex-col${s.eventPassed ? " opacity-60" : ""} lg:items-stretch lg:gap-3.5 lg:rounded-3xl lg:border lg:border-fm-line-dim lg:bg-fm-surface lg:p-3 lg:pb-4`}>
       <a href={spotHref(s, inApp)} target={inApp ? undefined : "_blank"} rel="noreferrer" className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-fm-line bg-fm-card lg:h-[180px] lg:w-full lg:border-0">
         <PlacePhoto
-          src={s.photo}
+          src={s.photo || s.plan?.imageUrl}
           locationId={s.locationId}
           fallback={
             <span aria-hidden className="absolute inset-0 flex items-center justify-center font-fm-serif text-[28px] text-fm-knob lg:inset-auto lg:bottom-3 lg:left-3 lg:text-[64px] lg:leading-[0.8] lg:text-fm-line">
@@ -300,6 +300,18 @@ function SpotItem({ s, busy, act, auth, isOwner }: {
             <span className="lg:hidden">{s.addedBy && ` · added by ${s.addedByMe ? "you" : s.addedBy}`}</span>
           </div>
           {s.addedBy && <div className="hidden truncate text-xs text-fm-muted lg:block">Added by {s.addedByMe ? "you" : s.addedBy}</div>}
+          {s.plan && (s.plan.title || s.plan.description) && (
+            <div className="mt-1 flex flex-col gap-1 rounded-xl border border-fm-line-dim bg-fm-canvas px-3 py-2">
+              {s.plan.title && <span className="line-clamp-2 text-[13px] font-semibold text-fm-ink">{s.plan.title}</span>}
+              {s.plan.description && <span className="line-clamp-3 text-xs leading-snug text-fm-muted">{s.plan.description}</span>}
+              {(s.plan.videoUrl || s.plan.sourceUrl) && (
+                <span className="flex gap-3 text-xs font-semibold">
+                  {s.plan.videoUrl && <a href={s.plan.videoUrl} target="_blank" rel="noreferrer" className="text-fm-ink underline underline-offset-2">Watch the video</a>}
+                  {s.plan.sourceUrl && <a href={s.plan.sourceUrl} target="_blank" rel="noreferrer" className="text-fm-ink-2 underline underline-offset-2">See the post</a>}
+                </span>
+              )}
+            </div>
+          )}
           {eventLabel && (
             <span className={`mt-0.5 flex h-[22px] w-fit max-w-full items-center gap-1 rounded-full border px-2 text-[11px] ${s.eventPassed ? "border-fm-line-dim text-fm-muted" : "border-fm-line text-fm-ink-2"}`}>
               <CalendarDays size={12} aria-hidden className="shrink-0" /> <span className="truncate">{eventLabel}</span>

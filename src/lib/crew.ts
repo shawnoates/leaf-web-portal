@@ -98,6 +98,8 @@ export type BookSpot = {
   eventStart?: string | null;
   eventEnd?: string | null;
   eventKind?: "movie" | "event" | null;
+  /** A plan someone shared into the book: its own title, description, video, cover and link. */
+  plan?: { title: string | null; description: string | null; videoUrl: string | null; imageUrl: string | null; sourceUrl: string | null } | null;
 };
 
 export type SavedPlace = {
