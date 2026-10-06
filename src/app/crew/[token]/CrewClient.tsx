@@ -25,6 +25,7 @@ import SeedPlaces from "@/components/crew/SeedPlaces";
 import CrewPulseCard from "@/components/crew/CrewPulseCard";
 import { EMPTY_PULSE } from "@/lib/crew-pulse";
 import CrewMoneyCard from "@/components/crew/CrewMoneyCard";
+import PlacePhoto from "@/components/crew/PlacePhoto";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
@@ -475,12 +476,11 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     <li key={s.spotId} className="flex w-[148px] shrink-0 snap-start flex-col gap-2 lg:w-auto lg:gap-2.5 lg:[&:nth-child(n+5)]:hidden">
                      <a href={spotHref(s, inApp)} target={inApp ? undefined : "_blank"} rel="noreferrer" className="flex flex-col gap-2 lg:gap-2.5">
                       <div className="relative h-[148px] overflow-hidden rounded-[20px] border border-fm-line bg-fm-card lg:h-[168px] lg:rounded-[22px]">
-                        {s.photo ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={s.photo} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <span aria-hidden className="absolute bottom-2.5 left-3 font-fm-serif text-[44px] leading-[0.8] text-fm-line lg:text-[52px]">{s.name.charAt(0)}</span>
-                        )}
+                        <PlacePhoto
+                          src={s.photo}
+                          locationId={s.locationId}
+                          fallback={<span aria-hidden className="absolute bottom-2.5 left-3 font-fm-serif text-[44px] leading-[0.8] text-fm-line lg:text-[52px]">{s.name.charAt(0)}</span>}
+                        />
                         <span className="absolute bottom-2.5 right-2.5 flex h-[26px] items-center gap-1 rounded-full bg-fm-canvas px-2.5 text-xs font-semibold">
                           <ChevronUp size={13} strokeWidth={2.6} aria-hidden /> {s.upvotes}
                           <span className="sr-only"> want to go</span>

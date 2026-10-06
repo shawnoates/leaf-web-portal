@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, Check, ChevronLeft, ChevronUp, Lock, Plus, Search } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
+import PlacePhoto from "@/components/crew/PlacePhoto";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import { Button, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Spinner, useInApp } from "@/components/crew/CrewShell";
 import { spotHref, crewHref, run, toDate, type BookSpot, type CrewAuth, type SavedPlace } from "@/lib/crew";
@@ -199,12 +200,11 @@ function BookView({ auth, crewName, canAdd, isOwner }: { auth: CrewAuth; crewNam
               {(showAllSaves ? mine : mine.slice(0, 8)).map((p) => (
                 <li key={p.bookmarkId} className="flex items-center gap-3 py-3.5">
                   <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-fm-line bg-fm-card">
-                    {p.photo ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.photo} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <span aria-hidden className="absolute inset-0 flex items-center justify-center font-fm-serif text-[22px] text-fm-knob">{p.name.charAt(0)}</span>
-                    )}
+                    <PlacePhoto
+                      src={p.photo}
+                      locationId={p.locationId}
+                      fallback={<span aria-hidden className="absolute inset-0 flex items-center justify-center font-fm-serif text-[22px] text-fm-knob">{p.name.charAt(0)}</span>}
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-base font-semibold lg:text-[15px]">{p.name}</div>
@@ -277,14 +277,15 @@ function SpotItem({ s, busy, act, auth, isOwner }: {
   return (
     <li className={`flex items-center gap-3.5 py-3.5 lg:flex-col${s.eventPassed ? " opacity-60" : ""} lg:items-stretch lg:gap-3.5 lg:rounded-3xl lg:border lg:border-fm-line-dim lg:bg-fm-surface lg:p-3 lg:pb-4`}>
       <a href={spotHref(s, inApp)} target={inApp ? undefined : "_blank"} rel="noreferrer" className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-fm-line bg-fm-card lg:h-[180px] lg:w-full lg:border-0">
-        {s.photo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={s.photo} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <span aria-hidden className="absolute inset-0 flex items-center justify-center font-fm-serif text-[28px] text-fm-knob lg:inset-auto lg:bottom-3 lg:left-3 lg:text-[64px] lg:leading-[0.8] lg:text-fm-line">
-            {s.name.charAt(0)}
-          </span>
-        )}
+        <PlacePhoto
+          src={s.photo}
+          locationId={s.locationId}
+          fallback={
+            <span aria-hidden className="absolute inset-0 flex items-center justify-center font-fm-serif text-[28px] text-fm-knob lg:inset-auto lg:bottom-3 lg:left-3 lg:text-[64px] lg:leading-[0.8] lg:text-fm-line">
+              {s.name.charAt(0)}
+            </span>
+          }
+        />
         {triedLabel && (
           <span className="absolute bottom-3 right-3 hidden h-[26px] items-center gap-1 rounded-full bg-fm-canvas px-2.5 text-xs text-fm-ink-2 lg:flex">
             <Check size={12} strokeWidth={2.6} aria-hidden /> {triedLabel}
