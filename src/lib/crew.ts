@@ -32,6 +32,10 @@ export type CycleView = {
   state: CycleState;
   trigger: "rhythm" | "member_ask" | "member_proposal" | "opportunity";
   venue: Venue | null;
+  /** A movie or event from the book: its days ('YYYY-MM-DD'), so the dates stay inside them. */
+  eventWindow?: { start: string; end: string; kind: "movie" | "event"; title: string | null } | null;
+  /** A movie night's real showtime and booking link, by date. */
+  showtimes?: Record<string, { time: string; bookingUrl: string | null }> | null;
   options: DateOption[];
   chosenOption: DateOption | null;
   startsAt: string | { iso: string } | null;
@@ -86,6 +90,10 @@ export type BookSpot = {
   eventDate?: string | { iso: string } | null;
   /** The event's day is over: the entry sits at the bottom and Leaf won't pick it for a night. */
   eventPassed?: boolean;
+  /** A movie or event's days, 'YYYY-MM-DD' (start = end for one night). */
+  eventStart?: string | null;
+  eventEnd?: string | null;
+  eventKind?: "movie" | "event" | null;
 };
 
 export type SavedPlace = {

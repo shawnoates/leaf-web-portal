@@ -995,12 +995,20 @@ function CycleCard({
           </div>
         )}
         <div className="flex min-w-0 flex-col gap-1">
+          {c.eventWindow?.title && (
+            <Mono className="text-fm-accent">{c.eventWindow.kind === "movie" ? "Movie" : "Event"} · {c.eventWindow.title}</Mono>
+          )}
           <h2 className="m-0 font-fm-serif text-[34px] font-normal leading-[1.05] lg:text-[40px]">{c.venue?.name || "Picking a place…"}</h2>
           <p className="m-0 text-sm text-fm-muted">
             {settled && c.chosenOption
               ? [chosen?.dow, timeLabel(c.chosenOption.time), c.venue?.address].filter(Boolean).join(" · ")
               : c.venue?.address || cycleStatusLine(c, names)}
           </p>
+          {settled && c.chosenOption && c.showtimes?.[c.chosenOption.date]?.bookingUrl && (
+            <a href={c.showtimes[c.chosenOption.date].bookingUrl!} target="_blank" rel="noreferrer" className="w-fit text-sm font-semibold text-fm-ink underline underline-offset-4">
+              Get tickets for the {timeLabel(c.showtimes[c.chosenOption.date].time)} showing
+            </a>
+          )}
           {hostRotation && c.hostId && (
             <p className="m-0 text-sm text-fm-ink-2">{c.isHost ? "You're hosting this one" : `${names[c.hostId] || "Someone"} is hosting`}</p>
           )}
