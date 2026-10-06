@@ -270,7 +270,32 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
         {/* Who the crew is */}
         <div className="flex flex-col gap-4 lg:col-start-1 lg:row-start-1 lg:gap-8">
           <div className="flex flex-col gap-4">
-            <DisplayTitle italic={second && <span className="block">{second}</span>}>{first}</DisplayTitle>
+            {/* Invite and Settings sit top right, beside the crew's name. */}
+            <div className="flex items-start justify-between gap-3">
+              <DisplayTitle italic={second && <span className="block">{second}</span>}>{first}</DisplayTitle>
+              <div className="flex shrink-0 items-center gap-2 pt-1 lg:pt-3">
+                {me.inviteLink && (
+                  <button
+                    type="button"
+                    onClick={openInvite}
+                    aria-label="Invite people"
+                    title="Invite"
+                    className="flex h-11 w-11 items-center justify-center rounded-full border border-fm-line text-fm-ink transition hover:bg-fm-card"
+                  >
+                    <UserPlus size={19} aria-hidden />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(true)}
+                  aria-label="Crew settings"
+                  title="Settings"
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-fm-line text-fm-ink transition hover:bg-fm-card"
+                >
+                  <Settings size={19} aria-hidden />
+                </button>
+              </div>
+            </div>
             <div className="flex items-center gap-3">
               <div className="flex lg:hidden">
                 {[...joined, ...invited].slice(0, 5).map((m, i) => (
@@ -280,16 +305,6 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 ))}
               </div>
               <p className="m-0 text-sm text-fm-ink-2 lg:text-[15px]">{summary}</p>
-              <div className="ml-auto flex shrink-0 items-center gap-3 lg:ml-2">
-                {me.inviteLink && (
-                  <button className="flex items-center gap-1.5 text-sm font-medium text-fm-ink hover:underline" onClick={openInvite}>
-                    <UserPlus size={15} aria-hidden /> Invite
-                  </button>
-                )}
-                <button className="flex items-center gap-1.5 text-sm font-medium text-fm-ink hover:underline" onClick={() => setSettingsOpen(true)}>
-                  <Settings size={15} aria-hidden /> Settings
-                </button>
-              </div>
             </div>
           </div>
 
@@ -393,7 +408,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             <CrewMoneyCard kind="after" split={split} auth={auth} onChange={setSplit} />
           )}
 
-          {data.pulse && data.pulse.stats.nights > 0 && (
+          {data.pulse && (
             <CrewPulseCard pulse={data.pulse} crewName={crew.name} shareToken={me.token || null} />
           )}
 
