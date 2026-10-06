@@ -14,6 +14,7 @@ import { CalendarCheck, Check, Copy, Share } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { trackMarketingEvent } from "@/components/marketing/analytics";
 import LeafSignIn, { type SignInMethod } from "@/components/LeafSignIn";
+import VenueSearch from "@/components/VenueSearch";
 
 const PACES = [
   { days: 7, label: "Every week" },
@@ -35,6 +36,9 @@ export default function StartCrewForm({ onOpenCrew }: {
   const [step, setStep] = useState<Step>("crew");
   const [crewName, setCrewName] = useState("");
   const [pace, setPace] = useState(14);
+  // "Just once" is for one place: ask where up front, so Leaf never picks one.
+  const [placeQuery, setPlaceQuery] = useState("");
+  const [place, setPlace] = useState<{ placeId?: string | null; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState<Created | null>(null);
@@ -55,6 +59,9 @@ export default function StartCrewForm({ onOpenCrew }: {
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         source: "landing",
       })) as Created;
+      if (place) {
+        await Parse.Cloud.run("addToCrewBook", { crewId: r.crewId, placeId: place.placeId || null, venue: place }).catch(() => {});
+      }
       setCreated(r);
       setHasPhone(Boolean(Parse.User.current()?.get("phone")));
       setStep("done");
@@ -140,6 +147,26 @@ export default function StartCrewForm({ onOpenCrew }: {
               ))}
             </div>
           </fieldset>
+          {pace === 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-semibold text-fm-ink-2">Where are you going?</span>
+              {place ? (
+                <div className="flex h-12 items-center justify-between gap-2 rounded-2xl border border-fm-line bg-fm-canvas px-4 text-[15px]">
+                  <span className="truncate">{place.name}</span>
+                  <button type="button" className="text-xs text-fm-muted underline" onClick={() => setPlace(null)}>Change</button>
+                </div>
+              ) : (
+                <VenueSearch
+                  value={placeQuery}
+                  onChange={setPlaceQuery}
+                  onSelect={(v) => setPlace(v as { placeId?: string | null; name: string })}
+                  placeholder="The bathhouse, the restaurant…"
+                  className={field}
+                />
+              )}
+              <p className="m-0 text-xs text-fm-muted">Leaf finds the date that works for everyone{place ? "" : ". Add the place now or on the crew page"}.</p>
+            </div>
+          )}
           <button type="button" className={primary} onClick={next} disabled={busy}>{busy ? "Starting…" : "Start the crew"}</button>
           <p className="m-0 text-xs leading-relaxed text-fm-muted">Your friends don&rsquo;t need the app. They join from a link.</p>
         </>
