@@ -1249,7 +1249,7 @@ function CycleCard({
           )}
         </>
       )}
-      {c.state === "polling" && (c.isHost || isOwner) && (
+      {c.state === "polling" && (c.isHost || isOwner) && !c.venue?.fixed && (
         <ChangePlace cycle={c} auth={auth} busy={busy} onAct={onAct} />
       )}
     </Card>
