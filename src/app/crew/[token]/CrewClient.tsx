@@ -30,7 +30,7 @@ import PlacePhoto from "@/components/crew/PlacePhoto";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
-  RHYTHM_LABELS, crewHref, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
+  RHYTHM_LABELS, crewHref, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
   type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult,
   type CrewAddOn,
 } from "@/lib/crew";
@@ -61,6 +61,10 @@ function splitName(name: string): [string, string | undefined] {
 function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; reload: () => Promise<void> }) {
   const embedded = useCrewEmbedded();
   const { crew, me, members, names, open, past, book } = data;
+  // Daytime crews (coffee, brunch) aren't "nights": go by the latest round's time.
+  const ev = open[0] ? cycleIsEvening(open[0]) : past[0] ? eveningAt(past[0].startsAt) : true;
+  const night = ev ? "night" : "get-together";
+  const nights = ev ? "nights" : "get-togethers";
   // Money: the latest night's bill, and each set night's cost. Kept here so a
   // claim or "I paid" updates the card at once (the server returns the new view).
   const [split, setSplit] = useState(data.split ?? null);
@@ -123,7 +127,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
     if (!me.inviteLink) return;
     // The link's preview already shows the crew (name, who invited you, how
     // often), so the message stays short: no name, no title field.
-    const text = `Join our crew on Leaf so we can plan nights out together: ${me.inviteLink}`;
+    const text = `Join our crew on Leaf so we can plan ${ev ? "nights out" : "time"} together: ${me.inviteLink}`;
     try {
       if (navigator.share) { await navigator.share({ text }); setLinkDone("Shared"); return; }
     } catch { return; }
@@ -198,8 +202,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
           </div>
           <p className="mt-4 text-[15px] leading-relaxed text-fm-ink-2">
             {crew.oneTime
-              ? "One night out with this crew. Leaf finds a date that works for everyone and plans it."
-              : `Nights out with this crew, ${rhythmLabel(crew.rhythmDays).toLowerCase()}. Leaf finds a date that works for everyone and plans it.`}
+              ? `One ${ev ? "night out" : "get-together"} with this crew. Leaf finds a date that works for everyone and plans it.`
+              : `${ev ? "Nights out" : "Get-togethers"} with this crew, ${rhythmLabel(crew.rhythmDays).toLowerCase()}. Leaf finds a date that works for everyone and plans it.`}
           </p>
           {faces.length > 0 && (
             <div className="mt-5 flex items-center gap-3">
@@ -323,7 +327,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <div className="min-w-0 flex-1">
                 <div className="text-[15px] font-semibold">Friend Mode</div>
                 <div className="truncate text-[12px] text-fm-muted">
-                  {crew.enabled === false ? "Off · nothing is planned or texted" : "On · Leaf plans nights for this group"}
+                  {crew.enabled === false ? "Off · nothing is planned or texted" : `On · Leaf plans ${nights} for this group`}
                 </div>
               </div>
               <FriendModeSwitch
@@ -336,7 +340,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
           )}
           {crew.joinedCount < crew.quorum && (
             <p className="m-0 text-sm text-fm-ink-2">
-              Waiting on {crew.quorum - crew.joinedCount} more to join before Leaf plans the first night.
+              Waiting on {crew.quorum - crew.joinedCount} more to join before Leaf plans the first {night}.
             </p>
           )}
         </div>
@@ -345,9 +349,9 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
         <div className="mt-7 flex min-w-0 flex-col gap-10 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:gap-14">
           {crew.lastOneTime && (
             <section className="flex flex-col gap-3 rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
-              <Eyebrow>{crew.lastOneTime.happened ? "That was the night" : "It didn't come together"}</Eyebrow>
+              <Eyebrow>{crew.lastOneTime.happened ? `That was the ${ev ? "night" : "day"}` : "It didn't come together"}</Eyebrow>
               <h2 className="m-0 font-fm-serif text-[30px] font-normal leading-[1.05] lg:text-[36px]">
-                {me.isOwner ? "Do it again?" : "One night out"}
+                {me.isOwner ? "Do it again?" : ev ? "One night out" : "One get-together"}
               </h2>
               <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">
                 {me.isOwner
@@ -357,7 +361,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               {me.isOwner && (
                 <div className="flex flex-wrap gap-2">
                   <Button disabled={busy !== null} onClick={() => act("again", () => run("runCrewAgain", auth, { calendarId: crew.id, oneTime: true }))}>
-                    {busy === "again" ? "Starting…" : "Another night"}
+                    {busy === "again" ? "Starting…" : ev ? "Another night" : "Another one"}
                   </Button>
                   <Button kind="ghost" disabled={busy !== null} onClick={() => act("again", () => run("runCrewAgain", auth, { calendarId: crew.id, oneTime: false, rhythmDays: 28 }))}>
                     Make it monthly
@@ -376,7 +380,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <Card>
                 <Eyebrow>Nothing being planned</Eyebrow>
                 <p className="mt-3 text-[15px] leading-relaxed text-fm-ink-2">
-                  {crew.enabled === false ? "Friend Mode is off, so Leaf isn't planning anything for this crew." : crew.oneTime ? "Leaf starts planning the night as soon as enough people are in." : `Leaf starts the next night on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()}). Got a place and a date in mind? Say so below.`}
+                  {crew.enabled === false ? "Friend Mode is off, so Leaf isn't planning anything for this crew." : crew.oneTime ? `Leaf starts planning the ${night} as soon as enough people are in.` : `Leaf starts the next ${night} on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()}). Got a place and a date in mind? Say so below.`}
                 </p>
                 {me.isOwner && crew.enabled !== false && !crew.oneTime && crew.nextRoundAt && (
                   <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -462,7 +466,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <Eyebrow>Where</Eyebrow>
               <div className="font-fm-serif text-[28px] leading-tight">{fixedPlace.label}</div>
               {fixedPlace.address && <p className="m-0 text-sm text-fm-muted">{fixedPlace.address}</p>}
-              <p className="m-0 text-xs text-fm-muted">Every night is here. Leaf just finds the date.</p>
+              <p className="m-0 text-xs text-fm-muted">Every {night} is here. Leaf just finds the date.</p>
             </section>
           ) : (
             <section className="flex flex-col gap-3.5 lg:gap-5">
@@ -478,7 +482,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                   className="flex flex-col items-start gap-4 rounded-[28px] border border-dashed border-fm-line p-6 hover:border-fm-ink-2 lg:flex-row lg:items-center lg:justify-between lg:p-8"
                 >
                   <p className="m-0 max-w-[44ch] text-[15px] leading-relaxed text-fm-ink-2 lg:text-base">
-                    No places yet. Add a few you&rsquo;ve been wanting to try and Leaf will plan nights around them.
+                    No places yet. Add a few you&rsquo;ve been wanting to try and Leaf will plan {nights} around them.
                   </p>
                   <span className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-fm-ink px-5 text-sm font-semibold text-fm-canvas">
                     <Plus size={16} strokeWidth={2.2} aria-hidden /> Add a place
@@ -599,14 +603,14 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
 
           {past.length > 0 && (
             <section>
-              <SectionTitle>Past nights</SectionTitle>
+              <SectionTitle>{ev ? "Past nights" : "Past get-togethers"}</SectionTitle>
               <ul className="mt-1.5 divide-y divide-fm-line-dim">
                 {past.map((p) => {
                   const d = toDate(p.startsAt);
                   return (
                     <li key={p.cycleId} className="flex items-center gap-4 py-3.5">
                       <Mono className="w-14 shrink-0 text-xs text-fm-muted">{d ? d.toLocaleDateString("en-US", { month: "short", day: "2-digit" }) : ""}</Mono>
-                      <span className="min-w-0 flex-1 truncate text-base font-medium">{p.venue?.name || "A night out"}</span>
+                      <span className="min-w-0 flex-1 truncate text-base font-medium">{p.venue?.name || (eveningAt(p.startsAt) ? "A night out" : "A get-together")}</span>
                       <span className="text-[13px] text-fm-muted">{p.headcount} went</span>
                     </li>
                   );
@@ -775,7 +779,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <div className="flex items-center gap-3.5 py-4">
                 <div className="min-w-0 flex-1">
                   <div className="text-[15px] font-semibold">Your calendar</div>
-                  <div className="text-[13px] text-fm-muted">{me.calendarSynced ? "Synced · Leaf offers nights you're free" : "Sync Google Calendar and Leaf offers nights you're free"}</div>
+                  <div className="text-[13px] text-fm-muted">{me.calendarSynced ? `Synced · Leaf offers ${ev ? "nights" : "days"} you're free` : `Sync Google Calendar and Leaf offers ${ev ? "nights" : "days"} you're free`}</div>
                 </div>
                 {!me.calendarSynced && (
                   <Button
@@ -810,7 +814,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     ))}
                     <option value="0">Just once</option>
                   </select>
-                  <p className="mb-0 mt-2 text-xs text-fm-muted">Leaf starts each night on this rhythm. Members can set a slower pace of their own below.</p>
+                  <p className="mb-0 mt-2 text-xs text-fm-muted">Leaf starts each {night} on this rhythm. Members can set a slower pace of their own below.</p>
                 </div>
               )}
 
@@ -870,7 +874,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 <div className="flex items-center gap-3 border-b border-fm-line-dim py-4">
                   <div className="min-w-0 flex-1">
                     <div className="text-[15px] font-semibold">Rotate who hosts</div>
-                    <div className="text-[13px] text-fm-muted">Each night Leaf plans goes to the next person in the crew, you first.</div>
+                    <div className="text-[13px] text-fm-muted">Each {night} Leaf plans goes to the next person in the crew, you first.</div>
                   </div>
                   <FriendModeSwitch
                     label="Rotate who hosts"
@@ -990,6 +994,7 @@ function CycleCard({
   crewId?: string;
 }) {
   const inApp = useInApp();
+  const ev = cycleIsEvening(c);
   // Not voted yet: start from the dates their calendar says they're free.
   // Nothing pre-ticked: Leaf already picked these dates around everyone's
   // calendars, so a tap here is a preference, and it saves by itself.
@@ -1050,7 +1055,7 @@ function CycleCard({
           {settled && c.planId ? (
             // A set night is a plan: its title opens it (the app opens it natively).
             <a href={`/p/${c.planId}${c.myInviteId ? `?n=${c.myInviteId}` : ""}`} className="w-fit hover:underline decoration-fm-line underline-offset-4">
-              <h2 className="m-0 font-fm-serif text-[34px] font-normal leading-[1.05] lg:text-[40px]">{c.venue?.name || "Your night"}</h2>
+              <h2 className="m-0 font-fm-serif text-[34px] font-normal leading-[1.05] lg:text-[40px]">{c.venue?.name || (ev ? "Your night" : "Your plan")}</h2>
             </a>
           ) : (
             <h2 className="m-0 font-fm-serif text-[34px] font-normal leading-[1.05] lg:text-[40px]">{c.venue?.name || "Picking a place…"}</h2>
@@ -1108,7 +1113,7 @@ function CycleCard({
         <>
           <div className="flex items-baseline justify-between gap-3">
             <p className="m-0 text-[15px] text-fm-ink-2">
-              {calendarSynced ? "Picked around everyone's calendars. Tap any you'd go to." : "Which nights work? Tap any you'd go to."}
+              {calendarSynced ? "Picked around everyone's calendars. Tap any you'd go to." : `Which ${ev ? "nights" : "days"} work? Tap any you'd go to.`}
             </p>
             <span role="status" aria-live="polite" className={`shrink-0 text-xs ${voteState === "error" ? "text-fm-danger" : "text-fm-muted"}`}>
               {voteState === "saving" ? "Saving…" : voteState === "saved" ? "Saved ✓" : voteState === "error" ? "Didn't save — tap again" : ""}
@@ -1116,7 +1121,7 @@ function CycleCard({
           </div>
           {!calendarSynced && (
             <div className="flex items-center gap-3 rounded-2xl border border-fm-line-dim px-3.5 py-2.5">
-              <p className="m-0 min-w-0 flex-1 text-[13px] leading-snug text-fm-ink-2">Connect Google Calendar and Leaf ticks the nights you&rsquo;re free.</p>
+              <p className="m-0 min-w-0 flex-1 text-[13px] leading-snug text-fm-ink-2">Connect Google Calendar and Leaf ticks the {ev ? "nights" : "days"} you&rsquo;re free.</p>
               <button
                 type="button"
                 onClick={onConnectCalendar}
@@ -1131,10 +1136,10 @@ function CycleCard({
             <div className="flex flex-col gap-3 rounded-[18px] border border-fm-line bg-fm-card p-4">
               <p className="m-0 text-[15px] leading-snug text-fm-ink">
                 {c.combineOffer.crewName} is already set for{" "}
-                {c.options[c.combineOffer.optionIndex] ? `${dayParts(c.options[c.combineOffer.optionIndex].date).dow} ${dayParts(c.options[c.combineOffer.optionIndex].date).month} ${dayParts(c.options[c.combineOffer.optionIndex].date).day}` : "one of these nights"}
-                {c.combineOffer.venue ? ` at ${c.combineOffer.venue}` : ""}, with some of the same people. Combine them into one night?
+                {c.options[c.combineOffer.optionIndex] ? `${dayParts(c.options[c.combineOffer.optionIndex].date).dow} ${dayParts(c.options[c.combineOffer.optionIndex].date).month} ${dayParts(c.options[c.combineOffer.optionIndex].date).day}` : `one of these ${ev ? "nights" : "days"}`}
+                {c.combineOffer.venue ? ` at ${c.combineOffer.venue}` : ""}, with some of the same people. Combine them into one {ev ? "night" : "plan"}?
               </p>
-              <p className="m-0 text-[13px] text-fm-muted">Combine invites everyone here to that night and skips this round. Keep separate drops that date from this poll.</p>
+              <p className="m-0 text-[13px] text-fm-muted">Combine invites everyone here to that {ev ? "night" : "plan"} and skips this round. Keep separate drops that date from this poll.</p>
               <div className="flex flex-wrap gap-2">
                 <Button small disabled={busy !== null} onClick={() => onAct("combine", () => run("resolveCrewClash", auth, { cycleId: c.cycleId, choice: "combine" }))}>
                   {busy === "combine" ? "Combining…" : "Combine"}
@@ -1276,7 +1281,7 @@ function CycleCard({
             confirmCancel ? (
               <div className="flex flex-col gap-2.5 rounded-[18px] border border-fm-line px-4 py-3.5">
                 <p className="m-0 text-sm leading-snug text-fm-ink">
-                  {`Cancel ${chosen ? `${chosen.dow} ${chosen.month} ${chosen.day}` : "this night"} for everyone? Leaf tells the people invited it\u2019s off.`}
+                  {`Cancel ${chosen ? `${chosen.dow} ${chosen.month} ${chosen.day}` : `this ${ev ? "night" : "plan"}`} for everyone? Leaf tells the people invited it\u2019s off.`}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button small disabled={busy !== null} onClick={() => onAct("cancelNight", () => run("cancelCrewNight", auth, { cycleId: c.cycleId }))}>
@@ -1291,7 +1296,7 @@ function CycleCard({
                 onClick={() => setConfirmCancel(true)}
                 className="min-h-11 w-fit text-sm text-fm-muted underline underline-offset-4 hover:text-fm-danger"
               >
-                Cancel this night
+                Cancel this {ev ? "night" : "plan"}
               </button>
             )
           )}

@@ -12,7 +12,7 @@
 
 import { useState } from "react";
 import { Camera, Check, ExternalLink, Receipt as ReceiptIcon } from "lucide-react";
-import { run, type CrewAuth, type CrewSplit } from "@/lib/crew";
+import { eveningAt, run, type CrewAuth, type CrewSplit } from "@/lib/crew";
 import { Button, Eyebrow, Mono } from "@/components/crew/CrewShell";
 
 const money = (n: number) => `$${(Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, "")}`;
@@ -120,7 +120,7 @@ export default function CrewMoneyCard({
     if (!costOpen) {
       return (
         <button type="button" onClick={() => setCostOpen(true)} className="flex items-center gap-2 px-1 text-sm font-semibold text-fm-ink-2 hover:text-fm-ink">
-          <ReceiptIcon size={16} aria-hidden /> Splitting a cost for this night? Collect it here
+          <ReceiptIcon size={16} aria-hidden /> Splitting a cost for this {eveningAt(split.startsAt) ? "night" : "plan"}? Collect it here
         </button>
       );
     }
