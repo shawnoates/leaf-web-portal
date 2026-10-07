@@ -41,6 +41,7 @@ import PlanAddonStack from "@/components/PlanAddonStack";
 import PaidRsvp from "@/components/PaidRsvp";
 import P2pPayCard from "@/components/P2pPayCard";
 import FriendInviteCard from "@/components/FriendInviteCard";
+import PlacardWelcome from "@/components/PlacardWelcome";
 import PlanInviteBanner from "@/components/PlanInviteBanner";
 import { inviteCodeFor } from "@/lib/plan-invite";
 import CollectAskFields, { EMPTY_COLLECT_ASK, collectAskPayload, type CollectAsk } from "@/components/p2p/CollectAskFields";
@@ -397,6 +398,9 @@ interface OrgData {
   isHost: boolean;
   plans: Plan[];
   planIdeas: PlanIdea[];
+  /** ?src=<placard QR>: the scanned place's own suggested plans (welcome popup only). */
+  placardIdeas?: PlanIdea[];
+  placardWelcome?: { name: string; photoUrl: string | null } | null;
   hidePlanIdeas: boolean;
   hideCustomPlans: boolean;
   hideDeals: boolean;
@@ -2052,6 +2056,8 @@ export default function OrgCalendarPage() {
   const [followPopupLoading, setFollowPopupLoading] = useState(false);
   const [showPlanIdeaPopup, setShowPlanIdeaPopup] = useState(false);
   const [popupIdea, setPopupIdea] = useState<PlanIdea | null>(null);
+  // Placard QR welcome: shown once per visit to a place's QR.
+  const [showPlacardWelcome, setShowPlacardWelcome] = useState(false);
   const [isInactive, setIsInactive] = useState<{ name: string } | null>(null);
   const [showHostLogin, setShowHostLogin] = useState(false);
   const [parseUser, setParseUser] = useState<Parse.User | null>(null);
@@ -2964,9 +2970,28 @@ export default function OrgCalendarPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // A placard QR scan opens the place's welcome popup (once per visit).
+  useEffect(() => {
+    if (!org?.placardWelcome || !org.placardIdeas?.length) return;
+    const key = `leaf_placard_welcome_${org.objectId}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch { /* storage unavailable: show it anyway */ }
+    // Hearts start from the server's counts, like the main list's.
+    setPlanIdeaInterestCounts((prev) => {
+      const next = { ...prev };
+      for (const i of org.placardIdeas || []) if (next[i.id] === undefined) next[i.id] = i.interestCount ?? 0;
+      return next;
+    });
+    setShowPlacardWelcome(true);
+  }, [org]);
+
   // Timed follow popup
   useEffect(() => {
     if (!org) return;
+    // The placard welcome is up: don't stack a second popup on it.
+    if (showPlacardWelcome) return;
     // Suppress: already following, owner/host, or recently dismissed
     if (isFollowing) return;
     if (org.isOwner || org.isHost) return;
@@ -2977,7 +3002,7 @@ export default function OrgCalendarPage() {
     } catch { /* localStorage unavailable */ }
     const timer = setTimeout(() => setShowFollowPopup(true), 5000);
     return () => clearTimeout(timer);
-  }, [org, isFollowing]);
+  }, [org, isFollowing, showPlacardWelcome]);
 
   function dismissFollowPopup() {
     setShowFollowPopup(false);
@@ -3131,7 +3156,10 @@ export default function OrgCalendarPage() {
         (typeof window !== "undefined"
           ? new URLSearchParams(window.location.search).get("idea")
           : null) || undefined;
-      const result = await Parse.Cloud.run("getOrgCalendarPage", { shareId, phoneNumber, ideaId });
+      // A placard QR (?src=v-…) asks for that place's own suggested plans.
+      const srcParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("src") : null;
+      const src = srcParam && /^v-[A-Za-z0-9]{4,16}$/.test(srcParam) ? srcParam : undefined;
+      const result = await Parse.Cloud.run("getOrgCalendarPage", { shareId, phoneNumber, ideaId, src });
 
       // Record page view (fire-and-forget)
       if (result.objectId) {
@@ -3237,7 +3265,7 @@ export default function OrgCalendarPage() {
           : undefined,
       }));
 
-      const planIdeas: PlanIdea[] = (result.planIdeas || []).map((idea: Record<string, unknown>) => ({
+      const mapIdea = (idea: Record<string, unknown>): PlanIdea => ({
         // A featured suggestion is a FeaturedSuggestion row merged into this
         // list by the server, and it ships `id` where a CalendarGeneratedPlan
         // ships `objectId`. Without the fallback its id is `undefined`, which
@@ -3283,7 +3311,9 @@ export default function OrgCalendarPage() {
         localWallClock: (idea.localWallClock as string) ?? null,
         venueName: (idea.venueName as string) ?? null,
         suggestedByName: (idea.suggestedByName as string) ?? null,
-      }));
+      });
+      const planIdeas: PlanIdea[] = (result.planIdeas || []).map(mapIdea);
+      const placardIdeas: PlanIdea[] = (result.placardWelcome?.ideas || []).map(mapIdea);
 
       // "Show suggested and featured plans" covers the AI starter cards too —
       // they render as "Suggested" and are the ONLY suggestion surface on a
@@ -3313,6 +3343,10 @@ export default function OrgCalendarPage() {
         isHost: result.isHost || false,
         plans,
         planIdeas,
+        placardIdeas,
+        placardWelcome: placardIdeas.length
+          ? { name: String(result.placardWelcome?.name || ""), photoUrl: (result.placardWelcome?.photoUrl as string) || null }
+          : null,
         // AI-adopted calendars already surface starter events as "Suggested"
         // cards up top — the AI plan-idea carousel below reads as a second
         // "here are some ideas" section and collides with them. Force the
@@ -7701,6 +7735,31 @@ export default function OrgCalendarPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Placard QR welcome: this place's own suggested plans */}
+      {showPlacardWelcome && org?.placardWelcome && (org.placardIdeas?.length ?? 0) > 0 && (
+        <PlacardWelcome
+          name={org.placardWelcome.name}
+          photoUrl={org.placardWelcome.photoUrl}
+          ideas={org.placardIdeas || []}
+          brandColor={org.brandColor || "#18181b"}
+          canHost={(org.isOwner || org.isHost || !!org.allowFollowersToHost) && !org.rsvpLimitReached}
+          counts={planIdeaInterestCounts}
+          interested={planIdeaLocallyInterested}
+          pending={planIdeaInterestPending}
+          onHeart={(id) => handlePlanIdeaInterest(id)}
+          onHost={(idea) => {
+            setShowPlacardWelcome(false);
+            setHostingIdea(idea);
+            setHostSubmitting(false);
+            setHostError(null);
+            setHostSuccess(false);
+            setHostNote("");
+            setSelectedVenue(null);
+          }}
+          onClose={() => setShowPlacardWelcome(false)}
+        />
       )}
 
       {/* Plan Idea Popup for Followers */}
