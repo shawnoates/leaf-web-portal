@@ -14,7 +14,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, Check, ChevronUp, MessageCircle, Plus, Settings, UserPlus, X } from "lucide-react";
+import { ArrowUp, Check, ChevronUp, MapPin, MessageCircle, Plus, Search, Settings, UserPlus, X } from "lucide-react";
+import VenueSearch from "@/components/VenueSearch";
 import Parse from "@/lib/parse-client";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import {
@@ -1329,13 +1330,22 @@ function ChangePlace({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: 
   const [open, setOpen] = useState(false);
   const [book, setBook] = useState<BookSpot[] | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
-  const change = async (spotId: string) => {
-    setPicked(spotId);
-    await onAct("changePlace", () => run("changeCrewPlace", auth, { cycleId: c.cycleId, spotId }));
+  const [query, setQuery] = useState("");
+  const [elsewhere, setElsewhere] = useState(false);
+  const [custom, setCustom] = useState({ name: "", address: "" });
+  const done = () => {
     // The card reloads with the new place; start fresh next time.
     setPicked(null);
     setOpen(false);
     setBook(null);
+    setQuery("");
+    setElsewhere(false);
+    setCustom({ name: "", address: "" });
+  };
+  const change = async (key: string, params: Record<string, unknown>) => {
+    setPicked(key);
+    await onAct("changePlace", () => run("changeCrewPlace", auth, { cycleId: c.cycleId, ...params }));
+    done();
   };
   const show = async () => {
     setOpen(true);
@@ -1346,39 +1356,74 @@ function ChangePlace({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: 
   };
   // Never offer the place it's already at.
   const choices = (book || []).filter((b) => b.name !== c.venue?.name);
+  const field = "h-11 w-full rounded-xl border border-fm-line bg-fm-canvas px-3 text-[16px] text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none";
   return (
     <div className="flex flex-col gap-2.5">
       {c.swapOffer && (
         <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-fm-line px-4 py-3.5">
           <p className="m-0 min-w-0 flex-1 text-sm text-fm-ink">{c.swapOffer.name} was just added. Nobody has voted yet. Use it instead?</p>
-          <Button small disabled={busy !== null} onClick={() => void change(c.swapOffer!.spotId)}>{busy === "changePlace" ? "Switching…" : `Use ${c.swapOffer.name}`}</Button>
+          <Button small disabled={busy !== null} onClick={() => void change(c.swapOffer!.spotId, { spotId: c.swapOffer!.spotId })}>{busy === "changePlace" ? "Switching…" : `Use ${c.swapOffer.name}`}</Button>
         </div>
       )}
       {!open ? (
         <div><Button small kind="ghost" onClick={() => void show()}>Change the place</Button></div>
       ) : (
-        <div className="flex flex-col gap-2 rounded-[18px] border border-fm-line p-3">
-          <Mono className="px-1 text-fm-muted">Pick from the book · same dates</Mono>
+        <div className="flex flex-col gap-2.5 rounded-[18px] border border-fm-line p-3">
+          <Mono className="px-1 text-fm-muted">Same dates · anywhere you like</Mono>
+          <label className="relative block">
+            <span className="sr-only">Search for a place</span>
+            <Search size={16} aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-fm-muted" />
+            <VenueSearch
+              value={query}
+              onChange={setQuery}
+              onSelect={(v) => void change(`search:${v.placeId || v.name}`, { venue: v })}
+              placeholder="Search any restaurant, bar, park…"
+              className="h-11 w-full rounded-xl border pl-10 pr-3 text-[16px] outline-none"
+            />
+          </label>
+          {picked?.startsWith("search:") && <p className="m-0 px-1 text-sm text-fm-muted">Switching…</p>}
+
           {!book ? (
             <p className="m-0 px-1 text-sm text-fm-muted">Loading the book…</p>
-          ) : choices.length === 0 ? (
-            <p className="m-0 px-1 text-sm text-fm-muted">Nothing else in the book yet. <Link href={crewHref(auth, "book")} className="underline">Add a place</Link></p>
-          ) : (
-            <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-              {choices.map((b) => (
-                <li key={b.spotId} className="flex items-center gap-3 rounded-xl border border-fm-line-dim px-3 py-2.5">
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-[15px] text-fm-ink">{b.name}</span>
-                    {(b.neighborhood || b.category) && <span className="truncate text-xs text-fm-muted">{b.neighborhood || b.category}</span>}
-                  </span>
-                  <Button small disabled={busy !== null} onClick={() => void change(b.spotId)}>
-                    {picked === b.spotId ? "Switching…" : "Use this"}
-                  </Button>
-                </li>
-              ))}
-            </ul>
+          ) : choices.length > 0 && (
+            <>
+              <Mono className="mt-1 px-1 text-fm-muted">From the book</Mono>
+              <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                {choices.map((b) => (
+                  <li key={b.spotId} className="flex items-center gap-3 rounded-xl border border-fm-line-dim px-3 py-2.5">
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-[15px] text-fm-ink">{b.name}</span>
+                      {(b.neighborhood || b.category) && <span className="truncate text-xs text-fm-muted">{b.neighborhood || b.category}</span>}
+                    </span>
+                    <Button small disabled={busy !== null} onClick={() => void change(b.spotId, { spotId: b.spotId })}>
+                      {picked === b.spotId ? "Switching…" : "Use this"}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
-          <button type="button" onClick={() => setOpen(false)} className="min-h-11 w-fit px-1 text-sm text-fm-muted underline underline-offset-4">Never mind</button>
+
+          {!elsewhere ? (
+            <button type="button" onClick={() => setElsewhere(true)} className="flex min-h-11 items-center gap-2 rounded-xl border border-dashed border-fm-line px-3 text-left text-[15px] text-fm-ink hover:border-fm-ink-2">
+              <MapPin size={16} aria-hidden className="text-fm-muted" /> Somewhere else, like someone&rsquo;s place
+            </button>
+          ) : (
+            <form
+              className="flex flex-col gap-2 rounded-xl border border-fm-line-dim p-3"
+              onSubmit={(e) => { e.preventDefault(); void change("custom", { custom }); }}
+            >
+              <span className="text-sm font-semibold text-fm-ink">Somewhere else, just for this one</span>
+              <input className={field} placeholder="What to call it (Maya's place)" maxLength={80} value={custom.name} onChange={(e) => setCustom({ ...custom, name: e.target.value })} aria-label="Place name" />
+              <input className={field} placeholder="Address (optional)" maxLength={200} value={custom.address} onChange={(e) => setCustom({ ...custom, address: e.target.value })} aria-label="Address, optional" />
+              <p className="m-0 text-xs text-fm-muted">Only the crew sees it. It isn&rsquo;t added to the book.</p>
+              <div className="flex gap-2">
+                <Button small type="submit" disabled={busy !== null || custom.name.trim().length < 2}>{picked === "custom" ? "Switching…" : "Use this place"}</Button>
+                <Button small kind="ghost" onClick={() => setElsewhere(false)}>Back</Button>
+              </div>
+            </form>
+          )}
+          <button type="button" onClick={() => done()} className="min-h-11 w-fit px-1 text-sm text-fm-muted underline underline-offset-4">Never mind</button>
         </div>
       )}
     </div>
