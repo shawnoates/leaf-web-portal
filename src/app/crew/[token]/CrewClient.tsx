@@ -1034,7 +1034,14 @@ function CycleCard({
           {c.eventWindow?.title && (
             <Mono className="text-fm-accent">{c.eventWindow.kind === "movie" ? "Movie" : "Event"} · {c.eventWindow.title}</Mono>
           )}
-          <h2 className="m-0 font-fm-serif text-[34px] font-normal leading-[1.05] lg:text-[40px]">{c.venue?.name || "Picking a place…"}</h2>
+          {settled && c.planId ? (
+            // A set night is a plan: its title opens it (the app opens it natively).
+            <a href={`/p/${c.planId}${c.myInviteId ? `?n=${c.myInviteId}` : ""}`} className="w-fit hover:underline decoration-fm-line underline-offset-4">
+              <h2 className="m-0 font-fm-serif text-[34px] font-normal leading-[1.05] lg:text-[40px]">{c.venue?.name || "Your night"}</h2>
+            </a>
+          ) : (
+            <h2 className="m-0 font-fm-serif text-[34px] font-normal leading-[1.05] lg:text-[40px]">{c.venue?.name || "Picking a place…"}</h2>
+          )}
           <p className="m-0 text-sm text-fm-muted">
             {settled && c.chosenOption
               ? [chosen?.dow, timeLabel(c.chosenOption.time), c.venue?.address].filter(Boolean).join(" · ")
