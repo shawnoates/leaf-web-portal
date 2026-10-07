@@ -38,6 +38,8 @@ export type CycleView = {
   showtimes?: Record<string, { time: string; bookingUrl: string | null }> | null;
   /** Waiting on a place: where Leaf suggests (been there together, or fits the crew's name). */
   placeSuggestion?: { name: string; address: string | null; locationId?: string; placeId?: string | null; lat?: number; lng?: number; why: "history" | "name" } | null;
+  /** A set night: this person's invite on its plan, for the plan chat link (/c/<id>). */
+  myInviteId?: string | null;
   /** Voting, nobody has voted, and a place was added since: offer it instead. */
   swapOffer?: { spotId: string; name: string } | null;
   options: DateOption[];

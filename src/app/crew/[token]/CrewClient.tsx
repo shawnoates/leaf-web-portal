@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, Check, ChevronUp, Plus, Settings, UserPlus, X } from "lucide-react";
+import { ArrowUp, Check, ChevronUp, MessageCircle, Plus, Settings, UserPlus, X } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import {
@@ -1240,6 +1240,16 @@ function CycleCard({
           )}
           {c.state === "booked" && (
             <p className="m-0 flex items-center gap-1.5 text-sm text-fm-ink-2"><Check size={16} aria-hidden /> Booked</p>
+          )}
+          {c.myInviteId && (
+            // The plan's own chat, same link Leaf texts: the app opens it
+            // natively; on the web it offers the app (or the web chat if signed in).
+            <a
+              href={`/c/${c.myInviteId}`}
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-fm-line text-[15px] font-semibold text-fm-ink hover:bg-fm-card"
+            >
+              <MessageCircle size={17} aria-hidden /> Chat with the group
+            </a>
           )}
           {(c.isHost || isOwner) && (
             confirmCancel ? (
