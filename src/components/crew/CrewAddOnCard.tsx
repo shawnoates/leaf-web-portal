@@ -89,7 +89,7 @@ export default function CrewAddOnCard({
   if (a.state === "suggested") {
     const options = a.options?.length ? a.options : [{ key: a.key, label: a.label, emoji: a.emoji, why: a.why || "", estimate: a.estimate }];
     return (
-      <section className="flex flex-col gap-3 rounded-[28px] border border-fm-line-dim bg-fm-surface py-5 lg:py-7">
+      <section className="flex min-w-0 max-w-full flex-col gap-3 rounded-[28px] border border-fm-line-dim bg-fm-surface py-5 lg:py-7">
         <div className="flex items-baseline justify-between gap-3 px-5 lg:px-7">
           <div>
             <Eyebrow>Before you go</Eyebrow>
