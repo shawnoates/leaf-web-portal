@@ -1113,7 +1113,7 @@ function CycleCard({
         <>
           <div className="flex items-baseline justify-between gap-3">
             <p className="m-0 text-[15px] text-fm-ink-2">
-              {calendarSynced ? "Picked around everyone's calendars. Tap any you'd go to." : `Which ${ev ? "nights" : "days"} work? Tap any you'd go to.`}
+              {calendarSynced && c.fit?.some((f) => f.known > 0) ? "Picked around everyone's calendars. Tap any you'd go to." : `Which ${ev ? "nights" : "days"} work? Tap any you'd go to.`}
             </p>
             <span role="status" aria-live="polite" className={`shrink-0 text-xs ${voteState === "error" ? "text-fm-danger" : "text-fm-muted"}`}>
               {voteState === "saving" ? "Saving…" : voteState === "saved" ? "Saved ✓" : voteState === "error" ? "Didn't save — tap again" : ""}
