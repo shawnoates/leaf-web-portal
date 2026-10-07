@@ -76,56 +76,56 @@ export default function PlacardWelcome<T extends Idea>({
           <X className="h-4 w-4" />
         </button>
 
-        <div className="flex items-center gap-3 px-5 pb-3 pt-6">
+        <div className="flex items-center gap-3 px-5 pb-2 pt-5">
           {photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={photoUrl} alt="" referrerPolicy="no-referrer" className="h-12 w-12 shrink-0 rounded-full object-cover ring-2 ring-white shadow" />
+            <img src={photoUrl} alt="" referrerPolicy="no-referrer" className="h-10 w-10 shrink-0 rounded-full object-cover" />
           ) : null}
           <div className="min-w-0 pr-8">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-zinc-500">You&rsquo;re at</p>
-            <h2 id="placard-welcome-title" className="truncate font-fm-serif text-[26px] leading-tight text-zinc-900">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">You&rsquo;re at</p>
+            <h2 id="placard-welcome-title" className="truncate font-fm-serif text-[22px] leading-tight text-zinc-900">
               {name}
             </h2>
           </div>
         </div>
-        <p className="px-5 text-[15px] leading-relaxed text-zinc-600">
-          Neighbors could meet here. Tap the heart on the ones you&rsquo;d come to{canHost ? ", or host one" : ""}.
-          {ideas.some((i) => i.bookingUrl) ? " Classes are booked on their own site." : ""}
+        <p className="px-5 text-[14px] leading-snug text-zinc-600">
+          Neighbors could meet here. Heart the ones you&rsquo;d come to{canHost ? ", or host one" : ""}.
         </p>
 
-        <ul className="space-y-3 px-5 pb-4 pt-4">
+        {/* A plain list, one row of actions each: heart, then Book (a class) and Host. */}
+        <ul className="mt-2 divide-y divide-zinc-100 px-5">
           {ideas.map((idea) => {
             const count = counts[idea.id] ?? 0;
             const isIn = interested.has(idea.id);
             const busy = pending.has(idea.id);
             return (
-              <li key={idea.id} className="rounded-2xl border border-zinc-200 p-4">
-                <p className="text-[12px] font-semibold text-zinc-500">
-                  {whenLabel(idea)}
-                  {idea.classTitle ? ` \u00b7 their ${idea.classTitle} class` : ""}
-                </p>
-                <h3 className="mt-0.5 text-[17px] font-semibold leading-snug text-zinc-900">{idea.title}</h3>
-                {idea.description && <p className="mt-1 line-clamp-2 text-[14px] leading-relaxed text-zinc-600">{idea.description}</p>}
-                <div className="mt-3 flex flex-wrap gap-2">
+              <li key={idea.id} className="py-4">
+                <p className="text-[12px] font-medium text-zinc-500">{whenLabel(idea)}</p>
+                <h3 className="mt-0.5 text-[16px] font-semibold leading-snug text-zinc-900">{idea.title}</h3>
+                {idea.description && <p className="mt-0.5 line-clamp-2 text-[13.5px] leading-snug text-zinc-600">{idea.description}</p>}
+                <div className="mt-3 flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => onHeart(idea.id)}
                     disabled={isIn || busy}
                     aria-pressed={isIn}
-                    className={`flex h-10 items-center justify-center gap-1.5 rounded-xl border px-3 text-[14px] font-semibold transition-colors disabled:cursor-default ${
+                    aria-label={isIn ? "You're in" : "I'd come"}
+                    title={isIn ? "You're in" : "I'd come"}
+                    className={`flex h-9 shrink-0 items-center justify-center gap-1 rounded-full border px-3 text-[13px] font-semibold transition-colors disabled:cursor-default ${
                       isIn ? "border-rose-200 bg-rose-50 text-rose-600" : "border-zinc-200 text-zinc-700 hover:border-zinc-300"
-                    } ${canHost ? "" : "flex-1"}`}
+                    }`}
                   >
                     {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Heart className="h-4 w-4" fill={isIn ? "currentColor" : "none"} />}
-                    {isIn ? "You're in" : "I'd come"}
-                    {count > 0 && <span className="font-normal text-zinc-500">· {count}</span>}
+                    {/* A class card has two more buttons, so its heart is just the icon. */}
+                    {!idea.bookingUrl && <span>{isIn ? "You're in" : "I'd come"}</span>}
+                    {count > 0 && <span className="font-normal text-zinc-500">{count}</span>}
                   </button>
                   {idea.bookingUrl && (
                     <a
                       href={idea.bookingUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex h-10 flex-1 items-center justify-center whitespace-nowrap rounded-xl px-3 text-[14px] font-semibold text-white hover:opacity-90"
+                      className="flex h-9 flex-1 items-center justify-center whitespace-nowrap rounded-full px-3 text-[13px] font-semibold text-white hover:opacity-90"
                       style={{ backgroundColor: brandColor }}
                     >
                       Book your spot
@@ -135,15 +135,16 @@ export default function PlacardWelcome<T extends Idea>({
                     <button
                       type="button"
                       onClick={() => onHost(idea)}
-                      // A class: booking is the main thing, hosting ("I'll be there, join me") goes below.
+                      // A class: booking is the main thing; hosting means "I'll be there, join me".
+                      title={idea.bookingUrl ? "I\u2019ll be there, join me" : undefined}
                       className={
                         idea.bookingUrl
-                          ? "h-10 w-full rounded-xl border border-zinc-300 text-[14px] font-semibold text-zinc-800 hover:border-zinc-400"
-                          : "h-10 flex-1 rounded-xl text-[14px] font-semibold text-white hover:opacity-90"
+                          ? "h-9 shrink-0 rounded-full border border-zinc-300 px-3.5 text-[13px] font-semibold text-zinc-800 hover:border-zinc-400"
+                          : "h-9 flex-1 rounded-full text-[13px] font-semibold text-white hover:opacity-90"
                       }
                       style={idea.bookingUrl ? undefined : { backgroundColor: brandColor }}
                     >
-                      {idea.bookingUrl ? "Host it: I\u2019ll be there, join me" : "Host this"}
+                      {idea.bookingUrl ? "Host it" : "Host this"}
                     </button>
                   )}
                 </div>
@@ -152,7 +153,7 @@ export default function PlacardWelcome<T extends Idea>({
           })}
         </ul>
 
-        <div className="border-t border-zinc-100 px-5 py-4 text-center">
+        <div className="border-t border-zinc-100 px-5 py-3 text-center">
           <button type="button" onClick={onClose} className="text-[14px] font-semibold text-zinc-600 underline underline-offset-4">
             See the whole calendar
           </button>
