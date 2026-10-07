@@ -36,7 +36,7 @@ async function photoToBase64(file: File): Promise<{ b64: string; type: string }>
   }
 }
 
-function HandlesForm({ auth, onSaved }: { auth: CrewAuth; onSaved: () => void }) {
+export function HandlesForm({ auth, onSaved }: { auth: CrewAuth; onSaved: () => void }) {
   const [h, setH] = useState({ venmo: "", cashapp: "", paypal: "", zelle: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

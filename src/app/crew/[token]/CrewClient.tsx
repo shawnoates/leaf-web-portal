@@ -25,12 +25,14 @@ import SeedPlaces from "@/components/crew/SeedPlaces";
 import CrewPulseCard from "@/components/crew/CrewPulseCard";
 import { EMPTY_PULSE } from "@/lib/crew-pulse";
 import CrewMoneyCard from "@/components/crew/CrewMoneyCard";
+import CrewAddOnCard from "@/components/crew/CrewAddOnCard";
 import PlacePhoto from "@/components/crew/PlacePhoto";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
   RHYTHM_LABELS, crewHref, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
   type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult,
+  type CrewAddOn,
 } from "@/lib/crew";
 
 export default function CrewClient({ token }: { token: string }) {
@@ -63,7 +65,12 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   // claim or "I paid" updates the card at once (the server returns the new view).
   const [split, setSplit] = useState(data.split ?? null);
   const [costs, setCosts] = useState(data.costs ?? {});
-  useEffect(() => { setSplit(data.split ?? null); setCosts(data.costs ?? {}); }, [data]);
+  const [addOns, setAddOns] = useState(data.addOns ?? []);
+  useEffect(() => { setSplit(data.split ?? null); setCosts(data.costs ?? {}); setAddOns(data.addOns ?? []); }, [data]);
+  const setAddOn = (cycleId: string, next: CrewAddOn | null) =>
+    setAddOns((list) => (next ? list.map((x) => (x.cycleId === cycleId ? next : x)) : list.filter((x) => x.cycleId !== cycleId)));
+  const addOnFor = (cycleId: string) => addOns.find((x) => x.cycleId === cycleId) || null;
+  const pastAddOns = addOns.filter((x) => !open.some((c) => c.cycleId === x.cycleId));
   const pills = data.prefPills || [];
   const [allPills, setAllPills] = useState(false);
   const [pace, setPace] = useState<string>(me.rhythmDays ? String(me.rhythmDays) : "");
@@ -392,6 +399,9 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     {costs[c.cycleId] && (
                       <CrewMoneyCard kind="cost" split={costs[c.cycleId]!} auth={auth} onChange={(next) => setCosts((m) => ({ ...m, [c.cycleId]: next }))} />
                     )}
+                    {addOnFor(c.cycleId) && (
+                      <CrewAddOnCard addOn={addOnFor(c.cycleId)!} auth={auth} onChange={(next) => setAddOn(c.cycleId, next)} />
+                    )}
                   </div>
                 ))}
               </div>
@@ -410,6 +420,9 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
           {split && (split.receipt || split.went) && (
             <CrewMoneyCard kind="after" split={split} auth={auth} onChange={setSplit} />
           )}
+          {pastAddOns.map((x) => (
+            <CrewAddOnCard key={x.cycleId} addOn={x} auth={auth} onChange={(next) => setAddOn(x.cycleId, next)} />
+          ))}
 
           {me.needsPace && !paceDone && !crew.oneTime && (
             <section className="rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">

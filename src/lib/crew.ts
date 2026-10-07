@@ -156,6 +156,40 @@ export type CrewPage = {
   split?: CrewSplit | null;
   /** A set night's cost to collect, by cycle id. */
   costs?: Record<string, CrewSplit | null>;
+  /** Something to split for a night: each set night's, plus a past one this person still has to settle. */
+  addOns?: CrewAddOn[];
+};
+
+type Paid = { at: string; method: string | null; confirmed: boolean };
+
+/** Split something for the night (server: crew-addons.js, crewAddOnView). Cents. */
+export type CrewAddOn = {
+  cycleId: string;
+  venue: string;
+  startsAt: string | { iso: string } | null;
+  /** The night hasn't happened yet. */
+  upcoming: boolean;
+  state: "suggested" | "on" | "bought";
+  key: string;
+  label: string;
+  emoji: string;
+  going: number;
+  /** Suggested or on: roughly what it costs for this many people. */
+  estimate?: { totalCents: number; eachCents: number };
+  why?: string;
+  id?: string;
+  item?: string;
+  picker?: { userId: string; name: string } | null;
+  isPicker?: boolean;
+  goingPeople?: { userId: string; name: string }[];
+  totalCents?: number;
+  eachCents?: number;
+  myShareCents?: number;
+  myPaid?: Paid | null;
+  payOptions?: PayOption[];
+  pickerHasHandles?: boolean;
+  people?: { userId: string; name: string; shareCents: number; paid: Paid | null }[];
+  settled?: boolean;
 };
 
 export type PayOption = { method: string; label: string; handle: string; url: string | null; hint?: string; recipientName?: string | null };
