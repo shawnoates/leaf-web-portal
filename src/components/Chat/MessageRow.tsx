@@ -43,6 +43,7 @@ export default function MessageRow({
   if (type === "system" && message.text && message.text.trim()) {
     return <SystemNoticeRow text={message.text} />;
   }
+  if (type === "leafAddOn") return <LeafAddOnRow message={message} />;
   if (type && !["leafMessage"].includes(type)) {
     return <OpenInAppRow message={message} />;
   }
@@ -138,6 +139,40 @@ function TextBubbleRow({
             />
           )}
           {text && <Linkified text={text} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- leafAddOn: Leaf's "split something for the night" (server: crew-addons-chat.js) ---
+// The item's picture, the text without its link, and a button to the crew
+// page, where Add it, the picker and paying back live.
+
+function LeafAddOnRow({ message }: { message: FirMessage }) {
+  const raw = (message.text || "").trim();
+  const link = raw.match(/https?:\/\/\S+$/)?.[0] || null;
+  const text = (link ? raw.slice(0, -link.length) : raw).replace(/\s*(Pick one|Pay \S+ back here):?\s*$/i, "").trim();
+  const href = link ? link.replace(/^https?:\/\/[^/]+/, "") || link : null;
+  const cta = message.addOnState === "bought" ? "Pay back" : message.addOnState === "suggested" ? "Pick one" : "See it";
+  return (
+    <div className="flex items-start gap-2">
+      <div className="w-8 shrink-0"><LeafAvatar /></div>
+      <div className="max-w-[80%] flex flex-col items-start">
+        <span className="text-[11px] mb-0.5 px-1 text-zinc-900">Leaf</span>
+        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white text-sm text-zinc-900">
+          {message.imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={message.imageUrl} alt="" className="block aspect-[4/3] w-full max-w-[320px] object-cover" />
+          )}
+          <div className="flex flex-col gap-2.5 px-3.5 py-3">
+            <p className="m-0 leading-relaxed">{text}</p>
+            {href && (
+              <a href={href} className="self-start rounded-full bg-zinc-900 px-4 py-2 text-[13px] font-semibold text-white">
+                {cta}
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </div>

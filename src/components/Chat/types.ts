@@ -23,6 +23,8 @@ export interface FirMessage {
 
   // Other type-specific fields are present but unused on web — they fall
   // through to the generic "Open in app" fallback card.
+  /** leafAddOn (server: crew-addons-chat.js): suggested | on | bought. */
+  addOnState?: string;
   [key: string]: unknown;
 }
 
