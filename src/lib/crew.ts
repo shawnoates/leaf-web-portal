@@ -174,6 +174,8 @@ export type CrewAddOn = {
   label: string;
   emoji: string;
   going: number;
+  /** Suggested: Leaf's options, best fit first (the carousel). */
+  options?: { key: string; label: string; emoji: string; why: string; estimate?: { totalCents: number; eachCents: number } }[];
   /** Suggested or on: roughly what it costs for this many people. */
   estimate?: { totalCents: number; eachCents: number };
   why?: string;

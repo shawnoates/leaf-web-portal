@@ -21,6 +21,28 @@ const money = (cents: number) => `$${(cents / 100).toFixed(2).replace(/\.00$/, "
 const first = (name?: string | null) => (name || "").split(/\s+/)[0] || "them";
 const field = "h-11 w-full rounded-xl border border-fm-line bg-fm-canvas px-3 text-[16px] text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none";
 
+/**
+ * The item's claymation picture (public/friend-mode/addons/<key>.png), or its
+ * emoji until that picture exists.
+ */
+function AddOnArt({ keyName, emoji, small = false }: { keyName: string; emoji: string; small?: boolean }) {
+  const [failed, setFailed] = useState(false);
+  const box = small ? "h-11 w-11 rounded-2xl text-[22px]" : "aspect-[4/3] w-full text-[56px]";
+  return (
+    <span className={`relative flex shrink-0 items-center justify-center overflow-hidden bg-fm-canvas ${box}`} aria-hidden>
+      {failed ? emoji : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`/friend-mode/addons/${keyName}.png`} alt="" className="h-full w-full object-cover"
+          onError={() => setFailed(true)}
+          // It can fail before the page is interactive, when onError isn't listening yet.
+          ref={(el) => { if (el?.complete && el.naturalWidth === 0) setFailed(true); }}
+        />
+      )}
+    </span>
+  );
+}
+
 export default function CrewAddOnCard({
   addOn: a,
   auth,
@@ -55,7 +77,7 @@ export default function CrewAddOnCard({
   );
   const heading = (
     <div className="flex items-start gap-3">
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-fm-card text-[22px]" aria-hidden>{a.emoji}</span>
+      <AddOnArt keyName={a.key} emoji={a.emoji} small />
       <div className="min-w-0">
         <Eyebrow>{a.upcoming ? "Before you go" : `From ${a.venue}`}</Eyebrow>
         <p className="m-0 mt-1 font-fm-serif text-[24px] leading-tight">{a.label}</p>
@@ -63,24 +85,42 @@ export default function CrewAddOnCard({
     </div>
   );
 
-  // ── Leaf's idea ──
+  // ── Leaf's ideas: a carousel, best fit first ──
   if (a.state === "suggested") {
-    return shell(
-      <>
-        {heading}
-        <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">
-          {a.why}{a.estimate ? ` About ${money(a.estimate.totalCents)}, so ${money(a.estimate.eachCents)} each${a.going > 1 ? ` for ${a.going}` : ""}.` : ""}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button small disabled={busy !== null} onClick={() => { track("crew_addon_add", { key: a.key }); void call("add", "addCrewAddOn", { key: a.key }); }}>
-            {busy === "add" ? "Adding…" : "Add it"}
-          </Button>
-          <Button small kind="ghost" disabled={busy !== null} onClick={() => { track("crew_addon_dismiss", { key: a.key }); void call("no", "dismissCrewAddOn"); }}>
+    const options = a.options?.length ? a.options : [{ key: a.key, label: a.label, emoji: a.emoji, why: a.why || "", estimate: a.estimate }];
+    return (
+      <section className="flex flex-col gap-3 rounded-[28px] border border-fm-line-dim bg-fm-surface py-5 lg:py-7">
+        <div className="flex items-baseline justify-between gap-3 px-5 lg:px-7">
+          <div>
+            <Eyebrow>Before you go</Eyebrow>
+            <p className="m-0 mt-1 font-fm-serif text-[24px] leading-tight">Split something for the night?</p>
+          </div>
+          <button type="button" className="shrink-0 text-xs text-fm-muted underline" disabled={busy !== null} onClick={() => { track("crew_addon_dismiss", { key: options[0].key }); void call("no", "dismissCrewAddOn"); }}>
             Not this time
-          </Button>
+          </button>
         </div>
-        {errorLine}
-      </>,
+        <ul className="m-0 flex list-none snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-5 px-5 pb-1 [scrollbar-width:none] lg:scroll-px-7 lg:px-7" aria-label="Things to split">
+          {options.map((o) => (
+            <li key={o.key} className="flex w-[78%] max-w-[300px] shrink-0 snap-start flex-col overflow-hidden rounded-3xl bg-fm-card">
+              <AddOnArt keyName={o.key} emoji={o.emoji} />
+              <div className="flex flex-1 flex-col gap-2 p-4">
+                <p className="m-0 text-[15px] font-semibold leading-snug text-fm-ink">{o.label}</p>
+                {o.estimate && (
+                  <p className="m-0 text-sm text-fm-ink-2">
+                    About <b className="font-semibold text-fm-ink">{money(o.estimate.eachCents)} each</b>
+                    <span className="text-fm-muted"> · {money(o.estimate.totalCents)} total</span>
+                  </p>
+                )}
+                <p className="m-0 flex-1 text-xs leading-relaxed text-fm-muted">{o.why}</p>
+                <Button small disabled={busy !== null} onClick={() => { track("crew_addon_add", { key: o.key }); void call(`add-${o.key}`, "addCrewAddOn", { key: o.key }); }}>
+                  {busy === `add-${o.key}` ? "Adding…" : "Add it"}
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+        {error && <p role="alert" className="m-0 px-5 text-sm text-fm-danger lg:px-7">{error}</p>}
+      </section>
     );
   }
 
