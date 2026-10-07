@@ -36,8 +36,8 @@ type Format = "counter" | "flyer" | "tent";
 
 const INK = "#1E3328";
 const SERIF = "var(--font-fm-serif)";
-/** The claymation picture: a clay picnic basket on Leaf's forest green. */
-const ART = "/friend-mode/addons/picnic.jpg";
+/** The claymation picture: a row of clay neighbors on Leaf's forest green. */
+const ART = "/placards/neighbors.jpg";
 const input =
   "w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-[15px] text-zinc-900 focus:border-leaf-600 focus:outline-none";
 
@@ -50,11 +50,13 @@ function Shell({ children }: { children: React.ReactNode }) {
  * background is the green), with the Leaf mark in the corner. Evergreen on
  * purpose: no dates, no upcoming nights, so a printed card never goes stale.
  */
-function ArtPanel({ style, mark = "0.32in" }: { style: React.CSSProperties; mark?: string }) {
+// `focus`: where the crop sits. The group stands in the lower part of the
+// picture over empty green, so crops anchor low to keep heads and feet.
+function ArtPanel({ style, mark = "0.32in", focus = "50% 75%" }: { style: React.CSSProperties; mark?: string; focus?: string }) {
   return (
     <div className="placard-art relative overflow-hidden" style={{ background: "#1f3427", ...style }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={ART} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      <img src={ART} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: focus }} />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/leaf-mark-tight.png" alt="" className="absolute brightness-0 invert" style={{ top: "0.18in", left: "0.2in", height: mark }} />
     </div>
@@ -73,7 +75,7 @@ function Partner({ p, size }: { p: Page; size: string }) {
 function CounterCard({ p }: { p: Page }) {
   return (
     <div className="placard-print placard-counter mx-auto flex flex-col bg-white text-center" style={{ width: "4in", height: "6in", color: INK }}>
-      <ArtPanel style={{ height: "2.35in" }} mark="0.28in" />
+      <ArtPanel style={{ height: "2.5in" }} mark="0.28in" focus="50% 72%" />
       <div className="flex flex-1 flex-col items-center justify-between" style={{ padding: "0.22in 0.3in 0.2in" }}>
         <p style={{ fontFamily: SERIF, fontSize: "20pt", lineHeight: 1.05 }}>{p.headline}</p>
         <div className="flex items-center gap-[0.16in]">
@@ -93,7 +95,7 @@ function Flyer({ p }: { p: Page }) {
   const tabs = Array.from({ length: 6 });
   return (
     <div className="placard-print placard-flyer mx-auto flex flex-col bg-white" style={{ width: "8.5in", height: "11in", color: INK }}>
-      <ArtPanel style={{ height: "3.9in" }} mark="0.45in" />
+      <ArtPanel style={{ height: "4.5in" }} mark="0.45in" focus="50% 80%" />
       <div className="flex flex-1 flex-col items-center justify-center text-center" style={{ padding: "0.3in 0.6in" }}>
         <p style={{ fontFamily: SERIF, fontSize: "40pt", lineHeight: 1.02, maxWidth: "7in" }}>{p.headline}</p>
         <div className="flex items-center" style={{ gap: "0.35in", marginTop: "0.35in" }}>
@@ -126,7 +128,7 @@ function Flyer({ p }: { p: Page }) {
 function TentFace({ p, flipped }: { p: Page; flipped?: boolean }) {
   return (
     <div className="flex" style={{ width: "8.5in", height: "5.5in", transform: flipped ? "rotate(180deg)" : undefined }}>
-      <ArtPanel style={{ width: "3.3in", height: "100%" }} mark="0.36in" />
+      <ArtPanel style={{ width: "4in", height: "100%" }} mark="0.36in" focus="50% 70%" />
       <div className="flex flex-1 flex-col justify-between" style={{ padding: "0.38in 0.4in 0.3in" }}>
         <p style={{ fontFamily: SERIF, fontSize: "27pt", lineHeight: 1.03 }}>{p.headline}</p>
         <div className="flex items-center" style={{ gap: "0.22in" }}>
