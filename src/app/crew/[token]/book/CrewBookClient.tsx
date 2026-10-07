@@ -312,6 +312,7 @@ function SpotItem({ s, busy, act, auth, isOwner }: {
               )}
             </div>
           )}
+          {s.needsPlace && <PlaceForPlan s={s} act={act} auth={auth} />}
           {eventLabel && (
             <span className={`mt-0.5 flex h-[22px] w-fit max-w-full items-center gap-1 rounded-full border px-2 text-[11px] ${s.eventPassed ? "border-fm-line-dim text-fm-muted" : "border-fm-line text-fm-ink-2"}`}>
               <CalendarDays size={12} aria-hidden className="shrink-0" /> <span className="truncate">{eventLabel}</span>
@@ -422,6 +423,34 @@ function EventForm({ onAdd, onCancel, busy }: { onAdd: (p: Record<string, unknow
         </Button>
         <Button small kind="ghost" onClick={onCancel}>Cancel</Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * A shared plan with no place yet (an Instagram post that named none): ask
+ * where it is, so Leaf can plan a night for it.
+ */
+function PlaceForPlan({ s, act, auth }: { s: BookSpot; act: (key: string, fn: () => Promise<unknown>) => Promise<void>; auth: CrewAuth }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="mt-1 flex h-9 w-fit items-center gap-1.5 rounded-full border border-fm-line px-3 text-xs font-semibold text-fm-ink hover:bg-fm-card">
+        <Search size={13} aria-hidden /> Where is this? Add the place
+      </button>
+    );
+  }
+  return (
+    <div className="mt-1 flex flex-col gap-1.5">
+      <VenueSearch
+        value={q}
+        onChange={setQ}
+        onSelect={(v) => act(`place:${s.spotId}`, async () => { await run("setCrewSpotPlace", auth, { spotId: s.spotId, placeId: v.placeId, venue: v }); setOpen(false); })}
+        placeholder="Search for the place"
+        className="h-10 w-full rounded-xl border px-3 text-[15px] outline-none"
+      />
+      <span className="text-[11px] text-fm-muted">Leaf plans a night for it once it has a place.</span>
     </div>
   );
 }

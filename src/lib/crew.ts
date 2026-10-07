@@ -79,7 +79,9 @@ export type Member = {
 
 export type BookSpot = {
   spotId: string;
-  locationId: string;
+  /** Null for a shared plan that has no place yet (needsPlace). */
+  locationId: string | null;
+  needsPlace?: boolean;
   name: string;
   address: string | null;
   neighborhood: string | null;
@@ -218,7 +220,9 @@ export const RHYTHM_LABELS: Record<number, string> = {
  * deep link the crew web view turns into the native place screen; on the
  * web it opens the place on Google Maps.
  */
-export function spotHref(s: { locationId: string; placeId: string | null; name: string; address: string | null }, inApp: boolean) {
+export function spotHref(s: { locationId: string | null; placeId: string | null; name: string; address: string | null; plan?: { sourceUrl: string | null } | null }, inApp: boolean) {
+  // A shared plan with no place yet: the post it came from.
+  if (!s.locationId) return s.plan?.sourceUrl || "#";
   if (inApp) return `leaf://location/${s.locationId}`;
   if (s.placeId) return `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(s.placeId)}`;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([s.name, s.address].filter(Boolean).join(" "))}`;
