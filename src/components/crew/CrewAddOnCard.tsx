@@ -22,7 +22,7 @@ const first = (name?: string | null) => (name || "").split(/\s+/)[0] || "them";
 const field = "h-11 w-full rounded-xl border border-fm-line bg-fm-canvas px-3 text-[16px] text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none";
 
 /**
- * The item's claymation picture (public/friend-mode/addons/<key>.png), or its
+ * The item's claymation picture (public/friend-mode/addons/<key>.jpg), or its
  * emoji until that picture exists.
  */
 function AddOnArt({ keyName, emoji, small = false }: { keyName: string; emoji: string; small?: boolean }) {
@@ -33,7 +33,7 @@ function AddOnArt({ keyName, emoji, small = false }: { keyName: string; emoji: s
       {failed ? emoji : (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={`/friend-mode/addons/${keyName}.png`} alt="" className="h-full w-full object-cover"
+          src={`/friend-mode/addons/${keyName}.jpg`} alt="" className="h-full w-full object-cover"
           onError={() => setFailed(true)}
           // It can fail before the page is interactive, when onError isn't listening yet.
           ref={(el) => { if (el?.complete && el.naturalWidth === 0) setFailed(true); }}
