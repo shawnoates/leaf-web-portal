@@ -14,7 +14,7 @@ function isIOSDevice(): boolean {
   return /iPad|iPhone|iPod/.test(ua) || (ua.includes("Mac") && navigator.maxTouchPoints > 1);
 }
 
-export default function ChatLanding({ notificationId }: { notificationId: string }) {
+export default function ChatLanding({ notificationId, fromApp = false }: { notificationId: string; fromApp?: boolean }) {
   const deepLink = `leaf://planChat?planId=${notificationId}`;
   const [isIOS, setIsIOS] = useState<boolean | null>(null);
   const [eventGroupId, setEventGroupId] = useState<string | null>(null);
@@ -65,6 +65,20 @@ export default function ChatLanding({ notificationId }: { notificationId: string
     if (!eventGroupId) return;
     window.location.replace(`/chat/${eventGroupId}`);
   }, [isIOS, hasUser, eventGroupId]);
+
+  // Opened from inside the Leaf app (the crew page's Chat link on a build
+  // that doesn't open the chat itself): one button straight into the app.
+  if (fromApp) {
+    return (
+      <div style={{ minHeight: "70vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: "60px 20px", textAlign: "center", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
+        <h1 style={{ fontSize: 22, fontWeight: 500, color: "#18181b", margin: 0 }}>The group chat</h1>
+        <p style={{ fontSize: 15, color: "#52525b", margin: 0 }}>Opens in Leaf.</p>
+        <a href={deepLink} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minHeight: 52, padding: "0 32px", borderRadius: 999, background: "#18181b", color: "#ffffff", fontSize: 16, fontWeight: 600, textDecoration: "none" }}>
+          Open the chat
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div

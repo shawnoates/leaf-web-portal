@@ -976,6 +976,7 @@ function CycleCard({
   canSkip?: boolean;
   crewId?: string;
 }) {
+  const inApp = useInApp();
   // Not voted yet: start from the dates their calendar says they're free.
   // Nothing pre-ticked: Leaf already picked these dates around everyone's
   // calendars, so a tap here is a preference, and it saves by itself.
@@ -1245,7 +1246,7 @@ function CycleCard({
             // The plan's own chat, same link Leaf texts: the app opens it
             // natively; on the web it offers the app (or the web chat if signed in).
             <a
-              href={`/c/${c.myInviteId}`}
+              href={`/c/${c.myInviteId}${inApp ? "?inapp=1" : ""}`}
               className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-fm-line text-[15px] font-semibold text-fm-ink hover:bg-fm-card"
             >
               <MessageCircle size={17} aria-hidden /> Chat with the group

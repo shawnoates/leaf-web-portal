@@ -16,9 +16,11 @@ export const metadata: Metadata = {
 
 type PageProps = {
   params: Promise<{ notificationId: string }>;
+  searchParams: Promise<{ inapp?: string }>;
 };
 
-export default async function ChatSharePage({ params }: PageProps) {
+export default async function ChatSharePage({ params, searchParams }: PageProps) {
   const { notificationId } = await params;
-  return <ChatLanding notificationId={notificationId} />;
+  const { inapp } = await searchParams;
+  return <ChatLanding notificationId={notificationId} fromApp={inapp === "1"} />;
 }
