@@ -1000,20 +1000,31 @@ function CycleCard({
   // calendars, so a tap here is a preference, and it saves by itself.
   const [picked, setPicked] = useState<Set<number>>(new Set(c.myVotes ?? []));
   const [voteState, setVoteState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Saves on every tap, right away: waiting for taps to settle lost the vote
+  // when someone tapped and left the page (the app closes its web view).
+  // One save at a time; taps made meanwhile go in the next one.
+  const saving = useRef(false);
+  const queued = useRef<Set<number> | null>(null);
   const saveVotes = (next: Set<number>) => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    // A short pause so a few quick taps save once.
-    saveTimer.current = setTimeout(async () => {
-      setVoteState("saving");
-      try {
-        await run("crewVote", auth, { cycleId: c.cycleId, options: [...next] });
-        setVoteState("saved");
-        setTimeout(() => setVoteState((v) => (v === "saved" ? "idle" : v)), 2200);
-      } catch {
-        setVoteState("error");
+    queued.current = next;
+    if (saving.current) return;
+    saving.current = true;
+    setVoteState("saving");
+    void (async () => {
+      let failed = false;
+      while (queued.current) {
+        const sending = queued.current;
+        queued.current = null;
+        try {
+          await run("crewVote", auth, { cycleId: c.cycleId, options: [...sending] });
+        } catch {
+          failed = true;
+        }
       }
-    }, 700);
+      saving.current = false;
+      setVoteState(failed ? "error" : "saved");
+      if (!failed) setTimeout(() => setVoteState((v) => (v === "saved" ? "idle" : v)), 2200);
+    })();
   };
   const toggleDate = (i: number) => {
     const n = new Set(picked);
