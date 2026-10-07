@@ -135,7 +135,7 @@ export default function CrewAddOnCard({
               <p className="m-0 text-xs leading-relaxed text-fm-muted">Name it, and one person picks it up. Everyone chips in.</p>
               <input
                 className="h-10 w-full rounded-xl border border-fm-line bg-fm-canvas px-3 text-[16px] text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none"
-                placeholder="Flowers for Maya" maxLength={60} value={custom.name}
+                placeholder="What are you splitting?" maxLength={60} value={custom.name}
                 onChange={(e) => setCustom({ ...custom, name: e.target.value })} aria-label="What you're splitting"
               />
               <input
