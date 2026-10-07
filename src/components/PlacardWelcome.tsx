@@ -20,6 +20,9 @@ type Idea = {
   date: string | null;
   preferredTime?: string | null;
   audienceTag?: string | null;
+  /** One of the business's own classes: book on its site. */
+  bookingUrl?: string | null;
+  classTitle?: string | null;
 };
 
 /** "Tue, Oct 13 · 9:30 AM". The date is stored at noon UTC, so read it in UTC. */
@@ -87,6 +90,7 @@ export default function PlacardWelcome<T extends Idea>({
         </div>
         <p className="px-5 text-[15px] leading-relaxed text-zinc-600">
           Neighbors could meet here. Tap the heart on the ones you&rsquo;d come to{canHost ? ", or host one" : ""}.
+          {ideas.some((i) => i.bookingUrl) ? " Classes are booked on their own site." : ""}
         </p>
 
         <ul className="space-y-3 px-5 pb-4 pt-4">
@@ -96,10 +100,13 @@ export default function PlacardWelcome<T extends Idea>({
             const busy = pending.has(idea.id);
             return (
               <li key={idea.id} className="rounded-2xl border border-zinc-200 p-4">
-                <p className="text-[12px] font-semibold text-zinc-500">{whenLabel(idea)}</p>
+                <p className="text-[12px] font-semibold text-zinc-500">
+                  {whenLabel(idea)}
+                  {idea.classTitle ? ` \u00b7 their ${idea.classTitle} class` : ""}
+                </p>
                 <h3 className="mt-0.5 text-[17px] font-semibold leading-snug text-zinc-900">{idea.title}</h3>
                 {idea.description && <p className="mt-1 line-clamp-2 text-[14px] leading-relaxed text-zinc-600">{idea.description}</p>}
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => onHeart(idea.id)}
@@ -113,14 +120,30 @@ export default function PlacardWelcome<T extends Idea>({
                     {isIn ? "You're in" : "I'd come"}
                     {count > 0 && <span className="font-normal text-zinc-500">· {count}</span>}
                   </button>
+                  {idea.bookingUrl && (
+                    <a
+                      href={idea.bookingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex h-10 flex-1 items-center justify-center whitespace-nowrap rounded-xl px-3 text-[14px] font-semibold text-white hover:opacity-90"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      Book your spot
+                    </a>
+                  )}
                   {canHost && (
                     <button
                       type="button"
                       onClick={() => onHost(idea)}
-                      className="h-10 flex-1 rounded-xl text-[14px] font-semibold text-white hover:opacity-90"
-                      style={{ backgroundColor: brandColor }}
+                      // A class: booking is the main thing, hosting ("I'll be there, join me") goes below.
+                      className={
+                        idea.bookingUrl
+                          ? "h-10 w-full rounded-xl border border-zinc-300 text-[14px] font-semibold text-zinc-800 hover:border-zinc-400"
+                          : "h-10 flex-1 rounded-xl text-[14px] font-semibold text-white hover:opacity-90"
+                      }
+                      style={idea.bookingUrl ? undefined : { backgroundColor: brandColor }}
                     >
-                      Host this
+                      {idea.bookingUrl ? "Host it: I\u2019ll be there, join me" : "Host this"}
                     </button>
                   )}
                 </div>

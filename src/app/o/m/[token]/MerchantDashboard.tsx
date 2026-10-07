@@ -525,7 +525,7 @@ export default function MerchantDashboard({
           </Card>
         )}
 
-        <Card>
+        <Card id="book">
           <H2>Book another night</H2>
           <p className="mt-1 text-[15px] text-stone-600">Pick a date and the part of the day. We&rsquo;ll set the time and confirm.</p>
           {bookNote && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{bookNote}</p>}

@@ -21,6 +21,8 @@ type PlanShareInfo = {
   heroImage?: string | null;
   /** A night a business made for Leaf. */
   onlyOnLeaf?: { with: string | null } | null;
+  /** Booked on the business's own site (a placard idea on one of its classes). */
+  bookingUrl?: string | null;
   // The invitation video's HLS stream, when the plan has one.
   videoUrl?: string | null;
   expiryDate: string | null;
@@ -382,6 +384,7 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
       calendarName={info.calendarName}
       calendarProfilePhoto={info.calendarProfilePhoto}
       onlyOnLeaf={info.onlyOnLeaf ?? null}
+      bookingUrl={info.bookingUrl ?? null}
       shareId={info.shareId}
       requireApproval={info.requireApproval}
       rsvpCount={info.rsvpCount ?? 0}

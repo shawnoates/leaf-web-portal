@@ -56,6 +56,8 @@ type Props = {
   calendarProfilePhoto: string | null;
   /** A night a business made for Leaf: "Only on Leaf" on the photo and under the title. */
   onlyOnLeaf?: OnlyOnLeafInfo;
+  /** Spots are sold on the business's own site: book there, RSVP here. */
+  bookingUrl?: string | null;
   // Only present when variant === "privateCalendar"
   shareId: string | null;
   // Affects "Count me in" vs "Request to Attend" button copy
@@ -91,6 +93,7 @@ export default function StandalonePlanCard({
   calendarName,
   calendarProfilePhoto,
   onlyOnLeaf = null,
+  bookingUrl = null,
   shareId,
   requireApproval,
   rsvpCount,
@@ -204,6 +207,23 @@ export default function StandalonePlanCard({
             <p className="text-sm text-zinc-600 whitespace-pre-wrap">
               {description}
             </p>
+          ) : null}
+
+          {/* A class at the business: spots are sold on its own site. */}
+          {bookingUrl ? (
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+              <p className="text-sm text-zinc-700">
+                {`This is one of ${location?.name ? `${location.name}\u2019s` : "the studio\u2019s"} own classes. Book your spot on their site, then RSVP here so neighbors know you\u2019re coming.`}
+              </p>
+              <a
+                href={bookingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 flex h-11 items-center justify-center rounded-lg bg-zinc-900 text-sm font-semibold text-white hover:bg-zinc-800"
+              >
+                Book your spot
+              </a>
+            </div>
           ) : null}
 
           {/*

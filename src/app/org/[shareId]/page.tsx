@@ -285,6 +285,9 @@ interface PlanIdea {
   centroid: string | null;
   // Public — anyone can express interest on a plan idea (same shape as
   // AI-suggested events). Server aggregates via PlanIdeaInterest.
+  // A placard idea on the business's own class: booked on its site.
+  bookingUrl?: string | null;
+  classTitle?: string | null;
   interestCount?: number;
   // Cohort the idea was generated for ("moms", "parents_kids", …). Null on
   // ideas generated before cohort rotation and on calendars that declare their
@@ -3311,6 +3314,8 @@ export default function OrgCalendarPage() {
         localWallClock: (idea.localWallClock as string) ?? null,
         venueName: (idea.venueName as string) ?? null,
         suggestedByName: (idea.suggestedByName as string) ?? null,
+        bookingUrl: (idea.bookingUrl as string) ?? null,
+        classTitle: (idea.classTitle as string) ?? null,
       });
       const planIdeas: PlanIdea[] = (result.planIdeas || []).map(mapIdea);
       const placardIdeas: PlanIdea[] = (result.placardWelcome?.ideas || []).map(mapIdea);
