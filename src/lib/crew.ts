@@ -303,6 +303,26 @@ export function optionLabel(o: DateOption) {
   return `${dayLabel(o.date)}${o.time ? ` · ${timeLabel(o.time)}` : ""}`;
 }
 
+/** Evening plans (5pm–4am) are "nights"; daytime ones (coffee, brunch, a hike) aren't. Unknown time: night. Same rule as the server's texts. */
+export function isEvening(hhmm: string | null | undefined): boolean {
+  if (!hhmm) return true;
+  const h = Number(hhmm.split(":")[0]);
+  return !Number.isFinite(h) || h >= 17 || h < 4;
+}
+
+/** A round's time: the chosen date's, else the first option's. */
+export function cycleIsEvening(c: Pick<CycleView, "chosenOption" | "options">): boolean {
+  return isEvening(c.chosenOption?.time ?? c.options?.[0]?.time ?? null);
+}
+
+/** From a start time, in this browser's zone. */
+export function eveningAt(v: string | { iso: string } | null | undefined): boolean {
+  const d = toDate(v);
+  if (!d) return true;
+  const h = d.getHours();
+  return h >= 17 || h < 4;
+}
+
 export function toDate(v: string | { iso: string } | null | undefined): Date | null {
   if (!v) return null;
   const iso = typeof v === "string" ? v : v.iso;

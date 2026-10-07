@@ -12,7 +12,7 @@
 
 import { useState } from "react";
 import { Check } from "lucide-react";
-import { run, type CrewAddOn, type CrewAuth } from "@/lib/crew";
+import { eveningAt, run, type CrewAddOn, type CrewAuth } from "@/lib/crew";
 import { Button, Eyebrow, Mono } from "@/components/crew/CrewShell";
 import { HandlesForm } from "@/components/crew/CrewMoneyCard";
 import { track } from "@/lib/track";
@@ -95,7 +95,7 @@ export default function CrewAddOnCard({
         <div className="flex items-baseline justify-between gap-3 px-5 lg:px-7">
           <div>
             <Eyebrow>Before you go</Eyebrow>
-            <p className="m-0 mt-1 font-fm-serif text-[24px] leading-tight">Split something for the night?</p>
+            <p className="m-0 mt-1 font-fm-serif text-[24px] leading-tight">Split something for the {eveningAt(a.startsAt) ? "night" : "day"}?</p>
           </div>
           <button type="button" className="shrink-0 text-xs text-fm-muted underline" disabled={busy !== null} onClick={() => { track("crew_addon_dismiss", { key: options[0].key }); void call("no", "dismissCrewAddOn"); }}>
             Not this time
