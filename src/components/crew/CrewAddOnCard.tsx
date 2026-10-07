@@ -56,6 +56,8 @@ export default function CrewAddOnCard({
   const [error, setError] = useState("");
   const [amount, setAmount] = useState("");
   const [needsHandles, setNeedsHandles] = useState(false);
+  // Something else: the crew's own thing to split.
+  const [custom, setCustom] = useState({ name: "", total: "" });
 
   const call = async (key: string, name: string, params: Record<string, unknown> = {}) => {
     setBusy(key); setError("");
@@ -118,6 +120,36 @@ export default function CrewAddOnCard({
               </div>
             </li>
           ))}
+          <li className="flex w-[78%] max-w-[300px] shrink-0 snap-start flex-col overflow-hidden rounded-3xl bg-fm-card">
+            <AddOnArt keyName="custom" emoji="✨" />
+            <form
+              className="flex flex-1 flex-col gap-2 p-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const cents = Math.round(parseFloat(custom.total.replace(/[^0-9.]/g, "")) * 100) || null;
+                track("crew_addon_add", { key: "custom" });
+                void call("add-custom", "addCrewAddOn", { custom: { name: custom.name, cents } });
+              }}
+            >
+              <p className="m-0 text-[15px] font-semibold leading-snug text-fm-ink">Something else</p>
+              <p className="m-0 text-xs leading-relaxed text-fm-muted">Name it, and one person picks it up. Everyone chips in.</p>
+              <input
+                className="h-10 w-full rounded-xl border border-fm-line bg-fm-canvas px-3 text-[16px] text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none"
+                placeholder="Flowers for Maya" maxLength={60} value={custom.name}
+                onChange={(e) => setCustom({ ...custom, name: e.target.value })} aria-label="What you're splitting"
+              />
+              <input
+                className="h-10 w-full rounded-xl border border-fm-line bg-fm-canvas px-3 text-[16px] text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none"
+                placeholder="Rough total ($)" inputMode="decimal" value={custom.total}
+                onChange={(e) => setCustom({ ...custom, total: e.target.value })} aria-label="Rough total, optional"
+              />
+              <div className="mt-auto">
+                <Button small type="submit" disabled={busy !== null || custom.name.trim().length < 2}>
+                  {busy === "add-custom" ? "Adding…" : "Add it"}
+                </Button>
+              </div>
+            </form>
+          </li>
         </ul>
         {error && <p role="alert" className="m-0 px-5 text-sm text-fm-danger lg:px-7">{error}</p>}
       </section>
