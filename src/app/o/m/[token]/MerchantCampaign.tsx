@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * "Your nights, on autopilot": the merchant runs their Leaf nights like an ad
+ * "Your Neighbor Hours, on autopilot": the merchant runs their Neighbor Hours like an ad
  * campaign. They pick their days, set a weekly limit on a slider that shows
  * what it buys (RSVPs, guests and what those guests spend, from past nights),
  * and switch it on or off. Server: offer-merchant-campaign-functions.js.
@@ -101,9 +101,9 @@ export default function MerchantCampaign({ token, preview }: { token: string; pr
       setNote(
         nextOn
           ? r.queued
-            ? `On. We've lined up ${r.queued} night${r.queued === 1 ? "" : "s"} and will confirm each one with you.`
-            : "Saved. We line up your nights about a week and a half ahead."
-          : `Off. ${r.withdrawn ? "Nights we hadn't booked yet are dropped; " : ""}booked nights still happen.`,
+            ? `On. We've lined up ${r.queued} Neighbor Hour${r.queued === 1 ? "" : "s"} and will confirm each one with you.`
+            : "Saved. We line up your Neighbor Hours about a week and a half ahead."
+          : `Off. ${r.withdrawn ? "Ones we hadn't booked yet are dropped; " : ""}booked ones still happen.`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save that");
@@ -120,15 +120,15 @@ export default function MerchantCampaign({ token, preview }: { token: string; pr
     <section id="campaign" className="scroll-mt-6 rounded-3xl bg-white p-6 shadow-sm sm:p-7">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="font-fm-serif text-[28px] leading-tight text-stone-900">Your nights</h2>
-          <p className="mt-1 text-[15px] leading-relaxed text-stone-600">Pick your slow days and a weekly limit. We fill them with neighbors and charge your card after each night.</p>
+          <h2 className="font-fm-serif text-[28px] leading-tight text-stone-900">Your Neighbor Hours</h2>
+          <p className="mt-1 text-[15px] leading-relaxed text-stone-600">Pick your slow days and a weekly limit. We fill them with neighbors and charge your card after each one.</p>
         </div>
         <label className="flex shrink-0 items-center gap-2 rounded-full border border-stone-200 px-3 py-1.5">
           <span className={`text-[14px] font-semibold ${on ? "text-leaf-700" : "text-stone-500"}`}>{on ? "On" : "Off"}</span>
           <input
             type="checkbox"
             role="switch"
-            aria-label="Run my nights"
+            aria-label="Run my Neighbor Hours"
             checked={on}
             disabled={saving || preview || (!on && (!days.length || !s.hasCard))}
             onChange={(e) => save(e.target.checked)}
@@ -141,11 +141,11 @@ export default function MerchantCampaign({ token, preview }: { token: string; pr
       {on ? (
         <div className="mt-5 rounded-2xl bg-leaf-50 p-4 ring-1 ring-leaf-200 sm:p-5">
           <p className="text-[16px] font-semibold text-leaf-900">
-            {autoStarted ? "Your nights are switched on." : "Your nights are on."}
+            {autoStarted ? "Your Neighbor Hours are switched on." : "Your Neighbor Hours are on."}
           </p>
           <p className="mt-1 text-[15px] leading-relaxed text-leaf-900">
-            {`We'll keep booking ${days.map((d) => `${WEEKDAY_NAMES[d.weekday]} ${d.partOfDay}s`).join(" and ") || "your days"} and charge ${dollars(s.feeCents)} per RSVP after each night, up to ${dollars(budget)} a week.`}
-            {autoStarted ? " We turned this on when you held your free night." : ""}
+            {`We'll keep booking ${days.map((d) => `${WEEKDAY_NAMES[d.weekday]} ${d.partOfDay}s`).join(" and ") || "your days"} and charge ${dollars(s.feeCents)} per RSVP after each one, up to ${dollars(budget)} a week.`}
+            {autoStarted ? " We turned this on when you held your free Neighbor Hour." : ""}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <button
@@ -156,13 +156,13 @@ export default function MerchantCampaign({ token, preview }: { token: string; pr
             >
               Switch off
             </button>
-            <span className="text-[13px] text-leaf-800">Booked nights still happen. You can switch back on anytime.</span>
+            <span className="text-[13px] text-leaf-800">Booked ones still happen. You can switch back on anytime.</span>
           </div>
         </div>
       ) : (
         <div className="mt-5 rounded-2xl bg-stone-50 p-4 ring-1 ring-stone-200 sm:p-5">
-          <p className="text-[16px] font-semibold text-stone-900">Your nights are off.</p>
-          <p className="mt-1 text-[15px] leading-relaxed text-stone-600">We won&rsquo;t book new nights until you switch them on. Nights already booked still happen.</p>
+          <p className="text-[16px] font-semibold text-stone-900">Your Neighbor Hours are off.</p>
+          <p className="mt-1 text-[15px] leading-relaxed text-stone-600">We won&rsquo;t book new ones until you switch them on. Ones already booked still happen.</p>
         </div>
       )}
 
@@ -251,16 +251,16 @@ export default function MerchantCampaign({ token, preview }: { token: string; pr
       <p className="mt-2 text-[12px] leading-relaxed text-stone-500">
         {est
           ? [
-              `Nights in ${where} draw ${span(est.rsvpsPerNight)} RSVPs`,
+              `Neighbor Hours in ${where} draw ${span(est.rsvpsPerNight)} RSVPs`,
               est.attendedPerNight ? ` and ${span(est.attendedPerNight)} guests` : "",
-              ` (last ${est.nights} nights).`,
+              ` (last ${est.nights}).`,
               est.spendPerGuest
-                ? ` Guests spend ${span(est.spendPerGuest, dollars)} each at ${est.spendPerGuest.scope === "category" ? "places like yours" : "Leaf nights"}, from receipts.`
+                ? ` Guests spend ${span(est.spendPerGuest, dollars)} each at ${est.spendPerGuest.scope === "category" ? "places like yours" : "Neighbor Hours"}, from receipts.`
                 : "",
               o.limitBinds && o.draw ? ` Your limit covers ${o.paid} RSVPs; your days usually draw up to ${o.draw.high}.` : "",
               " Estimates, not promises.",
             ].join("")
-          : `Your limit covers up to ${o.paid} RSVPs a week at ${dollars(s.feeCents)} each. We'll show typical turnout once there are a few nights to go on.`}
+          : `Your limit covers up to ${o.paid} RSVPs a week at ${dollars(s.feeCents)} each. We'll show typical turnout once there are a few to go on.`}
       </p>
 
       </div>
@@ -278,9 +278,9 @@ export default function MerchantCampaign({ token, preview }: { token: string; pr
       )}
 
       <p className="mt-6 border-t border-stone-100 pt-6 text-[13px] leading-relaxed text-stone-500">
-        {`${dollars(s.feeCents)} per RSVP, charged after each night and never more than your weekly limit. Under 5 RSVPs costs nothing.`}
-        {s.setupFeeOwed ? ` A one-time ${dollars(s.setupFeeCents)} setup is added to your first paid night.` : ""}
-        {" We confirm each night with you about a week ahead, and you can skip any night before it's booked."}
+        {`${dollars(s.feeCents)} per RSVP, charged after each one and never more than your weekly limit. Under 5 RSVPs costs nothing.`}
+        {s.setupFeeOwed ? ` A one-time ${dollars(s.setupFeeCents)} setup is added to your first paid one.` : ""}
+        {" We confirm each one with you about a week ahead, and you can skip any before it's booked."}
       </p>
 
       {note && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{note}</p>}

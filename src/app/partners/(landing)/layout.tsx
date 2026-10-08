@@ -14,13 +14,13 @@ const OG_ALT =
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Leaf for local businesses — Neighbors on your slowest nights",
+  title: "Leaf for local businesses — Neighbors in your slowest hours",
   description:
-    "Tell us your slowest days and hours and we'll send the residents who live around the corner. Your first night is free: no listing fee, no RSVP fees.",
+    "Tell us your slowest days and hours and we'll send the residents who live around the corner. Your first Neighbor Hour is free: no listing fee, no RSVP fees.",
   openGraph: {
-    title: "Leaf — Neighbors on your slowest nights",
+    title: "Leaf — Neighbors in your slowest hours",
     description:
-      "Tell us your slowest nights and we'll send your neighbors. First night free, then $6 per RSVP.",
+      "Tell us your slowest hours and we'll send your neighbors. First Neighbor Hour free, then $6 per RSVP.",
     type: "website",
     url: `${SITE_URL}/partners`,
     siteName: "Leaf OS",
@@ -38,9 +38,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Leaf — Neighbors on your slowest nights",
+    title: "Leaf — Neighbors in your slowest hours",
     description:
-      "Tell us your slowest nights and we'll send your neighbors. First night free, then $6 per RSVP.",
+      "Tell us your slowest hours and we'll send your neighbors. First Neighbor Hour free, then $6 per RSVP.",
     images: [OG_IMAGE],
   },
 };

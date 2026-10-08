@@ -95,17 +95,17 @@ export default function Hero() {
         <Reveal>
           <Eyebrow>For local businesses</Eyebrow>
           <h1 className="h-xl">
-            Neighbors on your{" "}
-            <span className="underline-amber">slowest nights.</span>
+            Neighbors in your{" "}
+            <span className="underline-amber">slowest hours.</span>
           </h1>
           <p className="lead" style={{ marginTop: 22 }}>
             Tell us your slowest days and hours. We&rsquo;ll send the residents who live
-            around the corner, from your neighborhood&rsquo;s Leaf calendar. Your first night
+            around the corner, from your neighborhood&rsquo;s Leaf calendar. Your first Neighbor Hour
             is free: no listing fee, no RSVP fees.
           </p>
           <div className="cta-row" style={{ marginTop: 28 }}>
             <CTA to="join" variant="primary" arrow>
-              Claim your free night
+              Claim your free Neighbor Hour
             </CTA>
             <CTA to="login" variant="ghost">
               Partner sign in

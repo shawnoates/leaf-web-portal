@@ -7,10 +7,10 @@ export function FinalCta() {
       <div className="container" style={{ textAlign: "center", maxWidth: 760 }}>
         <Reveal>
           <h2 className="h-xl" style={{ fontSize: "clamp(2.2rem, 5vw, 3.4rem)" }}>
-            Fill your slowest night with neighbors.
+            Fill your slowest hours with neighbors.
           </h2>
           <p className="lead" style={{ margin: "20px auto 0" }}>
-            Your first night is free: no listing fee, no RSVP fees. Claim it in two minutes,
+            Your first Neighbor Hour is free: no listing fee, no RSVP fees. Claim it in two minutes,
             and nothing is charged today.
           </p>
           <div
@@ -18,7 +18,7 @@ export function FinalCta() {
             style={{ marginTop: 30, marginInline: "auto" }}
           >
             <CTA to="join" variant="primary" arrow>
-              Claim your free night
+              Claim your free Neighbor Hour
             </CTA>
             <CTA to="login" variant="ghost">
               Partner sign in

@@ -309,7 +309,7 @@ function PastNight({ n }: { n: Night }) {
             <p className="mt-1 text-[13px] text-stone-600">
               {[
                 r.regulars.followsFromNight != null ? `${r.regulars.followsFromNight} followed the calendar from your counter card` : null,
-                r.regulars.returning != null ? `${r.regulars.returning} came back for another night` : null,
+                r.regulars.returning != null ? `${r.regulars.returning} came back for another` : null,
               ]
                 .filter(Boolean)
                 .join(" · ")}
@@ -376,7 +376,7 @@ export default function MerchantDashboard({
       await Parse.Cloud.run("merchantSkipRequest", { token, requestId });
       setReload((n) => n + 1);
     } catch (e) {
-      setBookError(e instanceof Error ? e.message : "Couldn't skip that night");
+      setBookError(e instanceof Error ? e.message : "Couldn't skip that one");
     }
   };
 
@@ -415,7 +415,7 @@ export default function MerchantDashboard({
     return (
       <Shell>
         <Brand />
-        <p className="mt-10 text-center text-[15px] text-stone-500">Loading your nights…</p>
+        <p className="mt-10 text-center text-[15px] text-stone-500">Loading your Neighbor Hours…</p>
       </Shell>
     );
   }
@@ -427,8 +427,8 @@ export default function MerchantDashboard({
       <H2>How billing works</H2>
       <p className="mt-2 text-[15px] leading-relaxed text-stone-600">
         {dollars(d.rsvpFeeCents)} per RSVP, counted 2 hours before, never more than you seat. Under 5 RSVPs costs nothing.
-        {d.freeNight.state === "granted" ? " Your first night is free." : d.freeNight.state === "used" ? " Your free first night is used." : ""}
-        {" After that, each night is charged to your card after the night, never more than your weekly limit."}
+        {d.freeNight.state === "granted" ? " Your first Neighbor Hour is free." : d.freeNight.state === "used" ? " Your free first Neighbor Hour is used." : ""}
+        {" After that, each one is charged to your card after it happens, never more than your weekly limit."}
       </p>
     </Card>
   );
@@ -450,7 +450,7 @@ export default function MerchantDashboard({
           {/* Phone: the summary, then their photo. Desktop: side by side. */}
           <header className={`mt-5 grid gap-5 lg:mt-8 lg:gap-8 ${d.photoUrl ? "lg:grid-cols-[minmax(0,1fr)_380px]" : ""}`}>
             <div className="rounded-3xl bg-leaf-800 p-6 text-white sm:p-8">
-              <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Your Leaf nights</p>
+              <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Your Neighbor Hours</p>
               <h1 className="mt-2 font-fm-serif text-[36px] leading-[1.02] lg:text-[48px]">{d.merchantName}</h1>
               <p className="mt-2 text-[15px] leading-relaxed text-leaf-100">
                 {d.calendarUrl ? (
@@ -463,7 +463,7 @@ export default function MerchantDashboard({
               </p>
               <div className={`mt-6 grid gap-x-4 gap-y-5 ${perRsvp ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
                 <Stat value={d.totals.upcoming} label="coming up" />
-                <Stat value={d.totals.nightsRun} label="nights run" />
+                <Stat value={d.totals.nightsRun} label="hosted" />
                 <Stat value={d.totals.guests} label="guests" />
                 {perRsvp && <Stat value={dollars(d.totals.chargedCents)} label="charged" />}
               </div>
@@ -497,7 +497,7 @@ export default function MerchantDashboard({
                   {d.upcoming.length ? (
                     d.upcoming.map((n) => <UpcomingNight key={n.id} n={n} token={token} />)
                   ) : (
-                    <p className="text-[15px] text-stone-600">Nothing on the books right now. Switch your nights on, or add a one-off night.</p>
+                    <p className="text-[15px] text-stone-600">Nothing on the books right now. Switch your Neighbor Hours on, or add a one-off Neighbor Hour.</p>
                   )}
                 </div>
                 <button
@@ -537,7 +537,7 @@ export default function MerchantDashboard({
               )}
 
               <Card id="book">
-                <H2>Add a one-off night</H2>
+                <H2>Add a one-off Neighbor Hour</H2>
                 <p className="mt-1 text-[15px] text-stone-600">Outside your usual days. Pick a date and the part of the day; we&rsquo;ll set the time and confirm.</p>
                 {bookNote && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{bookNote}</p>}
                 <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
@@ -569,13 +569,13 @@ export default function MerchantDashboard({
                   onClick={requestNight}
                   className="mt-4 h-12 w-full rounded-xl bg-leaf-800 text-[15px] font-semibold text-white disabled:opacity-40"
                 >
-                  {booking ? "Sending\u2026" : "Request this night"}
+                  {booking ? "Sending\u2026" : "Request this Neighbor Hour"}
                 </button>
               </Card>
 
               {d.past.length > 0 && (
                 <Card>
-                  <H2>Past nights</H2>
+                  <H2>Past Neighbor Hours</H2>
                   <div className="mt-4">
                     {d.past.map((n) => (
                       <PastNight key={n.id} n={n} />
@@ -596,7 +596,7 @@ export default function MerchantDashboard({
               {d.placardUrl && (
                 <Card>
                   <H2>Your counter card</H2>
-                  <p className="mt-2 text-[15px] leading-relaxed text-stone-600">A card with a QR code for your counter, so neighbors who stop by can find your nights and the calendar.</p>
+                  <p className="mt-2 text-[15px] leading-relaxed text-stone-600">A card with a QR code for your counter, so neighbors who stop by can find your Neighbor Hours and the calendar.</p>
                   <a
                     href={d.placardUrl}
                     className="mt-3 inline-block text-[15px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4"

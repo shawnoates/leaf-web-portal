@@ -27,7 +27,7 @@ export default function Header() {
   }, []);
 
   // A rep's walk-in email links here with ?lead=: carry it onto every
-  // "Claim your free night" button so the sign-up still credits the rep.
+  // "Claim your free Neighbor Hour" button so the sign-up still credits the rep.
   useEffect(() => {
     const lead = new URLSearchParams(window.location.search).get("lead");
     if (!lead) return;
@@ -49,7 +49,7 @@ export default function Header() {
             Partner sign in
           </a>
           <CTA to="join" variant="primary">
-            Claim your free night
+            Claim your free Neighbor Hour
           </CTA>
         </div>
       </div>

@@ -126,7 +126,7 @@ export default function Insight() {
 
         <Reveal className="inline-cta">
           <CTA to="join" variant="primary" arrow>
-            Claim your free night
+            Claim your free Neighbor Hour
           </CTA>
         </Reveal>
       </div>

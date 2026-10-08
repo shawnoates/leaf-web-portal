@@ -6,7 +6,7 @@ import { CTA } from "./ui";
 const items = [
   {
     q: "What's the catch?",
-    a: "There isn't one. Your first night is free: no listing fee, no RSVP fees. The card just claims it. If you like how it goes, book more nights at $6 per RSVP.",
+    a: "There isn't one. Your first Neighbor Hour is free: no listing fee, no RSVP fees. The card just claims it. If you like how it goes, book more nights at $6 per RSVP.",
   },
   {
     q: "Who are these people?",
@@ -18,7 +18,7 @@ const items = [
   },
   {
     q: "What if nobody shows up?",
-    a: "Under 5 RSVPs, there's no charge and we set up another night for you. You only ever pay for neighbors who said they're coming.",
+    a: "Under 5 RSVPs, there's no charge and we set up another one for you. You only ever pay for neighbors who said they're coming.",
   },
   {
     q: "How is this different from an ad?",
@@ -60,7 +60,7 @@ export default function Objections() {
         </div>
         <div className="inline-cta">
           <CTA to="join" variant="primary" arrow>
-            Claim your free night
+            Claim your free Neighbor Hour
           </CTA>
         </div>
       </div>
