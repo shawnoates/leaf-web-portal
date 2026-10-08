@@ -1103,22 +1103,26 @@ function CycleCard({
       )}
 
       {c.state === "picking" && c.placeSuggestion && (
-        <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-fm-line px-4 py-3.5">
-          <p className="m-0 min-w-0 flex-1 text-sm leading-snug text-fm-ink">
-            {c.placeSuggestion.why === "history" ? `Back to ${c.placeSuggestion.name}, like last time?` : `How about ${c.placeSuggestion.name}?`}
-            {c.placeSuggestion.address && <span className="block text-xs text-fm-muted">{c.placeSuggestion.address}</span>}
-          </p>
-          <Button
-            small
-            disabled={busy !== null}
-            onClick={() => onAct("addSuggested", () => run("addToCrewBook", auth, c.placeSuggestion!.locationId
-              ? { locationId: c.placeSuggestion!.locationId }
-              : { placeId: c.placeSuggestion!.placeId, venue: { name: c.placeSuggestion!.name, address: c.placeSuggestion!.address, lat: c.placeSuggestion!.lat, lng: c.placeSuggestion!.lng, placeId: c.placeSuggestion!.placeId } }))}
-          >
-            {busy === "addSuggested" ? "Adding…" : "Add it"}
-          </Button>
-          <Link href={crewHref(auth, "book")} className="text-sm text-fm-muted underline underline-offset-4">Somewhere else</Link>
-        </div>
+        <>
+          <div className="flex flex-col gap-3 rounded-[18px] border border-fm-line px-4 py-4">
+            <p className="m-0 text-[15px] leading-snug text-fm-ink">
+              {c.placeSuggestion.why === "history" ? `Back to ${c.placeSuggestion.name}, like last time?` : `How about ${c.placeSuggestion.name}?`}
+              {c.placeSuggestion.address && <span className="mt-0.5 block text-xs text-fm-muted">{c.placeSuggestion.address}</span>}
+            </p>
+            <div>
+              <Button
+                small
+                disabled={busy !== null}
+                onClick={() => onAct("addSuggested", () => run("addToCrewBook", auth, c.placeSuggestion!.locationId
+                  ? { locationId: c.placeSuggestion!.locationId }
+                  : { placeId: c.placeSuggestion!.placeId, venue: { name: c.placeSuggestion!.name, address: c.placeSuggestion!.address, lat: c.placeSuggestion!.lat, lng: c.placeSuggestion!.lng, placeId: c.placeSuggestion!.placeId } }))}
+              >
+                {busy === "addSuggested" ? "Adding…" : `Add ${c.placeSuggestion.name}`}
+              </Button>
+            </div>
+          </div>
+          <Link href={crewHref(auth, "book")} className="w-fit text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink">Pick somewhere else</Link>
+        </>
       )}
 
       {c.state === "polling" && (
