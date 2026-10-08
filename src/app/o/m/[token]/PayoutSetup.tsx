@@ -41,7 +41,7 @@ export default function PayoutSetup({ token }: { token: string }) {
 
   if (!status) return null;
   return (
-    <div className="mt-6 rounded-2xl border border-zinc-200 bg-white p-5">
+    <div id="payouts" className="mt-6 scroll-mt-6 rounded-2xl border border-zinc-200 bg-white p-5">
       <p className="text-[15px] font-semibold text-leaf-900">Get paid for your night</p>
       {status.payoutsEnabled ? (
         <p className="mt-2 text-[15px] text-zinc-700">Payouts are set up. Ticket sales, less our 10%, go to your bank after the night.</p>

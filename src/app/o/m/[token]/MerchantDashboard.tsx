@@ -14,6 +14,7 @@ import MerchantDeals from "./MerchantDeals";
 import MerchantCampaign from "./MerchantCampaign";
 
 type Phase = "pending" | "confirmed" | "now" | "past" | "cancelled";
+type Step = { key: string; label: string; status: "done" | "current" | "todo"; you?: boolean; detail: string | null };
 type Night = {
   id: string;
   dateLabel: string;
@@ -22,6 +23,8 @@ type Night = {
   title: string;
   rsvps: number | null;
   capacity: number | null;
+  // What's left before it's live (upcoming nights; older servers don't send it).
+  steps?: Step[] | null;
   guests: number | null;
   host: { kind: "leaf" | "you"; name: string | null } | null;
   contact?: { name: string; phone: string; isDefault: boolean };
@@ -225,6 +228,48 @@ function NightContact({ token, n }: { token: string; n: Night }) {
   );
 }
 
+/** Booked → (payouts) → on the calendar → RSVPs → the night, with their turn called out. */
+function NightSteps({ steps }: { steps: Step[] }) {
+  return (
+    <ol className="mt-3 space-y-2.5">
+      {steps.map((st) => (
+        <li key={st.key} className="flex gap-3">
+          <span
+            aria-hidden
+            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+              st.status === "done"
+                ? "bg-leaf-600 text-white"
+                : st.status === "current"
+                  ? st.you
+                    ? "bg-amber-400 text-amber-950"
+                    : "border-2 border-leaf-600 bg-white"
+                  : "border-2 border-stone-200 bg-white"
+            }`}
+          >
+            {st.status === "done" ? "\u2713" : ""}
+          </span>
+          <div className="min-w-0">
+            <p
+              className={`text-[15px] leading-snug ${
+                st.status === "todo" ? "text-stone-400" : st.status === "current" ? "font-semibold text-stone-900" : "text-stone-700"
+              }`}
+            >
+              {st.label}
+              <span className="sr-only">{st.status === "done" ? " (done)" : st.status === "current" ? " (now)" : " (next)"}</span>
+            </p>
+            {st.detail && <p className="text-[13px] text-stone-600">{st.detail}</p>}
+            {st.you && st.key === "payouts" && (
+              <a href="#payouts" className="mt-1 inline-block text-[14px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+                Set up payouts
+              </a>
+            )}
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function UpcomingNight({ n, token }: { n: Night; token: string }) {
   const p = PHASE[n.phase as keyof typeof PHASE];
   const pct = n.rsvps != null && n.capacity ? Math.min(100, Math.round((n.rsvps / n.capacity) * 100)) : null;
@@ -253,8 +298,12 @@ function UpcomingNight({ n, token }: { n: Night; token: string }) {
           )}
         </div>
       )}
-      {n.phase === "pending" && (
-        <p className="mt-2 text-[14px] text-stone-600">We&rsquo;re lining up the night. You&rsquo;ll get a note when it&rsquo;s on the calendar.</p>
+      {n.steps?.length ? (
+        <NightSteps steps={n.steps} />
+      ) : (
+        n.phase === "pending" && (
+          <p className="mt-2 text-[14px] text-stone-600">We&rsquo;re lining up the night. You&rsquo;ll get a note when it&rsquo;s on the calendar.</p>
+        )
       )}
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px]">
         {n.host && (
