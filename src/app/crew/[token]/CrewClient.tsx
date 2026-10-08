@@ -382,7 +382,6 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 night={data.lastNight}
                 meId={me.userId || null}
                 auth={auth}
-                inApp={inApp}
                 split={split && split.cycleId === data.lastNight.cycleId ? split : null}
                 onSplit={setSplit}
                 nextRoundAt={crew.enabled !== false && !crew.oneTime ? crew.nextRoundAt || null : null}
@@ -1345,11 +1344,11 @@ function CycleCard({
  */
 /**
  * The night that just happened (a day and a half after it starts): where, who
- * went, How was it?, the bill, and the chat. The RSVP, booking and cancel
+ * went, How was it? and the bill. The RSVP, booking, cancel and chat
  * controls are gone; underneath, when the next round starts.
  */
-export function LastNightCard({ night, meId, auth, inApp, split, onSplit, nextRoundAt }: {
-  night: LastNight; meId: string | null; auth: CrewAuth; inApp: boolean; split: CrewSplit | null; onSplit: (s: CrewSplit | null) => void; nextRoundAt: string | null;
+export function LastNightCard({ night, meId, auth, split, onSplit, nextRoundAt }: {
+  night: LastNight; meId: string | null; auth: CrewAuth; split: CrewSplit | null; onSplit: (s: CrewSplit | null) => void; nextRoundAt: string | null;
 }) {
   const [rating, setRating] = useState<"up" | "down" | null>(night.myRating);
   const [saving, setSaving] = useState(false);
@@ -1411,14 +1410,6 @@ export function LastNightCard({ night, meId, auth, inApp, split, onSplit, nextRo
 
       {split && (split.receipt || split.went) && <CrewMoneyCard kind="after" split={split} auth={auth} onChange={onSplit} />}
 
-      {night.myInviteId && (
-        <a
-          href={`/c/${night.myInviteId}${inApp ? "?inapp=1" : ""}`}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-fm-line text-[15px] font-semibold text-fm-ink hover:bg-fm-card"
-        >
-          <MessageCircle size={17} aria-hidden /> Chat with the group
-        </a>
-      )}
 
       {nextRoundAt && (
         <p className="m-0 border-t border-fm-line-dim pt-4 text-sm text-fm-muted">
