@@ -100,7 +100,7 @@ export default function MerchantDeals({ token, preview }: { token: string; previ
   };
 
   return (
-    <section id="deals" className="scroll-mt-6 rounded-3xl bg-white p-5 shadow-sm">
+    <section id="deals" className="scroll-mt-6 rounded-3xl bg-white p-6 shadow-sm sm:p-7">
       <h2 className="font-fm-serif text-[26px] leading-tight text-stone-900">Your deals</h2>
       <p className="mt-1 text-[15px] leading-relaxed text-stone-600">
         {`Post a deal for the neighbors around you. It shows on your neighborhood's Leaf calendar. ${price} a month, charged once it's approved. One deal at a time; stop anytime.`}

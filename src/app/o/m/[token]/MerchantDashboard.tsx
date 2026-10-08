@@ -8,7 +8,7 @@
 
 import { type ReactNode, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
-import { Brand, BusinessPhoto, Shell, dollars, formatPhone } from "./ui";
+import { Brand, BusinessPhoto, CREAM, Shell, dollars, formatPhone } from "./ui";
 import MerchantHello from "./MerchantHello";
 import MerchantDeals from "./MerchantDeals";
 import MerchantCampaign from "./MerchantCampaign";
@@ -136,7 +136,7 @@ function Stat({ value, label }: { value: string | number; label: string }) {
 
 function Card({ children, id }: { children: ReactNode; id?: string }) {
   return (
-    <section id={id} className="scroll-mt-6 rounded-3xl bg-white p-5 shadow-sm">
+    <section id={id} className="scroll-mt-6 rounded-3xl bg-white p-6 shadow-sm sm:p-7">
       {children}
     </section>
   );
@@ -422,186 +422,200 @@ export default function MerchantDashboard({
 
   const perRsvp = d.model === "per_rsvp";
   const credit = perRsvp ? d.credit ?? null : null;
+  const billing = perRsvp && (
+    <Card>
+      <H2>How billing works</H2>
+      <p className="mt-2 text-[15px] leading-relaxed text-stone-600">
+        {dollars(d.rsvpFeeCents)} per RSVP, counted 2 hours before, never more than you seat. Under 5 RSVPs costs nothing.
+        {d.freeNight.state === "granted" ? " Your first night is free." : d.freeNight.state === "used" ? " Your free first night is used." : ""}
+        {" After that, each night is charged to your card after the night, never more than your weekly limit."}
+      </p>
+    </Card>
+  );
+
   return (
-    <Shell>
-      {preview && (
-        <p className="mt-3 rounded-xl bg-amber-100 px-3 py-2 text-[13px] font-medium text-amber-900">
-          {`Preview of ${d.merchantName}\u2019s dashboard, what they see when they open their link. Nothing here can be changed. `}
-          <button type="button" onClick={onEdit} className="underline underline-offset-2">
-            See their form
-          </button>
-        </p>
-      )}
-      <div inert={preview || undefined}>
-      <Brand neighborhood={d.neighborhood} />
-      <BusinessPhoto url={d.photoUrl} credit={d.photoCredit} name={d.merchantName} />
+    <div className={`min-h-dvh ${CREAM} font-fm-sans text-stone-900`}>
+      <main className="mx-auto max-w-xl px-4 pb-24 pt-5 sm:px-6 lg:max-w-6xl lg:px-10 lg:pt-8">
+        {preview && (
+          <p className="mb-3 rounded-xl bg-amber-100 px-3 py-2 text-[13px] font-medium text-amber-900">
+            {`Preview of ${d.merchantName}\u2019s dashboard, what they see when they open their link. Nothing here can be changed. `}
+            <button type="button" onClick={onEdit} className="underline underline-offset-2">
+              See their form
+            </button>
+          </p>
+        )}
+        <div inert={preview || undefined}>
+          <Brand neighborhood={d.neighborhood} />
 
-      <div className="mt-6 rounded-3xl bg-leaf-800 p-6 text-white">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Your Leaf nights</p>
-        <h1 className="mt-2 font-fm-serif text-[36px] leading-[1.02]">{d.merchantName}</h1>
-        <p className="mt-2 text-[15px] leading-relaxed text-leaf-100">
-          {d.calendarUrl ? (
-            <a href={d.calendarUrl} target="_blank" rel="noreferrer" className="underline decoration-leaf-400 underline-offset-4">
-              {d.calendarName}
-            </a>
-          ) : (
-            d.calendarName
-          )}
-        </p>
-        <div className={`mt-5 grid gap-3 ${perRsvp ? "grid-cols-4" : "grid-cols-3"}`}>
-          <Stat value={d.totals.upcoming} label="coming up" />
-          <Stat value={d.totals.nightsRun} label="nights run" />
-          <Stat value={d.totals.guests} label="guests" />
-          {perRsvp && <Stat value={dollars(d.totals.chargedCents)} label="charged" />}
-        </div>
-      </div>
-
-      {welcome && <div className="mt-4 rounded-2xl bg-leaf-100 p-4 text-[15px] font-semibold text-leaf-900">{welcome}</div>}
-
-      {d.cardFailed && (
-        <a href="#card" className="mt-4 block rounded-2xl bg-amber-50 p-4 text-[15px] text-amber-900 ring-1 ring-amber-200">
-          Your last charge didn&rsquo;t go through. <span className="font-semibold underline">Update your card</span>
-        </a>
-      )}
-
-      <div className="mt-4 space-y-4">
-        {perRsvp && <MerchantCampaign token={token} preview={preview} />}
-
-        <Card>
-          <H2>Coming up</H2>
-          <div className="mt-3">
-            {d.upcoming.length ? (
-              d.upcoming.map((n) => <UpcomingNight key={n.id} n={n} token={token} />)
-            ) : (
-              <p className="text-[15px] text-stone-600">Nothing on the books right now. Pick more nights and we&rsquo;ll fill them.</p>
+          {/* Phone: the summary, then their photo. Desktop: side by side. */}
+          <header className={`mt-5 grid gap-5 lg:mt-8 lg:gap-8 ${d.photoUrl ? "lg:grid-cols-[minmax(0,1fr)_380px]" : ""}`}>
+            <div className="rounded-3xl bg-leaf-800 p-6 text-white sm:p-8">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Your Leaf nights</p>
+              <h1 className="mt-2 font-fm-serif text-[36px] leading-[1.02] lg:text-[48px]">{d.merchantName}</h1>
+              <p className="mt-2 text-[15px] leading-relaxed text-leaf-100">
+                {d.calendarUrl ? (
+                  <a href={d.calendarUrl} target="_blank" rel="noreferrer" className="underline decoration-leaf-400 underline-offset-4">
+                    {d.calendarName}
+                  </a>
+                ) : (
+                  d.calendarName
+                )}
+              </p>
+              <div className={`mt-6 grid gap-x-4 gap-y-5 ${perRsvp ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
+                <Stat value={d.totals.upcoming} label="coming up" />
+                <Stat value={d.totals.nightsRun} label="nights run" />
+                <Stat value={d.totals.guests} label="guests" />
+                {perRsvp && <Stat value={dollars(d.totals.chargedCents)} label="charged" />}
+              </div>
+            </div>
+            {d.photoUrl && (
+              <div className="[&_figure]:mt-0 lg:[&_img]:h-full lg:[&_img]:min-h-[220px]">
+                <BusinessPhoto url={d.photoUrl} credit={d.photoCredit} name={d.merchantName} />
+              </div>
             )}
-          </div>
-          <button
-            type="button"
-            onClick={onEdit}
-            className="mt-4 h-12 w-full rounded-xl border border-stone-300 text-[15px] font-semibold text-stone-800"
-          >
-            Change your nights or details
-          </button>
-          {/* Their hello plays on these nights, so it lives with them. */}
-          <MerchantHello token={token} inline />
-        </Card>
+          </header>
 
+          {(welcome || d.cardFailed) && (
+            <div className="mt-5 space-y-3">
+              {welcome && <div className="rounded-2xl bg-leaf-100 p-4 text-[15px] font-semibold text-leaf-900">{welcome}</div>}
+              {d.cardFailed && (
+                <a href="#card" className="block rounded-2xl bg-amber-50 p-4 text-[15px] text-amber-900 ring-1 ring-amber-200">
+                  Your last charge didn&rsquo;t go through. <span className="font-semibold underline">Update your card</span>
+                </a>
+              )}
+            </div>
+          )}
 
-        {d.requests && d.requests.length > 0 && (
-          <Card>
-            <H2>Waiting on us</H2>
-            <div className="mt-2 space-y-2">
-              {d.requests.map((q) => (
-                <div key={q.id} className="flex items-start justify-between gap-3">
-                  <p className="text-[15px] text-stone-700">
-                    <span className="font-semibold text-stone-900">{q.kind === "first" ? `Your first ${q.label.replace(/s( \u00b7.*)?$/, "")}` : q.label}</span>
-                    <span className="block text-[13px] text-stone-500">
-                      {q.source === "campaign"
-                        ? "Lined up from your days. We'll confirm the time with you. Nothing is booked until then."
-                        : "We\u2019ll confirm the date and time with you within a day. Nothing is booked until then."}
-                    </span>
-                  </p>
-                  {q.kind === "rebook" && !preview && (
-                    <button type="button" onClick={() => skipRequest(q.id)} className="shrink-0 text-[14px] font-semibold text-stone-600 underline underline-offset-2">
-                      Skip
-                    </button>
+          <div className="mt-6 grid gap-6 lg:mt-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-8">
+            {/* Main column: their nights. */}
+            <div className="min-w-0 space-y-6">
+              {perRsvp && <MerchantCampaign token={token} preview={preview} />}
+
+              <Card>
+                <H2>Coming up</H2>
+                <div className="mt-4">
+                  {d.upcoming.length ? (
+                    d.upcoming.map((n) => <UpcomingNight key={n.id} n={n} token={token} />)
+                  ) : (
+                    <p className="text-[15px] text-stone-600">Nothing on the books right now. Switch your nights on, or add a one-off night.</p>
                   )}
                 </div>
-              ))}
-            </div>
-          </Card>
-        )}
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="mt-5 h-12 w-full rounded-xl border border-stone-300 text-[15px] font-semibold text-stone-800"
+                >
+                  Change your details
+                </button>
+                {/* Their hello plays on these nights, so it lives with them. */}
+                <MerchantHello token={token} inline />
+              </Card>
 
-        <Card id="book">
-          <H2>Add a one-off night</H2>
-          <p className="mt-1 text-[15px] text-stone-600">Pick a date and the part of the day. We&rsquo;ll set the time and confirm.</p>
-          {bookNote && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{bookNote}</p>}
-          <input
-            type="date"
-            value={reqDate}
-            min={earliest}
-            onChange={(e) => setReqDate(e.target.value)}
-            className="mt-3 h-12 w-full rounded-xl border border-stone-300 bg-white px-3 text-[15px] focus:border-leaf-600 focus:outline-none"
-          />
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            {(["morning", "afternoon", "evening"] as const).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setReqPart(reqPart === p ? null : p)}
-                aria-pressed={reqPart === p}
-                className={`h-11 rounded-xl border text-[14px] font-semibold capitalize ${reqPart === p ? "border-leaf-800 bg-leaf-800 text-white" : "border-stone-300 bg-white text-stone-800"}`}
-              >
-                {p}
-              </button>
-            ))}
+              {d.requests && d.requests.length > 0 && (
+                <Card>
+                  <H2>Waiting on us</H2>
+                  <div className="mt-4 space-y-4">
+                    {d.requests.map((q) => (
+                      <div key={q.id} className="flex items-start justify-between gap-4">
+                        <p className="text-[15px] text-stone-700">
+                          <span className="font-semibold text-stone-900">{q.kind === "first" ? `Your first ${q.label.replace(/s( \u00b7.*)?$/, "")}` : q.label}</span>
+                          <span className="mt-0.5 block text-[13px] leading-snug text-stone-500">
+                            {q.source === "campaign"
+                              ? "Lined up from your days. We'll confirm the time with you. Nothing is booked until then."
+                              : "We\u2019ll confirm the date and time with you within a day. Nothing is booked until then."}
+                          </span>
+                        </p>
+                        {q.kind === "rebook" && !preview && (
+                          <button type="button" onClick={() => skipRequest(q.id)} className="shrink-0 rounded-lg border border-stone-300 px-3 py-1.5 text-[14px] font-semibold text-stone-700">
+                            Skip
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              <Card id="book">
+                <H2>Add a one-off night</H2>
+                <p className="mt-1 text-[15px] text-stone-600">Outside your usual days. Pick a date and the part of the day; we&rsquo;ll set the time and confirm.</p>
+                {bookNote && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{bookNote}</p>}
+                <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+                  <input
+                    type="date"
+                    value={reqDate}
+                    min={earliest}
+                    onChange={(e) => setReqDate(e.target.value)}
+                    className="h-12 w-full rounded-xl border border-stone-300 bg-white px-3 text-[16px] focus:border-leaf-600 focus:outline-none"
+                  />
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["morning", "afternoon", "evening"] as const).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setReqPart(reqPart === p ? null : p)}
+                        aria-pressed={reqPart === p}
+                        className={`h-12 rounded-xl border text-[14px] font-semibold capitalize ${reqPart === p ? "border-leaf-800 bg-leaf-800 text-white" : "border-stone-300 bg-white text-stone-800"}`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {bookError && <p className="mt-2 text-[14px] text-red-600">{bookError}</p>}
+                <button
+                  type="button"
+                  disabled={booking || !reqDate || !reqPart}
+                  onClick={requestNight}
+                  className="mt-4 h-12 w-full rounded-xl bg-leaf-800 text-[15px] font-semibold text-white disabled:opacity-40"
+                >
+                  {booking ? "Sending\u2026" : "Request this night"}
+                </button>
+              </Card>
+
+              {d.past.length > 0 && (
+                <Card>
+                  <H2>Past nights</H2>
+                  <div className="mt-4">
+                    {d.past.map((n) => (
+                      <PastNight key={n.id} n={n} />
+                    ))}
+                  </div>
+                </Card>
+              )}
+            </div>
+
+            {/* Side column on desktop, the rest of the page on a phone: deals and the account. */}
+            <aside className="min-w-0 space-y-6">
+              <MerchantDeals token={token} preview={preview} />
+              {billing}
+              {/* Prepaid balances are gone (2026-10-08); show one only while some is left. */}
+              {credit && credit.balanceCents > 0 && <LeafBalance credit={credit} />}
+              {account}
+              {d.placardUrl && (
+                <Card>
+                  <H2>Your counter card</H2>
+                  <p className="mt-2 text-[15px] leading-relaxed text-stone-600">A card with a QR code for your counter, so neighbors who stop by can find your nights and the calendar.</p>
+                  <a
+                    href={d.placardUrl}
+                    className="mt-3 inline-block text-[15px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4"
+                  >
+                    Print or order cards
+                  </a>
+                </Card>
+              )}
+              {d.cancelled.length > 0 && <p className="px-1 text-[13px] text-stone-500">Called off: {d.cancelled.map((n) => n.dateLabel).join(", ")}</p>}
+              <p className="px-1 pb-6 text-[13px] text-stone-500">
+                Questions? Reply to any email from Leaf, or write{" "}
+                <a href="mailto:shawn@getleaflets.co" className="underline">
+                  shawn@getleaflets.co
+                </a>
+                .
+              </p>
+            </aside>
           </div>
-          {bookError && <p className="mt-2 text-[14px] text-red-600">{bookError}</p>}
-          <button
-            type="button"
-            disabled={booking || !reqDate || !reqPart}
-            onClick={requestNight}
-            className="mt-3 h-12 w-full rounded-xl bg-leaf-800 text-[15px] font-semibold text-white disabled:opacity-40"
-          >
-            {booking ? "Sending…" : "Request this night"}
-          </button>
-        </Card>
-
-        <MerchantDeals token={token} preview={preview} />
-
-        {d.past.length > 0 && (
-          <Card>
-            <H2>Past nights</H2>
-            <div className="mt-3">
-              {d.past.map((n) => (
-                <PastNight key={n.id} n={n} />
-              ))}
-            </div>
-          </Card>
-        )}
-
-        {perRsvp && (
-          <Card>
-            <H2>How billing works</H2>
-            <p className="mt-2 text-[15px] leading-relaxed text-stone-600">
-              {dollars(d.rsvpFeeCents)} per RSVP, counted 2 hours before, never more than you seat. Under 5 RSVPs costs nothing.
-              {d.freeNight.state === "granted" ? " Your first night is free." : d.freeNight.state === "used" ? " Your free first night is used." : ""}
-              {" After that, each night is charged to your card after the night, never more than your weekly limit."}
-            </p>
-          </Card>
-        )}
-
-        {/* Prepaid balances are gone (2026-10-08); show one only while some is left. */}
-        {credit && credit.balanceCents > 0 && <LeafBalance credit={credit} />}
-
-
-
-        {account}
-
-        {d.placardUrl && (
-          <Card>
-            <H2>Your counter card</H2>
-            <p className="mt-2 text-[15px] leading-relaxed text-stone-600">A card with a QR code for your counter, so neighbors who stop by can find your nights and the calendar.</p>
-            <a
-              href={d.placardUrl}
-              className="mt-3 inline-block text-[15px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4"
-            >
-              Print or order cards
-            </a>
-          </Card>
-        )}
-
-        {d.cancelled.length > 0 && <p className="px-1 text-[13px] text-stone-500">Called off: {d.cancelled.map((n) => n.dateLabel).join(", ")}</p>}
-        <p className="px-1 pb-6 text-[13px] text-stone-500">
-          Questions, or want to stop? Reply to any email from Leaf, or write{" "}
-          <a href="mailto:shawn@getleaflets.co" className="underline">
-            shawn@getleaflets.co
-          </a>
-          .
-        </p>
-      </div>
-      </div>
-    </Shell>
+        </div>
+      </main>
+    </div>
   );
 }
