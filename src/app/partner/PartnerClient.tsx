@@ -7,6 +7,9 @@
  * leave a name and email, and — when their neighborhood has a Leaf calendar
  * with an open week — land on the same page an offer email links to
  * (/o/m/[token]) to pick nights and hold their first free night.
+ *
+ * A rep's walk-in email links here as /partner?lead=<token>: the business and
+ * contact come prefilled from the rep's lead, and the sign-up credits the rep.
  */
 
 import { useEffect, useState } from "react";
@@ -17,6 +20,15 @@ import { type RememberedPartner, forgetPartner, rememberedPartner } from "@/app/
 
 type Place = { placeId: string; name: string; address: string; type: string };
 type Outcome = { outcome: "offer" | "known" | "no_calendar" | "no_week" | "thanks"; name?: string; token?: string };
+type RepLead = {
+  valid: boolean;
+  businessName?: string | null;
+  formattedAddress?: string | null;
+  googlePlaceId?: string | null;
+  phone?: string | null;
+  contactName?: string | null;
+  contactEmail?: string | null;
+};
 
 export default function PartnerClient() {
   const router = useRouter();
@@ -35,6 +47,30 @@ export default function PartnerClient() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<Outcome | null>(null);
+  const [leadToken, setLeadToken] = useState<string | null>(null);
+
+  // From a rep's email: fill in what the rep already took down.
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("lead");
+    if (!token) return;
+    setLeadToken(token);
+    Parse.Cloud.run("validateBusinessLeadClaimToken", { token })
+      .then((r: RepLead) => {
+        if (!r?.valid) return;
+        if (r.contactName) setContactName(r.contactName);
+        if (r.contactEmail) setEmail(r.contactEmail);
+        if (r.phone) setPhone(formatPhone(r.phone));
+        if (r.businessName) setQuery(r.businessName);
+        if (r.googlePlaceId && r.businessName) {
+          const place = { placeId: r.googlePlaceId, name: r.businessName, address: r.formattedAddress || "", type: "" };
+          setResults([place]);
+          setPicked(place);
+        }
+      })
+      .catch(() => {
+        /* the form still works without the prefill */
+      });
+  }, []);
 
   const find = async () => {
     setError(null);
@@ -61,6 +97,7 @@ export default function PartnerClient() {
         email,
         phone,
         website: trap,
+        leadToken,
       })) as Outcome;
       if (r.outcome === "offer" && r.token) {
         router.push(`/o/m/${r.token}`);
@@ -126,8 +163,8 @@ export default function PartnerClient() {
           Fill a slow night with <em className="text-leaf-700">your neighbors</em>.
         </h1>
         <p className="mt-4 text-[16px] leading-relaxed text-stone-600">
-          Leaf runs a calendar for each neighborhood. We bring 8 to 15 neighbors to you on a quiet evening. Bars and restaurants pay $6 per RSVP
-          after the night, and your first night is free.
+          Leaf runs a calendar for each neighborhood. We bring 8 to 15 neighbors to you on a quiet evening. Your first night is free: no
+          listing fee and no RSVP fees. Add a card to claim it. After that it&rsquo;s $6 per RSVP, charged after the night.
         </p>
       </header>
 
@@ -223,6 +260,11 @@ export default function PartnerClient() {
             {busy && picked ? "One moment…" : picked ? `Continue with ${picked.name}` : "Find your business to start"}
           </button>
           <p className="mt-2 text-center text-[12px] text-stone-500">Next you&rsquo;ll pick your nights. Nothing is charged today.</p>
+          <p className="mt-1 text-center text-[13px] text-stone-500">
+            <a href="/neighbor-nights" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+              How Leaf nights work
+            </a>
+          </p>
           <p className="mt-3 text-center text-[13px] text-stone-500">
             Already with Leaf?{" "}
             <a href="/partner/login" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
