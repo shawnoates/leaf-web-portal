@@ -400,7 +400,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <div className={`grid grid-cols-1 gap-3 lg:gap-4 ${open.length > 1 ? "lg:grid-cols-2" : ""}`}>
                 {open.map((c) => (
                   <div key={c.cycleId} className="flex min-w-0 flex-col gap-3">
-                    <CycleCard cycle={c} names={names} members={members} busy={busy} onAct={act} auth={auth} quorum={crew.quorum} joined={joined.length} calendarSynced={Boolean(me.calendarSynced)} onConnectCalendar={connectCalendar} hostRotation={Boolean(crew.hostRotation)} isOwner={me.isOwner} canSkip={me.isOwner && !crew.oneTime && crew.enabled !== false} crewId={crew.id} />
+                    <CycleCard key={`${c.cycleId}:${c.options.length}`} cycle={c} names={names} members={members} busy={busy} onAct={act} auth={auth} quorum={crew.quorum} joined={joined.length} calendarSynced={Boolean(me.calendarSynced)} onConnectCalendar={connectCalendar} hostRotation={Boolean(crew.hostRotation)} isOwner={me.isOwner} canSkip={me.isOwner && !crew.oneTime && crew.enabled !== false} crewId={crew.id} />
                     {costs[c.cycleId] && (
                       <CrewMoneyCard kind="cost" split={costs[c.cycleId]!} auth={auth} onChange={(next) => setCosts((m) => ({ ...m, [c.cycleId]: next }))} />
                     )}
@@ -1205,6 +1205,7 @@ function CycleCard({
               {c.myVotes !== null && c.myVotes.length === 0 ? "You said none of these work" : "None of these work for me"}
             </button>
           )}
+          {c.options.length < 5 && <SuggestDate cycle={c} auth={auth} busy={busy} onAct={onAct} />}
         </>
       )}
 
@@ -1330,6 +1331,71 @@ function CycleCard({
  * another one in the book. Dates and votes stay; Leaf tells the crew. When
  * someone added a place before anyone voted, it's offered first.
  */
+/**
+ * Suggest another date: anyone in the crew adds one to the poll (up to 5).
+ * One-tap dates from their own calendar when it's connected, or any day and
+ * time. It goes on the end, so everyone's votes stay.
+ */
+function SuggestDate({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: CrewAuth; busy: string | null; onAct: (key: string, fn: () => Promise<unknown>) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [free, setFree] = useState<{ date: string; time: string }[] | null>(null);
+  const usualTime = c.options.find((o) => o.time)?.time || "19:00";
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState(usualTime);
+  const tomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toLocaleDateString("en-CA"); })();
+  const add = (d: string, t: string) => onAct("addDate", () => run("addCrewPollDate", auth, { cycleId: c.cycleId, date: d, time: t }));
+  const show = async () => {
+    setOpen(true);
+    if (free === null) {
+      const r = await run<{ synced: boolean; dates: { date: string; time: string }[] }>("getCrewFreeDates", auth, { cycleId: c.cycleId }).catch(() => ({ synced: false, dates: [] }));
+      setFree(r.dates || []);
+    }
+  };
+  const label = (d: string) => { const p = dayParts(d); return `${p.dow} ${p.month} ${p.day}`; };
+  if (!open) {
+    return (
+      <button type="button" onClick={() => void show()} className="flex min-h-11 w-fit items-center gap-1.5 text-sm text-fm-ink-2 underline underline-offset-4 hover:text-fm-ink">
+        <Plus size={15} aria-hidden /> Suggest another date
+      </button>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2.5 rounded-[18px] border border-fm-line p-3.5">
+      <span className="text-sm font-semibold text-fm-ink">Suggest another date</span>
+      {free && free.length > 0 && (
+        <>
+          <Mono className="text-fm-muted">You look free</Mono>
+          <div className="flex flex-wrap gap-2">
+            {free.map((f) => (
+              <button
+                key={f.date}
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void add(f.date, f.time)}
+                className="inline-flex min-h-10 items-center rounded-full border border-fm-line px-3.5 text-sm text-fm-ink hover:border-fm-ink-2 disabled:opacity-60"
+              >
+                {label(f.date)}{f.time ? ` · ${timeLabel(f.time)}` : ""}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <form
+        className="flex flex-wrap items-center gap-2"
+        onSubmit={(e) => { e.preventDefault(); if (date) void add(date, time); }}
+      >
+        <input type="date" min={tomorrow} value={date} onChange={(e) => setDate(e.target.value)} aria-label="Date"
+          className="h-11 rounded-xl border border-fm-line bg-fm-canvas px-3 text-[16px] text-fm-ink [color-scheme:dark] focus:border-fm-accent focus:outline-none" />
+        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Time"
+          className="h-11 rounded-xl border border-fm-line bg-fm-canvas px-3 text-[16px] text-fm-ink [color-scheme:dark] focus:border-fm-accent focus:outline-none" />
+        <Button small type="submit" disabled={busy !== null || !date}>{busy === "addDate" ? "Adding…" : "Add it"}</Button>
+      </form>
+      <p className="m-0 text-xs text-fm-muted">It joins the poll for everyone, counted as yours. Votes on the other dates stay.</p>
+      <button type="button" onClick={() => setOpen(false)} className="min-h-11 w-fit text-sm text-fm-muted underline underline-offset-4">Never mind</button>
+    </div>
+  );
+}
+
 function ChangePlace({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: CrewAuth; busy: string | null; onAct: (key: string, fn: () => Promise<unknown>) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [book, setBook] = useState<BookSpot[] | null>(null);
