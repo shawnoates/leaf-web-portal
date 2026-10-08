@@ -593,7 +593,8 @@ export default function MerchantDashboard({
               {/* Prepaid balances are gone (2026-10-08); show one only while some is left. */}
               {credit && credit.balanceCents > 0 && <LeafBalance credit={credit} />}
               {account}
-              {d.placardUrl && (
+              {/* Counter cards are for walk-in places (bars, restaurants); not ticketed studios. */}
+              {perRsvp && d.placardUrl && (
                 <Card>
                   <H2>Your counter card</H2>
                   <p className="mt-2 text-[15px] leading-relaxed text-stone-600">A card with a QR code for your counter, so neighbors who stop by can find your Neighbor Hours and the calendar.</p>
