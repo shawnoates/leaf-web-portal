@@ -42,10 +42,11 @@ export default function MarketingFooter({ blurb, dark = false }: { blurb: string
           ]}
         />
         <FooterColumn
-          title="Local businesses" ink={ink}
+          title="For businesses" ink={ink}
           links={[
-            { href: "/partner", label: "Host neighbors" },
-            { href: "/partner/login", label: "Business sign in" },
+            { href: "/partners", label: "Leaf for businesses" },
+            { href: "/partners/join", label: "Claim your free night" },
+            { href: "/partners/login", label: "Partner sign in" },
           ]}
         />
         <FooterColumn

@@ -1,12 +1,5 @@
 import type { ReactNode } from "react";
-import {
-  CLAIM_URL,
-  DEAL_URL,
-  DEMO_URL,
-  MANAGER_URL,
-  PARTNER_URL,
-  SAMPLE_URL,
-} from "./config";
+import { JOIN_URL, LOGIN_URL, MANAGER_URL } from "./config";
 
 export function LeafMark({
   size = 18,
@@ -36,36 +29,21 @@ export function Plaque({ children }: { children: ReactNode }) {
   return <span className="plaque">Source: {children}</span>;
 }
 
-export type CTATarget =
-  | "partner"
-  | "sample"
-  | "deal"
-  | "claim"
-  | "demo"
-  | "manager";
+export type CTATarget = "join" | "login" | "manager";
 export type CTAVariant = "primary" | "ghost";
 
-// Track names are distinct even when several targets alias the same
-// URL, so we can see funnel volume per CTA in dataLayer / GA.
-//   partner / claim / deal → partner.joinleaf.com/request (claim form)
-//   demo                    → the "Book a demo" calendar
-//   manager                 → the "Talk to a partner manager" catch-all
-//                             calendar (separate slot so partner managers
-//                             can see intent)
-//   sample                  → /partners/preview (merchant tour), currently
-//                             not wired into any CTA but kept in case we
-//                             re-add a "See where you show up" link later
+// Track names feed dataLayer / GA so we can see funnel volume per CTA.
+//   join    → /partners/join (claim the free night)
+//   login   → /partners/login (partner sign in)
+//   manager → the "Talk to a partner manager" calendar
 const MAP: Record<CTATarget, { href: string; track: string }> = {
-  partner: { href: PARTNER_URL, track: "become_partner" },
-  sample: { href: SAMPLE_URL, track: "view_sample" },
-  deal: { href: DEAL_URL, track: "post_deal" },
-  claim: { href: CLAIM_URL, track: "claim_business" },
-  demo: { href: DEMO_URL, track: "book_demo" },
+  join: { href: JOIN_URL, track: "claim_free_night" },
+  login: { href: LOGIN_URL, track: "partner_sign_in" },
   manager: { href: MANAGER_URL, track: "talk_to_manager" },
 };
 
 export function CTA({
-  to = "partner",
+  to = "join",
   variant = "primary",
   arrow = false,
   children,
@@ -82,9 +60,7 @@ export function CTA({
       className={`btn btn-${variant}`}
       href={href}
       data-cta={track}
-      {...(isExternal
-        ? { target: "_blank", rel: "noopener noreferrer" }
-        : { target: "_blank", rel: "noopener noreferrer" })}
+      {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
     >
       {children}
       {arrow && (
@@ -99,9 +75,9 @@ export function CTA({
 export function TrustStrip() {
   return (
     <div className="trust">
-      <span>Hyperlocal reach</span>
-      <span>You set the offer</span>
-      <span>We bring the people</span>
+      <span>First night free</span>
+      <span>$6 per RSVP after</span>
+      <span>No contract</span>
     </div>
   );
 }

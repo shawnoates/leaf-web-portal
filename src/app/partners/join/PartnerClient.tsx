@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * The public partner sign-up — /partner
+ * The public partner sign-up — /partners/join
  *
  * A link Shawn can hand to any business. They find themselves on Google,
  * leave a name and email, and — when their neighborhood has a Leaf calendar
  * with an open week — land on the same page an offer email links to
  * (/o/m/[token]) to pick nights and hold their first free night.
  *
- * A rep's walk-in email links here as /partner?lead=<token>: the business and
+ * A rep's walk-in email links here as /partners/join?lead=<token>: the business and
  * contact come prefilled from the rep's lead, and the sign-up credits the rep.
  */
 
@@ -261,13 +261,13 @@ export default function PartnerClient() {
           </button>
           <p className="mt-2 text-center text-[12px] text-stone-500">Next you&rsquo;ll pick your nights. Nothing is charged today.</p>
           <p className="mt-1 text-center text-[13px] text-stone-500">
-            <a href="/neighbor-nights" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+            <a href="/partners" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
               How Leaf nights work
             </a>
           </p>
           <p className="mt-3 text-center text-[13px] text-stone-500">
-            Already with Leaf?{" "}
-            <a href="/partner/login" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+            Already a partner?{" "}
+            <a href="/partners/login" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
               Sign in
             </a>
           </p>

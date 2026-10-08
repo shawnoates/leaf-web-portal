@@ -95,30 +95,22 @@ export default function Hero() {
         <Reveal>
           <Eyebrow>For local businesses</Eyebrow>
           <h1 className="h-xl">
-            Your next regulars live{" "}
-            <span className="underline-amber">around the corner.</span>
+            Neighbors on your{" "}
+            <span className="underline-amber">slowest nights.</span>
           </h1>
           <p className="lead" style={{ marginTop: 22 }}>
-            Leaf OS puts your business in front of the residents who live minutes from your
-            door &mdash; inside the community calendar they actually trust. Post a deal or
-            host an event.
+            Tell us your slowest days and hours. We&rsquo;ll send the residents who live
+            around the corner, from your neighborhood&rsquo;s Leaf calendar. Your first night
+            is free: no listing fee, no RSVP fees.
           </p>
           <div className="cta-row" style={{ marginTop: 28 }}>
-            <CTA to="partner" variant="primary" arrow>
-              Become a partner
+            <CTA to="join" variant="primary" arrow>
+              Claim your free night
             </CTA>
-            <CTA to="claim" variant="ghost">
-              Claim your business for free
+            <CTA to="login" variant="ghost">
+              Partner sign in
             </CTA>
           </div>
-          <a
-            className="cta-hint"
-            href="/partners/preview"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            See where you show up →
-          </a>
           <TrustStrip />
         </Reveal>
 

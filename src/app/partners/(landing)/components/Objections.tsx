@@ -5,26 +5,30 @@ import { CTA } from "./ui";
 
 const items = [
   {
-    q: "Does this actually work?",
-    a: "Start with one deal or one event and measure it — you'll see the new faces yourself. It's low cost and low risk, and you can roll it out wider once it proves out.",
+    q: "What's the catch?",
+    a: "There isn't one. Your first night is free: no listing fee, no RSVP fees. The card just claims it. If you like how it goes, book more nights at $6 per RSVP.",
   },
   {
-    q: "I already do Instagram and Google.",
-    a: "Those reach strangers anywhere. Leaf OS reaches the people who live a 5-minute walk away — the ones who can become weekly regulars. Different audience, far higher lifetime value.",
+    q: "Who are these people?",
+    a: "Residents of the buildings around you who use their neighborhood's Leaf calendar to plan their week. They live a short walk away, so they can become regulars.",
   },
   {
-    q: "I'm too busy to host an event.",
-    a: "Then post a deal for free — it's always on and takes zero effort. You give us the offer, we place it in nearby buildings, and you handle the counter.",
+    q: "Do I have to run anything?",
+    a: "No. Give the group a few tables or a corner of the room, and they order off your menu like anyone else. If you'd rather someone run the night, add a Leaf host for $99.",
   },
   {
-    q: "Is it expensive?",
-    a: "Start small. A handful of new regulars pays for it many times over — and repeat customers spend 67% more than one-time visitors.",
+    q: "What if nobody shows up?",
+    a: "Under 5 RSVPs, there's no charge and we set up another night for you. You only ever pay for neighbors who said they're coming.",
   },
   {
-    q: "Will residents actually come?",
-    a: "They're already on the calendar planning their week, and they want to support local. We bring the promotion and the turnout — that's our job, not yours.",
+    q: "How is this different from an ad?",
+    a: "An ad reaches strangers anywhere and charges for clicks. Leaf reaches the people who live a 5-minute walk away, and you pay per person who RSVPs.",
   },
-];
+  {
+    q: "I'm already a partner. How do I sign in?",
+    a: "Use Partner sign in and enter your email. We'll send you a link to your dashboard, no password needed.",
+  },
+]
 
 export default function Objections() {
   const [open, setOpen] = useState<number>(0);
@@ -55,8 +59,8 @@ export default function Objections() {
           })}
         </div>
         <div className="inline-cta">
-          <CTA to="partner" variant="primary" arrow>
-            Become a partner
+          <CTA to="join" variant="primary" arrow>
+            Claim your free night
           </CTA>
         </div>
       </div>

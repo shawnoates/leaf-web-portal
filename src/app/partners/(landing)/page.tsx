@@ -6,7 +6,6 @@ import Offer from "./components/Offer";
 import HowItWorks from "./components/HowItWorks";
 import Proof from "./components/Proof";
 import Objections from "./components/Objections";
-import TwoWays from "./components/TwoWays";
 import { FinalCta, Footer } from "./components/FinalCta";
 
 export default function PartnersPage() {
@@ -21,7 +20,6 @@ export default function PartnersPage() {
         <HowItWorks />
         <Proof />
         <Objections />
-        <TwoWays />
         <FinalCta />
       </main>
       <Footer />

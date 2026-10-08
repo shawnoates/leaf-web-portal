@@ -7,21 +7,21 @@ export function FinalCta() {
       <div className="container" style={{ textAlign: "center", maxWidth: 760 }}>
         <Reveal>
           <h2 className="h-xl" style={{ fontSize: "clamp(2.2rem, 5vw, 3.4rem)" }}>
-            Become the spot your neighbors love.
+            Fill your slowest night with neighbors.
           </h2>
           <p className="lead" style={{ margin: "20px auto 0" }}>
-            Reach the residents minutes from your door, turn them into regulars, and let us
-            bring the people. Start with a single deal or one event.
+            Your first night is free: no listing fee, no RSVP fees. Claim it in two minutes,
+            and nothing is charged today.
           </p>
           <div
             className="cta-row"
             style={{ marginTop: 30, marginInline: "auto" }}
           >
-            <CTA to="partner" variant="primary" arrow>
-              Become a partner
+            <CTA to="join" variant="primary" arrow>
+              Claim your free night
             </CTA>
-            <CTA to="claim" variant="ghost">
-              Claim your business for free
+            <CTA to="login" variant="ghost">
+              Partner sign in
             </CTA>
           </div>
           <div style={{ display: "flex", justifyContent: "center" }}>
@@ -44,8 +44,9 @@ export function Footer() {
         </a>
         <nav className="footer__links">
           <a href="#nearby">The opportunity</a>
-          <a href="#offer">What we offer</a>
+          <a href="#offer">What it costs</a>
           <a href="#how">How it works</a>
+          <a href="/partners/login">Partner sign in</a>
         </nav>
         <p className="footer__copy">
           Leaf OS connects local businesses with the neighbors next door. &copy;{" "}

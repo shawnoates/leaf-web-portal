@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import LoginClient from "./LoginClient";
 
 export const metadata: Metadata = {
-  title: "Sign in | Leaf for local places",
+  title: "Partner sign in | Leaf for businesses",
   description: "Get the link to your Leaf nights: your dashboard, RSVPs and bookings.",
 };
 
