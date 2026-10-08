@@ -537,8 +537,11 @@ export default function MerchantDashboard({
               )}
 
               <Card id="book">
-                <H2>Add a one-off Neighbor Hour</H2>
-                <p className="mt-1 text-[15px] text-stone-600">Outside your usual days. Pick a date and the part of the day; we&rsquo;ll set the time and confirm.</p>
+                {/* Ticketed places have no usual days (no campaign), so every night is a request. */}
+                <H2>{perRsvp ? "Add a one-off Neighbor Hour" : "Request a Neighbor Hour"}</H2>
+                <p className="mt-1 text-[15px] text-stone-600">
+                  {perRsvp ? "Outside your usual days. " : ""}Pick a date and the part of the day; we&rsquo;ll set the time and confirm.
+                </p>
                 {bookNote && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{bookNote}</p>}
                 <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
                   <input
