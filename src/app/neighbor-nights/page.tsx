@@ -32,7 +32,10 @@ const STEPS = [
     "We put the night on your neighborhood's Leaf calendar.",
     "Local residents who follow the calendar see it and RSVP. A typical night is 8 to 15 neighbors.",
   ],
-  ["Neighbors come in and order their own.", "Entry is free for them. You just need room for the group."],
+  [
+    "Neighbors come in and order their own.",
+    "Entry is free for them. You just need room for the group. Your team runs it, or add a Leaf host.",
+  ],
   ["We count RSVPs 2 hours before.", "Never more than you can seat. You're charged after the night."],
 ];
 
@@ -40,6 +43,7 @@ const PRICES = [
   ["First night", "Free. No listing fee, no RSVP fees. Add a card to claim it."],
   ["After that", "$6 for each person who RSVPs, charged after the night."],
   ["A quiet night", "Under 5 RSVPs costs nothing, and we set up another night for you."],
+  ["Optional Leaf host", "$99 for any night you'd like us to run instead of your team, the first night included."],
   ["Leaf balance", "From your second night, nights come out of a prepaid balance. We add $60 when it drops under $18. You can switch that off."],
   ["Contract", "None. Stop anytime."],
 ];
@@ -47,7 +51,7 @@ const PRICES = [
 const FAQ = [
   [
     "What's the catch?",
-    "There isn't one. The card holds your free night, and nothing is charged for it. If you like how it goes, keep booking nights at $6 per RSVP.",
+    "There isn't one. The card holds your free night: no listing fee, no RSVP fees. If you like how it goes, keep booking nights at $6 per RSVP.",
   ],
   [
     "Who are these people?",
@@ -55,7 +59,7 @@ const FAQ = [
   ],
   [
     "Do I have to run anything?",
-    "No. Give the group a few tables or a corner of the room. They order off your menu like anyone else.",
+    "No. Give the group a few tables or a corner of the room. They order off your menu like anyone else. If you'd rather someone run the night, add a Leaf host for $99.",
   ],
   [
     "How is this different from an ad?",
@@ -92,7 +96,7 @@ export default async function NeighborNightsPage({
           <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-200">Your first night</p>
           <p className="mt-1 font-fm-serif text-[32px] leading-[1.05]">Free.</p>
           <p className="mt-2 text-[16px] leading-relaxed text-leaf-100">
-            No listing fee and no RSVP fees. Add a card to claim it. Nothing is charged for that night.
+            No listing fee and no RSVP fees. Add a card to claim it.
           </p>
         </section>
 
