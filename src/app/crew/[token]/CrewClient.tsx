@@ -1437,6 +1437,7 @@ export function LastNightCard({ night, meId, auth, inApp, split, onSplit, nextRo
 function SuggestDate({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: CrewAuth; busy: string | null; onAct: (key: string, fn: () => Promise<unknown>) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [free, setFree] = useState<{ date: string; time: string }[] | null>(null);
+  const [synced, setSynced] = useState(false);
   const usualTime = c.options.find((o) => o.time)?.time || "19:00";
   const [date, setDate] = useState("");
   const [time, setTime] = useState(usualTime);
@@ -1447,6 +1448,7 @@ function SuggestDate({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: 
     if (free === null) {
       const r = await run<{ synced: boolean; dates: { date: string; time: string }[] }>("getCrewFreeDates", auth, { cycleId: c.cycleId }).catch(() => ({ synced: false, dates: [] }));
       setFree(r.dates || []);
+      setSynced(Boolean(r.synced));
     }
   };
   const label = (d: string) => { const p = dayParts(d); return `${p.dow} ${p.month} ${p.day}`; };
@@ -1462,7 +1464,7 @@ function SuggestDate({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: 
       <span className="text-sm font-semibold text-fm-ink">Suggest another date</span>
       {free && free.length > 0 && (
         <>
-          <Mono className="text-fm-muted">You look free</Mono>
+          <Mono className="text-fm-muted">{synced ? "You look free" : "Good days for the crew"}</Mono>
           <div className="flex flex-wrap gap-2">
             {free.map((f) => (
               <button
@@ -1478,6 +1480,7 @@ function SuggestDate({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: 
           </div>
         </>
       )}
+      <Mono className="text-fm-muted">{free && free.length > 0 ? "Or any day" : "Pick a day"}</Mono>
       <form
         className="flex flex-wrap items-center gap-2"
         onSubmit={(e) => { e.preventDefault(); if (date) void add(date, time); }}
