@@ -736,8 +736,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             title="Hold it with a card"
             sub={
               form.billing?.firstNightFree
-                ? "Your first night is free. After that, nights come out of a Leaf balance that tops up $60 at a time from this card."
-                : "Nights come out of a Leaf balance that tops up $60 at a time from this card."
+                ? "Your first night is free. After that, each night is charged to this card after it happens, never more than your weekly limit."
+                : "Each night is charged to this card after it happens, never more than your weekly limit."
             }
           >
             <CardSetup

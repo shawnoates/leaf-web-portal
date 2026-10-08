@@ -11,6 +11,7 @@ import Parse from "@/lib/parse-client";
 import { Brand, BusinessPhoto, Shell, dollars, formatPhone } from "./ui";
 import MerchantHello from "./MerchantHello";
 import MerchantDeals from "./MerchantDeals";
+import MerchantCampaign from "./MerchantCampaign";
 
 type Phase = "pending" | "confirmed" | "now" | "past" | "cancelled";
 type Night = {
@@ -74,7 +75,7 @@ export type Dashboard = {
   /** Open weeks on their night they can book now. */
   bookable?: { dateKey: string; label: string }[];
   /** Nights they asked for that Leaf hasn't booked yet. */
-  requests?: { id: string; kind: "first" | "rebook"; label: string }[];
+  requests?: { id: string; kind: "first" | "rebook"; label: string; source?: "campaign" | null }[];
 };
 
 type Credit = {
@@ -93,43 +94,14 @@ function shortDate(v: string | null) {
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function LeafBalance({ token, credit, onChange }: { token: string; credit: Credit; onChange: (c: Credit) => void }) {
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const toggle = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      const r = (await Parse.Cloud.run("setMerchantAutoReload", { token, on: !credit.autoReload })) as { credit: Omit<Credit, "recent"> };
-      onChange({ ...credit, ...r.credit });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't change that");
-    } finally {
-      setSaving(false);
-    }
-  };
+function LeafBalance({ credit }: { credit: Credit }) {
   return (
     <Card id="balance">
       <H2>Leaf balance</H2>
       <p className="mt-1 font-fm-serif text-[40px] leading-none text-stone-900">{dollars(credit.balanceCents)}</p>
       <p className="mt-2 text-[15px] leading-relaxed text-stone-600">
-        {credit.autoReload
-          ? `Each night's RSVPs come out of your balance. When it drops under ${dollars(credit.reloadBelowCents)} and you have a night booked, we add ${dollars(credit.reloadCents)} from your card.`
-          : "Auto reload is off: each night is charged to your card after the night."}
+        Left over from prepaying. Your next nights use it up first, then they&rsquo;re charged to your card after each night.
       </p>
-      {credit.reloadFailed && (
-        <a href="#card" className="mt-3 block rounded-xl bg-amber-50 p-3 text-[14px] text-amber-900 ring-1 ring-amber-200">
-          We couldn&rsquo;t add to your balance. <span className="font-semibold underline">Update your card</span>
-        </a>
-      )}
-      <label className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-stone-200 px-4 py-3">
-        <span className="text-[15px] font-semibold text-stone-800">
-          Auto reload
-          <span className="block text-[13px] font-normal text-stone-500">{`Adds ${dollars(credit.reloadCents)} when your balance drops under ${dollars(credit.reloadBelowCents)}`}</span>
-        </span>
-        <input type="checkbox" role="switch" checked={credit.autoReload} disabled={saving} onChange={toggle} className="h-6 w-6 accent-leaf-800" />
-      </label>
-      {error && <p className="mt-2 text-[14px] text-red-600">{error}</p>}
       {credit.recent.length > 0 && (
         <ul className="mt-4 divide-y divide-stone-100 text-[14px]">
           {credit.recent.map((r, i) => (
@@ -399,6 +371,15 @@ export default function MerchantDashboard({
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   })();
 
+  const skipRequest = async (requestId: string) => {
+    try {
+      await Parse.Cloud.run("merchantSkipRequest", { token, requestId });
+      setReload((n) => n + 1);
+    } catch (e) {
+      setBookError(e instanceof Error ? e.message : "Couldn't skip that night");
+    }
+  };
+
   const requestNight = async () => {
     setBooking(true);
     setBookError(null);
@@ -441,11 +422,6 @@ export default function MerchantDashboard({
 
   const perRsvp = d.model === "per_rsvp";
   const credit = perRsvp ? d.credit ?? null : null;
-  // Booking a night they'll pay for (past the free one) tops up a low balance.
-  const bookingReloads = Boolean(
-    credit && credit.autoReload && credit.balanceCents < credit.reloadBelowCents
-      && (d.freeNight.state === "used" || d.freeNight.state === "lapsed" || d.totals.upcoming > 0),
-  );
   return (
     <Shell>
       {preview && (
@@ -489,6 +465,8 @@ export default function MerchantDashboard({
       )}
 
       <div className="mt-4 space-y-4">
+        {perRsvp && <MerchantCampaign token={token} preview={preview} />}
+
         <Card>
           <H2>Coming up</H2>
           <div className="mt-3">
@@ -515,19 +493,28 @@ export default function MerchantDashboard({
             <H2>Waiting on us</H2>
             <div className="mt-2 space-y-2">
               {d.requests.map((q) => (
-                <p key={q.id} className="text-[15px] text-stone-700">
-                  <span className="font-semibold text-stone-900">{q.kind === "first" ? `Your first ${q.label.replace(/s( \u00b7.*)?$/, "")}` : q.label}</span>
-                  <span className="block text-[13px] text-stone-500">
-                    We&rsquo;ll confirm the date and time with you within a day. Nothing is booked until then.
-                  </span>
-                </p>
+                <div key={q.id} className="flex items-start justify-between gap-3">
+                  <p className="text-[15px] text-stone-700">
+                    <span className="font-semibold text-stone-900">{q.kind === "first" ? `Your first ${q.label.replace(/s( \u00b7.*)?$/, "")}` : q.label}</span>
+                    <span className="block text-[13px] text-stone-500">
+                      {q.source === "campaign"
+                        ? "Lined up from your days. We'll confirm the time with you. Nothing is booked until then."
+                        : "We\u2019ll confirm the date and time with you within a day. Nothing is booked until then."}
+                    </span>
+                  </p>
+                  {q.kind === "rebook" && !preview && (
+                    <button type="button" onClick={() => skipRequest(q.id)} className="shrink-0 text-[14px] font-semibold text-stone-600 underline underline-offset-2">
+                      Skip
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </Card>
         )}
 
         <Card id="book">
-          <H2>Book another night</H2>
+          <H2>Add a one-off night</H2>
           <p className="mt-1 text-[15px] text-stone-600">Pick a date and the part of the day. We&rsquo;ll set the time and confirm.</p>
           {bookNote && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{bookNote}</p>}
           <input
@@ -550,11 +537,6 @@ export default function MerchantDashboard({
               </button>
             ))}
           </div>
-          {bookingReloads && credit && (
-            <p className="mt-3 text-[13px] text-stone-500">
-              {`When we confirm the night, we'll add ${dollars(credit.reloadCents)} to your Leaf balance from your card. The night's RSVPs come out of it.`}
-            </p>
-          )}
           {bookError && <p className="mt-2 text-[14px] text-red-600">{bookError}</p>}
           <button
             type="button"
@@ -585,14 +567,13 @@ export default function MerchantDashboard({
             <p className="mt-2 text-[15px] leading-relaxed text-stone-600">
               {dollars(d.rsvpFeeCents)} per RSVP, counted 2 hours before, never more than you seat. Under 5 RSVPs costs nothing.
               {d.freeNight.state === "granted" ? " Your first night is free." : d.freeNight.state === "used" ? " Your free first night is used." : ""}
-              {credit?.autoReload
-                ? " After that, nights come out of your Leaf balance, and anything it doesn\u2019t cover goes to your card."
-                : " After that, each night is charged to your card after the night."}
+              {" After that, each night is charged to your card after the night, never more than your weekly limit."}
             </p>
           </Card>
         )}
 
-        {credit && <LeafBalance token={token} credit={credit} onChange={(c) => setD({ ...d, credit: c })} />}
+        {/* Prepaid balances are gone (2026-10-08); show one only while some is left. */}
+        {credit && credit.balanceCents > 0 && <LeafBalance credit={credit} />}
 
 
 

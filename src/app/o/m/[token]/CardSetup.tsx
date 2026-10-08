@@ -105,7 +105,7 @@ const CardSetup = forwardRef<
         <p className="mt-3 text-[13px] leading-snug text-stone-600">
           {`By saving your card, you authorize Leaf to charge it ${fee} per RSVP after each Leaf night at your place, counted 2 hours before the night and never more than you seat${
             hostFeeCents > 0 ? `, plus $${Math.round(hostFeeCents / 100)} for any night you ask a Leaf host to run` : ""
-          }. ${firstNightFree ? `Your first night's RSVPs are free. ` : ""}Nights with fewer than 5 RSVPs cost nothing. After your first night, nights come out of a Leaf balance: when you book a night and your balance is under $18, we add $60 to it from this card, and anything the balance doesn't cover is charged after the night. You can turn auto reload off on this page. Nothing is charged today. You can remove your card or stop anytime by replying to Shawn. `}
+          }. ${firstNightFree ? `Your first night's RSVPs are free. ` : ""}Nights with fewer than 5 RSVPs cost nothing. RSVP charges never go over the weekly limit you set. Your first paid night also carries a one-time $100 setup fee, charged after that night. If you post a deal, it's $20 a month, charged once it's approved. Nothing is charged today. You can remove your card or stop anytime by replying to Shawn. `}
           <a href="/terms-conditions" target="_blank" className="underline">
             Terms
           </a>

@@ -3,7 +3,7 @@
 /**
  * "Your deals" on the merchant dashboard: post a deal for the neighborhood
  * calendars around them, $20 a month. A deal is reviewed first and charged
- * only once it's approved (the Leaf balance first, then the card); it renews
+ * only once it's approved (any leftover Leaf balance first, then the card); it renews
  * monthly until they stop it. Server: offer-merchant-deal-functions.js.
  */
 
@@ -198,7 +198,7 @@ export default function MerchantDeals({ token, preview }: { token: string; previ
             />
           </Field>
           <p className="text-[13px] text-stone-500">
-            {`${price} for ${s.periodDays} days, from your Leaf balance first, then your card. Charged only once we approve it, then monthly until you stop it.`}
+            {`${price} for ${s.periodDays} days, charged to your card once we approve it, then monthly until you stop it.`}
           </p>
           <div className="flex gap-2">
             <button
