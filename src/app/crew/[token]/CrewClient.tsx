@@ -33,7 +33,7 @@ import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
   RHYTHM_LABELS, crewHref, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
   type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult,
-  type CrewAddOn,
+  type CrewAddOn, type CrewSplit, type LastNight,
 } from "@/lib/crew";
 
 export default function CrewClient({ token }: { token: string }) {
@@ -377,7 +377,19 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               {canStart && !proposing && !fixedPlace && <div className="flex gap-2">{startButtons}</div>}
             </div>
 
-            {open.length === 0 && !crew.lastOneTime && (
+            {data.lastNight && (
+              <LastNightCard
+                night={data.lastNight}
+                meId={me.userId || null}
+                auth={auth}
+                inApp={inApp}
+                split={split && split.cycleId === data.lastNight.cycleId ? split : null}
+                onSplit={setSplit}
+                nextRoundAt={crew.enabled !== false && !crew.oneTime ? crew.nextRoundAt || null : null}
+              />
+            )}
+
+            {open.length === 0 && !crew.lastOneTime && !data.lastNight && (
               <Card>
                 <Eyebrow>Nothing being planned</Eyebrow>
                 <p className="mt-3 text-[15px] leading-relaxed text-fm-ink-2">
@@ -422,7 +434,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             )}
           </section>
 
-          {split && (split.receipt || split.went) && (
+          {split && (split.receipt || split.went) && split.cycleId !== data.lastNight?.cycleId && (
             <CrewMoneyCard kind="after" split={split} auth={auth} onChange={setSplit} />
           )}
           {pastAddOns.map((x) => (
@@ -1331,6 +1343,92 @@ function CycleCard({
  * another one in the book. Dates and votes stay; Leaf tells the crew. When
  * someone added a place before anyone voted, it's offered first.
  */
+/**
+ * The night that just happened (a day and a half after it starts): where, who
+ * went, How was it?, the bill, and the chat. The RSVP, booking and cancel
+ * controls are gone; underneath, when the next round starts.
+ */
+export function LastNightCard({ night, meId, auth, inApp, split, onSplit, nextRoundAt }: {
+  night: LastNight; meId: string | null; auth: CrewAuth; inApp: boolean; split: CrewSplit | null; onSplit: (s: CrewSplit | null) => void; nextRoundAt: string | null;
+}) {
+  const [rating, setRating] = useState<"up" | "down" | null>(night.myRating);
+  const [saving, setSaving] = useState(false);
+  const start = toDate(night.startsAt);
+  const evening = eveningAt(night.startsAt);
+  const today = start && start.toDateString() === new Date().toDateString();
+  const yesterday = start && start.toDateString() === new Date(Date.now() - 86_400_000).toDateString();
+  const when = today ? (evening ? "Tonight" : "Today") : yesterday ? (evening ? "Last night" : "Yesterday") : start?.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }) || "Last time";
+  const first = (n: string) => n.split(/\s+/)[0];
+  const wentLine = (() => {
+    // "You and Gregory went": you first, when you were there.
+    const names = [
+      ...(night.went.some((p) => p.userId === meId) ? ["You"] : []),
+      ...night.went.filter((p) => p.userId !== meId).map((p) => first(p.name)),
+    ];
+    if (!names.length) return null;
+    const list = names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+    return `${list} went`;
+  })();
+  const rate = async (value: "up" | "down") => {
+    const next = rating === value ? null : value;
+    setRating(next);
+    setSaving(true);
+    try { await run("rateCrewNight", auth, { cycleId: night.cycleId, rating: next }); }
+    catch { setRating(rating); }
+    finally { setSaving(false); }
+  };
+  const ratingBtn = (value: "up" | "down", label: string, emoji: string) => (
+    <button
+      type="button"
+      aria-pressed={rating === value}
+      disabled={saving}
+      onClick={() => void rate(value)}
+      className={`flex h-12 flex-1 items-center justify-center gap-2 rounded-full border text-[15px] font-semibold transition ${
+        rating === value ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink hover:border-fm-ink-2"
+      }`}
+    >
+      <span aria-hidden>{emoji}</span> {label}
+    </button>
+  );
+  return (
+    <Card className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1.5">
+        <Eyebrow>{when}</Eyebrow>
+        <h3 className="m-0 font-fm-serif text-[34px] font-normal leading-[1.05] lg:text-[40px]">{night.venue?.name || "Your night out"}</h3>
+        {wentLine && <p className="m-0 text-[15px] text-fm-ink-2">{wentLine}</p>}
+      </div>
+
+      {night.iWent && (
+        <div className="flex flex-col gap-2.5">
+          <p className="m-0 text-[15px] text-fm-ink">How was it?</p>
+          <div className="flex gap-2">
+            {ratingBtn("up", "Good one", "👍")}
+            {ratingBtn("down", "Not again", "👎")}
+          </div>
+          {rating && <p className="m-0 text-xs text-fm-muted">{rating === "up" ? "Noted. Leaf keeps it in the mix." : "Noted. If most of the crew agrees, Leaf stops suggesting it."}</p>}
+        </div>
+      )}
+
+      {split && (split.receipt || split.went) && <CrewMoneyCard kind="after" split={split} auth={auth} onChange={onSplit} />}
+
+      {night.myInviteId && (
+        <a
+          href={`/c/${night.myInviteId}${inApp ? "?inapp=1" : ""}`}
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-fm-line text-[15px] font-semibold text-fm-ink hover:bg-fm-card"
+        >
+          <MessageCircle size={17} aria-hidden /> Chat with the group
+        </a>
+      )}
+
+      {nextRoundAt && (
+        <p className="m-0 border-t border-fm-line-dim pt-4 text-sm text-fm-muted">
+          What&rsquo;s next: Leaf starts the next round around {new Date(nextRoundAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}.
+        </p>
+      )}
+    </Card>
+  );
+}
+
 /**
  * Suggest another date: anyone in the crew adds one to the poll (up to 5).
  * One-tap dates from their own calendar when it's connected, or any day and

@@ -158,6 +158,21 @@ export type CrewPage = {
   costs?: Record<string, CrewSplit | null>;
   /** Something to split for a night: each set night's, plus a past one this person still has to settle. */
   addOns?: CrewAddOn[];
+  /** The night that just happened, for a day and a half: the crew page's Last night card. */
+  lastNight?: LastNight | null;
+};
+
+export type LastNight = {
+  cycleId: string;
+  venue: Venue | null;
+  startsAt: string | { iso: string } | null;
+  chosenOption: DateOption | null;
+  planId: string | null;
+  myInviteId: string | null;
+  went: { userId: string; name: string }[];
+  iWent: boolean;
+  myRating: "up" | "down" | null;
+  ratings: { up: number; down: number };
 };
 
 type Paid = { at: string; method: string | null; confirmed: boolean };
