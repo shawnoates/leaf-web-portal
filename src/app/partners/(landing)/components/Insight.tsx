@@ -125,8 +125,8 @@ export default function Insight() {
         </div>
 
         <Reveal className="inline-cta">
-          <CTA to="partner" variant="primary" arrow>
-            Turn neighbors into regulars
+          <CTA to="join" variant="primary" arrow>
+            Claim your free night
           </CTA>
         </Reveal>
       </div>

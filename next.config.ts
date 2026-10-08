@@ -26,6 +26,12 @@ const nextConfig: NextConfig = {
       // Short-slug aliases → real legal pages. Anyone with an old
       // /terms or /privacy bookmark still lands on real content.
       { source: "/terms", destination: "/terms-conditions", permanent: true },
+      // Businesses have one front door, /partners. Old sign-up, sign-in and
+      // info links (in sent emails and printed material) land there; the
+      // query string (a rep's ?lead=) carries through.
+      { source: "/partner", destination: "/partners/join", permanent: true },
+      { source: "/partner/login", destination: "/partners/login", permanent: true },
+      { source: "/neighbor-nights", destination: "/partners", permanent: true },
       { source: "/privacy", destination: "/privacy-policy", permanent: true },
       // /churches is the plural people reach for; the landing itself
       // lives at /church-leaders (parallel to /resident-managers, and

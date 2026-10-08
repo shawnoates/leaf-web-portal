@@ -4,20 +4,20 @@ import Reveal from "./Reveal";
 const steps = [
   {
     n: "1",
-    h: "Tell us your offer",
-    b: "Share a deal or an event you’d host. We help shape it to land with residents.",
+    h: "Tell us your slowest nights",
+    b: "Pick the days and hours you’d most like to fill, and add a card to claim your free night.",
   },
   {
     n: "2",
-    h: "We bring the people",
-    b: "We place your deal in nearby buildings, or promote and fill your event — RSVPs and turnout handled.",
+    h: "We bring the neighbors",
+    b: "Your night goes on your neighborhood’s Leaf calendar. Residents a short walk away RSVP. A typical night is 8 to 15.",
   },
   {
     n: "3",
     h: "They come back",
-    b: "Neighbors discover you, walk in, and become regulars. Roll out to more buildings as it works.",
+    b: "They order their own, meet each other, and find their new spot. Book another night when it works.",
   },
-];
+]
 
 export default function HowItWorks() {
   return (
@@ -54,8 +54,8 @@ export default function HowItWorks() {
             <Plaque>Local consumer trust research</Plaque>
           </div>
           <div className="inline-cta">
-            <CTA to="partner" variant="primary" arrow>
-              Become a partner
+            <CTA to="join" variant="primary" arrow>
+              Claim your free night
             </CTA>
           </div>
         </Reveal>

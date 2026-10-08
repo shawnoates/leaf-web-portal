@@ -1,6 +1,6 @@
 /**
  * Remember a merchant's link on this device, so coming back to /partner or
- * /partner/login offers their dashboard without hunting for the email.
+ * /partners/login offers their dashboard without hunting for the email.
  * Browser storage only: per device, can vanish, never required. The link
  * itself stays the key; this just keeps it handy.
  */

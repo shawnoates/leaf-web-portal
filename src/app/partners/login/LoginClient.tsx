@@ -39,7 +39,7 @@ export default function LoginClient() {
     <Shell>
       <Brand />
       <div className="mt-8 rounded-3xl bg-white p-6 shadow-sm">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-700">Your Leaf nights</p>
+        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-700">Partner sign in</p>
         <h1 className="mt-2 font-fm-serif text-[34px] leading-[1.05] text-stone-900">{known ? "Welcome back" : "Sign in"}</h1>
         {known && !sent ? (
           <>
@@ -83,8 +83,8 @@ export default function LoginClient() {
       </div>
       <p className="mt-5 px-1 text-[14px] text-stone-500">
         New to Leaf?{" "}
-        <a href="/partner" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
-          Host neighbors at your place
+        <a href="/partners/join" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+          Claim your free night
         </a>
       </p>
     </Shell>

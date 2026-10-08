@@ -354,7 +354,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         title="We couldn't find this one."
         body="The link may have been cut off. Try tapping it again from Shawn's email, or just reply to it."
       >
-        <a href="/partner/login" className="mt-4 block px-1 text-[15px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+        <a href="/partners/login" className="mt-4 block px-1 text-[15px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
           Already with Leaf? Email me my sign-in link
         </a>
       </Closed>
@@ -376,7 +376,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         title="This one has passed."
         body="The weeks on this offer have gone by. Reply to Shawn's email if you'd like to be on a future night."
       >
-        <a href="/partner/login" className="mt-4 block px-1 text-[15px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+        <a href="/partners/login" className="mt-4 block px-1 text-[15px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
           Already with Leaf? Email me my sign-in link
         </a>
       </Closed>
