@@ -587,7 +587,8 @@ export default function MerchantDashboard({
 
             {/* Side column on desktop, the rest of the page on a phone: deals and the account. */}
             <aside className="min-w-0 space-y-6">
-              <MerchantDeals token={token} preview={preview} />
+              {/* Ticketed places have no card on file, so deals (charged to a card) are per-RSVP only. */}
+              {perRsvp && <MerchantDeals token={token} preview={preview} />}
               {billing}
               {/* Prepaid balances are gone (2026-10-08); show one only while some is left. */}
               {credit && credit.balanceCents > 0 && <LeafBalance credit={credit} />}
