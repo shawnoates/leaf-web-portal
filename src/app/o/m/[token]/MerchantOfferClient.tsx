@@ -194,7 +194,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         const o = f.offer;
         const perRsvp = f.billing?.model === "per_rsvp";
         // The suggestion stays selected unless they already wrote their own.
-        const own = Boolean(f.suggested && o.title && o.title !== f.suggested.title);
+        // (a changed description counts too, or saving would put the suggestion's text back).
+        const own = Boolean(f.suggested && o.title && (o.title !== f.suggested.title || (o.description || "") !== f.suggested.description));
         setUseOwn(own);
         setTitle(own ? o.title : "");
         setDescription(own ? o.description : "");
@@ -482,37 +483,49 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         </p>
       )}
       <Brand neighborhood={form.neighborhood} />
-      <BusinessPhoto url={form.photoUrl} credit={form.photoCredit} name={form.merchantName} />
       {accepted && !noDashboard && !preview && (
         <button type="button" onClick={() => setView("dashboard")} className="mt-4 px-1 text-[15px] font-semibold text-leaf-700">
           ← Back to your Neighbor Hours
         </button>
       )}
 
-      <header className="mt-8 px-1">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">{accepted ? "Your Neighbor Hours" : "An invitation from Leaf"}</p>
-        <h1 className="mt-2 font-fm-serif text-[40px] leading-[1.02] tracking-[-0.01em] text-stone-900">
-          {perRsvp ? (
-            <>
-              Let&rsquo;s fill a slow night at <em className="text-leaf-700">{form.merchantName}</em>.
-            </>
-          ) : (
-            <>
-              A night on the calendar at <em className="text-leaf-700">{form.merchantName}</em>.
-            </>
-          )}
-        </h1>
-        <p className="mt-4 text-[16px] leading-relaxed text-stone-600">
-          {perRsvp
-            ? `We bring ${form.headcount} neighbors from ${theCalendar(form.calendarName)} calendar to you, on your slowest day.`
-            : `A taster for ${form.headcount} neighbors on ${theCalendar(form.calendarName)} calendar, on a day that suits you. Leaf keeps 10% of tickets.`}{" "}
-          {form.calendarUrl && (
-            <a href={form.calendarUrl} target="_blank" rel="noreferrer" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
-              See the calendar
-            </a>
-          )}
-        </p>
-      </header>
+      {/* Already signed up: this is an edit screen, not the invitation again. */}
+      {accepted ? (
+        <header className="mt-6 px-1">
+          <h1 className="font-fm-serif text-[32px] leading-[1.05] tracking-[-0.01em] text-stone-900">Change your details</h1>
+          <p className="mt-2 text-[15px] leading-relaxed text-stone-600">
+            Your night, your space, and how we reach you. Saved changes carry to your upcoming Neighbor Hours; dates and times stay as booked.
+          </p>
+        </header>
+      ) : (
+        <>
+          <BusinessPhoto url={form.photoUrl} credit={form.photoCredit} name={form.merchantName} />
+          <header className="mt-8 px-1">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">An invitation from Leaf</p>
+            <h1 className="mt-2 font-fm-serif text-[40px] leading-[1.02] tracking-[-0.01em] text-stone-900">
+              {perRsvp ? (
+                <>
+                  Let&rsquo;s fill a slow night at <em className="text-leaf-700">{form.merchantName}</em>.
+                </>
+              ) : (
+                <>
+                  A night on the calendar at <em className="text-leaf-700">{form.merchantName}</em>.
+                </>
+              )}
+            </h1>
+            <p className="mt-4 text-[16px] leading-relaxed text-stone-600">
+              {perRsvp
+                ? `We bring ${form.headcount} neighbors from ${theCalendar(form.calendarName)} calendar to you, on your slowest day.`
+                : `A taster for ${form.headcount} neighbors on ${theCalendar(form.calendarName)} calendar, on a day that suits you. Leaf keeps 10% of tickets.`}{" "}
+              {form.calendarUrl && (
+                <a href={form.calendarUrl} target="_blank" rel="noreferrer" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+                  See the calendar
+                </a>
+              )}
+            </p>
+          </header>
+        </>
+      )}
 
       {perRsvp && form.billing && !accepted && form.billing.freeNightState && (
         <div className="mt-7">
