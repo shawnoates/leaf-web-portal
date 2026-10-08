@@ -386,7 +386,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const accountSections = (
     <>
           {perRsvp && (
-            <section id="card" className="scroll-mt-6 rounded-3xl bg-white p-5 shadow-sm">
+            <section id="card" className="scroll-mt-6 rounded-3xl bg-white p-6 shadow-sm sm:p-7">
               <h2 className="font-fm-serif text-[26px] text-stone-900">Card on file</h2>
               <div className="mt-3">
                 <CardSetup
@@ -412,7 +412,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             </section>
           )}
           {notices && (
-            <section id="notifications" className="scroll-mt-6 rounded-3xl bg-white p-5 shadow-sm">
+            <section id="notifications" className="scroll-mt-6 rounded-3xl bg-white p-6 shadow-sm sm:p-7">
               <h2 className="font-fm-serif text-[26px] text-stone-900">Notifications</h2>
               <div className="mt-3">
                 <NoticePrefs token={token} value={notices} onChange={setNotices} standalone />
@@ -736,8 +736,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             title="Hold it with a card"
             sub={
               form.billing?.firstNightFree
-                ? "Your first night is free. After that, nights come out of a Leaf balance that tops up $60 at a time from this card."
-                : "Nights come out of a Leaf balance that tops up $60 at a time from this card."
+                ? "Your first night is free. After that we keep booking your day each week, up to $90 a week, until you switch it off on your dashboard. Each night is charged to this card after it happens."
+                : "Each night is charged to this card after it happens, never more than your weekly limit."
             }
           >
             <CardSetup

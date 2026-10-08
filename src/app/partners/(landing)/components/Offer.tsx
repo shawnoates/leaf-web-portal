@@ -49,12 +49,14 @@ export default function Offer() {
             <div className="offer__kind">Every night after</div>
             <h3>Pay per person</h3>
             <p className="offer__desc">
-              $6 for each neighbor who RSVPs, counted 2 hours before and never more than
-              you can seat. Charged after the night.
+              Pick your slow days and a weekly limit, and switch it on or off anytime, like
+              an ad campaign. $6 for each neighbor who RSVPs, counted 2 hours before and
+              charged to your card after the night. That rate never goes up.
             </p>
             <ul className="offer__list">
               <li>Under 5 RSVPs costs nothing, and we set up another night</li>
-              <li>Nights come out of a prepaid balance: we add $60 when it drops under $18 (you can switch that off)</li>
+              <li>Set a weekly limit: your RSVP charges never go over it</li>
+              <li>A one-time $100 setup, added to your first paid night after it happens</li>
               <li>Optional Leaf host, $99, for any night you&rsquo;d like us to run</li>
             </ul>
           </Reveal>
@@ -62,6 +64,10 @@ export default function Offer() {
 
         <Reveal style={{ marginTop: 28, textAlign: "center" }}>
           <p style={{ color: "var(--muted)" }}>
+            Partners can also post deals on their neighborhood&rsquo;s calendar from their
+            dashboard: $20 a month, charged once it&rsquo;s approved.
+          </p>
+          <p style={{ color: "var(--muted)", marginTop: 12 }}>
             Want something custom, or several locations?{" "}
             <strong style={{ color: "var(--forest)" }}>Talk to a partner manager.</strong>
           </p>
