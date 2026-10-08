@@ -103,7 +103,7 @@ export default function MerchantDeals({ token, preview }: { token: string; previ
     <section id="deals" className="scroll-mt-6 rounded-3xl bg-white p-5 shadow-sm">
       <h2 className="font-fm-serif text-[26px] leading-tight text-stone-900">Your deals</h2>
       <p className="mt-1 text-[15px] leading-relaxed text-stone-600">
-        {`Post a deal for the neighbors around you. It shows on your neighborhood's Leaf calendar. ${price} a month per deal, charged once it's approved. Stop anytime.`}
+        {`Post a deal for the neighbors around you. It shows on your neighborhood's Leaf calendar. ${price} a month, charged once it's approved. One deal at a time; stop anytime.`}
       </p>
 
       {note && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{note}</p>}
@@ -155,7 +155,9 @@ export default function MerchantDeals({ token, preview }: { token: string; previ
           Add a card to post a deal. <span className="font-semibold underline">Add your card</span>
         </a>
       ) : openCount >= s.maxOpen ? (
-        <p className="mt-3 text-[14px] text-stone-500">{`You have ${s.maxOpen} deals going. Stop one to post another.`}</p>
+        <p className="mt-3 text-[14px] text-stone-500">
+          {s.maxOpen === 1 ? "One deal at a time. Stop this one to post a new one." : `You have ${s.maxOpen} deals going. Stop one to post another.`}
+        </p>
       ) : open ? (
         <div className="mt-4 space-y-3">
           <Field label="The deal">

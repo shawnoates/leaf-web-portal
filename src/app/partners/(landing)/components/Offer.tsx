@@ -63,7 +63,7 @@ export default function Offer() {
         <Reveal style={{ marginTop: 28, textAlign: "center" }}>
           <p style={{ color: "var(--muted)" }}>
             Partners can also post deals on their neighborhood&rsquo;s calendar from their
-            dashboard: $20 a month per deal, charged once it&rsquo;s approved.
+            dashboard: $20 a month, charged once it&rsquo;s approved.
           </p>
           <p style={{ color: "var(--muted)", marginTop: 12 }}>
             Want something custom, or several locations?{" "}
