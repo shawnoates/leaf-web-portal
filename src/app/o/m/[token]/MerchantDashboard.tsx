@@ -10,6 +10,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { Brand, BusinessPhoto, Shell, dollars, formatPhone } from "./ui";
 import MerchantHello from "./MerchantHello";
+import MerchantDeals from "./MerchantDeals";
 
 type Phase = "pending" | "confirmed" | "now" | "past" | "cancelled";
 type Night = {
@@ -82,7 +83,7 @@ type Credit = {
   reloadCents: number;
   reloadBelowCents: number;
   reloadFailed: boolean;
-  recent: { kind: "reload" | "night"; amountCents: number; balanceAfterCents: number; dateKey: string | null; at: string | null }[];
+  recent: { kind: "reload" | "night" | "deal"; amountCents: number; balanceAfterCents: number; dateKey: string | null; at: string | null }[];
 };
 
 /** "Oct 12" from an ISO date or a YYYY-MM-DD key. */
@@ -133,7 +134,7 @@ function LeafBalance({ token, credit, onChange }: { token: string; credit: Credi
         <ul className="mt-4 divide-y divide-stone-100 text-[14px]">
           {credit.recent.map((r, i) => (
             <li key={i} className="flex items-baseline justify-between py-2">
-              <span className="text-stone-700">{r.kind === "reload" ? `Added ${shortDate(r.at)}` : `Night of ${shortDate(r.dateKey)}`}</span>
+              <span className="text-stone-700">{r.kind === "reload" ? `Added ${shortDate(r.at)}` : r.kind === "deal" ? `Deal, ${shortDate(r.at)}` : `Night of ${shortDate(r.dateKey)}`}</span>
               <span className={r.amountCents > 0 ? "font-semibold text-leaf-700" : "text-stone-700"}>
                 {r.amountCents > 0 ? "+" : "\u2212"}
                 {dollars(Math.abs(r.amountCents))}
@@ -564,6 +565,8 @@ export default function MerchantDashboard({
             {booking ? "Sending…" : "Request this night"}
           </button>
         </Card>
+
+        <MerchantDeals token={token} preview={preview} />
 
         {d.past.length > 0 && (
           <Card>
