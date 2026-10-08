@@ -91,7 +91,7 @@ function OfferCard({ form }: { form: Form }) {
   const fee = dollars(b.rsvpFeeCents);
   const spend = form.spendEstimate;
   const rows: [string, string][] = [
-    [b.firstNightFree ? "Your first night is on us" : "Free for neighbors", "Neighbors join free and everyone orders their own."],
+    [b.firstNightFree ? "Your first Neighbor Hour is on us" : "Free for neighbors", "Neighbors join free and everyone orders their own."],
     [b.firstNightFree ? `${fee} per RSVP after that` : `${fee} per RSVP`, "Charged after the night, counted 2 hours before, never more than you seat."],
     ["No crowd, no charge", "Under 5 RSVPs costs nothing, and we set up another night."],
   ];
@@ -307,7 +307,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             : r.requested
               ? `You're in. We'll confirm the date and time of your first ${DAYS[preferredDay ?? 0]} within a day.${perRsvp && form?.billing?.firstNightFree ? " It's on us." : ""}`
               : r.bookedDate
-              ? `You're in. See you ${r.bookedDate}.${perRsvp && form?.billing?.firstNightFree ? " This first night is on us." : ""}`
+              ? `You're in. See you ${r.bookedDate}.${perRsvp && form?.billing?.firstNightFree ? " This first Neighbor Hour is on us." : ""}`
               : "You're in. Those weeks already have someone, so you're first in line for the next opening.",
         );
         setForm((f) => (f ? { ...f, state: "accepted" } : f));
@@ -437,7 +437,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               ? "We'll use the new details from here on."
               : done.bookedDate
                 ? `${form.calendarName} neighbors can start RSVPing soon. We'll send the count 2 hours before${
-                    perRsvp && form.billing?.firstNightFree ? ", and this first night is on us" : ""
+                    perRsvp && form.billing?.firstNightFree ? ", and this first Neighbor Hour is on us" : ""
                   }.`
                 : "Those weeks already have someone, so you're first in line for the next opening. We'll be in touch."}
           </p>
@@ -454,7 +454,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               }}
               className="h-12 w-full rounded-xl border border-stone-300 text-[15px] font-semibold text-stone-800"
             >
-              See your nights
+              See your Neighbor Hours
             </button>
           )}
         </div>
@@ -471,7 +471,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const accepted = form.state === "accepted";
   const steps = (perRsvp ? 4 : 3) + (notices ? 1 : 0);
   const withHost = merchantHosts === false && hostFee ? ` + ${hostFee} host` : "";
-  const cta = accepted ? "Save changes" : perRsvp && form.billing?.firstNightFree ? `Hold my free night${withHost}` : "Count me in";
+  const cta = accepted ? "Save changes" : perRsvp && form.billing?.firstNightFree ? `Hold my free Neighbor Hour${withHost}` : "Count me in";
   const freeWorth = perRsvp && !accepted && !withHost && form.billing?.firstNightFree ? dollars((form.billing?.rsvpFeeCents ?? 600) * TYPICAL_RSVPS) : null;
 
   return (
@@ -485,12 +485,12 @@ export default function MerchantOfferClient({ token }: { token: string }) {
       <BusinessPhoto url={form.photoUrl} credit={form.photoCredit} name={form.merchantName} />
       {accepted && !noDashboard && !preview && (
         <button type="button" onClick={() => setView("dashboard")} className="mt-4 px-1 text-[15px] font-semibold text-leaf-700">
-          ← Back to your nights
+          ← Back to your Neighbor Hours
         </button>
       )}
 
       <header className="mt-8 px-1">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">{accepted ? "Your Leaf nights" : "An invitation from Leaf"}</p>
+        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">{accepted ? "Your Neighbor Hours" : "An invitation from Leaf"}</p>
         <h1 className="mt-2 font-fm-serif text-[40px] leading-[1.02] tracking-[-0.01em] text-stone-900">
           {perRsvp ? (
             <>
@@ -616,7 +616,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         <Section
           n={2}
           total={steps}
-          title={accepted ? "Your nights" : "What day works best?"}
+          title={accepted ? "Your Neighbor Hours" : "What day works best?"}
           sub={accepted ? "Book more nights from your dashboard." : "Pick your slowest day. We'll set the time and confirm your first one within a day."}
         >
           {!accepted && (
@@ -736,7 +736,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             title="Hold it with a card"
             sub={
               form.billing?.firstNightFree
-                ? "Your first night is free. After that we keep booking your day each week, up to $90 a week, until you switch it off on your dashboard. Each night is charged to this card after it happens."
+                ? "Your first Neighbor Hour is free. After that we keep booking your day each week, up to $90 a week, until you switch it off on your dashboard. Each night is charged to this card after it happens."
                 : "Each night is charged to this card after it happens, never more than your weekly limit."
             }
           >
@@ -753,7 +753,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         )}
 
         {notices && (
-          <Section n={perRsvp ? 5 : 4} total={steps} id="notifications" title="How should we reach you?" sub="Only about your nights. Never marketing.">
+          <Section n={perRsvp ? 5 : 4} total={steps} id="notifications" title="How should we reach you?" sub="Only about your Neighbor Hours. Never marketing.">
             <NoticePrefs token={token} value={notices} onChange={setNotices} />
           </Section>
         )}
@@ -793,7 +793,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           {error && <p className="mb-2 text-[14px] leading-snug text-red-600">{error}</p>}
           {freeLeft != null && (
             <p className="mb-2 text-center text-[14px] text-stone-600">
-              Your free night is held for <span className="text-[18px]"><CountdownText left={freeLeft} /></span>
+              Your free Neighbor Hour is held for <span className="text-[18px]"><CountdownText left={freeLeft} /></span>
             </p>
           )}
           <button
@@ -818,7 +818,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           </button>
           {perRsvp && !accepted && (
             <p className="mt-2 text-center text-[12px] text-stone-500">
-              {form.billing?.firstNightFree ? "Free first night. " : ""}
+              {form.billing?.firstNightFree ? "Free first Neighbor Hour. " : ""}
               {dollars(form.billing?.rsvpFeeCents ?? 600)} per RSVP after that. Stop anytime by replying to Shawn.
             </p>
           )}

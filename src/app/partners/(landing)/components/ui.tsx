@@ -75,7 +75,7 @@ export function CTA({
 export function TrustStrip() {
   return (
     <div className="trust">
-      <span>First night free</span>
+      <span>First Neighbor Hour free</span>
       <span>$6 per RSVP after</span>
       <span>No contract</span>
     </div>

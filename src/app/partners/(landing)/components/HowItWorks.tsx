@@ -4,18 +4,18 @@ import Reveal from "./Reveal";
 const steps = [
   {
     n: "1",
-    h: "Tell us your slowest nights",
-    b: "Pick the days and hours you’d most like to fill, and add a card to claim your free night.",
+    h: "Tell us your slowest hours",
+    b: "Pick the days and hours you’d most like to fill, and add a card to claim your free Neighbor Hour.",
   },
   {
     n: "2",
     h: "We bring the neighbors",
-    b: "Your night goes on your neighborhood’s Leaf calendar. Residents a short walk away RSVP. A typical night is 8 to 15.",
+    b: "Your Neighbor Hour goes on your neighborhood’s Leaf calendar. Residents a short walk away RSVP. A typical one draws 8 to 15.",
   },
   {
     n: "3",
     h: "They come back",
-    b: "They order their own, meet each other, and find their new spot. Book another night when it works.",
+    b: "They order their own, meet each other, and find their new spot. Book more when it works.",
   },
 ]
 
@@ -55,7 +55,7 @@ export default function HowItWorks() {
           </div>
           <div className="inline-cta">
             <CTA to="join" variant="primary" arrow>
-              Claim your free night
+              Claim your free Neighbor Hour
             </CTA>
           </div>
         </Reveal>

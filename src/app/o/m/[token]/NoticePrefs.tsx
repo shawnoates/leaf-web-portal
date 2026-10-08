@@ -97,7 +97,7 @@ export default function NoticePrefs({
             className="mt-0.5 h-5 w-5 shrink-0 accent-leaf-800"
           />
           <span className="text-[13px] leading-snug text-stone-600">
-            Text me about my Leaf nights at this number. Up to 4 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help,
+            Text me about my Neighbor Hours at this number. Up to 4 msgs/wk. Msg &amp; data rates may apply. Reply HELP for help,
             STOP to opt out.
             {value.smsOptedOut && " You replied STOP earlier: text START to our number to turn texts back on."}
           </span>

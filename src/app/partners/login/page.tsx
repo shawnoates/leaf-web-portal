@@ -3,7 +3,7 @@ import LoginClient from "./LoginClient";
 
 export const metadata: Metadata = {
   title: "Partner sign in | Leaf for businesses",
-  description: "Get the link to your Leaf nights: your dashboard, RSVPs and bookings.",
+  description: "Get the link to your Neighbor Hours: your dashboard, RSVPs and bookings.",
 };
 
 export const viewport: Viewport = {

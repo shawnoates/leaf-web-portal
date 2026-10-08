@@ -57,9 +57,9 @@ export default function FreeNightCountdown({
     const when = deadline ? new Date(deadline).toLocaleDateString("en-US", { month: "long", day: "numeric" }) : null;
     return (
       <div className="rounded-3xl border border-stone-200 bg-white p-5">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-500">Free first night</p>
+        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-500">Free first Neighbor Hour</p>
         <p className="mt-1 text-[15px] leading-snug text-stone-700">
-          The free first night offer ended{when ? ` on ${when}` : ""}. You can still join: {feeLabel} per RSVP from your first night, and nothing
+          The free first Neighbor Hour offer ended{when ? ` on ${when}` : ""}. You can still join: {feeLabel} per RSVP from your first Neighbor Hour, and nothing
           under 5 RSVPs.
         </p>
       </div>
@@ -69,12 +69,12 @@ export default function FreeNightCountdown({
 
   return (
     <div className="rounded-3xl bg-[#f3d9a4] p-5 text-stone-900">
-      <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-700">Your first night is free</p>
+      <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-700">Your first Neighbor Hour is free</p>
       <p className="mt-1 font-fm-serif text-[24px] leading-tight">
-        <s className="text-stone-500 decoration-stone-500/70">{worthLabel}</s> $0 for your first night
+        <s className="text-stone-500 decoration-stone-500/70">{worthLabel}</s> $0 for your first Neighbor Hour
       </p>
       <p className="mt-2 text-[13px] leading-snug text-stone-700">
-        {`A typical night is ${TYPICAL_RSVPS} RSVPs, so ${worthLabel} at ${feeLabel} each. Your first one is on us if you hold it within a week of first opening this page. After that it’s ${feeLabel} per RSVP from your first night.`}
+        {`A typical night is ${TYPICAL_RSVPS} RSVPs, so ${worthLabel} at ${feeLabel} each. Your first one is on us if you hold it within a week of first opening this page. After that it’s ${feeLabel} per RSVP from your first Neighbor Hour.`}
       </p>
     </div>
   );

@@ -63,7 +63,7 @@ export default function LoginClient() {
         ) : sent ? (
           <>
             <p className="mt-3 text-[16px] leading-relaxed text-stone-700">{sent}</p>
-            <p className="mt-2 text-[14px] leading-relaxed text-stone-500">It opens your dashboard: your nights, RSVPs, bookings and settings. No password needed.</p>
+            <p className="mt-2 text-[14px] leading-relaxed text-stone-500">It opens your dashboard: your Neighbor Hours, RSVPs, bookings and settings. No password needed.</p>
             <button type="button" onClick={() => setSent(null)} className="mt-5 text-[15px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
               Use a different email
             </button>
@@ -84,7 +84,7 @@ export default function LoginClient() {
       <p className="mt-5 px-1 text-[14px] text-stone-500">
         New to Leaf?{" "}
         <a href="/partners/join" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
-          Claim your free night
+          Claim your free Neighbor Hour
         </a>
       </p>
     </Shell>

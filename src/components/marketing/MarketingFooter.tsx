@@ -45,7 +45,7 @@ export default function MarketingFooter({ blurb, dark = false }: { blurb: string
           title="For businesses" ink={ink}
           links={[
             { href: "/partners", label: "Leaf for businesses" },
-            { href: "/partners/join", label: "Claim your free night" },
+            { href: "/partners/join", label: "Claim your free Neighbor Hour" },
             { href: "/partners/login", label: "Partner sign in" },
           ]}
         />
