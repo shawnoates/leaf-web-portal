@@ -94,17 +94,11 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
     setError(null);
     setNote(null);
     try {
-      const r = (await merchantRun("merchantSaveCampaign", { token, on: nextOn, days, weeklyBudgetCents: budget })) as { queued: number; withdrawn: number };
+      await merchantRun("merchantSaveCampaign", { token, on: nextOn, days, weeklyBudgetCents: budget });
       setOn(nextOn);
       setDirty(false);
       setAutoStarted(false);
-      setNote(
-        nextOn
-          ? r.queued
-            ? `On. We've lined up ${r.queued} Neighbor Hour${r.queued === 1 ? "" : "s"} and will confirm each one with you.`
-            : "Saved. We line up your Neighbor Hours about a week and a half ahead."
-          : `Off. ${r.withdrawn ? "Ones we hadn't booked yet are dropped; " : ""}booked ones still happen.`,
-      );
+      setNote(nextOn ? "Saved. Plans at your place on your days count toward your weekly limit." : "Off. Plans already on the calendar still happen.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save that");
     } finally {
@@ -141,15 +135,15 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
             {autoStarted ? "Your Neighbor Hours are switched on." : "Your Neighbor Hours are on."}
           </p>
           <p className="mt-1 text-[15px] leading-relaxed text-leaf-900">
-            {`We'll keep booking ${days.map((d) => `${WEEKDAY_NAMES[d.weekday]} ${d.partOfDay}s`).join(" and ") || "your days"} and charge ${dollars(s.feeCents)} per RSVP after each one, up to ${dollars(budget)} a week.`}
+            {`Neighbors' plans at your place on ${days.map((d) => `${WEEKDAY_NAMES[d.weekday]} ${d.partOfDay}s`).join(" and ") || "your days"} count toward it: ${dollars(s.feeCents)} per RSVP after each one, up to ${dollars(budget)} a week.`}
             {autoStarted ? " We turned this on when you held your free Neighbor Hour." : ""}
           </p>
-          <p className="mt-2 text-[13px] text-leaf-800">Switch it off anytime with the toggle. Booked ones still happen.</p>
+          <p className="mt-2 text-[13px] text-leaf-800">Switch it off anytime with the toggle. Plans already on the calendar still happen.</p>
         </div>
       ) : (
         <div className="mt-5 rounded-2xl bg-stone-50 p-4 ring-1 ring-stone-200 sm:p-5">
           <p className="text-[16px] font-semibold text-stone-900">Your Neighbor Hours are off.</p>
-          <p className="mt-1 text-[15px] leading-relaxed text-stone-600">Pick your days below, then flip the toggle to switch them on. Ones already booked still happen.</p>
+          <p className="mt-1 text-[15px] leading-relaxed text-stone-600">Pick your days below, then flip the toggle to switch them on. Plans already on the calendar still happen.</p>
         </div>
       )}
 
@@ -268,7 +262,6 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
         {`${dollars(s.feeCents)} per RSVP, counted 2 hours before and charged after each one, never more than your weekly limit. Under 5 RSVPs costs nothing.`}
         {firstNightFree ? " Your first Neighbor Hour is free." : ""}
         {s.setupFeeOwed ? ` A one-time ${dollars(s.setupFeeCents)} setup is added to your first paid one.` : ""}
-        {" We confirm each one with you about a week ahead, and you can skip any before it's booked."}
       </p>
 
       {note && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{note}</p>}
