@@ -9,6 +9,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { Brand, BusinessPhoto, CREAM, Shell, dollars, formatPhone } from "./ui";
 import MerchantHello from "./MerchantHello";
+import MerchantReport from "./MerchantReport";
 import MerchantDeals from "./MerchantDeals";
 import MerchantCampaign from "./MerchantCampaign";
 import { merchantAuth, merchantRun } from "@/lib/merchant-session";
@@ -632,6 +633,7 @@ export default function MerchantDashboard({
             <div className="min-w-0 space-y-6">
               {/* The billing terms are the fine print under their Neighbor Hours, not a card of their own. */}
               {perRsvp && <MerchantCampaign token={token} preview={preview} firstNightFree={d.freeNight.state === "granted"} />}
+              {perRsvp && <MerchantReport token={token} />}
 
               <Card>
                 <H2>Coming up</H2>

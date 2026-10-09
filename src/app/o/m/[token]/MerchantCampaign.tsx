@@ -12,7 +12,7 @@ import { Toggle, dollars } from "./ui";
 import { merchantRun } from "@/lib/merchant-session";
 
 type Range = { low: number; high: number };
-type Day = { weekday: number; partOfDay: "morning" | "afternoon" | "evening" };
+type Day = { weekday: number; partOfDay: "morning" | "afternoon" | "evening" | "any" };
 type CampaignState = {
   campaign: { on: boolean; days: Day[]; weeklyBudgetCents: number; autoStarted?: boolean };
   feeCents: number;
@@ -35,7 +35,14 @@ type CampaignState = {
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const PARTS: Day["partOfDay"][] = ["morning", "afternoon", "evening"];
+const PARTS: Day["partOfDay"][] = ["morning", "afternoon", "evening", "any"];
+const PART_LABEL: Record<Day["partOfDay"], string> = { morning: "Morning", afternoon: "Afternoon", evening: "Evening", any: "Any time" };
+
+/** "Wednesday evenings and Thursdays (all day)"; no days means every day. */
+const windowLabel = (days: Day[]) =>
+  days.length
+    ? days.map((d) => (d.partOfDay === "any" ? `${WEEKDAY_NAMES[d.weekday]}s (all day)` : `${WEEKDAY_NAMES[d.weekday]} ${d.partOfDay}s`)).join(" and ")
+    : "any day, any time";
 const STEP_CENTS = 600; // one RSVP per notch
 
 const span = (r: Range, f: (n: number) => string = String) => (r.low === r.high ? f(r.low) : `${f(r.low)}–${f(r.high)}`);
@@ -115,14 +122,14 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="font-fm-serif text-[28px] leading-tight text-stone-900">Your Neighbor Hours</h2>
-          <p className="mt-1 text-[15px] leading-relaxed text-stone-600">Pick your slow days and a weekly limit. We fill them with neighbors and charge your card after each one.</p>
+          <p className="mt-1 text-[15px] leading-relaxed text-stone-600">Pick your slow days and times and a weekly limit. Neighbors&rsquo; plans at your place in those times count, and we charge your card once a week.</p>
         </div>
         <div className="flex shrink-0 items-center gap-2 pt-1">
           <span className={`text-[14px] font-semibold ${on ? "text-leaf-700" : "text-stone-500"}`}>{on ? "On" : "Off"}</span>
           <Toggle
             label="Run my Neighbor Hours"
             on={on}
-            disabled={saving || preview || (!on && (!days.length || !s.hasCard))}
+            disabled={saving || preview || (!on && !s.hasCard)}
             onChange={(v) => save(v)}
           />
         </div>
@@ -135,7 +142,7 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
             {autoStarted ? "Your Neighbor Hours are switched on." : "Your Neighbor Hours are on."}
           </p>
           <p className="mt-1 text-[15px] leading-relaxed text-leaf-900">
-            {`Neighbors' plans at your place on ${days.map((d) => `${WEEKDAY_NAMES[d.weekday]} ${d.partOfDay}s`).join(" and ") || "your days"} count toward it: ${dollars(s.feeCents)} per RSVP after each one, up to ${dollars(budget)} a week.`}
+            {`Neighbors' plans at your place on ${windowLabel(days)} count toward it: ${dollars(s.feeCents)} per RSVP, charged once a week, up to ${dollars(budget)} a week. RSVPs outside these times are free.`}
             {autoStarted ? " We turned this on when you held your free Neighbor Hour." : ""}
           </p>
           <p className="mt-2 text-[13px] text-leaf-800">Switch it off anytime with the toggle. Plans already on the calendar still happen.</p>
@@ -171,21 +178,22 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
           );
         })}
       </div>
+      {days.length === 0 && <p className="mt-2 text-[13px] text-stone-500">No days picked: plans at your place on any day count.</p>}
       {days.length > 0 && (
         <div className="mt-2 space-y-1.5">
           {days.map((d) => (
             <div key={d.weekday} className="flex items-center justify-between gap-2 text-[14px]">
               <span className="w-12 font-semibold text-stone-800">{WEEKDAYS[d.weekday]}</span>
-              <div className="grid flex-1 grid-cols-3 gap-1.5">
+              <div className="grid flex-1 grid-cols-4 gap-1.5">
                 {PARTS.map((p) => (
                   <button
                     key={p}
                     type="button"
                     aria-pressed={d.partOfDay === p}
                     onClick={() => setPart(d.weekday, p)}
-                    className={`h-9 rounded-lg border text-[13px] font-semibold capitalize ${d.partOfDay === p ? "border-leaf-700 bg-leaf-50 text-leaf-800" : "border-stone-200 text-stone-600"}`}
+                    className={`h-9 rounded-lg border text-[12px] font-semibold sm:text-[13px] ${d.partOfDay === p ? "border-leaf-700 bg-leaf-50 text-leaf-800" : "border-stone-200 text-stone-600"}`}
                   >
-                    {p}
+                    {PART_LABEL[p]}
                   </button>
                 ))}
               </div>
@@ -259,7 +267,7 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
       )}
 
       <p className="mt-6 border-t border-stone-100 pt-6 text-[13px] leading-relaxed text-stone-500">
-        {`${dollars(s.feeCents)} per RSVP, counted 2 hours before and charged after each one, never more than your weekly limit. Under 5 RSVPs costs nothing.`}
+        {`${dollars(s.feeCents)} per RSVP, counted 2 hours before each plan and charged once a week for the week before, never more than your weekly limit. A plan with under 5 RSVPs costs nothing.`}
         {firstNightFree ? " Your first Neighbor Hour is free." : ""}
         {s.setupFeeOwed ? ` A one-time ${dollars(s.setupFeeCents)} setup is added to your first paid one.` : ""}
       </p>
@@ -271,7 +279,7 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
       {on && dirty && (
         <button
           type="button"
-          disabled={saving || preview || !days.length}
+          disabled={saving || preview}
           onClick={() => save(true)}
           className="mt-4 h-12 w-full rounded-xl bg-leaf-800 text-[15px] font-semibold text-white disabled:opacity-40"
         >
