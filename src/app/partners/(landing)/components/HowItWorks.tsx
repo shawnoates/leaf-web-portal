@@ -29,8 +29,8 @@ export default function HowItWorks() {
             title={<>It&rsquo;s a recommendation, not an ad.</>}
             lead={
               <>
-                Residents see you inside their building&rsquo;s community &mdash; a place they
-                trust, alongside their neighbors &mdash; not as one more ad they scroll past.
+                Residents see you inside their building&rsquo;s community, a place they
+                trust, alongside their neighbors. Not as one more ad they scroll past.
                 That&rsquo;s a fundamentally warmer way to be found.
               </>
             }
@@ -54,7 +54,7 @@ export default function HowItWorks() {
           <div>
             <p>
               Personal, local recommendations are still the most trusted way people choose
-              where to go &mdash; far more than ads or even online reviews. Leaf OS puts you
+              where to go, far more than ads or even online reviews. Leaf OS puts you
               on the right side of that: discovered by neighbors, in the community they trust.
             </p>
             <Plaque>Local consumer trust research</Plaque>

@@ -14,7 +14,7 @@ const proof = [
   },
   {
     fig: "44%",
-    line: "of revenue comes from repeat customers — just 21% of the base.",
+    line: "of revenue comes from repeat customers, just 21% of the base.",
     src: "Gorgias",
   },
   {
@@ -46,7 +46,7 @@ export default function Proof() {
             lead={
               <>
                 Reaching nearby residents and turning them into regulars isn&rsquo;t a
-                nice-to-have &mdash; it&rsquo;s the most profitable customer you can get.
+                nice-to-have. It&rsquo;s the most profitable customer you can get.
               </>
             }
           />

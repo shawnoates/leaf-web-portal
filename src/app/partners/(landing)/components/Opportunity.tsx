@@ -43,7 +43,7 @@ export default function Opportunity() {
             lead={
               <>
                 Hundreds of residents in the buildings nearby are looking for exactly what
-                you offer &mdash; and they&rsquo;d rather it be local. You just need to reach
+                you offer, and they&rsquo;d rather it be local. You just need to reach
                 them where they already plan their week.
               </>
             }

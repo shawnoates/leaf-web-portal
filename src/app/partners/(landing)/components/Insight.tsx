@@ -70,7 +70,7 @@ export default function Insight() {
             An ad gets you a click. <span className="accent">A neighbor gets you a regular.</span>
           </h2>
           <p className="lead" style={{ marginTop: 16 }}>
-            The money isn&rsquo;t in one-time foot traffic &mdash; it&rsquo;s in repeat
+            The money isn&rsquo;t in one-time foot traffic. It&rsquo;s in repeat
             visits. And the closer someone lives, the more often they come back.
           </p>
 
@@ -107,7 +107,7 @@ export default function Insight() {
             <ShareRing pct={44} color="var(--green-light)" label="of revenue" />
           </div>
           <p className="ratio-pair__caption">
-            Repeat customers are about <b>21%</b> of the base &mdash; and they generate{" "}
+            Repeat customers are about <b>21%</b> of the base, and they generate{" "}
             <b>~44%</b> of all revenue. More than 2&times; their share.
           </p>
 
