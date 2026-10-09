@@ -573,16 +573,6 @@ export default function MerchantDashboard({
 
   const perRsvp = d.model === "per_rsvp";
   const credit = perRsvp ? d.credit ?? null : null;
-  const billing = perRsvp && (
-    <Card>
-      <H2>How billing works</H2>
-      <p className="mt-2 text-[15px] leading-relaxed text-stone-600">
-        {dollars(d.rsvpFeeCents)} per RSVP, counted 2 hours before, never more than you seat. Under 5 RSVPs costs nothing.
-        {d.freeNight.state === "granted" ? " Your first Neighbor Hour is free." : d.freeNight.state === "used" ? " Your free first Neighbor Hour is used." : ""}
-        {" After that, each one is charged to your card after it happens, never more than your weekly limit."}
-      </p>
-    </Card>
-  );
 
   return (
     <div className={`min-h-dvh ${CREAM} font-fm-sans text-stone-900`}>
@@ -640,7 +630,8 @@ export default function MerchantDashboard({
           <div className="mt-6 grid gap-6 lg:mt-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-8">
             {/* Main column: their nights. */}
             <div className="min-w-0 space-y-6">
-              {perRsvp && <MerchantCampaign token={token} preview={preview} />}
+              {/* The billing terms are the fine print under their Neighbor Hours, not a card of their own. */}
+              {perRsvp && <MerchantCampaign token={token} preview={preview} firstNightFree={d.freeNight.state === "granted"} />}
 
               <Card>
                 <H2>Coming up</H2>
@@ -648,7 +639,7 @@ export default function MerchantDashboard({
                   {d.upcoming.length ? (
                     d.upcoming.map((n) => <UpcomingNight key={n.id} n={n} token={token} />)
                   ) : (
-                    <p className="text-[15px] text-stone-600">Nothing on the books right now. Switch your Neighbor Hours on, or add a one-off Neighbor Hour.</p>
+                    <p className="text-[15px] text-stone-600">{perRsvp ? "Nothing on the books right now. Switch your Neighbor Hours on and we\u2019ll line them up." : "Nothing on the books right now. Request a Neighbor Hour below."}</p>
                   )}
                 </div>
                 <button
@@ -687,11 +678,13 @@ export default function MerchantDashboard({
                 </Card>
               )}
 
+              {/* Ticketed places have no usual days (no campaign), so every night is a request.
+                  Bars and restaurants book through their Neighbor Hours days instead. */}
+              {!perRsvp && (
               <Card id="book">
-                {/* Ticketed places have no usual days (no campaign), so every night is a request. */}
-                <H2>{perRsvp ? "Add a one-off Neighbor Hour" : "Request a Neighbor Hour"}</H2>
+                <H2>Request a Neighbor Hour</H2>
                 <p className="mt-1 text-[15px] text-stone-600">
-                  {perRsvp ? "Outside your usual days. " : ""}Pick a date and the part of the day; we&rsquo;ll set the time and confirm.
+                  Pick a date and the part of the day; we&rsquo;ll set the time and confirm.
                 </p>
                 {bookNote && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{bookNote}</p>}
                 <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
@@ -726,6 +719,7 @@ export default function MerchantDashboard({
                   {booking ? "Sending\u2026" : "Request this Neighbor Hour"}
                 </button>
               </Card>
+              )}
 
               {d.past.length > 0 && (
                 <Card>
@@ -743,7 +737,6 @@ export default function MerchantDashboard({
             <aside className="min-w-0 space-y-6">
               {/* Ticketed places have no card on file, so deals (charged to a card) are per-RSVP only. */}
               {perRsvp && <MerchantDeals token={token} preview={preview} />}
-              {billing}
               {/* Prepaid balances are gone (2026-10-08); show one only while some is left. */}
               {credit && credit.balanceCents > 0 && <LeafBalance credit={credit} />}
               {account}

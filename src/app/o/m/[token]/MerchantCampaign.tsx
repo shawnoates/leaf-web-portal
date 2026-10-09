@@ -53,7 +53,7 @@ function outlook(s: CampaignState, budgetCents: number, nightsPerWeek: number) {
   return { paid, rsvps, guests, sales, limitBinds: Boolean(draw && paid < draw.high), draw };
 }
 
-export default function MerchantCampaign({ token, preview }: { token: string; preview?: boolean }) {
+export default function MerchantCampaign({ token, preview, firstNightFree }: { token: string; preview?: boolean; firstNightFree?: boolean }) {
   const [s, setS] = useState<CampaignState | null>(null);
   const [on, setOn] = useState(false);
   const [days, setDays] = useState<Day[]>([]);
@@ -278,7 +278,8 @@ export default function MerchantCampaign({ token, preview }: { token: string; pr
       )}
 
       <p className="mt-6 border-t border-stone-100 pt-6 text-[13px] leading-relaxed text-stone-500">
-        {`${dollars(s.feeCents)} per RSVP, charged after each one and never more than your weekly limit. Under 5 RSVPs costs nothing.`}
+        {`${dollars(s.feeCents)} per RSVP, counted 2 hours before and charged after each one, never more than your weekly limit. Under 5 RSVPs costs nothing.`}
+        {firstNightFree ? " Your first Neighbor Hour is free." : ""}
         {s.setupFeeOwed ? ` A one-time ${dollars(s.setupFeeCents)} setup is added to your first paid one.` : ""}
         {" We confirm each one with you about a week ahead, and you can skip any before it's booked."}
       </p>

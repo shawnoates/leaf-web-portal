@@ -241,6 +241,8 @@ export default function HostIntroVideoCard({
   const started = planStarted || video.planStarted === true;
   // Roster hosts have a bio on the page; everyone else has their name.
   const besideWhat = source.kind === "offer" ? "your bio" : "your name";
+  // A business records its hello once; Leaf puts it on every plan it makes for them.
+  const business = source.kind === "merchant";
 
   // Mux usually has a phone clip playable in well under a minute. Poll the
   // page while it says processing so the host sees it flip without a
@@ -444,12 +446,14 @@ export default function HostIntroVideoCard({
       {live ? (
         <>
           <h2 className="text-[17px] font-semibold text-leaf-900">
-            {video.planCancelled ? "This plan was called off." : "Your intro is on the plan page."}
+            {video.planCancelled ? "This plan was called off." : business ? "Your hello is saved." : "Your intro is on the plan page."}
           </h2>
           <p className="mt-1.5 text-[14px] leading-snug text-zinc-600">
             {video.planCancelled
               ? "Your intro is saved, but there's no plan page for it to be on any more."
-              : video.bonusEarned
+              : business
+                ? "We put it on every Neighbor Hour plan we create for you, so neighbors see who they\u2019re meeting."
+                : video.bonusEarned
                 ? `You earned ${bonus} on top — it's paid with the plan.`
                 : bonus
                   ? "Added after the bonus window, but it's up, and people RSVP to a face."
@@ -493,7 +497,10 @@ export default function HostIntroVideoCard({
             </picture>
           )}
           <p className={`${embedded ? "mt-2" : "mt-4"} text-[14px] leading-snug text-zinc-600`}>
-            A quick intro to camera goes on the plan page next to {besideWhat}.{video.rsvpStat ? "" : " People RSVP to a face."}
+            {business
+              ? "Record it once. This is the video we attach to each Neighbor Hour plan when we create it, so it isn\u2019t about any one night: just who you are and what your place is like."
+              : `A quick intro to camera goes on the plan page next to ${besideWhat}.`}
+            {video.rsvpStat ? "" : " People RSVP to a face."}
             {bonusOpen && deadlineLabel
               ? ` It pays ${bonus} on top if it's up by ${deadlineLabel}.`
               : bonus

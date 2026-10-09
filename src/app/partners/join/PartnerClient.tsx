@@ -19,7 +19,7 @@ import { Brand, Field, Shell, formatPhone, input } from "@/app/o/m/[token]/ui";
 import { type RememberedPartner, forgetPartner, rememberedPartner } from "@/app/o/m/[token]/remember";
 
 type Place = { placeId: string; name: string; address: string; type: string };
-type Outcome = { outcome: "offer" | "known" | "no_calendar" | "no_week" | "thanks"; name?: string; token?: string };
+type Outcome = { outcome: "offer" | "known" | "waitlist" | "no_calendar" | "no_week" | "thanks"; name?: string; token?: string };
 type RepLead = {
   valid: boolean;
   businessName?: string | null;
@@ -116,7 +116,9 @@ export default function PartnerClient() {
     const body =
       done.outcome === "known"
         ? `We already know ${name}. Shawn will reach out within a day to pick up where you left off.`
-        : done.outcome === "no_calendar"
+        : done.outcome === "waitlist"
+          ? `Leaf isn't open to businesses near ${name} yet, so you're on the waitlist. We'll email you as soon as your neighborhood opens.`
+          : done.outcome === "no_calendar"
           ? `There isn't a Leaf calendar near ${name} yet. We'll email you as soon as your neighborhood opens.`
           : done.outcome === "no_week"
             ? `The next few weeks near ${name} are spoken for. You're first in line, and we'll email you when a time opens.`
@@ -126,7 +128,7 @@ export default function PartnerClient() {
         <Brand />
         <div className="mt-10 rounded-3xl bg-white p-6 shadow-sm">
           <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">Thanks</p>
-          <h1 className="mt-2 font-fm-serif text-[34px] leading-[1.05] text-stone-900">We&rsquo;ve got you.</h1>
+          <h1 className="mt-2 font-fm-serif text-[34px] leading-[1.05] text-stone-900">{done.outcome === "waitlist" ? "You\u2019re on the list." : "We\u2019ve got you."}</h1>
           <p className="mt-3 text-[16px] leading-relaxed text-stone-600">{body}</p>
         </div>
       </Shell>
