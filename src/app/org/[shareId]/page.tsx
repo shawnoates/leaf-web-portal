@@ -290,6 +290,8 @@ interface PlanIdea {
   classTitle?: string | null;
   /** A placard idea someone hosted: the plan it became (its welcome sheet shows "I'm in"). */
   eventGroupId?: string | null;
+  /** A studio's after-class idea: the open spot nearby the group walks to. */
+  afterSpot?: { name: string; walkMin?: number | null; kind?: string | null } | null;
   interestCount?: number;
   // Cohort the idea was generated for ("moms", "parents_kids", …). Null on
   // ideas generated before cohort rotation and on calendars that declare their
@@ -3319,6 +3321,7 @@ export default function OrgCalendarPage() {
         bookingUrl: (idea.bookingUrl as string) ?? null,
         classTitle: (idea.classTitle as string) ?? null,
         eventGroupId: (idea.eventGroupId as string) ?? null,
+        afterSpot: (idea.afterSpot as PlanIdea["afterSpot"]) ?? null,
       });
       const planIdeas: PlanIdea[] = (result.planIdeas || []).map(mapIdea);
       const placardIdeas: PlanIdea[] = (result.placardWelcome?.ideas || []).map(mapIdea);

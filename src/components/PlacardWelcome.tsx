@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AnimationItem } from "lottie-web";
 import { Instrument_Sans } from "next/font/google";
-import { Check, Heart, Store, X } from "lucide-react";
+import { Check, Heart, MapPin, Store, X } from "lucide-react";
 
 const instrumentSans = Instrument_Sans({ subsets: ["latin"], weight: ["400", "500", "600"], display: "swap" });
 
@@ -47,6 +47,8 @@ type Idea = {
   preferredTime?: string | null;
   /** The plan a neighbor made of this idea, when someone hosted it. */
   eventGroupId?: string | null;
+  /** After a class: the open spot nearby the group walks to. */
+  afterSpot?: { name: string; walkMin?: number | null } | null;
 };
 
 /** A hosted idea's plan, as the calendar page knows it. */
@@ -358,6 +360,15 @@ export default function PlacardWelcome<T extends Idea>({
                 {idea.description && (
                   <p className="mt-2 line-clamp-2 text-[14px] leading-[1.45]" style={on ? { opacity: 0.85 } : { color: C.muted }}>
                     {idea.description}
+                  </p>
+                )}
+                {idea.afterSpot?.name && (
+                  <p className="mt-2 flex items-center gap-1.5 text-[13px] font-medium" style={on ? { opacity: 0.85 } : { color: C.muted }}>
+                    <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span className="truncate">
+                      Then {idea.afterSpot.name}
+                      {idea.afterSpot.walkMin ? ` \u00b7 ${idea.afterSpot.walkMin} min walk` : ""}
+                    </span>
                   </p>
                 )}
 
