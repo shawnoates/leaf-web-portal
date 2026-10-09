@@ -27,6 +27,19 @@ export default function PayoutSetup({ token }: { token: string }) {
     };
   }, [token]);
 
+  // Stripe login links work once and expire fast, so one is made per tap.
+  const openStripe = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = (await Parse.Cloud.run("createMerchantStripeLoginLink", { token })) as { url: string };
+      window.location.href = r.url;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't open Stripe.");
+      setBusy(false);
+    }
+  };
+
   const start = async () => {
     setBusy(true);
     setError(null);
@@ -44,7 +57,17 @@ export default function PayoutSetup({ token }: { token: string }) {
     <div id="payouts" className="mt-6 scroll-mt-6 rounded-2xl border border-zinc-200 bg-white p-5">
       <p className="text-[15px] font-semibold text-leaf-900">Get paid for your night</p>
       {status.payoutsEnabled ? (
-        <p className="mt-2 text-[15px] text-zinc-700">Payouts are set up. Ticket sales, less our 10%, go to your bank after the night.</p>
+        <>
+          <p className="mt-2 text-[15px] text-zinc-700">Payouts are set up. Ticket sales, less our 10%, go to your bank the morning after each night.</p>
+          <button
+            type="button"
+            onClick={openStripe}
+            disabled={busy}
+            className="mt-4 w-full rounded-xl border border-zinc-300 px-4 py-3 text-[15px] font-semibold text-leaf-900 hover:bg-zinc-50 disabled:opacity-40"
+          >
+            {busy ? "Opening Stripe…" : "View your payouts in Stripe"}
+          </button>
+        </>
       ) : (
         <>
           <p className="mt-2 text-[15px] leading-relaxed text-zinc-700">
