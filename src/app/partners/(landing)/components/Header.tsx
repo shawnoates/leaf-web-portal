@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CTA } from "./ui";
 import { JOIN_URL, LOGIN_URL } from "./config";
 import { signedInPartner } from "@/lib/merchant-session";
@@ -18,6 +18,15 @@ export default function Header() {
     a.href = `/o/m/${p.token}`;
     a.textContent = "Your dashboard";
     a.setAttribute("data-cta", "partner_dashboard");
+  }, []);
+
+  // Hairline under the bar only once the page has scrolled under it.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
@@ -49,21 +58,33 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="header">
+    <header className="header" data-scrolled={scrolled}>
       <div className="container header__in">
         <a className="brand" href="#top">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/leaf-logo-black.png" alt="Leaf" className="brand__logo" />
           <span className="brand__os">OS</span>
+          <span className="brand__for">For businesses</span>
         </a>
-        <div className="header__cta">
-          <a ref={signIn} className="link-ghost" href={LOGIN_URL} data-cta="partner_sign_in">
+        <nav className="header__nav">
+          <a className="header__link header__link--anchor" href="#how">
+            How it works
+          </a>
+          <a className="header__link header__link--anchor" href="#offer">
+            Pricing
+          </a>
+          <a
+            ref={signIn}
+            className="header__link header__link--strong"
+            href={LOGIN_URL}
+            data-cta="partner_sign_in"
+          >
             Partner sign in
           </a>
-          <CTA to="join" variant="primary">
+          <CTA to="join" variant="primary" small>
             Claim your free Neighbor Hour
           </CTA>
-        </div>
+        </nav>
       </div>
     </header>
   );

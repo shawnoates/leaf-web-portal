@@ -1,109 +1,66 @@
-import { CTA, Eyebrow, Plaque, TrustStrip } from "./ui";
+import { CTA, Plaque, TrustStrip } from "./ui";
 import Reveal from "./Reveal";
 
-function StorefrontArt() {
+// Neighbors around the table — the same photo the merchant dashboard uses
+// for a hosted night. object-position keeps the crop on the faces (and
+// clear of the generator's corner mark) at both the wide and square crops.
+function HeroMedia() {
   return (
-    <div
-      className="hero__art"
-      role="img"
-      aria-label="A local storefront with neighbors walking up from nearby buildings"
-    >
-      <svg
-        className="hero__people"
-        viewBox="0 0 400 440"
-        preserveAspectRatio="xMidYMid slice"
-        aria-hidden="true"
-      >
-        <defs>
-          <radialGradient id="p-glow" cx="50%" cy="22%" r="70%">
-            <stop offset="0%" stopColor="#cdeede" stopOpacity="0.45" />
-            <stop offset="100%" stopColor="#cdeede" stopOpacity="0" />
-          </radialGradient>
-        </defs>
-        <rect width="400" height="440" fill="url(#p-glow)" />
-        {[
-          { x: 26, h: 150 },
-          { x: 300, h: 180 },
-        ].map((b, i) => (
-          <g key={i}>
-            <rect x={b.x} y={120 + (180 - b.h)} width="74" height={b.h} rx="6" fill="#173d2c" />
-            {Array.from({ length: 12 }).map((_, k) => (
-              <rect
-                key={k}
-                x={b.x + 10 + (k % 3) * 20}
-                y={130 + Math.floor(k / 3) * 26 + (180 - b.h)}
-                width="12"
-                height="14"
-                rx="2"
-                fill="#74b894"
-                opacity="0.85"
-              />
-            ))}
-          </g>
-        ))}
-        <g>
-          <rect x="120" y="196" width="160" height="150" rx="8" fill="#fbfcfb" />
-          <rect x="120" y="196" width="160" height="34" rx="8" fill="#e8a33d" />
-          {Array.from({ length: 7 }).map((_, k) => (
-            <rect
-              key={k}
-              x={120 + k * 23}
-              y="230"
-              width="11.5"
-              height="18"
-              fill={k % 2 ? "#e8a33d" : "#fff"}
-              opacity="0.95"
-            />
-          ))}
-          <rect x="138" y="262" width="56" height="84" rx="4" fill="#cdeede" />
-          <rect x="206" y="262" width="56" height="50" rx="4" fill="#cdeede" />
-          <rect x="206" y="318" width="56" height="28" rx="4" fill="#2d6a4f" />
-          <circle cx="200" cy="214" r="6" fill="#173d2c" />
-        </g>
-        {[
-          [70, 400],
-          [110, 388],
-          [150, 372],
-          [190, 360],
-        ].map((p, i) => (
-          <circle key={i} cx={p[0]} cy={p[1]} r="5" fill="#2d6a4f" opacity={0.4 + i * 0.15} />
-        ))}
-        {[
-          [330, 400],
-          [290, 388],
-          [250, 374],
-          [212, 362],
-        ].map((p, i) => (
-          <circle
-            key={"r" + i}
-            cx={p[0]}
-            cy={p[1]}
-            r="5"
-            fill="#2d6a4f"
-            opacity={0.4 + i * 0.15}
-          />
-        ))}
-      </svg>
+    <div className="hero__media">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/hosted-night.jpg"
+        alt="Neighbors laughing around a table at a local bar while the owner pours wine"
+        className="hero__photo"
+      />
+
+      {/* What a Neighbor Hour looks like on the resident's calendar. */}
+      <div className="float float--event" aria-hidden="true">
+        <div className="float__meta">Thu &middot; 6:30 pm &middot; 3 min walk</div>
+        <div className="float__title">Neighbor Hour at your place</div>
+        <div className="float__row">
+          <div className="float__going">
+            <div className="avatars">
+              <span style={{ background: "#6dbf7a" }}>J</span>
+              <span style={{ background: "#2f6b3a" }}>P</span>
+              <span style={{ background: "#c08a4a" }}>M</span>
+              <span style={{ background: "#5c5c58" }}>+9</span>
+            </div>
+            12 going
+          </div>
+          <span className="float__badge">Neighbors</span>
+        </div>
+      </div>
+
+      <div className="float float--stat">
+        <div className="float__big">+67%</div>
+        <p className="float__label">
+          Repeat customers spend 67% more than first-timers. Yours live next door.
+        </p>
+        <Plaque>Bain &amp; Company</Plaque>
+      </div>
     </div>
   );
 }
 
 export default function Hero() {
   return (
-    <section id="top" className="hero band-paper section">
-      <div className="container hero__grid">
+    <section id="top" className="hero">
+      <div className="container">
         <Reveal>
-          <Eyebrow>For local businesses</Eyebrow>
-          <h1 className="h-xl">
-            Neighbors in your{" "}
-            <span className="underline-amber">slowest hours.</span>
+          <span className="hero__pill">
+            <span className="hero__pill-dot" aria-hidden="true" />
+            Leaf for local businesses
+          </span>
+          <h1 className="h-display">
+            Neighbors in your <br /><span className="accent">slowest hours.</span>
           </h1>
-          <p className="lead" style={{ marginTop: 22 }}>
+          <p className="lead">
             Tell us your slowest days and hours. We&rsquo;ll send the residents who live
-            around the corner, from your neighborhood&rsquo;s Leaf calendar. Your first Neighbor Hour
-            is free: no listing fee, no RSVP fees.
+            around the corner, from your neighborhood&rsquo;s Leaf calendar. Your first
+            Neighbor Hour is free: no listing fee, no RSVP fees.
           </p>
-          <div className="cta-row" style={{ marginTop: 28 }}>
+          <div className="cta-row cta-row--center">
             <CTA to="join" variant="primary" arrow>
               Claim your free Neighbor Hour
             </CTA>
@@ -111,23 +68,11 @@ export default function Hero() {
               Partner sign in
             </CTA>
           </div>
-          <TrustStrip />
+          <TrustStrip center />
         </Reveal>
 
         <Reveal delay={120}>
-          <div style={{ position: "relative" }}>
-            <StorefrontArt />
-            <div className="chip">
-              <div className="chip__big">+67% spend</div>
-              <div className="chip__label">
-                Repeat customers spend 67% more than first-timers &mdash; and yours live next
-                door.
-              </div>
-              <div style={{ marginTop: 10 }}>
-                <Plaque>Bain &amp; Company</Plaque>
-              </div>
-            </div>
-          </div>
+          <HeroMedia />
         </Reveal>
       </div>
     </section>

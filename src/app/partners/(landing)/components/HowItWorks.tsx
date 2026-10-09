@@ -1,19 +1,19 @@
-import { CTA, Eyebrow, Plaque } from "./ui";
+import { CTA, Plaque, SectionHead } from "./ui";
 import Reveal from "./Reveal";
 
 const steps = [
   {
-    n: "1",
+    n: "01",
     h: "Tell us your slowest hours",
     b: "Pick the days and hours you’d most like to fill, and add a card to claim your free Neighbor Hour.",
   },
   {
-    n: "2",
+    n: "02",
     h: "We bring the neighbors",
     b: "Your Neighbor Hour goes on your neighborhood’s Leaf calendar. Residents a short walk away RSVP. A typical one draws 8 to 15.",
   },
   {
-    n: "3",
+    n: "03",
     h: "They come back",
     b: "They order their own, meet each other, and find their new spot. Book more when it works.",
   },
@@ -21,42 +21,48 @@ const steps = [
 
 export default function HowItWorks() {
   return (
-    <section id="how" className="band-forest section">
+    <section id="how" className="section band-alt">
       <div className="container">
-        <Reveal className="section-head">
-          <Eyebrow>How it works</Eyebrow>
-          <h2 className="h-lg">It&rsquo;s a recommendation, not an ad.</h2>
-          <p className="lead">
-            Residents see you{" "}
-            <strong style={{ color: "#fff" }}>inside their building&rsquo;s community</strong>{" "}
-            &mdash; a place they trust, alongside their neighbors &mdash; not as one more ad
-            they scroll past. That&rsquo;s a fundamentally warmer way to be found.
-          </p>
+        <Reveal>
+          <SectionHead
+            eyebrow="How it works"
+            title={<>It&rsquo;s a recommendation, not an ad.</>}
+            lead={
+              <>
+                Residents see you inside their building&rsquo;s community &mdash; a place they
+                trust, alongside their neighbors &mdash; not as one more ad they scroll past.
+                That&rsquo;s a fundamentally warmer way to be found.
+              </>
+            }
+          />
         </Reveal>
 
         <div className="steps">
           {steps.map((s, i) => (
             <Reveal className="step" key={s.n} delay={i * 90}>
               <div className="step__n">{s.n}</div>
-              <h3>{s.h}</h3>
-              <p style={{ color: "var(--light)" }}>{s.b}</p>
+              <h3 className="step__title">{s.h}</h3>
+              <p className="step__body">{s.b}</p>
             </Reveal>
           ))}
         </div>
 
-        <Reveal style={{ marginTop: 30 }}>
-          <p style={{ color: "var(--light)", maxWidth: "62ch" }}>
-            Personal, local recommendations are still the most trusted way people choose
-            where to go &mdash; far more than ads or even online reviews. Leaf OS puts you
-            on the right side of that: discovered by neighbors, in the community they trust.
-          </p>
-          <div style={{ marginTop: 12 }}>
+        <Reveal className="trust-note">
+          <span className="trust-note__mark" aria-hidden="true">
+            &ldquo;
+          </span>
+          <div>
+            <p>
+              Personal, local recommendations are still the most trusted way people choose
+              where to go &mdash; far more than ads or even online reviews. Leaf OS puts you
+              on the right side of that: discovered by neighbors, in the community they trust.
+            </p>
             <Plaque>Local consumer trust research</Plaque>
-          </div>
-          <div className="inline-cta">
-            <CTA to="join" variant="primary" arrow>
-              Claim your free Neighbor Hour
-            </CTA>
+            <div className="inline-cta" style={{ marginTop: 28 }}>
+              <CTA to="join" variant="primary" arrow>
+                Claim your free Neighbor Hour
+              </CTA>
+            </div>
           </div>
         </Reveal>
       </div>

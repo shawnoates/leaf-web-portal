@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CTA } from "./ui";
+import { CTA, SectionHead } from "./ui";
 
 const items = [
   {
@@ -33,35 +33,38 @@ const items = [
 export default function Objections() {
   const [open, setOpen] = useState<number>(0);
   return (
-    <section className="band-white section">
-      <div className="container" style={{ maxWidth: 860 }}>
-        <div className="section-head" style={{ marginBottom: 30 }}>
-          <h2 className="h-lg">What you&rsquo;re probably thinking.</h2>
-        </div>
-        <div className="acc">
+    <section className="section">
+      <div className="container">
+        <SectionHead center eyebrow="FAQ" title={<>What you&rsquo;re probably thinking.</>} />
+        <div className="faq">
           {items.map((it, i) => {
             const isOpen = open === i;
             return (
               <div className="acc__item" key={i} data-open={isOpen}>
                 <button
+                  type="button"
                   className="acc__q"
                   aria-expanded={isOpen}
                   onClick={() => setOpen(isOpen ? -1 : i)}
                 >
                   {it.q}
-                  <span className="acc__sign" aria-hidden="true" />
+                  <span className="acc__sign" aria-hidden="true">
+                    +
+                  </span>
                 </button>
                 <div className="acc__a">
-                  <p>{it.a}</p>
+                  <div>
+                    <p>{it.a}</p>
+                  </div>
                 </div>
               </div>
             );
           })}
-        </div>
-        <div className="inline-cta">
-          <CTA to="join" variant="primary" arrow>
-            Claim your free Neighbor Hour
-          </CTA>
+          <div className="inline-cta" style={{ textAlign: "center" }}>
+            <CTA to="join" variant="primary" arrow>
+              Claim your free Neighbor Hour
+            </CTA>
+          </div>
         </div>
       </div>
     </section>

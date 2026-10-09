@@ -1,4 +1,4 @@
-import { CTA, Eyebrow } from "./ui";
+import { CTA, SectionHead } from "./ui";
 import Reveal from "./Reveal";
 
 /**
@@ -12,22 +12,25 @@ import Reveal from "./Reveal";
  */
 export default function Offer() {
   return (
-    <section id="offer" className="band-white section">
+    <section id="offer" className="section">
       <div className="container">
-        <Reveal className="section-head">
-          <Eyebrow>What it costs</Eyebrow>
-          <h2 className="h-lg">You only pay for neighbors who said they&rsquo;re coming.</h2>
-          <p className="lead">
-            No contract and no setup fee. Try one, see who walks in, and book more when
-            it works.
-          </p>
+        <Reveal>
+          <SectionHead
+            center
+            eyebrow="What it costs"
+            title={<>You only pay for neighbors who said they&rsquo;re coming.</>}
+            lead="No contract and no setup fee. Try one, see who walks in, and book more when it works."
+          />
         </Reveal>
 
         <div className="offer-grid">
-          <Reveal className="offer offer--reco">
+          <Reveal className="offer offer--dark on-dark">
             <span className="offer__tag">Free</span>
             <div className="offer__kind">Your first Neighbor Hour</div>
-            <h3>On us</h3>
+            <div className="offer__price">
+              <span className="offer__amount">$0</span>
+              <span className="offer__per">on us</span>
+            </div>
             <p className="offer__desc">
               No listing fee and no RSVP fees. Add a card to claim it. The free Neighbor Hour is
               held for 7 days after you first open your link.
@@ -45,9 +48,11 @@ export default function Offer() {
           </Reveal>
 
           <Reveal className="offer" delay={100}>
-            <span className="offer__tag offer__tag--quiet">$6 per RSVP</span>
             <div className="offer__kind">Every one after</div>
-            <h3>Pay per person</h3>
+            <div className="offer__price">
+              <span className="offer__amount">$6</span>
+              <span className="offer__per">per RSVP</span>
+            </div>
             <p className="offer__desc">
               Pick your slow days and a weekly limit, and switch it on or off anytime, like
               an ad campaign. $6 for each neighbor who RSVPs, counted 2 hours before and
@@ -62,16 +67,16 @@ export default function Offer() {
           </Reveal>
         </div>
 
-        <Reveal style={{ marginTop: 28, textAlign: "center" }}>
-          <p style={{ color: "var(--muted)" }}>
+        <Reveal className="offer-notes">
+          <p>
             Partners can also post deals on their neighborhood&rsquo;s calendar from their
             dashboard: $20 a month, charged once it&rsquo;s approved.
           </p>
-          <p style={{ color: "var(--muted)", marginTop: 12 }}>
+          <p>
             Want something custom, or several locations?{" "}
-            <strong style={{ color: "var(--forest)" }}>Talk to a partner manager.</strong>
+            <strong>Talk to a partner manager.</strong>
           </p>
-          <div className="inline-cta" style={{ display: "inline-block" }}>
+          <div className="inline-cta" style={{ marginTop: 20 }}>
             <CTA to="manager" variant="ghost" arrow>
               Talk to a partner manager
             </CTA>

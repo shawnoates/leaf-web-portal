@@ -22,6 +22,27 @@ export function Eyebrow({ children }: { children: ReactNode }) {
   return <p className="eyebrow">{children}</p>;
 }
 
+/** Eyebrow + italic serif heading + optional lead, the homepage's section opener. */
+export function SectionHead({
+  eyebrow,
+  title,
+  lead,
+  center = false,
+}: {
+  eyebrow?: ReactNode;
+  title: ReactNode;
+  lead?: ReactNode;
+  center?: boolean;
+}) {
+  return (
+    <div className={`section-head${center ? " section-head--center" : ""}`}>
+      {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
+      <h2 className="h-section">{title}</h2>
+      {lead && <p className="lead">{lead}</p>}
+    </div>
+  );
+}
+
 export function Plaque({ children }: { children: ReactNode }) {
   // Plain inline source citation — no pill, no dot. Matches the same
   // treatment on /resident-managers so the two marketing pages share
@@ -46,18 +67,20 @@ export function CTA({
   to = "join",
   variant = "primary",
   arrow = false,
+  small = false,
   children,
 }: {
   to?: CTATarget;
   variant?: CTAVariant;
   arrow?: boolean;
+  small?: boolean;
   children: ReactNode;
 }) {
   const { href, track } = MAP[to];
   const isExternal = /^https?:/.test(href);
   return (
     <a
-      className={`btn btn-${variant}`}
+      className={`btn btn-${variant}${small ? " btn-sm" : ""}`}
       href={href}
       data-cta={track}
       {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
@@ -72,9 +95,9 @@ export function CTA({
   );
 }
 
-export function TrustStrip() {
+export function TrustStrip({ center = false }: { center?: boolean }) {
   return (
-    <div className="trust">
+    <div className={`trust${center ? " trust--center" : ""}`}>
       <span>First Neighbor Hour free</span>
       <span>$6 per RSVP after</span>
       <span>No contract</span>

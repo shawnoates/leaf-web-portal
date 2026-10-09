@@ -27,7 +27,7 @@ function ShareRing({
           cx="50"
           cy="50"
           r={r}
-          stroke="var(--mint-deep)"
+          stroke="rgba(255,255,255,0.1)"
           strokeWidth="13"
           fill="none"
         />
@@ -48,10 +48,9 @@ function ShareRing({
           y="50"
           textAnchor="middle"
           dominantBaseline="central"
-          fontFamily="var(--display)"
-          fontSize="22"
-          fontWeight="700"
-          fill="var(--forest)"
+          fontFamily="var(--serif)"
+          fontSize="26"
+          fill="#fff"
         >
           {pct}%
         </text>
@@ -63,71 +62,61 @@ function ShareRing({
 
 export default function Insight() {
   return (
-    <section className="band-mint section">
-      <div className="container">
-        <Reveal className="section-head">
+    <section className="section band-forest">
+      <div className="container insight">
+        <Reveal>
           <Eyebrow>Why it pays</Eyebrow>
-          <h2 className="h-lg">An ad gets you a click. A neighbor gets you a regular.</h2>
-          <p className="lead">
+          <h2 className="h-section" style={{ color: "#fff" }}>
+            An ad gets you a click. <span className="accent">A neighbor gets you a regular.</span>
+          </h2>
+          <p className="lead" style={{ marginTop: 16 }}>
             The money isn&rsquo;t in one-time foot traffic &mdash; it&rsquo;s in repeat
             visits. And the closer someone lives, the more often they come back.
           </p>
+
+          <div style={{ marginTop: "clamp(32px, 4vw, 52px)" }}>
+            <div className="insight__big">
+              25&ndash;<em>95%</em>
+            </div>
+            <p className="insight__cap">
+              more profit from just a 5% increase in repeat customers.
+            </p>
+            <Plaque>Bain &amp; Company &middot; HBR</Plaque>
+          </div>
+
+          <div className="inline-cta">
+            <CTA to="join" variant="primary" arrow>
+              Claim your free Neighbor Hour
+            </CTA>
+          </div>
         </Reveal>
 
-        <div className="grid grid-2" style={{ alignItems: "stretch" }}>
-          <Reveal
-            className="card"
-            style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}
-          >
-            <div className="bigstat" style={{ padding: 0 }}>
-              <div
-                className="bigstat__num"
-                style={{ fontSize: "clamp(3.6rem, 11vw, 6.4rem)" }}
-              >
-                25&ndash;<em>95%</em>
-              </div>
-              <p className="bigstat__cap">
-                more profit from just a <strong>5% increase in repeat customers.</strong>
-              </p>
-              <div style={{ marginTop: 18 }}>
-                <Plaque>Bain &amp; Company &middot; HBR</Plaque>
-              </div>
+        <Reveal className="insight__card" delay={100}>
+          <h3 className="insight__card-title">
+            A small slice of customers drives a big slice of revenue
+          </h3>
+          <p className="insight__card-sub">
+            Share of a typical business&rsquo;s customers vs. share of revenue.
+          </p>
+
+          <div className="ratio-pair">
+            <ShareRing pct={21} color="rgba(255,255,255,0.55)" label="of customers" />
+            <div className="ratio-pair__arrow" aria-hidden="true">
+              drives
             </div>
-          </Reveal>
+            <ShareRing pct={44} color="var(--green-light)" label="of revenue" />
+          </div>
+          <p className="ratio-pair__caption">
+            Repeat customers are about <b>21%</b> of the base &mdash; and they generate{" "}
+            <b>~44%</b> of all revenue. More than 2&times; their share.
+          </p>
 
-          <Reveal className="card" delay={100}>
-            <h3 className="h-md" style={{ marginBottom: 6, fontSize: "1.3rem" }}>
-              A small slice of customers drives a big slice of revenue
-            </h3>
-            <p style={{ color: "var(--muted)", margin: "0 0 22px", fontSize: "0.92rem" }}>
-              Share of a typical business&rsquo;s customers vs. share of revenue.
-            </p>
-
-            <div className="ratio-pair">
-              <ShareRing pct={21} color="var(--mid)" label="of customers" />
-              <div className="ratio-pair__arrow" aria-hidden="true">
-                drives
-              </div>
-              <ShareRing pct={44} color="var(--amber)" label="of revenue" />
-            </div>
-            <p className="ratio-pair__caption">
-              Repeat customers are about <b>21%</b> of the base — and they generate{" "}
-              <b>~44%</b> of all revenue. More than 2&times; their share.
-            </p>
-
-            <p style={{ marginTop: 22, fontWeight: 700, color: "var(--forest)" }}>
-              The residents next door are the most likely people to become those regulars.
-            </p>
-            <div style={{ marginTop: 10 }}>
-              <Plaque>Gorgias &middot; repeat-customer data</Plaque>
-            </div>
-          </Reveal>
-        </div>
-
-        <Reveal className="inline-cta">
-          <CTA to="join" variant="primary" arrow>
-            Claim your free Neighbor Hour
-          </CTA>
+          <p className="insight__kicker">
+            The residents next door are the most likely people to become those regulars.
+          </p>
+          <div style={{ marginTop: 10 }}>
+            <Plaque>Gorgias &middot; repeat-customer data</Plaque>
+          </div>
         </Reveal>
       </div>
     </section>

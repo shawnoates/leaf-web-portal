@@ -1,4 +1,4 @@
-import { Eyebrow, Plaque } from "./ui";
+import { Plaque, SectionHead } from "./ui";
 import Reveal from "./Reveal";
 
 const proof = [
@@ -37,21 +37,25 @@ const proof = [
 
 export default function Proof() {
   return (
-    <section className="band-mint section">
+    <section className="section band-alt">
       <div className="container">
-        <Reveal className="section-head">
-          <Eyebrow>The evidence</Eyebrow>
-          <h2 className="h-lg">The math is on your side.</h2>
-          <p className="lead">
-            Reaching nearby residents and turning them into regulars isn&rsquo;t a
-            nice-to-have &mdash; it&rsquo;s the most profitable customer you can get.
-          </p>
+        <Reveal>
+          <SectionHead
+            eyebrow="The evidence"
+            title="The math is on your side."
+            lead={
+              <>
+                Reaching nearby residents and turning them into regulars isn&rsquo;t a
+                nice-to-have &mdash; it&rsquo;s the most profitable customer you can get.
+              </>
+            }
+          />
         </Reveal>
 
         <div className="proof-grid">
           {proof.map((p, i) => (
-            <Reveal className="card" key={p.fig + i} delay={(i % 3) * 90}>
-              <div className="proof__fig stat-fig">{p.fig}</div>
+            <Reveal className="proof" key={p.fig + i} delay={(i % 3) * 90}>
+              <div className="proof__fig">{p.fig}</div>
               <p className="proof__line">{p.line}</p>
               <Plaque>{p.src}</Plaque>
             </Reveal>

@@ -1,19 +1,15 @@
-import { Eyebrow, Plaque } from "./ui";
+import { Plaque, SectionHead } from "./ui";
 import Reveal from "./Reveal";
 
 function RadiusArt() {
   return (
     <div
-      className="radius"
+      className="map"
       role="img"
       aria-label="Your store at the center of a 5-minute walk full of nearby residents"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/partners-opportunity.png"
-        alt=""
-        className="radius__photo"
-      />
+      <img src="/partners-opportunity.png" alt="" />
     </div>
   );
 }
@@ -38,37 +34,38 @@ const stats = [
 
 export default function Opportunity() {
   return (
-    <section id="nearby" className="band-white section">
+    <section id="nearby" className="section band-rule">
       <div className="container">
-        <Reveal className="section-head">
-          <Eyebrow>The opportunity</Eyebrow>
-          <h2 className="h-lg">There&rsquo;s a customer base living right around you.</h2>
-          <p className="lead">
-            Hundreds of residents in the buildings nearby are looking for exactly what you
-            offer &mdash; and they&rsquo;d rather it be local. You just need to reach them
-            where they already plan their week.
-          </p>
+        <Reveal>
+          <SectionHead
+            eyebrow="The opportunity"
+            title={<>There&rsquo;s a customer base living right around you.</>}
+            lead={
+              <>
+                Hundreds of residents in the buildings nearby are looking for exactly what
+                you offer &mdash; and they&rsquo;d rather it be local. You just need to reach
+                them where they already plan their week.
+              </>
+            }
+          />
         </Reveal>
 
-        <div className="hero__grid">
+        <div className="split">
           <Reveal>
             <RadiusArt />
           </Reveal>
-          <Reveal delay={100} className="grid" style={{ gap: 16 }}>
-            {stats.map((s) => (
-              <div
-                className="card opportunity-stat"
-                key={s.fig}
-              >
-                <div className="opportunity-stat__fig stat-amber stat-fig">
-                  {s.fig}
-                </div>
-                <div className="opportunity-stat__body">
-                  <p style={{ marginBottom: 8 }}>{s.line}</p>
-                  <Plaque>{s.src}</Plaque>
-                </div>
-              </div>
-            ))}
+          <Reveal delay={100}>
+            <ul className="statlist">
+              {stats.map((s) => (
+                <li key={s.fig}>
+                  <div className="statlist__fig">{s.fig}</div>
+                  <div>
+                    <p className="statlist__line">{s.line}</p>
+                    <Plaque>{s.src}</Plaque>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </Reveal>
         </div>
       </div>

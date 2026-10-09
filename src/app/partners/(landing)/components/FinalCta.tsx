@@ -1,22 +1,21 @@
+import Link from "next/link";
 import { CTA, TrustStrip } from "./ui";
 import Reveal from "./Reveal";
 
 export function FinalCta() {
   return (
-    <section className="band-forest section">
-      <div className="container" style={{ textAlign: "center", maxWidth: 760 }}>
+    <section className="section band-forest closing">
+      <div className="container">
         <Reveal>
-          <h2 className="h-xl" style={{ fontSize: "clamp(2.2rem, 5vw, 3.4rem)" }}>
-            Fill your slowest hours with neighbors.
+          <h2 className="closing__h">
+            Fill your slowest hours
+            <em>with neighbors.</em>
           </h2>
-          <p className="lead" style={{ margin: "20px auto 0" }}>
-            Your first Neighbor Hour is free: no listing fee, no RSVP fees. Claim it in two minutes,
-            and nothing is charged today.
+          <p className="lead">
+            Your first Neighbor Hour is free: no listing fee, no RSVP fees. Claim it in two
+            minutes, and nothing is charged today.
           </p>
-          <div
-            className="cta-row"
-            style={{ marginTop: 30, marginInline: "auto" }}
-          >
+          <div className="cta-row cta-row--center">
             <CTA to="join" variant="primary" arrow>
               Claim your free Neighbor Hour
             </CTA>
@@ -24,9 +23,7 @@ export function FinalCta() {
               Partner sign in
             </CTA>
           </div>
-          <div style={{ display: "flex", justifyContent: "center" }}>
-            <TrustStrip />
-          </div>
+          <TrustStrip center />
         </Reveal>
       </div>
     </section>
@@ -37,20 +34,36 @@ export function Footer() {
   return (
     <footer className="footer">
       <div className="container footer__in">
-        <a className="brand brand--light" href="#top">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/leaf-logo-white.svg" alt="Leaf" className="brand__logo" />
-          <span className="brand__os brand__os--light">OS</span>
-        </a>
-        <nav className="footer__links">
+        <div className="footer__about">
+          <a className="brand" href="#top">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/leaf-logo-black.png" alt="Leaf" className="brand__logo" />
+            <span className="brand__os">OS</span>
+          </a>
+          <p>Leaf OS connects local businesses with the neighbors next door.</p>
+        </div>
+        <nav className="footer__col">
+          <div className="footer__title">For businesses</div>
           <a href="#nearby">The opportunity</a>
-          <a href="#offer">What it costs</a>
           <a href="#how">How it works</a>
-          <a href="/partners/login">Partner sign in</a>
+          <a href="#offer">What it costs</a>
+          <Link href="/partners/login">Partner sign in</Link>
+        </nav>
+        <nav className="footer__col">
+          <div className="footer__title">Leaf</div>
+          <Link href="/">Home</Link>
+          <Link href="/about">About</Link>
+          <Link href="/organizations">For organizations</Link>
+          <Link href="/help">Help</Link>
+        </nav>
+        <nav className="footer__col">
+          <div className="footer__title">Legal</div>
+          <Link href="/terms-conditions">Terms</Link>
+          <Link href="/privacy-policy">Privacy</Link>
+          <Link href="/safety">Safety</Link>
         </nav>
         <p className="footer__copy">
-          Leaf OS connects local businesses with the neighbors next door. &copy;{" "}
-          {new Date().getFullYear()} Leaf by One Common LLC.
+          &copy; {new Date().getFullYear()} Leaf by One Common LLC.
         </p>
       </div>
     </footer>

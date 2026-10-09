@@ -10,19 +10,19 @@ import { FinalCta, Footer } from "./components/FinalCta";
 
 export default function PartnersPage() {
   return (
-    <>
+    <div className="pl">
       <Header />
       <main>
         <Hero />
         <Opportunity />
         <Insight />
-        <Offer />
         <HowItWorks />
+        <Offer />
         <Proof />
         <Objections />
         <FinalCta />
       </main>
       <Footer />
-    </>
+    </div>
   );
 }
