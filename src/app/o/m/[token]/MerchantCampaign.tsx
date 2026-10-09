@@ -31,7 +31,7 @@ type CampaignState = {
     attendedPerNight: Range | null;
     showRate: number | null;
     // Hosts' receipts, or (before any) the app's split-the-bill receipts.
-    spendPerGuest: (Range & { mean?: number; scope: "category" | "everywhere" | "splits_category" | "splits_everywhere"; nights: number }) | null;
+    spendPerGuest: (Range & { mean?: number; label?: string | null; scope: "category" | "everywhere" | "splits_category" | "splits_everywhere"; nights: number }) | null;
   } | null;
   calendarName: string;
 };
@@ -64,6 +64,12 @@ function outlook(s: CampaignState, budgetCents: number) {
   const each = spend ? spend.mid ?? Math.round((spend.low + spend.high) / 2) : null;
   const sales: Range | null = each ? { low: guests.low * each, high: guests.high * each } : null;
   return { paid, guests, sales, each };
+}
+
+/** Where the per-guest figure comes from, naming their kind of place when the server says. */
+function spendSource(sp: { scope: keyof typeof SPEND_FROM; label?: string | null }) {
+  if (sp.label) return sp.scope === "category" ? `by hosts' receipts at ${sp.label}` : `by bills Leaf neighbors split at ${sp.label}`;
+  return SPEND_FROM[sp.scope].replace(/^from /, "by ");
 }
 
 /** Guest spend for a week, to the nearest $10. */
@@ -257,7 +263,7 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
       <p className="mt-2 text-[12px] leading-relaxed text-stone-500">
         {[
           `Your limit pays for ${o.paid} RSVPs a week at ${dollars(s.feeCents)} each. Guests: half to all of them show up.`,
-          o.each && est?.spendPerGuest ? ` Guest spend: that many guests at ${dollars(o.each)} a person, what a typical guest spends, going ${SPEND_FROM[est.spendPerGuest.scope].replace(/^from /, "by ")}.` : "",
+          o.each && est?.spendPerGuest ? ` Guest spend: that many guests at ${dollars(o.each)} a person, what a typical guest spends, going ${spendSource(est.spendPerGuest)}.` : "",
           " Estimates, not promises.",
         ].join("")}
       </p>
