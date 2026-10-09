@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { dollars } from "./ui";
+import { Toggle, dollars } from "./ui";
 import { merchantRun } from "@/lib/merchant-session";
 
 type Range = { low: number; high: number };
@@ -123,18 +123,15 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
           <h2 className="font-fm-serif text-[28px] leading-tight text-stone-900">Your Neighbor Hours</h2>
           <p className="mt-1 text-[15px] leading-relaxed text-stone-600">Pick your slow days and a weekly limit. We fill them with neighbors and charge your card after each one.</p>
         </div>
-        <label className="flex shrink-0 items-center gap-2 rounded-full border border-stone-200 px-3 py-1.5">
+        <div className="flex shrink-0 items-center gap-2 pt-1">
           <span className={`text-[14px] font-semibold ${on ? "text-leaf-700" : "text-stone-500"}`}>{on ? "On" : "Off"}</span>
-          <input
-            type="checkbox"
-            role="switch"
-            aria-label="Run my Neighbor Hours"
-            checked={on}
+          <Toggle
+            label="Run my Neighbor Hours"
+            on={on}
             disabled={saving || preview || (!on && (!days.length || !s.hasCard))}
-            onChange={(e) => save(e.target.checked)}
-            className="h-5 w-5 accent-leaf-800"
+            onChange={(v) => save(v)}
           />
-        </label>
+        </div>
       </div>
 
       {/* Plain about what's running and what it charges, and how to stop it. */}
@@ -147,22 +144,12 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
             {`We'll keep booking ${days.map((d) => `${WEEKDAY_NAMES[d.weekday]} ${d.partOfDay}s`).join(" and ") || "your days"} and charge ${dollars(s.feeCents)} per RSVP after each one, up to ${dollars(budget)} a week.`}
             {autoStarted ? " We turned this on when you held your free Neighbor Hour." : ""}
           </p>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              disabled={saving || preview}
-              onClick={() => save(false)}
-              className="h-10 rounded-xl border border-leaf-700 bg-white px-4 text-[14px] font-semibold text-leaf-800 disabled:opacity-40"
-            >
-              Switch off
-            </button>
-            <span className="text-[13px] text-leaf-800">Booked ones still happen. You can switch back on anytime.</span>
-          </div>
+          <p className="mt-2 text-[13px] text-leaf-800">Switch it off anytime with the toggle. Booked ones still happen.</p>
         </div>
       ) : (
         <div className="mt-5 rounded-2xl bg-stone-50 p-4 ring-1 ring-stone-200 sm:p-5">
           <p className="text-[16px] font-semibold text-stone-900">Your Neighbor Hours are off.</p>
-          <p className="mt-1 text-[15px] leading-relaxed text-stone-600">We won&rsquo;t book new ones until you switch them on. Ones already booked still happen.</p>
+          <p className="mt-1 text-[15px] leading-relaxed text-stone-600">Pick your days below, then flip the toggle to switch them on. Ones already booked still happen.</p>
         </div>
       )}
 
@@ -287,14 +274,15 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
       {note && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{note}</p>}
       {error && <p className="mt-2 text-[14px] text-red-600">{error}</p>}
 
-      {(dirty || (!on && days.length > 0)) && (
+      {/* Off: the toggle switches it on with these days. On: changes need saving. */}
+      {on && dirty && (
         <button
           type="button"
-          disabled={saving || preview || !days.length || (!s.hasCard && !on)}
+          disabled={saving || preview || !days.length}
           onClick={() => save(true)}
           className="mt-4 h-12 w-full rounded-xl bg-leaf-800 text-[15px] font-semibold text-white disabled:opacity-40"
         >
-          {saving ? "Saving…" : on ? "Save changes" : "Switch on"}
+          {saving ? "Saving…" : "Save changes"}
         </button>
       )}
     </section>
