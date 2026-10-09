@@ -14,7 +14,7 @@ const OG_ALT =
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Leaf for local businesses: neighbors in your slowest hours",
+  title: "Leaf Partners: neighbors in your slowest hours",
   description:
     "Tell us your slowest days and hours and we'll send the residents who live around the corner. Your first Neighbor Hour is free: no listing fee, no RSVP fees.",
   openGraph: {

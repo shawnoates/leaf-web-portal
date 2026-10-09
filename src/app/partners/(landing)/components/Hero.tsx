@@ -50,7 +50,7 @@ export default function Hero() {
         <Reveal>
           <span className="hero__pill">
             <span className="hero__pill-dot" aria-hidden="true" />
-            Leaf for local businesses
+            Leaf Partners
           </span>
           <h1 className="h-display">
             Neighbors in your <br /><span className="accent">slowest hours.</span>
