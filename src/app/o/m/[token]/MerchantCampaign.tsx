@@ -51,24 +51,18 @@ const STEP_CENTS = 600; // one RSVP per notch
 const span = (r: Range, f: (n: number) => string = String) => (r.low === r.high ? f(r.low) : `${f(r.low)}–${f(r.high)}`);
 
 /**
- * Mirrors weeklyOutlook in offer-merchant-campaign.js, with the median
- * carried through. Without a show rate yet, RSVPs stand in for guests.
+ * The week the limit buys: RSVPs is what it pays for (one number); guests
+ * range from half of those RSVPs showing up to all of them; spend is those
+ * guests at the average spend per person for places like theirs.
  */
-function outlook(s: CampaignState, budgetCents: number, nightsPerWeek: number) {
+const SHOW_LOW = 0.5;
+function outlook(s: CampaignState, budgetCents: number) {
   const paid = Math.floor(budgetCents / Math.max(1, s.feeCents));
-  const per = s.estimate?.rsvpsPerNight ?? null;
-  const times = (r: Range, k: number): Range => ({ low: r.low * k, high: r.high * k, mid: r.mid != null ? r.mid * k : undefined });
-  const cap = (r: Range): Range => ({ low: Math.min(paid, r.low), high: Math.min(paid, r.high), mid: r.mid != null ? Math.min(paid, r.mid) : undefined });
-  const draw = per && nightsPerWeek ? times(per, nightsPerWeek) : null;
-  const rsvps = draw ? cap(draw) : { low: paid, high: paid };
-  const rate = s.estimate?.showRate ?? null;
-  const guests = draw ? (rate != null ? { low: Math.round(rsvps.low * rate), high: Math.round(rsvps.high * rate), mid: rsvps.mid != null ? Math.round(rsvps.mid * rate) : undefined } : rsvps) : null;
+  const guests: Range = { low: Math.ceil(paid * SHOW_LOW), high: paid };
   const spend = s.estimate?.spendPerGuest ?? null;
-  // Guests times the usual spend: multiplying the low and high ends of both
-  // compounds the spread into a range too wide to plan with.
   const each = spend ? spend.mid ?? Math.round((spend.low + spend.high) / 2) : null;
-  const sales = guests && each ? { low: guests.low * each, high: guests.high * each, mid: guests.mid != null ? guests.mid * each : undefined } : null;
-  return { paid, rsvps, guests, sales, limitBinds: Boolean(draw && paid < draw.high), draw };
+  const sales: Range | null = each ? { low: guests.low * each, high: guests.high * each } : null;
+  return { paid, guests, sales, each };
 }
 
 /** Guest spend for a week, to the nearest $10. */
@@ -82,8 +76,6 @@ const SPEND_FROM: Record<"category" | "everywhere" | "splits_category" | "splits
   splits_everywhere: "from bills Leaf neighbors split on nights out",
 };
 
-/** "usually 2", under a range. */
-const usually = (r: Range | null, f: (n: number) => string = String) => (r && r.mid != null && r.low !== r.high ? `usually ${f(r.mid)}` : "");
 
 export default function MerchantCampaign({ token, preview, firstNightFree }: { token: string; preview?: boolean; firstNightFree?: boolean }) {
   const [s, setS] = useState<CampaignState | null>(null);
@@ -109,7 +101,7 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
       .catch(() => setS(null));
   }, [token]);
 
-  const o = useMemo(() => (s ? outlook(s, budget, days.length) : null), [s, budget, days.length]);
+  const o = useMemo(() => (s ? outlook(s, budget) : null), [s, budget]);
   if (!s || !o) return null;
 
   const toggleDay = (w: number) => {
@@ -139,8 +131,6 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
   };
 
   const est = s.estimate;
-  const where = est?.scope === "neighborhood" || est?.scope === "plans_neighborhood" ? (s.calendarName || "your neighborhood") : "Leaf neighborhoods";
-  const fromPlans = est?.scope === "plans_neighborhood" || est?.scope === "plans_everywhere";
   const spentPct = Math.min(100, Math.round((s.thisWeek.spentCents / Math.max(1, budget)) * 100));
 
   return (
@@ -251,36 +241,24 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
 
       <div className="mt-5 grid grid-cols-3 gap-2 text-center sm:gap-3">
         <div className="rounded-2xl bg-stone-50 px-2 py-4">
-          <p className="font-fm-serif text-[24px] leading-none text-stone-900">{span(o.rsvps)}</p>
+          <p className="font-fm-serif text-[24px] leading-none text-stone-900">{o.paid}</p>
           <p className="mt-1 text-[12px] text-stone-500">RSVPs a week</p>
-          {usually(o.rsvps) && <p className="mt-0.5 text-[12px] font-semibold text-stone-700">{usually(o.rsvps)}</p>}
         </div>
         <div className="rounded-2xl bg-stone-50 px-2 py-4">
-          <p className="font-fm-serif text-[24px] leading-none text-stone-900">{o.guests ? span(o.guests) : "—"}</p>
+          <p className="font-fm-serif text-[24px] leading-none text-stone-900">{span(o.guests)}</p>
           <p className="mt-1 text-[12px] text-stone-500">guests a week</p>
-          {usually(o.guests) && <p className="mt-0.5 text-[12px] font-semibold text-stone-700">{usually(o.guests)}</p>}
         </div>
         <div className="rounded-2xl bg-leaf-50 px-2 py-4">
-          <p className="font-fm-serif text-[24px] leading-none text-leaf-800">{o.sales ? span(o.sales, roundDollars) : "—"}</p>
+          <p className="font-fm-serif text-[24px] leading-none text-leaf-800">{o.sales ? span(o.sales, roundDollars) : "\u2014"}</p>
           <p className="mt-1 text-[12px] text-leaf-700">guest spend</p>
-          {usually(o.sales, roundDollars) && <p className="mt-0.5 text-[12px] font-semibold text-leaf-800">{usually(o.sales, roundDollars)}</p>}
         </div>
       </div>
       <p className="mt-2 text-[12px] leading-relaxed text-stone-500">
-        {est
-          ? [
-              est.rsvpsPerNight
-                ? fromPlans
-                  ? `Leaf plans ${est.scope === "plans_neighborhood" ? `in ${where}` : "across all neighborhoods"} draw ${span(est.rsvpsPerNight)} RSVPs, usually ${est.rsvpsPerNight.mid ?? est.rsvpsPerNight.low} (last ${est.nights}, until your own Neighbor Hours run).`
-                  : `Neighbor Hours in ${where} draw ${span(est.rsvpsPerNight)} RSVPs${est.attendedPerNight ? ` and ${span(est.attendedPerNight)} guests` : ""} (last ${est.nights}).`
-                : `Your limit covers up to ${o.paid} RSVPs a week at ${dollars(s.feeCents)} each.`,
-              est.spendPerGuest
-                ? ` Guests spend ${span(est.spendPerGuest, dollars)} each, usually ${dollars(est.spendPerGuest.mid ?? est.spendPerGuest.low)}, ${SPEND_FROM[est.spendPerGuest.scope]}.`
-                : "",
-              o.limitBinds && o.draw ? ` Your limit covers ${o.paid} RSVPs; your days usually draw up to ${o.draw.high}.` : "",
-              " Estimates, not promises.",
-            ].join("")
-          : `Your limit covers up to ${o.paid} RSVPs a week at ${dollars(s.feeCents)} each. We'll show typical turnout once there are a few to go on.`}
+        {[
+          `Your limit pays for ${o.paid} RSVPs a week at ${dollars(s.feeCents)} each. Guests: half to all of them show up.`,
+          o.each && est?.spendPerGuest ? ` Guest spend: that many guests at ${dollars(o.each)} a person, the average ${SPEND_FROM[est.spendPerGuest.scope]}.` : "",
+          " Estimates, not promises.",
+        ].join("")}
       </p>
 
       </div>
