@@ -31,7 +31,7 @@ type CampaignState = {
     attendedPerNight: Range | null;
     showRate: number | null;
     // Hosts' receipts, or (before any) the app's split-the-bill receipts.
-    spendPerGuest: (Range & { scope: "category" | "everywhere" | "splits_category" | "splits_everywhere"; nights: number }) | null;
+    spendPerGuest: (Range & { mean?: number; scope: "category" | "everywhere" | "splits_category" | "splits_everywhere"; nights: number }) | null;
   } | null;
   calendarName: string;
 };
@@ -60,7 +60,8 @@ function outlook(s: CampaignState, budgetCents: number) {
   const paid = Math.floor(budgetCents / Math.max(1, s.feeCents));
   const guests: Range = { low: Math.ceil(paid * SHOW_LOW), high: paid };
   const spend = s.estimate?.spendPerGuest ?? null;
-  const each = spend ? spend.mid ?? Math.round((spend.low + spend.high) / 2) : null;
+  // The mean spend per person (the median until the server sends the mean).
+  const each = spend ? spend.mean ?? spend.mid ?? Math.round((spend.low + spend.high) / 2) : null;
   const sales: Range | null = each ? { low: guests.low * each, high: guests.high * each } : null;
   return { paid, guests, sales, each };
 }
