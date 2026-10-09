@@ -427,7 +427,8 @@ export function tellLeafReceipt(r: TellLeafResult): string {
         : r.preferTime ? `around ${clockLabel(r.preferTime)}` : "";
   const prefer = r.preferDays?.length
     ? `I'll aim for ${listDays(r.preferDays)}${at ? `, ${at}` : ""}`
-    : at ? `I'll aim for nights ${at}` : "";
+    // "Nights" only for an evening time: noon is a daytime plan.
+    : at ? `I'll aim for ${isEvening(r.preferTime || w?.earliest || w?.latest || null) ? "nights" : "plans"} ${at}` : "";
   const avoid = r.avoidDays?.length ? `I'll steer clear of ${listDays(r.avoidDays)}` : "";
   const sky = r.weather === "nice" ? "I'll check the forecast and go for a dry, nice day" : "";
   const both = [prefer, avoid, sky].filter(Boolean).join(", and ");
