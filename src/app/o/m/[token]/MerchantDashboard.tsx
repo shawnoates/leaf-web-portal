@@ -7,11 +7,11 @@
  */
 
 import { type ReactNode, useEffect, useState } from "react";
-import Parse from "@/lib/parse-client";
 import { Brand, BusinessPhoto, CREAM, Shell, dollars, formatPhone } from "./ui";
 import MerchantHello from "./MerchantHello";
 import MerchantDeals from "./MerchantDeals";
 import MerchantCampaign from "./MerchantCampaign";
+import { merchantRun } from "@/lib/merchant-session";
 
 type Phase = "pending" | "confirmed" | "now" | "past" | "cancelled";
 type Step = { key: string; label: string; status: "done" | "current" | "todo"; you?: boolean; detail: string | null };
@@ -163,7 +163,7 @@ function NightContact({ token, n }: { token: string; n: Night }) {
     setBusy(true);
     setError(null);
     try {
-      const r = (await Parse.Cloud.run("updateMerchantNightContact", { token, slotId: n.id, name, phone, reset })) as {
+      const r = (await merchantRun("updateMerchantNightContact", { token, slotId: n.id, name, phone, reset })) as {
         contact: NonNullable<Night["contact"]>;
         introSent: boolean;
       };
@@ -422,7 +422,7 @@ export default function MerchantDashboard({
 
   const skipRequest = async (requestId: string) => {
     try {
-      await Parse.Cloud.run("merchantSkipRequest", { token, requestId });
+      await merchantRun("merchantSkipRequest", { token, requestId });
       setReload((n) => n + 1);
     } catch (e) {
       setBookError(e instanceof Error ? e.message : "Couldn't skip that one");
@@ -433,7 +433,7 @@ export default function MerchantDashboard({
     setBooking(true);
     setBookError(null);
     try {
-      const r = (await Parse.Cloud.run("merchantRequestNight", { token, dateKey: reqDate, partOfDay: reqPart })) as { request: { label: string } };
+      const r = (await merchantRun("merchantRequestNight", { token, dateKey: reqDate, partOfDay: reqPart })) as { request: { label: string } };
       setBookNote(`Requested: ${r.request.label}. We'll confirm the time within a day.`);
       setReqDate("");
       setReqPart(null);
@@ -447,7 +447,7 @@ export default function MerchantDashboard({
 
   useEffect(() => {
     let live = true;
-    Parse.Cloud.run("getOfferMerchantDashboard", { token })
+    merchantRun("getOfferMerchantDashboard", { token })
       .then((r: unknown) => {
         if (!live) return;
         const dash = r as Dashboard;

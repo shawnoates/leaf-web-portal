@@ -30,6 +30,8 @@ import { forgetPartner, rememberPartner } from "./remember";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 import FreeNightCountdown, { CountdownText, TYPICAL_RSVPS, useCountdown } from "./FreeNightCountdown";
+import { SIGN_IN_EVENT, forgetSession, isSignInError, merchantAuth, merchantRun, saveSession } from "@/lib/merchant-session";
+import SignInGate from "./SignInGate";
 
 type DateOption = { dateKey: string; label: string };
 
@@ -168,6 +170,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const [view, setView] = useState<"dashboard" | "form">("dashboard");
   const [noDashboard, setNoDashboard] = useState(false);
   const [welcome, setWelcome] = useState<string | null>(null);
+  // Signed up, but this device isn't signed in: the code screen.
+  const [signIn, setSignIn] = useState<{ hint: string } | null>(null);
   const showForm = useCallback(() => setView("form"), []);
   const dashboardUnavailable = useCallback(() => {
     setNoDashboard(true);
@@ -180,9 +184,31 @@ export default function MerchantOfferClient({ token }: { token: string }) {
 
   const load = useCallback(async () => {
     try {
-      const isPreview = new URLSearchParams(window.location.search).get("preview") === "1";
+      const qs = new URLSearchParams(window.location.search);
+      // ?preview=<signature> from the admin (the old ?preview=1 still shows the banner).
+      const isPreview = qs.has("preview");
       setPreview(isPreview);
-      const f = (await Parse.Cloud.run("getMerchantOfferForm", { token, preview: isPreview })) as Form;
+      // A fresh link from a Leaf email (?s=) signs this device in, then leaves the address bar.
+      const sig = qs.get("s");
+      if (sig) {
+        const r = (await Parse.Cloud.run("startMerchantSession", { token, s: sig }).catch(() => null)) as { session: string | null; name?: string } | null;
+        if (r?.session) saveSession(token, r.session, r.name || "");
+        qs.delete("s");
+        const rest = qs.toString();
+        window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}${window.location.hash}`);
+      }
+      let f: Form;
+      try {
+        f = (await Parse.Cloud.run("getMerchantOfferForm", { token, preview: isPreview, ...merchantAuth(token) })) as Form;
+      } catch (e) {
+        if (!isSignInError(e)) throw e;
+        // Signed up, and this device isn't signed in: ask for a code.
+        forgetSession(token);
+        const c = (await Parse.Cloud.run("checkMerchantSession", { token }).catch(() => null)) as { emailHint?: string } | null;
+        setSignIn({ hint: c?.emailHint || "" });
+        return;
+      }
+      setSignIn(null);
       setForm(f);
       // Keep a working link handy on this device; drop one that stopped working.
       // A preview is Shawn's device, not theirs: leave it alone.
@@ -228,6 +254,13 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // A call that finds this device signed out (an expired session) brings the code screen back.
+  useEffect(() => {
+    const ask = () => setSignIn((cur) => cur || { hint: "" });
+    window.addEventListener(SIGN_IN_EVENT, ask);
+    return () => window.removeEventListener(SIGN_IN_EVENT, ask);
+  }, []);
 
   // #card and #notifications links from receipts and reminders land on the right section.
   useEffect(() => {
@@ -278,10 +311,10 @@ export default function MerchantOfferClient({ token }: { token: string }) {
     try {
       if (perRsvp) await cardRef.current?.save();
       if (notices) {
-        const r = (await Parse.Cloud.run("updateMerchantNotices", { token, ...noticePayload(notices) })) as { notices: Notices };
+        const r = (await merchantRun("updateMerchantNotices", { token, ...noticePayload(notices) })) as { notices: Notices };
         setNotices(r.notices);
       }
-      const r = (await Parse.Cloud.run("submitMerchantOfferForm", {
+      const r = (await merchantRun("submitMerchantOfferForm", {
         token,
         accept: true,
         title: nightTitle,
@@ -298,7 +331,9 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         windows: form?.state === "accepted" ? windows : [],
         otherWindows: form?.state === "accepted" ? otherWindows : "",
         preferredDay: form?.state === "accepted" ? undefined : preferredDay,
-      })) as { state: string; bookedDate?: string | null; benched?: boolean; updated?: boolean; requested?: boolean };
+      })) as { state: string; bookedDate?: string | null; benched?: boolean; updated?: boolean; requested?: boolean; session?: string | null };
+      // Saying yes signs this device in to the dashboard it's about to land on.
+      if (r.session) saveSession(token, r.session, form?.merchantName || "");
       setDone({ bookedDate: r.bookedDate ?? null, benched: Boolean(r.benched), updated: r.updated });
       // Straight to their dashboard, with what just happened at the top.
       if (r.state === "accepted" && !noDashboard) {
@@ -327,7 +362,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
     if (preview) return;
     setBusy(true);
     try {
-      await Parse.Cloud.run("submitMerchantOfferForm", { token, accept: false, declineReason });
+      await merchantRun("submitMerchantOfferForm", { token, accept: false, declineReason });
       setForm((f) => (f ? { ...f, state: "declined" } : f));
     } catch (e) {
       setError(e instanceof Error ? e.message : "That didn't go through. Try again?");
@@ -336,6 +371,19 @@ export default function MerchantOfferClient({ token }: { token: string }) {
     }
   };
 
+  if (signIn) {
+    return (
+      <SignInGate
+        token={token}
+        hint={signIn.hint}
+        onSignedIn={() => {
+          setSignIn(null);
+          setLoading(true);
+          load();
+        }}
+      />
+    );
+  }
   if (loading) {
     return (
       <Shell>

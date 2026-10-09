@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
-import Parse from "@/lib/parse-client";
+import { merchantRun } from "@/lib/merchant-session";
 
 export default function PayoutSetup({ token }: { token: string }) {
   const [status, setStatus] = useState<{ connected: boolean; payoutsEnabled: boolean; detailsSubmitted?: boolean } | null>(null);
@@ -19,8 +19,8 @@ export default function PayoutSetup({ token }: { token: string }) {
 
   useEffect(() => {
     let alive = true;
-    Parse.Cloud.run("getMerchantPayoutStatus", { token })
-      .then((st: { connected: boolean; payoutsEnabled: boolean; detailsSubmitted?: boolean }) => alive && setStatus(st))
+    merchantRun<{ connected: boolean; payoutsEnabled: boolean; detailsSubmitted?: boolean }>("getMerchantPayoutStatus", { token })
+      .then((st) => alive && setStatus(st))
       .catch(() => alive && setStatus({ connected: false, payoutsEnabled: false }));
     return () => {
       alive = false;
@@ -32,7 +32,7 @@ export default function PayoutSetup({ token }: { token: string }) {
     setBusy(true);
     setError(null);
     try {
-      const r = (await Parse.Cloud.run("createMerchantStripeLoginLink", { token })) as { url: string };
+      const r = (await merchantRun("createMerchantStripeLoginLink", { token })) as { url: string };
       window.location.href = r.url;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't open Stripe.");
@@ -44,7 +44,7 @@ export default function PayoutSetup({ token }: { token: string }) {
     setBusy(true);
     setError(null);
     try {
-      const r = (await Parse.Cloud.run("createMerchantPayoutLink", { token })) as { url: string };
+      const r = (await merchantRun("createMerchantPayoutLink", { token })) as { url: string };
       window.location.href = r.url;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't open payout setup.");

@@ -1,13 +1,25 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { CTA } from "./ui";
 import { JOIN_URL, LOGIN_URL } from "./config";
+import { signedInPartner } from "@/lib/merchant-session";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type WindowWithDataLayer = Window & { dataLayer?: any[] };
 
 export default function Header() {
+  // A device that's signed in goes straight to its dashboard (set after load, like ?lead= below).
+  const signIn = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    const p = signedInPartner();
+    const a = signIn.current;
+    if (!p || !a) return;
+    a.href = `/o/m/${p.token}`;
+    a.textContent = "Your dashboard";
+    a.setAttribute("data-cta", "partner_dashboard");
+  }, []);
+
   useEffect(() => {
     function onClick(e: MouseEvent) {
       const target = e.target as HTMLElement | null;
@@ -45,7 +57,7 @@ export default function Header() {
           <span className="brand__os">OS</span>
         </a>
         <div className="header__cta">
-          <a className="link-ghost" href={LOGIN_URL} data-cta="partner_sign_in">
+          <a ref={signIn} className="link-ghost" href={LOGIN_URL} data-cta="partner_sign_in">
             Partner sign in
           </a>
           <CTA to="join" variant="primary">

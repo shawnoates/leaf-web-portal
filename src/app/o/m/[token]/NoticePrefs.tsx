@@ -8,8 +8,8 @@
  */
 
 import { useState } from "react";
-import Parse from "@/lib/parse-client";
 import { Field, Toggle, formatPhone, input } from "./ui";
+import { merchantRun } from "@/lib/merchant-session";
 
 export type NoticeTopic = { key: string; label: string; detail: string };
 export type Prefs = Record<string, { email: boolean; sms: boolean }>;
@@ -54,7 +54,7 @@ export default function NoticePrefs({
     setSaving(true);
     setError(null);
     try {
-      const r = (await Parse.Cloud.run("updateMerchantNotices", { token, ...noticePayload(value) })) as { notices: Notices };
+      const r = (await merchantRun("updateMerchantNotices", { token, ...noticePayload(value) })) as { notices: Notices };
       onChange(r.notices);
       setSaved(true);
     } catch (e) {

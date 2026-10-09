@@ -8,8 +8,8 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import Parse from "@/lib/parse-client";
 import { dollars } from "./ui";
+import { merchantRun } from "@/lib/merchant-session";
 
 type Range = { low: number; high: number };
 type Day = { weekday: number; partOfDay: "morning" | "afternoon" | "evening" };
@@ -65,7 +65,7 @@ export default function MerchantCampaign({ token, preview }: { token: string; pr
   const [autoStarted, setAutoStarted] = useState(false);
 
   useEffect(() => {
-    Parse.Cloud.run("merchantGetCampaign", { token })
+    merchantRun("merchantGetCampaign", { token })
       .then((r: unknown) => {
         const c = r as CampaignState;
         setS(c);
@@ -94,7 +94,7 @@ export default function MerchantCampaign({ token, preview }: { token: string; pr
     setError(null);
     setNote(null);
     try {
-      const r = (await Parse.Cloud.run("merchantSaveCampaign", { token, on: nextOn, days, weeklyBudgetCents: budget })) as { queued: number; withdrawn: number };
+      const r = (await merchantRun("merchantSaveCampaign", { token, on: nextOn, days, weeklyBudgetCents: budget })) as { queued: number; withdrawn: number };
       setOn(nextOn);
       setDirty(false);
       setAutoStarted(false);

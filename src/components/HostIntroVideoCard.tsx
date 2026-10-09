@@ -24,6 +24,7 @@ import HlsVideo from "@/components/HlsVideo";
 import IntroVideoRecorder, { type Beat, canRecordInBrowser } from "@/components/IntroVideoRecorder";
 import { introVideoFrame } from "@/lib/intro-video-frame";
 import { TrendingUp } from "lucide-react";
+import { merchantAuth } from "@/lib/merchant-session";
 
 export type IntroVideoInfo = {
   available: boolean;
@@ -80,7 +81,8 @@ export type IntroVideoSource =
 
 function fnsFor(source: IntroVideoSource) {
   if (source.kind === "merchant") {
-    const base = { token: source.token };
+    // A business's page: its device session (or Shawn's preview) rides along.
+    const base = { token: source.token, ...merchantAuth(source.token) };
     return { create: "createMerchantIntroUpload", finalize: "finalizeMerchantIntroUpload", remove: "removeMerchantIntroVideo", base };
   }
   if (source.kind === "offer") {

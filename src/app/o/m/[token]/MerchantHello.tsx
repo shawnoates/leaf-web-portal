@@ -8,8 +8,8 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import Parse from "@/lib/parse-client";
 import HostIntroVideoCard, { type IntroVideoInfo } from "@/components/HostIntroVideoCard";
+import { merchantRun } from "@/lib/merchant-session";
 
 export default function MerchantHello({
   token,
@@ -23,8 +23,8 @@ export default function MerchantHello({
 
   const fetchVideo = useCallback(
     (): Promise<IntroVideoInfo | null> =>
-      Parse.Cloud.run("getMerchantIntroVideo", { token })
-        .then((r: { video: IntroVideoInfo }) => r.video)
+      merchantRun<{ video: IntroVideoInfo }>("getMerchantIntroVideo", { token })
+        .then((r) => r.video)
         .catch(() => null),
     [token],
   );

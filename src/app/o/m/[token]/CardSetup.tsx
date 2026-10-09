@@ -8,7 +8,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { loadStripe, type Stripe, type StripeElements } from "@stripe/stripe-js";
-import Parse from "@/lib/parse-client";
+import { merchantRun } from "@/lib/merchant-session";
 
 export type Card = { brand: string; last4: string; exp: string; email?: string };
 export type CardSetupHandle = { save: () => Promise<Card | null>; hasSavedCard: () => boolean };
@@ -34,7 +34,7 @@ const CardSetup = forwardRef<
       setReady(false);
       (async () => {
         try {
-          const s = (await Parse.Cloud.run("createMerchantCardSetup", { token })) as { clientSecret: string; publishableKey: string };
+          const s = (await merchantRun("createMerchantCardSetup", { token })) as { clientSecret: string; publishableKey: string };
           if (!s.publishableKey) throw new Error("Card entry isn't available right now.");
           const stripe = await loadStripe(s.publishableKey);
           if (cancelled || !stripe || !mountRef.current) return;
@@ -69,7 +69,7 @@ const CardSetup = forwardRef<
         const { error: err, setupIntent } = await stripe.confirmSetup({ elements, redirect: "if_required" });
         if (err) throw new Error(err.message || "That card didn't save.");
         if (!setupIntent) throw new Error("That card didn't save.");
-        const r = (await Parse.Cloud.run("saveMerchantCard", { token, setupIntentId: setupIntent.id })) as { card: Card };
+        const r = (await merchantRun("saveMerchantCard", { token, setupIntentId: setupIntent.id })) as { card: Card };
         setEditing(false);
         onSaved(r.card);
         return r.card;

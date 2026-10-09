@@ -8,8 +8,8 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import Parse from "@/lib/parse-client";
 import { Field, dollars, input, textarea } from "./ui";
+import { merchantRun } from "@/lib/merchant-session";
 
 type Phase = "in_review" | "live" | "ending" | "ended" | "rejected" | "payment_failed";
 type Deal = {
@@ -59,7 +59,7 @@ export default function MerchantDeals({ token, preview }: { token: string; previ
   const [note, setNote] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    Parse.Cloud.run("merchantListDeals", { token })
+    merchantRun("merchantListDeals", { token })
       .then((r: unknown) => setS(r as DealsState))
       .catch(() => setS(null));
   }, [token]);
@@ -74,7 +74,7 @@ export default function MerchantDeals({ token, preview }: { token: string; previ
     setBusy("post");
     setError(null);
     try {
-      await Parse.Cloud.run("merchantCreateDeal", { token, ...form });
+      await merchantRun("merchantCreateDeal", { token, ...form });
       setForm({ title: "", description: "", terms: "", promoCode: "" });
       setOpen(false);
       setNote("Sent for review. We'll email you when it's live, usually within a day.");
@@ -90,7 +90,7 @@ export default function MerchantDeals({ token, preview }: { token: string; previ
     setBusy(dealId);
     setError(null);
     try {
-      await Parse.Cloud.run(fn, { token, dealId });
+      await merchantRun(fn, { token, dealId });
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't change that deal");
