@@ -257,7 +257,7 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
       <p className="mt-2 text-[12px] leading-relaxed text-stone-500">
         {[
           `Your limit pays for ${o.paid} RSVPs a week at ${dollars(s.feeCents)} each. Guests: half to all of them show up.`,
-          o.each && est?.spendPerGuest ? ` Guest spend: that many guests at ${dollars(o.each)} a person, what a typical guest spends ${SPEND_FROM[est.spendPerGuest.scope].replace(/^from /, "by ")}.` : "",
+          o.each && est?.spendPerGuest ? ` Guest spend: that many guests at ${dollars(o.each)} a person, what a typical guest spends, going ${SPEND_FROM[est.spendPerGuest.scope].replace(/^from /, "by ")}.` : "",
           " Estimates, not promises.",
         ].join("")}
       </p>
