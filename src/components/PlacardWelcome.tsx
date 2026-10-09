@@ -362,12 +362,14 @@ export default function PlacardWelcome<T extends Idea>({
                     {idea.description}
                   </p>
                 )}
-                {idea.afterSpot?.name && (
+                {/* Where: the spot the group walks to after a class, else right here. */}
+                {name && (
                   <p className="mt-2 flex items-center gap-1.5 text-[13px] font-medium" style={on ? { opacity: 0.85 } : { color: C.muted }}>
                     <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     <span className="truncate">
-                      Then {idea.afterSpot.name}
-                      {idea.afterSpot.walkMin ? ` \u00b7 ${idea.afterSpot.walkMin} min walk` : ""}
+                      {idea.afterSpot?.name
+                        ? `Then ${idea.afterSpot.name}${idea.afterSpot.walkMin ? ` \u00b7 ${idea.afterSpot.walkMin} min walk` : ""}`
+                        : `Here at ${name}`}
                     </span>
                   </p>
                 )}
