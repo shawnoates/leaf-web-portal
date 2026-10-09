@@ -18,9 +18,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import Parse from "@/lib/parse-client";
+import { merchantAuth } from "@/lib/merchant-session";
 
 type Page = {
-  state: "ok" | "unavailable";
+  state: "ok" | "unavailable" | "dashboard";
   name: string;
   headline: string;
   examples: string;
@@ -41,8 +42,12 @@ const ART = "/placards/neighbors.jpg";
 const input =
   "w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-[15px] text-zinc-900 focus:border-leaf-600 focus:outline-none";
 
-function Shell({ children }: { children: React.ReactNode }) {
+function PageShell({ children }: { children: React.ReactNode }) {
   return <main className="mx-auto max-w-2xl px-5 py-10 pb-24">{children}</main>;
+}
+
+function EmbedShell({ children }: { children: React.ReactNode }) {
+  return <div className="pt-2">{children}</div>;
 }
 
 /**
@@ -164,7 +169,14 @@ const FORMATS: { key: Format; label: string }[] = [
   { key: "flyer", label: "Flyer with tear-offs" },
 ];
 
-export default function PlacardClient({ token }: { token: string }) {
+/**
+ * `embed`: the counter card section of the business's dashboard (under its
+ * sign-in). Without it this is a venue's page, or a business's old link,
+ * which the server sends on to their dashboard.
+ */
+export default function PlacardClient({ token, embed }: { token: string; embed?: { offerToken: string } }) {
+  const auth = useCallback(() => (embed ? { embed: true, ...merchantAuth(embed.offerToken) } : {}), [embed]);
+  const Shell = embed ? EmbedShell : PageShell;
   const [page, setPage] = useState<Page | null>(null);
   const [loading, setLoading] = useState(true);
   const [format, setFormat] = useState<Format>("counter");
@@ -178,7 +190,11 @@ export default function PlacardClient({ token }: { token: string }) {
 
   const load = useCallback(async () => {
     try {
-      const p = (await Parse.Cloud.run("getPlacardPage", { token })) as Page;
+      const p = (await Parse.Cloud.run("getPlacardPage", { token, ...auth() })) as Page & { dashboardUrl?: string };
+      if (p.state === "dashboard" && p.dashboardUrl) {
+        window.location.replace(p.dashboardUrl);
+        return;
+      }
       setPage(p);
       if (p.state === "ok" && p.mailRequest) setMode("mailed");
     } catch {
@@ -186,14 +202,14 @@ export default function PlacardClient({ token }: { token: string }) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, auth]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const print = async () => {
-    Parse.Cloud.run("recordPlacardPrint", { token, format }).catch(() => {});
+    Parse.Cloud.run("recordPlacardPrint", { ...auth(), token, format }).catch(() => {});
     window.print();
   };
 
@@ -202,6 +218,7 @@ export default function PlacardClient({ token }: { token: string }) {
     setBusy(true);
     try {
       await Parse.Cloud.run("requestPlacardMail", {
+        ...auth(),
         token,
         items: { stand: stand ? 1 : 0, tent: tent ? 1 : 0, cards: Number(cards) || 0 },
         shipTo: ship,
@@ -215,7 +232,7 @@ export default function PlacardClient({ token }: { token: string }) {
   };
 
   const decline = async () => {
-    await Parse.Cloud.run("declinePlacard", { token }).catch(() => {});
+    await Parse.Cloud.run("declinePlacard", { ...auth(), token }).catch(() => {});
     setMode("declined");
   };
 

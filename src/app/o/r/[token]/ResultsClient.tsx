@@ -14,9 +14,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { loadStripe, type Stripe, type StripeElements } from "@stripe/stripe-js";
 import Parse from "@/lib/parse-client";
+import { merchantAuth } from "@/lib/merchant-session";
 
 type Results = {
-  state: "ok" | "unavailable";
+  state: "ok" | "unavailable" | "dashboard";
   role: "merchant" | "venue";
   name: string;
   calendarName: string;
@@ -70,7 +71,14 @@ function Label({ children }: { children: React.ReactNode }) {
   return <span className="mb-1.5 block text-[13px] font-medium text-zinc-600">{children}</span>;
 }
 
-export default function ResultsClient({ token }: { token: string }) {
+/**
+ * `embed`: shown inside the business's dashboard (one night, under its
+ * sign-in). Without it this is the venue's page, or a business's old link,
+ * which the server sends on to that night on their dashboard.
+ */
+export default function ResultsClient({ token, embed }: { token: string; embed?: { offerToken: string } }) {
+  const auth = useCallback(() => (embed ? { embed: true, ...merchantAuth(embed.offerToken) } : {}), [embed]);
+  const Wrap = embed ? EmbedWrap : PageWrap;
   const [r, setR] = useState<Results | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -97,7 +105,11 @@ export default function ResultsClient({ token }: { token: string }) {
 
   const load = useCallback(async () => {
     try {
-      const res = (await Parse.Cloud.run("getSlotResults", { token })) as Results;
+      const res = (await Parse.Cloud.run("getSlotResults", { token, ...auth() })) as Results & { dashboardUrl?: string };
+      if (res.state === "dashboard" && res.dashboardUrl) {
+        window.location.replace(res.dashboardUrl);
+        return;
+      }
       setR(res);
       if (res.feedback) {
         setRating(res.feedback.rating);
@@ -111,7 +123,7 @@ export default function ResultsClient({ token }: { token: string }) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, auth]);
 
   useEffect(() => {
     load();
@@ -144,7 +156,7 @@ export default function ResultsClient({ token }: { token: string }) {
   const sendFeedback = async () => {
     setBusy(true);
     try {
-      await Parse.Cloud.run("submitSlotFeedback", { token, rating, wentWell, change, counterSpendDollars: counterSpend || null });
+      await Parse.Cloud.run("submitSlotFeedback", { ...auth(), token, rating, wentWell, change, counterSpendDollars: counterSpend || null });
       setFeedbackSaved(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "That didn't save.");
@@ -158,6 +170,7 @@ export default function ResultsClient({ token }: { token: string }) {
     setError(null);
     try {
       const res = (await Parse.Cloud.run("createRebookSetup", {
+        ...auth(),
         token,
         dateKey,
         title,
@@ -186,7 +199,7 @@ export default function ResultsClient({ token }: { token: string }) {
       return;
     }
     try {
-      const res = (await Parse.Cloud.run("confirmRebook", { token, rebookId: setup.rebookId })) as { dateLabel: string };
+      const res = (await Parse.Cloud.run("confirmRebook", { ...auth(), token, rebookId: setup.rebookId })) as { dateLabel: string };
       setBookedLabel(res.dateLabel);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't book that date.");
@@ -198,7 +211,7 @@ export default function ResultsClient({ token }: { token: string }) {
   const chooseMakeGood = async (choice: "run" | "move") => {
     setBusy(true);
     try {
-      await Parse.Cloud.run("chooseMakeGood", { token, choice });
+      await Parse.Cloud.run("chooseMakeGood", { ...auth(), token, choice });
       setMakeGoodDone(choice === "run" ? "Great, it's on. We'll keep pushing it this week." : "Got it. Shawn will move it and confirm the new week with you. No extra cost.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "That didn't save.");
@@ -209,17 +222,17 @@ export default function ResultsClient({ token }: { token: string }) {
 
   if (loading) {
     return (
-      <main className="mx-auto max-w-lg px-5 py-10">
+      <Wrap>
         <p className="text-[15px] text-zinc-500">Loading…</p>
-      </main>
+      </Wrap>
     );
   }
   if (!r || r.state !== "ok") {
     return (
-      <main className="mx-auto max-w-lg px-5 py-10">
+      <Wrap>
         <h1 className="text-xl font-semibold text-leaf-900">We couldn&rsquo;t find this one.</h1>
         <p className="mt-3 text-[15px] text-zinc-700">Try the link from Shawn&rsquo;s email again, or just reply to it.</p>
-      </main>
+      </Wrap>
     );
   }
 
@@ -227,7 +240,7 @@ export default function ResultsClient({ token }: { token: string }) {
   const fee = rb ? money(rb.feeCents) : "$75";
 
   return (
-    <main className="mx-auto max-w-lg px-5 py-10 pb-24">
+    <Wrap last>
       <p className="text-[13px] font-medium uppercase tracking-wide text-leaf-700">{r.calendarName}</p>
       <h1 className="mt-1 text-2xl font-semibold leading-tight text-leaf-900">
         {r.attended != null ? `${r.attended} neighbors came` : "Your night"}
@@ -426,6 +439,14 @@ export default function ResultsClient({ token }: { token: string }) {
       )}
 
       {error && <p className="mt-6 text-[14px] text-red-700">{error}</p>}
-    </main>
+    </Wrap>
   );
+}
+
+function PageWrap({ children, last }: { children: React.ReactNode; last?: boolean }) {
+  return <main className={`mx-auto max-w-lg px-5 py-10${last ? " pb-24" : ""}`}>{children}</main>;
+}
+
+function EmbedWrap({ children }: { children: React.ReactNode; last?: boolean }) {
+  return <div className="pt-2">{children}</div>;
 }

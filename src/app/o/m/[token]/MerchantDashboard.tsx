@@ -11,7 +11,10 @@ import { Brand, BusinessPhoto, CREAM, Shell, dollars, formatPhone } from "./ui";
 import MerchantHello from "./MerchantHello";
 import MerchantDeals from "./MerchantDeals";
 import MerchantCampaign from "./MerchantCampaign";
-import { merchantRun } from "@/lib/merchant-session";
+import { merchantAuth, merchantRun } from "@/lib/merchant-session";
+import Parse from "@/lib/parse-client";
+import ResultsClient from "@/app/o/r/[token]/ResultsClient";
+import PlacardClient from "@/app/o/p/[token]/PlacardClient";
 
 type Phase = "pending" | "confirmed" | "now" | "past" | "cancelled";
 type Step = { key: string; label: string; status: "done" | "current" | "todo"; you?: boolean; detail: string | null };
@@ -37,6 +40,9 @@ type Night = {
   } | null;
   payout: { status: string | null; payoutCents: number | null } | null;
   resultsUrl: string | null;
+  // Results, rebook and the make-good choice, shown here (under the sign-in).
+  resultsToken?: string | null;
+  makeGood?: { rsvps: number | null; choice: "run" | "move" | null } | null;
   report: {
     spend: {
       subtotalCents: number;
@@ -66,6 +72,7 @@ export type Dashboard = {
   /** Leaf balance (bars and restaurants): prepaid, reloads when low. */
   credit?: Credit | null;
   placardUrl: string | null;
+  placardToken?: string | null;
   upcoming: Night[];
   past: Night[];
   cancelled: Night[];
@@ -270,11 +277,78 @@ function NightSteps({ steps }: { steps: Step[] }) {
   );
 }
 
+/** The counter card: print it or have some mailed, right here (it used to be its own page). */
+function CounterCard({ d, token }: { d: Dashboard; token: string }) {
+  const [open, setOpen] = useState(() => linkedHere("counter-card"));
+  return (
+    <Card id="counter-card">
+      <H2>Your counter card</H2>
+      <p className="mt-2 text-[15px] leading-relaxed text-stone-600">A card with a QR code for your counter, so neighbors who stop by can find your Neighbor Hours and the calendar.</p>
+      {d.placardToken ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            className="mt-3 inline-block text-[15px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4"
+          >
+            {open ? "Hide" : "Print or order cards"}
+          </button>
+          {open && <PlacardClient token={d.placardToken} embed={{ offerToken: token }} />}
+        </>
+      ) : (
+        <a href={d.placardUrl || "#"} className="mt-3 inline-block text-[15px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+          Print or order cards
+        </a>
+      )}
+    </Card>
+  );
+}
+
+/** Emails link to one night (#night-<id>) or the counter card; open it when they land. */
+const linkedHere = (id: string) => typeof window !== "undefined" && window.location.hash === `#${id}`;
+
+/** Two days out with light RSVPs: run it anyway, or move it to a later week at no cost. */
+function MakeGoodChoice({ n, token }: { n: Night; token: string }) {
+  const [done, setDone] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const choose = async (choice: "run" | "move") => {
+    setBusy(true);
+    setError(null);
+    try {
+      await Parse.Cloud.run("chooseMakeGood", { token: n.resultsToken, choice, embed: true, ...merchantAuth(token) });
+      setDone(choice === "run" ? "Great, it's on. We'll keep pushing it this week." : "Got it. We'll move it and confirm the new week with you. No extra cost.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That didn't save. Try again?");
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (done) return <p className="mt-3 rounded-xl bg-stone-50 p-3 text-[14px] text-stone-700">{done}</p>;
+  return (
+    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3.5">
+      <p className="text-[14px] font-semibold text-amber-900">
+        RSVPs are light so far{n.makeGood?.rsvps != null ? ` (${n.makeGood.rsvps})` : ""}. Run it anyway, or move it to a later week at no cost?
+      </p>
+      <div className="mt-3 flex gap-2">
+        <button type="button" disabled={busy} onClick={() => choose("run")} className="h-10 flex-1 rounded-lg bg-leaf-800 text-[14px] font-semibold text-white disabled:opacity-50">
+          Run it
+        </button>
+        <button type="button" disabled={busy} onClick={() => choose("move")} className="h-10 flex-1 rounded-lg border border-stone-300 bg-white text-[14px] font-semibold text-stone-800 disabled:opacity-50">
+          Move it free
+        </button>
+      </div>
+      {error && <p className="mt-2 text-[13px] text-red-700">{error}</p>}
+    </div>
+  );
+}
+
 function UpcomingNight({ n, token }: { n: Night; token: string }) {
   const p = PHASE[n.phase as keyof typeof PHASE];
   const pct = n.rsvps != null && n.capacity ? Math.min(100, Math.round((n.rsvps / n.capacity) * 100)) : null;
   return (
-    <div className="border-t border-stone-100 py-4 first:border-t-0 first:pt-0 last:pb-0">
+    <div id={`night-${n.id}`} className="scroll-mt-6 border-t border-stone-100 py-4 first:border-t-0 first:pt-0 last:pb-0">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-fm-serif text-[22px] leading-tight text-stone-900">{n.dateLabel}</p>
@@ -298,6 +372,7 @@ function UpcomingNight({ n, token }: { n: Night; token: string }) {
           )}
         </div>
       )}
+      {n.makeGood && !n.makeGood.choice && n.resultsToken && <MakeGoodChoice n={n} token={token} />}
       {n.steps?.length ? (
         <NightSteps steps={n.steps} />
       ) : (
@@ -325,10 +400,11 @@ function UpcomingNight({ n, token }: { n: Night; token: string }) {
   );
 }
 
-function PastNight({ n }: { n: Night }) {
+function PastNight({ n, token }: { n: Night; token: string }) {
+  const [open, setOpen] = useState(() => linkedHere(`night-${n.id}`));
   const r = n.report;
   return (
-    <div className="border-t border-stone-100 py-4 first:border-t-0 first:pt-0 last:pb-0">
+    <div id={`night-${n.id}`} className="scroll-mt-6 border-t border-stone-100 py-4 first:border-t-0 first:pt-0 last:pb-0">
       <div className="flex items-baseline justify-between gap-3">
         <p className="font-fm-serif text-[20px] leading-tight text-stone-900">{n.dateLabel}</p>
         {n.guests != null && <p className="shrink-0 text-[14px] text-stone-600">{n.guests} guests</p>}
@@ -376,10 +452,28 @@ function PastNight({ n }: { n: Night }) {
           )}
         </div>
       )}
-      {n.resultsUrl && (
-        <a href={n.resultsUrl} className="mt-2 inline-block text-[14px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
-          How it went
-        </a>
+      {n.resultsToken ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            className="mt-2 inline-block text-[14px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4"
+          >
+            {open ? "Hide how it went" : "How it went, and book another"}
+          </button>
+          {open && (
+            <div className="mt-2 rounded-2xl border border-stone-200 bg-stone-50/60 px-4 pb-4">
+              <ResultsClient token={n.resultsToken} embed={{ offerToken: token }} />
+            </div>
+          )}
+        </>
+      ) : (
+        n.resultsUrl && (
+          <a href={n.resultsUrl} className="mt-2 inline-block text-[14px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+            How it went
+          </a>
+        )
       )}
     </div>
   );
@@ -459,6 +553,14 @@ export default function MerchantDashboard({
       live = false;
     };
   }, [token, onUnavailable, reload]);
+
+  // An email's #night-<id> or #counter-card: once the nights are on the page, scroll to it.
+  useEffect(() => {
+    const id = typeof window !== "undefined" ? window.location.hash.slice(1) : "";
+    if (!d || !(id.startsWith("night-") || id === "counter-card")) return;
+    const t = setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
+    return () => clearTimeout(t);
+  }, [d]);
 
   if (!d) {
     return (
@@ -630,7 +732,7 @@ export default function MerchantDashboard({
                   <H2>Past Neighbor Hours</H2>
                   <div className="mt-4">
                     {d.past.map((n) => (
-                      <PastNight key={n.id} n={n} />
+                      <PastNight key={n.id} n={n} token={token} />
                     ))}
                   </div>
                 </Card>
@@ -646,18 +748,7 @@ export default function MerchantDashboard({
               {credit && credit.balanceCents > 0 && <LeafBalance credit={credit} />}
               {account}
               {/* Counter cards are for walk-in places (bars, restaurants); not ticketed studios. */}
-              {perRsvp && d.placardUrl && (
-                <Card>
-                  <H2>Your counter card</H2>
-                  <p className="mt-2 text-[15px] leading-relaxed text-stone-600">A card with a QR code for your counter, so neighbors who stop by can find your Neighbor Hours and the calendar.</p>
-                  <a
-                    href={d.placardUrl}
-                    className="mt-3 inline-block text-[15px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4"
-                  >
-                    Print or order cards
-                  </a>
-                </Card>
-              )}
+              {perRsvp && (d.placardToken || d.placardUrl) && <CounterCard d={d} token={token} />}
               {d.cancelled.length > 0 && <p className="px-1 text-[13px] text-stone-500">Called off: {d.cancelled.map((n) => n.dateLabel).join(", ")}</p>}
               <p className="px-1 pb-6 text-[13px] text-stone-500">
                 Questions? Reply to any email from Leaf, or write{" "}
