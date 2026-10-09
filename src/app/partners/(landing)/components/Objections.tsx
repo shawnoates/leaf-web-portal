@@ -6,7 +6,7 @@ import { CTA, SectionHead } from "./ui";
 const items = [
   {
     q: "What's the catch?",
-    a: "There isn't one. Your first Neighbor Hour is free: no listing fee, no RSVP fees. The card just claims it. If you like how it goes, book more nights at $6 per RSVP.",
+    a: "There isn't one. Your first Neighbor Hour is free: no listing fee, no RSVP fees. If you like how it goes, book more nights at $6 per RSVP.",
   },
   {
     q: "Who are these people?",

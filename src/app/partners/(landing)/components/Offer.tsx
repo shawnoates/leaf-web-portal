@@ -32,8 +32,8 @@ export default function Offer() {
               <span className="offer__per">on us</span>
             </div>
             <p className="offer__desc">
-              No listing fee and no RSVP fees. Add a card to claim it. The free Neighbor Hour is
-              held for 7 days after you first open your link.
+              No listing fee and no RSVP fees. Tell us about your place, book a quick call,
+              and we&rsquo;ll set it up with you.
             </p>
             <ul className="offer__list">
               <li>Pick your slowest day and time</li>

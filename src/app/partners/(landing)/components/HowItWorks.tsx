@@ -5,7 +5,7 @@ const steps = [
   {
     n: "01",
     h: "Tell us your slowest hours",
-    b: "Pick the days and hours you’d most like to fill, and add a card to claim your free Neighbor Hour.",
+    b: "Pick the days and hours you’d most like to fill, and book a quick call. We’ll set up your free Neighbor Hour.",
   },
   {
     n: "02",

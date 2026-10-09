@@ -12,8 +12,8 @@ export function FinalCta() {
             <em>with neighbors.</em>
           </h2>
           <p className="lead">
-            Your first Neighbor Hour is free: no listing fee, no RSVP fees. Claim it in two
-            minutes, and nothing is charged today.
+            Your first Neighbor Hour is free: no listing fee, no RSVP fees. Tell us about your
+            place and book a quick call. Nothing is charged today.
           </p>
           <div className="cta-row cta-row--center">
             <CTA to="join" variant="primary" arrow>

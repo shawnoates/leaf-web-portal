@@ -17,9 +17,17 @@ import { useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import { Brand, Field, Shell, formatPhone, input } from "@/app/o/m/[token]/ui";
 import { type RememberedPartner, forgetPartner, rememberedPartner } from "@/app/o/m/[token]/remember";
+import { MANAGER_URL } from "../(landing)/components/config";
 
 type Place = { placeId: string; name: string; address: string; type: string };
-type Outcome = { outcome: "offer" | "known" | "waitlist" | "no_calendar" | "no_week" | "thanks"; name?: string; token?: string };
+// waitlist reason "wants_call": no rep brought them in, so they book a call
+// and Shawn lets them in from the waitlist after it.
+type Outcome = {
+  outcome: "offer" | "known" | "waitlist" | "no_calendar" | "no_week" | "thanks";
+  reason?: "wants_call" | "no_calendar" | "closed" | "no_week";
+  name?: string;
+  token?: string;
+};
 type RepLead = {
   valid: boolean;
   businessName?: string | null;
@@ -113,8 +121,10 @@ export default function PartnerClient() {
 
   if (done) {
     const name = done.name || picked?.name || "your place";
-    const body =
-      done.outcome === "known"
+    const wantsCall = done.outcome === "waitlist" && done.reason === "wants_call";
+    const body = wantsCall
+      ? `We've saved ${name}. Book a quick call and we'll look at your slowest hours, match you to your neighborhood's calendar, and set up your free Neighbor Hour.`
+      : done.outcome === "known"
         ? `We already know ${name}. Shawn will reach out within a day to pick up where you left off.`
         : done.outcome === "waitlist"
           ? `Leaf isn't open to businesses near ${name} yet, so you're on the waitlist. We'll email you as soon as your neighborhood opens.`
@@ -128,8 +138,19 @@ export default function PartnerClient() {
         <Brand />
         <div className="mt-10 rounded-3xl bg-white p-6 shadow-sm">
           <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">Thanks</p>
-          <h1 className="mt-2 font-fm-serif text-[34px] leading-[1.05] text-stone-900">{done.outcome === "waitlist" ? "You\u2019re on the list." : "We\u2019ve got you."}</h1>
+          <h1 className="mt-2 font-fm-serif text-[34px] leading-[1.05] text-stone-900">{wantsCall ? "One quick call." : done.outcome === "waitlist" ? "You\u2019re on the list." : "We\u2019ve got you."}</h1>
           <p className="mt-3 text-[16px] leading-relaxed text-stone-600">{body}</p>
+          {wantsCall && (
+            <a
+              href={MANAGER_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-cta="partner_book_call"
+              className="mt-6 flex h-14 w-full items-center justify-center rounded-2xl bg-leaf-800 text-[17px] font-semibold text-white shadow-sm"
+            >
+              Book a call
+            </a>
+          )}
         </div>
       </Shell>
     );
@@ -166,7 +187,7 @@ export default function PartnerClient() {
         </h1>
         <p className="mt-4 text-[16px] leading-relaxed text-stone-600">
           Leaf runs a calendar for each neighborhood. We bring 8 to 15 neighbors to you on a quiet evening. Your first Neighbor Hour is free: no
-          listing fee and no RSVP fees. Add a card to claim it. After that it&rsquo;s $6 per RSVP, charged after it happens.
+          listing fee and no RSVP fees. {leadToken ? "Add a card to claim it." : "Tell us about your place and book a quick call, and we\u2019ll set it up with you."}{" "}After that it&rsquo;s $6 per RSVP, charged after it happens.
         </p>
       </header>
 
@@ -261,7 +282,7 @@ export default function PartnerClient() {
           >
             {busy && picked ? "One moment…" : picked ? `Continue with ${picked.name}` : "Find your business to start"}
           </button>
-          <p className="mt-2 text-center text-[12px] text-stone-500">Next you&rsquo;ll pick your days. Nothing is charged today.</p>
+          <p className="mt-2 text-center text-[12px] text-stone-500">{leadToken ? "Next you\u2019ll pick your days." : "Next you\u2019ll book a quick call."} Nothing is charged today.</p>
           <p className="mt-1 text-center text-[13px] text-stone-500">
             <a href="/partners" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
               How Neighbor Hours work
