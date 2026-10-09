@@ -103,7 +103,7 @@ export default function LeafSignIn({
   const verifyPhone = async () => {
     setBusy(true); setError("");
     try {
-      const r = (await Parse.Cloud.run("verifyOTP", { phone: e164, code: phoneCode })) as { sessionToken?: string } | string;
+      const r = (await Parse.Cloud.run("verifyOTP", { phone: e164, code: phoneCode, name: name.trim() })) as { sessionToken?: string } | string;
       const token = typeof r === "object" && r?.sessionToken ? r.sessionToken : null;
       if (!token) { setError("That code didn't work. Try again."); return; }
       await Parse.User.become(token);

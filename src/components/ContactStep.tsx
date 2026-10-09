@@ -58,7 +58,7 @@ export function usePhoneVerify(options?: { requireSession?: boolean }) {
     setSending(true);
     setError("");
     try {
-      const result = await Parse.Cloud.run("verifyOTP", { phone: `+1${digits}`, code });
+      const result = await Parse.Cloud.run("verifyOTP", { phone: `+1${digits}`, code, name: name.trim() });
       if (result && typeof result === "object" && result.sessionToken) {
         // The session is the proof the server checks; the cookie only
         // remembers name + phone for the next form.

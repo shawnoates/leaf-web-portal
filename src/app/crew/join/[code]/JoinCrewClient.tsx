@@ -77,7 +77,7 @@ export default function JoinCrewClient({ code }: { code: string }) {
   const verify = async () => {
     setBusy(true); setError("");
     try {
-      const r = (await Parse.Cloud.run("verifyOTP", { phone: `+1${digits.slice(-10)}`, code: otp })) as { sessionToken?: string } | string;
+      const r = (await Parse.Cloud.run("verifyOTP", { phone: `+1${digits.slice(-10)}`, code: otp, name: name.trim() })) as { sessionToken?: string } | string;
       const token = typeof r === "object" && r?.sessionToken ? r.sessionToken : null;
       if (!token) { setError("That code didn't work. Try again."); return; }
       await Parse.User.become(token);

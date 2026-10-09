@@ -113,6 +113,7 @@ export default function ScheduleDealModal({
       const result = await Parse.Cloud.run("verifyOTP", {
         phone: `+1${digits}`,
         code,
+        name: name.trim(),
       });
       if (result && typeof result === "object" && "sessionToken" in result) {
         await Parse.User.become((result as { sessionToken: string }).sessionToken);
