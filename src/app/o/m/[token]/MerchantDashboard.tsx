@@ -138,10 +138,64 @@ const PHASE: Record<Exclude<Phase, "past" | "cancelled">, { label: string; tone:
 
 function Stat({ value, label }: { value: string | number; label: string }) {
   return (
-    <div>
-      <p className="font-fm-serif text-[28px] leading-none tabular-nums">{value}</p>
-      <p className="mt-1 text-[12px] text-leaf-200">{label}</p>
+    <div className="min-w-0 px-4 first:pl-0">
+      <p className="font-fm-serif text-[30px] leading-none tabular-nums">{value}</p>
+      <p className="mt-1.5 text-[13px] leading-snug text-leaf-100">{label}</p>
     </div>
+  );
+}
+
+/**
+ * The top of the summary: what's next. Their next night with its status and
+ * RSVPs filling toward capacity, or, with nothing booked, how to get one.
+ */
+function NextUp({ n, perRsvp }: { n: Night | null; perRsvp: boolean }) {
+  if (!n) {
+    return (
+      <div className="rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Next up</p>
+        <p className="mt-1.5 text-[17px] font-semibold">Nothing booked yet</p>
+        <p className="mt-1 text-[14px] leading-relaxed text-leaf-100">
+          {perRsvp
+            ? "Neighbors\u2019 plans at your place show up here as they\u2019re made. Want a set night? Request one."
+            : "Request a night and we\u2019ll put it in front of the neighborhood."}
+        </p>
+        <a href="#book" className="mt-3 inline-flex h-10 items-center rounded-xl bg-white px-4 text-[14px] font-semibold text-leaf-900">
+          Request a night
+        </a>
+      </div>
+    );
+  }
+  const p = PHASE[n.phase as keyof typeof PHASE];
+  const pct = n.rsvps != null && n.capacity ? Math.min(100, Math.round((n.rsvps / n.capacity) * 100)) : null;
+  return (
+    <a href={`#night-${n.id}`} className="block rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10 transition hover:bg-white/[0.1]">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Next up</p>
+        {p && <span className="shrink-0 rounded-full bg-white/15 px-2.5 py-0.5 text-[12px] font-semibold text-white">{p.label}</span>}
+      </div>
+      <p className="mt-1.5 font-fm-serif text-[24px] leading-tight">{n.dateLabel}</p>
+      <p className="text-[14px] text-leaf-100">
+        {n.timeLabel}
+        {n.title ? ` \u00b7 ${n.title}` : ""}
+      </p>
+      {n.rsvps != null && (
+        <div className="mt-3">
+          <p className="text-[14px] text-leaf-100">
+            <span className="font-semibold text-white">{n.rsvps}</span>
+            {`${n.capacity ? ` of ${n.capacity}` : ""} RSVP\u2019d`}
+          </p>
+          {pct != null && (
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/15">
+              <div className="h-full rounded-full bg-leaf-300" style={{ width: `${pct}%` }} />
+            </div>
+          )}
+        </div>
+      )}
+      {n.steps?.find((st) => st.you && st.status === "current") && (
+        <p className="mt-3 text-[14px] font-semibold text-amber-200">Your turn: {n.steps.find((st) => st.you && st.status === "current")?.label}</p>
+      )}
+    </a>
   );
 }
 
@@ -603,12 +657,17 @@ export default function MerchantDashboard({
                   d.calendarName
                 )}
               </p>
-              <div className={`mt-6 grid gap-x-4 gap-y-5 ${perRsvp ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
-                <Stat value={d.totals.upcoming} label="coming up" />
-                <Stat value={d.totals.nightsRun} label="hosted" />
-                <Stat value={d.totals.guests} label="guests" />
-                {perRsvp && <Stat value={dollars(d.totals.chargedCents)} label="charged" />}
+              <div className="mt-6">
+                <NextUp n={d.upcoming[0] || null} perRsvp={perRsvp} />
               </div>
+              {/* The running totals, once there's something to count (a row of zeros reads as broken). */}
+              {d.totals.nightsRun > 0 && (
+                <div className="mt-6 flex divide-x divide-white/15">
+                  <Stat value={d.totals.nightsRun} label={d.totals.nightsRun === 1 ? "night hosted" : "nights hosted"} />
+                  <Stat value={d.totals.guests} label="neighbors through your door" />
+                  {perRsvp ? <Stat value={dollars(d.totals.chargedCents)} label="charged so far" /> : <Stat value={d.totals.upcoming} label="coming up" />}
+                </div>
+              )}
             </div>
             {d.photoUrl && (
               <div className="[&_figure]:mt-0 lg:[&_img]:h-full lg:[&_img]:min-h-[220px]">
