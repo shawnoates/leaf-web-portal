@@ -114,7 +114,7 @@ type AddonOrder = {
   buyerName: string;
   method: "venmo" | "cashapp" | "paypal" | "zelle" | null;
   autoConfirmAt: string | null;
-  items: { title: string; quantity: number }[];
+  items: { title: string; quantity: number; guestNote?: string | null }[];
 };
 
 const ADDON_METHOD: Record<string, string> = { venmo: "Venmo", cashapp: "Cash App", paypal: "PayPal", zelle: "Zelle" };
@@ -158,6 +158,11 @@ function AddonOrders({ orders, notificationId, onChanged }: {
                 <p className="text-[14px] font-medium text-zinc-900">
                   {o.buyerName} · {o.items.map((i) => `${i.quantity > 1 ? `${i.quantity} × ` : ""}${i.title}`).join(", ")}
                 </p>
+                {o.items.filter((i) => i.guestNote).map((i) => (
+                  <p key={i.title} className="text-[13px] text-zinc-700">
+                    {o.items.length > 1 ? `${i.title}: ` : ""}&ldquo;{i.guestNote}&rdquo;
+                  </p>
+                ))}
                 <p className={`text-[12px] ${o.status === "claimed" ? "text-amber-700" : o.status === "paid" ? "text-emerald-700" : "text-zinc-500"}`}>
                   {o.status === "paid" ? `Paid ${money(o.totalCents)} ✓`
                     : o.status === "claimed" ? `Says they paid ${money(o.totalCents)}${o.method ? ` on ${ADDON_METHOD[o.method]}` : ""} · ${o.ref}`

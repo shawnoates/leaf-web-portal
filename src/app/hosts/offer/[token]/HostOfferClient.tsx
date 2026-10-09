@@ -110,6 +110,8 @@ type OfferAddon = {
   maxCents: number;
   suggestedCents: number;
   chosen: boolean;
+  // Leaf's pick for this plan (pre-ticked); the rest are optional. Absent from older offers.
+  suggested?: boolean;
   // Turned off after guests had ordered: no new orders, still to hand out.
   closed?: boolean;
   priceCents: number | null;
@@ -117,9 +119,9 @@ type OfferAddon = {
 
 const dollars = (c: number) => `$${(c / 100).toFixed(2).replace(/\.00$/, "")}`;
 
-/** Ticks and prices as typed: everything ticked on a live offer, what the host chose once accepted. */
+/** Ticks and prices as typed: Leaf's picks ticked on a live offer, what the host chose once accepted. */
 const seedAddonPick = (o: { state: string; addons?: OfferAddon[] }) => Object.fromEntries((o.addons || []).map((a) => [
-  a.slug, { on: o.state === "accepted" ? a.chosen : true, price: String(((a.priceCents ?? a.suggestedCents) / 100)) },
+  a.slug, { on: o.state === "accepted" ? a.chosen : a.suggested ?? true, price: String(((a.priceCents ?? a.suggestedCents) / 100)) },
 ]));
 
 const card =
@@ -515,7 +517,7 @@ export default function HostOfferClient({ token }: { token: string }) {
     <>
       <p className="text-[14px] font-medium text-leaf-900">Add-ons guests can buy</p>
           <p className="mt-1 text-[13px] leading-snug text-zinc-600">
-            Pick the ones you&rsquo;ll handle and set your price. Guests pay you directly and you keep all of it.
+            Optional. Pick any you&rsquo;d like to handle and set your price within the range. Guests order when they RSVP, pay you directly on Venmo, Cash App, PayPal or Zelle, and you keep all of it. They can add a note, like their coffee order.
           </p>
           <div className="mt-3 space-y-3">
             {offer.addons!.map((a) => {

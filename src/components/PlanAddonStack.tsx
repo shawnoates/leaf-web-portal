@@ -24,6 +24,8 @@ interface Addon {
   priceCents: number;
   imageUrl: string | null;
   maxQuantity: number;
+  // What to ask for a note ("Your coffee or tea order"); null = a general note.
+  notePrompt?: string | null;
 }
 
 type Method = "venmo" | "cashapp" | "paypal" | "zelle";
@@ -43,7 +45,7 @@ interface Order {
   status: "unpaid" | "claimed" | "paid";
   ref: string;
   totalCents: number;
-  items: { planAddonId: string | null; title: string; quantity: number; unitCents: number }[];
+  items: { planAddonId: string | null; title: string; quantity: number; unitCents: number; guestNote?: string | null }[];
   method: Method | null;
   autoConfirmAt: string | null;
   note: string;
@@ -91,6 +93,8 @@ export default function PlanAddonStack({
   const [orders, setOrders] = useState<Order[]>([]);
   const [payee, setPayee] = useState("the host");
   const [qty, setQty] = useState<Record<string, number>>({});
+  // A note for the host per add-on ("oat latte, no sugar"), optional.
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -140,9 +144,13 @@ export default function PlanAddonStack({
   const pickedTotal = picked.reduce((n, a) => n + a.priceCents * (qty[a.objectId] || 0), 0);
   const order = async () => {
     const ok = await run("orderPlanAddons", {
-      eventGroupId, name, items: picked.map((a) => ({ planAddonId: a.objectId, quantity: qty[a.objectId] })),
+      eventGroupId, name,
+      items: picked.map((a) => ({ planAddonId: a.objectId, quantity: qty[a.objectId], note: (notes[a.objectId] || "").trim() || undefined })),
     });
-    if (ok) setQty({});
+    if (ok) {
+      setQty({});
+      setNotes({});
+    }
   };
 
   if (loading) return null;
@@ -190,6 +198,17 @@ export default function PlanAddonStack({
                           className="w-8 h-8 rounded-full border border-zinc-300 text-zinc-700 disabled:opacity-30">+</button>
                       </div>
                     </div>
+                    {n > 0 && (
+                      <input
+                        type="text"
+                        value={notes[a.objectId] || ""}
+                        maxLength={200}
+                        onChange={(e) => setNotes((p) => ({ ...p, [a.objectId]: e.target.value }))}
+                        placeholder={a.notePrompt ? `${a.notePrompt} (optional)` : `Note for ${host} (optional)`}
+                        aria-label={a.notePrompt || `Note for ${host}`}
+                        className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-[16px] sm:text-sm focus:border-zinc-900 focus:outline-none"
+                      />
+                    )}
                   </div>
                 </div>
               );
@@ -219,7 +238,7 @@ function OrderCard({ order, host, busy, onPaid, onCancel, onCopied }: {
 }) {
   const [last, setLast] = useState<Method | null>(null);
   const [picking, setPicking] = useState(false);
-  const what = order.items.map((i) => `${i.quantity > 1 ? `${i.quantity} × ` : ""}${i.title}`).join(", ");
+  const what = order.items.map((i) => `${i.quantity > 1 ? `${i.quantity} × ` : ""}${i.title}${i.guestNote ? ` (${i.guestNote})` : ""}`).join(", ");
 
   if (order.status === "paid") {
     return (
