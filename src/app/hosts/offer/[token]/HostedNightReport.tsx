@@ -7,8 +7,8 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import Parse from "@/lib/parse-client";
 import { IMAGE_ACCEPT, processImageFile } from "@/lib/image-utils";
+import { linkRun } from "@/lib/link-session";
 
 type Receipt = { id: string; url: string | null; subtotalCents: number; checks: number; totalCents: number; estimated: boolean; readOk: boolean; isReceipt: boolean };
 type Report = {
@@ -36,7 +36,7 @@ export default function HostedNightReport({ token }: { token: string }) {
 
   const load = useCallback(async () => {
     try {
-      setR((await Parse.Cloud.run("getHostNightReport", { token })) as Report);
+      setR((await linkRun("getHostNightReport", { token })) as Report);
     } catch {
       setR(null);
     }
@@ -55,7 +55,7 @@ export default function HostedNightReport({ token }: { token: string }) {
     try {
       for (const f of Array.from(files)) {
         const p = await processImageFile(f);
-        setR((await Parse.Cloud.run(fn, { token, fileBase64: p.base64, mimeType: "image/jpeg" })) as Report);
+        setR((await linkRun(fn, { token, fileBase64: p.base64, mimeType: "image/jpeg" })) as Report);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "That didn't upload.");
@@ -73,7 +73,7 @@ export default function HostedNightReport({ token }: { token: string }) {
         ...(e.subtotal !== undefined ? { subtotalCents: Math.round(Number(e.subtotal || 0) * 100) } : {}),
         ...(e.checks !== undefined ? { checks: Number(e.checks) || 1 } : {}),
       }));
-      setR((await Parse.Cloud.run("updateHostNightReport", { token, receipts, ...patch })) as Report);
+      setR((await linkRun("updateHostNightReport", { token, receipts, ...patch })) as Report);
       setEdits({});
     } catch (e) {
       setError(e instanceof Error ? e.message : "That didn't save.");
@@ -142,7 +142,7 @@ export default function HostedNightReport({ token }: { token: string }) {
             <button
               type="button"
               aria-label="Remove receipt"
-              onClick={() => Parse.Cloud.run("updateHostNightReport", { token, receipts: [{ id: x.id, removed: true }] }).then((v: unknown) => setR(v as Report))}
+              onClick={() => linkRun("updateHostNightReport", { token, receipts: [{ id: x.id, removed: true }] }).then((v: unknown) => setR(v as Report))}
               className="h-9 w-9 shrink-0 rounded-full text-[18px] text-zinc-400"
             >
               ×

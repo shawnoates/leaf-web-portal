@@ -15,6 +15,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { loadStripe, type Stripe, type StripeElements } from "@stripe/stripe-js";
 import Parse from "@/lib/parse-client";
 import { merchantAuth } from "@/lib/merchant-session";
+import { isSignInError, linkAuth, linkEmailHint, signInFromEmailLink } from "@/lib/link-session";
+import LinkSignInGate from "@/components/LinkSignInGate";
 
 type Results = {
   state: "ok" | "unavailable" | "dashboard";
@@ -77,7 +79,9 @@ function Label({ children }: { children: React.ReactNode }) {
  * which the server sends on to that night on their dashboard.
  */
 export default function ResultsClient({ token, embed }: { token: string; embed?: { offerToken: string } }) {
-  const auth = useCallback(() => (embed ? { embed: true, ...merchantAuth(embed.offerToken) } : {}), [embed]);
+  // Embedded: the business's dashboard session. Otherwise a venue's page: its own (lib/link-session).
+  const auth = useCallback(() => (embed ? { embed: true, ...merchantAuth(embed.offerToken) } : linkAuth(token)), [embed, token]);
+  const [signIn, setSignIn] = useState<{ hint: string } | null>(null);
   const Wrap = embed ? EmbedWrap : PageWrap;
   const [r, setR] = useState<Results | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,7 +109,10 @@ export default function ResultsClient({ token, embed }: { token: string; embed?:
 
   const load = useCallback(async () => {
     try {
-      const res = (await Parse.Cloud.run("getSlotResults", { token, ...auth() })) as Results & { dashboardUrl?: string };
+      const res = (await (async () => {
+        if (!embed) await signInFromEmailLink("venueResults", token);
+        return Parse.Cloud.run("getSlotResults", { token, ...auth() });
+      })()) as Results & { dashboardUrl?: string };
       if (res.state === "dashboard" && res.dashboardUrl) {
         window.location.replace(res.dashboardUrl);
         return;
@@ -118,12 +125,13 @@ export default function ResultsClient({ token, embed }: { token: string; embed?:
         setFeedbackSaved(true);
       }
       if (res.rebook?.lastPriceCents != null) setPrice(String(res.rebook.lastPriceCents / 100));
-    } catch {
-      setR({ state: "unavailable" } as Results);
+    } catch (e) {
+      if (!embed && isSignInError(e)) setSignIn({ hint: await linkEmailHint("venueResults", token) });
+      else setR({ state: "unavailable" } as Results);
     } finally {
       setLoading(false);
     }
-  }, [token, auth]);
+  }, [token, auth, embed]);
 
   useEffect(() => {
     load();
@@ -220,6 +228,20 @@ export default function ResultsClient({ token, embed }: { token: string; embed?:
     }
   };
 
+  if (signIn) {
+    return (
+      <LinkSignInGate
+        page="venueResults"
+        token={token}
+        hint={signIn.hint}
+        onSignedIn={() => {
+          setSignIn(null);
+          setLoading(true);
+          load();
+        }}
+      />
+    );
+  }
   if (loading) {
     return (
       <Wrap>

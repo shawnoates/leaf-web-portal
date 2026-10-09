@@ -25,6 +25,7 @@ import IntroVideoRecorder, { type Beat, canRecordInBrowser } from "@/components/
 import { introVideoFrame } from "@/lib/intro-video-frame";
 import { TrendingUp } from "lucide-react";
 import { merchantAuth } from "@/lib/merchant-session";
+import { linkAuth } from "@/lib/link-session";
 
 export type IntroVideoInfo = {
   available: boolean;
@@ -86,7 +87,8 @@ function fnsFor(source: IntroVideoSource) {
     return { create: "createMerchantIntroUpload", finalize: "finalizeMerchantIntroUpload", remove: "removeMerchantIntroVideo", base };
   }
   if (source.kind === "offer") {
-    const base = { token: source.token };
+    // The host's page: its device session rides along (lib/link-session).
+    const base = { token: source.token, ...linkAuth(source.token) };
     return { create: "createHostIntroUpload", finalize: "finalizeHostIntroUpload", remove: "removeHostIntroVideo", base };
   }
   const base = source.kind === "plan" ? { eventGroupId: source.eventGroupId } : { notificationId: source.notificationId };
@@ -227,7 +229,7 @@ export default function HostIntroVideoCard({
     setSocial(next);
     setSocialError(null);
     try {
-      await Parse.Cloud.run("setHostIntroSocialConsent", { token: source.token, allowed: next });
+      await Parse.Cloud.run("setHostIntroSocialConsent", { token: source.token, allowed: next, ...linkAuth(source.token) });
     } catch (e) {
       setSocial(!next);
       setSocialError(e instanceof Error ? e.message : "Couldn't save that.");

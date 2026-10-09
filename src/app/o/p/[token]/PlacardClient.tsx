@@ -19,6 +19,8 @@ import { useCallback, useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import Parse from "@/lib/parse-client";
 import { merchantAuth } from "@/lib/merchant-session";
+import { isSignInError, linkAuth, linkEmailHint, signInFromEmailLink } from "@/lib/link-session";
+import LinkSignInGate from "@/components/LinkSignInGate";
 
 type Page = {
   state: "ok" | "unavailable" | "dashboard";
@@ -175,7 +177,9 @@ const FORMATS: { key: Format; label: string }[] = [
  * which the server sends on to their dashboard.
  */
 export default function PlacardClient({ token, embed }: { token: string; embed?: { offerToken: string } }) {
-  const auth = useCallback(() => (embed ? { embed: true, ...merchantAuth(embed.offerToken) } : {}), [embed]);
+  // Embedded: the business's dashboard session. Otherwise a venue's page: its own (lib/link-session).
+  const auth = useCallback(() => (embed ? { embed: true, ...merchantAuth(embed.offerToken) } : linkAuth(token)), [embed, token]);
+  const [signIn, setSignIn] = useState<{ hint: string } | null>(null);
   const Shell = embed ? EmbedShell : PageShell;
   const [page, setPage] = useState<Page | null>(null);
   const [loading, setLoading] = useState(true);
@@ -190,19 +194,23 @@ export default function PlacardClient({ token, embed }: { token: string; embed?:
 
   const load = useCallback(async () => {
     try {
-      const p = (await Parse.Cloud.run("getPlacardPage", { token, ...auth() })) as Page & { dashboardUrl?: string };
+      const p = (await (async () => {
+        if (!embed) await signInFromEmailLink("venuePlacard", token);
+        return Parse.Cloud.run("getPlacardPage", { token, ...auth() });
+      })()) as Page & { dashboardUrl?: string };
       if (p.state === "dashboard" && p.dashboardUrl) {
         window.location.replace(p.dashboardUrl);
         return;
       }
       setPage(p);
       if (p.state === "ok" && p.mailRequest) setMode("mailed");
-    } catch {
-      setPage({ state: "unavailable" } as Page);
+    } catch (e) {
+      if (!embed && isSignInError(e)) setSignIn({ hint: await linkEmailHint("venuePlacard", token) });
+      else setPage({ state: "unavailable" } as Page);
     } finally {
       setLoading(false);
     }
-  }, [token, auth]);
+  }, [token, auth, embed]);
 
   useEffect(() => {
     load();
@@ -236,6 +244,20 @@ export default function PlacardClient({ token, embed }: { token: string; embed?:
     setMode("declined");
   };
 
+  if (signIn) {
+    return (
+      <LinkSignInGate
+        page="venuePlacard"
+        token={token}
+        hint={signIn.hint}
+        onSignedIn={() => {
+          setSignIn(null);
+          setLoading(true);
+          load();
+        }}
+      />
+    );
+  }
   if (loading) {
     return (
       <Shell>

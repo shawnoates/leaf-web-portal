@@ -18,6 +18,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
+import { SIGN_IN_EVENT, isSignInError, linkAuth, linkEmailHint, linkRun, saveLinkSession, signInFromEmailLink } from "@/lib/link-session";
+import LinkSignInGate from "@/components/LinkSignInGate";
 import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
 import { IMAGE_ACCEPT, processImageFile } from "@/lib/image-utils";
 import HostIntroVideoCard, { type IntroVideoInfo } from "@/components/HostIntroVideoCard";
@@ -201,6 +203,8 @@ export default function HostOfferClient({ token }: { token: string }) {
   const [offer, setOffer] = useState<Offer | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  // Accepted, and this device isn't signed in: the code screen (lib/link-session).
+  const [signIn, setSignIn] = useState<{ hint: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -241,14 +245,17 @@ export default function HostOfferClient({ token }: { token: string }) {
   const load = useCallback(async (): Promise<Offer | null> => {
     setLoading(true);
     try {
-      const r = (await Parse.Cloud.run("getHostOffer", { token })) as Offer;
+      await signInFromEmailLink("host", token);
+      const r = (await Parse.Cloud.run("getHostOffer", { token, ...linkAuth(token) })) as Offer;
+      setSignIn(null);
       setOffer(r);
       setAddonPick((prev) => Object.keys(prev).length ? prev : seedAddonPick(r));
       setAddonHandles((prev) => prev ?? r.payHandles?.handles ?? null);
       setPaymentSaved(r.hasPaymentDetails);
       return r;
-    } catch {
-      setNotFound(true);
+    } catch (e) {
+      if (isSignInError(e)) setSignIn({ hint: await linkEmailHint("host", token) });
+      else setNotFound(true);
       return null;
     } finally {
       setLoading(false);
@@ -258,6 +265,13 @@ export default function HostOfferClient({ token }: { token: string }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // A call that finds this device signed out brings the code screen back.
+  useEffect(() => {
+    const ask = () => setSignIn((cur) => cur || { hint: "" });
+    window.addEventListener(SIGN_IN_EVENT, ask);
+    return () => window.removeEventListener(SIGN_IN_EVENT, ask);
+  }, []);
 
   const pickedAddons = () => (offer?.addons || []).filter((a) => addonPick[a.slug]?.on).map((a) => ({
     slug: a.slug,
@@ -274,7 +288,7 @@ export default function HostOfferClient({ token }: { token: string }) {
     setAddonSaving(true);
     setAddonNote(null);
     try {
-      const r = (await Parse.Cloud.run("setHostOfferAddons", {
+      const r = (await linkRun("setHostOfferAddons", {
         token,
         addons: chosen,
         payHandles: chosen.length && (handlesTouched || !offer?.payHandles?.saved) ? addonHandles : undefined,
@@ -309,7 +323,7 @@ export default function HostOfferClient({ token }: { token: string }) {
     setBusy(true);
     setError(null);
     try {
-      const r = await Parse.Cloud.run("acceptHostOffer", {
+      const r = await linkRun<{ hasPaymentDetails?: boolean; session?: string | null }>("acceptHostOffer", {
         token,
         agreed: true,
         agreementVersion: offer?.agreementVersion,
@@ -319,6 +333,8 @@ export default function HostOfferClient({ token }: { token: string }) {
         addons: offer?.addons?.length ? chosenAddons : undefined,
         payHandles: chosenAddons.length && (handlesTouched || !offer?.payHandles?.saved) ? addonHandles : undefined,
       });
+      // Accepting signs this device in, so the page still opens once it's locked.
+      saveLinkSession(token, r.session);
       setPaymentSaved(Boolean(r.hasPaymentDetails));
       setView("done");
       await load();
@@ -339,7 +355,7 @@ export default function HostOfferClient({ token }: { token: string }) {
     setBusy(true);
     setError(null);
     try {
-      await Parse.Cloud.run("declineHostOffer", { token, reason: declineReason.trim() || undefined });
+      await linkRun("declineHostOffer", { token, reason: declineReason.trim() || undefined });
       await load();
       setView("done");
     } catch (e) {
@@ -356,7 +372,7 @@ export default function HostOfferClient({ token }: { token: string }) {
     setBusy(true);
     setError(null);
     try {
-      await Parse.Cloud.run("cancelHostAssignment", { token, reason: cancelReason.trim() || undefined });
+      await linkRun("cancelHostAssignment", { token, reason: cancelReason.trim() || undefined });
       await load();
       setView("done");
     } catch (e) {
@@ -370,7 +386,7 @@ export default function HostOfferClient({ token }: { token: string }) {
     setBusy(true);
     setError(null);
     try {
-      await Parse.Cloud.run("submitHostPaymentDetails", {
+      await linkRun("submitHostPaymentDetails", {
         token,
         method: payMethod,
         handle: payHandle.trim(),
@@ -405,7 +421,7 @@ export default function HostOfferClient({ token }: { token: string }) {
     setBusy(true);
     setError(null);
     try {
-      await Parse.Cloud.run("submitHostAttendance", {
+      await linkRun("submitHostAttendance", {
         token,
         photosBase64: photos.map((p) => p.base64),
         note: photoNote.trim() || undefined,
@@ -420,6 +436,7 @@ export default function HostOfferClient({ token }: { token: string }) {
     }
   };
 
+  if (signIn) return <LinkSignInGate page="host" token={token} hint={signIn.hint} onSignedIn={() => load()} />;
   if (loading) {
     return (
       <Shell>
