@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, Check, ChevronUp, MapPin, MessageCircle, Plus, Search, Settings, UserPlus, X } from "lucide-react";
+import { ArrowUp, CalendarDays, Check, ChevronUp, MapPin, MessageCircle, Plus, Search, Settings, UserPlus, X } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
 import Parse from "@/lib/parse-client";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
@@ -170,6 +170,22 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
       setBusy(null);
     }
   };
+
+  // "Connect your calendar": for members who haven't, when no vote is open
+  // (the vote has its own prompt). Not now hides it for this crew on this device.
+  const calKey = `crew-cal-nudge:${crew.id}`;
+  const [calHidden, setCalHidden] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try { setCalHidden(window.localStorage.getItem(calKey) === "1"); } catch { setCalHidden(false); }
+    }, 0);
+    return () => clearTimeout(t);
+  }, [calKey]);
+  const hideCal = () => {
+    setCalHidden(true);
+    try { window.localStorage.setItem(calKey, "1"); } catch { /* private mode */ }
+  };
+  const showCalNudge = me.status === "in" && !me.calendarSynced && !calHidden && !open.some((c) => c.state === "polling");
 
   const joined = members.filter((m) => m.status === "in");
   const invited = members.filter((m) => m.status === "invited");
@@ -432,6 +448,26 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               />
             )}
           </section>
+
+          {showCalNudge && (
+            <section className="flex items-start gap-3.5 rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-fm-card text-fm-accent" aria-hidden>
+                <CalendarDays size={20} />
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-3">
+                <div>
+                  <p className="m-0 text-[16px] font-semibold text-fm-ink">Connect your calendar</p>
+                  <p className="m-0 mt-1 text-[14px] leading-relaxed text-fm-ink-2">
+                    Leaf finds {ev ? "nights" : "days"} that work for you and skips the ones you&rsquo;re busy. Your crew never sees your calendar, just which dates work.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button small disabled={busy !== null} onClick={connectCalendar}>{busy === "gcal" ? "Opening…" : "Connect Google Calendar"}</Button>
+                  <button type="button" className="text-sm text-fm-muted underline underline-offset-4" onClick={hideCal}>Not now</button>
+                </div>
+              </div>
+            </section>
+          )}
 
           {split && (split.receipt || split.went) && split.cycleId !== data.lastNight?.cycleId && (
             <CrewMoneyCard kind="after" split={split} auth={auth} onChange={setSplit} />
