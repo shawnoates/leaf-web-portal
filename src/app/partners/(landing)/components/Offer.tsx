@@ -5,7 +5,7 @@ import Reveal from "./Reveal";
  * "What it costs" — the per-RSVP deal, side by side:
  *
  *   Your first Neighbor Hour  — free: no listing fee, no RSVP fees; a card claims it
- *   Every night after — $6 per RSVP, nothing under 5 RSVPs
+ *   After that — $6 per RSVP in the days and times they pick, up to a weekly limit
  *
  * The Leaf host is an optional add-on on any night. Anything custom goes to
  * a partner manager.
@@ -55,13 +55,13 @@ export default function Offer() {
             </div>
             <p className="offer__desc">
               Pick your slow days and a weekly limit, and switch it on or off anytime, like
-              an ad campaign. $6 for each neighbor who RSVPs, counted 2 hours before and
-              charged to your card after it happens. That rate never goes up.
+              an ad campaign. $6 for each neighbor who RSVPs in your days and times, counted
+              2 hours before and charged to your card once a week. That rate never goes up.
             </p>
             <ul className="offer__list">
-              <li>Under 5 RSVPs costs nothing, and we set up another one</li>
+              <li>RSVPs outside your days and times are free</li>
               <li>Set a weekly limit: your RSVP charges never go over it</li>
-              <li>A one-time $100 setup, added to your first paid Neighbor Hour, after it happens</li>
+              <li>A one-time $100 setup, added to your first paid week</li>
               <li>Optional Leaf host, $99, for any Neighbor Hour you&rsquo;d like us to run</li>
             </ul>
           </Reveal>

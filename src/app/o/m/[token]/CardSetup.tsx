@@ -103,9 +103,9 @@ const CardSetup = forwardRef<
         {error && <p className="mt-2 text-[14px] text-red-600">{error}</p>}
         {/* Consent for charges made later, when the merchant isn't here (off-session). */}
         <p className="mt-3 text-[13px] leading-snug text-stone-600">
-          {`By saving your card, you authorize Leaf to charge it ${fee} per RSVP after each Neighbor Hour at your place, counted 2 hours before it starts and never more than you seat${
+          {`By saving your card, you authorize Leaf to charge it ${fee} per RSVP for Neighbor Hours at your place, counted 2 hours before each one starts and never more than you seat${
             hostFeeCents > 0 ? `, plus $${Math.round(hostFeeCents / 100)} for any Neighbor Hour you ask a Leaf host to run` : ""
-          }. ${firstNightFree ? `Your first Neighbor Hour's RSVPs are free. ` : ""}Nights with fewer than 5 RSVPs cost nothing. After your first Neighbor Hour, we keep booking your day each week until you switch it off on your dashboard, and RSVP charges never go over your weekly limit ($90 to start; change it anytime). Your first paid night also carries a one-time $100 setup fee, charged after that night. If you post a deal, it's $20 a month, charged once it's approved. Nothing is charged today. You can remove your card or stop anytime by replying to Shawn. `}
+          }. ${firstNightFree ? `Your first Neighbor Hour's RSVPs are free. ` : ""}After your first Neighbor Hour, neighbors' plans at your place in the days and times you pick count, and we charge once a week for the week before until you switch it off on your dashboard. RSVPs outside your days and times are free, and RSVP charges never go over your weekly limit ($90 to start; change it anytime). Your first paid week also carries a one-time $100 setup fee. If you post a deal, it's $20 a month, charged once it's approved. Nothing is charged today. You can remove your card or stop anytime by replying to Shawn. `}
           <a href="/terms-conditions" target="_blank" className="underline">
             Terms
           </a>

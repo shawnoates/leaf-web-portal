@@ -59,8 +59,8 @@ export default function FreeNightCountdown({
       <div className="rounded-3xl border border-stone-200 bg-white p-5">
         <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-500">Free first Neighbor Hour</p>
         <p className="mt-1 text-[15px] leading-snug text-stone-700">
-          The free first Neighbor Hour offer ended{when ? ` on ${when}` : ""}. You can still join: {feeLabel} per RSVP from your first Neighbor Hour, and nothing
-          under 5 RSVPs.
+          The free first Neighbor Hour offer ended{when ? ` on ${when}` : ""}. You can still join: {feeLabel} per RSVP from your first Neighbor Hour, up to
+          a weekly limit you set.
         </p>
       </div>
     );

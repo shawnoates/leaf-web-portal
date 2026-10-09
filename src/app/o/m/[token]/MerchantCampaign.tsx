@@ -267,7 +267,7 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
       )}
 
       <p className="mt-6 border-t border-stone-100 pt-6 text-[13px] leading-relaxed text-stone-500">
-        {`${dollars(s.feeCents)} per RSVP, counted 2 hours before each plan and charged once a week for the week before, never more than your weekly limit. A plan with under 5 RSVPs costs nothing.`}
+        {`${dollars(s.feeCents)} per RSVP, counted 2 hours before each plan and charged once a week for the week before, never more than your weekly limit. RSVPs outside your days and times are free.`}
         {firstNightFree ? " Your first Neighbor Hour is free." : ""}
         {s.setupFeeOwed ? ` A one-time ${dollars(s.setupFeeCents)} setup is added to your first paid one.` : ""}
       </p>

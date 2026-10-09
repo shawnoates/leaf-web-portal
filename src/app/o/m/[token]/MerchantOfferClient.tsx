@@ -94,8 +94,8 @@ function OfferCard({ form }: { form: Form }) {
   const spend = form.spendEstimate;
   const rows: [string, string][] = [
     [b.firstNightFree ? "Your first Neighbor Hour is on us" : "Free for neighbors", "Neighbors join free and everyone orders their own."],
-    [b.firstNightFree ? `${fee} per RSVP after that` : `${fee} per RSVP`, "Charged after the night, counted 2 hours before, never more than you seat."],
-    ["No crowd, no charge", "Under 5 RSVPs costs nothing, and we set up another night."],
+    [b.firstNightFree ? `${fee} per RSVP after that` : `${fee} per RSVP`, "Counted 2 hours before each plan, never more than you seat, charged once a week."],
+    ["You set the limit", "Pick your days, times and a weekly limit. Your RSVP charges never go over it."],
   ];
   return (
     <div className="overflow-hidden rounded-3xl bg-leaf-800 text-white">
@@ -797,7 +797,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             title="Hold it with a card"
             sub={
               form.billing?.firstNightFree
-                ? "Your first Neighbor Hour is free. After that we keep booking your day each week, up to $90 a week, until you switch it off on your dashboard. Each night is charged to this card after it happens."
+                ? "Your first Neighbor Hour is free. After that, neighbors' plans at your place on your day count, up to $90 a week, until you switch it off on your dashboard. We charge this card once a week."
                 : "Each night is charged to this card after it happens, never more than your weekly limit."
             }
           >

@@ -18,7 +18,7 @@ const items = [
   },
   {
     q: "What if nobody shows up?",
-    a: "Under 5 RSVPs, there's no charge and we set up another one for you. You only ever pay for neighbors who said they're coming.",
+    a: "You only pay for neighbors who RSVP, inside the days and times you pick, and never more than your weekly limit. Your first Neighbor Hour is free.",
   },
   {
     q: "How is this different from an ad?",
