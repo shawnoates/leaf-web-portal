@@ -288,6 +288,8 @@ interface PlanIdea {
   // A placard idea on the business's own class: booked on its site.
   bookingUrl?: string | null;
   classTitle?: string | null;
+  /** A placard idea someone hosted: the plan it became (its welcome sheet shows "I'm in"). */
+  eventGroupId?: string | null;
   interestCount?: number;
   // Cohort the idea was generated for ("moms", "parents_kids", …). Null on
   // ideas generated before cohort rotation and on calendars that declare their
@@ -3316,6 +3318,7 @@ export default function OrgCalendarPage() {
         suggestedByName: (idea.suggestedByName as string) ?? null,
         bookingUrl: (idea.bookingUrl as string) ?? null,
         classTitle: (idea.classTitle as string) ?? null,
+        eventGroupId: (idea.eventGroupId as string) ?? null,
       });
       const planIdeas: PlanIdea[] = (result.planIdeas || []).map(mapIdea);
       const placardIdeas: PlanIdea[] = (result.placardWelcome?.ideas || []).map(mapIdea);
@@ -7747,13 +7750,28 @@ export default function OrgCalendarPage() {
         <PlacardWelcome
           name={org.placardWelcome.name}
           photoUrl={org.placardWelcome.photoUrl}
-          ideas={org.placardIdeas || []}
-          brandColor={org.brandColor || "#18181b"}
+          // A hosted idea needs its plan on this page to RSVP to; one that isn't here is left out.
+          ideas={(org.placardIdeas || []).filter((i) => !i.eventGroupId || org.plans.some((p) => p.id === i.eventGroupId))}
           canHost={(org.isOwner || org.isHost || !!org.allowFollowersToHost) && !org.rsvpLimitReached}
           counts={planIdeaInterestCounts}
           interested={planIdeaLocallyInterested}
           pending={planIdeaInterestPending}
+          hostedPlan={(idea) => {
+            const plan = idea.eventGroupId ? org.plans.find((p) => p.id === idea.eventGroupId) : null;
+            if (!plan) return null;
+            return {
+              planId: plan.id,
+              hostName: plan.hostCardName || plan.hostName,
+              count: plan.rsvpCount,
+              joined: rsvpedPlanIds.has(plan.id) || pendingRsvpIds.has(plan.id),
+            };
+          }}
           onHeart={(id) => handlePlanIdeaInterest(id)}
+          // The RSVP modal (z-50) opens over the sheet and asks who they are if it needs to.
+          onRsvp={(planId) => {
+            const plan = org.plans.find((p) => p.id === planId);
+            if (plan) setRsvpPlan(plan);
+          }}
           onHost={(idea) => {
             setShowPlacardWelcome(false);
             setHostingIdea(idea);

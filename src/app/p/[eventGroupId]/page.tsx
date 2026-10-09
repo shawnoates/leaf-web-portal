@@ -384,7 +384,6 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
       calendarName={info.calendarName}
       calendarProfilePhoto={info.calendarProfilePhoto}
       onlyOnLeaf={info.onlyOnLeaf ?? null}
-      bookingUrl={info.bookingUrl ?? null}
       shareId={info.shareId}
       requireApproval={info.requireApproval}
       rsvpCount={info.rsvpCount ?? 0}
