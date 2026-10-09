@@ -95,7 +95,7 @@ export default function SignInGate({ token, hint, onSignedIn }: { token: string;
         <Link href="/partners/login" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
           Sign in with another email
         </Link>{" "}
-        or write shawn@getleaflets.co.
+        or write partners@joinleaf.com.
       </p>
     </Shell>
   );

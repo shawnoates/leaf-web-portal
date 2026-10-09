@@ -806,8 +806,8 @@ export default function MerchantDashboard({
               {d.cancelled.length > 0 && <p className="px-1 text-[13px] text-stone-500">Called off: {d.cancelled.map((n) => n.dateLabel).join(", ")}</p>}
               <p className="px-1 pb-6 text-[13px] text-stone-500">
                 Questions? Reply to any email from Leaf, or write{" "}
-                <a href="mailto:shawn@getleaflets.co" className="underline">
-                  shawn@getleaflets.co
+                <a href="mailto:partners@joinleaf.com" className="underline">
+                  partners@joinleaf.com
                 </a>
                 .
               </p>
