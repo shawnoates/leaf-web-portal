@@ -368,7 +368,7 @@ function Row({
           </span>
 
           {task.detail && !done && (
-            <span className="block text-[13px] text-zinc-500 mt-0.5 leading-relaxed">
+            <span className="block whitespace-pre-line text-[13px] text-zinc-500 mt-0.5 leading-relaxed">
               {renderLinkedText(task.detail, { hostOnly: true })}
             </span>
           )}
@@ -485,7 +485,7 @@ function IntroRow({
     <li className="border-b border-zinc-100 last:border-b-0 px-4 py-3.5">
       <p className="text-[15px] leading-snug text-zinc-900">{task.title}</p>
       {task.status !== "done" && task.detail && (
-        <p className="block text-[13px] text-zinc-500 mt-0.5 leading-relaxed">{task.detail}</p>
+        <p className="block whitespace-pre-line text-[13px] text-zinc-500 mt-0.5 leading-relaxed">{task.detail}</p>
       )}
       <div className="mt-3">
         <HostIntroVideoCard
@@ -559,7 +559,7 @@ function MeetingSpotRow({
         <div className="min-w-0 flex-1">
           <p className={`text-[15px] leading-snug ${done ? "text-zinc-500" : "text-zinc-900"}`}>{task.title}</p>
           {!done && task.detail && (
-            <p className="text-[13px] text-zinc-500 mt-0.5 leading-relaxed">{task.detail}</p>
+            <p className="whitespace-pre-line text-[13px] text-zinc-500 mt-0.5 leading-relaxed">{task.detail}</p>
           )}
 
           {pack && shown && (
