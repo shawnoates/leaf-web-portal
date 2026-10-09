@@ -252,12 +252,12 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
           <p className="mt-1 text-[12px] text-stone-500">RSVPs a week</p>
         </div>
         <div className="rounded-2xl bg-stone-50 px-2 py-4">
-          <p className="font-fm-serif text-[24px] leading-none text-stone-900">{span(o.guests)}</p>
+          <p className="font-fm-serif text-[24px] leading-none text-stone-900">{`~${span(o.guests)}`}</p>
           <p className="mt-1 text-[12px] text-stone-500">guests a week</p>
         </div>
         <div className="rounded-2xl bg-leaf-50 px-2 py-4">
           <p className="font-fm-serif text-[24px] leading-none text-leaf-800">{o.sales ? span(o.sales, roundDollars) : "\u2014"}</p>
-          <p className="mt-1 text-[12px] text-leaf-700">guest spend</p>
+          <p className="mt-1 text-[12px] text-leaf-700">guest typical spend</p>
         </div>
       </div>
       <p className="mt-2 text-[12px] leading-relaxed text-stone-500">
