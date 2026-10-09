@@ -801,8 +801,8 @@ export default function MerchantDashboard({
               {/* Prepaid balances are gone (2026-10-08); show one only while some is left. */}
               {credit && credit.balanceCents > 0 && <LeafBalance credit={credit} />}
               {account}
-              {/* Counter cards are for walk-in places (bars, restaurants); not ticketed studios. */}
-              {perRsvp && (d.placardToken || d.placardUrl) && <CounterCard d={d} token={token} />}
+              {/* Every business with a space gets one, ticketed studios included (front desk or counter). */}
+              {(d.placardToken || d.placardUrl) && <CounterCard d={d} token={token} />}
               {d.cancelled.length > 0 && <p className="px-1 text-[13px] text-stone-500">Called off: {d.cancelled.map((n) => n.dateLabel).join(", ")}</p>}
               <p className="px-1 pb-6 text-[13px] text-stone-500">
                 Questions? Reply to any email from Leaf, or write{" "}
