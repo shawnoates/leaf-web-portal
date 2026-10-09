@@ -11,7 +11,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Toggle, dollars } from "./ui";
 import { merchantRun } from "@/lib/merchant-session";
 
-type Range = { low: number; high: number };
+/** The middle half of past nights, and the median ("usually") when the server sends it. */
+type Range = { low: number; high: number; mid?: number };
 type Day = { weekday: number; partOfDay: "morning" | "afternoon" | "evening" | "any" };
 type CampaignState = {
   campaign: { on: boolean; days: Day[]; weeklyBudgetCents: number; autoStarted?: boolean };
@@ -23,12 +24,14 @@ type CampaignState = {
   hasCard: boolean;
   thisWeek: { spentCents: number };
   estimate: {
-    scope: "neighborhood" | "everywhere";
+    // Neighbor Hours here or everywhere; before any have run, Leaf's public plans.
+    scope: "neighborhood" | "everywhere" | "plans_neighborhood" | "plans_everywhere" | null;
     nights: number;
-    rsvpsPerNight: Range;
+    rsvpsPerNight: Range | null;
     attendedPerNight: Range | null;
     showRate: number | null;
-    spendPerGuest: (Range & { scope: "category" | "everywhere"; nights: number }) | null;
+    // Hosts' receipts, or (before any) the app's split-the-bill receipts.
+    spendPerGuest: (Range & { scope: "category" | "everywhere" | "splits_category" | "splits_everywhere"; nights: number }) | null;
   } | null;
   calendarName: string;
 };
@@ -47,18 +50,40 @@ const STEP_CENTS = 600; // one RSVP per notch
 
 const span = (r: Range, f: (n: number) => string = String) => (r.low === r.high ? f(r.low) : `${f(r.low)}–${f(r.high)}`);
 
-/** Mirrors weeklyOutlook in offer-merchant-campaign.js. */
+/**
+ * Mirrors weeklyOutlook in offer-merchant-campaign.js, with the median
+ * carried through. Without a show rate yet, RSVPs stand in for guests.
+ */
 function outlook(s: CampaignState, budgetCents: number, nightsPerWeek: number) {
   const paid = Math.floor(budgetCents / Math.max(1, s.feeCents));
   const per = s.estimate?.rsvpsPerNight ?? null;
-  const draw = per && nightsPerWeek ? { low: per.low * nightsPerWeek, high: per.high * nightsPerWeek } : null;
-  const rsvps = draw ? { low: Math.min(paid, draw.low), high: Math.min(paid, draw.high) } : { low: paid, high: paid };
+  const times = (r: Range, k: number): Range => ({ low: r.low * k, high: r.high * k, mid: r.mid != null ? r.mid * k : undefined });
+  const cap = (r: Range): Range => ({ low: Math.min(paid, r.low), high: Math.min(paid, r.high), mid: r.mid != null ? Math.min(paid, r.mid) : undefined });
+  const draw = per && nightsPerWeek ? times(per, nightsPerWeek) : null;
+  const rsvps = draw ? cap(draw) : { low: paid, high: paid };
   const rate = s.estimate?.showRate ?? null;
-  const guests = rate != null ? { low: Math.round(rsvps.low * rate), high: Math.round(rsvps.high * rate) } : null;
+  const guests = draw ? (rate != null ? { low: Math.round(rsvps.low * rate), high: Math.round(rsvps.high * rate), mid: rsvps.mid != null ? Math.round(rsvps.mid * rate) : undefined } : rsvps) : null;
   const spend = s.estimate?.spendPerGuest ?? null;
-  const sales = guests && spend ? { low: guests.low * spend.low, high: guests.high * spend.high } : null;
+  // Guests times the usual spend: multiplying the low and high ends of both
+  // compounds the spread into a range too wide to plan with.
+  const each = spend ? spend.mid ?? Math.round((spend.low + spend.high) / 2) : null;
+  const sales = guests && each ? { low: guests.low * each, high: guests.high * each, mid: guests.mid != null ? guests.mid * each : undefined } : null;
   return { paid, rsvps, guests, sales, limitBinds: Boolean(draw && paid < draw.high), draw };
 }
+
+/** Guest spend for a week, to the nearest $10. */
+const roundDollars = (c: number) => dollars(Math.round(c / 1000) * 1000);
+
+/** Where a spend figure comes from, for the line under the tiles. */
+const SPEND_FROM: Record<"category" | "everywhere" | "splits_category" | "splits_everywhere", string> = {
+  category: "from hosts' receipts at places like yours",
+  everywhere: "from hosts' receipts at Neighbor Hours",
+  splits_category: "from bills Leaf neighbors split at places like yours",
+  splits_everywhere: "from bills Leaf neighbors split on nights out",
+};
+
+/** "usually 2", under a range. */
+const usually = (r: Range | null, f: (n: number) => string = String) => (r && r.mid != null && r.low !== r.high ? `usually ${f(r.mid)}` : "");
 
 export default function MerchantCampaign({ token, preview, firstNightFree }: { token: string; preview?: boolean; firstNightFree?: boolean }) {
   const [s, setS] = useState<CampaignState | null>(null);
@@ -114,7 +139,8 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
   };
 
   const est = s.estimate;
-  const where = est?.scope === "neighborhood" ? (s.calendarName || "your neighborhood") : "Leaf neighborhoods";
+  const where = est?.scope === "neighborhood" || est?.scope === "plans_neighborhood" ? (s.calendarName || "your neighborhood") : "Leaf neighborhoods";
+  const fromPlans = est?.scope === "plans_neighborhood" || est?.scope === "plans_everywhere";
   const spentPct = Math.min(100, Math.round((s.thisWeek.spentCents / Math.max(1, budget)) * 100));
 
   return (
@@ -227,24 +253,29 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
         <div className="rounded-2xl bg-stone-50 px-2 py-4">
           <p className="font-fm-serif text-[24px] leading-none text-stone-900">{span(o.rsvps)}</p>
           <p className="mt-1 text-[12px] text-stone-500">RSVPs a week</p>
+          {usually(o.rsvps) && <p className="mt-0.5 text-[12px] font-semibold text-stone-700">{usually(o.rsvps)}</p>}
         </div>
         <div className="rounded-2xl bg-stone-50 px-2 py-4">
           <p className="font-fm-serif text-[24px] leading-none text-stone-900">{o.guests ? span(o.guests) : "—"}</p>
           <p className="mt-1 text-[12px] text-stone-500">guests a week</p>
+          {usually(o.guests) && <p className="mt-0.5 text-[12px] font-semibold text-stone-700">{usually(o.guests)}</p>}
         </div>
         <div className="rounded-2xl bg-leaf-50 px-2 py-4">
-          <p className="font-fm-serif text-[24px] leading-none text-leaf-800">{o.sales ? span(o.sales, (c) => dollars(Math.round(c / 1000) * 1000)) : "—"}</p>
+          <p className="font-fm-serif text-[24px] leading-none text-leaf-800">{o.sales ? span(o.sales, roundDollars) : "—"}</p>
           <p className="mt-1 text-[12px] text-leaf-700">guest spend</p>
+          {usually(o.sales, roundDollars) && <p className="mt-0.5 text-[12px] font-semibold text-leaf-800">{usually(o.sales, roundDollars)}</p>}
         </div>
       </div>
       <p className="mt-2 text-[12px] leading-relaxed text-stone-500">
         {est
           ? [
-              `Neighbor Hours in ${where} draw ${span(est.rsvpsPerNight)} RSVPs`,
-              est.attendedPerNight ? ` and ${span(est.attendedPerNight)} guests` : "",
-              ` (last ${est.nights}).`,
+              est.rsvpsPerNight
+                ? fromPlans
+                  ? `Leaf plans ${est.scope === "plans_neighborhood" ? `in ${where}` : "across all neighborhoods"} draw ${span(est.rsvpsPerNight)} RSVPs, usually ${est.rsvpsPerNight.mid ?? est.rsvpsPerNight.low} (last ${est.nights}, until your own Neighbor Hours run).`
+                  : `Neighbor Hours in ${where} draw ${span(est.rsvpsPerNight)} RSVPs${est.attendedPerNight ? ` and ${span(est.attendedPerNight)} guests` : ""} (last ${est.nights}).`
+                : `Your limit covers up to ${o.paid} RSVPs a week at ${dollars(s.feeCents)} each.`,
               est.spendPerGuest
-                ? ` Guests spend ${span(est.spendPerGuest, dollars)} each at ${est.spendPerGuest.scope === "category" ? "places like yours" : "Neighbor Hours"}, from receipts.`
+                ? ` Guests spend ${span(est.spendPerGuest, dollars)} each, usually ${dollars(est.spendPerGuest.mid ?? est.spendPerGuest.low)}, ${SPEND_FROM[est.spendPerGuest.scope]}.`
                 : "",
               o.limitBinds && o.draw ? ` Your limit covers ${o.paid} RSVPs; your days usually draw up to ${o.draw.high}.` : "",
               " Estimates, not promises.",
