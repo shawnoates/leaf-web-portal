@@ -53,15 +53,15 @@ const span = (r: Range, f: (n: number) => string = String) => (r.low === r.high 
 /**
  * The week the limit buys: RSVPs is what it pays for (one number); guests
  * range from half of those RSVPs showing up to all of them; spend is those
- * guests at the average spend per person for places like theirs.
+ * guests at the median spend per person for places like theirs.
  */
 const SHOW_LOW = 0.5;
 function outlook(s: CampaignState, budgetCents: number) {
   const paid = Math.floor(budgetCents / Math.max(1, s.feeCents));
   const guests: Range = { low: Math.ceil(paid * SHOW_LOW), high: paid };
   const spend = s.estimate?.spendPerGuest ?? null;
-  // The mean spend per person (the median until the server sends the mean).
-  const each = spend ? spend.mean ?? spend.mid ?? Math.round((spend.low + spend.high) / 2) : null;
+  // The median spend per person: a few big bills pull the mean well above what most guests spend.
+  const each = spend ? spend.mid ?? Math.round((spend.low + spend.high) / 2) : null;
   const sales: Range | null = each ? { low: guests.low * each, high: guests.high * each } : null;
   return { paid, guests, sales, each };
 }
@@ -257,7 +257,7 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
       <p className="mt-2 text-[12px] leading-relaxed text-stone-500">
         {[
           `Your limit pays for ${o.paid} RSVPs a week at ${dollars(s.feeCents)} each. Guests: half to all of them show up.`,
-          o.each && est?.spendPerGuest ? ` Guest spend: that many guests at ${dollars(o.each)} a person, the average ${SPEND_FROM[est.spendPerGuest.scope]}.` : "",
+          o.each && est?.spendPerGuest ? ` Guest spend: that many guests at ${dollars(o.each)} a person, what a typical guest spends ${SPEND_FROM[est.spendPerGuest.scope].replace(/^from /, "by ")}.` : "",
           " Estimates, not promises.",
         ].join("")}
       </p>
