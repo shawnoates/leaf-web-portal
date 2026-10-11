@@ -149,7 +149,10 @@ export type CrewPage = {
   prefPills?: PrefPill[];
   open: CycleView[];
   past: { cycleId: string; venue: Venue | null; startsAt: string | { iso: string } | null; headcount: number; planId: string | null }[];
+  /** The newest few in the book (the crew page's row). */
   book: BookSpot[];
+  /** How many places the whole book holds. */
+  bookTotal?: number;
   /** Crew Pulse: rings, score and stats from the last 90 days (null if it couldn't be worked out). */
   pulse?: CrewPulse | null;
   /** Split the bill for the latest night that ended this week (null when there's none). */

@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, CalendarDays, Check, ChevronUp, MapPin, MessageCircle, Plus, Search, Settings, UserPlus, X } from "lucide-react";
+import { ArrowUp, CalendarDays, Check, ChevronRight, ChevronUp, MapPin, MessageCircle, Plus, Search, Settings, UserPlus, X } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
 import Parse from "@/lib/parse-client";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
@@ -559,7 +559,23 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                      </a>
                     </li>
                   ))}
+                  {/* The rest of the book: newest are shown here, everything is there. */}
+                  <li className="flex w-[148px] shrink-0 snap-start flex-col gap-2 lg:hidden">
+                    <Link
+                      href={crewHref(auth, "book")}
+                      className="flex h-[148px] flex-col items-center justify-center gap-2 rounded-[20px] border border-dashed border-fm-line text-center text-fm-ink hover:border-fm-ink-2"
+                    >
+                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-fm-card" aria-hidden><ChevronRight size={18} strokeWidth={2.2} /></span>
+                      <span className="text-[15px] font-semibold">{(data.bookTotal ?? book.length) > book.length ? "See more" : "See the book"}</span>
+                      {(data.bookTotal ?? book.length) > book.length && <span className="text-xs text-fm-muted">{data.bookTotal} places</span>}
+                    </Link>
+                  </li>
                 </ul>
+              )}
+              {book.length > 0 && (data.bookTotal ?? book.length) > 4 && (
+                <Link href={crewHref(auth, "book")} className="hidden w-fit text-sm font-semibold text-fm-ink-2 underline underline-offset-4 hover:text-fm-ink lg:inline">
+                  See all {data.bookTotal} places
+                </Link>
               )}
             </section>
           )}
