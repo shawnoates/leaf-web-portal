@@ -4,7 +4,7 @@
  * "Get paid": the merchant's payout setup, on their acceptance form.
  *
  * Ticket money for their night is held by Leaf and sent to them after the
- * night runs, less Leaf's 10%, through Stripe. This connects their bank
+ * night runs, less Leaf's $6 a ticket, through Stripe. This connects their bank
  * account (Stripe Express onboarding, hosted by Stripe). Coming back from
  * Stripe lands on ?payouts=done, and the status is re-read.
  */
@@ -58,7 +58,7 @@ export default function PayoutSetup({ token }: { token: string }) {
       <p className="text-[15px] font-semibold text-leaf-900">Get paid for your night</p>
       {status.payoutsEnabled ? (
         <>
-          <p className="mt-2 text-[15px] text-zinc-700">Payouts are set up. Ticket sales, less our 10%, go to your bank the morning after each night.</p>
+          <p className="mt-2 text-[15px] text-zinc-700">Payouts are set up. Ticket sales, less our $6 a ticket, go to your bank the morning after each night.</p>
           <button
             type="button"
             onClick={openStripe}
@@ -71,7 +71,7 @@ export default function PayoutSetup({ token }: { token: string }) {
       ) : (
         <>
           <p className="mt-2 text-[15px] leading-relaxed text-zinc-700">
-            Neighbors pay for tickets through Leaf. After the night we send you the ticket sales, less our 10%. Connect your bank
+            Neighbors pay for tickets through Leaf. After the night we send you the ticket sales, less our $6 a ticket. Connect your bank
             account with Stripe so it can land. It takes a few minutes.
             {status.detailsSubmitted ? " Stripe is still checking your details." : ""}
           </p>

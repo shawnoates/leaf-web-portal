@@ -6,7 +6,7 @@
  * Linked from Shawn's email two days after a night. Each side sees its own
  * numbers only: a venue never sees what the merchant made. Three quick
  * questions. A merchant whose night worked can book the next one here: a
- * different offer on an open date, $75 plus the usual 10%, card saved now and
+ * different offer on an open date, $75 plus the usual $6 a ticket, card saved now and
  * charged when the week is confirmed. A rebooked night with thin RSVPs two
  * days out asks the merchant to run it anyway or move it free.
  */
@@ -403,7 +403,7 @@ export default function ResultsClient({ token, embed }: { token: string; embed?:
                 {r.attended != null ? `${r.attended} neighbors came. ` : ""}Want to do it again?
               </p>
               <p className="mt-2 text-[15px] leading-relaxed text-zinc-700">
-                Choose your next date for {fee}, plus our usual 10% of tickets. Or we&rsquo;ll reach out when there&rsquo;s an opening.
+                Choose your next date for {fee}, plus our usual $6 a ticket. Or we&rsquo;ll reach out when there&rsquo;s an opening.
               </p>
               {!setup ? (
                 <div className="mt-4 space-y-3">

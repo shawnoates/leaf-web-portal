@@ -116,6 +116,17 @@ function PriceSummary({ weeklyCents, feeCents }: { weeklyCents: number; feeCents
   );
 }
 
+/** A workshop's ticket: what they keep of each one, after Leaf's flat fee (none on their first night). */
+function TicketSplit({ priceCents, feeCents, firstNightFree }: { priceCents: number; feeCents: number; firstNightFree: boolean }) {
+  const fee = Math.min(feeCents, priceCents);
+  return (
+    <p className="rounded-xl bg-stone-50 p-3 text-[14px] leading-snug text-stone-700 ring-1 ring-stone-200">
+      {`You keep ${dollars(priceCents - fee)} of each ${dollars(priceCents)} ticket; Leaf keeps ${dollars(fee)}.`}
+      {firstNightFree && <span className="font-semibold text-leaf-700">{` Your first one, you keep all ${dollars(priceCents)}.`}</span>}
+    </p>
+  );
+}
+
 /**
  * Sign-up as the top of their dashboard: their name in the green header and a
  * white setup box with what's left (each step links to its section). Once
@@ -774,7 +785,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           blurb={
             perRsvp
               ? "We bring neighbors from your neighborhood\u2019s Leaf calendar to you, in your slowest hours. Your first Neighbor Hour is on us."
-              : "A short taster of what you teach, for neighbors on your neighborhood\u2019s Leaf calendar. They buy tickets; Leaf keeps 10%."
+              : "A short taster of what you teach, for neighbors on your neighborhood\u2019s Leaf calendar. They buy tickets; Leaf keeps $6 a ticket, and nothing on your first one."
           }
           steps={
             perRsvp
@@ -878,6 +889,13 @@ export default function MerchantOfferClient({ token }: { token: string }) {
                 <input value={durationMin} onChange={(e) => setDurationMin(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className={input} />
               </Field>
             </div>
+          )}
+          {!perRsvp && Number(price) > 0 && (
+            <TicketSplit
+              priceCents={Math.round(Number(price) * 100)}
+              feeCents={form.billing?.rsvpFeeCents ?? 600}
+              firstNightFree={Boolean(form.billing?.firstNightFree)}
+            />
           )}
           {!perRsvp && Number(price) * 100 > form.priceCeilingCents && (
             <p className="rounded-xl bg-amber-50 p-3 text-[14px] leading-snug text-amber-900">
