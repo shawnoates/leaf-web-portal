@@ -912,7 +912,7 @@ export default function MerchantDashboard({
           <div className="mt-6 grid gap-6 lg:mt-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-8">
             {/* Main column: their Neighbor Hours, then their nights. */}
             <div className="min-w-0 space-y-6">
-              {perRsvp && d.night && <NightCard token={token} night={d.night} preview={preview} />}
+              {d.night && <NightCard token={token} night={d.night} preview={preview} />}
               {perRsvp && <MerchantCampaign token={token} preview={preview} firstNightFree={d.freeNight.state === "granted"} onSummary={setCampaign} />}
 
               {/* Your nights: what's coming up (with each night's bar and the host add-on), and past weeks. */}

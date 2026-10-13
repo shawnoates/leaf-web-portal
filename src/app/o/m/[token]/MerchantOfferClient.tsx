@@ -23,8 +23,8 @@ import Parse from "@/lib/parse-client";
 import PayoutSetup from "./PayoutSetup";
 import CardSetup, { type Card, type CardSetupHandle } from "./CardSetup";
 import NoticePrefs, { noticePayload, type Notices } from "./NoticePrefs";
-import { Brand, BusinessPhoto, Choice, Closed, Field, Section, Shell, dollars, formatPhone, input, textarea } from "./ui";
-import NightPicker, { nightMeta, type Suggested } from "./NightPicker";
+import { Brand, Choice, Closed, Field, Section, Shell, dollars, formatPhone, input, textarea } from "./ui";
+import { type Suggested } from "./NightPicker";
 import MerchantDashboard from "./MerchantDashboard";
 import { DaysPicker, WeeklyLimit, type Day } from "./MerchantCampaign";
 import { forgetPartner, rememberPartner } from "./remember";
@@ -121,13 +121,13 @@ function PriceSummary({ weeklyCents, feeCents }: { weeklyCents: number; feeCents
  * white setup box with what's left (each step links to its section). Once
  * they hold their free night, the same spot shows the setup bar.
  */
-function OnboardingHeader({ name, steps }: { name: string; steps: { href: string; label: string; done: boolean }[] }) {
+function OnboardingHeader({ name, blurb, steps }: { name: string; blurb: string; steps: { href: string; label: string; done: boolean }[] }) {
   const done = steps.filter((s) => s.done).length;
   return (
     <header className="mt-5 rounded-3xl bg-leaf-800 p-6 text-white sm:p-8">
       <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Your Neighbor Hours</p>
       <h1 className="mt-2 font-fm-serif text-[36px] leading-[1.02]">{name}</h1>
-      <p className="mt-2 text-[15px] leading-relaxed text-leaf-100">We bring neighbors from your neighborhood&rsquo;s Leaf calendar to you, in your slowest hours. Your first Neighbor Hour is on us.</p>
+      <p className="mt-2 text-[15px] leading-relaxed text-leaf-100">{blurb}</p>
       <section aria-label="Get set up" className="mt-6 rounded-2xl bg-white p-4 text-stone-900 shadow-sm sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">Get set up</p>
@@ -147,7 +147,7 @@ function OnboardingHeader({ name, steps }: { name: string; steps: { href: string
           ))}
         </ol>
         <p className="mt-3 text-[14px] leading-relaxed text-stone-600">
-          {done === steps.length ? "All set. Hold your free Neighbor Hour below." : "Three quick steps, then hold your free Neighbor Hour. We write your night and you'll see it before it goes live."}
+          {done === steps.length ? "All set. Send it below." : `${steps.length} quick steps. We write your night and you'll see it before it goes live.`}
         </p>
       </section>
     </header>
@@ -369,7 +369,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   );
   const suggested: Suggested | null = form?.suggested ?? (form?.offer ? { title: form.offer.title, description: form.offer.description, durationMin: form.offer.durationMin, priceCents: form.offer.priceCents } : null);
   // Bars and restaurants don't name their night: Leaf drafts it (approved in Today); this is only a placeholder until then.
-  const nightTitle = (useOwn || !suggested ? title : suggested.title) || (perRsvp ? "Neighbor Hour" : "");
+  const nightTitle = (useOwn || !suggested ? title : suggested.title) || "Neighbor Hour";
   const nightDescription = useOwn || !suggested ? description : suggested.description;
   const phoneDigits = contactPhone.replace(/\D/g, "");
   const missing: string[] = [];
@@ -421,7 +421,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         windows: form?.state === "accepted" ? windows : [],
         otherWindows: form?.state === "accepted" ? otherWindows : "",
         days: form?.state === "accepted" ? undefined : days,
-        nightNotes: perRsvp ? nightNotes : undefined,
+        nightNotes,
         weeklyBudgetCents: form?.state === "accepted" || !perRsvp ? undefined : weeklyBudget,
       })) as { state: string; bookedDate?: string | null; benched?: boolean; updated?: boolean; requested?: boolean; session?: string | null };
       // Saying yes signs this device in to the dashboard it's about to land on.
@@ -604,17 +604,30 @@ export default function MerchantOfferClient({ token }: { token: string }) {
     </>
   );
 
-  // Bars and restaurants change their details right in the dashboard's Account card, not on a separate page.
-  const detailsRow = perRsvp ? (
+  // Everyone changes their details right in the dashboard's Account card, not on a separate page.
+  const detailsRow = (
     <AccountRow
       id="details"
       title="Your details"
-      summary={`${capacity ? `Seats ${capacity}` : "Seats not set"} \u00b7 ${merchantHosts === false ? "Leaf host" : "Your team welcomes"}${contactName ? ` \u00b7 ask for ${contactName}` : ""}`}
+      summary={`${
+        perRsvp ? (capacity ? `Seats ${capacity}` : "Seats not set") : `${price ? `$${price} a ticket` : "No price yet"}${durationMin ? `, ${durationMin} min` : ""}`
+      } \u00b7 ${merchantHosts === false ? "Leaf host" : "Your team welcomes"}${contactName ? ` \u00b7 ask for ${contactName}` : ""}`}
     >
       <div className="space-y-3">
-        <Field label="How many can you seat together?" hint="We never bill for more RSVPs than this.">
-          <input value={capacity} onChange={(e) => setCapacity(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className={input} />
-        </Field>
+        {perRsvp ? (
+          <Field label="How many can you seat together?" hint="We never bill for more RSVPs than this.">
+            <input value={capacity} onChange={(e) => setCapacity(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className={input} />
+          </Field>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Price per person">
+              <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" className={input} />
+            </Field>
+            <Field label="Minutes">
+              <input value={durationMin} onChange={(e) => setDurationMin(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className={input} />
+            </Field>
+          </div>
+        )}
         <div>
           <span className="mb-1.5 block text-[14px] font-medium text-stone-700">Who welcomes the group?</span>
           <div className="flex gap-2">
@@ -640,7 +653,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         </button>
       </div>
     </AccountRow>
-  ) : null;
+  );
 
   if (done) {
     return (
@@ -716,39 +729,29 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             Your night, your space, and how we reach you. Saved changes carry to your upcoming Neighbor Hours; dates and times stay as booked.
           </p>
         </header>
-      ) : perRsvp ? (
-        // Bars and restaurants sign up inside their dashboard: the same header, with a setup checklist in it.
+      ) : (
+        // Everyone signs up inside their dashboard: the same header, with a setup checklist in it.
         <OnboardingHeader
           name={form.merchantName}
-          steps={[
-            { href: "#days", label: "Your slow days", done: days.length > 0 },
-            { href: "#place", label: "About your place", done: merchantHosts !== null && Number(capacity) > 0 },
-            { href: "#card", label: "Hold it with a card", done: card !== null },
-          ]}
+          blurb={
+            perRsvp
+              ? "We bring neighbors from your neighborhood\u2019s Leaf calendar to you, in your slowest hours. Your first Neighbor Hour is on us."
+              : "A short taster of what you teach, for neighbors on your neighborhood\u2019s Leaf calendar. They buy tickets; Leaf keeps 10%."
+          }
+          steps={
+            perRsvp
+              ? [
+                  { href: "#days", label: "Your slow days", done: days.length > 0 },
+                  { href: "#place", label: "About your place", done: merchantHosts !== null && Number(capacity) > 0 },
+                  { href: "#card", label: "Hold it with a card", done: card !== null },
+                ]
+              : [
+                  { href: "#days", label: "Your days", done: days.length > 0 },
+                  { href: "#class", label: "About your class", done: Number(price) > 0 && hasSpace !== null },
+                  { href: "#place", label: "Who welcomes them", done: merchantHosts !== null },
+                ]
+          }
         />
-      ) : (
-        <>
-          <BusinessPhoto url={form.photoUrl} credit={form.photoCredit} name={form.merchantName} />
-          <header className="mt-8 px-1">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">An invitation from Leaf</p>
-            <h1 className="mt-2 font-fm-serif text-[40px] leading-[1.02] tracking-[-0.01em] text-stone-900">
-              {perRsvp ? (
-                <>
-                  Let&rsquo;s fill a slow night at <em className="text-leaf-700">{form.merchantName}</em>.
-                </>
-              ) : (
-                <>
-                  A night on the calendar at <em className="text-leaf-700">{form.merchantName}</em>.
-                </>
-              )}
-            </h1>
-            <p className="mt-4 text-[16px] leading-relaxed text-stone-600">
-              {perRsvp
-                ? `We bring ${form.headcount} neighbors from your neighborhood\u2019s Leaf calendar to you, on your slowest day.`
-                : `A taster for ${form.headcount} neighbors on your neighborhood\u2019s Leaf calendar, on a day that suits you. Leaf keeps 10% of tickets.`}
-            </p>
-          </header>
-        </>
       )}
 
       {perRsvp && form.billing && !accepted && form.billing.freeNightState && (
@@ -777,28 +780,44 @@ export default function MerchantOfferClient({ token }: { token: string }) {
       )}
 
       <div className="mt-6 space-y-4">
-        {!perRsvp && (
-        <Section n={1} total={steps} title="Your night" sub="Keep ours, or write your own.">
-          {suggested && (
-            <NightPicker
-              suggested={suggested}
-              useOwn={useOwn}
-              setUseOwn={setUseOwn}
-              title={title}
-              setTitle={setTitle}
-              description={description}
-              setDescription={setDescription}
-              merchantName={form.merchantName}
-              meta={nightMeta({
-                // The time is set with them per night, not the calendar's default.
-                startTimeLabel: "",
-                durationMin: Number(durationMin) || suggested.durationMin,
-                headcount: form.headcount,
-                priceCents: perRsvp ? 0 : Math.round(Number(price || 0) * 100),
-                perRsvp,
-              })}
-            />
+
+        <Section
+          n={1}
+          total={steps}
+          id="days"
+          title={accepted ? "Your Neighbor Hours" : "Your slow days"}
+          sub={
+            accepted
+              ? "Book more nights from your dashboard."
+              : "Pick the days and times you'd like neighbors in. We'll book your free first Neighbor Hour on one of them and confirm the date."
+          }
+        >
+          {!accepted && (
+            <>
+              <DaysPicker days={days} onChange={setDays} emptyNote={null} />
+              {perRsvp && (
+                <div className="border-t border-stone-100 pt-4">
+                  <WeeklyLimit budget={weeklyBudget} min={3000} max={100000} onChange={setWeeklyBudget} />
+                  <p className="mt-2 text-[13px] leading-snug text-stone-500">
+                    {`After your free first one, RSVPs on your days are ${dollars(form.billing?.rsvpFeeCents ?? 600)} each, charged once a week, never more than this.`}
+                  </p>
+                </div>
+              )}
+            </>
           )}
+        </Section>
+
+        {!perRsvp && (
+        <Section n={2} total={steps} id="class" title="About your class" sub="What the taster is, its price and length, and where. Leaf writes your night from this.">
+          <Field label="What should the taster be?" hint="What people make or learn, who it's for, anything to highlight. You'll see the wording before it goes live.">
+            <textarea
+              value={nightNotes}
+              onChange={(e) => setNightNotes(e.target.value.slice(0, 600))}
+              rows={3}
+              className={textarea}
+              placeholder="e.g. A 90-minute intro to the wheel; everyone throws a small bowl and we fire it for pickup"
+            />
+          </Field>
           {perRsvp ? (
             <Field label="How many can you seat together?" hint="We never bill for more RSVPs than this.">
               <input value={capacity} onChange={(e) => setCapacity(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className={input} />
@@ -851,32 +870,6 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           )}
         </Section>
         )}
-
-        <Section
-          n={perRsvp ? 1 : 2}
-          total={steps}
-          id="days"
-          title={accepted ? "Your Neighbor Hours" : "Your slow days"}
-          sub={
-            accepted
-              ? "Book more nights from your dashboard."
-              : "Pick the days and times you'd like neighbors in. We'll book your free first Neighbor Hour on one of them and confirm the date."
-          }
-        >
-          {!accepted && (
-            <>
-              <DaysPicker days={days} onChange={setDays} emptyNote={null} />
-              {perRsvp && (
-                <div className="border-t border-stone-100 pt-4">
-                  <WeeklyLimit budget={weeklyBudget} min={3000} max={100000} onChange={setWeeklyBudget} />
-                  <p className="mt-2 text-[13px] leading-snug text-stone-500">
-                    {`After your free first one, RSVPs on your days are ${dollars(form.billing?.rsvpFeeCents ?? 600)} each, charged once a week, never more than this.`}
-                  </p>
-                </div>
-              )}
-            </>
-          )}
-        </Section>
 
         <Section
           n={perRsvp ? 2 : 3}
