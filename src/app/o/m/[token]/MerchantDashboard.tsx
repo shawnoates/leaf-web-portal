@@ -190,10 +190,10 @@ function Stat({ value, label }: { value: string | number; label: string }) {
 function NextUp({ n, perRsvp, campaign, settingUp }: { n: Night | null; perRsvp: boolean; campaign: CampaignSummary | null; settingUp: boolean }) {
   if (!n && settingUp) {
     return (
-      <div className="rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Next up</p>
+      <div className="rounded-2xl bg-white p-4 text-stone-900 shadow-sm sm:p-5">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">Next up</p>
         <p className="mt-1.5 text-[17px] font-semibold">Your free first Neighbor Hour</p>
-        <p className="mt-1 text-[14px] leading-relaxed text-leaf-100">We&rsquo;re setting it up. Its date shows here once it&rsquo;s set.</p>
+        <p className="mt-1 text-[14px] leading-relaxed text-stone-600">We&rsquo;re setting it up. Its date shows here once it&rsquo;s set.</p>
       </div>
     );
   }
@@ -216,11 +216,11 @@ function NextUp({ n, perRsvp, campaign, settingUp }: { n: Night | null; perRsvp:
             }
           : { title: "Nothing booked yet", body: "Neighbors\u2019 plans at your place show up here as they\u2019re made.", cta: "See your Neighbor Hours", href: "#campaign" };
     return (
-      <div className="rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Next up</p>
+      <div className="rounded-2xl bg-white p-4 text-stone-900 shadow-sm sm:p-5">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">Next up</p>
         <p className="mt-1.5 text-[17px] font-semibold">{empty.title}</p>
-        <p className="mt-1 text-[14px] leading-relaxed text-leaf-100">{empty.body}</p>
-        <a href={empty.href} className="mt-3 inline-flex h-10 items-center rounded-xl bg-white px-4 text-[14px] font-semibold text-leaf-900">
+        <p className="mt-1 text-[14px] leading-relaxed text-stone-600">{empty.body}</p>
+        <a href={empty.href} className="mt-3 inline-flex h-10 items-center rounded-xl bg-leaf-800 px-4 text-[14px] font-semibold text-white">
           {empty.cta}
         </a>
       </div>
@@ -229,31 +229,31 @@ function NextUp({ n, perRsvp, campaign, settingUp }: { n: Night | null; perRsvp:
   const p = PHASE[n.phase as keyof typeof PHASE];
   const pct = n.rsvps != null && n.capacity ? Math.min(100, Math.round((n.rsvps / n.capacity) * 100)) : null;
   return (
-    <a href={`#night-${n.id}`} className="block rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10 transition hover:bg-white/[0.1]">
+    <a href={`#night-${n.id}`} className="block rounded-2xl bg-white p-4 text-stone-900 shadow-sm transition hover:bg-stone-50 sm:p-5">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Next up</p>
-        {p && <span className="shrink-0 rounded-full bg-white/15 px-2.5 py-0.5 text-[12px] font-semibold text-white">{p.label}</span>}
+        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">Next up</p>
+        {p && <span className="shrink-0 rounded-full bg-leaf-100 px-2.5 py-0.5 text-[12px] font-semibold text-leaf-800">{p.label}</span>}
       </div>
       <p className="mt-1.5 font-fm-serif text-[24px] leading-tight">{n.dateLabel}</p>
-      <p className="text-[14px] text-leaf-100">
+      <p className="text-[14px] text-stone-500">
         {n.timeLabel}
         {n.title ? ` \u00b7 ${n.title}` : ""}
       </p>
       {n.rsvps != null && (
         <div className="mt-3">
-          <p className="text-[14px] text-leaf-100">
-            <span className="font-semibold text-white">{n.rsvps}</span>
+          <p className="text-[14px] text-stone-600">
+            <span className="font-semibold text-stone-900">{n.rsvps}</span>
             {`${n.capacity ? ` of ${n.capacity}` : ""} RSVP\u2019d`}
           </p>
           {pct != null && (
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/15">
-              <div className="h-full rounded-full bg-leaf-300" style={{ width: `${pct}%` }} />
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-stone-200">
+              <div className="h-full rounded-full bg-leaf-600" style={{ width: `${pct}%` }} />
             </div>
           )}
         </div>
       )}
       {n.steps?.find((st) => st.you && st.status === "current") && (
-        <p className="mt-3 text-[14px] font-semibold text-amber-200">Your turn: {n.steps.find((st) => st.you && st.status === "current")?.label}</p>
+        <p className="mt-3 text-[14px] font-semibold text-amber-700">Your turn: {n.steps.find((st) => st.you && st.status === "current")?.label}</p>
       )}
     </a>
   );
