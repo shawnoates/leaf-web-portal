@@ -102,10 +102,10 @@ const STEP_GREENS = ["#9dbeb3", "#74a494", "#5a8c7b", "#426c5e", "#253a33"];
 function SetupProgress({ setup }: { setup: Setup }) {
   const total = setup.stages.length;
   return (
-    <section aria-label="Setting up your first Neighbor Hour" className="rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10 sm:p-5">
+    <section aria-label="Setting up your first Neighbor Hour" className="rounded-2xl bg-white p-4 text-stone-900 shadow-sm sm:p-5">
       <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Setting up your first Neighbor Hour</p>
-        <p className="shrink-0 whitespace-nowrap rounded-full bg-white/15 px-2.5 py-0.5 text-[12px] font-semibold text-white">{`Step ${setup.step} of ${total}`}</p>
+        <p className="min-w-0 text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">Setting up your first Neighbor Hour</p>
+        <p className="shrink-0 whitespace-nowrap rounded-full bg-leaf-100 px-2.5 py-0.5 text-[12px] font-semibold text-leaf-800">{`Step ${setup.step} of ${total}`}</p>
       </div>
       <ol className="mt-3 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}>
         {setup.stages.map((st, i) => {
@@ -113,14 +113,14 @@ function SetupProgress({ setup }: { setup: Setup }) {
           const current = i + 1 === setup.step;
           return (
             <li key={st.key} aria-current={current ? "step" : undefined}>
-              <div className="h-2 rounded-full bg-white/15" style={done || current ? { backgroundColor: STEP_GREENS[Math.min(i, STEP_GREENS.length - 1)] } : undefined} />
-              <p className={`mt-2 hidden text-[11px] leading-tight sm:block ${current ? "font-semibold text-white" : "text-leaf-300"}`}>{st.label}</p>
+              <div className="h-2 rounded-full bg-stone-200" style={done || current ? { backgroundColor: STEP_GREENS[Math.min(i, STEP_GREENS.length - 1)] } : undefined} />
+              <p className={`mt-2 hidden text-[11px] leading-tight sm:block ${current ? "font-semibold text-stone-900" : done ? "text-stone-600" : "text-stone-400"}`}>{st.label}</p>
             </li>
           );
         })}
       </ol>
       <p className="mt-3 text-[17px] font-semibold sm:hidden">{setup.stages[setup.step - 1]?.label}</p>
-      <p className="mt-1 text-[14px] leading-relaxed text-leaf-100 sm:mt-3">{setup.detail}</p>
+      <p className="mt-1 text-[14px] leading-relaxed text-stone-600 sm:mt-3">{setup.detail}</p>
     </section>
   );
 }
