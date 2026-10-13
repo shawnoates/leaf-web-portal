@@ -498,7 +498,7 @@ function HostAddOn({ n, token }: { n: Night; token: string }) {
         {confirming ? (
           <>
             <p className="mt-3 text-[13px] leading-snug text-stone-600">
-              {`We'll offer it to the best-matched Leaf hosts now. You're hosting until one says yes, and it's ${fee} only if a host runs it and 5 or more neighbors RSVP.`}
+              {`We'll offer it to the best-matched Leaf hosts now. You're hosting until one says yes, and it's ${fee} only if a host runs it and at least one neighbor RSVPs.`}
             </p>
             <div className="mt-3 flex gap-2">
               <button type="button" disabled={busy} onClick={ask} className="h-11 flex-1 rounded-xl bg-leaf-800 text-[14px] font-semibold text-white disabled:opacity-50">
