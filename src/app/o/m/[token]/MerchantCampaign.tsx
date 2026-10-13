@@ -84,6 +84,82 @@ const SPEND_FROM: Record<"category" | "everywhere" | "splits_category" | "splits
 };
 
 
+/**
+ * Their days: tap a weekday to add it, then pick the part of the day for
+ * each. Shared by this section and the sign-up form.
+ */
+export function DaysPicker({ days, onChange, emptyNote = "No days picked: plans at your place on any day count." }: { days: Day[]; onChange: (d: Day[]) => void; emptyNote?: string | null }) {
+  const toggleDay = (w: number) =>
+    onChange(days.some((d) => d.weekday === w) ? days.filter((d) => d.weekday !== w) : [...days, { weekday: w, partOfDay: "evening" as const }].sort((a, b) => a.weekday - b.weekday));
+  const setPart = (w: number, partOfDay: Day["partOfDay"]) => onChange(days.map((d) => (d.weekday === w ? { ...d, partOfDay } : d)));
+  return (
+    <>
+      <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-stone-500">Your days</p>
+      <div className="mt-2 grid grid-cols-7 gap-1.5">
+        {WEEKDAYS.map((label, w) => {
+          const picked = days.some((d) => d.weekday === w);
+          return (
+            <button
+              key={label}
+              type="button"
+              aria-pressed={picked}
+              onClick={() => toggleDay(w)}
+              className={`h-11 rounded-xl border text-[14px] font-semibold ${picked ? "border-leaf-800 bg-leaf-800 text-white" : "border-stone-300 bg-white text-stone-700"}`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      {days.length === 0 && emptyNote && <p className="mt-2 text-[13px] text-stone-500">{emptyNote}</p>}
+      {days.length > 0 && (
+        <div className="mt-2 space-y-1.5">
+          {days.map((d) => (
+            <div key={d.weekday} className="flex items-center justify-between gap-2 text-[14px]">
+              <span className="w-12 font-semibold text-stone-800">{WEEKDAYS[d.weekday]}</span>
+              <div className="grid flex-1 grid-cols-4 gap-1.5">
+                {PARTS.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    aria-pressed={d.partOfDay === p}
+                    onClick={() => setPart(d.weekday, p)}
+                    className={`h-9 rounded-lg border text-[12px] font-semibold sm:text-[13px] ${d.partOfDay === p ? "border-leaf-700 bg-leaf-50 text-leaf-800" : "border-stone-200 text-stone-600"}`}
+                  >
+                    {PART_LABEL[p]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** The weekly limit slider, one RSVP per notch. Shared by this section and the sign-up form. */
+export function WeeklyLimit({ budget, min, max, onChange }: { budget: number; min: number; max: number; onChange: (v: number) => void }) {
+  return (
+    <>
+      <div className="flex items-baseline justify-between">
+        <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-stone-500">Weekly limit</p>
+        <p className="font-fm-serif text-[30px] leading-none text-stone-900">{dollars(budget)}</p>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={Math.min(max, 60000)}
+        step={STEP_CENTS}
+        value={budget}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label="Weekly limit"
+        className="mt-3 w-full accent-leaf-800"
+      />
+    </>
+  );
+}
+
 /** What the dashboard's Next up card shows for a bar with nothing booked. */
 export type CampaignSummary = { on: boolean; days: Day[]; weeklyBudgetCents: number };
 
@@ -126,15 +202,6 @@ export default function MerchantCampaign({
 
   const o = useMemo(() => (s ? outlook(s, budget) : null), [s, budget]);
   if (!s || !o) return null;
-
-  const toggleDay = (w: number) => {
-    setDirty(true);
-    setDays((cur) => (cur.some((d) => d.weekday === w) ? cur.filter((d) => d.weekday !== w) : [...cur, { weekday: w, partOfDay: "evening" as const }].sort((a, b) => a.weekday - b.weekday)));
-  };
-  const setPart = (w: number, partOfDay: Day["partOfDay"]) => {
-    setDirty(true);
-    setDays((cur) => cur.map((d) => (d.weekday === w ? { ...d, partOfDay } : d)));
-  };
 
   const save = async (nextOn: boolean) => {
     setSaving(true);
@@ -201,66 +268,24 @@ export default function MerchantCampaign({
       )}
 
       <div className="mt-6 border-t border-stone-100 pt-6">
-      <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-stone-500">Your days</p>
-      <div className="mt-2 grid grid-cols-7 gap-1.5">
-        {WEEKDAYS.map((label, w) => {
-          const picked = days.some((d) => d.weekday === w);
-          return (
-            <button
-              key={label}
-              type="button"
-              aria-pressed={picked}
-              onClick={() => toggleDay(w)}
-              className={`h-11 rounded-xl border text-[14px] font-semibold ${picked ? "border-leaf-800 bg-leaf-800 text-white" : "border-stone-300 bg-white text-stone-700"}`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-      {days.length === 0 && <p className="mt-2 text-[13px] text-stone-500">No days picked: plans at your place on any day count.</p>}
-      {days.length > 0 && (
-        <div className="mt-2 space-y-1.5">
-          {days.map((d) => (
-            <div key={d.weekday} className="flex items-center justify-between gap-2 text-[14px]">
-              <span className="w-12 font-semibold text-stone-800">{WEEKDAYS[d.weekday]}</span>
-              <div className="grid flex-1 grid-cols-4 gap-1.5">
-                {PARTS.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    aria-pressed={d.partOfDay === p}
-                    onClick={() => setPart(d.weekday, p)}
-                    className={`h-9 rounded-lg border text-[12px] font-semibold sm:text-[13px] ${d.partOfDay === p ? "border-leaf-700 bg-leaf-50 text-leaf-800" : "border-stone-200 text-stone-600"}`}
-                  >
-                    {PART_LABEL[p]}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
+        <DaysPicker
+          days={days}
+          onChange={(next) => {
+            setDays(next);
+            setDirty(true);
+          }}
+        />
       </div>
 
       <div className="mt-6 border-t border-stone-100 pt-6">
-      <div className="flex items-baseline justify-between">
-        <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-stone-500">Weekly limit</p>
-        <p className="font-fm-serif text-[30px] leading-none text-stone-900">{dollars(budget)}</p>
-      </div>
-      <input
-        type="range"
+      <WeeklyLimit
+        budget={budget}
         min={s.minBudgetCents}
-        max={Math.min(s.maxBudgetCents, 60000)}
-        step={STEP_CENTS}
-        value={budget}
-        onChange={(e) => {
-          setBudget(Number(e.target.value));
+        max={s.maxBudgetCents}
+        onChange={(v) => {
+          setBudget(v);
           setDirty(true);
         }}
-        aria-label="Weekly limit"
-        className="mt-3 w-full accent-leaf-800"
       />
 
       <div className="mt-5 grid grid-cols-3 gap-2 text-center sm:gap-3">

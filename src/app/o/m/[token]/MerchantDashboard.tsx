@@ -85,9 +85,40 @@ export type Dashboard = {
   };
   /** Open weeks on their night they can book now. */
   bookable?: { dateKey: string; label: string }[];
+  /** Setting up their free first night (five stages, moved on by Leaf); null once it's billed. */
+  setup?: Setup | null;
   /** Nights they asked for that Leaf hasn't booked yet. */
   requests?: { id: string; kind: "first" | "rebook"; label: string; source?: "campaign" | null }[];
 };
+
+type Setup = { stage: string; step: number; stages: { key: string; label: string }[]; detail: string; date: string | null };
+
+/** The setup bar at the top: where their free first Neighbor Hour is, step by step. */
+function SetupProgress({ setup }: { setup: Setup }) {
+  const total = setup.stages.length;
+  return (
+    <section aria-label="Setting up your first Neighbor Hour" className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-leaf-200 sm:p-6">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">Setting up your first Neighbor Hour</p>
+        <p className="shrink-0 text-[13px] font-semibold text-stone-500">{`Step ${setup.step} of ${total}`}</p>
+      </div>
+      <ol className="mt-4 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}>
+        {setup.stages.map((st, i) => {
+          const done = i + 1 < setup.step;
+          const current = i + 1 === setup.step;
+          return (
+            <li key={st.key} aria-current={current ? "step" : undefined}>
+              <div className={`h-2 rounded-full ${done || current ? "bg-leaf-700" : "bg-stone-200"}`} />
+              <p className={`mt-2 hidden text-[12px] leading-tight sm:block ${current ? "font-semibold text-stone-900" : done ? "text-stone-600" : "text-stone-400"}`}>{st.label}</p>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="mt-4 font-fm-serif text-[24px] leading-tight text-stone-900">{setup.stages[setup.step - 1]?.label}</p>
+      <p className="mt-1 text-[15px] leading-relaxed text-stone-600">{setup.detail}</p>
+    </section>
+  );
+}
 
 type Credit = {
   balanceCents: number;
@@ -151,7 +182,16 @@ function Stat({ value, label }: { value: string | number; label: string }) {
  * bars and restaurants get theirs from their Neighbor Hours days, ticketed
  * places request a night.
  */
-function NextUp({ n, perRsvp, campaign }: { n: Night | null; perRsvp: boolean; campaign: CampaignSummary | null }) {
+function NextUp({ n, perRsvp, campaign, settingUp }: { n: Night | null; perRsvp: boolean; campaign: CampaignSummary | null; settingUp: boolean }) {
+  if (!n && settingUp) {
+    return (
+      <div className="rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Next up</p>
+        <p className="mt-1.5 text-[17px] font-semibold">Your free first Neighbor Hour</p>
+        <p className="mt-1 text-[14px] leading-relaxed text-leaf-100">We&rsquo;re setting it up. Its date shows here once it&rsquo;s set.</p>
+      </div>
+    );
+  }
   if (!n) {
     const empty = !perRsvp
       ? { title: "Nothing booked yet", body: "Request a night and we\u2019ll put it in front of the neighborhood.", cta: "Request a night", href: "#book" }
@@ -659,6 +699,13 @@ export default function MerchantDashboard({
         <div inert={preview || undefined}>
           <Brand neighborhood={d.neighborhood} />
 
+          {/* Setting up their free first night: always first, so they know where it stands. */}
+          {d.setup && (
+            <div className="mt-5 lg:mt-8">
+              <SetupProgress setup={d.setup} />
+            </div>
+          )}
+
           {/* Phone: the summary, then their photo. Desktop: side by side. */}
           <header className={`mt-5 grid gap-5 lg:mt-8 lg:gap-8 ${d.photoUrl ? "lg:grid-cols-[minmax(0,1fr)_380px]" : ""}`}>
             <div className="rounded-3xl bg-leaf-800 p-6 text-white sm:p-8">
@@ -674,7 +721,7 @@ export default function MerchantDashboard({
                 )}
               </p>
               <div className="mt-6">
-                <NextUp n={d.upcoming[0] || null} perRsvp={perRsvp} campaign={campaign} />
+                <NextUp n={d.upcoming[0] || null} perRsvp={perRsvp} campaign={campaign} settingUp={Boolean(d.setup)} />
               </div>
               {/* The running totals, once there's something to count (a row of zeros reads as broken). */}
               {d.totals.nightsRun > 0 && (
@@ -716,7 +763,13 @@ export default function MerchantDashboard({
                   {d.upcoming.length ? (
                     d.upcoming.map((n) => <UpcomingNight key={n.id} n={n} token={token} />)
                   ) : (
-                    <p className="text-[15px] text-stone-600">{perRsvp ? "Nothing on the books right now. Switch your Neighbor Hours on and we\u2019ll line them up." : "Nothing on the books right now. Request a Neighbor Hour below."}</p>
+                    <p className="text-[15px] text-stone-600">
+                      {d.setup
+                        ? "Your free first Neighbor Hour shows up here once its date is set."
+                        : perRsvp
+                          ? "Nothing on the books right now. Switch your Neighbor Hours on and we\u2019ll line them up."
+                          : "Nothing on the books right now. Request a Neighbor Hour below."}
+                    </p>
                   )}
                 </div>
                 <button
@@ -730,11 +783,12 @@ export default function MerchantDashboard({
                 <MerchantHello token={token} inline />
               </Card>
 
-              {d.requests && d.requests.length > 0 && (
+              {/* The first night's request is the setup bar's job while it shows. */}
+              {d.requests && d.requests.some((q) => !(d.setup && q.kind === "first")) && (
                 <Card>
                   <H2>Waiting on us</H2>
                   <div className="mt-4 space-y-4">
-                    {d.requests.map((q) => (
+                    {d.requests.filter((q) => !(d.setup && q.kind === "first")).map((q) => (
                       <div key={q.id} className="flex items-start justify-between gap-4">
                         <p className="text-[15px] text-stone-700">
                           <span className="font-semibold text-stone-900">{q.kind === "first" ? `Your first ${q.label.replace(/s( \u00b7.*)?$/, "")}` : q.label}</span>

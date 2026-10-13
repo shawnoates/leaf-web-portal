@@ -26,9 +26,9 @@ import NoticePrefs, { noticePayload, type Notices } from "./NoticePrefs";
 import { Brand, BusinessPhoto, Choice, Closed, Field, Section, Shell, dollars, formatPhone, input, textarea } from "./ui";
 import NightPicker, { nightMeta, type Suggested } from "./NightPicker";
 import MerchantDashboard from "./MerchantDashboard";
+import { DaysPicker, WeeklyLimit, type Day } from "./MerchantCampaign";
 import { forgetPartner, rememberPartner } from "./remember";
 
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 import FreeNightCountdown, { CountdownText, TYPICAL_RSVPS, useCountdown } from "./FreeNightCountdown";
 import { SIGN_IN_EVENT, forgetSession, isSignInError, merchantAuth, merchantRun, saveSession } from "@/lib/merchant-session";
 import SignInGate from "./SignInGate";
@@ -86,6 +86,37 @@ const EXAMPLE_RSVPS = 12;
 /** "the X calendar", without doubling up when the name already starts with "The". */
 function theCalendar(name: string) {
   return /^the\s/i.test(name) ? name : `the ${name}`;
+}
+
+/** What they're signing up for, with what's free crossed out: the check at the card step. */
+function PriceSummary({ weeklyCents, feeCents }: { weeklyCents: number; feeCents: number }) {
+  const row = "flex items-start justify-between gap-4 py-3";
+  return (
+    <div className="divide-y divide-stone-200 rounded-2xl bg-stone-50 px-4 text-[15px] ring-1 ring-stone-200">
+      <div className={row}>
+        <span className="text-stone-700">Your weekly limit</span>
+        <span className="font-semibold text-stone-900">{dollars(weeklyCents)}</span>
+      </div>
+      <div className={row}>
+        <span className="text-stone-700">First Night&rsquo;s RSVPs</span>
+        <span className="text-right">
+          <span className="block font-semibold text-leaf-700">Free</span>
+          <s className="block text-[13px] text-stone-400">{`${dollars(feeCents)} / RSVP`}</s>
+        </span>
+      </div>
+      <div className={row}>
+        <span className="text-stone-700">Listing fee</span>
+        <span className="text-right">
+          <span className="block font-semibold text-leaf-700">Free</span>
+          <s className="block text-[13px] text-stone-400">Listing fee</s>
+        </span>
+      </div>
+      <div className={row}>
+        <span className="font-semibold text-stone-900">Due today</span>
+        <span className="font-semibold text-stone-900">$0</span>
+      </div>
+    </div>
+  );
 }
 
 function OfferCard({ form }: { form: Form }) {
@@ -161,7 +192,10 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const [contactPhone, setContactPhone] = useState("");
   const [windows, setWindows] = useState<string[]>([]);
   // New sign-ups give us a day; Shawn sets the date and time.
-  const [preferredDay, setPreferredDay] = useState<number | null>(null);
+  // Their Neighbor Hours: days (each with a part of the day) and a weekly limit.
+  // Shawn books the free first night on one of these days.
+  const [days, setDays] = useState<Day[]>([]);
+  const [weeklyBudget, setWeeklyBudget] = useState(9000);
   const [otherWindows, setOtherWindows] = useState("");
   const [card, setCard] = useState<Card | null>(null);
   const [useOwn, setUseOwn] = useState(false);
@@ -285,7 +319,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const missing: string[] = [];
   if (!nightTitle.trim()) missing.push("a name for the night");
   if (!perRsvp && hasSpace === null) missing.push("whether you have room");
-  if (form?.state !== "accepted" && preferredDay === null) missing.push("a day");
+  if (form?.state !== "accepted" && !days.length) missing.push("your days");
   if (phoneDigits.length > 0 && phoneDigits.length < 10) missing.push("a full phone number (or leave it blank)");
 
   const saveCardOnly = async () => {
@@ -330,7 +364,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         // Editing keeps their dates; a new sign-up sends the day instead.
         windows: form?.state === "accepted" ? windows : [],
         otherWindows: form?.state === "accepted" ? otherWindows : "",
-        preferredDay: form?.state === "accepted" ? undefined : preferredDay,
+        days: form?.state === "accepted" ? undefined : days,
+        weeklyBudgetCents: form?.state === "accepted" || !perRsvp ? undefined : weeklyBudget,
       })) as { state: string; bookedDate?: string | null; benched?: boolean; updated?: boolean; requested?: boolean; session?: string | null };
       // Saying yes signs this device in to the dashboard it's about to land on.
       if (r.session) saveSession(token, r.session, form?.merchantName || "");
@@ -341,7 +376,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           r.updated
             ? "Your changes are saved."
             : r.requested
-              ? `You're in. We'll confirm the date and time of your first ${DAYS[preferredDay ?? 0]} within a day.${perRsvp && form?.billing?.firstNightFree ? " It's on us." : ""}`
+              ? `You're in.${perRsvp && form?.billing?.firstNightFree ? " Your first Neighbor Hour is on us." : ""} We'll pick a date on your days; follow along at the top.`
               : r.bookedDate
               ? `You're in. See you ${r.bookedDate}.${perRsvp && form?.billing?.firstNightFree ? " This first Neighbor Hour is on us." : ""}`
               : "You're in. Those weeks already have someone, so you're first in line for the next opening.",
@@ -677,28 +712,25 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         <Section
           n={2}
           total={steps}
-          title={accepted ? "Your Neighbor Hours" : "What day works best?"}
-          sub={accepted ? "Book more nights from your dashboard." : "Pick your slowest day. We'll set the time and confirm your first one within a day."}
+          title={accepted ? "Your Neighbor Hours" : "Your slow days"}
+          sub={
+            accepted
+              ? "Book more nights from your dashboard."
+              : "Pick the days and times you'd like neighbors in. We'll book your free first Neighbor Hour on one of them and confirm the date."
+          }
         >
           {!accepted && (
-            <div className="grid grid-cols-4 gap-2">
-              {[1, 2, 3, 4, 5, 6, 0].map((d) => {
-                const on = preferredDay === d;
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => setPreferredDay(on ? null : d)}
-                    aria-pressed={on}
-                    className={`min-h-12 rounded-xl border px-2 text-[15px] font-semibold transition-colors ${
-                      on ? "border-leaf-800 bg-leaf-800 text-white" : "border-stone-300 bg-white text-stone-900 active:bg-stone-50"
-                    }`}
-                  >
-                    {DAYS[d].slice(0, 3)}
-                  </button>
-                );
-              })}
-            </div>
+            <>
+              <DaysPicker days={days} onChange={setDays} emptyNote={null} />
+              {perRsvp && (
+                <div className="border-t border-stone-100 pt-4">
+                  <WeeklyLimit budget={weeklyBudget} min={3000} max={100000} onChange={setWeeklyBudget} />
+                  <p className="mt-2 text-[13px] leading-snug text-stone-500">
+                    {`After your free first one, RSVPs on your days are ${dollars(form.billing?.rsvpFeeCents ?? 600)} each, charged once a week, never more than this.`}
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </Section>
 
@@ -797,10 +829,13 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             title="Hold it with a card"
             sub={
               form.billing?.firstNightFree
-                ? "Your first Neighbor Hour is free. After that, neighbors' plans at your place on your day count, up to $90 a week, until you switch it off on your dashboard. We charge this card once a week."
+                ? `Your first Neighbor Hour is free. After that, neighbors' plans at your place on your days count, up to ${dollars(weeklyBudget)} a week, until you switch it off on your dashboard. We charge this card once a week.`
                 : "Each night is charged to this card after it happens, never more than your weekly limit."
             }
           >
+            {!accepted && form.billing?.firstNightFree && (
+              <PriceSummary weeklyCents={weeklyBudget} feeCents={form.billing?.rsvpFeeCents ?? 600} />
+            )}
             <CardSetup
                   ref={cardRef}
                   token={token}
