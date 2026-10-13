@@ -291,18 +291,18 @@ function NextUp({ n, perRsvp, campaign, settingUp }: { n: Night | null; perRsvp:
       : campaign?.on
         ? {
             title: "Your Neighbor Hours are on",
-            body: `Neighbors\u2019 plans at your place on ${windowLabel(campaign.days)} count, up to ${dollars(campaign.weeklyBudgetCents)} a week. They show up here as they\u2019re made.`,
+            body: `Each week we post a Neighbor Hour at your place on one of your days (${windowLabel(campaign.days)}), up to ${dollars(campaign.weeklyBudgetCents)} a week. Your next one shows up here once it\u2019s set.`,
             cta: "Change your Neighbor Hours",
             href: "#campaign",
           }
         : campaign
           ? {
               title: "Your Neighbor Hours are off",
-              body: "Switch them on and neighbors\u2019 plans at your place on your slow days count, up to a weekly limit you set.",
+              body: "Switch them on and we\u2019ll post a Neighbor Hour at your place each week on one of your slow days, up to a weekly limit you set.",
               cta: "Switch them on",
               href: "#campaign",
             }
-          : { title: "Nothing booked yet", body: "Neighbors\u2019 plans at your place show up here as they\u2019re made.", cta: "See your Neighbor Hours", href: "#campaign" };
+          : { title: "Nothing booked yet", body: "Your Neighbor Hours show up here once they\u2019re set.", cta: "See your Neighbor Hours", href: "#campaign" };
     return (
       <div className="rounded-2xl bg-white p-4 text-stone-900 shadow-sm sm:p-5">
         <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">Next up</p>
@@ -978,7 +978,7 @@ export default function MerchantDashboard({
                           </p>
                           <p className="mt-1 text-[14px] leading-snug text-stone-600">
                             {perRsvp && !campaign?.on && !d.setup
-                              ? "Switch your Neighbor Hours on and neighbors\u2019 plans at your place show up here."
+                              ? "Switch your Neighbor Hours on and we\u2019ll post one each week. They show up here."
                               : perRsvp
                                 ? "Each night gets its own progress bar, the RSVPs as they come in, and the option to add a Leaf host."
                                 : "Request a Neighbor Hour below."}

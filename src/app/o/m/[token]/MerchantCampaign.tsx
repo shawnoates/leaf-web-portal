@@ -92,7 +92,7 @@ const SPEND_FROM: Record<"category" | "everywhere" | "splits_category" | "splits
  * Their days: tap a weekday to add it, then pick the part of the day for
  * each. Shared by this section and the sign-up form.
  */
-export function DaysPicker({ days, onChange, emptyNote = "No days picked: plans at your place on any day count." }: { days: Day[]; onChange: (d: Day[]) => void; emptyNote?: string | null }) {
+export function DaysPicker({ days, onChange, emptyNote = "No days picked yet. Pick at least one so we know when to post your Neighbor Hour." }: { days: Day[]; onChange: (d: Day[]) => void; emptyNote?: string | null }) {
   const toggleDay = (w: number) =>
     onChange(days.some((d) => d.weekday === w) ? days.filter((d) => d.weekday !== w) : [...days, { weekday: w, partOfDay: "evening" as const }].sort((a, b) => a.weekday - b.weekday));
   const setPart = (w: number, partOfDay: Day["partOfDay"]) => onChange(days.map((d) => (d.weekday === w ? { ...d, partOfDay } : d)));
@@ -218,7 +218,7 @@ export default function MerchantCampaign({
       onSummary?.({ on: nextOn, days, weeklyBudgetCents: budget });
       setDirty(false);
       setEditing(false);
-      setNote(nextOn ? "Saved. Plans at your place on your days count toward your weekly limit." : "Off. Plans already on the calendar still happen.");
+      setNote(nextOn ? "Saved. We\u2019ll post one Neighbor Hour a week on one of these days." : "Off. Nights already on the calendar still happen.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save that");
     } finally {
@@ -236,8 +236,8 @@ export default function MerchantCampaign({
           <h2 className="font-fm-serif text-[28px] leading-tight text-stone-900">Your Neighbor Hours</h2>
           <p className="mt-1 text-[15px] leading-relaxed text-stone-600">
             {on
-              ? `Neighbors' plans at your place in these times count: ${dollars(s.feeCents)} per RSVP, charged once a week.${firstNightFree ? " Your first Neighbor Hour is free." : ""}`
-              : "Off. Pick your slow days and a weekly limit, then switch them on. Plans already on the calendar still happen."}
+              ? `Each week we post one Neighbor Hour at your place on one of these days, and neighbors' own plans at your place in these times count too: ${dollars(s.feeCents)} per RSVP, charged once a week, never more than your limit.${firstNightFree ? " Your first Neighbor Hour is free." : ""}`
+              : "Off. Pick your slow days and a weekly limit, then switch them on. Nights already on the calendar still happen."}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2 pt-1">

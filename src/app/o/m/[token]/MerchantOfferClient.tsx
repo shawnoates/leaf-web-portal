@@ -1047,7 +1047,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             title="Hold it with a card"
             sub={
               form.billing?.firstNightFree
-                ? `Your first Neighbor Hour is free. After that, neighbors' plans at your place on your days count, up to ${dollars(weeklyBudget)} a week, until you switch it off on your dashboard. We charge this card once a week.`
+                ? `Your first Neighbor Hour is free. After that, we post one a week on one of your days, ${dollars(form.billing?.rsvpFeeCents ?? 600)} per RSVP and never more than ${dollars(weeklyBudget)} a week, until you switch it off on your dashboard. We charge this card once a week.`
                 : "Each night is charged to this card after it happens, never more than your weekly limit."
             }
           >

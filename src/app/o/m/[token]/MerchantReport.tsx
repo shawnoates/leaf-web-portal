@@ -74,7 +74,7 @@ export default function MerchantReport({ token, bare = false }: { token: string;
       ) : (
         <h2 className="font-fm-serif text-[26px] leading-tight text-stone-900">Your weekly report</h2>
       )}
-      <p className="mt-1 text-[15px] text-stone-600">Plans at your place, and what counts toward your week. We email it every Monday when anything counted.</p>
+      <p className="mt-1 text-[15px] text-stone-600">Your Neighbor Hours and neighbors&rsquo; own plans at your place, and what counts toward your week. We email it every Monday when anything counted.</p>
 
       <div className="mt-5">
         <div className="flex items-baseline justify-between">
