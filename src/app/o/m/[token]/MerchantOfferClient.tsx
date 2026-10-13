@@ -747,7 +747,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             <div className="rounded-2xl bg-leaf-50 p-4">
               <p className="font-fm-serif text-[22px] leading-tight text-stone-900">Meet your new regulars</p>
               <p className="mt-1 text-[14px] leading-snug text-stone-600">
-                Say hi at the door and show them to their table. That first hello is how a room of neighbors turns into faces you see every week.
+                Say hi at the door and show the group where to gather. That first hello is how a room of neighbors turns into faces you see every week.
               </p>
               <ul className="mt-3 space-y-2 text-[14px] leading-snug text-stone-700">
                 <li className="flex gap-2.5">
