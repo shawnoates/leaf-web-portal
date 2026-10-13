@@ -83,11 +83,6 @@ type Form = {
 
 const EXAMPLE_RSVPS = 12;
 
-/** "the X calendar", without doubling up when the name already starts with "The". */
-function theCalendar(name: string) {
-  return /^the\s/i.test(name) ? name : `the ${name}`;
-}
-
 /** What they're signing up for, with what's free crossed out: the check at the card step. */
 function PriceSummary({ weeklyCents, feeCents }: { weeklyCents: number; feeCents: number }) {
   const row = "flex items-start justify-between gap-4 py-3";
@@ -577,7 +572,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             {done.updated
               ? "We'll use the new details from here on."
               : done.bookedDate
-                ? `${form.calendarName} neighbors can start RSVPing soon. We'll send the count 2 hours before${
+                ? `Neighbors can start RSVPing soon. We'll send the count 2 hours before${
                     perRsvp && form.billing?.firstNightFree ? ", and this first Neighbor Hour is on us" : ""
                   }.`
                 : "Those weeks already have someone, so you're first in line for the next opening. We'll be in touch."}
@@ -655,8 +650,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             </h1>
             <p className="mt-4 text-[16px] leading-relaxed text-stone-600">
               {perRsvp
-                ? `We bring ${form.headcount} neighbors from ${theCalendar(form.calendarName)} calendar to you, on your slowest day.`
-                : `A taster for ${form.headcount} neighbors on ${theCalendar(form.calendarName)} calendar, on a day that suits you. Leaf keeps 10% of tickets.`}
+                ? `We bring ${form.headcount} neighbors from your neighborhood\u2019s Leaf calendar to you, on your slowest day.`
+                : `A taster for ${form.headcount} neighbors on your neighborhood\u2019s Leaf calendar, on a day that suits you. Leaf keeps 10% of tickets.`}
             </p>
           </header>
         </>
