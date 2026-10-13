@@ -847,9 +847,11 @@ export default function MerchantDashboard({
                     <p className="text-[15px] text-stone-600">
                       {d.setup
                         ? "Your free first Neighbor Hour shows up here once its date is set."
-                        : perRsvp
-                          ? "Nothing on the books right now. Switch your Neighbor Hours on and we\u2019ll line them up."
-                          : "Nothing on the books right now. Request a Neighbor Hour below."}
+                        : perRsvp && campaign?.on
+                          ? "Nothing booked yet. Neighbors\u2019 plans at your place on your days show up here as they\u2019re made."
+                          : perRsvp
+                            ? "Nothing on the books right now. Switch your Neighbor Hours on and we\u2019ll line them up."
+                            : "Nothing on the books right now. Request a Neighbor Hour below."}
                     </p>
                   )}
                 </div>
