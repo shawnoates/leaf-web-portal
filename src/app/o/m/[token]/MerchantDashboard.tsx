@@ -93,6 +93,9 @@ export type Dashboard = {
 
 type Setup = { stage: string; step: number; stages: { key: string; label: string }[]; detail: string; date: string | null };
 
+/** A green per step, light to dark (leaf-300 to leaf-800); the setup emails use the same. */
+const STEP_GREENS = ["#9dbeb3", "#74a494", "#5a8c7b", "#426c5e", "#253a33"];
+
 /** The setup bar at the top: where their free first Neighbor Hour is, step by step. */
 function SetupProgress({ setup }: { setup: Setup }) {
   const total = setup.stages.length;
@@ -108,7 +111,7 @@ function SetupProgress({ setup }: { setup: Setup }) {
           const current = i + 1 === setup.step;
           return (
             <li key={st.key} aria-current={current ? "step" : undefined}>
-              <div className={`h-2 rounded-full ${done || current ? "bg-leaf-700" : "bg-stone-200"}`} />
+              <div className="h-2 rounded-full bg-stone-200" style={done || current ? { backgroundColor: STEP_GREENS[Math.min(i, STEP_GREENS.length - 1)] } : undefined} />
               <p className={`mt-2 hidden text-[12px] leading-tight sm:block ${current ? "font-semibold text-stone-900" : done ? "text-stone-600" : "text-stone-400"}`}>{st.label}</p>
             </li>
           );
@@ -346,44 +349,44 @@ function NightContact({ token, n }: { token: string; n: Night }) {
 }
 
 /** Booked → (payouts) → on the calendar → RSVPs → the night, with their turn called out. */
+/** Step names as merchants see them ("Booked" reads as "Date set", as in setup). */
+const STEP_LABEL: Record<string, string> = { booked: "Date set" };
+
+/** A step's green: spread light to dark across however many steps the night has. */
+const greenFor = (i: number, n: number) => STEP_GREENS[n > 1 ? Math.round((i * (STEP_GREENS.length - 1)) / (n - 1)) : STEP_GREENS.length - 1];
+
+/**
+ * One night's progress as a bar, in the setup bar's greens: a segment per
+ * step, filled through the current one, with what's happening now under it.
+ */
 function NightSteps({ steps }: { steps: Step[] }) {
+  const current = steps.find((st) => st.status === "current") || null;
   return (
-    <ol className="mt-3 space-y-2.5">
-      {steps.map((st) => (
-        <li key={st.key} className="flex gap-3">
-          <span
-            aria-hidden
-            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-              st.status === "done"
-                ? "bg-leaf-600 text-white"
-                : st.status === "current"
-                  ? st.you
-                    ? "bg-amber-400 text-amber-950"
-                    : "border-2 border-leaf-600 bg-white"
-                  : "border-2 border-stone-200 bg-white"
-            }`}
-          >
-            {st.status === "done" ? "\u2713" : ""}
-          </span>
-          <div className="min-w-0">
-            <p
-              className={`text-[15px] leading-snug ${
-                st.status === "todo" ? "text-stone-400" : st.status === "current" ? "font-semibold text-stone-900" : "text-stone-700"
-              }`}
-            >
-              {st.label}
-              <span className="sr-only">{st.status === "done" ? " (done)" : st.status === "current" ? " (now)" : " (next)"}</span>
-            </p>
-            {st.detail && <p className="text-[13px] text-stone-600">{st.detail}</p>}
-            {st.you && st.key === "payouts" && (
-              <a href="#payouts" className="mt-1 inline-block text-[14px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
-                Set up payouts
-              </a>
-            )}
-          </div>
-        </li>
-      ))}
-    </ol>
+    <div className="mt-3">
+      <ol className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
+        {steps.map((st, i) => {
+          const on = st.status !== "todo";
+          return (
+            <li key={st.key} aria-current={st.status === "current" ? "step" : undefined}>
+              <div
+                className={`h-2 rounded-full ${on ? "" : "bg-stone-200"} ${st.status === "current" && st.you ? "ring-2 ring-amber-300" : ""}`}
+                style={on ? { backgroundColor: greenFor(i, steps.length) } : undefined}
+              />
+              <p className={`mt-1.5 text-[12px] leading-tight ${st.status === "current" ? "font-semibold text-stone-900" : on ? "text-stone-600" : "text-stone-400"}`}>
+                {STEP_LABEL[st.key] || st.label}
+                <span className="sr-only">{st.status === "done" ? " (done)" : st.status === "current" ? " (now)" : " (next)"}</span>
+              </p>
+            </li>
+          );
+        })}
+      </ol>
+      {current?.detail && <p className="mt-2 text-[14px] text-stone-600">{current.detail}</p>}
+      {current?.you && current.key === "payouts" && (
+        <a href="#payouts" className="mt-1 inline-block text-[14px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+          Set up payouts
+        </a>
+      )}
+    </div>
   );
 }
 
