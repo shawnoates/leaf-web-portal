@@ -113,7 +113,7 @@ function SetupProgress({ setup }: { setup: Setup }) {
           const current = i + 1 === setup.step;
           return (
             <li key={st.key} aria-current={current ? "step" : undefined}>
-              <div className="h-2 rounded-full bg-stone-200" style={done || current ? { backgroundColor: STEP_GREENS[Math.min(i, STEP_GREENS.length - 1)] } : undefined} />
+              <div className="h-2 rounded-full bg-stone-200" style={done || current ? { backgroundColor: greenFor(i, total) } : undefined} />
               <p className={`mt-2 hidden text-[11px] leading-tight sm:block ${current ? "font-semibold text-stone-900" : done ? "text-stone-600" : "text-stone-400"}`}>{st.label}</p>
             </li>
           );
