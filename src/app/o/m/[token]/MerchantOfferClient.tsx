@@ -121,6 +121,39 @@ function PriceSummary({ weeklyCents, feeCents }: { weeklyCents: number; feeCents
  * white setup box with what's left (each step links to its section). Once
  * they hold their free night, the same spot shows the setup bar.
  */
+/**
+ * Our suggested night at sign-up, with "Ask for a change": what they'd change
+ * goes to Leaf with their notes, and the wording Leaf writes takes it in.
+ */
+function OurIdea({ idea, ask, setAsk }: { idea: Suggested; ask: string; setAsk: (v: string) => void }) {
+  const [open, setOpen] = useState(Boolean(ask));
+  return (
+    <div className="rounded-2xl bg-leaf-50 p-4 ring-1 ring-leaf-100">
+      <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">Our idea for your night</p>
+      <p className="mt-1.5 font-fm-serif text-[22px] leading-tight text-stone-900">{idea.title}</p>
+      {idea.description && <p className="mt-1 text-[14px] leading-snug text-stone-600">{idea.description}</p>}
+      {open ? (
+        <div className="mt-3">
+          <label className="text-[14px] font-medium text-stone-700" htmlFor="idea-ask">What would you change?</label>
+          <textarea
+            id="idea-ask"
+            value={ask}
+            onChange={(e) => setAsk(e.target.value.slice(0, 300))}
+            rows={2}
+            className={textarea}
+            placeholder="e.g. Make it a trivia night instead, and keep it to our back room"
+          />
+          <p className="mt-1 text-[12px] text-stone-500">We&rsquo;ll write your night with this in mind. You&rsquo;ll see it before it goes live.</p>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} className="mt-3 text-[14px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+          Ask for a change
+        </button>
+      )}
+    </div>
+  );
+}
+
 function OnboardingHeader({ name, blurb, steps }: { name: string; blurb: string; steps: { href: string; label: string; done: boolean }[] }) {
   const done = steps.filter((s) => s.done).length;
   return (
@@ -251,6 +284,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const [otherWindows, setOtherWindows] = useState("");
   // What they want highlighted (bars and restaurants): Leaf writes their night from it.
   const [nightNotes, setNightNotes] = useState("");
+  // "Ask for a change" to our suggested night, at sign-up: goes to Leaf with their notes.
+  const [ideaAsk, setIdeaAsk] = useState("");
   const [card, setCard] = useState<Card | null>(null);
   const [useOwn, setUseOwn] = useState(false);
   const [notices, setNotices] = useState<Notices | null>(null);
@@ -421,7 +456,10 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         windows: form?.state === "accepted" ? windows : [],
         otherWindows: form?.state === "accepted" ? otherWindows : "",
         days: form?.state === "accepted" ? undefined : days,
-        nightNotes,
+        // Their notes, plus anything they'd change about our suggested night (Leaf drafts from both).
+        nightNotes: ideaAsk.trim() && suggested
+          ? `${nightNotes.trim()}${nightNotes.trim() ? "\n\n" : ""}What they'd change about our idea ("${suggested.title}"): ${ideaAsk.trim()}`.slice(0, 600)
+          : nightNotes,
         weeklyBudgetCents: form?.state === "accepted" || !perRsvp ? undefined : weeklyBudget,
       })) as { state: string; bookedDate?: string | null; benched?: boolean; updated?: boolean; requested?: boolean; session?: string | null };
       // Saying yes signs this device in to the dashboard it's about to land on.
@@ -809,6 +847,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
 
         {!perRsvp && (
         <Section n={2} total={steps} id="class" title="About your class" sub="What the taster is, its price and length, and where. Leaf writes your night from this.">
+          {!accepted && suggested && <OurIdea idea={suggested} ask={ideaAsk} setAsk={setIdeaAsk} />}
           <Field label="What should the taster be?" hint="What people make or learn, who it's for, anything to highlight. You'll see the wording before it goes live.">
             <textarea
               value={nightNotes}
@@ -880,6 +919,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         >
           {perRsvp && (
             <>
+              {!accepted && suggested && <OurIdea idea={suggested} ask={ideaAsk} setAsk={setIdeaAsk} />}
               <Field label="What should we highlight?" hint="Specials, the vibe, your space, who comes in. Leaf writes your night from this, and you'll see it before it goes live.">
                 <textarea
                   value={nightNotes}
