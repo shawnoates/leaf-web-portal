@@ -31,6 +31,8 @@ type Night = {
   steps?: Step[] | null;
   guests: number | null;
   host: { kind: "leaf" | "you"; name: string | null } | null;
+  /** "Add a Leaf host" on a night they run (older servers don't send it). */
+  hostAddOn?: { state: "available" | "too_close" | "offering" | "hosted" | "none_found" | null; feeCents: number } | null;
   contact?: { name: string; phone: string; isDefault: boolean };
   planUrl: string | null;
   charge: {
@@ -457,6 +459,81 @@ function MakeGoodChoice({ n, token }: { n: Night; token: string }) {
   );
 }
 
+/**
+ * The "Add a Leaf host" option on a night they run. Asking sends offers to the
+ * best-matched Leaf hosts; until one says yes they're still hosting, and the
+ * fee applies only if a host runs it (and 5+ neighbors RSVP).
+ */
+function HostAddOn({ n, token }: { n: Night; token: string }) {
+  const [state, setState] = useState(n.hostAddOn?.state ?? null);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fee = dollars(n.hostAddOn?.feeCents ?? 9900);
+
+  const ask = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = (await merchantRun("merchantAddLeafHost", { token, slotId: n.id })) as { state: typeof state };
+      setState(r.state);
+      setConfirming(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn\u2019t ask for a host");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (state === "available") {
+    return (
+      <div className="mt-4 rounded-2xl bg-leaf-50 p-4 ring-1 ring-leaf-200">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="font-fm-serif text-[20px] leading-tight text-stone-900">Add a Leaf host</p>
+          <p className="shrink-0 text-[14px] font-semibold text-leaf-800">{fee}</p>
+        </div>
+        <p className="mt-1 text-[14px] leading-snug text-stone-600">
+          A Leaf host welcomes the group and runs the night. You get what guests spent, photos for your socials, and how many became regulars.
+        </p>
+        {confirming ? (
+          <>
+            <p className="mt-3 text-[13px] leading-snug text-stone-600">
+              {`We'll offer it to the best-matched Leaf hosts now. You're hosting until one says yes, and it's ${fee} only if a host runs it and 5 or more neighbors RSVP.`}
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button type="button" disabled={busy} onClick={ask} className="h-11 flex-1 rounded-xl bg-leaf-800 text-[14px] font-semibold text-white disabled:opacity-50">
+                {busy ? "Asking\u2026" : "Yes, find me a host"}
+              </button>
+              <button type="button" disabled={busy} onClick={() => setConfirming(false)} className="h-11 rounded-xl border border-stone-300 px-4 text-[14px] font-semibold text-stone-700">
+                Not now
+              </button>
+            </div>
+          </>
+        ) : (
+          <button type="button" onClick={() => setConfirming(true)} className="mt-3 h-11 w-full rounded-xl bg-leaf-800 text-[14px] font-semibold text-white">
+            Add a Leaf host
+          </button>
+        )}
+        {error && <p className="mt-2 text-[14px] text-red-600">{error}</p>}
+      </div>
+    );
+  }
+  if (state === "offering") {
+    return (
+      <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] leading-snug text-leaf-900 ring-1 ring-leaf-200">
+        <span className="font-semibold">Finding your Leaf host.</span> We&rsquo;ll email you when one says yes. Until then, you&rsquo;re hosting as planned.
+      </p>
+    );
+  }
+  if (state === "none_found") {
+    return <p className="mt-3 text-[14px] text-stone-600">No Leaf host was free for this one, so you&rsquo;re hosting as planned. No host fee.</p>;
+  }
+  if (state === "too_close") {
+    return <p className="mt-3 text-[13px] text-stone-500">Want a Leaf host? Add one at least 10 days ahead.</p>;
+  }
+  return null;
+}
+
 function UpcomingNight({ n, token }: { n: Night; token: string }) {
   const p = PHASE[n.phase as keyof typeof PHASE];
   const pct = n.rsvps != null && n.capacity ? Math.min(100, Math.round((n.rsvps / n.capacity) * 100)) : null;
@@ -508,6 +585,7 @@ function UpcomingNight({ n, token }: { n: Night; token: string }) {
           </a>
         )}
       </div>
+      <HostAddOn n={n} token={token} />
       <NightContact token={token} n={n} />
     </div>
   );
