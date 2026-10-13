@@ -787,14 +787,13 @@ export default function MerchantDashboard({
           <Brand neighborhood={d.neighborhood} />
 
           {/* One header: who they are, and where things stand (the setup bar while their
-              free first night is set up, then their next night). No calendar link: merchants
-              shouldn't be sent to a calendar of other places. */}
+              free first night is set up, then their next night). No calendar, by name or
+              link: merchants shouldn't be pointed at a calendar of other places. */}
           <header className="mt-5 rounded-3xl bg-leaf-800 p-6 text-white sm:p-8 lg:mt-8">
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:items-end">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:items-start">
               <div className="min-w-0">
                 <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Your Neighbor Hours</p>
                 <h1 className="mt-2 font-fm-serif text-[36px] leading-[1.02] lg:text-[48px]">{d.merchantName}</h1>
-                {d.calendarName && <p className="mt-2 text-[15px] leading-relaxed text-leaf-100">{d.calendarName}</p>}
               </div>
               {d.setup ? <SetupProgress setup={d.setup} /> : <NextUp n={d.upcoming[0] || null} perRsvp={perRsvp} campaign={campaign} settingUp={false} />}
             </div>
