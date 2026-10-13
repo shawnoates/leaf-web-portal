@@ -64,6 +64,8 @@ type Form = {
     contactPhone: string;
     windows: string[];
     otherWindows: string;
+    /** What they want highlighted; Leaf drafts their night from it. */
+    nightNotes?: string;
   };
   dateOptions: DateOption[];
   billing?: {
@@ -111,6 +113,44 @@ function PriceSummary({ weeklyCents, feeCents }: { weeklyCents: number; feeCents
         <span className="font-semibold text-stone-900">$0</span>
       </div>
     </div>
+  );
+}
+
+/**
+ * Sign-up as the top of their dashboard: their name in the green header and a
+ * white setup box with what's left (each step links to its section). Once
+ * they hold their free night, the same spot shows the setup bar.
+ */
+function OnboardingHeader({ name, steps }: { name: string; steps: { href: string; label: string; done: boolean }[] }) {
+  const done = steps.filter((s) => s.done).length;
+  return (
+    <header className="mt-5 rounded-3xl bg-leaf-800 p-6 text-white sm:p-8">
+      <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Your Neighbor Hours</p>
+      <h1 className="mt-2 font-fm-serif text-[36px] leading-[1.02]">{name}</h1>
+      <p className="mt-2 text-[15px] leading-relaxed text-leaf-100">We bring neighbors from your neighborhood&rsquo;s Leaf calendar to you, in your slowest hours. Your first Neighbor Hour is on us.</p>
+      <section aria-label="Get set up" className="mt-6 rounded-2xl bg-white p-4 text-stone-900 shadow-sm sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">Get set up</p>
+          <p className="shrink-0 whitespace-nowrap rounded-full bg-leaf-100 px-2.5 py-0.5 text-[12px] font-semibold text-leaf-800">{`${done} of ${steps.length} done`}</p>
+        </div>
+        <ol className="mt-3 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
+          {steps.map((st, i) => (
+            <li key={st.href}>
+              <a href={st.href} className="block">
+                <div className="h-2 rounded-full bg-stone-200" style={st.done ? { backgroundColor: ["#9dbeb3", "#5a8c7b", "#253a33"][Math.min(i, 2)] } : undefined} />
+                <p className={`mt-2 text-[12px] leading-tight ${st.done ? "text-stone-600" : "font-semibold text-stone-900"}`}>
+                  {st.done ? "\u2713 " : ""}
+                  {st.label}
+                </p>
+              </a>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-3 text-[14px] leading-relaxed text-stone-600">
+          {done === steps.length ? "All set. Hold your free Neighbor Hour below." : "Three quick steps, then hold your free Neighbor Hour. We write your night and you'll see it before it goes live."}
+        </p>
+      </section>
+    </header>
   );
 }
 
@@ -209,6 +249,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const [days, setDays] = useState<Day[]>([]);
   const [weeklyBudget, setWeeklyBudget] = useState(9000);
   const [otherWindows, setOtherWindows] = useState("");
+  // What they want highlighted (bars and restaurants): Leaf writes their night from it.
+  const [nightNotes, setNightNotes] = useState("");
   const [card, setCard] = useState<Card | null>(null);
   const [useOwn, setUseOwn] = useState(false);
   const [notices, setNotices] = useState<Notices | null>(null);
@@ -283,6 +325,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         setContactPhone(formatPhone(o.contactPhone));
         setWindows(o.windows);
         setOtherWindows(o.otherWindows);
+        setNightNotes(o.nightNotes || "");
         setCard(f.billing?.card ?? null);
         if (f.notices) {
           // Texts go to the night's phone unless they've set another.
@@ -325,7 +368,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
     perRsvp && form?.state !== "accepted" && form?.billing?.freeNightState === "open",
   );
   const suggested: Suggested | null = form?.suggested ?? (form?.offer ? { title: form.offer.title, description: form.offer.description, durationMin: form.offer.durationMin, priceCents: form.offer.priceCents } : null);
-  const nightTitle = useOwn || !suggested ? title : suggested.title;
+  // Bars and restaurants don't name their night: Leaf drafts it (approved in Today); this is only a placeholder until then.
+  const nightTitle = (useOwn || !suggested ? title : suggested.title) || (perRsvp ? "Neighbor Hour" : "");
   const nightDescription = useOwn || !suggested ? description : suggested.description;
   const phoneDigits = contactPhone.replace(/\D/g, "");
   const missing: string[] = [];
@@ -377,6 +421,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         windows: form?.state === "accepted" ? windows : [],
         otherWindows: form?.state === "accepted" ? otherWindows : "",
         days: form?.state === "accepted" ? undefined : days,
+        nightNotes: perRsvp ? nightNotes : undefined,
         weeklyBudgetCents: form?.state === "accepted" || !perRsvp ? undefined : weeklyBudget,
       })) as { state: string; bookedDate?: string | null; benched?: boolean; updated?: boolean; requested?: boolean; session?: string | null };
       // Saying yes signs this device in to the dashboard it's about to land on.
@@ -559,6 +604,44 @@ export default function MerchantOfferClient({ token }: { token: string }) {
     </>
   );
 
+  // Bars and restaurants change their details right in the dashboard's Account card, not on a separate page.
+  const detailsRow = perRsvp ? (
+    <AccountRow
+      id="details"
+      title="Your details"
+      summary={`${capacity ? `Seats ${capacity}` : "Seats not set"} \u00b7 ${merchantHosts === false ? "Leaf host" : "Your team welcomes"}${contactName ? ` \u00b7 ask for ${contactName}` : ""}`}
+    >
+      <div className="space-y-3">
+        <Field label="How many can you seat together?" hint="We never bill for more RSVPs than this.">
+          <input value={capacity} onChange={(e) => setCapacity(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className={input} />
+        </Field>
+        <div>
+          <span className="mb-1.5 block text-[14px] font-medium text-stone-700">Who welcomes the group?</span>
+          <div className="flex gap-2">
+            <Choice on={merchantHosts === true} onClick={() => setMerchantHosts(true)}>
+              We will
+            </Choice>
+            <Choice on={merchantHosts === false} onClick={() => setMerchantHosts(false)}>
+              {`Hosted night${hostFee ? ` \u00b7 ${hostFee}` : ""}`}
+            </Choice>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Who should they ask for?">
+            <input value={contactName} onChange={(e) => setContactName(e.target.value)} autoComplete="name" className={input} />
+          </Field>
+          <Field label="Phone (optional)">
+            <input value={contactPhone} onChange={(e) => setContactPhone(formatPhone(e.target.value))} type="tel" inputMode="tel" autoComplete="tel" placeholder="(555) 555-5555" className={input} />
+          </Field>
+        </div>
+        {error && <p className="text-[14px] text-red-600">{error}</p>}
+        <button type="button" onClick={submit} disabled={busy || preview} className="h-12 w-full rounded-xl bg-leaf-800 text-[15px] font-semibold text-white disabled:opacity-50">
+          {busy ? "Saving\u2026" : "Save your details"}
+        </button>
+      </div>
+    </AccountRow>
+  ) : null;
+
   if (done) {
     return (
       <Shell>
@@ -600,12 +683,13 @@ export default function MerchantOfferClient({ token }: { token: string }) {
 
   if (form.state === "accepted" && view === "dashboard") {
     return (
-      <MerchantDashboard token={token} onEdit={showForm} onUnavailable={dashboardUnavailable} account={accountRows} welcome={welcome} preview={preview} />
+      <MerchantDashboard token={token} onEdit={showForm} onUnavailable={dashboardUnavailable} account={accountRows} details={detailsRow} welcome={welcome} preview={preview} />
     );
   }
 
   const accepted = form.state === "accepted";
-  const steps = (perRsvp ? 4 : 3) + (notices ? 1 : 0);
+  // Bars and restaurants: days, about your place, card (+ how to reach you). Ticketed: night, days, welcome (+ reach).
+  const steps = 3 + (notices ? 1 : 0);
   const withHost = merchantHosts === false && hostFee ? ` + ${hostFee} host` : "";
   const cta = accepted ? "Save changes" : perRsvp && form.billing?.firstNightFree ? `Hold my free Neighbor Hour${withHost}` : "Count me in";
   const freeWorth = perRsvp && !accepted && !withHost && form.billing?.firstNightFree ? dollars((form.billing?.rsvpFeeCents ?? 600) * TYPICAL_RSVPS) : null;
@@ -632,6 +716,16 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             Your night, your space, and how we reach you. Saved changes carry to your upcoming Neighbor Hours; dates and times stay as booked.
           </p>
         </header>
+      ) : perRsvp ? (
+        // Bars and restaurants sign up inside their dashboard: the same header, with a setup checklist in it.
+        <OnboardingHeader
+          name={form.merchantName}
+          steps={[
+            { href: "#days", label: "Your slow days", done: days.length > 0 },
+            { href: "#place", label: "About your place", done: merchantHosts !== null && Number(capacity) > 0 },
+            { href: "#card", label: "Hold it with a card", done: card !== null },
+          ]}
+        />
       ) : (
         <>
           <BusinessPhoto url={form.photoUrl} credit={form.photoCredit} name={form.merchantName} />
@@ -683,6 +777,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
       )}
 
       <div className="mt-6 space-y-4">
+        {!perRsvp && (
         <Section n={1} total={steps} title="Your night" sub="Keep ours, or write your own.">
           {suggested && (
             <NightPicker
@@ -755,10 +850,12 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             </div>
           )}
         </Section>
+        )}
 
         <Section
-          n={2}
+          n={perRsvp ? 1 : 2}
           total={steps}
+          id="days"
           title={accepted ? "Your Neighbor Hours" : "Your slow days"}
           sub={
             accepted
@@ -781,7 +878,30 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           )}
         </Section>
 
-        <Section n={3} total={steps} title="Who welcomes the group?" sub="Your team, or make it a Hosted night.">
+        <Section
+          n={perRsvp ? 2 : 3}
+          total={steps}
+          id="place"
+          title={perRsvp ? "About your place" : "Who welcomes the group?"}
+          sub={perRsvp ? "What to highlight, how many you seat, and who welcomes the group. We write your night from it." : "Your team, or make it a Hosted night."}
+        >
+          {perRsvp && (
+            <>
+              <Field label="What should we highlight?" hint="Specials, the vibe, your space, who comes in. Leaf writes your night from this, and you'll see it before it goes live.">
+                <textarea
+                  value={nightNotes}
+                  onChange={(e) => setNightNotes(e.target.value.slice(0, 600))}
+                  rows={3}
+                  className={textarea}
+                  placeholder="e.g. $8 negronis on Wednesdays, a back room that fits 14, board games behind the bar"
+                />
+              </Field>
+              <Field label="How many can you seat together?" hint="We never bill for more RSVPs than this.">
+                <input value={capacity} onChange={(e) => setCapacity(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className={input} />
+              </Field>
+              <span className="-mb-1 block text-[14px] font-medium text-stone-700">Who welcomes the group?</span>
+            </>
+          )}
           <div className="flex gap-2">
             <Choice on={merchantHosts === true} onClick={() => setMerchantHosts(true)}>
               We will
@@ -870,7 +990,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
 
         {perRsvp && (
           <Section
-            n={4}
+            n={3}
             total={steps}
             id="card"
             title="Hold it with a card"
@@ -896,7 +1016,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         )}
 
         {notices && (
-          <Section n={perRsvp ? 5 : 4} total={steps} id="notifications" title="How should we reach you?" sub="Only about your Neighbor Hours. Never marketing.">
+          <Section n={4} total={steps} id="notifications" title="How should we reach you?" sub="Only about your Neighbor Hours. Never marketing.">
             <NoticePrefs token={token} value={notices} onChange={setNotices} />
           </Section>
         )}

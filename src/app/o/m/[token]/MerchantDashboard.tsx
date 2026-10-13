@@ -87,11 +87,99 @@ export type Dashboard = {
   };
   /** Open weeks on their night they can book now. */
   bookable?: { dateKey: string; label: string }[];
-  /** Setting up their free first night (five stages, moved on by Leaf); null once it's billed. */
+  /** Their night's name and description: Leaf's draft waiting on approval, or what's approved. */
+  night?: NightCopy | null;
+  /** Setting up their free first night (four stages, moved on by Leaf); null once it's billed. */
   setup?: Setup | null;
   /** Nights they asked for that Leaf hasn't booked yet. */
   requests?: { id: string; kind: "first" | "rebook"; label: string; source?: "campaign" | null }[];
 };
+
+type NightCopy = { status: "pending" | "approved"; title: string | null; description: string | null; notes: string; changeRequest: { note: string; at: string | null } | null };
+
+/**
+ * Their night: Leaf writes the name and description from what they'd like
+ * highlighted and what neighbors nearby RSVP to; Shawn approves it. Before
+ * that they see it's being written (and can add notes); after, the words and
+ * "Ask for a change" (it goes to Leaf; nothing waits on it).
+ */
+function NightCard({ token, night: start, preview }: { token: string; night: NightCopy; preview: boolean }) {
+  const [night, setNight] = useState(start);
+  const [notes, setNotes] = useState(start.notes);
+  const [asking, setAsking] = useState(false);
+  const [ask, setAsk] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const run = async (name: string, params: Record<string, unknown>, done: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = (await merchantRun(name, { token, ...params })) as { night: NightCopy };
+      setNight(r.night);
+      setNote(done);
+      setAsking(false);
+      setAsk("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That didn\u2019t save");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const area = "mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-[15px] leading-relaxed focus:border-leaf-600 focus:outline-none";
+  return (
+    <Card id="night">
+      <H2>Your night</H2>
+      {night.status === "approved" && night.title ? (
+        <div className="mt-4 rounded-2xl bg-leaf-50 p-4 ring-1 ring-leaf-100">
+          <p className="font-fm-serif text-[24px] leading-tight text-stone-900">{night.title}</p>
+          <p className="mt-1.5 text-[15px] leading-relaxed text-stone-700">{night.description}</p>
+        </div>
+      ) : (
+        <p className="mt-2 text-[15px] leading-relaxed text-stone-600">
+          We&rsquo;re writing your night from what you&rsquo;d like to highlight and what neighbors near you RSVP to. You&rsquo;ll see it here before it goes live.
+        </p>
+      )}
+
+      {night.status === "approved" && night.changeRequest ? (
+        <p className="mt-3 rounded-xl bg-amber-50 p-3 text-[14px] text-amber-900">
+          You asked: &ldquo;{night.changeRequest.note}&rdquo;. We&rsquo;ll email you when it&rsquo;s updated.
+        </p>
+      ) : night.status === "approved" && !asking ? (
+        <button type="button" disabled={preview} onClick={() => setAsking(true)} className="mt-3 text-[14px] font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+          Ask for a change
+        </button>
+      ) : null}
+      {asking && (
+        <div className="mt-3">
+          <label className="text-[14px] font-medium text-stone-700" htmlFor="night-ask">What should we change?</label>
+          <textarea id="night-ask" value={ask} onChange={(e) => setAsk(e.target.value)} rows={3} className={area} placeholder="e.g. Mention our patio, and that it's dog friendly" />
+          <div className="mt-2 flex gap-2">
+            <button type="button" disabled={busy || !ask.trim()} onClick={() => run("merchantRequestNightChange", { note: ask }, "Sent. We\u2019ll email you when it\u2019s updated.")} className="h-11 rounded-xl bg-leaf-800 px-4 text-[14px] font-semibold text-white disabled:opacity-40">
+              Send to Leaf
+            </button>
+            <button type="button" onClick={() => setAsking(false)} className="h-11 rounded-xl border border-stone-300 px-4 text-[14px] font-semibold text-stone-700">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-5 border-t border-stone-100 pt-4">
+        <label className="text-[14px] font-semibold text-stone-900" htmlFor="night-notes">What should we highlight?</label>
+        <p className="text-[13px] text-stone-500">Specials, the vibe, your space, who comes in. We use it when we write your nights.</p>
+        <textarea id="night-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={area} placeholder="e.g. $8 negronis on Wednesdays, a back room that fits 14, board games behind the bar" />
+        {notes.trim() !== (night.notes || "").trim() && (
+          <button type="button" disabled={busy || preview} onClick={() => run("merchantSaveNightNotes", { notes }, "Saved.")} className="mt-2 h-11 rounded-xl bg-leaf-800 px-4 text-[14px] font-semibold text-white disabled:opacity-40">
+            {busy ? "Saving\u2026" : "Save"}
+          </button>
+        )}
+      </div>
+      {note && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{note}</p>}
+      {error && <p className="mt-2 text-[14px] text-red-600">{error}</p>}
+    </Card>
+  );
+}
 
 type Setup = { stage: string; step: number; stages: { key: string; label: string }[]; detail: string; date: string | null };
 
@@ -683,6 +771,7 @@ export default function MerchantDashboard({
   onEdit,
   onUnavailable,
   account,
+  details = null,
   welcome = null,
   preview = false,
 }: {
@@ -691,6 +780,8 @@ export default function MerchantDashboard({
   onUnavailable: () => void;
   /** Card and notification settings, rendered by the page that owns their state. */
   account: ReactNode;
+  /** Their details (seats, who welcomes, contact) edited in place; without it, "Change" opens the form. */
+  details?: ReactNode;
   /** What just happened (after Hold), shown at the top. */
   welcome?: string | null;
   /** ?preview=1: Shawn seeing what they see. Shown as is, nothing clickable. */
@@ -821,6 +912,7 @@ export default function MerchantDashboard({
           <div className="mt-6 grid gap-6 lg:mt-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-8">
             {/* Main column: their Neighbor Hours, then their nights. */}
             <div className="min-w-0 space-y-6">
+              {perRsvp && d.night && <NightCard token={token} night={d.night} preview={preview} />}
               {perRsvp && <MerchantCampaign token={token} preview={preview} firstNightFree={d.freeNight.state === "granted"} onSummary={setCampaign} />}
 
               {/* Your nights: what's coming up (with each night's bar and the host add-on), and past weeks. */}
@@ -980,7 +1072,7 @@ export default function MerchantDashboard({
                 <H2>Account</H2>
                 <div className="mt-2 divide-y divide-stone-100">
                   {account}
-                  <div className="flex items-center justify-between gap-3 py-3.5">
+                  {details || <div className="flex items-center justify-between gap-3 py-3.5">
                     <div className="min-w-0">
                       <p className="text-[15px] font-semibold text-stone-900">Your details</p>
                       <p className="text-[13px] text-stone-500">Your night, how many you seat, who to ask for</p>
@@ -988,7 +1080,7 @@ export default function MerchantDashboard({
                     <button type="button" onClick={onEdit} className="shrink-0 rounded-lg border border-stone-300 px-3 py-1.5 text-[14px] font-semibold text-stone-700">
                       Change
                     </button>
-                  </div>
+                  </div>}
                 </div>
               </Card>
               <p className="px-1 pb-6 text-[13px] text-stone-500">
