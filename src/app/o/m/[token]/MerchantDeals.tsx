@@ -50,7 +50,8 @@ function phaseLine(d: Deal): { label: string; tone: string } {
   }
 }
 
-export default function MerchantDeals({ token, preview }: { token: string; preview?: boolean }) {
+/** bare: a section of the Get more neighbors card, no card of its own. */
+export default function MerchantDeals({ token, preview, bare = false }: { token: string; preview?: boolean; bare?: boolean }) {
   const [s, setS] = useState<DealsState | null>(null);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ title: "", description: "", terms: "", promoCode: "" });
@@ -100,9 +101,13 @@ export default function MerchantDeals({ token, preview }: { token: string; previ
   };
 
   return (
-    <section id="deals" className="scroll-mt-6 rounded-3xl bg-white p-6 shadow-sm sm:p-7">
-      <h2 className="font-fm-serif text-[26px] leading-tight text-stone-900">Your deals</h2>
-      <p className="mt-1 text-[15px] leading-relaxed text-stone-600">
+    <section id="deals" className={bare ? "scroll-mt-6" : "scroll-mt-6 rounded-3xl bg-white p-6 shadow-sm sm:p-7"}>
+      {bare ? (
+        <h3 className="text-[17px] font-semibold text-stone-900">Your deals</h3>
+      ) : (
+        <h2 className="font-fm-serif text-[26px] leading-tight text-stone-900">Your deals</h2>
+      )}
+      <p className={bare ? "mt-1 text-[14px] leading-relaxed text-stone-600" : "mt-1 text-[15px] leading-relaxed text-stone-600"}>
         {`Post a deal for the neighbors around you. It shows on your neighborhood's Leaf calendar. ${price} a month, charged once it's approved. One deal at a time; stop anytime.`}
       </p>
 

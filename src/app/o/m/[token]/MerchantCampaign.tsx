@@ -48,6 +48,10 @@ export const windowLabel = (days: Day[]) =>
     : "any day, any time";
 const STEP_CENTS = 600; // one RSVP per notch
 
+const PART_SHORT: Record<Day["partOfDay"], string> = { morning: "mornings", afternoon: "afternoons", evening: "evenings", any: "all day" };
+/** "Wed evenings, Thu afternoons": the summary's short form of their days. */
+const shortDays = (days: Day[]) => days.map((d) => `${WEEKDAYS[d.weekday]} ${PART_SHORT[d.partOfDay]}`).join(", ");
+
 const span = (r: Range, f: (n: number) => string = String) => (r.low === r.high ? f(r.low) : `${f(r.low)}–${f(r.high)}`);
 
 /**
@@ -183,7 +187,9 @@ export default function MerchantCampaign({
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
-  const [autoStarted, setAutoStarted] = useState(false);
+  // The summary shows by default; the days, times and limit open on request
+  // (or straight away from an email's #campaign link).
+  const [editing, setEditing] = useState(() => typeof window !== "undefined" && window.location.hash === "#campaign");
 
   useEffect(() => {
     merchantRun("merchantGetCampaign", { token })
@@ -193,7 +199,6 @@ export default function MerchantCampaign({
         setOn(c.campaign.on);
         setDays(c.campaign.days);
         setBudget(c.campaign.weeklyBudgetCents);
-        setAutoStarted(Boolean(c.campaign.autoStarted));
         onSummary?.({ on: c.campaign.on, days: c.campaign.days, weeklyBudgetCents: c.campaign.weeklyBudgetCents });
       })
       .catch(() => setS(null));
@@ -212,7 +217,7 @@ export default function MerchantCampaign({
       setOn(nextOn);
       onSummary?.({ on: nextOn, days, weeklyBudgetCents: budget });
       setDirty(false);
-      setAutoStarted(false);
+      setEditing(false);
       setNote(nextOn ? "Saved. Plans at your place on your days count toward your weekly limit." : "Off. Plans already on the calendar still happen.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save that");
@@ -229,7 +234,11 @@ export default function MerchantCampaign({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="font-fm-serif text-[28px] leading-tight text-stone-900">Your Neighbor Hours</h2>
-          <p className="mt-1 text-[15px] leading-relaxed text-stone-600">Pick your slow days and times and a weekly limit. Neighbors&rsquo; plans at your place in those times count, and we charge your card once a week.</p>
+          <p className="mt-1 text-[15px] leading-relaxed text-stone-600">
+            {on
+              ? `Neighbors' plans at your place in these times count: ${dollars(s.feeCents)} per RSVP, charged once a week.${firstNightFree ? " Your first Neighbor Hour is free." : ""}`
+              : "Off. Pick your slow days and a weekly limit, then switch them on. Plans already on the calendar still happen."}
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-2 pt-1">
           <span className={`text-[14px] font-semibold ${on ? "text-leaf-700" : "text-stone-500"}`}>{on ? "On" : "Off"}</span>
@@ -242,31 +251,53 @@ export default function MerchantCampaign({
         </div>
       </div>
 
-      {/* Plain about what's running and what it charges, and how to stop it. */}
-      {on ? (
-        <div className="mt-5 rounded-2xl bg-leaf-50 p-4 ring-1 ring-leaf-200 sm:p-5">
-          <p className="text-[16px] font-semibold text-leaf-900">
-            {autoStarted ? "Your Neighbor Hours are switched on." : "Your Neighbor Hours are on."}
-          </p>
-          <p className="mt-1 text-[15px] leading-relaxed text-leaf-900">
-            {`Neighbors' plans at your place on ${windowLabel(days)} count toward it: ${dollars(s.feeCents)} per RSVP, charged once a week, up to ${dollars(budget)} a week. RSVPs outside these times are free.`}
-            {autoStarted ? " We turned this on when you held your free Neighbor Hour." : ""}
-          </p>
-          <p className="mt-2 text-[13px] text-leaf-800">Switch it off anytime with the toggle. Plans already on the calendar still happen.</p>
-        </div>
-      ) : (
-        <div className="mt-5 rounded-2xl bg-stone-50 p-4 ring-1 ring-stone-200 sm:p-5">
-          <p className="text-[16px] font-semibold text-stone-900">Your Neighbor Hours are off.</p>
-          <p className="mt-1 text-[15px] leading-relaxed text-stone-600">Pick your days below, then flip the toggle to switch them on. Plans already on the calendar still happen.</p>
-        </div>
-      )}
-
       {!s.hasCard && (
         <a href="#card" className="mt-4 block rounded-xl bg-amber-50 p-3 text-[14px] text-amber-900 ring-1 ring-amber-200">
           Add a card to switch it on. <span className="font-semibold underline">Add your card</span>
         </a>
       )}
 
+      {/* The summary: their days, limit and what it brings, and this week so far. */}
+      {!editing && (
+        <>
+          <dl className="mt-5 grid overflow-hidden rounded-2xl ring-1 ring-stone-200 sm:grid-cols-3">
+            {[
+              { label: "Your days", value: days.length ? shortDays(days) : "Any day, any time" },
+              { label: "Weekly limit", value: dollars(budget) },
+              { label: "Guests a week", value: `~${span(o.guests)}` },
+            ].map((f, i) => (
+              <div key={f.label} className={`px-4 py-3 ${i ? "border-t border-stone-200 sm:border-l sm:border-t-0" : ""}`}>
+                <dd className="font-fm-serif text-[22px] leading-tight text-stone-900">{f.value}</dd>
+                <dt className="mt-0.5 text-[12px] text-stone-500">{f.label}</dt>
+              </div>
+            ))}
+          </dl>
+          {on && (
+            <div className="mt-4">
+              <div className="flex justify-between text-[13px] text-stone-600">
+                <span>This week</span>
+                <span>{`${dollars(s.thisWeek.spentCents)} of ${dollars(budget)}`}</span>
+              </div>
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-stone-100">
+                <div className="h-full rounded-full bg-leaf-600" style={{ width: `${spentPct}%` }} />
+              </div>
+            </div>
+          )}
+          {note && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{note}</p>}
+          {error && <p className="mt-2 text-[14px] text-red-600">{error}</p>}
+          <button
+            type="button"
+            disabled={preview}
+            onClick={() => setEditing(true)}
+            className="mt-5 h-11 rounded-xl bg-leaf-800 px-5 text-[14px] font-semibold text-white disabled:opacity-40"
+          >
+            {on ? "Change days or limit" : "Pick your days"}
+          </button>
+        </>
+      )}
+
+      {editing && (
+        <>
       <div className="mt-6 border-t border-stone-100 pt-6">
         <DaysPicker
           days={days}
@@ -333,16 +364,43 @@ export default function MerchantCampaign({
       {note && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{note}</p>}
       {error && <p className="mt-2 text-[14px] text-red-600">{error}</p>}
 
-      {/* Off: the toggle switches it on with these days. On: changes need saving. */}
-      {on && dirty && (
+      {/* On: changes need saving. Off: switching on saves these days too. */}
+      <div className="mt-4 flex gap-2">
+        {on && dirty ? (
+          <button
+            type="button"
+            disabled={saving || preview}
+            onClick={() => save(true)}
+            className="h-12 flex-1 rounded-xl bg-leaf-800 text-[15px] font-semibold text-white disabled:opacity-40"
+          >
+            {saving ? "Saving\u2026" : "Save changes"}
+          </button>
+        ) : !on ? (
+          <button
+            type="button"
+            disabled={saving || preview || !s.hasCard || !dirty}
+            onClick={() => save(true)}
+            className="h-12 flex-1 rounded-xl bg-leaf-800 text-[15px] font-semibold text-white disabled:opacity-40"
+          >
+            {saving ? "Saving\u2026" : "Switch them on with these days"}
+          </button>
+        ) : null}
         <button
           type="button"
-          disabled={saving || preview}
-          onClick={() => save(true)}
-          className="mt-4 h-12 w-full rounded-xl bg-leaf-800 text-[15px] font-semibold text-white disabled:opacity-40"
+          onClick={() => {
+            setEditing(false);
+            if (dirty && s) {
+              setDays(s.campaign.days);
+              setBudget(s.campaign.weeklyBudgetCents);
+              setDirty(false);
+            }
+          }}
+          className="h-12 rounded-xl border border-stone-300 px-5 text-[15px] font-semibold text-stone-700"
         >
-          {saving ? "Saving…" : "Save changes"}
+          {dirty ? "Cancel" : "Done"}
         </button>
+      </div>
+        </>
       )}
     </section>
   );

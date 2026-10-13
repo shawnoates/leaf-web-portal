@@ -7,7 +7,7 @@
  */
 
 import { type ReactNode, useEffect, useState } from "react";
-import { Brand, BusinessPhoto, CREAM, Shell, dollars, formatPhone } from "./ui";
+import { Brand, CREAM, Shell, dollars, formatPhone, linkedHere } from "./ui";
 import MerchantHello from "./MerchantHello";
 import MerchantReport from "./MerchantReport";
 import MerchantDeals from "./MerchantDeals";
@@ -98,29 +98,29 @@ type Setup = { stage: string; step: number; stages: { key: string; label: string
 /** A green per step, light to dark (leaf-300 to leaf-800); the setup emails use the same. */
 const STEP_GREENS = ["#9dbeb3", "#74a494", "#5a8c7b", "#426c5e", "#253a33"];
 
-/** The setup bar at the top: where their free first Neighbor Hour is, step by step. */
+/** The setup bar, in the header: where their free first Neighbor Hour is, step by step. */
 function SetupProgress({ setup }: { setup: Setup }) {
   const total = setup.stages.length;
   return (
-    <section aria-label="Setting up your first Neighbor Hour" className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-leaf-200 sm:p-6">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">Setting up your first Neighbor Hour</p>
-        <p className="shrink-0 text-[13px] font-semibold text-stone-500">{`Step ${setup.step} of ${total}`}</p>
+    <section aria-label="Setting up your first Neighbor Hour" className="rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10 sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <p className="min-w-0 text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Setting up your first Neighbor Hour</p>
+        <p className="shrink-0 whitespace-nowrap rounded-full bg-white/15 px-2.5 py-0.5 text-[12px] font-semibold text-white">{`Step ${setup.step} of ${total}`}</p>
       </div>
-      <ol className="mt-4 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}>
+      <ol className="mt-3 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}>
         {setup.stages.map((st, i) => {
           const done = i + 1 < setup.step;
           const current = i + 1 === setup.step;
           return (
             <li key={st.key} aria-current={current ? "step" : undefined}>
-              <div className="h-2 rounded-full bg-stone-200" style={done || current ? { backgroundColor: STEP_GREENS[Math.min(i, STEP_GREENS.length - 1)] } : undefined} />
-              <p className={`mt-2 hidden text-[12px] leading-tight sm:block ${current ? "font-semibold text-stone-900" : done ? "text-stone-600" : "text-stone-400"}`}>{st.label}</p>
+              <div className="h-2 rounded-full bg-white/15" style={done || current ? { backgroundColor: STEP_GREENS[Math.min(i, STEP_GREENS.length - 1)] } : undefined} />
+              <p className={`mt-2 hidden text-[11px] leading-tight sm:block ${current ? "font-semibold text-white" : "text-leaf-300"}`}>{st.label}</p>
             </li>
           );
         })}
       </ol>
-      <p className="mt-4 font-fm-serif text-[24px] leading-tight text-stone-900">{setup.stages[setup.step - 1]?.label}</p>
-      <p className="mt-1 text-[15px] leading-relaxed text-stone-600">{setup.detail}</p>
+      <p className="mt-3 text-[17px] font-semibold sm:hidden">{setup.stages[setup.step - 1]?.label}</p>
+      <p className="mt-1 text-[14px] leading-relaxed text-leaf-100 sm:mt-3">{setup.detail}</p>
     </section>
   );
 }
@@ -267,6 +267,11 @@ function Card({ children, id }: { children: ReactNode; id?: string }) {
   );
 }
 
+/** A card, or (bare) a plain section of another card. */
+function CardOrPlain({ bare, id, children }: { bare: boolean; id?: string; children: ReactNode }) {
+  return bare ? <div id={id} className="scroll-mt-6">{children}</div> : <Card id={id}>{children}</Card>;
+}
+
 function H2({ children }: { children: ReactNode }) {
   return <h2 className="font-fm-serif text-[26px] leading-tight text-stone-900">{children}</h2>;
 }
@@ -393,12 +398,12 @@ function NightSteps({ steps }: { steps: Step[] }) {
 }
 
 /** The counter card: print it or have some mailed, right here (it used to be its own page). */
-function CounterCard({ d, token }: { d: Dashboard; token: string }) {
+function CounterCard({ d, token, bare = false }: { d: Dashboard; token: string; bare?: boolean }) {
   const [open, setOpen] = useState(() => linkedHere("counter-card"));
   return (
-    <Card id="counter-card">
-      <H2>Your counter card</H2>
-      <p className="mt-2 text-[15px] leading-relaxed text-stone-600">A card with a QR code for your counter, so neighbors who stop by can find your Neighbor Hours and the calendar.</p>
+    <CardOrPlain bare={bare} id="counter-card">
+      {bare ? <h3 className="text-[17px] font-semibold text-stone-900">Your counter card</h3> : <H2>Your counter card</H2>}
+      <p className={bare ? "mt-0.5 text-[14px] leading-snug text-stone-600" : "mt-2 text-[15px] leading-relaxed text-stone-600"}>A card with a QR code for your counter, so regulars can join the community meetups at your spot.</p>
       {d.placardToken ? (
         <>
           <button
@@ -416,12 +421,11 @@ function CounterCard({ d, token }: { d: Dashboard; token: string }) {
           Print or order cards
         </a>
       )}
-    </Card>
+    </CardOrPlain>
   );
 }
 
 /** Emails link to one night (#night-<id>) or the counter card; open it when they land. */
-const linkedHere = (id: string) => typeof window !== "undefined" && window.location.hash === `#${id}`;
 
 /** Two days out with light RSVPs: run it anyway, or move it to a later week at no cost. */
 function MakeGoodChoice({ n, token }: { n: Night; token: string }) {
@@ -695,6 +699,8 @@ export default function MerchantDashboard({
   const [d, setD] = useState<Dashboard | null>(null);
   const [reload, setReload] = useState(0);
   const [campaign, setCampaign] = useState<CampaignSummary | null>(null);
+  // Your nights: coming up, or past (an email\u2019s #report link opens past).
+  const [tab, setTab] = useState<"upcoming" | "past">(() => (linkedHere("report") ? "past" : "upcoming"));
   const [reqDate, setReqDate] = useState("");
   const [reqPart, setReqPart] = useState<"morning" | "afternoon" | "evening" | null>(null);
   const [booking, setBooking] = useState(false);
@@ -780,42 +786,24 @@ export default function MerchantDashboard({
         <div inert={preview || undefined}>
           <Brand neighborhood={d.neighborhood} />
 
-          {/* Setting up their free first night: always first, so they know where it stands. */}
-          {d.setup && (
-            <div className="mt-5 lg:mt-8">
-              <SetupProgress setup={d.setup} />
-            </div>
-          )}
-
-          {/* Phone: the summary, then their photo. Desktop: side by side. */}
-          <header className={`mt-5 grid gap-5 lg:mt-8 lg:gap-8 ${d.photoUrl ? "lg:grid-cols-[minmax(0,1fr)_380px]" : ""}`}>
-            <div className="rounded-3xl bg-leaf-800 p-6 text-white sm:p-8">
-              <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Your Neighbor Hours</p>
-              <h1 className="mt-2 font-fm-serif text-[36px] leading-[1.02] lg:text-[48px]">{d.merchantName}</h1>
-              <p className="mt-2 text-[15px] leading-relaxed text-leaf-100">
-                {d.calendarUrl ? (
-                  <a href={d.calendarUrl} target="_blank" rel="noreferrer" className="underline decoration-leaf-400 underline-offset-4">
-                    {d.calendarName}
-                  </a>
-                ) : (
-                  d.calendarName
-                )}
-              </p>
-              <div className="mt-6">
-                <NextUp n={d.upcoming[0] || null} perRsvp={perRsvp} campaign={campaign} settingUp={Boolean(d.setup)} />
+          {/* One header: who they are, and where things stand (the setup bar while their
+              free first night is set up, then their next night). No calendar link: merchants
+              shouldn't be sent to a calendar of other places. */}
+          <header className="mt-5 rounded-3xl bg-leaf-800 p-6 text-white sm:p-8 lg:mt-8">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:items-end">
+              <div className="min-w-0">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Your Neighbor Hours</p>
+                <h1 className="mt-2 font-fm-serif text-[36px] leading-[1.02] lg:text-[48px]">{d.merchantName}</h1>
+                {d.calendarName && <p className="mt-2 text-[15px] leading-relaxed text-leaf-100">{d.calendarName}</p>}
               </div>
-              {/* The running totals, once there's something to count (a row of zeros reads as broken). */}
-              {d.totals.nightsRun > 0 && (
-                <div className="mt-6 flex divide-x divide-white/15">
-                  <Stat value={d.totals.nightsRun} label={d.totals.nightsRun === 1 ? "night hosted" : "nights hosted"} />
-                  <Stat value={d.totals.guests} label="neighbors through your door" />
-                  {perRsvp ? <Stat value={dollars(d.totals.chargedCents)} label="charged so far" /> : <Stat value={d.totals.upcoming} label="coming up" />}
-                </div>
-              )}
+              {d.setup ? <SetupProgress setup={d.setup} /> : <NextUp n={d.upcoming[0] || null} perRsvp={perRsvp} campaign={campaign} settingUp={false} />}
             </div>
-            {d.photoUrl && (
-              <div className="[&_figure]:mt-0 lg:[&_img]:h-full lg:[&_img]:min-h-[220px]">
-                <BusinessPhoto url={d.photoUrl} credit={d.photoCredit} name={d.merchantName} />
+            {/* The running totals, once there's something to count (a row of zeros reads as broken). */}
+            {d.totals.nightsRun > 0 && (
+              <div className="mt-6 flex divide-x divide-white/15">
+                <Stat value={d.totals.nightsRun} label={d.totals.nightsRun === 1 ? "night hosted" : "nights hosted"} />
+                <Stat value={d.totals.guests} label="neighbors through your door" />
+                {perRsvp ? <Stat value={dollars(d.totals.chargedCents)} label="charged so far" /> : <Stat value={d.totals.upcoming} label="coming up" />}
               </div>
             )}
           </header>
@@ -832,45 +820,37 @@ export default function MerchantDashboard({
           )}
 
           <div className="mt-6 grid gap-6 lg:mt-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-8">
-            {/* Main column: their nights. */}
+            {/* Main column: their Neighbor Hours, then their nights. */}
             <div className="min-w-0 space-y-6">
-              {/* The billing terms are the fine print under their Neighbor Hours, not a card of their own. */}
               {perRsvp && <MerchantCampaign token={token} preview={preview} firstNightFree={d.freeNight.state === "granted"} onSummary={setCampaign} />}
-              {perRsvp && <MerchantReport token={token} />}
 
-              <Card>
-                <H2>Coming up</H2>
-                <div className="mt-4">
-                  {d.upcoming.length ? (
-                    d.upcoming.map((n) => <UpcomingNight key={n.id} n={n} token={token} />)
-                  ) : (
-                    <p className="text-[15px] text-stone-600">
-                      {d.setup
-                        ? "Your free first Neighbor Hour shows up here once its date is set."
-                        : perRsvp && campaign?.on
-                          ? "Nothing booked yet. Neighbors\u2019 plans at your place on your days show up here as they\u2019re made."
-                          : perRsvp
-                            ? "Nothing on the books right now. Switch your Neighbor Hours on and we\u2019ll line them up."
-                            : "Nothing on the books right now. Request a Neighbor Hour below."}
-                    </p>
-                  )}
+              {/* Your nights: what's coming up (with each night's bar and the host add-on), and past weeks. */}
+              <Card id="nights">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <H2>Your nights</H2>
+                  <div role="tablist" className="flex gap-1 rounded-full bg-stone-100 p-1">
+                    {(["upcoming", "past"] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        role="tab"
+                        aria-selected={tab === t}
+                        onClick={() => setTab(t)}
+                        className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold ${tab === t ? "bg-leaf-800 text-white" : "text-stone-600"}`}
+                      >
+                        {t === "upcoming" ? "Coming up" : "Past"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={onEdit}
-                  className="mt-5 h-12 w-full rounded-xl border border-stone-300 text-[15px] font-semibold text-stone-800"
-                >
-                  Change your details
-                </button>
-                {/* Their hello plays on these nights, so it lives with them. */}
-                <MerchantHello token={token} inline />
-              </Card>
-
+                <div className="mt-4">
+                  {tab === "upcoming" ? (
+                    <>
               {/* The first night's request is the setup bar's job while it shows. */}
               {d.requests && d.requests.some((q) => !(d.setup && q.kind === "first")) && (
-                <Card>
-                  <H2>Waiting on us</H2>
-                  <div className="mt-4 space-y-4">
+                <div className="mb-5 rounded-2xl bg-stone-50 p-4 ring-1 ring-stone-200">
+                  <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-stone-500">Waiting on us</p>
+                  <div className="mt-3 space-y-4">
                     {d.requests.filter((q) => !(d.setup && q.kind === "first")).map((q) => (
                       <div key={q.id} className="flex items-start justify-between gap-4">
                         <p className="text-[15px] text-stone-700">
@@ -889,8 +869,52 @@ export default function MerchantDashboard({
                       </div>
                     ))}
                   </div>
-                </Card>
+                </div>
               )}
+
+                      {d.upcoming.length ? (
+                        d.upcoming.map((n) => <UpcomingNight key={n.id} n={n} token={token} />)
+                      ) : (
+                        <div className="rounded-2xl bg-leaf-50 p-4 ring-1 ring-leaf-100">
+                          <p className="text-[15px] font-semibold text-stone-900">
+                            {d.setup
+                              ? "Your free first Neighbor Hour shows up here once its date is set."
+                              : perRsvp && campaign?.on
+                                ? "Nothing booked yet."
+                                : perRsvp
+                                  ? "Nothing on the books right now."
+                                  : "Nothing on the books right now."}
+                          </p>
+                          <p className="mt-1 text-[14px] leading-snug text-stone-600">
+                            {perRsvp && !campaign?.on && !d.setup
+                              ? "Switch your Neighbor Hours on and neighbors\u2019 plans at your place show up here."
+                              : perRsvp
+                                ? "Each night gets its own progress bar, the RSVPs as they come in, and the option to add a Leaf host."
+                                : "Request a Neighbor Hour below."}
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="space-y-6">
+                      {perRsvp && <MerchantReport token={token} bare />}
+                      {d.past.length > 0 ? (
+                        <div>
+                          <h3 className="text-[17px] font-semibold text-stone-900">Past Neighbor Hours</h3>
+                          <div className="mt-2">
+                            {d.past.map((n) => (
+                              <PastNight key={n.id} n={n} token={token} />
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        !perRsvp && <p className="text-[15px] text-stone-600">Your past Neighbor Hours show up here.</p>
+                      )}
+                      {d.cancelled.length > 0 && <p className="text-[13px] text-stone-500">Called off: {d.cancelled.map((n) => n.dateLabel).join(", ")}</p>}
+                    </div>
+                  )}
+                </div>
+              </Card>
 
               {/* Ticketed places have no usual days (no campaign), so every night is a request.
                   Bars and restaurants book through their Neighbor Hours days instead. */}
@@ -935,28 +959,39 @@ export default function MerchantDashboard({
               </Card>
               )}
 
-              {d.past.length > 0 && (
-                <Card>
-                  <H2>Past Neighbor Hours</H2>
-                  <div className="mt-4">
-                    {d.past.map((n) => (
-                      <PastNight key={n.id} n={n} token={token} />
-                    ))}
-                  </div>
-                </Card>
-              )}
             </div>
 
-            {/* Side column on desktop, the rest of the page on a phone: deals and the account. */}
+            {/* Side column on desktop, the rest of the page on a phone. */}
             <aside className="min-w-0 space-y-6">
-              {/* Ticketed places have no card on file, so deals (charged to a card) are per-RSVP only. */}
-              {perRsvp && <MerchantDeals token={token} preview={preview} />}
+              {/* Ways to bring in more neighbors: their hello, a deal, the counter card. */}
+              <Card id="grow">
+                <H2>Get more neighbors</H2>
+                <div className="mt-4 divide-y divide-stone-100 [&>*]:py-4 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
+                  <MerchantHello token={token} compact />
+                  {/* Ticketed places have no card on file, so deals (charged to a card) are per-RSVP only. */}
+                  {perRsvp && <MerchantDeals token={token} preview={preview} bare />}
+                  {/* Every business with a space gets one, ticketed studios included (front desk or counter). */}
+                  {(d.placardToken || d.placardUrl) && <CounterCard d={d} token={token} bare />}
+                </div>
+              </Card>
               {/* Prepaid balances are gone (2026-10-08); show one only while some is left. */}
               {credit && credit.balanceCents > 0 && <LeafBalance credit={credit} />}
-              {account}
-              {/* Every business with a space gets one, ticketed studios included (front desk or counter). */}
-              {(d.placardToken || d.placardUrl) && <CounterCard d={d} token={token} />}
-              {d.cancelled.length > 0 && <p className="px-1 text-[13px] text-stone-500">Called off: {d.cancelled.map((n) => n.dateLabel).join(", ")}</p>}
+              {/* Settings, folded: card, notifications, their details. */}
+              <Card id="account">
+                <H2>Account</H2>
+                <div className="mt-2 divide-y divide-stone-100">
+                  {account}
+                  <div className="flex items-center justify-between gap-3 py-3.5">
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-semibold text-stone-900">Your details</p>
+                      <p className="text-[13px] text-stone-500">Your night, how many you seat, who to ask for</p>
+                    </div>
+                    <button type="button" onClick={onEdit} className="shrink-0 rounded-lg border border-stone-300 px-3 py-1.5 text-[14px] font-semibold text-stone-700">
+                      Change
+                    </button>
+                  </div>
+                </div>
+              </Card>
               <p className="px-1 pb-6 text-[13px] text-stone-500">
                 Questions? Reply to any email from Leaf, or write{" "}
                 <a href="mailto:partners@joinleaf.com" className="underline">

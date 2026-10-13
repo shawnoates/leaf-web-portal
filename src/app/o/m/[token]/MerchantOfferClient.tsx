@@ -18,7 +18,7 @@
  * and (ticketed) payouts.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import Parse from "@/lib/parse-client";
 import PayoutSetup from "./PayoutSetup";
 import CardSetup, { type Card, type CardSetupHandle } from "./CardSetup";
@@ -165,6 +165,23 @@ function OfferCard({ form }: { form: Form }) {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+/** A dashboard Account row: title and a one-line summary, opening in place (or straight away from an email's #id link). */
+function AccountRow({ id, title, summary, children }: { id: string; title: string; summary: string; children: ReactNode }) {
+  const [open, setOpen] = useState(() => typeof window !== "undefined" && window.location.hash === `#${id}`);
+  return (
+    <div id={id} className="scroll-mt-6 py-3.5">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center justify-between gap-3 text-left">
+        <span className="min-w-0">
+          <span className="block text-[15px] font-semibold text-stone-900">{title}</span>
+          <span className="block truncate text-[13px] text-stone-500">{summary}</span>
+        </span>
+        <span aria-hidden className={`shrink-0 text-[18px] text-stone-400 transition-transform ${open ? "rotate-90" : ""}`}>&rsaquo;</span>
+      </button>
+      {open && <div className="mt-3">{children}</div>}
     </div>
   );
 }
@@ -507,6 +524,46 @@ export default function MerchantOfferClient({ token }: { token: string }) {
     </>
   );
 
+  // The same settings on the dashboard: one-line rows in its Account card that open in place.
+  const brand = card ? `${card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : "Card"}${card.last4 ? ` \u2022\u2022 ${card.last4}` : ""}` : "None yet";
+  const accountRows = (
+    <>
+      {perRsvp && (
+        <AccountRow id="card" title="Card on file" summary={brand}>
+          <CardSetup
+            ref={cardRef}
+            token={token}
+            card={card}
+            onSaved={setCard}
+            feeCents={form.billing?.rsvpFeeCents ?? 600}
+            firstNightFree={Boolean(form.billing?.firstNightFree)}
+            hostFeeCents={form.leafHostFeeCents ?? 0}
+          />
+          {card === null && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={saveCardOnly}
+              className="mt-3 h-12 w-full rounded-xl bg-leaf-800 text-[15px] font-semibold text-white disabled:opacity-50"
+            >
+              {busy ? "Saving\u2026" : "Save card"}
+            </button>
+          )}
+        </AccountRow>
+      )}
+      {notices && (
+        <AccountRow id="notifications" title="Notifications" summary="What we email and text you">
+          <NoticePrefs token={token} value={notices} onChange={setNotices} standalone />
+        </AccountRow>
+      )}
+      {!perRsvp && Number(price) > 0 && (
+        <AccountRow id="payouts" title="Payouts" summary="Where your ticket money goes">
+          <PayoutSetup token={token} />
+        </AccountRow>
+      )}
+    </>
+  );
+
   if (done) {
     return (
       <Shell>
@@ -548,7 +605,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
 
   if (form.state === "accepted" && view === "dashboard") {
     return (
-      <MerchantDashboard token={token} onEdit={showForm} onUnavailable={dashboardUnavailable} account={accountSections} welcome={welcome} preview={preview} />
+      <MerchantDashboard token={token} onEdit={showForm} onUnavailable={dashboardUnavailable} account={accountRows} welcome={welcome} preview={preview} />
     );
   }
 
@@ -599,12 +656,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             <p className="mt-4 text-[16px] leading-relaxed text-stone-600">
               {perRsvp
                 ? `We bring ${form.headcount} neighbors from ${theCalendar(form.calendarName)} calendar to you, on your slowest day.`
-                : `A taster for ${form.headcount} neighbors on ${theCalendar(form.calendarName)} calendar, on a day that suits you. Leaf keeps 10% of tickets.`}{" "}
-              {form.calendarUrl && (
-                <a href={form.calendarUrl} target="_blank" rel="noreferrer" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
-                  See the calendar
-                </a>
-              )}
+                : `A taster for ${form.headcount} neighbors on ${theCalendar(form.calendarName)} calendar, on a day that suits you. Leaf keeps 10% of tickets.`}
             </p>
           </header>
         </>

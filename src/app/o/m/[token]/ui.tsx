@@ -143,3 +143,6 @@ export function formatPhone(v: string) {
   if (d.length < 7) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
   return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
 }
+
+/** True when the page was opened at #id (an email's link to one section). */
+export const linkedHere = (id: string) => typeof window !== "undefined" && window.location.hash === `#${id}`;

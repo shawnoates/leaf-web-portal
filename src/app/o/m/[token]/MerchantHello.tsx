@@ -8,18 +8,23 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { linkedHere } from "./ui";
 import HostIntroVideoCard, { type IntroVideoInfo } from "@/components/HostIntroVideoCard";
 import { merchantRun } from "@/lib/merchant-session";
 
 export default function MerchantHello({
   token,
   inline = false,
+  compact = false,
 }: {
   token: string;
   /** Inside the Coming up card: a section under the nights, not a card of its own. */
   inline?: boolean;
+  /** A row in the Get more neighbors card: one line, and the recorder opens on tap. */
+  compact?: boolean;
 }) {
   const [video, setVideo] = useState<IntroVideoInfo | null>(null);
+  const [open, setOpen] = useState(() => linkedHere("hello"));
 
   const fetchVideo = useCallback(
     (): Promise<IntroVideoInfo | null> =>
@@ -45,6 +50,34 @@ export default function MerchantHello({
       <HostIntroVideoCard source={{ kind: "merchant", token }} video={video} timeZone={null} planStarted={false} onChanged={load} scriptCollapsed />
     </div>
   );
+  if (compact) {
+    const has = video.status === "ready" || video.status === "processing";
+    return (
+      <div id="hello" className="scroll-mt-6">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-[17px] font-semibold text-stone-900">{has ? "Your 30-second hello" : "Add a 30-second hello"}</h3>
+            <p className="mt-0.5 text-[14px] leading-snug text-stone-600">
+              {has
+                ? video.status === "processing"
+                  ? "Processing. It plays on each Neighbor Hour plan we make."
+                  : "It plays on each Neighbor Hour plan we make."
+                : "We attach it to each Neighbor Hour plan. People RSVP to a face."}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            className={`h-10 shrink-0 rounded-xl px-4 text-[14px] font-semibold ${open ? "border border-stone-300 text-stone-700" : "bg-leaf-800 text-white"}`}
+          >
+            {open ? "Close" : has ? "See it" : "Record it"}
+          </button>
+        </div>
+        {open && body}
+      </div>
+    );
+  }
   if (inline) {
     return (
       <div id="hello" className="mt-5 scroll-mt-6 border-t border-stone-200 pt-5">
