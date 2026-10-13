@@ -13,7 +13,7 @@ import { merchantRun } from "@/lib/merchant-session";
 
 /** The middle half of past nights, and the median ("usually") when the server sends it. */
 type Range = { low: number; high: number; mid?: number };
-type Day = { weekday: number; partOfDay: "morning" | "afternoon" | "evening" | "any" };
+export type Day = { weekday: number; partOfDay: "morning" | "afternoon" | "evening" | "any" };
 type CampaignState = {
   campaign: { on: boolean; days: Day[]; weeklyBudgetCents: number; autoStarted?: boolean };
   feeCents: number;
@@ -42,7 +42,7 @@ const PARTS: Day["partOfDay"][] = ["morning", "afternoon", "evening", "any"];
 const PART_LABEL: Record<Day["partOfDay"], string> = { morning: "Morning", afternoon: "Afternoon", evening: "Evening", any: "Any time" };
 
 /** "Wednesday evenings and Thursdays (all day)"; no days means every day. */
-const windowLabel = (days: Day[]) =>
+export const windowLabel = (days: Day[]) =>
   days.length
     ? days.map((d) => (d.partOfDay === "any" ? `${WEEKDAY_NAMES[d.weekday]}s (all day)` : `${WEEKDAY_NAMES[d.weekday]} ${d.partOfDay}s`)).join(" and ")
     : "any day, any time";
@@ -84,7 +84,21 @@ const SPEND_FROM: Record<"category" | "everywhere" | "splits_category" | "splits
 };
 
 
-export default function MerchantCampaign({ token, preview, firstNightFree }: { token: string; preview?: boolean; firstNightFree?: boolean }) {
+/** What the dashboard's Next up card shows for a bar with nothing booked. */
+export type CampaignSummary = { on: boolean; days: Day[]; weeklyBudgetCents: number };
+
+export default function MerchantCampaign({
+  token,
+  preview,
+  firstNightFree,
+  onSummary,
+}: {
+  token: string;
+  preview?: boolean;
+  firstNightFree?: boolean;
+  /** Called once loaded and after each save. */
+  onSummary?: (c: CampaignSummary) => void;
+}) {
   const [s, setS] = useState<CampaignState | null>(null);
   const [on, setOn] = useState(false);
   const [days, setDays] = useState<Day[]>([]);
@@ -104,8 +118,10 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
         setDays(c.campaign.days);
         setBudget(c.campaign.weeklyBudgetCents);
         setAutoStarted(Boolean(c.campaign.autoStarted));
+        onSummary?.({ on: c.campaign.on, days: c.campaign.days, weeklyBudgetCents: c.campaign.weeklyBudgetCents });
       })
       .catch(() => setS(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const o = useMemo(() => (s ? outlook(s, budget) : null), [s, budget]);
@@ -127,6 +143,7 @@ export default function MerchantCampaign({ token, preview, firstNightFree }: { t
     try {
       await merchantRun("merchantSaveCampaign", { token, on: nextOn, days, weeklyBudgetCents: budget });
       setOn(nextOn);
+      onSummary?.({ on: nextOn, days, weeklyBudgetCents: budget });
       setDirty(false);
       setAutoStarted(false);
       setNote(nextOn ? "Saved. Plans at your place on your days count toward your weekly limit." : "Off. Plans already on the calendar still happen.");

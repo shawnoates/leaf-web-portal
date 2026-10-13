@@ -11,7 +11,7 @@ import { Brand, BusinessPhoto, CREAM, Shell, dollars, formatPhone } from "./ui";
 import MerchantHello from "./MerchantHello";
 import MerchantReport from "./MerchantReport";
 import MerchantDeals from "./MerchantDeals";
-import MerchantCampaign from "./MerchantCampaign";
+import MerchantCampaign, { type CampaignSummary, windowLabel } from "./MerchantCampaign";
 import { merchantAuth, merchantRun } from "@/lib/merchant-session";
 import Parse from "@/lib/parse-client";
 import ResultsClient from "@/app/o/r/[token]/ResultsClient";
@@ -147,21 +147,36 @@ function Stat({ value, label }: { value: string | number; label: string }) {
 
 /**
  * The top of the summary: what's next. Their next night with its status and
- * RSVPs filling toward capacity, or, with nothing booked, how to get one.
+ * RSVPs filling toward capacity, or, with nothing booked, how to get one:
+ * bars and restaurants get theirs from their Neighbor Hours days, ticketed
+ * places request a night.
  */
-function NextUp({ n, perRsvp }: { n: Night | null; perRsvp: boolean }) {
+function NextUp({ n, perRsvp, campaign }: { n: Night | null; perRsvp: boolean; campaign: CampaignSummary | null }) {
   if (!n) {
+    const empty = !perRsvp
+      ? { title: "Nothing booked yet", body: "Request a night and we\u2019ll put it in front of the neighborhood.", cta: "Request a night", href: "#book" }
+      : campaign?.on
+        ? {
+            title: "Your Neighbor Hours are on",
+            body: `Neighbors\u2019 plans at your place on ${windowLabel(campaign.days)} count, up to ${dollars(campaign.weeklyBudgetCents)} a week. They show up here as they\u2019re made.`,
+            cta: "Change your Neighbor Hours",
+            href: "#campaign",
+          }
+        : campaign
+          ? {
+              title: "Your Neighbor Hours are off",
+              body: "Switch them on and neighbors\u2019 plans at your place on your slow days count, up to a weekly limit you set.",
+              cta: "Switch them on",
+              href: "#campaign",
+            }
+          : { title: "Nothing booked yet", body: "Neighbors\u2019 plans at your place show up here as they\u2019re made.", cta: "See your Neighbor Hours", href: "#campaign" };
     return (
       <div className="rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10">
         <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Next up</p>
-        <p className="mt-1.5 text-[17px] font-semibold">Nothing booked yet</p>
-        <p className="mt-1 text-[14px] leading-relaxed text-leaf-100">
-          {perRsvp
-            ? "Neighbors\u2019 plans at your place show up here as they\u2019re made. Want a set night? Request one."
-            : "Request a night and we\u2019ll put it in front of the neighborhood."}
-        </p>
-        <a href="#book" className="mt-3 inline-flex h-10 items-center rounded-xl bg-white px-4 text-[14px] font-semibold text-leaf-900">
-          Request a night
+        <p className="mt-1.5 text-[17px] font-semibold">{empty.title}</p>
+        <p className="mt-1 text-[14px] leading-relaxed text-leaf-100">{empty.body}</p>
+        <a href={empty.href} className="mt-3 inline-flex h-10 items-center rounded-xl bg-white px-4 text-[14px] font-semibold text-leaf-900">
+          {empty.cta}
         </a>
       </div>
     );
@@ -558,6 +573,7 @@ export default function MerchantDashboard({
 }) {
   const [d, setD] = useState<Dashboard | null>(null);
   const [reload, setReload] = useState(0);
+  const [campaign, setCampaign] = useState<CampaignSummary | null>(null);
   const [reqDate, setReqDate] = useState("");
   const [reqPart, setReqPart] = useState<"morning" | "afternoon" | "evening" | null>(null);
   const [booking, setBooking] = useState(false);
@@ -658,7 +674,7 @@ export default function MerchantDashboard({
                 )}
               </p>
               <div className="mt-6">
-                <NextUp n={d.upcoming[0] || null} perRsvp={perRsvp} />
+                <NextUp n={d.upcoming[0] || null} perRsvp={perRsvp} campaign={campaign} />
               </div>
               {/* The running totals, once there's something to count (a row of zeros reads as broken). */}
               {d.totals.nightsRun > 0 && (
@@ -691,7 +707,7 @@ export default function MerchantDashboard({
             {/* Main column: their nights. */}
             <div className="min-w-0 space-y-6">
               {/* The billing terms are the fine print under their Neighbor Hours, not a card of their own. */}
-              {perRsvp && <MerchantCampaign token={token} preview={preview} firstNightFree={d.freeNight.state === "granted"} />}
+              {perRsvp && <MerchantCampaign token={token} preview={preview} firstNightFree={d.freeNight.state === "granted"} onSummary={setCampaign} />}
               {perRsvp && <MerchantReport token={token} />}
 
               <Card>
