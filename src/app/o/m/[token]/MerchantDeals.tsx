@@ -33,6 +33,17 @@ function day(iso: string | null) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+/** The status pill on each deal. */
+const PILL_LABEL: Record<string, string> = { in_review: "In review", live: "Live", ending: "Ending", payment_failed: "Paused", rejected: "Not approved", ended: "Ended" };
+const PILL: Record<string, string> = {
+  in_review: "bg-stone-200 text-stone-700",
+  live: "bg-leaf-100 text-leaf-800",
+  ending: "bg-stone-200 text-stone-700",
+  payment_failed: "bg-amber-100 text-amber-900",
+  rejected: "bg-red-100 text-red-800",
+  ended: "bg-stone-200 text-stone-600",
+};
+
 function phaseLine(d: Deal): { label: string; tone: string } {
   switch (d.phase) {
     case "in_review":
@@ -114,14 +125,18 @@ export default function MerchantDeals({ token, preview, bare = false }: { token:
       {note && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{note}</p>}
 
       {shown.length > 0 && (
-        <ul className="mt-3 divide-y divide-stone-100">
+        <ul className="mt-3 space-y-2">
           {shown.map((d) => {
             const line = phaseLine(d);
             return (
-              <li key={d.id} className="py-3">
-                <p className="text-[16px] font-semibold text-stone-900">{d.title}</p>
-                {d.description && <p className="text-[14px] text-stone-600">{d.description}</p>}
-                <p className={`mt-1 text-[13px] ${line.tone}`}>{line.label}</p>
+              // Each deal is its own item: a box with the deal, its status, and what they can do.
+              <li key={d.id} className="rounded-2xl bg-stone-50 p-4 ring-1 ring-stone-200">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="min-w-0 text-[16px] font-semibold leading-snug text-stone-900">{d.title}</p>
+                  <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${PILL[d.phase] || PILL.ended}`}>{PILL_LABEL[d.phase] || "Ended"}</span>
+                </div>
+                {d.description && <p className="mt-0.5 text-[14px] text-stone-600">{d.description}</p>}
+                <p className={`mt-2 text-[13px] ${line.tone}`}>{line.label}</p>
                 {d.phase === "live" && d.interestCount > 0 && (
                   <p className="text-[13px] text-stone-500">{`${d.interestCount} neighbor${d.interestCount === 1 ? "" : "s"} tapped "I'm interested"`}</p>
                 )}

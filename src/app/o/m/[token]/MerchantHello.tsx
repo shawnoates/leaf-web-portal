@@ -54,8 +54,19 @@ export default function MerchantHello({
     const has = video.status === "ready" || video.status === "processing";
     return (
       <div id="hello" className="scroll-mt-6">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+        <div className="flex items-start gap-3">
+          {/* Their take's poster once they have one; until then the animated example (a still for reduced motion). */}
+          {has && video.posterUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={video.posterUrl} alt="" className="h-24 w-[4.5rem] shrink-0 rounded-xl object-cover" />
+          ) : (
+            <picture className="shrink-0">
+              <source media="(prefers-reduced-motion: reduce)" srcSet="/host-intro-hero.jpg" />
+              <source type="image/webp" srcSet="/host-intro-hero.webp" />
+              <img src="/host-intro-hero.jpg" alt="" width={400} height={500} loading="lazy" decoding="async" className="h-24 w-[4.5rem] rounded-xl object-cover" />
+            </picture>
+          )}
+          <div className="min-w-0 flex-1">
             <h3 className="text-[17px] font-semibold text-stone-900">{has ? "Your 30-second hello" : "Add a 30-second hello"}</h3>
             <p className="mt-0.5 text-[14px] leading-snug text-stone-600">
               {has
@@ -64,15 +75,15 @@ export default function MerchantHello({
                   : "It plays on each Neighbor Hour plan we make."
                 : "We attach it to each Neighbor Hour plan. People RSVP to a face."}
             </p>
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              className={`mt-2 h-10 rounded-xl px-4 text-[14px] font-semibold ${open ? "border border-stone-300 text-stone-700" : "bg-leaf-800 text-white"}`}
+            >
+              {open ? "Close" : has ? "See it" : "Record it"}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            className={`h-10 shrink-0 rounded-xl px-4 text-[14px] font-semibold ${open ? "border border-stone-300 text-stone-700" : "bg-leaf-800 text-white"}`}
-          >
-            {open ? "Close" : has ? "See it" : "Record it"}
-          </button>
         </div>
         {open && body}
       </div>
