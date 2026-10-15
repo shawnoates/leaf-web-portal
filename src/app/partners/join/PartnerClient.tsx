@@ -56,9 +56,13 @@ export default function PartnerClient() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<Outcome | null>(null);
   const [leadToken, setLeadToken] = useState<string | null>(null);
+  // ?for=shop or ?for=studio: the words match what the rep offered (bars by default).
+  const [kind, setKind] = useState<"bar" | "shop" | "studio">("bar");
 
   // From a rep's email: fill in what the rep already took down.
   useEffect(() => {
+    const f = new URLSearchParams(window.location.search).get("for");
+    if (f === "shop" || f === "studio") setKind(f);
     const token = new URLSearchParams(window.location.search).get("lead");
     if (!token) return;
     setLeadToken(token);
@@ -183,11 +187,21 @@ export default function PartnerClient() {
       <header className="mt-8 px-1">
         <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">For local businesses</p>
         <h1 className="mt-2 font-fm-serif text-[40px] leading-[1.02] tracking-[-0.01em] text-stone-900">
-          Fill a slow hour with <em className="text-leaf-700">your neighbors</em>.
+          {kind === "shop" ? (
+            <>An evening for <em className="text-leaf-700">your neighbors</em>.</>
+          ) : kind === "studio" ? (
+            <>A taster class for <em className="text-leaf-700">your neighbors</em>.</>
+          ) : (
+            <>Fill a slow hour with <em className="text-leaf-700">your neighbors</em>.</>
+          )}
         </h1>
         <p className="mt-4 text-[16px] leading-relaxed text-stone-600">
-          Leaf runs a calendar for each neighborhood. We bring 8 to 15 neighbors to you on a quiet evening. Your first Neighbor Hour is free: no
-          listing fee and no RSVP fees. {leadToken ? "Add a card to claim it." : "Tell us about your place and book a quick call, and we\u2019ll set it up with you."}{" "}After that it&rsquo;s $6 per RSVP, charged after it happens.
+          {kind === "shop"
+            ? "Leaf runs a calendar for each neighborhood. We bring 10 to 15 neighbors to your shop on a quiet evening. They buy a $20 ticket that\u2019s $20 to spend with you; on your first one, you keep all of it. After that, Leaf keeps $6 of each ticket. No setup fee, no card."
+            : kind === "studio"
+              ? "Leaf runs a calendar for each neighborhood. We bring 10 to 15 neighbors to a taster of what you teach. They buy tickets at a price you set; on your first one, you keep all of it. After that, Leaf keeps $6 a ticket. No setup fee, no card."
+              : <>Leaf runs a calendar for each neighborhood. We bring 8 to 15 neighbors to you on a quiet evening. Your first Neighbor Hour is free: no
+          listing fee and no RSVP fees. {leadToken ? "Add a card to claim it." : "Tell us about your place and book a quick call, and we\u2019ll set it up with you."}{" "}After that it&rsquo;s $6 per RSVP, charged after it happens.</>}
         </p>
       </header>
 
@@ -284,8 +298,8 @@ export default function PartnerClient() {
           </button>
           <p className="mt-2 text-center text-[12px] text-stone-500">{leadToken ? "Next you\u2019ll pick your days." : "Next you\u2019ll book a quick call."} Nothing is charged today.</p>
           <p className="mt-1 text-center text-[13px] text-stone-500">
-            <a href="/partners" className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
-              How Neighbor Hours work
+            <a href={kind === "bar" ? "/partners" : `/partners?for=${kind}`} className="font-semibold text-leaf-700 underline decoration-leaf-300 underline-offset-4">
+              {kind === "shop" ? "How Neighbor Nights work" : kind === "studio" ? "How tasters work" : "How Neighbor Hours work"}
             </a>
           </p>
           <p className="mt-3 text-center text-[13px] text-stone-500">

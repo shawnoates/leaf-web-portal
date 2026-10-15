@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { CTA } from "./ui";
 import { JOIN_URL, LOGIN_URL } from "./config";
 import { signedInPartner } from "@/lib/merchant-session";
+import { COPY, type Kind } from "./copy";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type WindowWithDataLayer = Window & { dataLayer?: any[] };
 
-export default function Header() {
+export default function Header({ kind = "bar" }: { kind?: Kind }) {
   // A device that's signed in goes straight to its dashboard (set after load, like ?lead= below).
   const signIn = useRef<HTMLAnchorElement>(null);
   useEffect(() => {
@@ -48,14 +49,25 @@ export default function Header() {
   }, []);
 
   // A rep's walk-in email links here with ?lead=: carry it onto every
-  // "Claim your free Neighbor Hour" button so the sign-up still credits the rep.
+  // sign-up button (so the sign-up still credits the rep) and onto the
+  // bars / shops / studios tabs. The sign-up gets ?for= too, so its words match.
   useEffect(() => {
     const lead = new URLSearchParams(window.location.search).get("lead");
-    if (!lead) return;
-    document.querySelectorAll<HTMLAnchorElement>(`a[href="${JOIN_URL}"]`).forEach((a) => {
-      a.href = `${JOIN_URL}?lead=${encodeURIComponent(lead)}`;
-    });
-  }, []);
+    const q = new URLSearchParams();
+    if (lead) q.set("lead", lead);
+    if (kind !== "bar") q.set("for", kind);
+    if (q.toString()) {
+      document.querySelectorAll<HTMLAnchorElement>(`a[href="${JOIN_URL}"]`).forEach((a) => {
+        a.href = `${JOIN_URL}?${q.toString()}`;
+      });
+    }
+    if (lead) {
+      document.querySelectorAll<HTMLAnchorElement>("a[data-kind-tab]").forEach((a) => {
+        const k = a.getAttribute("data-kind-tab");
+        a.href = `/partners?${k && k !== "bar" ? `for=${k}&` : ""}lead=${encodeURIComponent(lead)}`;
+      });
+    }
+  }, [kind]);
 
   return (
     <header className="header" data-scrolled={scrolled}>
@@ -82,7 +94,7 @@ export default function Header() {
             Partner sign in
           </a>
           <CTA to="join" variant="primary" small>
-            Claim your free Neighbor Hour
+            {COPY[kind].cta}
           </CTA>
         </nav>
       </div>

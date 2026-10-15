@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { JOIN_URL, LOGIN_URL, MANAGER_URL } from "./config";
+import { COPY, type Kind } from "./copy";
 
 export function LeafMark({
   size = 18,
@@ -95,12 +96,29 @@ export function CTA({
   );
 }
 
-export function TrustStrip({ center = false }: { center?: boolean }) {
+export function TrustStrip({ center = false, kind = "bar" }: { center?: boolean; kind?: Kind }) {
   return (
     <div className={`trust${center ? " trust--center" : ""}`}>
-      <span>First Neighbor Hour free</span>
-      <span>$6 per RSVP after</span>
-      <span>No contract</span>
+      {COPY[kind].trust.map((t) => (
+        <span key={t}>{t}</span>
+      ))}
     </div>
+  );
+}
+
+/**
+ * Bars, shops or studios: the same page in three versions (?for=). Header
+ * carries a rep's ?lead= onto these links, as it does for the sign-up.
+ */
+export function KindTabs({ kind }: { kind: Kind }) {
+  const kinds: Kind[] = ["bar", "shop", "studio"];
+  return (
+    <nav className="kind-tabs" aria-label="Which kind of business">
+      {kinds.map((k) => (
+        <a key={k} data-kind-tab={k} href={k === "bar" ? "/partners" : `/partners?for=${k}`} aria-current={k === kind ? "page" : undefined} className={k === kind ? "kind-tabs__on" : undefined}>
+          {COPY[k].tab}
+        </a>
+      ))}
+    </nav>
   );
 }

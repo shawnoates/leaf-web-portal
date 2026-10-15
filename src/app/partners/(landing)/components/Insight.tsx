@@ -1,5 +1,6 @@
 import { CTA, Eyebrow, Plaque } from "./ui";
 import Reveal from "./Reveal";
+import { COPY, type Kind } from "./copy";
 
 /**
  * Proportional ring used in the "small slice → big slice" comparison
@@ -60,7 +61,7 @@ function ShareRing({
   );
 }
 
-export default function Insight() {
+export default function Insight({ kind }: { kind: Kind }) {
   return (
     <section className="section band-forest">
       <div className="container insight">
@@ -86,7 +87,7 @@ export default function Insight() {
 
           <div className="inline-cta">
             <CTA to="join" variant="primary" arrow>
-              Claim your free Neighbor Hour
+              {COPY[kind].cta}
             </CTA>
           </div>
         </Reveal>

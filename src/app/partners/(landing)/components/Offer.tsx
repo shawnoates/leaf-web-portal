@@ -1,68 +1,55 @@
 import { CTA, SectionHead } from "./ui";
 import Reveal from "./Reveal";
+import { COPY, type Kind } from "./copy";
 
 /**
- * "What it costs" — the per-RSVP deal, side by side:
- *
- *   Your first Neighbor Hour  — free: no listing fee, no RSVP fees; a card claims it
- *   After that — $6 per RSVP in the days and times they pick, up to a weekly limit
- *
- * The Leaf host is an optional add-on on any night. Anything custom goes to
- * a partner manager.
+ * "What it costs", side by side: the first one (free, or every ticket dollar
+ * theirs) and every one after ($6 per RSVP for bars; Leaf's $6 a ticket for
+ * shops and studios). The words are in copy.ts. Anything custom goes to a
+ * partner manager.
  */
-export default function Offer() {
+export default function Offer({ kind }: { kind: Kind }) {
+  const c = COPY[kind];
+  const [first, after] = c.offers;
   return (
     <section id="offer" className="section">
       <div className="container">
         <Reveal>
-          <SectionHead
-            center
-            eyebrow="What it costs"
-            title={<>You only pay for neighbors who said they&rsquo;re coming.</>}
-            lead="No contract and no setup fee. Try one, see who walks in, and book more when it works."
-          />
+          <SectionHead center eyebrow="What it costs" title={<>{c.offerTitle}</>} lead={c.offerLead} />
         </Reveal>
 
         <div className="offer-grid">
           <Reveal className="offer offer--dark on-dark">
-            <span className="offer__tag">Free</span>
-            <div className="offer__kind">Your first Neighbor Hour</div>
+            {first.tag && <span className="offer__tag">{first.tag}</span>}
+            <div className="offer__kind">{first.kind}</div>
             <div className="offer__price">
-              <span className="offer__amount">$0</span>
-              <span className="offer__per">on us</span>
+              <span className="offer__amount">{first.amount}</span>
+              <span className="offer__per">{first.per}</span>
             </div>
-            <p className="offer__desc">
-              No listing fee and no RSVP fees. Tell us about your place, book a quick call,
-              and we&rsquo;ll set it up with you.
-            </p>
+            <p className="offer__desc">{first.desc}</p>
             <ul className="offer__list">
-              <li>Pick your slowest day and time</li>
-              <li>We invite the residents around you</li>
-              <li>You just have room for the group</li>
+              {first.list.map((l) => (
+                <li key={l}>{l}</li>
+              ))}
             </ul>
             <div className="offer__cta">
               <CTA to="join" variant="primary" arrow>
-                Claim your free Neighbor Hour
+                {c.cta}
               </CTA>
             </div>
           </Reveal>
 
           <Reveal className="offer" delay={100}>
-            <div className="offer__kind">Every one after</div>
+            <div className="offer__kind">{after.kind}</div>
             <div className="offer__price">
-              <span className="offer__amount">$6</span>
-              <span className="offer__per">per RSVP</span>
+              <span className="offer__amount">{after.amount}</span>
+              <span className="offer__per">{after.per}</span>
             </div>
-            <p className="offer__desc">
-              Pick your slow days and a weekly limit, and switch it on or off anytime, like
-              an ad campaign. $6 for each neighbor who RSVPs in your days and times, counted
-              2 hours before and charged to your card once a week. That rate never goes up.
-            </p>
+            <p className="offer__desc">{after.desc}</p>
             <ul className="offer__list">
-              <li>RSVPs outside your days and times are free</li>
-              <li>Set a weekly limit: your RSVP charges never go over it</li>
-              <li>A one-time $100 setup, added to your first paid week</li>
-              <li>Optional Leaf host, $99, for any Neighbor Hour you&rsquo;d like us to run</li>
+              {after.list.map((l) => (
+                <li key={l}>{l}</li>
+              ))}
             </ul>
           </Reveal>
         </div>

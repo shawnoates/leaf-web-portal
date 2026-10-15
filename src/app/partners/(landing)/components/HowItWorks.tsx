@@ -1,25 +1,9 @@
 import { CTA, Plaque, SectionHead } from "./ui";
 import Reveal from "./Reveal";
+import { COPY, type Kind } from "./copy";
 
-const steps = [
-  {
-    n: "01",
-    h: "Tell us your slowest hours",
-    b: "Pick the days and hours you’d most like to fill, and book a quick call. We’ll set up your free Neighbor Hour.",
-  },
-  {
-    n: "02",
-    h: "We bring the neighbors",
-    b: "Your Neighbor Hour goes on your neighborhood’s Leaf calendar. Residents a short walk away RSVP. A typical one draws 8 to 15.",
-  },
-  {
-    n: "03",
-    h: "They come back",
-    b: "They order their own, meet each other, and find their new spot. Book more when it works.",
-  },
-]
-
-export default function HowItWorks() {
+export default function HowItWorks({ kind }: { kind: Kind }) {
+  const steps = COPY[kind].steps;
   return (
     <section id="how" className="section band-alt">
       <div className="container">
@@ -60,7 +44,7 @@ export default function HowItWorks() {
             <Plaque>Local consumer trust research</Plaque>
             <div className="inline-cta" style={{ marginTop: 28 }}>
               <CTA to="join" variant="primary" arrow>
-                Claim your free Neighbor Hour
+                {COPY[kind].cta}
               </CTA>
             </div>
           </div>

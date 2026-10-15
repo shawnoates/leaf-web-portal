@@ -338,3 +338,8 @@
 .partner-landing .footer__title { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); margin-bottom: 2px; }
 .partner-landing .footer a:hover { opacity: 0.7; }
 .partner-landing .footer__copy { grid-column: 1 / -1; font-size: 12px; padding-top: 8px; }
+
+/* Bars / shops / studios: the same page in three versions (?for=). */
+.pl .kind-tabs { display: inline-flex; gap: 4px; padding: 4px; margin: 18px auto 0; border-radius: 999px; background: rgba(28, 25, 23, 0.06); flex-wrap: wrap; justify-content: center; }
+.pl .kind-tabs a { padding: 7px 14px; border-radius: 999px; font-size: 14px; font-weight: 600; color: #57534e; text-decoration: none; }
+.pl .kind-tabs a.kind-tabs__on { background: #fff; color: #1c1917; box-shadow: 0 1px 2px rgba(28, 25, 23, 0.12); }
