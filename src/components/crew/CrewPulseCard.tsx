@@ -15,8 +15,8 @@ import { pulseRingRows, ringGeometry, trendLine, PULSE_COLORS } from "@/lib/crew
 import { Card, Eyebrow, Mono } from "@/components/crew/CrewShell";
 import { track } from "@/lib/track";
 
-function Rings({ pulse, size }: { pulse: CrewPulse; size: number }) {
-  const rows = pulseRingRows(pulse);
+function Rings({ pulse, size, evening }: { pulse: CrewPulse; size: number; evening: boolean }) {
+  const rows = pulseRingRows(pulse, evening);
   const stroke = size >= 180 ? 18 : 14;
   const geo = ringGeometry(size, stroke, 4, rows.length);
   return (
@@ -43,7 +43,7 @@ function Rings({ pulse, size }: { pulse: CrewPulse; size: number }) {
         ) : (
           <>
             <span className="font-fm-serif text-[36px] leading-none">{pulse.stats.nights}</span>
-            <span className="mt-1 text-[11px] text-fm-muted">{pulse.stats.nights === 1 ? "night so far" : "nights so far"}</span>
+            <span className="mt-1 text-[11px] text-fm-muted">{pulse.stats.nights === 1 ? (evening ? "night so far" : "time so far") : (evening ? "nights so far" : "times so far")}</span>
           </>
         )}
       </div>
@@ -51,13 +51,15 @@ function Rings({ pulse, size }: { pulse: CrewPulse; size: number }) {
   );
 }
 
-export default function CrewPulseCard({ pulse, crewName, shareToken }: { pulse: CrewPulse; crewName: string; shareToken: string | null }) {
+export default function CrewPulseCard({ pulse, crewName, shareToken, evening = true }: { pulse: CrewPulse; crewName: string; shareToken: string | null; evening?: boolean }) {
   const [sharing, setSharing] = useState(false);
-  const rows = pulseRingRows(pulse);
+  const rows = pulseRingRows(pulse, evening);
+  // Daytime crews (coffee, brunch) get together; they don't have nights.
+  const one = evening ? "night" : "get-together";
   const scored = pulse.score != null;
   const trend = trendLine(pulse.trend);
   const stats = [
-    { n: pulse.stats.nights, label: pulse.stats.nights === 1 ? "night together" : "nights together" },
+    { n: pulse.stats.nights, label: evening ? (pulse.stats.nights === 1 ? "night together" : "nights together") : (pulse.stats.nights === 1 ? "time together" : "times together") },
     { n: pulse.stats.places, label: pulse.stats.places === 1 ? "place tried" : "places tried" },
     { n: pulse.stats.streak, label: "in a row" },
     { n: pulse.stats.mostAtOnce, label: "most at once" },
@@ -111,8 +113,8 @@ export default function CrewPulseCard({ pulse, crewName, shareToken }: { pulse: 
       </div>
 
       <div className="flex items-center gap-4 lg:gap-7">
-        <div className="lg:hidden"><Rings pulse={pulse} size={140} /></div>
-        <div className="hidden lg:block"><Rings pulse={pulse} size={200} /></div>
+        <div className="lg:hidden"><Rings pulse={pulse} size={140} evening={evening} /></div>
+        <div className="hidden lg:block"><Rings pulse={pulse} size={200} evening={evening} /></div>
         {scored ? (
           <ul className="m-0 flex min-w-0 flex-1 list-none flex-col gap-3 p-0 lg:gap-4">
             {rows.map((r) => (
@@ -129,8 +131,8 @@ export default function CrewPulseCard({ pulse, crewName, shareToken }: { pulse: 
         ) : (
           <p className="m-0 text-sm leading-relaxed text-fm-ink-2">
             {pulse.stats.nights === 0
-              ? "How well your crew actually hangs out. The rings start filling after your first night out, and the score shows up after the second."
-              : "Your score shows up after the second night. The rings fill as people come, the crew keeps its rhythm, and more of you pitch in."}
+              ? `How well your crew actually hangs out. The rings start filling after your first ${evening ? "night out" : "get-together"}, and the score shows up after the second.`
+              : `Your score shows up after the second ${one}. The rings fill as people come, the crew keeps its rhythm, and more of you pitch in.`}
           </p>
         )}
       </div>

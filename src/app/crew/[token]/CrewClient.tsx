@@ -652,6 +652,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             pulse={data.pulse && data.pulse.score == null ? { ...data.pulse, bandLabel: "Warming up" } : (data.pulse || EMPTY_PULSE)}
             crewName={crew.name}
             shareToken={me.token || null}
+            evening={ev}
           />
 
           {me.needsSeed && !seedDone && (

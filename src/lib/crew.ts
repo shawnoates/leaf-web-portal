@@ -341,6 +341,13 @@ export function eveningAt(v: string | { iso: string } | null | undefined): boole
   return h >= 17 || h < 4;
 }
 
+/** A daytime crew (coffee, brunch) isn't "nights": go by the latest round's time. */
+export function crewIsEvening(page: Pick<CrewPage, "open" | "past">): boolean {
+  const open = page.open ?? [];
+  const past = page.past ?? [];
+  return open[0] ? cycleIsEvening(open[0]) : past[0] ? eveningAt(past[0].startsAt) : true;
+}
+
 export function toDate(v: string | { iso: string } | null | undefined): Date | null {
   if (!v) return null;
   const iso = typeof v === "string" ? v : v.iso;

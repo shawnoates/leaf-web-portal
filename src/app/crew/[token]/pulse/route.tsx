@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 import Parse from "@/lib/parse";
-import type { CrewPage } from "@/lib/crew";
+import { crewIsEvening, type CrewPage } from "@/lib/crew";
 import { pulseRingRows, ringGeometry, trendLine } from "@/lib/crew-pulse";
 import { friendModeFonts } from "@/lib/og-fonts";
 import { SITE_HOST } from "@/lib/site";
@@ -43,14 +43,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
 
   const { fonts, hasSerif, hasSans } = await friendModeFonts();
   const serif = hasSerif ? "Instrument Serif" : "Georgia, serif";
-  const rows = pulseRingRows(pulse);
+  const evening = crewIsEvening(page);
+  const rows = pulseRingRows(pulse, evening);
   const size = 400;
   const stroke = 32;
   const geo = ringGeometry(size, stroke, 9, rows.length);
   const trend = trendLine(pulse.trend);
   const name = page.crew.name.length > 34 ? page.crew.name.slice(0, 33).trimEnd() + "…" : page.crew.name;
   const stats = [
-    { n: pulse.stats.nights, label: "nights together" },
+    { n: pulse.stats.nights, label: evening ? "nights together" : "times together" },
     { n: pulse.stats.places, label: "places tried" },
     { n: pulse.stats.streak, label: "in a row" },
     { n: pulse.stats.mostAtOnce, label: "most at once" },
@@ -137,7 +138,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
         ) : <div style={{ display: "flex" }} />}
 
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "24px", paddingTop: "26px", borderTop: `2px solid ${LINE_DIM}` }}>
-          <div style={{ display: "flex", fontSize: "26px", lineHeight: 1.35, color: INK_2, maxWidth: "600px" }}>Leaf picks the nights around everyone&apos;s calendars. You just show up.</div>
+          <div style={{ display: "flex", fontSize: "26px", lineHeight: 1.35, color: INK_2, maxWidth: "600px" }}>{`Leaf picks the ${evening ? "nights" : "days"} around everyone's calendars. You just show up.`}</div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
             <div style={{ display: "flex", fontFamily: serif, fontSize: "40px" }}>Friend Mode on Leaf</div>
             <div style={{ display: "flex", fontSize: "22px", color: ACCENT }}>{SITE_HOST}</div>

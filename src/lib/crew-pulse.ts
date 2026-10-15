@@ -8,14 +8,14 @@ export type PulseRingKey = keyof typeof PULSE_COLORS;
 export type PulseRingRow = { key: PulseRingKey; label: string; value: number; display: string; sub: string; color: string };
 
 /** The rings that apply to this crew, outermost first, with their plain-English read-outs. */
-export function pulseRingRows(p: CrewPulse): PulseRingRow[] {
+export function pulseRingRows(p: CrewPulse, evening = true): PulseRingRow[] {
   const rows: PulseRingRow[] = [];
   const d = p.ringDetail;
   if (p.rings.showUp != null) {
-    rows.push({ key: "showUp", label: "Show up", value: p.rings.showUp, display: `${Math.round(p.rings.showUp * 100)}%`, sub: "Of the crew, per night", color: PULSE_COLORS.showUp });
+    rows.push({ key: "showUp", label: "Show up", value: p.rings.showUp, display: `${Math.round(p.rings.showUp * 100)}%`, sub: evening ? "Of the crew, per night" : "Of the crew, each time", color: PULSE_COLORS.showUp });
   }
   if (p.rings.keepItGoing != null && d.expectedNights) {
-    rows.push({ key: "keepItGoing", label: "Keep it going", value: p.rings.keepItGoing, display: `${d.nightsInWindow} / ${d.expectedNights}`, sub: "Nights on rhythm", color: PULSE_COLORS.keepItGoing });
+    rows.push({ key: "keepItGoing", label: "Keep it going", value: p.rings.keepItGoing, display: `${d.nightsInWindow} / ${d.expectedNights}`, sub: evening ? "Nights on rhythm" : "Get-togethers on rhythm", color: PULSE_COLORS.keepItGoing });
   }
   if (p.rings.shareLoad != null) {
     rows.push({ key: "shareLoad", label: "Share the load", value: p.rings.shareLoad, display: `${Math.min(d.contributors, d.members)} / ${d.members}`, sub: "Hosted, added a place or voted", color: PULSE_COLORS.shareLoad });
