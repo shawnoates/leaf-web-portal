@@ -68,6 +68,8 @@ type Form = {
     nightNotes?: string;
     /** A shop's Neighbor Night: the ticket is a fixed amount of store credit. */
     storeCredit?: boolean;
+    /** A shop's Neighbor Night: what neighbors get that a normal visit doesn't. */
+    nightExtra?: string;
   };
   dateOptions: DateOption[];
   billing?: {
@@ -299,6 +301,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const [otherWindows, setOtherWindows] = useState("");
   // What they want highlighted (bars and restaurants): Leaf writes their night from it.
   const [nightNotes, setNightNotes] = useState("");
+  const [nightExtra, setNightExtra] = useState("");
   // "Ask for a change" to our suggested night, at sign-up: goes to Leaf with their notes.
   const [ideaAsk, setIdeaAsk] = useState("");
   const [card, setCard] = useState<Card | null>(null);
@@ -376,6 +379,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         setWindows(o.windows);
         setOtherWindows(o.otherWindows);
         setNightNotes(o.nightNotes || "");
+        setNightExtra(o.nightExtra || "");
         setCard(f.billing?.card ?? null);
         if (f.notices) {
           // Texts go to the night's phone unless they've set another.
@@ -427,6 +431,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const missing: string[] = [];
   if (!nightTitle.trim()) missing.push("a name for the night");
   if (!perRsvp && hasSpace === null) missing.push("whether you have room");
+  if (shop && nightExtra.trim().length < 3) missing.push("what neighbors get that night");
   if (form?.state !== "accepted" && !days.length) missing.push("your days");
   if (phoneDigits.length > 0 && phoneDigits.length < 10) missing.push("a full phone number (or leave it blank)");
 
@@ -477,6 +482,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         nightNotes: ideaAsk.trim() && suggested
           ? `${nightNotes.trim()}${nightNotes.trim() ? "\n\n" : ""}What they'd change about our idea ("${suggested.title}"): ${ideaAsk.trim()}`.slice(0, 600)
           : nightNotes,
+        ...(shop ? { nightExtra } : {}),
         weeklyBudgetCents: form?.state === "accepted" || !perRsvp ? undefined : weeklyBudget,
       })) as { state: string; bookedDate?: string | null; benched?: boolean; updated?: boolean; requested?: boolean; session?: string | null };
       // Saying yes signs this device in to the dashboard it's about to land on.
@@ -812,7 +818,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               : [
                   { href: "#days", label: "Your days", done: days.length > 0 },
                   shop
-                    ? { href: "#class", label: "About your night", done: nightNotes.trim().length > 0 }
+                    ? { href: "#class", label: "About your night", done: nightNotes.trim().length > 0 && nightExtra.trim().length >= 3 }
                     : { href: "#class", label: "About your class", done: Number(price) > 0 && hasSpace !== null },
                   { href: "#place", label: "Who welcomes them", done: merchantHosts !== null },
                 ]
@@ -894,6 +900,19 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               placeholder={shop ? "e.g. Our dried flower wall, the local honey we stock, and how we started in my kitchen" : "e.g. A 90-minute intro to the wheel; everyone throws a small bowl and we fire it for pickup"}
             />
           </Field>
+          {shop && (
+            <Field
+              label="What will neighbors get that night that they wouldn\u2019t on a normal visit?"
+              hint="Something to drink, first look at something new, a small demo or gift. It\u2019s why they come; we lead with it."
+            >
+              <input
+                value={nightExtra}
+                onChange={(e) => setNightExtra(e.target.value.slice(0, 200))}
+                className={input}
+                placeholder="e.g. Wine, and first pick of the fall wreaths before they go on sale"
+              />
+            </Field>
+          )}
           {shop ? (
             <div className="grid grid-cols-2 gap-3">
               <div>
