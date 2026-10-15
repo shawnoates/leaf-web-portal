@@ -341,7 +341,7 @@ export function cycleIsEvening(c: Pick<CycleView, "chosenOption" | "options">): 
 }
 
 /** From a start time, in this browser's zone. */
-export function eveningAt(v: string | { iso: string } | null | undefined): boolean {
+export function eveningAt(v: Date | string | { iso: string } | null | undefined): boolean {
   const d = toDate(v);
   if (!d) return true;
   const h = d.getHours();
@@ -352,11 +352,17 @@ export function eveningAt(v: string | { iso: string } | null | undefined): boole
 export function crewIsEvening(page: Pick<CrewPage, "open" | "past"> & { crew?: { usualTime?: string | null } }): boolean {
   const open = page.open ?? [];
   const past = page.past ?? [];
-  return open[0] ? cycleIsEvening(open[0]) : past[0] ? eveningAt(past[0].startsAt) : isEvening(page.crew?.usualTime ?? null);
+  // The first thing that knows a time: a round still picking has no dates yet.
+  const openTime = open[0] ? open[0].chosenOption?.time ?? open[0].options?.[0]?.time ?? null : null;
+  if (openTime) return isEvening(openTime);
+  if (past[0] && toDate(past[0].startsAt)) return eveningAt(past[0].startsAt);
+  return isEvening(page.crew?.usualTime ?? null);
 }
 
-export function toDate(v: string | { iso: string } | null | undefined): Date | null {
+/** A date as the server sends it: Parse.Cloud.run hands back a Date; cached pages and REST give strings or { iso }. */
+export function toDate(v: Date | string | { iso: string } | null | undefined): Date | null {
   if (!v) return null;
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v;
   const iso = typeof v === "string" ? v : v.iso;
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? null : d;
