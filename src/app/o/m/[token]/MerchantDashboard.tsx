@@ -77,6 +77,8 @@ export type Dashboard = {
   placardUrl: string | null;
   placardToken?: string | null;
   upcoming: Night[];
+  /** A shop or studio with nothing coming up: the next night to suggest, about four weeks after the last. */
+  nextSuggestion?: { dateKey: string; partOfDay: "morning" | "afternoon" | "evening"; label: string } | null;
   past: Night[];
   cancelled: Night[];
   totals: {
@@ -792,8 +794,17 @@ export default function MerchantDashboard({
   const [campaign, setCampaign] = useState<CampaignSummary | null>(null);
   // Your nights: coming up, or past (an email\u2019s #report link opens past).
   const [tab, setTab] = useState<"upcoming" | "past">(() => (linkedHere("report") ? "past" : "upcoming"));
-  const [reqDate, setReqDate] = useState("");
-  const [reqPart, setReqPart] = useState<"morning" | "afternoon" | "evening" | null>(null);
+  // An email's "Book your next one" link (?next=YYYY-MM-DD&part=evening#book) fills the request in.
+  type Part = "morning" | "afternoon" | "evening";
+  const fromLink = ((): { date: string; part: Part | null } => {
+    if (typeof window === "undefined") return { date: "", part: null };
+    const q = new URLSearchParams(window.location.search);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(q.get("next") || "") ? (q.get("next") as string) : "";
+    const p = q.get("part");
+    return { date, part: p === "morning" || p === "afternoon" || p === "evening" ? p : null };
+  })();
+  const [reqDate, setReqDate] = useState(fromLink.date);
+  const [reqPart, setReqPart] = useState<"morning" | "afternoon" | "evening" | null>(fromLink.part);
   const [booking, setBooking] = useState(false);
   const [bookNote, setBookNote] = useState<string | null>(null);
   const [bookError, setBookError] = useState<string | null>(null);
@@ -846,7 +857,7 @@ export default function MerchantDashboard({
   // An email's #night-<id> or #counter-card: once the nights are on the page, scroll to it.
   useEffect(() => {
     const id = typeof window !== "undefined" ? window.location.hash.slice(1) : "";
-    if (!d || !(id.startsWith("night-") || id === "counter-card")) return;
+    if (!d || !(id.startsWith("night-") || id === "counter-card" || id === "book")) return;
     const t = setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
     return () => clearTimeout(t);
   }, [d]);
@@ -1015,6 +1026,23 @@ export default function MerchantDashboard({
                 <p className="mt-1 text-[15px] text-stone-600">
                   Pick a date and the part of the day; we&rsquo;ll set the time and confirm.
                 </p>
+                {d.nextSuggestion && reqDate !== d.nextSuggestion.dateKey && (
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-leaf-50 p-3 ring-1 ring-leaf-100">
+                    <p className="text-[14px] text-leaf-900">
+                      <span className="font-semibold">Book your next one:</span> {d.nextSuggestion.label}. About a month after your last, on the same day.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReqDate(d.nextSuggestion!.dateKey);
+                        setReqPart(d.nextSuggestion!.partOfDay);
+                      }}
+                      className="h-10 rounded-xl bg-leaf-800 px-3.5 text-[14px] font-semibold text-white"
+                    >
+                      Use this date
+                    </button>
+                  </div>
+                )}
                 {bookNote && <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] font-semibold text-leaf-800">{bookNote}</p>}
                 <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
                   <input
