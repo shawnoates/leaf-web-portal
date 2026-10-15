@@ -32,6 +32,7 @@ import { forgetPartner, rememberPartner } from "./remember";
 import FreeNightCountdown, { CountdownText, TYPICAL_RSVPS, useCountdown } from "./FreeNightCountdown";
 import { SIGN_IN_EVENT, forgetSession, isSignInError, merchantAuth, merchantRun, saveSession } from "@/lib/merchant-session";
 import SignInGate from "./SignInGate";
+import { MERCHANT_TERMS_URL, MERCHANT_TERMS_VERSION } from "@/lib/merchant-terms";
 
 type DateOption = { dateKey: string; label: string };
 
@@ -84,6 +85,8 @@ type Form = {
   spendEstimate?: { lowCents: number; highCents: number; source: string } | null;
   categoryLabel?: string | null;
   notices?: Notices;
+  /** The Merchant Terms in force, and whether they've agreed to them. */
+  terms?: { version: string; agreed: boolean };
   suggested?: Suggested | null;
 };
 
@@ -115,6 +118,47 @@ function PriceSummary({ weeklyCents, feeCents }: { weeklyCents: number; feeCents
       <div className={row}>
         <span className="font-semibold text-stone-900">Due today</span>
         <span className="font-semibold text-stone-900">$0</span>
+      </div>
+    </div>
+  );
+}
+
+/** A bar along the bottom of the dashboard until they agree to the Merchant Terms in force. */
+function TermsPrompt({ token, name, onAgreed }: { token: string; name: string; onAgreed: () => void }) {
+  const [checked, setChecked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const agree = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await merchantRun("merchantAcceptTerms", { token, version: MERCHANT_TERMS_VERSION });
+      onAgreed();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That didn\u2019t go through. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-200/80 bg-[#f6f2ea]/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
+      <div className="mx-auto max-w-lg">
+        <p className="text-[15px] font-semibold text-stone-900">We&rsquo;ve written down our terms</p>
+        <p className="mt-0.5 text-[14px] leading-snug text-stone-600">How fees, payouts, refunds and cancellations work, in one place. Nothing about your price changes.</p>
+        <label className="mt-2 flex items-start gap-2.5 text-[14px] leading-snug text-stone-700">
+          <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-leaf-700" />
+          <span>
+            I agree to the{" "}
+            <a href={MERCHANT_TERMS_URL} target="_blank" rel="noreferrer" className="font-semibold text-leaf-700 underline">
+              Leaf Merchant Terms
+            </a>{" "}
+            for {name || "my business"}.
+          </span>
+        </label>
+        {error && <p className="mt-1 text-[14px] text-red-600">{error}</p>}
+        <button type="button" onClick={agree} disabled={!checked || busy} className="mt-2 h-12 w-full rounded-xl bg-leaf-800 text-[15px] font-semibold text-white disabled:opacity-50">
+          {busy ? "One moment\u2026" : "Agree"}
+        </button>
       </div>
     </div>
   );
@@ -302,6 +346,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   // What they want highlighted (bars and restaurants): Leaf writes their night from it.
   const [nightNotes, setNightNotes] = useState("");
   const [nightExtra, setNightExtra] = useState("");
+  // The Merchant Terms checkbox, above the sign-up button.
+  const [agreeTerms, setAgreeTerms] = useState(false);
   // "Ask for a change" to our suggested night, at sign-up: goes to Leaf with their notes.
   const [ideaAsk, setIdeaAsk] = useState("");
   const [card, setCard] = useState<Card | null>(null);
@@ -434,6 +480,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   if (shop && nightExtra.trim().length < 3) missing.push("what neighbors get that night");
   if (form?.state !== "accepted" && !days.length) missing.push("your days");
   if (phoneDigits.length > 0 && phoneDigits.length < 10) missing.push("a full phone number (or leave it blank)");
+  const needsTerms = form?.state !== "accepted" && form?.terms?.agreed !== true;
+  if (needsTerms && !agreeTerms) missing.push("your agreement to the Merchant Terms");
 
   const saveCardOnly = async () => {
     setBusy(true);
@@ -483,6 +531,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           ? `${nightNotes.trim()}${nightNotes.trim() ? "\n\n" : ""}What they'd change about our idea ("${suggested.title}"): ${ideaAsk.trim()}`.slice(0, 600)
           : nightNotes,
         ...(shop ? { nightExtra } : {}),
+        ...(needsTerms && agreeTerms ? { agreedTerms: MERCHANT_TERMS_VERSION } : {}),
         weeklyBudgetCents: form?.state === "accepted" || !perRsvp ? undefined : weeklyBudget,
       })) as { state: string; bookedDate?: string | null; benched?: boolean; updated?: boolean; requested?: boolean; session?: string | null };
       // Saying yes signs this device in to the dashboard it's about to land on.
@@ -764,7 +813,13 @@ export default function MerchantOfferClient({ token }: { token: string }) {
 
   if (form.state === "accepted" && view === "dashboard") {
     return (
-      <MerchantDashboard token={token} onEdit={showForm} onUnavailable={dashboardUnavailable} account={accountRows} details={detailsRow} welcome={welcome} preview={preview} />
+      <>
+        <MerchantDashboard token={token} onEdit={showForm} onUnavailable={dashboardUnavailable} account={accountRows} details={detailsRow} welcome={welcome} preview={preview} />
+        {/* Signed up before the Merchant Terms, or they changed since: agree here. */}
+        {form.terms && !form.terms.agreed && !preview && (
+          <TermsPrompt token={token} name={form.merchantName} onAgreed={() => setForm({ ...form, terms: { version: MERCHANT_TERMS_VERSION, agreed: true } })} />
+        )}
+      </>
     );
   }
 
@@ -1161,6 +1216,23 @@ export default function MerchantOfferClient({ token }: { token: string }) {
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-stone-200/80 bg-[#f6f2ea]/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
         <div className="mx-auto max-w-lg">
           {error && <p className="mb-2 text-[14px] leading-snug text-red-600">{error}</p>}
+          {needsTerms && (
+            <label className="mb-2 flex items-start gap-2.5 text-[14px] leading-snug text-stone-700">
+              <input
+                type="checkbox"
+                checked={agreeTerms}
+                onChange={(e) => setAgreeTerms(e.target.checked)}
+                className="mt-0.5 h-5 w-5 shrink-0 accent-leaf-700"
+              />
+              <span>
+                I agree to the{" "}
+                <a href={MERCHANT_TERMS_URL} target="_blank" rel="noreferrer" className="font-semibold text-leaf-700 underline">
+                  Leaf Merchant Terms
+                </a>{" "}
+                for {form.merchantName || "my business"}.
+              </span>
+            </label>
+          )}
           {freeLeft != null && (
             <p className="mb-2 text-center text-[14px] text-stone-600">
               Your free Neighbor Hour is held for <span className="text-[18px]"><CountdownText left={freeLeft} /></span>

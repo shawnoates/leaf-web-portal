@@ -106,7 +106,7 @@ const CardSetup = forwardRef<
           {`By saving your card, you authorize Leaf to charge it ${fee} per RSVP for Neighbor Hours at your place, counted 2 hours before each one starts and never more than you seat${
             hostFeeCents > 0 ? `, plus $${Math.round(hostFeeCents / 100)} for any Neighbor Hour you ask a Leaf host to run` : ""
           }. ${firstNightFree ? `Your first Neighbor Hour's RSVPs are free. ` : ""}After your first Neighbor Hour, we post one a week at your place on one of the days you pick, and neighbors' own plans at your place in those days and times count too. We charge once a week for the week before, until you switch it off on your dashboard. RSVPs outside your days and times are free, and RSVP charges never go over your weekly limit ($90 to start; change it anytime). Your first paid week also carries a one-time $100 setup fee. If you post a deal, it's $20 a month, charged once it's approved. Nothing is charged today. You can remove your card or stop anytime by replying to Shawn. `}
-          <a href="/terms-conditions" target="_blank" className="underline">
+          <a href="/partners/terms" target="_blank" className="underline">
             Terms
           </a>
           {" · "}
