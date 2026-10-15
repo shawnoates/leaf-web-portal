@@ -32,7 +32,7 @@ import PlacePhoto from "@/components/crew/PlacePhoto";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
-  RHYTHM_LABELS, crewHref, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
+  RHYTHM_LABELS, crewHref, crewIsEvening, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
   type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult,
   type CrewAddOn, type CrewSplit, type LastNight,
 } from "@/lib/crew";
@@ -63,8 +63,9 @@ function splitName(name: string): [string, string | undefined] {
 function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; reload: () => Promise<void> }) {
   const embedded = useCrewEmbedded();
   const { crew, me, members, names, open, past, book } = data;
-  // Daytime crews (coffee, brunch) aren't "nights": go by the latest round's time.
-  const ev = open[0] ? cycleIsEvening(open[0]) : past[0] ? eveningAt(past[0].startsAt) : true;
+  // Daytime crews (coffee, brunch) aren't "nights": go by the latest round's
+  // time, else when the crew usually meets (what members said, or its name).
+  const ev = crewIsEvening(data);
   const night = ev ? "night" : "get-together";
   const nights = ev ? "nights" : "get-togethers";
   // Money: the latest night's bill, and each set night's cost. Kept here so a
@@ -127,7 +128,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
     if (!me.inviteLink) return;
     // The link's preview already shows the crew (name, who invited you, how
     // often), so the message stays short: no name, no title field.
-    const text = `Join our crew on Leaf so we can plan ${ev ? "nights out" : "time"} together: ${me.inviteLink}`;
+    const text = `Join our crew on Leaf so we can ${ev ? "plan nights out together" : "get together"}: ${me.inviteLink}`;
     try {
       if (navigator.share) { await navigator.share({ text }); setLinkDone("Shared"); return; }
     } catch { return; }

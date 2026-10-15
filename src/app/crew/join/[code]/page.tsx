@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { SITE_URL } from "@/lib/site";
 import JoinCrewClient from "./JoinCrewClient";
-import { fetchCrewInvite, firstName, paceLabel } from "./fetch-invite";
+import { fetchCrewInvite, firstName, inviteIsEvening, paceLabel } from "./fetch-invite";
 
 type PageProps = { params: Promise<{ code: string }> };
 
@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const invite = await fetchCrewInvite(code);
   const title = invite ? `Join ${invite.name} on Leaf` : "Join a crew · Leaf";
   const description = invite
-    ? `${firstName(invite.ownerName)} invited you. ${paceLabel(invite)}, Leaf finds a night that works for everyone and plans it. Tap to join or say no thanks.`
+    ? `${firstName(invite.ownerName)} invited you. ${paceLabel(invite)}, Leaf finds a ${inviteIsEvening(invite) ? "night" : "time"} that works for everyone and plans it. Tap to join or say no thanks.`
     : "Recurring plans with your crew, on your schedule.";
   return {
     title,

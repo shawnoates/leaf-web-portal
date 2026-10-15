@@ -16,10 +16,10 @@ import { CrewShell, Card, Button } from "@/components/crew/CrewShell";
 import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
 import SeedPlaces from "@/components/crew/SeedPlaces";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
-import { cadenceLabel } from "@/lib/crew";
+import { cadenceLabel, isEvening } from "@/lib/crew";
 
 type Invite = {
-  name: string; ownerName: string; image: string | null; rhythmDays: number; oneTime?: boolean; joined: number; full: boolean;
+  name: string; ownerName: string; image: string | null; rhythmDays: number; oneTime?: boolean; usualTime?: string | null; joined: number; full: boolean;
   mine: { status: string | null; crewId: string } | null;
 };
 
@@ -158,7 +158,7 @@ export default function JoinCrewClient({ code }: { code: string }) {
 
       <Card>
         <p className="text-[15px] text-zinc-700">
-          Recurring plans with your crew, on your schedule. Leaf picks a place, asks everyone which dates work, and locks the night.
+          Recurring plans with your crew, on your schedule. Leaf picks a place, asks everyone which dates work, and locks {isEvening(invite.usualTime ?? null) ? "the night" : "it in"}.
         </p>
 
         {invite.full ? (

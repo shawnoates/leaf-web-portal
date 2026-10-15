@@ -6,6 +6,8 @@ export type CrewInvitePreview = {
   ownerName: string;
   rhythmDays: number;
   oneTime?: boolean;
+  /** When the crew usually meets, if its name says ("09:00" for a morning crew). */
+  usualTime?: string | null;
   joined: number;
   full: boolean;
 };
@@ -27,8 +29,16 @@ export function firstName(full: string): string {
   return (full || "").trim().split(/\s+/)[0] || "A friend";
 }
 
-export function paceLabel(i: Pick<CrewInvitePreview, "rhythmDays" | "oneTime">): string {
-  if (i.oneTime) return "One night out";
+/** A morning or daytime crew isn't "nights" (5pm–4am is; unknown: night, as on the crew page). */
+export function inviteIsEvening(i: Pick<CrewInvitePreview, "usualTime"> | null): boolean {
+  const t = i?.usualTime;
+  if (!t) return true;
+  const h = Number(t.split(":")[0]);
+  return !Number.isFinite(h) || h >= 17 || h < 4;
+}
+
+export function paceLabel(i: Pick<CrewInvitePreview, "rhythmDays" | "oneTime" | "usualTime">): string {
+  if (i.oneTime) return inviteIsEvening(i) ? "One night out" : "One get-together";
   const labels: Record<number, string> = {
     7: "Every week", 14: "Every 2 weeks", 21: "Every 3 weeks", 28: "Every month", 42: "Every 6 weeks", 56: "Every 2 months",
   };

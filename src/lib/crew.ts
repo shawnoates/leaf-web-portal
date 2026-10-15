@@ -138,6 +138,8 @@ export type CrewPage = {
     /** 'friends': started with Start a crew (its calendar is hidden). 'calendar': Friend Mode on a real calendar. */
     origin?: "friends" | "calendar";
     /** 'fixed': venue rotation off, the crew always meets at `fixedPlace`. */
+    /** When the crew meets before a round sets it ("09:00" for a morning crew). */
+    usualTime?: string | null;
     placeMode?: "book" | "fixed";
     fixedPlace?: FixedPlace | null;
     /** Each round Leaf starts goes to the next member to host. */
@@ -346,11 +348,11 @@ export function eveningAt(v: string | { iso: string } | null | undefined): boole
   return h >= 17 || h < 4;
 }
 
-/** A daytime crew (coffee, brunch) isn't "nights": go by the latest round's time. */
-export function crewIsEvening(page: Pick<CrewPage, "open" | "past">): boolean {
+/** A daytime crew (coffee, brunch) isn't "nights": go by the latest round's time, else the crew's usual time. */
+export function crewIsEvening(page: Pick<CrewPage, "open" | "past"> & { crew?: { usualTime?: string | null } }): boolean {
   const open = page.open ?? [];
   const past = page.past ?? [];
-  return open[0] ? cycleIsEvening(open[0]) : past[0] ? eveningAt(past[0].startsAt) : true;
+  return open[0] ? cycleIsEvening(open[0]) : past[0] ? eveningAt(past[0].startsAt) : isEvening(page.crew?.usualTime ?? null);
 }
 
 export function toDate(v: string | { iso: string } | null | undefined): Date | null {

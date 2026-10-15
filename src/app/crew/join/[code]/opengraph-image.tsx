@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { SITE_HOST } from "@/lib/site";
 import { friendModeFonts } from "@/lib/og-fonts";
-import { fetchCrewInvite, firstName, paceLabel } from "./fetch-invite";
+import { fetchCrewInvite, firstName, inviteIsEvening, paceLabel } from "./fetch-invite";
 
 // 1200x630 unfurl card for a crew's invite link (iMessage, WhatsApp, Slack).
 // Friend Mode's dark palette and lime accent, so the preview looks like the
@@ -102,7 +102,7 @@ export default async function Image({ params }: { params: Promise<{ code: string
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", fontSize: "26px", color: MUTED }}>
-            Leaf finds a night that works and plans it.
+            {`Leaf finds a ${inviteIsEvening(invite) ? "night" : "time"} that works and plans it.`}
           </div>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <div
