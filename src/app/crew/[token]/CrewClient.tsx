@@ -27,6 +27,7 @@ import CrewPulseCard from "@/components/crew/CrewPulseCard";
 import { EMPTY_PULSE } from "@/lib/crew-pulse";
 import CrewMoneyCard from "@/components/crew/CrewMoneyCard";
 import CrewAddOnCard from "@/components/crew/CrewAddOnCard";
+import FixedPlacePicker from "@/components/crew/FixedPlacePicker";
 import PlacePhoto from "@/components/crew/PlacePhoto";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
@@ -108,8 +109,6 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   // no book, no seeding and no booking.
   const fixedPlace = crew.placeMode === "fixed" ? crew.fixedPlace || null : null;
   const [placeOn, setPlaceOn] = useState(crew.placeMode === "fixed");
-  const [placeLabel, setPlaceLabel] = useState(crew.fixedPlace?.label || "");
-  const [placeAddress, setPlaceAddress] = useState(crew.fixedPlace?.address || "");
   const openInvite = () => {
     setInviteOpen(true);
     setInviteNote("");
@@ -888,7 +887,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                   <div className="flex items-center gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="text-[15px] font-semibold">Skip venue rotation</div>
-                      <div className="text-[13px] text-fm-muted">Always meet at one place, like a family dinner at home.</div>
+                      <div className="text-[13px] text-fm-muted">Always meet at one place: home, or the same spot every time.</div>
                     </div>
                     <FriendModeSwitch
                       label="Skip venue rotation"
@@ -902,35 +901,13 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     />
                   </div>
                   {placeOn && (
-                    <div className="mt-3 flex flex-col gap-2">
-                      <input
-                        value={placeLabel}
-                        onChange={(e) => setPlaceLabel(e.target.value)}
-                        placeholder="Name it, like Mom's"
-                        maxLength={60}
-                        aria-label="Place name"
-                        className="h-11 w-full rounded-xl border px-3 text-sm"
-                      />
-                      <input
-                        value={placeAddress}
-                        onChange={(e) => setPlaceAddress(e.target.value)}
-                        placeholder="Address (optional)"
-                        maxLength={200}
-                        autoComplete="street-address"
-                        aria-label="Address"
-                        className="h-11 w-full rounded-xl border px-3 text-sm"
-                      />
-                      <p className="m-0 text-xs text-fm-muted">Only people in the crew see the address.</p>
-                      <div>
-                        <Button
-                          small
-                          disabled={busy !== null || !placeLabel.trim()}
-                          onClick={() => act("place", () => run("setCrewPlaceMode", auth, { calendarId: crew.id, mode: "fixed", label: placeLabel.trim(), address: placeAddress.trim() }))}
-                        >
-                          {busy === "place" ? "Saving…" : crew.placeMode === "fixed" ? "Update place" : "Save place"}
-                        </Button>
-                      </div>
-                    </div>
+                    <FixedPlacePicker
+                      auth={auth}
+                      calendarId={crew.id}
+                      current={crew.placeMode === "fixed" ? crew.fixedPlace || null : null}
+                      busy={busy === "place"}
+                      onSave={(params) => act("place", () => run("setCrewPlaceMode", auth, params))}
+                    />
                   )}
                 </div>
               )}

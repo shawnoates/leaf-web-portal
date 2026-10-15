@@ -12,6 +12,18 @@ interface Venue {
   name: string;
   address: string;
   placeId: string;
+  /** "address" when Google matched a street address, not a business or landmark. */
+  kind?: "place" | "address";
+  /** Google's whole line, "123 Main St, Brooklyn, NY, USA". */
+  description?: string;
+}
+
+const ADDRESS_TYPES = ["street_address", "premise", "subpremise", "route", "geocode"];
+
+function predictionKind(p: google.maps.places.AutocompletePrediction): "place" | "address" {
+  const types = p.types || [];
+  if (types.includes("establishment") || types.includes("point_of_interest")) return "place";
+  return types.some((t) => ADDRESS_TYPES.includes(t)) ? "address" : "place";
 }
 
 interface VenueSearchProps {
@@ -168,7 +180,7 @@ export default function VenueSearch({
     const venueName = prediction.structured_formatting.main_text;
     const address = prediction.structured_formatting.secondary_text || "";
     onChange(venueName);
-    onSelect({ name: venueName, address, placeId: prediction.place_id });
+    onSelect({ name: venueName, address, placeId: prediction.place_id, kind: predictionKind(prediction), description: prediction.description });
     setSuggestions([]);
     setShowDropdown(false);
   };

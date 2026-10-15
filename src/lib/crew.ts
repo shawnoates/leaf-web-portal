@@ -27,6 +27,9 @@ export type Venue = {
   custom?: boolean;
 };
 
+/** A crew's one place: a name, maybe a real place or one of the organizer's own (custom: Home). */
+export type FixedPlace = { label: string; address: string | null; locationId?: string | null; custom?: boolean; photo?: string | null };
+
 export type CycleState = "picking" | "polling" | "locked" | "booked" | "done" | "skipped" | "cancelled";
 
 export type CycleView = {
@@ -136,7 +139,7 @@ export type CrewPage = {
     origin?: "friends" | "calendar";
     /** 'fixed': venue rotation off, the crew always meets at `fixedPlace`. */
     placeMode?: "book" | "fixed";
-    fixedPlace?: { label: string; address: string | null } | null;
+    fixedPlace?: FixedPlace | null;
     /** Each round Leaf starts goes to the next member to host. */
     hostRotation?: boolean;
     /** When Leaf starts the next round on its own (recurring crews that are on). */
