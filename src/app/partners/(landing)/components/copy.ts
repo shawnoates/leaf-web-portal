@@ -102,7 +102,7 @@ export const COPY: Record<Kind, PartnerCopy> = {
     floatTitle: "Neighbor Night at your shop",
     floatBadge: "$20 to spend",
     photo: "/shop-night.jpg",
-    photoAlt: "The owner of a small shop showing neighbors a book, glasses of wine in hand",
+    photoAlt: "The owner of a small clothing shop showing neighbors a jacket, glasses of wine in hand",
     trust: ["First Neighbor Night: you keep all of it", "$14 of every $20 after", "No setup fee"],
     steps: [
       { n: "01", h: "Tell us what you’d show them", b: "Three things you’d want every neighbor to know about, something they only get that night, and a quiet evening: after close, a slow hour, or before you open." },
