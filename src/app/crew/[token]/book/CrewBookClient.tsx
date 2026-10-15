@@ -16,6 +16,7 @@ import Link from "next/link";
 import { CalendarDays, Check, ChevronLeft, ChevronUp, Lock, Plus, Search } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
 import PlacePhoto from "@/components/crew/PlacePhoto";
+import ShareFromInstagramHint from "@/components/crew/ShareFromInstagramHint";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import { Button, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Spinner, useInApp } from "@/components/crew/CrewShell";
 import { spotHref, crewHref, run, toDate, type BookSpot, type CrewAuth, type SavedPlace } from "@/lib/crew";
@@ -154,6 +155,12 @@ function BookView({ auth, crewName, canAdd, isOwner }: { auth: CrewAuth; crewNam
       </div>
 
       {error && <p className="mt-4 rounded-2xl bg-[#3A2321] px-4 py-3 text-sm text-fm-danger">{error}</p>}
+
+      {canAdd && (
+        <div className="mt-6 lg:mr-[428px]">
+          <ShareFromInstagramHint crewName={crewName} inApp={inApp} />
+        </div>
+      )}
 
       <div className="mt-8 grid grid-cols-1 gap-10 lg:mt-10 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-12">
         <section className="min-w-0">
