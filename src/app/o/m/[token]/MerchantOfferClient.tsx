@@ -66,6 +66,8 @@ type Form = {
     otherWindows: string;
     /** What they want highlighted; Leaf drafts their night from it. */
     nightNotes?: string;
+    /** A shop's Neighbor Night: the ticket is a fixed amount of store credit. */
+    storeCredit?: boolean;
   };
   dateOptions: DateOption[];
   billing?: {
@@ -117,11 +119,13 @@ function PriceSummary({ weeklyCents, feeCents }: { weeklyCents: number; feeCents
 }
 
 /** A workshop's ticket: what they keep of each one, after Leaf's flat fee (none on their first night). */
-function TicketSplit({ priceCents, feeCents, firstNightFree }: { priceCents: number; feeCents: number; firstNightFree: boolean }) {
+function TicketSplit({ priceCents, feeCents, firstNightFree, shop = false }: { priceCents: number; feeCents: number; firstNightFree: boolean; shop?: boolean }) {
   const fee = Math.min(feeCents, priceCents);
   return (
     <p className="rounded-xl bg-stone-50 p-3 text-[14px] leading-snug text-stone-700 ring-1 ring-stone-200">
-      {`You keep ${dollars(priceCents - fee)} of each ${dollars(priceCents)} ticket; Leaf keeps ${dollars(fee)}.`}
+      {shop
+        ? `Each neighbor\u2019s ${dollars(priceCents)} ticket is ${dollars(priceCents)} to spend in your shop that night. You keep ${dollars(priceCents - fee)} of each; Leaf keeps ${dollars(fee)}.`
+        : `You keep ${dollars(priceCents - fee)} of each ${dollars(priceCents)} ticket; Leaf keeps ${dollars(fee)}.`}
       {firstNightFree && <span className="font-semibold text-leaf-700">{` Your first one, you keep all ${dollars(priceCents)}.`}</span>}
     </p>
   );
@@ -361,7 +365,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         setDescription(own ? o.description : "");
         setPrice(String(o.priceCents / 100));
         setDurationMin(String(o.durationMin || 60));
-        setHasSpace(perRsvp ? true : o.hasSpace);
+        setHasSpace(perRsvp || o.storeCredit ? true : o.hasSpace);
         // Bars seat the group themselves: default to the top of the range.
         const top = Number(String(f.headcount).split(/\D+/).filter(Boolean).pop()) || 15;
         setCapacity(o.capacity ? String(o.capacity) : perRsvp ? String(top) : "");
@@ -406,6 +410,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
 
 
   const perRsvp = form?.billing?.model === "per_rsvp";
+  // A shop's Neighbor Night: a fixed $20 ticket that's $20 to spend, in their own shop.
+  const shop = form?.offer?.storeCredit === true;
   // "$99": what a Leaf host costs, shown on the Hosted night choice.
   const hostFee = form?.leafHostFeeCents ? `$${Math.round(form.leafHostFeeCents / 100)}` : null;
   // The free-night clock rides on the button so it's always in view.
@@ -659,7 +665,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
       id="details"
       title="Your details"
       summary={`${
-        perRsvp ? (capacity ? `Seats ${capacity}` : "Seats not set") : `${price ? `$${price} a ticket` : "No price yet"}${durationMin ? `, ${durationMin} min` : ""}`
+        perRsvp ? (capacity ? `Seats ${capacity}` : "Seats not set") : shop ? `$20 to spend${durationMin ? `, ${durationMin} min` : ""}` : `${price ? `$${price} a ticket` : "No price yet"}${durationMin ? `, ${durationMin} min` : ""}`
       } \u00b7 ${merchantHosts === false ? "Leaf host" : "Your team welcomes"}${contactName ? ` \u00b7 ask for ${contactName}` : ""}`}
     >
       <div className="space-y-3">
@@ -669,9 +675,16 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           </Field>
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Price per person">
-              <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" className={input} />
-            </Field>
+            {shop ? (
+              <div>
+                <span className="mb-1.5 block text-[14px] font-medium text-stone-700">Ticket</span>
+                <p className="flex h-12 items-center rounded-xl bg-stone-50 px-3.5 text-[16px] font-semibold text-stone-900 ring-1 ring-stone-200">$20 to spend</p>
+              </div>
+            ) : (
+              <Field label="Price per person">
+                <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" className={input} />
+              </Field>
+            )}
             <Field label="Minutes">
               <input value={durationMin} onChange={(e) => setDurationMin(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className={input} />
             </Field>
@@ -785,7 +798,9 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           blurb={
             perRsvp
               ? "We bring neighbors from your neighborhood\u2019s Leaf calendar to you, in your slowest hours. Your first Neighbor Hour is on us."
-              : "A short taster of what you teach, for neighbors on your neighborhood\u2019s Leaf calendar. They buy tickets; Leaf keeps $6 a ticket, and nothing on your first one."
+              : shop
+                ? "An evening in your shop for neighbors who\u2019ve walked past and never come in. Each ticket is $20 to spend with you that night; Leaf keeps $6 of each, and nothing on your first one."
+                : "A short taster of what you teach, for neighbors on your neighborhood\u2019s Leaf calendar. They buy tickets; Leaf keeps $6 a ticket, and nothing on your first one."
           }
           steps={
             perRsvp
@@ -796,7 +811,9 @@ export default function MerchantOfferClient({ token }: { token: string }) {
                 ]
               : [
                   { href: "#days", label: "Your days", done: days.length > 0 },
-                  { href: "#class", label: "About your class", done: Number(price) > 0 && hasSpace !== null },
+                  shop
+                    ? { href: "#class", label: "About your night", done: nightNotes.trim().length > 0 }
+                    : { href: "#class", label: "About your class", done: Number(price) > 0 && hasSpace !== null },
                   { href: "#place", label: "Who welcomes them", done: merchantHosts !== null },
                 ]
           }
@@ -857,18 +874,37 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         </Section>
 
         {!perRsvp && (
-        <Section n={2} total={steps} id="class" title="About your class" sub="What the taster is, its price and length, and where. Leaf writes your night from this.">
+        <Section
+          n={2}
+          total={steps}
+          id="class"
+          title={shop ? "About your night" : "About your class"}
+          sub={shop ? "What you\u2019d show neighbors and how long it runs. Leaf writes your night from this." : "What the taster is, its price and length, and where. Leaf writes your night from this."}
+        >
           {!accepted && suggested && <OurIdea idea={suggested} ask={ideaAsk} setAsk={setIdeaAsk} />}
-          <Field label="What should the taster be?" hint="What people make or learn, who it's for, anything to highlight. You'll see the wording before it goes live.">
+          <Field
+            label={shop ? "Three things you\u2019d want every neighbor to know about" : "What should the taster be?"}
+            hint={shop ? "Your favorite things in the shop, its story, something new. You\u2019ll see the wording before it goes live." : "What people make or learn, who it's for, anything to highlight. You'll see the wording before it goes live."}
+          >
             <textarea
               value={nightNotes}
               onChange={(e) => setNightNotes(e.target.value.slice(0, 600))}
               rows={3}
               className={textarea}
-              placeholder="e.g. A 90-minute intro to the wheel; everyone throws a small bowl and we fire it for pickup"
+              placeholder={shop ? "e.g. Our dried flower wall, the local honey we stock, and how we started in my kitchen" : "e.g. A 90-minute intro to the wheel; everyone throws a small bowl and we fire it for pickup"}
             />
           </Field>
-          {perRsvp ? (
+          {shop ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <span className="mb-1.5 block text-[14px] font-medium text-stone-700">Ticket</span>
+                <p className="flex h-12 items-center rounded-xl bg-stone-50 px-3.5 text-[16px] font-semibold text-stone-900 ring-1 ring-stone-200">$20 to spend</p>
+              </div>
+              <Field label="Minutes">
+                <input value={durationMin} onChange={(e) => setDurationMin(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className={input} />
+              </Field>
+            </div>
+          ) : perRsvp ? (
             <Field label="How many can you seat together?" hint="We never bill for more RSVPs than this.">
               <input value={capacity} onChange={(e) => setCapacity(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className={input} />
             </Field>
@@ -895,14 +931,15 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               priceCents={Math.round(Number(price) * 100)}
               feeCents={form.billing?.rsvpFeeCents ?? 600}
               firstNightFree={Boolean(form.billing?.firstNightFree)}
+              shop={shop}
             />
           )}
-          {!perRsvp && Number(price) * 100 > form.priceCeilingCents && (
+          {!perRsvp && !shop && Number(price) * 100 > form.priceCeilingCents && (
             <p className="rounded-xl bg-amber-50 p-3 text-[14px] leading-snug text-amber-900">
               Under {dollars(form.priceCeilingCents)} is where neighbors actually RSVP. Above it, they hesitate.
             </p>
           )}
-          {!perRsvp && (
+          {!perRsvp && !shop && (
             <div>
               <span className="mb-1.5 block text-[14px] font-medium text-stone-700">Do you have room for {form.headcount}?</span>
               <div className="flex gap-2">
@@ -915,7 +952,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               </div>
             </div>
           )}
-          {!perRsvp && hasSpace && (
+          {!perRsvp && !shop && hasSpace && (
             <div className="grid grid-cols-[1fr_6rem] gap-3">
               <Field label="Address">
                 <input value={address} onChange={(e) => setAddress(e.target.value)} autoComplete="street-address" className={input} />
