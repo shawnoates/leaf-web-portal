@@ -71,6 +71,9 @@ type Form = {
     storeCredit?: boolean;
     /** A shop's Neighbor Night: what neighbors get that a normal visit doesn't. */
     nightExtra?: string;
+    /** A shop: four suggestions for nightExtra, and the range its credit can be set in. */
+    extraIdeas?: string[];
+    creditRange?: { minCents: number; maxCents: number; bestLowCents: number; bestHighCents: number };
   };
   dateOptions: DateOption[];
   billing?: {
@@ -478,6 +481,9 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   if (!nightTitle.trim()) missing.push("a name for the night");
   if (!perRsvp && hasSpace === null) missing.push("whether you have room");
   if (shop && nightExtra.trim().length < 3) missing.push("what neighbors get that night");
+  const credit = Math.round(Number(price || 0) * 100);
+  const range = form?.offer?.creditRange;
+  if (shop && range && (credit < range.minCents || credit > range.maxCents)) missing.push(`a ticket between ${dollars(range.minCents)} and ${dollars(range.maxCents)}`);
   if (form?.state !== "accepted" && !days.length) missing.push("your days");
   if (phoneDigits.length > 0 && phoneDigits.length < 10) missing.push("a full phone number (or leave it blank)");
   const needsTerms = form?.state !== "accepted" && form?.terms?.agreed !== true;
@@ -720,7 +726,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
       id="details"
       title="Your details"
       summary={`${
-        perRsvp ? (capacity ? `Seats ${capacity}` : "Seats not set") : shop ? `$20 to spend${durationMin ? `, ${durationMin} min` : ""}` : `${price ? `$${price} a ticket` : "No price yet"}${durationMin ? `, ${durationMin} min` : ""}`
+        perRsvp ? (capacity ? `Seats ${capacity}` : "Seats not set") : shop ? `$${price || 20} to spend${durationMin ? `, ${durationMin} min` : ""}` : `${price ? `$${price} a ticket` : "No price yet"}${durationMin ? `, ${durationMin} min` : ""}`
       } \u00b7 ${merchantHosts === false ? "Leaf host" : "Your team welcomes"}${contactName ? ` \u00b7 ask for ${contactName}` : ""}`}
     >
       <div className="space-y-3">
@@ -731,10 +737,9 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {shop ? (
-              <div>
-                <span className="mb-1.5 block text-[14px] font-medium text-stone-700">Ticket</span>
-                <p className="flex h-12 items-center rounded-xl bg-stone-50 px-3.5 text-[16px] font-semibold text-stone-900 ring-1 ring-stone-200">$20 to spend</p>
-              </div>
+              <Field label="Ticket, all theirs to spend">
+                <input value={price} onChange={(e) => setPrice(e.target.value.replace(/\D/g, "").slice(0, 3))} inputMode="numeric" className={input} />
+              </Field>
             ) : (
               <Field label="Price per person">
                 <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" className={input} />
@@ -860,7 +865,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             perRsvp
               ? "We bring neighbors from your neighborhood\u2019s Leaf calendar to you, in your slowest hours. Your first Neighbor Hour is on us."
               : shop
-                ? "An evening in your shop for neighbors who\u2019ve walked past and never come in. Each ticket is $20 to spend with you that night; Leaf keeps $6 of each, and nothing on your first one."
+                ? "An evening in your shop for neighbors who\u2019ve walked past and never come in. Each ticket is theirs to spend with you that night; Leaf keeps $6 of each, and nothing on your first one."
                 : "A short taster of what you teach, for neighbors on your neighborhood\u2019s Leaf calendar. They buy tickets; Leaf keeps $6 a ticket, and nothing on your first one."
           }
           steps={
@@ -958,22 +963,50 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           {shop && (
             <Field
               label="What will neighbors get that night that they wouldn\u2019t on a normal visit?"
-              hint="Something to drink, first look at something new, a small demo or gift. It\u2019s why they come; we lead with it."
+              hint={`On top of their ${dollars(Math.round(Number(price || 0) * 100) || 2000)} to spend. It\u2019s why they come, so we lead with it. Tap any that fit.`}
             >
+              {(form.offer.extraIdeas || []).length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {(form.offer.extraIdeas || []).map((idea) => {
+                    const on = nightExtra.toLowerCase().includes(idea.toLowerCase());
+                    return (
+                      <button
+                        key={idea}
+                        type="button"
+                        onClick={() =>
+                          setNightExtra((v) =>
+                            on
+                              ? v.split(/,\s*/).filter((x) => x.toLowerCase() !== idea.toLowerCase()).join(", ")
+                              : (v.trim() ? `${v.trim()}, ${idea}` : idea).slice(0, 200),
+                          )
+                        }
+                        className={`rounded-full px-3 py-1.5 text-[14px] ring-1 ${on ? "bg-leaf-800 text-white ring-leaf-800" : "bg-white text-stone-700 ring-stone-300"}`}
+                      >
+                        {idea}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <input
                 value={nightExtra}
                 onChange={(e) => setNightExtra(e.target.value.slice(0, 200))}
                 className={input}
-                placeholder="e.g. Wine, and first pick of the fall wreaths before they go on sale"
+                placeholder="Or write your own"
               />
             </Field>
           )}
           {shop ? (
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <span className="mb-1.5 block text-[14px] font-medium text-stone-700">Ticket</span>
-                <p className="flex h-12 items-center rounded-xl bg-stone-50 px-3.5 text-[16px] font-semibold text-stone-900 ring-1 ring-stone-200">$20 to spend</p>
-              </div>
+              <Field
+                label="Ticket, all theirs to spend"
+                hint={form.offer.creditRange ? `${dollars(form.offer.creditRange.bestLowCents)}\u2013${dollars(form.offer.creditRange.bestHighCents)} sells best. Anywhere from ${dollars(form.offer.creditRange.minCents)} to ${dollars(form.offer.creditRange.maxCents)}.` : undefined}
+              >
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[16px] text-stone-500">$</span>
+                  <input value={price} onChange={(e) => setPrice(e.target.value.replace(/\D/g, "").slice(0, 3))} inputMode="numeric" className={`${input} pl-7`} />
+                </div>
+              </Field>
               <Field label="Minutes">
                 <input value={durationMin} onChange={(e) => setDurationMin(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className={input} />
               </Field>
