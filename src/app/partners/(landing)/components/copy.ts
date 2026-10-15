@@ -23,6 +23,7 @@ export interface PartnerCopy {
   heroLead: string;
   floatTitle: string;
   floatBadge: string;
+  photo: string;
   photoAlt: string;
   trust: [string, string, string];
   steps: Step[];
@@ -48,6 +49,7 @@ export const COPY: Record<Kind, PartnerCopy> = {
       "Tell us your slowest days and hours. We’ll send the residents who live around the corner, from your neighborhood’s Leaf calendar. Your first Neighbor Hour is free: no listing fee, no RSVP fees.",
     floatTitle: "Neighbor Hour at your place",
     floatBadge: "Neighbors",
+    photo: "/hosted-night.jpg",
     photoAlt: "Neighbors laughing around a table at a local bar",
     trust: ["First Neighbor Hour free", "$6 per RSVP after", "No contract"],
     steps: [
@@ -99,7 +101,8 @@ export const COPY: Record<Kind, PartnerCopy> = {
       "A dozen neighbors from a few blocks away, on one of your quiet evenings. People who’ve walked past and never come in. They buy a $20 ticket that’s $20 to spend that night, so everyone who walks in is ready to buy.",
     floatTitle: "Neighbor Night at your shop",
     floatBadge: "$20 to spend",
-    photoAlt: "Neighbors laughing together with drinks in hand",
+    photo: "/shop-night.jpg",
+    photoAlt: "The owner of a small shop showing neighbors a book, glasses of wine in hand",
     trust: ["First Neighbor Night: you keep all of it", "$14 of every $20 after", "No setup fee"],
     steps: [
       { n: "01", h: "Tell us what you’d show them", b: "Three things you’d want every neighbor to know about, something they only get that night, and a quiet evening: after close, a slow hour, or before you open." },
@@ -150,7 +153,8 @@ export const COPY: Record<Kind, PartnerCopy> = {
       "About an hour of what you teach, for neighbors who live a short walk away. They buy tickets at a price you set, try it, and the ones who love it come back for your full class.",
     floatTitle: "Taster class at your studio",
     floatBadge: "Tickets",
-    photoAlt: "Neighbors laughing together",
+    photo: "/studio-taster.jpg",
+    photoAlt: "Neighbors laughing through a beginner class in a sunny studio",
     trust: ["First taster: you keep all of it", "$6 a ticket after", "No setup fee"],
     steps: [
       { n: "01", h: "Tell us what you’d teach", b: "About an hour of it, a ticket price, and the days that work. Leaf writes the listing with you." },

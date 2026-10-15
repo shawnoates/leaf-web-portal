@@ -11,7 +11,7 @@ function HeroMedia({ kind }: { kind: Kind }) {
     <div className="hero__media">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/hosted-night.jpg"
+        src={c.photo}
         alt={c.photoAlt}
         className="hero__photo"
       />
