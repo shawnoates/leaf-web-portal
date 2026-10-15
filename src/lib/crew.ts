@@ -23,6 +23,8 @@ export type Venue = {
   phone?: string | null;
   /** The crew's own place (venue rotation off): a name like "Mom's", maybe an address. */
   fixed?: boolean;
+  /** Somewhere just for this round ("Somewhere else"): it can change again. */
+  custom?: boolean;
 };
 
 export type CycleState = "picking" | "polling" | "locked" | "booked" | "done" | "skipped" | "cancelled";

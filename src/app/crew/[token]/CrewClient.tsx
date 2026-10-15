@@ -1383,7 +1383,7 @@ function CycleCard({
           )}
         </>
       )}
-      {c.state === "polling" && (c.isHost || isOwner) && !c.venue?.fixed && (
+      {["polling", "locked", "booked"].includes(c.state) && (c.isHost || isOwner) && (!c.venue?.fixed || c.venue?.custom) && (
         <ChangePlace cycle={c} auth={auth} busy={busy} onAct={onAct} />
       )}
     </Card>
@@ -1391,8 +1391,8 @@ function CycleCard({
 }
 
 /**
- * Organizer or this round's host, while it's voting: switch the place to
- * another one in the book. Dates and votes stay; Leaf tells the crew. When
+ * Organizer or this round's host, while it's voting or once the night is set:
+ * switch the place. Dates (or the set day and time) stay; Leaf tells the crew. When
  * someone added a place before anyone voted, it's offered first.
  */
 /**
@@ -1584,7 +1584,8 @@ function ChangePlace({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: 
         <div><Button small kind="ghost" onClick={() => void show()}>Change the place</Button></div>
       ) : (
         <div className="flex flex-col gap-2.5 rounded-[18px] border border-fm-line p-3">
-          <Mono className="px-1 text-fm-muted">Same dates · anywhere you like</Mono>
+          <Mono className="px-1 text-fm-muted">{c.state === "polling" ? "Same dates · anywhere you like" : "Same day and time · anywhere you like"}</Mono>
+          {c.state === "booked" && <p className="m-0 px-1 text-sm text-fm-ink-2">You booked {c.venue?.name || "the old place"}. Cancel that booking, then book the new place.</p>}
           <label className="relative block">
             <span className="sr-only">Search for a place</span>
             <Search size={16} aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-fm-muted" />
