@@ -28,6 +28,7 @@ import { EMPTY_PULSE } from "@/lib/crew-pulse";
 import CrewMoneyCard from "@/components/crew/CrewMoneyCard";
 import CrewAddOnCard from "@/components/crew/CrewAddOnCard";
 import FixedPlacePicker from "@/components/crew/FixedPlacePicker";
+import { AddPhotos, CrewPhotosSection, PhotoStrip } from "@/components/crew/CrewPhotos";
 import PlacePhoto from "@/components/crew/PlacePhoto";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
@@ -665,6 +666,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               />
             </section>
           )}
+
+          {me.status === "in" && <CrewPhotosSection auth={auth} meId={me.userId || null} title="Photos" skipCycleId={data.lastNight?.cycleId ?? null} />}
 
           {past.length > 0 && (
             <section>
@@ -1383,6 +1386,16 @@ export function LastNightCard({ night, meId, auth, split, onSplit, nextRoundAt }
 }) {
   const [rating, setRating] = useState<"up" | "down" | null>(night.myRating);
   const [saving, setSaving] = useState(false);
+  const [attendance, setAttendance] = useState<"yes" | "no" | null>(night.myAttendance ?? null);
+  const [photos, setPhotos] = useState(night.photos ?? []);
+  // Said they made it, or nothing yet and they'd said yes to the night.
+  const wasThere = attendance === "yes" || (attendance === null && night.iWent);
+  const answer = async (attended: boolean) => {
+    const before = attendance;
+    setAttendance(attended ? "yes" : "no");
+    try { await run("setCrewNightAttendance", auth, { cycleId: night.cycleId, attended }); }
+    catch { setAttendance(before); }
+  };
   const start = toDate(night.startsAt);
   const evening = eveningAt(night.startsAt);
   const today = start && start.toDateString() === new Date().toDateString();
@@ -1428,7 +1441,26 @@ export function LastNightCard({ night, meId, auth, split, onSplit, nextRoundAt }
         {wentLine && <p className="m-0 text-[15px] text-fm-ink-2">{wentLine}</p>}
       </div>
 
-      {night.iWent && (
+      {night.myInviteId && (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="m-0 mr-1 text-[15px] text-fm-ink">Did you make it?</p>
+          {([["yes", "I went", true], ["no", "Couldn't make it", false]] as const).map(([value, label, attended]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={attendance === value}
+              onClick={() => void answer(attended)}
+              className={`h-10 rounded-full border px-4 text-sm font-semibold transition ${
+                attendance === value ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink hover:border-fm-ink-2"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {wasThere && (
         <div className="flex flex-col gap-2.5">
           <p className="m-0 text-[15px] text-fm-ink">How was it?</p>
           <div className="flex gap-2">
@@ -1436,6 +1468,21 @@ export function LastNightCard({ night, meId, auth, split, onSplit, nextRoundAt }
             {ratingBtn("down", "Not again", "👎")}
           </div>
           {rating && <p className="m-0 text-xs text-fm-muted">{rating === "up" ? "Noted. Leaf keeps it in the mix." : "Noted. If most of the crew agrees, Leaf stops suggesting it."}</p>}
+        </div>
+      )}
+
+      {(photos.length > 0 || (night.uploadsOpen && night.myInviteId && attendance !== "no")) && (
+        <div className="flex flex-col gap-2.5">
+          <p className="m-0 text-[15px] text-fm-ink">{photos.length ? `Photos · ${photos.length}` : "Got photos?"}</p>
+          <PhotoStrip photos={photos} />
+          {night.uploadsOpen && night.myInviteId && night.photoLimits && attendance !== "no" && (
+            <AddPhotos
+              inviteId={night.myInviteId}
+              limits={night.photoLimits}
+              mine={photos.filter((p) => p.uploaderId === meId).length}
+              onUploaded={(p) => setPhotos((ps) => [p, ...ps])}
+            />
+          )}
         </div>
       )}
 

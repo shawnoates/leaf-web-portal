@@ -183,6 +183,13 @@ export type LastNight = {
   iWent: boolean;
   myRating: "up" | "down" | null;
   ratings: { up: number; down: number };
+  /** "Did you make it?": their answer, or null before they say. */
+  myAttendance?: "yes" | "no" | null;
+  /** The night's photos (same store as the recap page), newest first. */
+  photos?: import("@/components/recap/types").Photo[];
+  /** Within 7 days of the night: members can still add photos. */
+  uploadsOpen?: boolean;
+  photoLimits?: { maxPerAttendee: number; maxPerEvent: number; maxBytes: number };
 };
 
 type Paid = { at: string; method: string | null; confirmed: boolean };
