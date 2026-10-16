@@ -17,6 +17,7 @@ import {
   Plus,
   RefreshCw,
   Send,
+  UserPlus,
   Users,
   Vote,
   X,
@@ -884,13 +885,10 @@ export default function PlanDetailModal({
             </div>
           ) : (
             // Non-poll branch — attendees list
-            <div>
-              {canInvite && (
-                <div className="mb-6">
-                  <FriendInviteCard eventGroupId={plan.objectId} variant="host" limitedSpots={plan.capacity != null} />
-                </div>
-              )}
-              <div className="flex items-center justify-between gap-2">
+            // One card: who's coming on top, the direct-invite composer as its
+            // footer — inviting is how the list grows, so they live together.
+            <div className="rounded-xl border border-zinc-200">
+              <div className="flex items-center justify-between gap-2 px-3.5 py-3">
                 <div className="flex items-baseline min-w-0">
                   <h4 className="text-[15px] font-semibold text-zinc-900">Attendees</h4>
                   {!planRsvpsLoading && (
@@ -915,43 +913,60 @@ export default function PlanDetailModal({
                   >
                     <RefreshCw className={`w-4 h-4 ${planRsvpsLoading ? "animate-spin" : ""}`} />
                   </button>
-                  <a
-                    href={sharingPhones.length > 0 ? messageAllHref : undefined}
-                    aria-disabled={sharingPhones.length === 0 || undefined}
-                    className={`h-8 px-3 rounded-lg bg-zinc-900 text-white text-[13px] font-medium inline-flex items-center gap-1.5 no-underline hover:bg-zinc-800 ${sharingPhones.length === 0 ? "opacity-40 pointer-events-none" : ""} ${FOCUS_RING}`}
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    Message all
-                  </a>
+                  {sharingPhones.length > 0 && (
+                    <a
+                      href={messageAllHref}
+                      className={`h-8 px-3 rounded-lg bg-zinc-900 text-white text-[13px] font-medium inline-flex items-center gap-1.5 no-underline hover:bg-zinc-800 ${FOCUS_RING}`}
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      Message all
+                    </a>
+                  )}
                 </div>
               </div>
               {planRsvpsError && (
-                <div className="mt-3 border border-red-200 bg-red-50 text-red-700 rounded-lg px-3 py-2 text-xs">
+                <div className="mx-3.5 mb-3 border border-red-200 bg-red-50 text-red-700 rounded-lg px-3 py-2 text-xs">
                   Couldn&apos;t load attendees: {planRsvpsError}
                 </div>
               )}
               {planRsvpsLoading ? (
-                <p className="mt-3 text-sm text-zinc-400">Loading...</p>
+                <p className="border-t border-zinc-100 px-3.5 py-3 text-sm text-zinc-400">Loading...</p>
               ) : planRsvps.length > 0 ? (
-                <PlanAttendeeList
-                  attendees={planRsvps}
-                  capacity={plan.capacity}
-                  onApprove={approveRsvp}
-                  onDecline={declineRsvp}
-                  onRemove={removeRsvp}
-                />
+                <div className="border-t border-zinc-100">
+                  <PlanAttendeeList
+                    attendees={planRsvps}
+                    capacity={plan.capacity}
+                    onApprove={approveRsvp}
+                    onDecline={declineRsvp}
+                    onRemove={removeRsvp}
+                  />
+                </div>
               ) : (
-                <div className="mt-3 rounded-xl border border-dashed border-zinc-200 px-4 py-6 text-center text-sm text-zinc-500">
-                  <p>No one&apos;s RSVP&apos;d yet. Cross-promote it to nearby communities to get it moving.</p>
-                  {canShare && (
-                    <button
-                      type="button"
-                      onClick={() => onShare?.(plan)}
-                      className={`mt-2 text-sm font-medium text-zinc-900 underline underline-offset-2 rounded ${FOCUS_RING}`}
-                    >
-                      Cross-promote
-                    </button>
-                  )}
+                <p className="border-t border-zinc-100 px-3.5 py-4 text-sm text-zinc-500">
+                  No one&apos;s RSVP&apos;d yet.{" "}
+                  {canInvite ? (
+                    "A text from you gets more yeses than any link. Leaf writes it; you send it to a friend or a group chat."
+                  ) : canShare ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onShare?.(plan)}
+                        className={`font-medium text-zinc-900 underline underline-offset-2 rounded ${FOCUS_RING}`}
+                      >
+                        Cross-promote
+                      </button>{" "}
+                      it to nearby communities to get it moving.
+                    </>
+                  ) : null}
+                </p>
+              )}
+              {canInvite && (
+                <div className="border-t border-zinc-100 bg-zinc-50/60 rounded-b-xl px-3.5 pt-3 pb-3.5">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-zinc-700">
+                    <UserPlus className="w-3.5 h-3.5" aria-hidden />
+                    {planRsvps.length > 0 ? "Invite more" : "Send a direct invite"}
+                  </p>
+                  <FriendInviteCard eventGroupId={plan.objectId} variant="host" limitedSpots={plan.capacity != null} bare />
                 </div>
               )}
             </div>

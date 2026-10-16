@@ -111,7 +111,7 @@ export default function PlanAttendeeList({ attendees, capacity, onApprove, onDec
 
   return (
     <>
-      <ul className="mt-3 rounded-xl border border-zinc-200">
+      <ul>
         {attendees.map((a, i) => (
           <AttendeeRow
             key={a.notificationId}
