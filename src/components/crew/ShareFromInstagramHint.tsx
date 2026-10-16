@@ -5,11 +5,13 @@
  * small phone loops through the four steps (send the post, pick Leaf, Add on
  * the crew, it's in the book) beside the same steps in words. Pure CSS: one
  * 10s loop, each scene in its own quarter. With reduced motion it holds still
- * on the "Add" step. Hidden for good once dismissed on this device.
+ * on the "Add" step. Each member can close it; it stays closed for them on
+ * every device (hideCrewTip), and at once on this one.
  */
 
 import { useState, useSyncExternalStore } from "react";
 import { Bookmark, Check, Heart, MessageCircle, Send, X } from "lucide-react";
+import { run, type CrewAuth } from "@/lib/crew";
 
 const KEY = "fm-ig-share-hint-hidden";
 const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
@@ -134,19 +136,22 @@ function Phone({ crewName }: { crewName: string }) {
   );
 }
 
-export default function ShareFromInstagramHint({ crewName, inApp }: { crewName: string; inApp: boolean }) {
-  // Dismissed earlier on this device (read after hydration), or just now.
+export const IG_SHARE_TIP = "igShare";
+
+export default function ShareFromInstagramHint({ crewName, inApp, auth, hiddenTips = [] }: { crewName: string; inApp: boolean; auth: CrewAuth; hiddenTips?: string[] }) {
+  // Closed by this member (any device), on this device before that was saved, or just now.
   const hiddenBefore = useSyncExternalStore(
     () => () => {},
     () => { try { return Boolean(localStorage.getItem(KEY)); } catch { return false; } },
     () => false,
   );
   const [hidden, setHidden] = useState(false);
-  if (hidden || hiddenBefore) return null;
+  if (hidden || hiddenBefore || hiddenTips.includes(IG_SHARE_TIP)) return null;
 
   const hide = () => {
     setHidden(true);
     try { localStorage.setItem(KEY, "1"); } catch {}
+    run("hideCrewTip", auth, { tip: IG_SHARE_TIP }).catch(() => {});
   };
   const steps = [
     <>On the post, tap <Send size={13} className="inline -translate-y-px" aria-label="Share" /></>,

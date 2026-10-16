@@ -149,7 +149,7 @@ export type CrewPage = {
     /** A one-time crew after its night: offer "Do it again?". */
     lastOneTime?: { happened: boolean; venue: string | null; at: string | { iso: string } | null } | null;
   };
-  me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null; calendarSynced?: boolean; inviteLink?: string | null; needsSeed?: boolean; needsPace?: boolean };
+  me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null; calendarSynced?: boolean; inviteLink?: string | null; needsSeed?: boolean; needsPace?: boolean; hiddenTips?: string[] };
   members: Member[];
   names: Record<string, string>;
   /** Tell Leaf pills: what the crew has said so far, with counts (never who). */

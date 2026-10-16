@@ -37,7 +37,7 @@ export default function CrewBookClient({ token }: { token: string }) {
   if (load.status === "error") return <DeadState title="Couldn't open the book." body={load.message} />;
   // Invitees answer on the crew page first; the book stays closed until then.
   if (load.data.me.status === "invited" || load.data.me.status === "declined") return <GoTo href={crewHref(load.auth)} />;
-  return <BookView auth={load.auth} crewName={load.data.crew.name} canAdd={load.data.me.status === "in"} isOwner={load.data.me.isOwner} />;
+  return <BookView auth={load.auth} crewName={load.data.crew.name} canAdd={load.data.me.status === "in"} isOwner={load.data.me.isOwner} hiddenTips={load.data.me.hiddenTips} />;
 }
 
 function GoTo({ href }: { href: string }) {
@@ -45,7 +45,7 @@ function GoTo({ href }: { href: string }) {
   return <Spinner label="Opening your invite…" />;
 }
 
-function BookView({ auth, crewName, canAdd, isOwner }: { auth: CrewAuth; crewName: string; canAdd: boolean; isOwner: boolean }) {
+function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewAuth; crewName: string; canAdd: boolean; isOwner: boolean; hiddenTips?: string[] }) {
   const [book, setBook] = useState<Book | null>(null);
   const [sort, setSort] = useState<"wanted" | "new">("wanted");
   const [query, setQuery] = useState("");
@@ -158,7 +158,7 @@ function BookView({ auth, crewName, canAdd, isOwner }: { auth: CrewAuth; crewNam
 
       {canAdd && (
         <div className="mt-6 lg:mr-[428px]">
-          <ShareFromInstagramHint crewName={crewName} inApp={inApp} />
+          <ShareFromInstagramHint crewName={crewName} inApp={inApp} auth={auth} hiddenTips={hiddenTips} />
         </div>
       )}
 

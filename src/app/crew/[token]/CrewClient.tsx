@@ -28,6 +28,7 @@ import { EMPTY_PULSE } from "@/lib/crew-pulse";
 import CrewMoneyCard from "@/components/crew/CrewMoneyCard";
 import CrewAddOnCard from "@/components/crew/CrewAddOnCard";
 import FixedPlacePicker from "@/components/crew/FixedPlacePicker";
+import ShareFromInstagramHint from "@/components/crew/ShareFromInstagramHint";
 import { AddPhotos, CrewPhotosSection, PhotoStrip } from "@/components/crew/CrewPhotos";
 import PlacePhoto from "@/components/crew/PlacePhoto";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
@@ -577,6 +578,9 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 <Link href={crewHref(auth, "book")} className="hidden w-fit text-sm font-semibold text-fm-ink-2 underline underline-offset-4 hover:text-fm-ink lg:inline">
                   See all {data.bookTotal} places
                 </Link>
+              )}
+              {me.status === "in" && (
+                <ShareFromInstagramHint crewName={crew.name} inApp={inApp} auth={auth} hiddenTips={me.hiddenTips} />
               )}
             </section>
           )}
