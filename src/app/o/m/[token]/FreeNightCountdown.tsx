@@ -46,7 +46,8 @@ export default function FreeNightCountdown({
   worthLabel,
 }: {
   deadline: string | null;
-  state: "open" | "lapsed" | "granted" | "used";
+  /** none: their calendar has no free first night; nothing shows. */
+  state: "open" | "lapsed" | "granted" | "used" | "none";
   feeLabel: string;
   /** What a typical first night would cost, shown struck through. */
   worthLabel: string;

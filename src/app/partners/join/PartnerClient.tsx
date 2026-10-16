@@ -36,6 +36,8 @@ type RepLead = {
   phone?: string | null;
   contactName?: string | null;
   contactEmail?: string | null;
+  /** False when the rep's bar is on a calendar testing no free first night. */
+  firstNightFree?: boolean;
 };
 
 export default function PartnerClient() {
@@ -58,6 +60,8 @@ export default function PartnerClient() {
   const [leadToken, setLeadToken] = useState<string | null>(null);
   // ?for=shop or ?for=studio: the words match what the rep offered (bars by default).
   const [kind, setKind] = useState<"bar" | "shop" | "studio">("bar");
+  // A rep's bar on a calendar testing no free first night: pay from the first one.
+  const [noFreeNight, setNoFreeNight] = useState(false);
 
   // From a rep's email: fill in what the rep already took down.
   useEffect(() => {
@@ -69,6 +73,7 @@ export default function PartnerClient() {
     Parse.Cloud.run("validateBusinessLeadClaimToken", { token })
       .then((r: RepLead) => {
         if (!r?.valid) return;
+        if (r.firstNightFree === false) setNoFreeNight(true);
         if (r.contactName) setContactName(r.contactName);
         if (r.contactEmail) setEmail(r.contactEmail);
         if (r.phone) setPhone(formatPhone(r.phone));
@@ -200,7 +205,10 @@ export default function PartnerClient() {
             ? "Leaf runs a calendar for each neighborhood. We bring 10 to 15 neighbors to your shop on a quiet evening. They buy a $20 ticket that\u2019s $20 to spend with you; on your first one, you keep all of it. After that, Leaf keeps $6 of each ticket. No setup fee, no card."
             : kind === "studio"
               ? "Leaf runs a calendar for each neighborhood. We bring 10 to 15 neighbors to a taster of what you teach. They buy tickets at a price you set; on your first one, you keep all of it. After that, Leaf keeps $6 a ticket. No setup fee, no card."
-              : <>Leaf runs a calendar for each neighborhood. We bring 8 to 15 neighbors to you on a quiet evening. Your first Neighbor Hour is free: no
+              : noFreeNight
+                ? <>Leaf runs a calendar for each neighborhood. We bring 8 to 15 neighbors to you on a quiet evening. No listing fee: you pay $6 per RSVP,
+          charged after each Neighbor Hour, up to a weekly limit you set. Add a card to get started.</>
+                : <>Leaf runs a calendar for each neighborhood. We bring 8 to 15 neighbors to you on a quiet evening. Your first Neighbor Hour is free: no
           listing fee and no RSVP fees. {leadToken ? "Add a card to claim it." : "Tell us about your place and book a quick call, and we\u2019ll set it up with you."}{" "}After that it&rsquo;s $6 per RSVP, charged after it happens.</>}
         </p>
       </header>

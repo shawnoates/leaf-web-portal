@@ -80,7 +80,7 @@ type Form = {
     model: "ticket" | "per_rsvp";
     rsvpFeeCents: number;
     firstNightFree: boolean;
-    freeNightState?: "open" | "lapsed" | "granted" | "used";
+    freeNightState?: "open" | "lapsed" | "granted" | "used" | "none";
     freeNightDeadline?: string | null;
     card: Card | null;
     cardFailed: boolean;
