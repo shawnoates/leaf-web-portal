@@ -1005,6 +1005,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   // any user-touched field or AI-filled field currently holds a value.
   function hasUnsavedChanges(): boolean {
     if (creating) return false; // in-flight; don't nag
+    if (success || helloPlanId) return false; // already saved; nothing to discard
     if (title.trim()) return true;
     if (description.trim()) return true;
     if (venueQuery.trim()) return true;
@@ -1033,7 +1034,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [creating, title, description, venueQuery, date, time, capacity, hostNote, imageBase64, selectedImageUrl, promptInput]);
+  }, [creating, title, description, venueQuery, date, time, capacity, hostNote, imageBase64, selectedImageUrl, promptInput, success, helloPlanId]);
 
   async function handleCreate() {
     if (!title) return;
