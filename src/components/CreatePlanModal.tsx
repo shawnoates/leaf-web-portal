@@ -2240,6 +2240,24 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
             </div>
           )}
 
+          {/* Editing: collecting is set up (or changed) on the plan's /pay
+              page, so point there instead of hiding it. A new tab keeps
+              unsaved edits here. */}
+          {editMode && isHosted && eventGroupId && (
+            <a
+              href={`/pay/${eventGroupId}`}
+              target="_blank"
+              rel="noopener"
+              className="flex items-center justify-between py-1 no-underline group"
+            >
+              <div>
+                <p className="text-xs font-medium text-zinc-700">Collect money</p>
+                <p className="text-xs text-zinc-400">Set up or change payments on the plan&rsquo;s payments page</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-zinc-400 group-hover:text-zinc-900 shrink-0 ml-3" />
+            </a>
+          )}
+
           {canCollect && (
             <div className="space-y-3">
               <div className="flex items-center justify-between py-1">
