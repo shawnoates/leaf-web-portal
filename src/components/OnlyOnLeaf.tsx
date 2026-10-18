@@ -1,8 +1,9 @@
 
 /**
  * "Only on Leaf": a night a local business made for Leaf neighbors (the offer
- * pipeline stamps `onlyOnLeaf` when it publishes). The pill sits on the
- * cover; the line is a small chip above the title on the plan's page
+ * pipeline stamps `onlyOnLeaf` when it publishes). The pill sits on a plan
+ * card's cover in a list; on the plan itself it's a small chip above the
+ * title, never over the photo
  * (2026-10-18: the business's name is already in the title and the host
  * row, so the chip just says "Only on Leaf"; "made with …" is its tooltip).
  * Both take the calendar's brand color, black when it has none.

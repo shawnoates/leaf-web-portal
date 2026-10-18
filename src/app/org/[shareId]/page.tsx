@@ -5976,7 +5976,6 @@ export default function OrgCalendarPage() {
             </button>
 
             <div className="relative hidden md:block w-1/2 h-full bg-zinc-100">
-              {selectedEvent.onlyOnLeaf && <OnlyOnLeafPill color={org.brandColor} />}
               {selectedEvent.image ? (
                 <FittedImage src={selectedEvent.image} />
               ) : (
@@ -5994,9 +5993,9 @@ export default function OrgCalendarPage() {
                     <CrossPromoEyebrow source={selectedEvent.promotedFrom} />
                   </div>
                 )}
-                {/* On a phone the cover (and its pill) is hidden: the chip stands in. */}
+                {/* Above the title, not over the photo (2026-10-18). */}
                 {selectedEvent.onlyOnLeaf && (
-                  <div className="flex md:hidden">
+                  <div className="flex">
                     <OnlyOnLeafLine info={selectedEvent.onlyOnLeaf} color={org.brandColor} />
                   </div>
                 )}

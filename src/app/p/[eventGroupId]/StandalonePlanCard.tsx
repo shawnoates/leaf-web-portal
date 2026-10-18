@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Lock, MapPin, Wallet } from "lucide-react";
 import PlanHeroMedia from "./PlanHeroMedia";
-import { OnlyOnLeafPill, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
+import { OnlyOnLeafLine, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
 import HlsVideo from "@/components/HlsVideo";
 import HostIntroInline from "@/components/HostIntroInline";
 import { introVideoFrame } from "@/lib/intro-video-frame";
@@ -122,10 +122,10 @@ export default function StandalonePlanCard({
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm overflow-hidden">
         <div className="relative">
           <PlanHeroMedia image={image} videoUrl={videoUrl} />
-          {onlyOnLeaf && <OnlyOnLeafPill />}
         </div>
         <div className={`p-6 space-y-4 ${blurDetails ? "blur-[2px] select-none pointer-events-none" : ""}`}>
           <div className="space-y-1">
+            {onlyOnLeaf && <OnlyOnLeafLine info={onlyOnLeaf} className="mb-1.5" />}
             <h1 className="text-xl font-semibold text-zinc-900">{title}</h1>
             {calendarName && variant === "privateCalendar" ? (
               <div className="flex items-center gap-2 text-sm text-zinc-500">
