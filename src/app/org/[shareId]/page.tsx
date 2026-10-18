@@ -5994,10 +5994,15 @@ export default function OrgCalendarPage() {
                     <CrossPromoEyebrow source={selectedEvent.promotedFrom} />
                   </div>
                 )}
+                {/* On a phone the cover (and its pill) is hidden: the chip stands in. */}
+                {selectedEvent.onlyOnLeaf && (
+                  <div className="flex md:hidden">
+                    <OnlyOnLeafLine info={selectedEvent.onlyOnLeaf} color={org.brandColor} />
+                  </div>
+                )}
                 <h2 className="text-4xl md:text-5xl font-light tracking-tighter">
                   {selectedEvent.title}
                 </h2>
-                <OnlyOnLeafLine info={selectedEvent.onlyOnLeaf} color={org.brandColor} />
                 {/* Host line mirrors the card's precedence (see ~2689): a
                     virtual host or Leaf-host persona overrides the raw
                     hostName. Without this the modal showed the underlying
