@@ -9,6 +9,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { Brand, CREAM, Shell, dollars, formatPhone, linkedHere } from "./ui";
 import MerchantHello from "./MerchantHello";
+import NightPhoto, { type NightImage } from "./NightPhoto";
 import MerchantReport from "./MerchantReport";
 import MerchantDeals from "./MerchantDeals";
 import MerchantCampaign, { type CampaignSummary, windowLabel } from "./MerchantCampaign";
@@ -97,7 +98,7 @@ export type Dashboard = {
   requests?: { id: string; kind: "first" | "rebook"; label: string; source?: "campaign" | null }[];
 };
 
-type NightCopy = { status: "pending" | "approved"; title: string | null; description: string | null; notes: string; changeRequest: { note: string; at: string | null } | null };
+type NightCopy = { status: "pending" | "approved"; title: string | null; description: string | null; notes: string; changeRequest: { note: string; at: string | null } | null; image?: NightImage };
 
 /**
  * Their night: Leaf writes the name and description from what they'd like
@@ -166,6 +167,8 @@ function NightCard({ token, night: start, preview }: { token: string; night: Nig
           </div>
         </div>
       )}
+
+      <NightPhoto token={token} image={night.image ?? null} query={night.title || ""} preview={preview} />
 
       <div className="mt-5 border-t border-stone-100 pt-4">
         <label className="text-[14px] font-semibold text-stone-900" htmlFor="night-notes">What should we highlight?</label>
