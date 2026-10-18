@@ -3166,7 +3166,10 @@ export default function OrgCalendarPage() {
       // A placard QR (?src=v-…) asks for that place's own suggested plans.
       const srcParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("src") : null;
       const src = srcParam && /^v-[A-Za-z0-9]{4,16}$/.test(srcParam) ? srcParam : undefined;
-      const result = await Parse.Cloud.run("getOrgCalendarPage", { shareId, phoneNumber, ideaId, src });
+      // A $1 ticket test plan's private link (?testPlan=<id>): the server shows that one plan here.
+      const testPlanParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("testPlan") : null;
+      const testPlan = testPlanParam && /^[A-Za-z0-9]{6,20}$/.test(testPlanParam) ? testPlanParam : undefined;
+      const result = await Parse.Cloud.run("getOrgCalendarPage", { shareId, phoneNumber, ideaId, src, testPlan });
 
       // Record page view (fire-and-forget)
       if (result.objectId) {
