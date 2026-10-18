@@ -4890,7 +4890,7 @@ export default function OrgCalendarPage() {
                 {plan.onlyOnLeaf && (
                   <div
                     aria-hidden="true"
-                    className={`pointer-events-none absolute inset-0 translate-y-3 ${index % 2 !== 0 ? "translate-x-3" : "-translate-x-3"}`}
+                    className={`pointer-events-none absolute -inset-2 md:inset-0 md:translate-y-3 ${index % 2 !== 0 ? "md:translate-x-3" : "md:-translate-x-3"}`}
                     style={{ border: `1.5px solid color-mix(in srgb, #5a8c7b 60%, white)` }}
                   />
                 )}
