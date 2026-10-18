@@ -915,6 +915,8 @@ function RsvpModal({
     );
   }, [showAlternatives, alternatives, plan.id, calendarId]);
   const [isPendingResult, setIsPendingResult] = useState(false);
+  // What a paid ticket cost, for the "Paid" line on the confirmation.
+  const [paidCents, setPaidCents] = useState(0);
   const [isWaitlistResult, setIsWaitlistResult] = useState(false);
   const [sharePhone, setSharePhone] = useState(true);
   const [followState, setFollowState] = useState<"idle" | "following" | "done" | "pending">(
@@ -1168,10 +1170,18 @@ function RsvpModal({
                     planId={plan.id}
                     sessionToken={verify.sessionToken}
                     name={verify.name}
+                    phone={verify.phone}
                     priceCents={plan.ticketPriceCents ?? 0}
                     feeCents={plan.bookingFeeCents ?? 0}
+                    summary={{
+                      title: plan.title,
+                      when: [plan.date, plan.time].filter(Boolean).join(" \u00b7 "),
+                      place: plan.location?.isPrivate ? null : plan.location?.name || null,
+                      image: plan.image || null,
+                    }}
                     brandColor={brandColor}
-                    onPaid={(already) => {
+                    onPaid={(already, totalCents) => {
+                      setPaidCents(totalCents);
                       setFormStep("success");
                       onRsvpSuccess?.(plan.id, already);
                     }}
@@ -1192,23 +1202,52 @@ function RsvpModal({
           </div>
         ) : (
           <div className="py-6 text-center space-y-5">
-            <div className={`w-14 h-14 border ${isPendingResult ? "border-amber-500" : "border-zinc-900"} rounded-full flex items-center justify-center mx-auto`}>
-              {isPendingResult ? <Clock className="w-7 h-7 text-amber-500" /> : <CheckCircle2 className="w-7 h-7" />}
-            </div>
-            <div>
-              <h4 className="text-2xl font-light mb-2">
-                {isWaitlistResult ? "You\u0027re on the waitlist!" : isPendingResult ? "Request Sent!" : collectsP2p ? "Your spot is held" : "You\u0027re in!"}
-              </h4>
-              <p className="text-sm text-zinc-500 max-w-xs mx-auto">
-                {isWaitlistResult
-                  ? `You\u0027ll get ${contact?.notify === "email" ? "an email" : "a text"} the moment a spot opens up.`
-                  : isPendingResult
-                    ? `You\u0027ll get ${contact?.notify === "email" ? "an email" : "a text"} when your request is approved.`
-                    : collectsP2p
-                      ? (plan.p2pSplit ? "You\u2019ll pay your share once the headcount is set." : "Pay the host below to keep it.")
-                      : "Coordinate with the group. Join the Plan Chat."}
-              </p>
-            </div>
+            {!isPendingResult && !isWaitlistResult && !collectsP2p ? (
+              // Confirmed (free or paid): say so, then the ticket itself (2026-10-18).
+              <div className="space-y-4 text-left">
+                <div className="flex items-center gap-2 text-[14px] font-semibold text-emerald-800">
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-emerald-50">
+                    <Check className="h-3.5 w-3.5" />
+                  </span>
+                  {paidTicket && paidCents > 0 ? `Paid \u00b7 $${(paidCents / 100).toFixed(paidCents % 100 ? 2 : 0)}` : "You\u2019re on the list"}
+                </div>
+                <h4 className="font-serif text-[30px] leading-tight text-zinc-900">You&rsquo;re going.</h4>
+                <div className="overflow-hidden rounded-2xl text-white" style={{ backgroundColor: "#253a33" }}>
+                  <div className="px-5 py-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#9dbeb3]">{paidTicket ? "Your ticket" : "Your plan"}</p>
+                    <p className="mt-1.5 font-serif text-[20px] leading-snug">{plan.title}</p>
+                    <p className="mt-1 text-[14px] text-[#e0ebe7]">
+                      {[plan.date, plan.time].filter(Boolean).join(" \u00b7 ")}
+                      {!plan.location?.isPrivate && plan.location?.name ? <><br />{plan.location.name}</> : null}
+                    </p>
+                  </div>
+                  <div className="flex justify-between gap-3 border-t border-dashed border-white/30 px-5 py-3 text-[13px] text-[#e0ebe7]">
+                    <span>{[contact?.name || verify.name, paidTicket ? "1 ticket" : null].filter(Boolean).join(" \u00b7 ")}</span>
+                    <span>We&rsquo;ll {contact?.notify === "email" ? "email" : "text"} you the day before</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+              <div className={`w-14 h-14 border ${isPendingResult ? "border-amber-500" : "border-zinc-900"} rounded-full flex items-center justify-center mx-auto`}>
+                {isPendingResult ? <Clock className="w-7 h-7 text-amber-500" /> : <CheckCircle2 className="w-7 h-7" />}
+              </div>
+              <div>
+                <h4 className="text-2xl font-light mb-2">
+                  {isWaitlistResult ? "You\u0027re on the waitlist!" : isPendingResult ? "Request Sent!" : collectsP2p ? "Your spot is held" : "You\u0027re in!"}
+                </h4>
+                <p className="text-sm text-zinc-500 max-w-xs mx-auto">
+                  {isWaitlistResult
+                    ? `You\u0027ll get ${contact?.notify === "email" ? "an email" : "a text"} the moment a spot opens up.`
+                    : isPendingResult
+                      ? `You\u0027ll get ${contact?.notify === "email" ? "an email" : "a text"} when your request is approved.`
+                      : collectsP2p
+                        ? (plan.p2pSplit ? "You\u2019ll pay your share once the headcount is set." : "Pay the host below to keep it.")
+                        : "Coordinate with the group. Join the Plan Chat."}
+                </p>
+              </div>
+              </>
+            )}
 
             {/* Add-ons (design §1): between the "You're in!" block and the
                 chat button. Only for a confirmed RSVP — a pending request or a
@@ -1253,10 +1292,10 @@ function RsvpModal({
             {!isPendingResult && !notificationId && (
               <Link
                 href={`/chat/${plan.id}`}
-                className="flex items-center justify-center gap-2 w-full text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 rounded-lg"
+                className="flex items-center justify-center gap-2 w-full text-white py-3 text-[15px] font-semibold transition-opacity hover:opacity-90 rounded-xl"
                 style={{ backgroundColor: brandColor || "#18181b" }}
               >
-                <MessageCircle className="w-4 h-4" /> Join Plan Chat
+                <MessageCircle className="w-4 h-4" /> Plan chat
               </Link>
             )}
 
@@ -1275,56 +1314,48 @@ function RsvpModal({
               return (
                 <a
                   href={icsUrl}
-                  className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-xs uppercase tracking-wider font-bold hover:bg-zinc-50 transition-colors rounded-lg"
+                  className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-[15px] font-semibold hover:bg-zinc-50 transition-colors rounded-xl"
                 >
                   <Calendar className="w-4 h-4" />
-                  Add to Calendar
+                  Add to calendar
                 </a>
               );
             })()}
 
-            {calendarId && calendarName && followState === "idle" && (
-              <div className="pt-1">
+            {/* Follow as a toggle row (2026-10-18): the old full-width button wrapped badly. */}
+            {calendarId && calendarName && (
+              <div className="text-left">
                 <button
-                  onClick={handleFollowCalendar}
-                  className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-xs uppercase tracking-wider font-bold hover:bg-zinc-50 transition-colors rounded-lg"
+                  type="button"
+                  onClick={followState === "idle" ? handleFollowCalendar : undefined}
+                  disabled={followState !== "idle"}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-zinc-200 px-4 py-3.5 text-left disabled:cursor-default"
+                  aria-pressed={followState === "done" || followState === "pending"}
                 >
-                  <Heart className="w-4 h-4" />
-                  {isPrivateCalendar ? `Request to Follow ${calendarName}` : `Follow ${calendarName}`}
+                  <span className="min-w-0">
+                    <span className="block text-[14px] font-semibold text-zinc-900">
+                      {isPrivateCalendar ? `Ask to follow ${calendarName}` : `New plans from ${calendarName}`}
+                    </span>
+                    <span className="block text-[13px] text-zinc-500">
+                      {followState === "pending"
+                        ? "Request sent. You\u2019ll hear when it\u2019s approved."
+                        : followState === "done"
+                          ? "Following. We\u2019ll let you know when something new is posted."
+                          : `We\u2019ll ${contact?.notify === "email" ? "email" : "text"} you when something new is posted.`}
+                    </span>
+                  </span>
+                  {followState === "following" ? (
+                    <Loader2 className="ml-auto h-5 w-5 shrink-0 animate-spin text-zinc-400" />
+                  ) : (
+                    <span
+                      className={`relative ml-auto h-[26px] w-[44px] shrink-0 rounded-full transition-colors ${followState === "done" || followState === "pending" ? "" : "bg-zinc-200"}`}
+                      style={followState === "done" || followState === "pending" ? { backgroundColor: "#253a33" } : undefined}
+                    >
+                      <span className={`absolute top-[3px] h-5 w-5 rounded-full bg-white shadow transition-all ${followState === "done" || followState === "pending" ? "left-[21px]" : "left-[3px]"}`} />
+                    </span>
+                  )}
                 </button>
-                <p className="text-[11px] text-zinc-400 mt-1.5">
-                  Get notified when new plans are added.
-                </p>
-                {followError && (
-                  <p className="text-[11px] text-red-500 mt-1.5">{followError}</p>
-                )}
-              </div>
-            )}
-
-            {calendarId && calendarName && followState === "following" && (
-              <div className="pt-1">
-                <div className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-xs uppercase tracking-wider font-bold rounded-lg opacity-60">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Following…
-                </div>
-              </div>
-            )}
-
-            {calendarName && followState === "done" && (
-              <div className="pt-1">
-                <div className="flex items-center justify-center gap-2 w-full border border-emerald-200 bg-emerald-50 text-emerald-700 py-3 text-xs uppercase tracking-wider font-bold rounded-lg">
-                  <Check className="w-4 h-4" />
-                  Following {calendarName}
-                </div>
-              </div>
-            )}
-
-            {calendarName && followState === "pending" && (
-              <div className="pt-1">
-                <div className="flex items-center justify-center gap-2 w-full border border-amber-200 bg-amber-50 text-amber-700 py-3 text-xs uppercase tracking-wider font-bold rounded-lg">
-                  <Clock className="w-4 h-4" />
-                  Follow Request Pending
-                </div>
+                {followError && <p className="mt-1.5 text-[11px] text-red-500">{followError}</p>}
               </div>
             )}
 
@@ -1332,7 +1363,7 @@ function RsvpModal({
               onClick={onClose}
               className="text-sm text-zinc-400 hover:text-zinc-900"
             >
-              Close
+              Done
             </button>
           </div>
         )}
