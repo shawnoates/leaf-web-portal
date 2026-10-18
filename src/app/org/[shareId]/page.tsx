@@ -1054,7 +1054,9 @@ function RsvpModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm overflow-y-auto">
       <div
-        className={`bg-white w-full ${maxWidthClass} rounded-t-2xl md:rounded-2xl p-8 md:p-12 relative my-0 md:my-8`}
+        // Capped at the screen and scrolls itself: a tall sheet (the ticket
+        // checkout's card form) centred in the overlay was cut off at the top.
+        className={`bg-white w-full ${maxWidthClass} rounded-t-2xl md:rounded-2xl p-8 md:p-12 relative my-0 md:my-8 max-h-[92dvh] md:max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain`}
       >
         <button
           onClick={onClose}

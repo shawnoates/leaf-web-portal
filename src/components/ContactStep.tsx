@@ -130,6 +130,10 @@ export function ContactStep({
   /** Replaces the final button once the phone is verified (paid tickets). */
   renderVerifiedAction?: () => React.ReactNode;
 }) {
+  // A paid ticket is bought with a verified phone (renderVerifiedAction): no
+  // email option, and verifying never confirms a free RSVP on its own.
+  const paid = Boolean(renderVerifiedAction);
+  allowEmail = allowEmail && !paid;
   const [session, setSession] = useState(readContactSession);
   // The browser keeps its own copy of the signed-in account, which can lag
   // (an old address after a merge). Refresh it so the verified row shows the
@@ -164,9 +168,11 @@ export function ContactStep({
     e.preventDefault();
     if (verify.step === "phone") { await verify.sendOTP(); return; }
     if (verify.step === "code") {
-      if (await verify.verifyOTP()) await onConfirmed({ name: verify.name, phone: verify.phone, notify: "text" });
+      // Paid: once verified, the payment step takes over (renderVerifiedAction).
+      if ((await verify.verifyOTP()) && !paid) await onConfirmed({ name: verify.name, phone: verify.phone, notify: "text" });
       return;
     }
+    if (paid) return;
     await onConfirmed({ name: verify.name, phone: verify.phone, notify: "text" });
   };
 
