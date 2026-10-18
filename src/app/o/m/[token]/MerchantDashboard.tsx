@@ -556,7 +556,8 @@ function MakeGoodChoice({ n, token }: { n: Night; token: string }) {
 /**
  * The "Add a Leaf host" option on a night they run. Asking sends offers to the
  * best-matched Leaf hosts; until one says yes they're still hosting, and the
- * fee applies only if a host runs it (and 5+ neighbors RSVP).
+ * fee applies only if a host runs it (and at least one neighbor RSVPs). Until
+ * a host says yes they can take the request back ("Cancel host request").
  */
 function HostAddOn({ n, token }: { n: Night; token: string }) {
   const [state, setState] = useState(n.hostAddOn?.state ?? null);
@@ -579,6 +580,19 @@ function HostAddOn({ n, token }: { n: Night; token: string }) {
     }
   };
 
+  const cancel = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = (await merchantRun("merchantCancelLeafHost", { token, slotId: n.id })) as { state: typeof state };
+      setState(r.state);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn\u2019t cancel the request");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (state === "available") {
     return (
       <div className="mt-4 rounded-2xl bg-leaf-50 p-4 ring-1 ring-leaf-200">
@@ -587,7 +601,7 @@ function HostAddOn({ n, token }: { n: Night; token: string }) {
           <p className="shrink-0 text-[14px] font-semibold text-leaf-800">{fee}</p>
         </div>
         <p className="mt-1 text-[14px] leading-snug text-stone-600">
-          A Leaf host welcomes the group and runs the night. You get what guests spent, photos for your socials, and how many became regulars.
+          Optional: you don&rsquo;t need one to run your night. A Leaf host welcomes the group and runs it for you, and you get what guests spent, photos for your socials, and how many became regulars.
         </p>
         {confirming ? (
           <>
@@ -614,9 +628,15 @@ function HostAddOn({ n, token }: { n: Night; token: string }) {
   }
   if (state === "offering") {
     return (
-      <p className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] leading-snug text-leaf-900 ring-1 ring-leaf-200">
-        <span className="font-semibold">Finding your Leaf host.</span> We&rsquo;ll email you when one says yes. Until then, you&rsquo;re hosting as planned.
-      </p>
+      <div className="mt-3 rounded-xl bg-leaf-50 p-3 text-[14px] leading-snug text-leaf-900 ring-1 ring-leaf-200">
+        <p>
+          <span className="font-semibold">Finding your Leaf host.</span> We&rsquo;ll email you when one says yes. Until then, you&rsquo;re hosting as planned.
+        </p>
+        <button type="button" disabled={busy} onClick={cancel} className="mt-2 text-[13px] font-semibold text-leaf-800 underline disabled:opacity-50">
+          {busy ? "Cancelling\u2026" : "Cancel host request (no fee)"}
+        </button>
+        {error && <p className="mt-1 text-[13px] text-red-600">{error}</p>}
+      </div>
     );
   }
   if (state === "none_found") {
