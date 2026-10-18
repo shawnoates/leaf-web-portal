@@ -82,6 +82,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { OnlyOnLeafLine, OnlyOnLeafPill, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
+import { PhotoCredit } from "@/components/PhotoCredit";
 
 
 // --- Types ---
@@ -104,6 +105,8 @@ interface Plan {
   hostName: string;
   /** A night a business made for Leaf: the "Only on Leaf" pill and line. */
   onlyOnLeaf?: OnlyOnLeafInfo;
+  /** An Unsplash photo's photographer, shown on the photo (their API terms). */
+  imageCredit?: { name: string; url: string } | null;
   /** Who the "Your host" card names: a business host's contact (first name), else hostName. */
   hostCardName?: string;
   hostAvatar: string | null;
@@ -3296,6 +3299,7 @@ export default function OrgCalendarPage() {
           typeof p.leafHostChatUnread === "number" ? p.leafHostChatUnread : 0,
         promotedFrom: (p.promotedFrom as Plan["promotedFrom"]) ?? null,
         onlyOnLeaf: (p.onlyOnLeaf as OnlyOnLeafInfo) ?? null,
+        imageCredit: (p.imageCredit as Plan["imageCredit"]) ?? null,
         addons: Array.isArray(p.addons)
           ? (p.addons as Record<string, unknown>[]).map((a) => ({
               objectId: a.objectId as string,
@@ -4876,10 +4880,22 @@ export default function OrgCalendarPage() {
                 key={plan.id}
                 className={`group flex flex-col md:flex-row gap-12 md:items-center ${
                   index % 2 !== 0 ? "md:flex-row-reverse" : ""
-                }`}
+                } ${plan.onlyOnLeaf ? "relative -mx-4 px-4 py-8 md:-mx-10 md:px-10 md:py-12" : ""}`}
+                style={plan.onlyOnLeaf ? { backgroundColor: `color-mix(in srgb, #5a8c7b 10%, white)` } : undefined}
               >
+                {/* A night a business made for Leaf (2026-10-18): a light tinted
+                    band and an offset frame behind the photo, so it stands out
+                    from the rest of the calendar. */}
+                <div className="relative w-full md:w-3/5">
+                {plan.onlyOnLeaf && (
+                  <div
+                    aria-hidden="true"
+                    className={`pointer-events-none absolute inset-0 translate-y-3 ${index % 2 !== 0 ? "translate-x-3" : "-translate-x-3"}`}
+                    style={{ border: `1.5px solid color-mix(in srgb, #5a8c7b 60%, white)` }}
+                  />
+                )}
                 <div
-                  className="relative w-full md:w-3/5 aspect-[16/10] overflow-hidden cursor-pointer bg-zinc-100 shadow-sm"
+                  className="relative w-full aspect-[16/10] overflow-hidden cursor-pointer bg-zinc-100 shadow-sm"
                   onClick={() => setSelectedEvent(plan)}
                 >
                   {plan.image ? (
@@ -4917,6 +4933,8 @@ export default function OrgCalendarPage() {
                       }}
                     />
                   )}
+                  {plan.imageCredit && <PhotoCredit credit={plan.imageCredit} />}
+                </div>
                 </div>
 
                 <div className="w-full md:w-2/5 space-y-6">
@@ -5976,6 +5994,7 @@ export default function OrgCalendarPage() {
             </button>
 
             <div className="relative hidden md:block w-1/2 h-full bg-zinc-100">
+              {selectedEvent.imageCredit && <PhotoCredit credit={selectedEvent.imageCredit} />}
               {selectedEvent.image ? (
                 <FittedImage src={selectedEvent.image} />
               ) : (

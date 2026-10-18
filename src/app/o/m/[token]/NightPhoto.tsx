@@ -13,7 +13,7 @@ import { Loader2 } from "lucide-react";
 import { merchantRun } from "@/lib/merchant-session";
 
 export type NightImage = { url: string; credit?: string | null; creditUrl?: string | null } | null;
-type Photo = { url: string; thumbUrl: string; credit?: string | null; creditUrl?: string | null; alt?: string };
+type Photo = { id?: string; url: string; thumbUrl: string; credit?: string | null; creditUrl?: string | null; alt?: string };
 
 const LEAF_PHOTOS: Photo[] = [
   { url: "https://www.joinleaf.com/studio-taster.jpg", thumbUrl: "/studio-taster.jpg", alt: "A beginner class in a sunny studio" },
@@ -40,8 +40,8 @@ export default function NightPhoto({ token, image, query, preview, onSaved }: {
     setBusy("search");
     setError(null);
     try {
-      const r = (await Parse.Cloud.run("searchUnsplashPhotos", { query: q.trim(), perPage: 12 })) as { url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[];
-      setResults(r.map((p) => ({ url: p.url, thumbUrl: p.thumbUrl, alt: p.alt, credit: p.photographerName, creditUrl: p.photographerUrl })));
+      const r = (await Parse.Cloud.run("searchUnsplashPhotos", { query: q.trim(), perPage: 12 })) as { id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[];
+      setResults(r.map((p) => ({ id: p.id, url: p.url, thumbUrl: p.thumbUrl, alt: p.alt, credit: p.photographerName, creditUrl: p.photographerUrl })));
       if (!r.length) setError("No photos for that. Try other words.");
     } catch {
       setError("Search didn’t work. Try again.");
@@ -53,7 +53,7 @@ export default function NightPhoto({ token, image, query, preview, onSaved }: {
     setBusy(p?.url || "clear");
     setError(null);
     try {
-      const r = (await merchantRun("merchantSetNightPhoto", { token, url: p?.url ?? null, credit: p?.credit || "", creditUrl: p?.creditUrl || "" })) as { night: { image: NightImage } };
+      const r = (await merchantRun("merchantSetNightPhoto", { token, url: p?.url ?? null, credit: p?.credit || "", creditUrl: p?.creditUrl || "", photoId: p?.id || "" })) as { night: { image: NightImage } };
       setShown(r.night.image);
       onSaved?.(r.night.image);
       setOpen(false);

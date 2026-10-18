@@ -98,7 +98,14 @@ export type Dashboard = {
   requests?: { id: string; kind: "first" | "rebook"; label: string; source?: "campaign" | null }[];
 };
 
-type NightCopy = { status: "pending" | "approved"; title: string | null; description: string | null; notes: string; changeRequest: { note: string; at: string | null } | null; image?: NightImage };
+type NightCopy = { status: "pending" | "approved"; title: string | null; description: string | null; notes: string; changeRequest: { note: string; at: string | null } | null; image?: NightImage; kind?: "bar" | "shop" | "studio" };
+
+/** What to ask them to highlight, by kind of night (a bar's example isn't a studio's). */
+const HIGHLIGHT: Record<"bar" | "shop" | "studio", { hint: string; example: string }> = {
+  bar: { hint: "Specials, the vibe, your space, who comes in. We use it when we write your nights.", example: "e.g. $8 negronis on Wednesdays, a back room that fits 14, board games behind the bar" },
+  shop: { hint: "What you\u2019d show neighbors, what\u2019s new, how you started. We use it when we write your nights.", example: "e.g. Our dried flower wall, the local honey we stock, and how we started in my kitchen" },
+  studio: { hint: "What the class is like, who it\u2019s for, what to bring. We use it when we write your nights.", example: "e.g. A gentle beginner flow, no experience needed, mats provided, tea after" },
+};
 
 /**
  * Their night: Leaf writes the name and description from what they'd like
@@ -172,8 +179,8 @@ function NightCard({ token, night: start, preview }: { token: string; night: Nig
 
       <div className="mt-5 border-t border-stone-100 pt-4">
         <label className="text-[14px] font-semibold text-stone-900" htmlFor="night-notes">What should we highlight?</label>
-        <p className="text-[13px] text-stone-500">Specials, the vibe, your space, who comes in. We use it when we write your nights.</p>
-        <textarea id="night-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={area} placeholder="e.g. $8 negronis on Wednesdays, a back room that fits 14, board games behind the bar" />
+        <p className="text-[13px] text-stone-500">{HIGHLIGHT[night.kind || "bar"].hint}</p>
+        <textarea id="night-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={area} placeholder={HIGHLIGHT[night.kind || "bar"].example} />
         {notes.trim() !== (night.notes || "").trim() && (
           <button type="button" disabled={busy || preview} onClick={() => run("merchantSaveNightNotes", { notes }, "Saved.")} className="mt-2 h-11 rounded-xl bg-leaf-800 px-4 text-[14px] font-semibold text-white disabled:opacity-40">
             {busy ? "Saving\u2026" : "Save"}
