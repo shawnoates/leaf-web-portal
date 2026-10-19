@@ -32,17 +32,27 @@ export default function PointsEarned() {
 
   useEffect(() => {
     let cancelled = false;
-    try {
-      if (!Parse.User.current()) return;
-      Parse.Cloud.run("getPointsSummary")
-        .then((s: { unseen?: PointsUnseen[]; balance?: number }) => {
-          if (cancelled || !s?.unseen?.length) return;
-          setBalance(s.balance || 0);
-          setAward(s.unseen[0]);
-        })
-        .catch(() => { /* non-fatal */ });
-    } catch { /* Parse not initialized */ }
-    return () => { cancelled = true; };
+    const load = () => {
+      try {
+        if (!Parse.User.current()) return;
+        Parse.Cloud.run("getPointsSummary")
+          .then((s: { unseen?: PointsUnseen[]; balance?: number }) => {
+            if (cancelled || !s?.unseen?.length) return;
+            setBalance(s.balance || 0);
+            setAward((cur) => cur ?? s.unseen![0]);
+          })
+          .catch(() => { /* non-fatal */ });
+      } catch { /* Parse not initialized */ }
+    };
+    load();
+    // A web check-in just landed: the award is written a moment later, so look
+    // again shortly to celebrate it right where the guest is.
+    const onEarned = () => { window.setTimeout(load, 1200); };
+    window.addEventListener(POINTS_EVENT, onEarned);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(POINTS_EVENT, onEarned);
+    };
   }, []);
 
   if (!award) return null;

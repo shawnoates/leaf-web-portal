@@ -39,6 +39,7 @@ import FriendModeCalendarPicker from "@/components/crew/FriendModeCalendarPicker
 import { useInApp } from "@/components/crew/CrewShell";
 import HostPointsTag from "@/components/HostPointsTag";
 import PointsChip from "@/components/PointsChip";
+import CheckInPill from "@/components/CheckInPill";
 import { awardDetail, type PointsSummary } from "@/lib/points";
 
 // ============================================================================
@@ -114,6 +115,11 @@ interface Plan {
     introVideo?: { url: string; posterUrl: string | null; aspectRatio?: string | null; durationSec?: number | null } | null;
   } | null;
   rsvpState: RsvpState;
+  /** Leaf points a check-in at this plan is worth to the viewer; null when the
+   *  venue is hidden or unknown. Absent on older servers. */
+  checkInPoints?: number | null;
+  /** The viewer already checked in (recent plans only). */
+  checkedIn?: boolean;
   /** Accepted RSVPs only — the server emits EventGroup.rsvpCount here, which
    *  excludes the host. Unlike /org's attendeeCount there is NO +1 host pad,
    *  so comparing it against `capacity` matches the server's waitlist gate. */
@@ -1335,6 +1341,16 @@ function Hero({
           </h2>
           {context && <div className="hero-ctx">{context}</div>}
           {statusLine && <div className="hero-status">{statusLine}</div>}
+          <div className="pts-line">
+            <CheckInPill
+              planId={plan.id}
+              date={plan.date}
+              points={plan.checkInPoints}
+              checkedIn={plan.checkedIn}
+              going={plan.rsvpState === "going"}
+              hosting={viewerHosts(plan)}
+            />
+          </div>
           {/* The host's own hello: one line to the checklist, where the
               recorder lives, until it is up. */}
           {plan.viewerIsHost && plan.hostNotificationId && (
@@ -1943,6 +1959,16 @@ function PlanRow({
           <button className="plan-link" onClick={onOpen}>{plan.title}</button>
         </h3>
         <div className="row-meta">{meta}</div>
+        <div className="pts-line">
+          <CheckInPill
+            planId={plan.id}
+            date={plan.date}
+            points={plan.checkInPoints}
+            checkedIn={plan.checkedIn}
+            going={plan.rsvpState === "going"}
+            hosting={viewerHosts(plan)}
+          />
+        </div>
       </div>
       <div className="row-act">
         {plan.hostState === "waiting_on_host" ? (
@@ -3345,6 +3371,8 @@ const CSS = `
 .leafme .pts-how p{font-size:10.5px;color:var(--muted);margin-top:6px}
 .leafme .pts-host{display:block;margin-top:5px;text-align:right}
 .leafme .pts-popup{margin-top:10px}
+.leafme .pts-line{margin-top:6px}
+.leafme .pts-line:empty{display:none}
 /* Recap rows reuse the .place shell but carry a button, not a heart — the
    mobile rules below give .row-btn a top margin meant for the plan spine. */
 .leafme .place .row-btn{flex:none;margin-top:0}
