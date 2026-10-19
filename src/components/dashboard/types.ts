@@ -489,5 +489,7 @@ export interface DashboardCrew {
   iconUrl?: string | null;
   status: "active" | "paused" | "invited" | "off";
   statusLine?: string | null;
+  /** When the crew last had activity (ISO): the menu lists the latest first. */
+  activeAt?: string | null;
   isOwner?: boolean;
 }

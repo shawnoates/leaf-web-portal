@@ -53,7 +53,7 @@ export type DashboardSidebarProps = {
 };
 
 /** Active crews listed before "Show all", so the menu fits a laptop screen. */
-const LIVE_CREWS_SHOWN = 6;
+const LIVE_CREWS_SHOWN = 3;
 
 export default function DashboardSidebar({
   orgName,
@@ -79,7 +79,10 @@ export default function DashboardSidebar({
   // Crews that are switched off or paused sit at the bottom, folded away
   // (open when one of them is the one being looked at).
   const isOff = (c: DashboardCrew) => c.status === "off" || c.status === "paused";
-  const liveCrews = crews.filter((c) => !isOff(c));
+  // Invites first (they need an answer), then the most recently active.
+  const liveCrews = crews.filter((c) => !isOff(c)).sort((a, b) =>
+    Number(b.status === "invited") - Number(a.status === "invited")
+    || (Date.parse(b.activeAt || "") || 0) - (Date.parse(a.activeAt || "") || 0));
   const offCrews = crews.filter(isOff);
   const [showOff, setShowOff] = useState(false);
   const offOpen = showOff || offCrews.some((c) => c.crewId === selectedCrewId);
@@ -119,9 +122,11 @@ export default function DashboardSidebar({
     <aside
       className={
         variant === "drawer"
-          ? "no-scrollbar flex w-[280px] max-w-[85vw] h-full flex-col bg-zinc-50 px-3.5 py-[18px] overflow-y-auto"
-          : // Pinned to the window; scrolls (without a scrollbar) only when the window is shorter than the menu.
-            "no-scrollbar hidden lg:flex w-[232px] shrink-0 flex-col bg-zinc-50 border-r border-zinc-100 px-3.5 py-[18px] sticky top-0 h-screen overflow-y-auto"
+          ? "flex w-[280px] max-w-[85vw] h-full flex-col bg-zinc-50 px-3.5 py-[18px]"
+          : // Pinned to the window: the org and the footer (Settings, Help, Log
+            // out) always show; only the lists between them move, and only
+            // when the window is shorter than they are.
+            "hidden lg:flex w-[232px] shrink-0 flex-col bg-zinc-50 border-r border-zinc-100 px-3.5 py-[18px] sticky top-0 h-screen"
       }
     >
       {/* Org switcher block */}
@@ -148,6 +153,7 @@ export default function DashboardSidebar({
         </div>
       </div>
 
+      <div className="no-scrollbar -mx-1 min-h-0 flex-1 overflow-y-auto px-1">
       {/* Places */}
       {!orgless && <nav className="flex flex-col gap-0.5">
         {NAV_ITEMS.map((item) => {
@@ -287,10 +293,10 @@ export default function DashboardSidebar({
         </>
       )}
 
-      <div className="flex-1" />
+      </div>
 
       {/* Footer */}
-      <div className="border-t border-zinc-200 pt-2.5 mt-4 flex flex-col">
+      <div className="shrink-0 border-t border-zinc-200 pt-2.5 mt-4 flex flex-col">
         {isOwner && (
           <button
             onClick={() => onNavigate("settings")}
