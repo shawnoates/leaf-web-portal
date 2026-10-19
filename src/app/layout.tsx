@@ -112,6 +112,18 @@ export default function RootLayout({
           }}
         />
         <script async src="https://bzrcdn.openai.com/sdk/oaiq.min.js" />
+        {/* Google Ads tag */}
+        <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18520912235" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'AW-18520912235');
+            `,
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col font-sans bg-white text-zinc-900 selection:bg-zinc-200">
         <UserActivityBeacon />
