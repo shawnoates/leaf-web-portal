@@ -123,6 +123,8 @@ interface Plan {
   // still belongs to the current host.
   hostIntroVideo: HostIntro | null;
   attendeeCount: number;
+  /** A business runs it (Aura's class): the host isn't counted as attending. */
+  businessHosted?: boolean;
   /** Accepted RSVPs only (host excluded) — the number the server compares
    *  against `capacity` when deciding to waitlist. `attendeeCount` pads +1
    *  for the host, so never use it for the full check. */
@@ -737,7 +739,11 @@ function buildIcsHref(opts: {
 
 // --- Components ---
 
-function AvatarStack({ count }: { count: number }) {
+/** "3 attending", or "Be the first to join" on a business's night nobody has joined yet. */
+const attendingLabel = (plan: Pick<Plan, "attendeeCount" | "businessHosted">) =>
+  plan.businessHosted && plan.attendeeCount === 0 ? "Be the first to join" : `${plan.attendeeCount} attending`;
+
+function AvatarStack({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-3">
       <div className="flex -space-x-3 overflow-hidden">
@@ -746,7 +752,7 @@ function AvatarStack({ count }: { count: number }) {
         </div>
       </div>
       <span className="text-xs tracking-widest uppercase font-bold text-zinc-400">
-        {count} Attending
+        {label}
       </span>
     </div>
   );
@@ -3259,9 +3265,12 @@ export default function OrgCalendarPage() {
         // rsvpCount tracks RSVPs only; a real host is always attending so add 1 —
         // but a virtual/AI host (or one Leaf hasn't confirmed yet) isn't a real
         // attendee, so don't pad the count for those.
+        // A business's night doesn't count its host either: "1 attending"
+        // with nobody signed up reads emptier than "Be the first to join".
         attendeeCount:
           ((p.rsvpCount as number) || 0) +
-          (p.leafHostState === "leaf_arranging" ? 0 : 1),
+          (p.leafHostState === "leaf_arranging" || (p.host as Record<string, unknown>)?.isBusinessHost ? 0 : 1),
+        businessHosted: Boolean((p.host as Record<string, unknown>)?.isBusinessHost),
         rsvpCount: (p.rsvpCount as number) || 0,
         capacity: typeof p.capacity === "number" && p.capacity > 0 ? p.capacity : null,
         location: p.location ? {
@@ -5133,7 +5142,7 @@ export default function OrgCalendarPage() {
                     ) : (
                       <>
                         <div className="flex items-center gap-3">
-                          <AvatarStack count={plan.attendeeCount} />
+                          <AvatarStack label={attendingLabel(plan)} />
                           {viewerHostsPlan(plan) ? (
                             <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
                               <Check className="w-3 h-3" /> Hosting
@@ -6098,7 +6107,7 @@ export default function OrgCalendarPage() {
                         </span>
                       </span>
                       <span className="flex items-center gap-2 whitespace-nowrap">
-                        <Users className="w-4 h-4 flex-shrink-0" /> {selectedEvent.attendeeCount} attending
+                        <Users className="w-4 h-4 flex-shrink-0" /> {attendingLabel(selectedEvent)}
                         {planIsFull(selectedEvent) && (
                           <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600">· Full</span>
                         )}

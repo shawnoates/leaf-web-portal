@@ -166,10 +166,17 @@ export default function FriendInviteCard({
             type="text"
             value={friendName}
             onChange={(e) => setFriendName(e.target.value)}
-            placeholder={limitedSpots ? "Name (optional, holds a spot)" : "Name (optional)"}
+            // Chrome read "Name" as a cardholder name and offered saved cards
+            // (2026-10-18), ignoring autocomplete="off"; so no "name" in the
+            // placeholder, label or field name, and password managers told to skip it.
+            placeholder={limitedSpots ? "Who\u2019s it for? (optional, holds a spot)" : "Who\u2019s it for? (optional)"}
             maxLength={40}
+            name="leaf-invite-for"
             autoComplete="off"
-            aria-label="Friend's first name, optional"
+            data-1p-ignore
+            data-lpignore="true"
+            data-form-type="other"
+            aria-label="Who the invite is for, optional"
             className="flex-1 min-w-0 border-b border-zinc-300 py-2 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors"
           />
           <button
