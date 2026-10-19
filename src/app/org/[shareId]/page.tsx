@@ -83,7 +83,7 @@ import {
 } from "lucide-react";
 import { OnlyOnLeafLine, OnlyOnLeafPill, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
 import { PhotoCredit } from "@/components/PhotoCredit";
-import HostPointsTag from "@/components/HostPointsTag";
+import HostPointsTag, { HostPointsNote } from "@/components/HostPointsTag";
 import PointsChip from "@/components/PointsChip";
 import CheckInPill from "@/components/CheckInPill";
 
@@ -7034,6 +7034,7 @@ export default function OrgCalendarPage() {
                         {hostError}
                       </p>
                     )}
+                    <div className="pt-4"><HostPointsNote /></div>
                     <div className="pt-8 flex gap-4">
                       <button
                         type="button"
@@ -8503,6 +8504,8 @@ export default function OrgCalendarPage() {
                     <PhoneVerifyFields verify={hostVerify} />
                   </div>
                 )}
+
+                <HostPointsNote />
 
                 <div className="flex flex-col gap-3 pt-2">
                   <button

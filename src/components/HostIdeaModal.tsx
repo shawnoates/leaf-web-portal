@@ -6,6 +6,7 @@ import { isVenueBlacklisted } from "@/lib/venue-blacklist";
 import { ensureGooglePlaces, fetchVenuePhotoUrl } from "@/lib/google-places";
 import { zoneOffsetSuffix } from "@/lib/wall-clock";
 import PlanIntroSection from "@/components/PlanIntroSection";
+import { HostPointsNote } from "@/components/HostPointsTag";
 import {
   AlertTriangle,
   Calendar,
@@ -684,6 +685,8 @@ export default function HostIdeaModal({
                 </div>
 
                 {error && <p className="text-sm text-red-500">{error}</p>}
+
+                <HostPointsNote />
 
                 <div className="pt-2 flex gap-4">
                   <button
