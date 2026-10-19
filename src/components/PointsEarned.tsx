@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { awardLine, type PointsUnseen } from "@/lib/points";
+import { POINTS_EVENT } from "@/components/PointsChip";
 
 // "You earned points", shown on the first Leaf page someone opens after an
 // award. The very first award opens the celebration (dark green hero, a
@@ -49,7 +50,11 @@ export default function PointsEarned() {
   const dismiss = () => {
     const id = award.id;
     setAward(null);
-    Parse.Cloud.run("markPointsSeen", { ids: [id] }).catch(() => {});
+    // Mark it seen first, then tell any header chip to pull the new balance
+    // and nudge: the points land where people look for them.
+    Parse.Cloud.run("markPointsSeen", { ids: [id] })
+      .catch(() => {})
+      .finally(() => window.dispatchEvent(new Event(POINTS_EVENT)));
   };
 
   const where = award.businessName || award.planTitle || "this plan";
@@ -177,9 +182,10 @@ function Celebration({
 
           <p style={S.balance}>Your balance: <b style={{ fontWeight: 600, color: "#17150f" }}>{balance} points</b></p>
 
-          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-            <Link href="/me#points" onClick={onClose} style={S.ghost}>See my points</Link>
-            <button type="button" onClick={onClose} style={S.primary}>{isHost ? "Host another" : "Keep going"}</button>
+          <div style={{ marginTop: 14 }}>
+            <button type="button" onClick={onClose} style={{ ...S.primary, width: "100%" }}>
+              {isHost ? "Host another" : "Keep going"}
+            </button>
           </div>
 
           <button type="button" onClick={() => setExplainer((v) => !v)} style={S.what}>

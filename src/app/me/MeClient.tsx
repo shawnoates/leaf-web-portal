@@ -38,6 +38,7 @@ import FriendModeSetup from "@/components/dashboard/FriendModeSetup";
 import FriendModeCalendarPicker from "@/components/crew/FriendModeCalendarPicker";
 import { useInApp } from "@/components/crew/CrewShell";
 import HostPointsTag from "@/components/HostPointsTag";
+import PointsChip from "@/components/PointsChip";
 import { awardLine, type PointsSummary } from "@/lib/points";
 
 // ============================================================================
@@ -1043,11 +1044,8 @@ function DashboardView({
             </div>
           )}
           <div className="topbar-r">
-            {points && (
-              <a className="pts-chip" href="#points" aria-label={`${points.balance} points, see my points`}>
-                {points.balance} pts
-              </a>
-            )}
+            <PointsChip />
+
             <button className="pill" onClick={openCreate}>+ New plan</button>
             {!inApp && (
               <div className="who">

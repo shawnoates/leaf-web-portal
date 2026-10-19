@@ -84,6 +84,7 @@ import {
 import { OnlyOnLeafLine, OnlyOnLeafPill, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
 import { PhotoCredit } from "@/components/PhotoCredit";
 import HostPointsTag from "@/components/HostPointsTag";
+import PointsChip from "@/components/PointsChip";
 
 
 // --- Types ---
@@ -4646,6 +4647,7 @@ export default function OrgCalendarPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <PointsChip />
             {!org.isOwner && !org.isHost && (
               isFollowing ? (
                 <button
@@ -4728,6 +4730,7 @@ export default function OrgCalendarPage() {
             </span>
           </div>
           <div className="flex items-center gap-2 flex-none">
+            <PointsChip />
             {!org.isOwner && !org.isHost && (
               isFollowing ? (
                 <button
