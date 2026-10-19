@@ -110,8 +110,9 @@ export default function DashboardSidebar({
     <aside
       className={
         variant === "drawer"
-          ? "flex w-[280px] max-w-[85vw] h-full flex-col bg-zinc-50 px-3.5 py-[18px] overflow-y-auto"
-          : "hidden lg:flex w-[232px] shrink-0 flex-col bg-zinc-50 border-r border-zinc-100 px-3.5 py-[18px] sticky top-0 h-screen overflow-y-auto"
+          ? "no-scrollbar flex w-[280px] max-w-[85vw] h-full flex-col bg-zinc-50 px-3.5 py-[18px] overflow-y-auto"
+          : // Pinned to the window; scrolls (without a scrollbar) only when the window is shorter than the menu.
+            "no-scrollbar hidden lg:flex w-[232px] shrink-0 flex-col bg-zinc-50 border-r border-zinc-100 px-3.5 py-[18px] sticky top-0 h-screen overflow-y-auto"
       }
     >
       {/* Org switcher block */}
