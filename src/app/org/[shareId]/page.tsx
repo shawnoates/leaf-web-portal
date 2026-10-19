@@ -5403,7 +5403,6 @@ export default function OrgCalendarPage() {
                                     canHostAsHost || !!org.allowFollowersToHost;
                                   if (!active) return null;
                                   return (
-                                    <div className="flex flex-col items-center gap-1.5">
                                     <button
                                       onClick={() => {
                                         // Blank, never prefilled: a canned
@@ -5419,8 +5418,6 @@ export default function OrgCalendarPage() {
                                     >
                                       Host This
                                     </button>
-                                    <HostPointsTag />
-                                    </div>
                                   );
                                 })()}
                                 <button
@@ -5432,6 +5429,9 @@ export default function OrgCalendarPage() {
                                   <span className="text-xs font-bold uppercase tracking-widest">Share</span>
                                 </button>
                               </div>
+                              {(org.isOwner || org.isHost || !!org.allowFollowersToHost) && (
+                                <div className="-mt-3"><HostPointsTag /></div>
+                              )}
                             </div>
                           </div>
                         </article>
@@ -5690,7 +5690,6 @@ export default function OrgCalendarPage() {
                             canHostAsHost || !!org.allowFollowersToHost;
                           if (!active) return null;
                           return (
-                            <div className="flex flex-col items-center gap-1.5">
                             <button
                               onClick={() => {
                                 if (org.rsvpLimitReached) return;
@@ -5715,8 +5714,6 @@ export default function OrgCalendarPage() {
                             >
                               Host This
                             </button>
-                            {!org.rsvpLimitReached && <HostPointsTag />}
-                            </div>
                           );
                         })()}
                         {!idea.isFeatured && (
@@ -5730,6 +5727,9 @@ export default function OrgCalendarPage() {
                           </button>
                         )}
                       </div>
+                      {!org.rsvpLimitReached && (org.isOwner || org.isHost || !!org.allowFollowersToHost) && (
+                        <div className="-mt-3"><HostPointsTag /></div>
+                      )}
                     </div>
                   </div>
                 </article>
