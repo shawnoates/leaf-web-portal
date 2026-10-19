@@ -4,6 +4,10 @@
  * The card on file for bars and restaurants. Stripe's Payment Element is
  * mounted into a div; the parent calls `save()` (through the ref) when the
  * merchant taps the main button, so saving the card and accepting is one tap.
+ *
+ * Deferred setup (2026-10-18): the element loads with only the publishable
+ * key; the Stripe customer and SetupIntent are made on save, so opening the
+ * page leaves nothing in Stripe.
  */
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
@@ -34,13 +38,17 @@ const CardSetup = forwardRef<
       setReady(false);
       (async () => {
         try {
-          const s = (await merchantRun("createMerchantCardSetup", { token })) as { clientSecret: string; publishableKey: string };
+          const s = (await merchantRun("createMerchantCardSetup", { token, prepare: true })) as { publishableKey: string };
           if (!s.publishableKey) throw new Error("Card entry isn't available right now.");
           const stripe = await loadStripe(s.publishableKey);
           if (cancelled || !stripe || !mountRef.current) return;
           stripeRef.current = stripe;
           const elements = stripe.elements({
-            clientSecret: s.clientSecret,
+            mode: "setup",
+            currency: "usd",
+            setupFutureUsage: "off_session",
+            // Must match the SetupIntent the server makes on save (card, Apple/Google Pay, Link).
+            paymentMethodTypes: ["card", "link"],
             appearance: {
               theme: "stripe",
               variables: { borderRadius: "12px", colorPrimary: "#253A33", fontFamily: "inherit", fontSizeBase: "16px" },
@@ -66,7 +74,11 @@ const CardSetup = forwardRef<
         const stripe = stripeRef.current;
         const elements = elementsRef.current;
         if (!stripe || !elements) throw new Error("Add a card to hold your first free Neighbor Hour.");
-        const { error: err, setupIntent } = await stripe.confirmSetup({ elements, redirect: "if_required" });
+        // Check the card form first; only then make the customer and the setup.
+        const { error: invalid } = await elements.submit();
+        if (invalid) throw new Error(invalid.message || "Check your card details.");
+        const s = (await merchantRun("createMerchantCardSetup", { token })) as { clientSecret: string };
+        const { error: err, setupIntent } = await stripe.confirmSetup({ elements, clientSecret: s.clientSecret, redirect: "if_required" });
         if (err) throw new Error(err.message || "That card didn't save.");
         if (!setupIntent) throw new Error("That card didn't save.");
         const r = (await merchantRun("saveMerchantCard", { token, setupIntentId: setupIntent.id })) as { card: Card };
