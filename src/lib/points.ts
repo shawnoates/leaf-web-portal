@@ -6,7 +6,7 @@ export const HOST_POINTS_MAX = 50;
 
 export interface PointsRow {
   id: string;
-  kind: "attend" | "host";
+  kind: "attend" | "host" | "chat";
   delta: number;
   planTitle: string | null;
   businessName: string | null;
@@ -39,6 +39,7 @@ export interface PointsSummary {
 /** "Visit 3 at Still Studio" / "You hosted Thursday run". */
 export function awardLine(r: PointsRow): string {
   if (r.kind === "host") return `You hosted ${r.planTitle || "a plan"}`;
+  if (r.kind === "chat") return `Chatted in ${r.planTitle || "a plan"}`;
   const where = r.businessName || r.planTitle || "this plan";
   return r.visitNumber ? `Visit ${r.visitNumber} at ${where}` : `Went to ${where}`;
 }
