@@ -6414,6 +6414,16 @@ export default function OrgCalendarPage() {
                       <Check className="w-4 h-4 text-emerald-600" />
                       <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">You&apos;re Attending</span>
                     </div>
+                    <div className="flex justify-center">
+                      <CheckInPill
+                        planId={selectedEvent.id}
+                        date={selectedEvent.dateISO ?? null}
+                        points={checkInInfo[selectedEvent.id]?.points}
+                        checkedIn={checkInInfo[selectedEvent.id]?.checkedIn}
+                        going
+                        hosting={false}
+                      />
+                    </div>
                     {/* Add-ons for someone who is already in. The RSVP success
                         step is the first offer; this is the way back for a guest
                         who RSVP'd before the add-on existed or said "No thanks".
@@ -6468,6 +6478,7 @@ export default function OrgCalendarPage() {
                     )}
                   </div>
                 ) : (
+                  <>
                   <div className="flex gap-4">
                     {/* RSVP closes at start time. The card itself stays up until
                         local midnight, so without a state of its own this
@@ -6499,6 +6510,14 @@ export default function OrgCalendarPage() {
                       <span className="text-xs font-bold uppercase tracking-widest">Share</span>
                     </button>
                   </div>
+                  {planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "upcoming"
+                    && !selectedEvent.location?.isPrivate
+                    && (selectedEvent.location?.name || selectedEvent.location?.address) && (
+                    <p className="mt-3 text-xs text-zinc-500">
+                      Check in when you get there to earn Leaf points.
+                    </p>
+                  )}
+                  </>
                 )}
                 {/* Full plan: the guest just read the whole pitch and hit a
                     waitlist. Show this calendar's other hosted plans with a
