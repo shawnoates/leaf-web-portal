@@ -52,6 +52,9 @@ export type DashboardSidebarProps = {
   variant?: "desktop" | "drawer";
 };
 
+/** Active crews listed before "Show all", so the menu fits a laptop screen. */
+const LIVE_CREWS_SHOWN = 6;
+
 export default function DashboardSidebar({
   orgName,
   tierLabel,
@@ -80,6 +83,12 @@ export default function DashboardSidebar({
   const offCrews = crews.filter(isOff);
   const [showOff, setShowOff] = useState(false);
   const offOpen = showOff || offCrews.some((c) => c.crewId === selectedCrewId);
+  // Keep the menu short enough to fit: the first few crews, then "Show all"
+  // (all of them when the selected crew is further down).
+  const [showAllLive, setShowAllLive] = useState(false);
+  const selectedFarDown = liveCrews.findIndex((c) => c.crewId === selectedCrewId) >= LIVE_CREWS_SHOWN;
+  const liveOpen = showAllLive || selectedFarDown;
+  const shownLive = liveOpen ? liveCrews : liveCrews.slice(0, LIVE_CREWS_SHOWN);
   const crewRow = (crew: DashboardCrew) => {
     const selected = selectedCrewId === crew.crewId;
     const icon = crew.image || crew.iconUrl;
@@ -240,7 +249,18 @@ export default function DashboardSidebar({
             Friend Mode
           </p>
           <div className="flex flex-col gap-0.5">
-            {liveCrews.map(crewRow)}
+            {shownLive.map(crewRow)}
+            {liveCrews.length > LIVE_CREWS_SHOWN && !(selectedFarDown && !showAllLive) && (
+              <button
+                type="button"
+                onClick={() => setShowAllLive((v) => !v)}
+                aria-expanded={liveOpen}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-left text-[11px] text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors"
+              >
+                <ChevronRight className={`w-3 h-3 transition-transform ${liveOpen ? "-rotate-90" : "rotate-90"}`} aria-hidden />
+                {liveOpen ? "Show fewer" : `Show all ${liveCrews.length}`}
+              </button>
+            )}
             {onStartCrew && (
               <button
                 onClick={onStartCrew}
