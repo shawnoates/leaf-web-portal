@@ -85,6 +85,7 @@ import { OnlyOnLeafLine, OnlyOnLeafPill, type OnlyOnLeafInfo } from "@/component
 import { PhotoCredit } from "@/components/PhotoCredit";
 import HostPointsTag from "@/components/HostPointsTag";
 import PointsChip from "@/components/PointsChip";
+import CheckInPill from "@/components/CheckInPill";
 
 
 // --- Types ---
@@ -2144,6 +2145,23 @@ export default function OrgCalendarPage() {
   // surface reappear in the other.
   const [hostThisNote, setHostThisNote] = useState("");
   const [rsvpedPlanIds, setRsvpedPlanIds] = useState<Set<string>>(new Set());
+  // What a check-in is worth for the signed-in viewer on each plan they're going
+  // to, and whether they already did. Fetched from the server, never computed here.
+  const [checkInInfo, setCheckInInfo] = useState<Record<string, { points: number | null; checkedIn: boolean }>>({});
+  const rsvpedKey = [...rsvpedPlanIds].sort().join(",");
+  useEffect(() => {
+    if (!rsvpedKey) return;
+    try {
+      if (!Parse.User.current()) return;
+    } catch { return; }
+    let cancelled = false;
+    Parse.Cloud.run("getMyCheckInInfo", { planIds: rsvpedKey.split(",") })
+      .then((res: Record<string, { points: number | null; checkedIn: boolean }>) => {
+        if (!cancelled && res) setCheckInInfo(res);
+      })
+      .catch(() => { /* non-fatal */ });
+    return () => { cancelled = true; };
+  }, [rsvpedKey]);
   const [pendingRsvpIds, setPendingRsvpIds] = useState<Set<string>>(new Set());
   // Waitlist state on top of "pending": which pending rows are waitlist
   // seats (vs approval requests), and which of those hold an open claim
@@ -5165,6 +5183,18 @@ export default function OrgCalendarPage() {
                             </span>
                           ) : null}
                         </div>
+                        {rsvpedPlanIds.has(plan.id) && !viewerHostsPlan(plan) && (
+                          <div className="-mt-3">
+                            <CheckInPill
+                              planId={plan.id}
+                              date={plan.dateISO ?? null}
+                              points={checkInInfo[plan.id]?.points}
+                              checkedIn={checkInInfo[plan.id]?.checkedIn}
+                              going
+                              hosting={false}
+                            />
+                          </div>
+                        )}
                         {p2pPriceShort(plan.p2pAmountCents, plan.p2pSplit) && (
                           // Under the attending count, icon centred on the avatar so the two read as one block.
                           <p className="-mt-3 flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-zinc-900">
