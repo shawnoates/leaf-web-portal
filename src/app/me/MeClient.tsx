@@ -39,7 +39,7 @@ import FriendModeCalendarPicker from "@/components/crew/FriendModeCalendarPicker
 import { useInApp } from "@/components/crew/CrewShell";
 import HostPointsTag from "@/components/HostPointsTag";
 import PointsChip from "@/components/PointsChip";
-import { awardLine, type PointsSummary } from "@/lib/points";
+import { awardDetail, type PointsSummary } from "@/lib/points";
 
 // ============================================================================
 // Attendee dashboard (/me). The signed-in home: the next plan, everything
@@ -1048,9 +1048,8 @@ function DashboardView({
             </div>
           )}
           <div className="topbar-r">
-            <PointsChip />
-
             <button className="pill" onClick={openCreate}>+ New plan</button>
+            <PointsChip />
             {!inApp && (
               <div className="who">
                 <span>{data.person.firstName || "You"}</span>
@@ -2456,7 +2455,7 @@ function PointsRail({ points }: { points: PointsSummary }) {
           <div className="place" key={r.id}>
             <div className="place-text">
               <div className="place-n">{r.planTitle || "Plan"}</div>
-              <div className="place-s">{awardLine(r)}{r.createdAt ? ` · ${ago(r.createdAt)}` : ""}</div>
+              <div className="place-s">{awardDetail(r)}{r.createdAt ? ` · ${ago(r.createdAt)}` : ""}</div>
             </div>
             <span className="pts">{r.delta > 0 ? "+" : ""}{r.delta}</span>
           </div>

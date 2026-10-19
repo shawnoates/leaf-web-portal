@@ -43,3 +43,11 @@ export function awardLine(r: PointsRow): string {
   const where = r.businessName || r.planTitle || "this plan";
   return r.visitNumber ? `Visit ${r.visitNumber} at ${where}` : `Went to ${where}`;
 }
+
+/** The line under a row that already shows the plan title: no repeat of it. */
+export function awardDetail(r: PointsRow): string {
+  if (r.kind === "host") return "You hosted";
+  if (r.kind === "chat") return "Chat bonus";
+  const where = r.businessName || "this plan";
+  return r.visitNumber ? `Visit ${r.visitNumber} at ${where}` : `Went to ${where}`;
+}

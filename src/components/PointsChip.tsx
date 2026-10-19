@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
-import { awardLine, type PointsSummary } from "@/lib/points";
+import { awardDetail, type PointsSummary } from "@/lib/points";
 
 // The signed-in member's Leaf points, top right of a page header. A small
 // "60 pts" chip; tapping it opens a popover with the balance, the places
@@ -113,7 +113,7 @@ export default function PointsChip({ className }: { className?: string }) {
             <div key={r.id} style={S.row}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12.5 }}>{r.planTitle || "Plan"}</div>
-                <div style={S.muted}>{awardLine(r)}</div>
+                <div style={S.muted}>{awardDetail(r)}</div>
               </div>
               <span style={S.tag}>{r.delta > 0 ? "+" : ""}{r.delta}</span>
             </div>
