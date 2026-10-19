@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   Calendar,
+  ChevronRight,
   Users,
   TrendingUp,
   Mail,
@@ -71,6 +73,39 @@ export default function DashboardSidebar({
   orgless = false,
   variant = "desktop",
 }: DashboardSidebarProps) {
+  // Crews that are switched off or paused sit at the bottom, folded away
+  // (open when one of them is the one being looked at).
+  const isOff = (c: DashboardCrew) => c.status === "off" || c.status === "paused";
+  const liveCrews = crews.filter((c) => !isOff(c));
+  const offCrews = crews.filter(isOff);
+  const [showOff, setShowOff] = useState(false);
+  const offOpen = showOff || offCrews.some((c) => c.crewId === selectedCrewId);
+  const crewRow = (crew: DashboardCrew) => {
+    const selected = selectedCrewId === crew.crewId;
+    const icon = crew.image || crew.iconUrl;
+    return (
+      <button
+        key={crew.crewId}
+        onClick={() => onSelectCrew?.(crew.crewId)}
+        title={crew.statusLine || undefined}
+        className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
+          selected ? "bg-white border border-zinc-200" : "border border-transparent hover:bg-zinc-100"
+        } ${isOff(crew) ? "opacity-60" : ""}`}
+      >
+        {icon ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={icon} alt="" className={`w-[18px] h-[18px] object-cover shrink-0 ${crew.image ? "rounded-full" : "rounded-[5px]"}`} />
+        ) : (
+          <FriendModeIcon size={18} className="shrink-0" />
+        )}
+        <span className={`text-xs truncate ${selected ? "font-medium text-zinc-900" : "font-normal text-zinc-700"}`}>
+          {crew.name}
+        </span>
+        {crew.status === "invited" && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" aria-label="Invited" />}
+      </button>
+    );
+  };
+
   return (
     <aside
       className={
@@ -204,30 +239,7 @@ export default function DashboardSidebar({
             Friend Mode
           </p>
           <div className="flex flex-col gap-0.5">
-            {crews.map((crew) => {
-              const selected = selectedCrewId === crew.crewId;
-              return (
-                <button
-                  key={crew.crewId}
-                  onClick={() => onSelectCrew?.(crew.crewId)}
-                  title={crew.statusLine || undefined}
-                  className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
-                    selected ? "bg-white border border-zinc-200" : "border border-transparent hover:bg-zinc-100"
-                  } ${crew.status === "off" || crew.status === "paused" ? "opacity-60" : ""}`}
-                >
-                  {crew.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={crew.image} alt="" className="w-[18px] h-[18px] rounded-full object-cover shrink-0" />
-                  ) : (
-                    <FriendModeIcon size={18} className="shrink-0" />
-                  )}
-                  <span className={`text-xs truncate ${selected ? "font-medium text-zinc-900" : "font-normal text-zinc-700"}`}>
-                    {crew.name}
-                  </span>
-                  {crew.status === "invited" && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" aria-label="Invited" />}
-                </button>
-              );
-            })}
+            {liveCrews.map(crewRow)}
             {onStartCrew && (
               <button
                 onClick={onStartCrew}
@@ -235,6 +247,20 @@ export default function DashboardSidebar({
               >
                 <Plus className="w-3.5 h-3.5" /> Start a crew
               </button>
+            )}
+            {offCrews.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowOff((v) => !v)}
+                  aria-expanded={offOpen}
+                  className="mt-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-left text-[11px] text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors"
+                >
+                  <ChevronRight className={`w-3 h-3 transition-transform ${offOpen ? "rotate-90" : ""}`} aria-hidden />
+                  Off · {offCrews.length}
+                </button>
+                {offOpen && offCrews.map(crewRow)}
+              </>
             )}
           </div>
         </>

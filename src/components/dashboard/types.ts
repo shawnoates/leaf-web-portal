@@ -485,6 +485,8 @@ export interface DashboardCrew {
   crewId: string;
   name: string;
   image?: string | null;
+  /** The crew's claymation icon (from its name), when it has no photo. */
+  iconUrl?: string | null;
   status: "active" | "paused" | "invited" | "off";
   statusLine?: string | null;
   isOwner?: boolean;
