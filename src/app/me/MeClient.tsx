@@ -37,6 +37,8 @@ import FriendModeIntro, { friendModeIntroDue, stampFriendModeIntro, type FriendM
 import FriendModeSetup from "@/components/dashboard/FriendModeSetup";
 import FriendModeCalendarPicker from "@/components/crew/FriendModeCalendarPicker";
 import { useInApp } from "@/components/crew/CrewShell";
+import HostPointsTag from "@/components/HostPointsTag";
+import { awardLine, type PointsSummary } from "@/lib/points";
 
 // ============================================================================
 // Attendee dashboard (/me). The signed-in home: the next plan, everything
@@ -286,6 +288,8 @@ interface Dashboard {
     prefersEmail?: boolean;
   };
   greeting?: { weather: Weather | null };
+  /** Leaf points; absent on older servers or if the lookup failed. */
+  points?: PointsSummary | null;
   needsHost?: NeedsHost;
   pendingRecaps?: PendingRecap[]; // may be absent while the server side ships
   spotProbes?: SpotProbe[]; // may be absent while the server side ships
@@ -1014,10 +1018,15 @@ function DashboardView({
   const inApp = useInApp();
   useNativeLinksInApp();
 
+  // The points card stays hidden until they have earned something.
+  const points = data.points && (data.points.balance > 0 || data.points.businesses.length > 0)
+    ? data.points : null;
+
   const hasRail =
     (rail && (rail.tier1.length > 0 || rail.tier2.length > 0)) ||
     places.length > 0 ||
     recaps.length > 0 ||
+    points !== null ||
     mapPins.length > 0 ||
     crews.length > 0;
 
@@ -1034,6 +1043,11 @@ function DashboardView({
             </div>
           )}
           <div className="topbar-r">
+            {points && (
+              <a className="pts-chip" href="#points" aria-label={`${points.balance} points, see my points`}>
+                {points.balance} pts
+              </a>
+            )}
             <button className="pill" onClick={openCreate}>+ New plan</button>
             {!inApp && (
               <div className="who">
@@ -1180,6 +1194,7 @@ function DashboardView({
             {recaps.length > 0 && (
               <RecapRail rows={recaps} onOpen={(r) => setPopupRecap(r)} />
             )}
+            {points && <PointsRail points={points} />}
             {mapPins.length > 0 && (
               <section className="rail railmap">
                 <div className="eyebrow">Your week, mapped</div>
@@ -1928,7 +1943,10 @@ function PlanRow({
       </div>
       <div className="row-act">
         {plan.hostState === "waiting_on_host" ? (
-          <Link className="row-btn host" href={hostHref} onClick={bridgeIdentityToOrgPage}>Host this</Link>
+          <>
+            <Link className="row-btn host" href={hostHref} onClick={bridgeIdentityToOrgPage}>Host this</Link>
+            <HostPointsTag short className="pts-host" />
+          </>
         ) : canAttend ? (
           <AttendCta plan={plan} onRsvp={onRsvp} />
         ) : canChat(plan) ? (
@@ -2407,6 +2425,50 @@ function TextsCard({
   );
 }
 
+// ---- Rail: your Leaf points -------------------------------------------------
+function PointsRail({ points }: { points: PointsSummary }) {
+  return (
+    <section className="rail" id="points">
+      <div className="eyebrow">Your Leaf points</div>
+      <div className="places">
+        <div className="place pts-bal">
+          <div className="place-text">
+            <div><span className="pts-big">{points.balance}</span> <span className="place-s">points</span></div>
+            <div className="place-s">Ticket discounts are coming soon.</div>
+          </div>
+          {points.monthEarned > 0 && <span className="pts">+{points.monthEarned} this month</span>}
+        </div>
+        {points.businesses.slice(0, 3).map((b) => (
+          <div className="place" key={b.id}>
+            <div className="place-text">
+              <div className="place-n">{b.name}</div>
+              <div className="place-s">Visit {b.visits} · next visit worth {b.nextWorth}</div>
+              <div className="pts-bar"><span style={{ width: `${Math.min(100, (b.visits / 5) * 100)}%` }} /></div>
+            </div>
+            {b.regular && <span className="pts">Regular</span>}
+          </div>
+        ))}
+        {points.recent.slice(0, 3).map((r) => (
+          <div className="place" key={r.id}>
+            <div className="place-text">
+              <div className="place-n">{r.planTitle || "Plan"}</div>
+              <div className="place-s">{awardLine(r)}{r.createdAt ? ` · ${ago(r.createdAt)}` : ""}</div>
+            </div>
+            <span className="pts">{r.delta > 0 ? "+" : ""}{r.delta}</span>
+          </div>
+        ))}
+        <details className="place pts-how">
+          <summary>How points work</summary>
+          <p>
+            Check in at a plan to earn. The more you return to a place, the more each visit is worth:
+            10, 20, 30, 40, then 50. Host a plan and earn when people show up.
+          </p>
+        </details>
+      </div>
+    </section>
+  );
+}
+
 // ---- Rail: calendars you follow -------------------------------------------
 function CalendarsRail({ rows }: { rows: HostCalRow[] }) {
   return (
@@ -2588,6 +2650,7 @@ function NeedsHostPopup({
                 </button>
                 <button className="btn popup-host" onClick={() => setHosting(true)}>Host this</button>
               </div>
+              <div className="pts-popup"><HostPointsTag /></div>
             </>
           )}
         </div>
@@ -3223,6 +3286,17 @@ const CSS = `
 .leafme .place-text{flex:1 1 auto;min-width:0}
 .leafme .place-n{font-size:12.5px;color:var(--ink)}
 .leafme .place-s{font-size:10.5px;color:var(--muted)}
+.leafme .pts{font-size:10.5px;font-weight:500;color:var(--green);background:var(--green-tint);border-radius:999px;padding:3px 9px;white-space:nowrap}
+.leafme .pts-chip{font-size:11px;font-weight:500;color:var(--green);background:var(--green-tint);border:1px solid var(--card);border-radius:999px;padding:5px 11px;white-space:nowrap}
+.leafme .pts-big{font-size:24px;font-weight:500;line-height:1.1}
+.leafme .pts-bal{padding:12px 11px}
+.leafme .pts-bar{height:3px;border-radius:2px;background:var(--line);margin-top:5px;overflow:hidden}
+.leafme .pts-bar span{display:block;height:100%;background:var(--green)}
+.leafme .pts-how{display:block}
+.leafme .pts-how summary{font-size:11px;color:var(--green);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.leafme .pts-how p{font-size:10.5px;color:var(--muted);margin-top:6px}
+.leafme .pts-host{display:block;margin-top:5px;text-align:right}
+.leafme .pts-popup{margin-top:10px}
 /* Recap rows reuse the .place shell but carry a button, not a heart — the
    mobile rules below give .row-btn a top margin meant for the plan spine. */
 .leafme .place .row-btn{flex:none;margin-top:0}

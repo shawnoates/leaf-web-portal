@@ -83,6 +83,7 @@ import {
 } from "lucide-react";
 import { OnlyOnLeafLine, OnlyOnLeafPill, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
 import { PhotoCredit } from "@/components/PhotoCredit";
+import HostPointsTag from "@/components/HostPointsTag";
 
 
 // --- Types ---
@@ -4565,6 +4566,7 @@ export default function OrgCalendarPage() {
                 Host this
               </button>
             )}
+            {canHost && !org.rsvpLimitReached && <HostPointsTag short className="self-end" />}
           </div>
         </div>
       </article>
@@ -5401,6 +5403,7 @@ export default function OrgCalendarPage() {
                                     canHostAsHost || !!org.allowFollowersToHost;
                                   if (!active) return null;
                                   return (
+                                    <div className="flex flex-col items-center gap-1.5">
                                     <button
                                       onClick={() => {
                                         // Blank, never prefilled: a canned
@@ -5416,6 +5419,8 @@ export default function OrgCalendarPage() {
                                     >
                                       Host This
                                     </button>
+                                    <HostPointsTag />
+                                    </div>
                                   );
                                 })()}
                                 <button
@@ -5685,6 +5690,7 @@ export default function OrgCalendarPage() {
                             canHostAsHost || !!org.allowFollowersToHost;
                           if (!active) return null;
                           return (
+                            <div className="flex flex-col items-center gap-1.5">
                             <button
                               onClick={() => {
                                 if (org.rsvpLimitReached) return;
@@ -5709,6 +5715,8 @@ export default function OrgCalendarPage() {
                             >
                               Host This
                             </button>
+                            {!org.rsvpLimitReached && <HostPointsTag />}
+                            </div>
                           );
                         })()}
                         {!idea.isFeatured && (

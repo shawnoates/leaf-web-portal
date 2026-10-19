@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Instrument_Serif, JetBrains_Mono, Manrope, Newsreader } from "next/font/google";
 import "./globals.css";
 import UserActivityBeacon from "@/components/UserActivityBeacon";
+import PointsEarned from "@/components/PointsEarned";
 import { SITE_URL } from "@/lib/site";
 
 const inter = Inter({
@@ -127,6 +128,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col font-sans bg-white text-zinc-900 selection:bg-zinc-200">
         <UserActivityBeacon />
+        <PointsEarned />
         {children}
       </body>
     </html>
