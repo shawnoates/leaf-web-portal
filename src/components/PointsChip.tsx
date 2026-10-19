@@ -83,6 +83,10 @@ export default function PointsChip({ className }: { className?: string }) {
         aria-label={`${points.balance} points, open my points`}
         style={{ ...S.chip, animation: bump ? "lp-bump .6s ease-out" : undefined }}
       >
+        <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true" style={{ flex: "none" }}>
+          <circle cx="12" cy="12" r="11" fill="#253a33" />
+          <path d="M12 5.8l1.9 4 4.3.5-3.2 3 .9 4.3-3.9-2.2-3.9 2.2.9-4.3-3.2-3 4.3-.5z" fill="#c8f25a" />
+        </svg>
         {points.balance} pts
       </button>
 
@@ -127,7 +131,7 @@ const FONT = "var(--font-geist-sans, -apple-system, BlinkMacSystemFont, sans-ser
 const S: Record<string, React.CSSProperties> = {
   wrap: { position: "relative", display: "inline-block", fontFamily: FONT },
   chip: {
-    fontSize: 11, fontWeight: 500, color: "#253a33", background: "#f3f7f5", cursor: "pointer",
+    display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 500, color: "#253a33", background: "#f3f7f5", cursor: "pointer",
     border: "1px solid rgba(0,0,0,.09)", borderRadius: 999, padding: "5px 11px", whiteSpace: "nowrap",
     fontFamily: FONT,
   },

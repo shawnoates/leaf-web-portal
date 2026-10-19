@@ -1019,12 +1019,16 @@ function DashboardView({
   const inApp = useInApp();
   useNativeLinksInApp();
 
+  // Four or more calendars need a host: show them as cards in the wide column.
+  // Fewer stay a compact list in the rail, where a carousel would only hide them.
+  const calsWide = rail && rail.tier2.length >= CAL_CAROUSEL_MIN ? rail.tier2 : null;
+
   // The points card stays hidden until they have earned something.
   const points = data.points && (data.points.balance > 0 || data.points.businesses.length > 0)
     ? data.points : null;
 
   const hasRail =
-    (rail && (rail.tier1.length > 0 || rail.tier2.length > 0)) ||
+    (rail && (rail.tier1.length > 0 || (rail.tier2.length > 0 && !calsWide))) ||
     places.length > 0 ||
     recaps.length > 0 ||
     points !== null ||
@@ -1147,6 +1151,8 @@ function DashboardView({
             </section>
           )}
 
+          {calsWide && <CalendarsCarousel rows={calsWide} />}
+
           {qualifierActive && (
             <CommunityQualifierCard
               nearby={nearby}
@@ -1205,7 +1211,7 @@ function DashboardView({
             {places.length > 0 && (
               <PlacesRail probes={places} onAnswered={(id) => setPopupAnsweredId(id)} />
             )}
-            {rail && rail.tier2.length > 0 && <CalendarsRail rows={rail.tier2} />}
+            {rail && rail.tier2.length > 0 && !calsWide && <CalendarsRail rows={rail.tier2} />}
             <TextsCard inCrew={crews.length > 0} person={data.person} onChanged={onRefresh} />
           </aside>
         )}
@@ -2467,6 +2473,51 @@ function PointsRail({ points }: { points: PointsSummary }) {
   );
 }
 
+// ---- Wide column: calendars you follow, as cards ---------------------------
+const CAL_CAROUSEL_MIN = 4;
+
+function CalendarsCarousel({ rows }: { rows: HostCalRow[] }) {
+  const strip = useRef<HTMLDivElement>(null);
+  const scroll = (dir: -1 | 1) =>
+    strip.current?.scrollBy({ left: dir * 190, behavior: "smooth" });
+  return (
+    <section className="sect">
+      <div className="sect-head">
+        <div className="eyebrow">Calendars you follow</div>
+        <div className="cal-nav">
+          <button type="button" className="cal-arr" aria-label="Previous calendars" onClick={() => scroll(-1)}>‹</button>
+          <button type="button" className="cal-arr" aria-label="Next calendars" onClick={() => scroll(1)}>›</button>
+        </div>
+      </div>
+      <div className="cal-strip" ref={strip}>
+        {rows.map((c, i) => (
+          <Link
+            key={c.calendarId}
+            className="cal-card"
+            href={c.calendarShareId ? `/org/${c.calendarShareId}` : "#"}
+            onClick={bridgeIdentityToOrgPage}
+          >
+            {c.calendarPhoto ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="cal-photo" src={c.calendarPhoto} alt="" />
+            ) : (
+              <span className={`cal-photo ph ${i % 2 ? "cream" : "sage"}`}>{initial(c.calendarName)}</span>
+            )}
+            <div className="cal-card-b">
+              <div className="cal-card-n">{c.calendarName}</div>
+              <div className={`cal-s ${c.soonestIsUrgent ? "urgent" : ""}`}>
+                {c.count} plan{c.count === 1 ? "" : "s"} need{c.count === 1 ? "s" : ""} a host
+                {c.soonestIsUrgent ? " · soon" : ""}
+              </div>
+              <span className="row-btn ghost cal-card-go">View</span>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ---- Rail: calendars you follow -------------------------------------------
 function CalendarsRail({ rows }: { rows: HostCalRow[] }) {
   return (
@@ -3305,6 +3356,22 @@ const CSS = `
 .leafme .heart-toggle.on{background:var(--green);border-color:var(--green);color:#fff}
 .leafme .heart-toggle:disabled{cursor:default}
 
+.leafme .cal-nav{display:flex;gap:6px}
+.leafme .cal-arr{width:26px;height:26px;border-radius:50%;border:1px solid var(--edge);background:var(--paper);
+  color:var(--ink);font-size:14px;line-height:1;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center}
+.leafme .cal-arr:hover{background:var(--recessed)}
+.leafme .cal-strip{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px;scrollbar-width:none}
+.leafme .cal-strip::-webkit-scrollbar{display:none}
+.leafme .cal-card{flex:none;width:176px;scroll-snap-align:start;background:var(--paper);border:1px solid var(--card);
+  border-radius:10px;overflow:hidden;display:block}
+.leafme .cal-card:hover{border-color:var(--edge)}
+.leafme .cal-photo{display:block;width:100%;height:96px;object-fit:cover}
+.leafme .cal-photo.ph{display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:500;color:var(--green)}
+.leafme .cal-photo.sage{background:#dfe8e2}
+.leafme .cal-photo.cream{background:#efe9dc}
+.leafme .cal-card-b{padding:9px 10px 10px}
+.leafme .cal-card-n{font-size:12.5px;line-height:1.3;height:32px;overflow:hidden;color:var(--ink)}
+.leafme .cal-card-go{display:flex;justify-content:center;margin-top:9px}
 .leafme .cals{display:flex;flex-direction:column;gap:1px}
 .leafme .cal-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
 .leafme .cal-row:last-child{border-bottom:1px solid var(--line)}
