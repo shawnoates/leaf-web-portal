@@ -194,7 +194,7 @@ function Celebration({
 
         <div style={S.body}>
           {isHost ? (
-            <p style={S.copy}>Every person who shows up adds 3 more, up to 50 a plan. Host again to keep stacking.</p>
+            <p style={S.copy}>The more people who show up, the more you earn. Host again to keep stacking.</p>
           ) : (
             <p style={S.copy}>
               {awardLine(award)}.{award.nextWorth ? ` Come back and the next one is worth ${award.nextWorth}.` : ""}

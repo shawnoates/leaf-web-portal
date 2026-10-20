@@ -1,8 +1,6 @@
 // Leaf points, phase 1 (collect and show). The server owns the rules
 // (leaflets-server/cloud/points-rules.js); this file only carries the shapes it
-// returns and the one number the host surfaces advertise.
-
-export const HOST_POINTS_MAX = 50;
+// returns. Point amounts themselves are never hardcoded in the clients.
 
 export interface PointsRow {
   id: string;

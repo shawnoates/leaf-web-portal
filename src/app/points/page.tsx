@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { HOST_POINTS_MAX } from "@/lib/points";
 
 export const metadata: Metadata = {
   title: "How Leaf points work",
@@ -8,13 +7,6 @@ export const metadata: Metadata = {
     "Earn Leaf points by showing up to plans and hosting them. The more you return to a place, the more each visit is worth.",
 };
 
-const VISITS = [
-  { n: "1st visit", pts: 10 },
-  { n: "2nd", pts: 20 },
-  { n: "3rd", pts: 30 },
-  { n: "4th", pts: 40 },
-  { n: "5th and after", pts: 50 },
-];
 
 const INK = "#17150f";
 const BODY = "#6f6a5f";
@@ -53,28 +45,10 @@ export default function PointsPage() {
 
         <section style={{ marginTop: 40 }}>
           <p style={eyebrow}>Going to plans</p>
-          <h2 style={h2}>Check in, earn more each time you return</h2>
+          <h2 style={h2}>Check in, and earn more as you return</h2>
           <p style={p}>
-            Check in at a plan and you earn points. How many depends on how often you&rsquo;ve been to that
-            place before.
-          </p>
-          <div style={{ border: `1px solid ${LINE}`, borderRadius: 10, overflow: "hidden", margin: "16px 0" }}>
-            {VISITS.map((v, i) => (
-              <div
-                key={v.n}
-                style={{
-                  display: "flex", justifyContent: "space-between", padding: "12px 16px", fontSize: 15,
-                  borderTop: i ? `1px solid ${LINE}` : "none",
-                }}
-              >
-                <span>{v.n}</span>
-                <span style={{ color: GREEN, fontWeight: 500 }}>+{v.pts} points</span>
-              </div>
-            ))}
-          </div>
-          <p style={p}>
-            If you don&rsquo;t visit a place for 90 days, it steps back one level, so the habit is what
-            counts.
+            Check in at a plan and you earn points. The more often you go back to the same place, the more each
+            visit is worth, so showing up regularly is what counts.
           </p>
         </section>
 
@@ -97,10 +71,9 @@ export default function PointsPage() {
           <p style={eyebrow}>Hosting</p>
           <h2 style={h2}>Host a plan, earn when people come</h2>
           <p style={p}>
-            When a plan you host has run, you earn <b style={{ color: INK, fontWeight: 500 }}>10 points plus 3 for
-            every person who showed up</b>, up to {HOST_POINTS_MAX} points a plan. People count once they&rsquo;ve
-            checked in or you&rsquo;ve marked them as attended. A plan nobody came to earns nothing, and your own
-            check-in doesn&rsquo;t count.
+            When a plan you host has run, you earn points, and the more people who show up, the more you earn.
+            People count once they&rsquo;ve checked in or you&rsquo;ve marked them as attended. A plan nobody came
+            to earns nothing, and your own check-in doesn&rsquo;t count.
           </p>
           <p style={p}>Points for a hosted plan arrive a few hours after it ends.</p>
         </section>
@@ -109,8 +82,7 @@ export default function PointsPage() {
           <p style={eyebrow}>A small extra</p>
           <h2 style={h2}>Say hello in the plan chat</h2>
           <p style={p}>
-            The first message you send in a plan&rsquo;s chat after you&rsquo;ve checked in earns 5 points, once
-            per plan.
+            Chatting in a plan after you&rsquo;ve checked in can earn a small bonus, once per plan.
           </p>
         </section>
 
