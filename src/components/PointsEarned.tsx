@@ -232,7 +232,7 @@ const CSS = `
   animation-name:lp-fall;animation-timing-function:ease-out;animation-fill-mode:forwards}
 @keyframes lp-fall{0%{opacity:1;transform:translate(0,0) rotate(0)}
   100%{opacity:0;transform:translate(var(--dx),260px) rotate(var(--rot))}}
-.lp-cta{position:sticky;bottom:0;background:#fff;margin:14px -18px -18px;padding:10px 18px 18px}
+.lp-cta{position:sticky;bottom:0;background:#fff;margin:22px -26px 0;padding:6px 26px 4px}
 @media (max-height:560px){
   .lp-hero{padding:14px 20px 12px!important}
   .lp-num{font-size:44px!important;margin-top:6px!important}
@@ -268,7 +268,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   hero: {
     position: "relative", background: "#253a33", color: "#f2f1ec", textAlign: "center",
-    padding: "26px 20px 24px", overflow: "hidden",
+    padding: "30px 24px 28px", overflow: "hidden",
   },
   heroX: {
     position: "absolute", top: 10, right: 12, zIndex: 3, background: "transparent", border: "none",
@@ -278,34 +278,34 @@ const S: Record<string, React.CSSProperties> = {
     position: "relative", zIndex: 2, display: "inline-block", fontSize: 11, fontWeight: 500, color: "#c8f25a",
     border: "1px solid rgba(200,242,90,.4)", borderRadius: 999, padding: "4px 11px",
   },
-  head: { position: "relative", zIndex: 2, fontSize: 22, fontWeight: 600, margin: "12px 0 2px" },
+  head: { position: "relative", zIndex: 2, fontSize: 22, fontWeight: 600, margin: "16px 0 6px" },
   heroSub: { position: "relative", zIndex: 2, fontSize: 12, color: "#a3aca6" },
   num: {
     position: "relative", zIndex: 2, display: "inline-block", fontSize: 64, fontWeight: 600,
-    lineHeight: 1, color: "#c8f25a", marginTop: 12,
+    lineHeight: 1, color: "#c8f25a", marginTop: 22,
   },
   unit: {
     position: "relative", zIndex: 2, fontSize: 12, letterSpacing: ".14em", textTransform: "uppercase",
-    color: "#f2f1ec", marginTop: 2,
+    color: "#f2f1ec", marginTop: 8,
   },
-  body: { padding: "16px 18px 18px", textAlign: "center" },
-  copy: { fontSize: 13, lineHeight: 1.5, margin: 0 },
-  balance: { fontSize: 12, color: "#6f6a5f", margin: "12px 0 0" },
+  body: { padding: "24px 26px 22px", textAlign: "center" },
+  copy: { fontSize: 14, lineHeight: 1.6, margin: 0 },
+  balance: { fontSize: 13, color: "#6f6a5f", margin: "18px 0 0" },
   ghost: {
-    flex: 1, textAlign: "center", fontSize: 12, fontWeight: 500, padding: "11px 14px", borderRadius: 9,
+    flex: 1, textAlign: "center", fontSize: 12, fontWeight: 500, padding: "14px 14px", borderRadius: 10,
     border: "1px solid rgba(0,0,0,.2)", color: "#17150f", background: "#fff", textDecoration: "none",
   },
   primary: {
-    flex: 1, fontSize: 12, fontWeight: 500, padding: "11px 14px", borderRadius: 9,
+    flex: 1, fontSize: 14, fontWeight: 500, padding: "14px 14px", borderRadius: 10,
     border: "1px solid #253a33", color: "#fff", background: "#253a33", cursor: "pointer", fontFamily: FONT,
   },
   later: {
-    display: "block", width: "100%", marginTop: 6, padding: "8px 0", background: "none", border: "none",
-    cursor: "pointer", fontSize: 12, color: "#6f6a5f", fontFamily: FONT,
+    display: "block", width: "100%", marginTop: 10, padding: "10px 0", background: "none", border: "none",
+    cursor: "pointer", fontSize: 13, color: "#6f6a5f", fontFamily: FONT,
   },
   what: {
-    display: "block", width: "100%", marginTop: 12, background: "none", border: "none", cursor: "pointer",
-    fontSize: 11, color: "#6f6a5f", textDecoration: "underline", textUnderlineOffset: 2, fontFamily: FONT,
+    display: "block", width: "100%", marginTop: 16, background: "none", border: "none", cursor: "pointer",
+    fontSize: 11, color: "#8b8578", textDecoration: "underline", textUnderlineOffset: 2, fontFamily: FONT,
   },
   how: { background: "#faf9f7", borderRadius: 8, padding: 12, marginTop: 10, textAlign: "left" },
   howP: { fontSize: 12, color: "#6f6a5f", margin: "0 0 4px", lineHeight: 1.5 },
