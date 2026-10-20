@@ -1050,6 +1050,15 @@ function CycleCard({
   // calendars, so a tap here is a preference, and it saves by itself.
   const [picked, setPicked] = useState<Set<number>>(new Set(c.myVotes ?? []));
   const [voteState, setVoteState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  // The page paints its saved copy first, then the fresh one: follow the
+  // fresh votes when they arrive (unless a tap is still being saved), or a
+  // copy from before you voted would keep your dates looking unpicked.
+  const votesKey = JSON.stringify(c.myVotes ?? []);
+  const [seenVotesKey, setSeenVotesKey] = useState(votesKey);
+  if (votesKey !== seenVotesKey) {
+    setSeenVotesKey(votesKey);
+    if (voteState !== "saving") setPicked(new Set(c.myVotes ?? []));
+  }
   // Saves on every tap, right away: waiting for taps to settle lost the vote
   // when someone tapped and left the page (the app closes its web view).
   // One save at a time; taps made meanwhile go in the next one.
