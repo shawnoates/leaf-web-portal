@@ -2148,6 +2148,24 @@ export default function OrgCalendarPage() {
   // What a check-in is worth for the signed-in viewer on each plan they're going
   // to, and whether they already did. Fetched from the server, never computed here.
   const [checkInInfo, setCheckInInfo] = useState<Record<string, { points: number | null; checkedIn: boolean }>>({});
+  // The plan popup shows what a check-in is worth before you RSVP, so it asks
+  // for the opened plan too (signed-in viewers only; signed-out see the first-visit 10).
+  const [viewerSignedIn, setViewerSignedIn] = useState(false);
+  const openPlanId = selectedEvent?.id ?? null;
+  useEffect(() => {
+    if (!openPlanId) return;
+    try {
+      if (!Parse.User.current()) return;
+    } catch { return; }
+    setViewerSignedIn(true);
+    let cancelled = false;
+    Parse.Cloud.run("getMyCheckInInfo", { planIds: [openPlanId] })
+      .then((res: Record<string, { points: number | null; checkedIn: boolean }>) => {
+        if (!cancelled && res) setCheckInInfo((prev) => ({ ...prev, ...res }));
+      })
+      .catch(() => { /* non-fatal */ });
+    return () => { cancelled = true; };
+  }, [openPlanId]);
   const rsvpedKey = [...rsvpedPlanIds].sort().join(",");
   useEffect(() => {
     if (!rsvpedKey) return;
@@ -6308,6 +6326,9 @@ export default function OrgCalendarPage() {
               </div>
 
               <div className="pt-8 border-t border-zinc-100 flex flex-col gap-4">
+                {/* The RSVP / attending actions stay pinned to the bottom of the
+                    popup while the details scroll behind them. */}
+                <div className="sticky bottom-0 z-10 -mx-8 md:-mx-16 px-8 md:px-16 pt-4 pb-6 md:pb-10 bg-white border-t border-zinc-100">
                 {selectedEvent.isPoll ? (
                   <div className="space-y-4">
                     <PollVoteWidget
@@ -6514,11 +6535,17 @@ export default function OrgCalendarPage() {
                     && !selectedEvent.location?.isPrivate
                     && (selectedEvent.location?.name || selectedEvent.location?.address) && (
                     <p className="mt-3 text-xs text-zinc-500">
-                      Check in when you get there to earn Leaf points.
+                      {(() => {
+                        const pts = viewerSignedIn ? checkInInfo[selectedEvent.id]?.points : 10;
+                        return pts
+                          ? `Check in when you get there to earn +${pts} Leaf points.`
+                          : "Check in when you get there to earn Leaf points.";
+                      })()}
                     </p>
                   )}
                   </>
                 )}
+                </div>
                 {/* Full plan: the guest just read the whole pitch and hit a
                     waitlist. Show this calendar's other hosted plans with a
                     spot open right under the button, so the way forward is
