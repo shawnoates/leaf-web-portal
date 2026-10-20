@@ -165,7 +165,7 @@ function Celebration({
     <div style={S.overlay} onClick={onClose}>
       <style>{CSS}</style>
       <div ref={dialog} role="dialog" aria-modal="true" aria-label="You earned points" style={S.sheet} onClick={(e) => e.stopPropagation()}>
-        <div style={S.hero}>
+        <div className="lp-hero" style={S.hero}>
           <button type="button" onClick={onClose} aria-label="Close" style={S.heroX}>×</button>
           {!calm && pieces.map((p, i) => (
             <i
@@ -181,7 +181,7 @@ function Celebration({
           <span style={S.badge}>{isHost ? "Your plan ran" : "Check-in confirmed"}</span>
           <div style={S.head}>{isHost ? "Nice hosting!" : "You showed up!"}</div>
           <div style={S.heroSub}>{award.planTitle || where}{isHost ? "" : award.businessName ? ` · ${award.businessName}` : ""}</div>
-          <div className={calm ? undefined : "lp-pop"} style={S.num}>+{shown}</div>
+          <div className={calm ? "lp-num" : "lp-num lp-pop"} style={S.num}>+{shown}</div>
           <div style={S.unit}>Leaf points</div>
         </div>
 
@@ -222,7 +222,7 @@ function Celebration({
 
           <p style={S.balance}>Your balance: <b style={{ fontWeight: 600, color: "#17150f" }}>{balance} points</b></p>
 
-          <div style={{ marginTop: 14 }}>
+          <div className="lp-cta">
             <button ref={primary} type="button" onClick={onClose} style={{ ...S.primary, width: "100%" }}>
               {isHost ? "Host another" : "Keep going"}
             </button>
@@ -249,6 +249,11 @@ const CSS = `
   animation-name:lp-fall;animation-timing-function:ease-out;animation-fill-mode:forwards}
 @keyframes lp-fall{0%{opacity:1;transform:translate(0,0) rotate(0)}
   100%{opacity:0;transform:translate(var(--dx),260px) rotate(var(--rot))}}
+.lp-cta{position:sticky;bottom:0;background:#fff;margin:14px -18px -18px;padding:10px 18px 18px}
+@media (max-height:560px){
+  .lp-hero{padding:14px 20px 12px!important}
+  .lp-num{font-size:44px!important;margin-top:6px!important}
+}
 .lp-pop{animation:lp-pop .7s cubic-bezier(.2,1.6,.4,1) both}
 .lp-pop-late{animation:lp-pop .6s .5s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes lp-pop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
@@ -258,7 +263,8 @@ const FONT = "var(--font-geist-sans, -apple-system, BlinkMacSystemFont, sans-ser
 
 const S: Record<string, React.CSSProperties> = {
   banner: {
-    position: "fixed", top: 12, left: "50%", transform: "translateX(-50%)", zIndex: 1000,
+    position: "fixed", bottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)", left: "50%",
+    transform: "translateX(-50%)", zIndex: 1000,
     width: "min(480px, calc(100vw - 24px))", display: "flex", alignItems: "center", gap: 12,
     background: "#fff", border: "1px solid rgba(0,0,0,.09)", borderRadius: 10, padding: "10px 12px",
     color: "#17150f", boxShadow: "0 6px 20px rgba(0,0,0,.08)", fontFamily: FONT,

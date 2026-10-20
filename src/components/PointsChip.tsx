@@ -35,6 +35,10 @@ export default function PointsChip({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const [bump, setBump] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
+  const chipBtn = useRef<HTMLButtonElement>(null);
+  // Where the popover sits, in viewport coordinates, so it stays on screen even
+  // when the chip is not at the far right of a narrow header.
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const refresh = useCallback((force: boolean) => {
     try {
@@ -62,11 +66,16 @@ export default function PointsChip({ className }: { className?: string }) {
       if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    const onMove = () => setOpen(false);
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onMove);
+    window.addEventListener("scroll", onMove, true);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onMove);
+      window.removeEventListener("scroll", onMove, true);
     };
   }, [open]);
 
@@ -77,7 +86,16 @@ export default function PointsChip({ className }: { className?: string }) {
       <style>{`@keyframes lp-bump{0%{transform:scale(1)}40%{transform:scale(1.18)}100%{transform:scale(1)}}`}</style>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        ref={chipBtn}
+        onClick={() => {
+          if (!open && chipBtn.current) {
+            const r = chipBtn.current.getBoundingClientRect();
+            const width = Math.min(264, window.innerWidth - 24);
+            const left = Math.min(Math.max(r.right - width, 12), window.innerWidth - width - 12);
+            setPos({ top: r.bottom + 8, left, width });
+          }
+          setOpen((v) => !v);
+        }}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={`${points.balance} points, open my points`}
@@ -90,8 +108,12 @@ export default function PointsChip({ className }: { className?: string }) {
         {points.balance} pts
       </button>
 
-      {open && (
-        <div role="dialog" aria-label="Your Leaf points" style={S.pop}>
+      {open && pos && (
+        <div
+          role="dialog"
+          aria-label="Your Leaf points"
+          style={{ ...S.pop, top: pos.top, left: pos.left, width: pos.width }}
+        >
           <div style={S.eyebrow}>Your Leaf points</div>
           <div>
             <span style={{ fontSize: 28, fontWeight: 500, lineHeight: 1.1 }}>{points.balance}</span>{" "}
@@ -136,7 +158,7 @@ const S: Record<string, React.CSSProperties> = {
     fontFamily: FONT,
   },
   pop: {
-    position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 60, width: 264, textAlign: "left",
+    position: "fixed", zIndex: 60, textAlign: "left",
     background: "#fff", color: "#17150f", border: "1px solid rgba(0,0,0,.09)", borderRadius: 10,
     padding: 14, boxShadow: "0 10px 28px rgba(0,0,0,.12)",
   },
