@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import { awardLine, type PointsUnseen } from "@/lib/points";
 import { POINTS_EVENT } from "@/components/PointsChip";
@@ -21,16 +22,24 @@ function rand(i: number, salt: number): number {
   return x - Math.floor(x);
 }
 
+// Pages where an award pop-up would be in the way: third-party embeds, payment
+// and redemption flows, and live plan chat (someone may be mid-message). The
+// award stays unseen and shows on the next page that isn't one of these.
+const QUIET_PREFIXES = ["/embed", "/pay", "/redeem", "/chat"];
+
 function prefersReducedMotion(): boolean {
   return typeof window !== "undefined"
     && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
 }
 
 export default function PointsEarned() {
+  const pathname = usePathname() || "";
+  const quiet = QUIET_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const [award, setAward] = useState<PointsUnseen | null>(null);
   const [balance, setBalance] = useState(0);
 
   useEffect(() => {
+    if (quiet) return;
     let cancelled = false;
     const load = () => {
       try {
@@ -53,9 +62,9 @@ export default function PointsEarned() {
       cancelled = true;
       window.removeEventListener(POINTS_EVENT, onEarned);
     };
-  }, []);
+  }, [quiet]);
 
-  if (!award) return null;
+  if (!award || quiet) return null;
 
   const dismiss = () => {
     const id = award.id;
@@ -103,6 +112,27 @@ function Celebration({
   const calm = useMemo(() => prefersReducedMotion(), []);
   const [shown, setShown] = useState(calm ? award.delta : 0);
   const [explainer, setExplainer] = useState(false);
+  const dialog = useRef<HTMLDivElement>(null);
+  const primary = useRef<HTMLButtonElement>(null);
+
+  // Keyboard: focus lands on the main button, Escape closes, Tab stays inside.
+  useEffect(() => {
+    primary.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.preventDefault(); onClose(); return; }
+      if (e.key !== "Tab" || !dialog.current) return;
+      const items = Array.from(
+        dialog.current.querySelectorAll<HTMLElement>("button, a[href]"),
+      ).filter((el) => !el.hasAttribute("disabled"));
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   // Count up to the award.
   useEffect(() => {
@@ -134,7 +164,7 @@ function Celebration({
   return (
     <div style={S.overlay} onClick={onClose}>
       <style>{CSS}</style>
-      <div role="dialog" aria-modal="true" aria-label="You earned points" style={S.sheet} onClick={(e) => e.stopPropagation()}>
+      <div ref={dialog} role="dialog" aria-modal="true" aria-label="You earned points" style={S.sheet} onClick={(e) => e.stopPropagation()}>
         <div style={S.hero}>
           <button type="button" onClick={onClose} aria-label="Close" style={S.heroX}>×</button>
           {!calm && pieces.map((p, i) => (
@@ -193,7 +223,7 @@ function Celebration({
           <p style={S.balance}>Your balance: <b style={{ fontWeight: 600, color: "#17150f" }}>{balance} points</b></p>
 
           <div style={{ marginTop: 14 }}>
-            <button type="button" onClick={onClose} style={{ ...S.primary, width: "100%" }}>
+            <button ref={primary} type="button" onClick={onClose} style={{ ...S.primary, width: "100%" }}>
               {isHost ? "Host another" : "Keep going"}
             </button>
           </div>
