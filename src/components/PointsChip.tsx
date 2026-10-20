@@ -141,7 +141,10 @@ export default function PointsChip({ className }: { className?: string }) {
             </div>
           ))}
 
-          <Link href="/me#points" onClick={() => setOpen(false)} style={S.more}>See everything</Link>
+          <div style={{ display: "flex", gap: 14, marginTop: 12 }}>
+            <Link href="/me#points" onClick={() => setOpen(false)} style={S.more}>See everything</Link>
+            <a href="/points" target="_blank" rel="noopener noreferrer" style={S.more}>How it works</a>
+          </div>
         </div>
       )}
     </div>
@@ -176,7 +179,7 @@ const S: Record<string, React.CSSProperties> = {
     padding: "3px 9px", whiteSpace: "nowrap",
   },
   more: {
-    display: "block", marginTop: 12, fontSize: 11, color: "#253a33", textDecoration: "underline",
+    display: "block", fontSize: 11, color: "#253a33", textDecoration: "underline",
     textUnderlineOffset: 2,
   },
 };

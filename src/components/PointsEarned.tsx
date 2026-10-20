@@ -120,7 +120,6 @@ function Celebration({
   const isHost = award.kind === "host";
   const calm = useMemo(() => prefersReducedMotion(), []);
   const [shown, setShown] = useState(calm ? award.delta : 0);
-  const [explainer, setExplainer] = useState(false);
   const dialog = useRef<HTMLDivElement>(null);
   const primary = useRef<HTMLButtonElement>(null);
 
@@ -211,16 +210,9 @@ function Celebration({
             <button type="button" onClick={onClose} style={S.later}>Maybe later</button>
           </div>
 
-          <button type="button" onClick={() => setExplainer((v) => !v)} style={S.what}>
+          <a href="/points" target="_blank" rel="noopener noreferrer" style={S.what}>
             What are Leaf points?
-          </button>
-          {explainer && (
-            <div style={S.how}>
-              <p style={S.howP}>Earn them each time you check in at a plan, and when people show up to one you host.</p>
-              <p style={S.howP}>The more you return to a place, the more each visit is worth.</p>
-              <p style={S.howP}>Soon you&rsquo;ll spend them on ticket discounts.</p>
-            </div>
-          )}
+          </a>
         </div>
       </div>
     </div>
@@ -304,9 +296,7 @@ const S: Record<string, React.CSSProperties> = {
     cursor: "pointer", fontSize: 13, color: "#6f6a5f", fontFamily: FONT,
   },
   what: {
-    display: "block", width: "100%", marginTop: 16, background: "none", border: "none", cursor: "pointer",
+    display: "block", width: "100%", marginTop: 16, textAlign: "center", background: "none", border: "none", cursor: "pointer",
     fontSize: 11, color: "#8b8578", textDecoration: "underline", textUnderlineOffset: 2, fontFamily: FONT,
   },
-  how: { background: "#faf9f7", borderRadius: 8, padding: 12, marginTop: 10, textAlign: "left" },
-  howP: { fontSize: 12, color: "#6f6a5f", margin: "0 0 4px", lineHeight: 1.5 },
 };

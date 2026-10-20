@@ -2486,13 +2486,9 @@ function PointsRail({ points }: { points: PointsSummary }) {
             <span className="pts">{r.delta > 0 ? "+" : ""}{r.delta}</span>
           </div>
         ))}
-        <details className="place pts-how">
-          <summary>How points work</summary>
-          <p>
-            Check in at a plan to earn. The more you return to a place, the more each visit is worth:
-            10, 20, 30, 40, then 50. Host a plan and earn when people show up.
-          </p>
-        </details>
+        <div className="place pts-how">
+          <a href="/points" target="_blank" rel="noopener noreferrer">How points work</a>
+        </div>
       </div>
     </section>
   );
@@ -3367,8 +3363,7 @@ const CSS = `
 .leafme .pts-bar{height:3px;border-radius:2px;background:var(--line);margin-top:5px;overflow:hidden}
 .leafme .pts-bar span{display:block;height:100%;background:var(--green)}
 .leafme .pts-how{display:block}
-.leafme .pts-how summary{font-size:11px;color:var(--green);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
-.leafme .pts-how p{font-size:10.5px;color:var(--muted);margin-top:6px}
+.leafme .pts-how a{font-size:11px;color:var(--green);text-decoration:underline;text-underline-offset:2px}
 .leafme .pts-host{display:block;margin-top:5px;text-align:right}
 .leafme .pts-popup{margin-top:10px}
 .leafme .pts-line{margin-top:6px}
