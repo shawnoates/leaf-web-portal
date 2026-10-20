@@ -13,7 +13,6 @@ import { POINTS_EVENT } from "@/components/PointsChip";
 // stamps seenAt on dismiss, so it shows once per award across devices.
 // Mounted once in the root layout; signed-out visitors never see it.
 
-const LADDER = [10, 20, 30, 40, 50];
 const CONFETTI = ["#c8f25a", "#f2f1ec", "#6dbf7a", "#a7dcb0", "#c8f25a"];
 
 // A fixed scatter (no Math.random in render): the same burst every time.
@@ -158,7 +157,6 @@ function Celebration({
     dur: 1.8 + rand(i, 5) * 1.2,
   })), []);
 
-  const step = Math.min(award.visitNumber || 1, 5);
   const where = award.businessName || award.planTitle || "this plan";
 
   return (
@@ -189,35 +187,9 @@ function Celebration({
           {isHost ? (
             <p style={S.copy}>Every person who shows up adds 3 more, up to 50 a plan. Host again to keep stacking.</p>
           ) : (
-            <>
-              <div style={{ display: "flex", gap: 4 }}>
-                {LADDER.map((n, i) => {
-                  const now = i + 1 === step;
-                  const done = i + 1 < step;
-                  return (
-                    <div key={n} style={{ flex: 1, textAlign: "center" }}>
-                      <div
-                        className={now && !calm ? "lp-pop-late" : undefined}
-                        style={{
-                          width: 28, height: 28, borderRadius: "50%", margin: "0 auto 4px",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 11, fontWeight: 500,
-                          background: now ? "#253a33" : done ? "#f3f7f5" : "#fff",
-                          color: now ? "#c8f25a" : done ? "#253a33" : "#8b8578",
-                          border: `1px solid ${now ? "#253a33" : "rgba(0,0,0,.15)"}`,
-                        }}
-                      >{done ? "✓" : n}</div>
-                      <div style={{ fontSize: 10, color: now ? "#17150f" : "#8b8578" }}>
-                        {now ? "Today" : i + 1 === step + 1 ? "Next" : i === 4 ? "Max" : ""}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <p style={{ ...S.copy, marginTop: 8 }}>
-                {awardLine(award)}.{award.nextWorth ? ` Come back and the next one is worth ${award.nextWorth}.` : ""}
-              </p>
-            </>
+            <p style={S.copy}>
+              {awardLine(award)}.{award.nextWorth ? ` Come back and the next one is worth ${award.nextWorth}.` : ""}
+            </p>
           )}
 
           <p style={S.balance}>Your balance: <b style={{ fontWeight: 600, color: "#17150f" }}>{balance} points</b></p>
@@ -255,7 +227,6 @@ const CSS = `
   .lp-num{font-size:44px!important;margin-top:6px!important}
 }
 .lp-pop{animation:lp-pop .7s cubic-bezier(.2,1.6,.4,1) both}
-.lp-pop-late{animation:lp-pop .6s .5s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes lp-pop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
 `;
 
