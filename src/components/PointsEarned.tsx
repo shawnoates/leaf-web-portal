@@ -97,15 +97,25 @@ export default function PointsEarned() {
     );
   }
 
-  return <Celebration award={award} balance={balance} onClose={dismiss} />;
+  // "Make Plans": mark it seen, then open the new-plan composer on /me.
+  const makePlans = () => {
+    const id = award.id;
+    setAward(null);
+    Parse.Cloud.run("markPointsSeen", { ids: [id] })
+      .catch(() => {})
+      .finally(() => window.location.assign("/me?openNewPlan=1"));
+  };
+
+  return <Celebration award={award} balance={balance} onClose={dismiss} onMakePlans={makePlans} />;
 }
 
 function Celebration({
-  award, balance, onClose,
+  award, balance, onClose, onMakePlans,
 }: {
   award: PointsUnseen;
   balance: number;
   onClose: () => void;
+  onMakePlans: () => void;
 }) {
   const isHost = award.kind === "host";
   const calm = useMemo(() => prefersReducedMotion(), []);
@@ -195,9 +205,10 @@ function Celebration({
           <p style={S.balance}>Your balance: <b style={{ fontWeight: 600, color: "#17150f" }}>{balance} points</b></p>
 
           <div className="lp-cta">
-            <button ref={primary} type="button" onClick={onClose} style={{ ...S.primary, width: "100%" }}>
-              {isHost ? "Host another" : "Keep going"}
+            <button ref={primary} type="button" onClick={onMakePlans} style={{ ...S.primary, width: "100%" }}>
+              Make Plans
             </button>
+            <button type="button" onClick={onClose} style={S.later}>Maybe later</button>
           </div>
 
           <button type="button" onClick={() => setExplainer((v) => !v)} style={S.what}>
@@ -287,6 +298,10 @@ const S: Record<string, React.CSSProperties> = {
   primary: {
     flex: 1, fontSize: 12, fontWeight: 500, padding: "11px 14px", borderRadius: 9,
     border: "1px solid #253a33", color: "#fff", background: "#253a33", cursor: "pointer", fontFamily: FONT,
+  },
+  later: {
+    display: "block", width: "100%", marginTop: 6, padding: "8px 0", background: "none", border: "none",
+    cursor: "pointer", fontSize: 12, color: "#6f6a5f", fontFamily: FONT,
   },
   what: {
     display: "block", width: "100%", marginTop: 12, background: "none", border: "none", cursor: "pointer",
