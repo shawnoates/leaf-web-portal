@@ -483,6 +483,13 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             <CrewAddOnCard key={x.cycleId} addOn={x} auth={auth} onChange={(next) => setAddOn(x.cycleId, next)} />
           ))}
 
+          {me.birthdayAsk && (
+            <BirthdayPick ask={me.birthdayAsk} auth={auth} book={book} onDone={() => void reload()} />
+          )}
+          {me.needsBirthday && !me.birthdayAsk && (
+            <AddBirthday auth={auth} onDone={() => void reload()} />
+          )}
+
           {me.needsPace && !paceDone && !crew.oneTime && (
             <section className="rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
               <label htmlFor="first-pace" className="block font-fm-serif text-[26px] leading-tight">How often for you?</label>
@@ -943,6 +950,21 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 </div>
               )}
 
+              {me.isOwner && (
+                <div className="flex items-center gap-3 border-b border-fm-line-dim py-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-[15px] font-semibold">Birthdays <span className="rounded-full bg-fm-card px-1.5 py-0.5 font-fm-mono text-[9px] tracking-[0.06em] text-fm-accent">BETA</span></div>
+                    <div className="text-[13px] text-fm-muted">The {night} nearest someone&rsquo;s birthday is theirs: they pick where, Leaf finds a date that week.</div>
+                  </div>
+                  <FriendModeSwitch
+                    label="Birthdays"
+                    checked={Boolean(crew.birthdays)}
+                    disabled={busy !== null}
+                    onChange={(v) => act("birthdays", () => run("setCrewBirthdays", auth, { calendarId: crew.id, on: v }))}
+                  />
+                </div>
+              )}
+
               <div className="py-4">
                 <label htmlFor="my-pace" className="block text-[15px] font-semibold">Your pace</label>
                 <select
@@ -1108,7 +1130,9 @@ function CycleCard({
   const [confirmSkip, setConfirmSkip] = useState(false);
   const stateWord = { picking: "Picking", polling: "Voting", locked: "Locked in", booked: "Booked" }[c.state as string];
   const who = c.trigger === "member_proposal" ? `${names[c.hostId || ""] || "A member"}'s idea`
-    : c.trigger === "weather" ? "Nice day ahead" : "Up next";
+    : c.trigger === "weather" ? "Nice day ahead"
+    : c.trigger === "birthday" ? `${names[c.birthdayOfId || ""] || "Someone"}'s birthday`
+    : c.trigger === "event" ? "It's on" : "Up next";
   const chosen = c.chosenOption ? dayParts(c.chosenOption.date) : null;
 
   return (
@@ -1760,5 +1784,108 @@ function EventMatchCard({ match: m, busy, onAnswer }: { match: EventMatch; busy:
         {m.url && <a href={m.url} target="_blank" rel="noreferrer" className="ml-1 text-sm text-fm-ink-2 underline underline-offset-4">See tickets</a>}
       </div>
     </Card>
+  );
+}
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/**
+ * Birthdays on, your birthday's coming up: where do you want to go? A place
+ * from the book, any place, or Leaf picks. Leaf then finds a date that week.
+ */
+function BirthdayPick({ ask, auth, book, onDone }: { ask: { date: string }; auth: CrewAuth; book: BookSpot[]; onDone: () => void }) {
+  const [query, setQuery] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const d = dayParts(ask.date);
+  const pick = async (key: string, params: Record<string, unknown>) => {
+    setBusy(key);
+    setNote("");
+    try {
+      const r = await run<{ started: boolean; queued?: boolean }>("pickBirthdayPlace", auth, params);
+      if (r.queued) setNote("Got it. The crew has a night in the works; Leaf starts yours right after.");
+      onDone();
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : "Couldn't save that.");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const places = book.filter((b) => b.locationId && !b.needsPlace).slice(0, 4);
+  return (
+    <Card className="flex flex-col gap-4">
+      <Eyebrow>Your birthday · {d.dow}, {d.month} {d.day}</Eyebrow>
+      <h2 className="m-0 font-fm-serif text-[30px] font-normal leading-tight">Where do you want to go?</h2>
+      <p className="m-0 text-sm text-fm-ink-2">Pick a spot. Leaf finds a night that week that works for everyone, and you don&rsquo;t have to organize your own party.</p>
+      {places.length > 0 && (
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+          {places.map((b) => (
+            <li key={b.spotId} className="flex items-center gap-3 rounded-xl border border-fm-line-dim px-3 py-2.5">
+              <span className="min-w-0 flex-1 truncate text-[15px]">{b.name}</span>
+              <Button small disabled={busy !== null} onClick={() => void pick(b.spotId, { spotId: b.spotId })}>{busy === b.spotId ? "Saving…" : "This one"}</Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <label className="relative block">
+        <span className="sr-only">Search for a place</span>
+        <Search size={16} aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-fm-muted" />
+        <VenueSearch
+          value={query}
+          onChange={setQuery}
+          onSelect={(v) => void pick("search", { venue: v, placeId: v.placeId })}
+          placeholder="Anywhere: a restaurant, a bar, a rooftop…"
+          className="h-11 w-full rounded-xl border pl-10 pr-3 text-[16px] outline-none"
+        />
+      </label>
+      <button type="button" disabled={busy !== null} onClick={() => void pick("leaf", { leafPicks: true })} className="w-fit text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink">
+        {busy === "leaf" ? "Saving…" : "Surprise me: let Leaf pick"}
+      </button>
+      {note && <p className="m-0 text-sm text-fm-ink-2">{note}</p>}
+    </Card>
+  );
+}
+
+/** Birthdays on and Leaf doesn't know yours: month and day, no year. */
+function AddBirthday({ auth, onDone }: { auth: CrewAuth; onDone: () => void }) {
+  const [month, setMonth] = useState(0);
+  const [day, setDay] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [hidden, setHidden] = useState(false);
+  if (hidden) return null;
+  const save = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await run("setMyBirthday", auth, { month, day });
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save that.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const field = "h-11 rounded-xl border border-fm-line bg-fm-canvas px-3 text-[15px] text-fm-ink";
+  return (
+    <section className="rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
+      <h2 className="m-0 font-fm-serif text-[24px] font-normal leading-tight">When&rsquo;s your birthday?</h2>
+      <p className="mb-0 mt-2 text-[14px] leading-relaxed text-fm-ink-2">This crew celebrates birthdays: the night nearest yours is yours, and you pick where. Month and day only.</p>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <label className="sr-only" htmlFor="bday-month">Month</label>
+        <select id="bday-month" className={field} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+          <option value={0}>Month</option>
+          {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+        </select>
+        <label className="sr-only" htmlFor="bday-day">Day</label>
+        <select id="bday-day" className={field} value={day} onChange={(e) => setDay(Number(e.target.value))}>
+          <option value={0}>Day</option>
+          {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+        </select>
+        <Button small disabled={busy || !month || !day} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</Button>
+        <Button small kind="ghost" onClick={() => setHidden(true)}>Not now</Button>
+      </div>
+      {error && <p className="mb-0 mt-2 text-sm text-fm-danger">{error}</p>}
+    </section>
   );
 }

@@ -58,7 +58,7 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   // On a trigger: Weather (a rule and the place it's for) or An event (what to watch for).
-  const [trigKind, setTrigKind] = useState<"weather" | "event">("weather");
+  const [trigKind, setTrigKind] = useState<"weather" | "event" | "birthdays">("weather");
   const [watchFor, setWatchFor] = useState("");
   const [minF, setMinF] = useState(80);
   const [noRain, setNoRain] = useState(true);
@@ -87,6 +87,7 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
           triggerOnly: true,
           trigger: { kind: "event", query: watchFor.trim() },
         } : {}),
+        ...(pace === TRIGGER && trigKind === "birthdays" ? { triggerOnly: true, birthdays: true } : {}),
         invitees: people.map((p) => ({ userId: p.userId })),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         source,
@@ -209,10 +210,10 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
           {pace === TRIGGER && (
             <div className="flex flex-col gap-3 rounded-2xl border border-fm-line bg-fm-surface p-4">
               <div role="group" aria-label="Trigger" className="flex flex-wrap gap-2">
-                {(["weather", "event"] as const).map((k) => (
+                {(["weather", "event", "birthdays"] as const).map((k) => (
                   <button key={k} type="button" aria-pressed={trigKind === k} onClick={() => setTrigKind(k)}
                     className={`h-9 rounded-full px-4 text-sm font-semibold ${trigKind === k ? "bg-fm-ink text-fm-canvas" : "border border-fm-line text-fm-ink-2"}`}>
-                    {k === "weather" ? "Weather" : "An event"}
+                    {k === "weather" ? "Weather" : k === "event" ? "An event" : "Birthdays"}
                   </button>
                 ))}
               </div>
@@ -224,6 +225,11 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
                     Every week Leaf looks for its next dates near you (Ticketmaster, then the web). When one fits your calendar, you get &ldquo;It&rsquo;s a go?&rdquo; One tap sends the invites to the crew.
                   </p>
                 </div>
+              )}
+              {trigKind === "birthdays" && (
+                <p className="m-0 text-xs leading-relaxed text-fm-muted">
+                  About three weeks before someone in the crew has a birthday, Leaf asks them where they want to go, then finds a night that week that works for everyone. Members add their birthday when they join.
+                </p>
               )}
               {trigKind === "weather" && (<>
               <div className="flex items-center justify-between gap-3 text-sm">
@@ -341,7 +347,9 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
             <span className="font-fm-mono text-[11px] uppercase tracking-[0.1em] text-fm-accent">You&rsquo;re set</span>
             <h2 className="m-0 font-fm-serif text-[32px] font-normal leading-tight">{crewName.trim()} is ready.</h2>
             <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">
-              {pace === TRIGGER && trigKind === "event"
+              {pace === TRIGGER && trigKind === "birthdays"
+                ? "Send the link to the group. When someone's birthday is coming up, Leaf asks them where they want to go."
+                : pace === TRIGGER && trigKind === "event"
                 ? `Send the link to the group. Leaf watches for ${watchFor.trim()} every week and asks you when there's a date that fits.`
                 : pace === TRIGGER && place
                 ? `Send the link to the group. Leaf watches the forecast at ${place.name} and invites everyone when a good day comes up.`
