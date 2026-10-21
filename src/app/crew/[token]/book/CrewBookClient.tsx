@@ -50,6 +50,20 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
   const [book, setBook] = useState<Book | null>(null);
   const [sort, setSort] = useState<"wanted" | "new">("wanted");
   const [query, setQuery] = useState("");
+  // What Leaf finds for what's typed (a team's next game, a show's next date),
+  // so the search's "Watch for" row can show it and move to the top.
+  const [eventLookup, setEventLookup] = useState<{ q: string; matches: Found[] } | null>(null);
+  const typed = query.trim();
+  useEffect(() => {
+    if (!canAdd || typed.length < 4) return;
+    let live = true;
+    const t = setTimeout(() => {
+      run<{ matches: Found[] }>("previewCrewEvent", auth, { query: typed })
+        .then((r) => { if (live) setEventLookup({ q: typed, matches: r.matches }); })
+        .catch(() => {});
+    }, 600);
+    return () => { live = false; clearTimeout(t); };
+  }, [typed, canAdd, auth]);
   const [addingEvent, setAddingEvent] = useState(false);
   // From the crew page's "+ Add": the search starts focused.
   // From the crew page's empty book: "Watch for an event" opens Add an event on "No, Leaf finds it".
@@ -150,19 +164,26 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
                 autoFocus={focusSearch}
                 key={focusSearch ? "focus" : "plain"}
                 // A team, a comedian, a tour: watch for it (BETA).
-                extraOption={(q) => ({
-                  first: looksLikeEvent(q),
-                  onSelect: () => void act("watch", async () => { await run("addCrewEventWatch", auth, { query: q }); setQuery(""); }),
-                  content: (
-                    <div className="flex items-center gap-3 px-4 py-3">
-                      <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-fm-accent text-fm-canvas"><Eye size={18} strokeWidth={2.2} /></span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold">Watch for &ldquo;{q}&rdquo; <span className="font-fm-mono text-[9px] text-fm-accent">BETA</span></span>
-                        <span className="block text-xs text-fm-muted">Leaf finds the dates and asks when one fits</span>
-                      </span>
-                    </div>
-                  ),
-                })}
+                extraOption={(q) => {
+                  const next = eventLookup?.q === q ? eventLookup.matches[0] : undefined;
+                  return {
+                    first: Boolean(next) || looksLikeEvent(q),
+                    onSelect: () => void act("watch", async () => { await run("addCrewEventWatch", auth, { query: q }); setQuery(""); }),
+                    content: (
+                      <div className="flex items-center gap-3 px-4 py-3">
+                        <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-fm-accent text-fm-canvas"><Eye size={18} strokeWidth={2.2} /></span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold">Watch for {next ? next.title : <>&ldquo;{q}&rdquo;</>} <span className="font-fm-mono text-[9px] text-fm-accent">BETA</span></span>
+                          <span className="block truncate text-xs text-fm-muted">
+                            {next
+                              ? `Next: ${shortDate(next.date)}${next.time ? ` · ${clock12(next.time)}` : ""} · ${next.watchParty ? "watch together" : next.venueName}`
+                              : "Leaf finds the dates and asks when one fits"}
+                          </span>
+                        </span>
+                      </div>
+                    ),
+                  };
+                }}
               />
             </label>
             <p className="mb-0 ml-5 mt-2 text-xs text-fm-muted">
