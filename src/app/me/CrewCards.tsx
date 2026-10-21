@@ -33,6 +33,8 @@ export type CrewRow = {
   isOwner?: boolean;
   /** The calendar's photo, like the "Calendars you follow" rows. */
   image?: string | null;
+  /** The crew's claymation icon (from its name), when it has no photo. */
+  iconUrl?: string | null;
 };
 
 

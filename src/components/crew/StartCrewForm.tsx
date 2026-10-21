@@ -24,17 +24,24 @@ const PACES = [
 ];
 
 type Step = "crew" | "signin" | "done";
+/** Someone already on Leaf, picked before the form opened (people you go out with). */
+export type CrewPerson = { userId: string; name: string };
 type Created = { crewId: string; link: string; inviteLink: string };
 
 const field = "h-12 w-full rounded-2xl border border-fm-line bg-fm-canvas px-4 text-base text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none";
 const primary = "flex h-12 w-full items-center justify-center gap-2 rounded-full bg-fm-accent px-6 text-[15px] font-bold text-fm-canvas transition hover:brightness-105 disabled:opacity-60";
 
-export default function StartCrewForm({ onOpenCrew }: {
+export default function StartCrewForm({ onOpenCrew, people = [], suggestedName = "", source = "landing" }: {
   /** In the dashboard: open the new crew there instead of leaving for its page. */
   onOpenCrew?: (crewId: string) => void;
+  /** Invited by account when the crew is made ("Start a crew with Maya and Dev"). */
+  people?: CrewPerson[];
+  suggestedName?: string;
+  /** Where it started, for friendMode.enabledVia ("me", "landing", …). */
+  source?: string;
 } = {}) {
   const [step, setStep] = useState<Step>("crew");
-  const [crewName, setCrewName] = useState("");
+  const [crewName, setCrewName] = useState(suggestedName);
   const [pace, setPace] = useState(14);
   // "Just once" is for one place: ask where up front, so Leaf never picks one.
   const [placeQuery, setPlaceQuery] = useState("");
@@ -55,9 +62,9 @@ export default function StartCrewForm({ onOpenCrew }: {
         name: crewName.trim(),
         rhythmDays: pace || 28,
         oneTime: pace === 0,
-        invitees: [],
+        invitees: people.map((p) => ({ userId: p.userId })),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        source: "landing",
+        source,
       })) as Created;
       if (place) {
         await Parse.Cloud.run("addToCrewBook", { crewId: r.crewId, placeId: place.placeId || null, venue: place }).catch(() => {});
@@ -131,6 +138,17 @@ export default function StartCrewForm({ onOpenCrew }: {
             <label htmlFor="crew-name" className="text-sm font-semibold text-fm-ink-2">Name your crew</label>
             <input id="crew-name" className={field} value={crewName} onChange={(e) => setCrewName(e.target.value)} placeholder="Thursday dinners" maxLength={60} autoComplete="off" />
           </div>
+          {people.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-semibold text-fm-ink-2">Who&rsquo;s in</span>
+              <div className="flex flex-wrap gap-2">
+                {people.map((p) => (
+                  <span key={p.userId} className="flex h-9 items-center rounded-full border border-fm-line bg-fm-card px-3.5 text-sm">{p.name}</span>
+                ))}
+              </div>
+              <span className="text-xs text-fm-muted">They get the invite from you. You can add more from the crew page.</span>
+            </div>
+          )}
           <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
             <legend className="mb-2 text-sm font-semibold text-fm-ink-2">How often?</legend>
             <div className="grid grid-cols-2 gap-2">

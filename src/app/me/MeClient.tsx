@@ -35,6 +35,8 @@ import {
 } from "./CrewCards";
 import FriendModeIntro, { friendModeIntroDue, stampFriendModeIntro, type FriendModeSource } from "@/components/crew/FriendModeIntro";
 import FriendModeSetup from "@/components/dashboard/FriendModeSetup";
+import StartCrewModal from "@/components/crew/StartCrewModal";
+import type { CrewPerson } from "@/components/crew/StartCrewForm";
 import FriendModeCalendarPicker from "@/components/crew/FriendModeCalendarPicker";
 import { useInApp } from "@/components/crew/CrewShell";
 import HostPointsTag from "@/components/HostPointsTag";
@@ -308,6 +310,8 @@ interface Dashboard {
   // Friend Mode (all optional while the server side ships)
   crews?: CrewRow[];
   crewActions?: CrewAction[];
+  /** No crew yet: people they keep going to plans with (twice in 90 days). */
+  goOutWith?: CrewPerson[];
   hostInvites?: HostInvite[]; // may be absent while the server side ships
   // One prompt card at a time, chosen and flag-gated server-side. Only
   // community_qualifier renders here; other keys are ignored.
@@ -997,6 +1001,8 @@ function DashboardView({
   const crews = data.crews || [];
   // Crews you're in and that are on — the quiet crew card when nothing needs you.
   const quietCrews = crews.filter((c) => c.status !== "invited" && c.status !== "off");
+  // Start a crew (header, Your crews): null = closed.
+  const [startCrew, setStartCrew] = useState<{ people: CrewPerson[]; name: string } | null>(null);
   const hostInvites = data.hostInvites || [];
   const firstName = (data.person.firstName || "").trim().split(/\s+/)[0] || "";
   const rail = data.needsHost;
@@ -1054,6 +1060,7 @@ function DashboardView({
             </div>
           )}
           <div className="topbar-r">
+            <button className="pill alt" onClick={() => setStartCrew({ people: [], name: "" })}>+ Start a crew</button>
             <button className="pill" onClick={openCreate}>+ New plan</button>
             <PointsChip />
             {!inApp && (
@@ -1156,6 +1163,13 @@ function DashboardView({
             </section>
           )}
 
+          <YourCrews
+            crews={crews}
+            actions={crewActions}
+            people={data.goOutWith || []}
+            onStart={(people, name) => setStartCrew({ people, name })}
+          />
+
           {calsWide && <CalendarsCarousel rows={calsWide} />}
 
           {qualifierActive && (
@@ -1226,6 +1240,16 @@ function DashboardView({
         <PlanModal plan={openPlan} onClose={() => setOpenPlanId(null)} onRsvp={onRsvp} />
       )}
 
+
+      {startCrew && (
+        <StartCrewModal
+          people={startCrew.people}
+          suggestedName={startCrew.name}
+          source="me"
+          onClose={() => { setStartCrew(null); void onRefresh(); }}
+          onOpenCrew={(id) => { window.location.href = `/crew/${id}`; }}
+        />
+      )}
 
       {fmIntro && (
         <FriendModeIntro
@@ -1894,6 +1918,108 @@ function HeroActions({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: Rsv
 }
 
 // ---- "Your plans" row ------------------------------------------------------
+/** "Maya & Dev", or "Maya, Dev & Ana": a crew named after its people. */
+function crewNameFor(people: CrewPerson[]): string {
+  const firsts = people.map((p) => p.name.trim().split(/\s+/)[0]).filter(Boolean);
+  if (firsts.length < 2) return "";
+  return `${firsts.slice(0, -1).join(", ")} & ${firsts[firsts.length - 1]}`;
+}
+
+/**
+ * Your crews, in the same rows as Your plans: each crew's status, Vote when
+ * a poll waits on you, else Open. With no crew it stays as a way in: the
+ * people you keep going to plans with, or a plain Start a crew row.
+ */
+function YourCrews({ crews, actions, people, onStart }: {
+  crews: CrewRow[];
+  actions: CrewAction[];
+  people: CrewPerson[];
+  onStart: (people: CrewPerson[], name: string) => void;
+}) {
+  const [all, setAll] = useState(false);
+  const live = crews.filter((c) => c.status !== "off" && c.status !== "invited");
+  const offCount = crews.filter((c) => c.status === "off").length;
+  // An invite waiting is answered in the crew card above, not here.
+  if (crews.length > 0 && live.length === 0 && offCount === 0) return null;
+  const shown = all ? live : live.slice(0, 3);
+  const votes = new Set(actions.filter((a) => a.kind === "poll").map((a) => a.crewId));
+  const firsts = people.map((p) => p.name.trim().split(/\s+/)[0]);
+  const peopleLine = people.length === 1
+    ? `You've been to a few plans with ${firsts[0]}`
+    : `You keep ending up at plans with ${firsts.slice(0, -1).join(", ")} and ${firsts[firsts.length - 1]}`;
+
+  return (
+    <section className="sect">
+      <div className="sect-head">
+        <div className="eyebrow">Your crews</div>
+        {live.length > 0 && (
+          <div className="sect-meta">{live.length} crew{live.length === 1 ? "" : "s"}{offCount > 0 ? ` · ${offCount} off` : ""}</div>
+        )}
+      </div>
+      <div className="rows">
+        {live.length === 0 ? (
+          <article className="row last">
+            <div className="crew-ico" aria-hidden>
+              {people.length > 0 ? (
+                people.slice(0, 2).map((p) => <span key={p.userId} className="crew-face">{initial(p.name)}</span>)
+              ) : (
+                <span className="crew-face">+</span>
+              )}
+            </div>
+            <div className="row-text">
+              <h3 className="row-title">{people.length > 0 ? `${peopleLine}. Make it a crew?` : "Start a crew"}</h3>
+              <div className="row-meta">
+                {people.length > 0
+                  ? "Leaf finds a time that works for all of you and plans it."
+                  : "Pick a few friends and how often. Leaf finds a time that works and plans it."}
+              </div>
+            </div>
+            <div className="row-act">
+              <button className="row-btn primary" onClick={() => onStart(people, crewNameFor(people))}>
+                {people.length > 0 ? "Start a crew" : "Start one"}
+              </button>
+            </div>
+          </article>
+        ) : (
+          shown.map((c, i) => (
+            <article key={c.crewId} className={`row ${i === shown.length - 1 ? "last" : ""}`}>
+              <div className="crew-ico" aria-hidden>
+                {c.image || c.iconUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={(c.image || c.iconUrl) as string} alt="" />
+                ) : (
+                  <span className="crew-face">{initial(c.name)}</span>
+                )}
+              </div>
+              <div className="row-text">
+                <h3 className="row-title"><Link className="plan-link" href={`/crew/${c.crewId}`}>{c.name}</Link></h3>
+                <div className={`row-meta ${votes.has(c.crewId) ? "crew-due" : c.status === "paused" ? "" : "crew-on"}`}>
+                  {votes.has(c.crewId) ? "Pick your dates" : c.statusLine || "On"}
+                </div>
+              </div>
+              <div className="row-act">
+                {votes.has(c.crewId) ? (
+                  <Link className="row-btn primary" href={`/crew/${c.crewId}`}>Vote</Link>
+                ) : (
+                  <Link className="row-btn ghost" href={`/crew/${c.crewId}`}>Open</Link>
+                )}
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+      {live.length > 0 && (
+        <div className="crew-more">
+          {live.length > 3 && (
+            <button className="showmore" onClick={() => setAll(!all)}>{all ? "Show fewer" : `Show ${live.length - 3} more crew${live.length - 3 === 1 ? "" : "s"}`}</button>
+          )}
+          <button className="showmore crew-start" onClick={() => onStart([], "")}>+ Start a crew</button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function PlanRow({
   plan, index, last, onRsvp, onOpen,
 }: {
@@ -3233,6 +3359,17 @@ const CSS = `
 .leafme .sect-meta{font-size:11px;color:var(--muted)}
 .leafme .sect-meta .new{color:var(--green)}
 .leafme .rows{display:flex;flex-direction:column;gap:2px}
+.leafme .pill.alt{background:var(--paper);color:var(--green);box-shadow:inset 0 0 0 1px var(--green)}
+.leafme .crew-ico{width:44px;height:44px;flex:none;align-self:center;border-radius:50%;overflow:hidden;
+  background:var(--green);display:flex;align-items:center;justify-content:center}
+.leafme .crew-ico img{width:100%;height:100%;object-fit:cover}
+.leafme .crew-face{width:30px;height:30px;border-radius:50%;background:#c8f25a;color:#101a16;font-size:12px;font-weight:700;
+  display:inline-flex;align-items:center;justify-content:center;border:2px solid var(--green)}
+.leafme .crew-face+.crew-face{margin-left:-12px}
+.leafme .row-meta.crew-on{color:#4d7a1f}
+.leafme .row-meta.crew-due{color:var(--orange)}
+.leafme .crew-more{display:flex;gap:16px;align-items:center}
+.leafme .crew-start{color:var(--green);font-weight:600}
 .leafme .row{display:flex;gap:14px;padding:12px 4px;border-top:1px solid var(--line)}
 .leafme .row.last{border-bottom:1px solid var(--line)}
 .leafme .row-date{width:38px;flex:none;text-align:center}
