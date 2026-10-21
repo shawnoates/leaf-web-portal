@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, CalendarDays, Check, ChevronRight, ChevronUp, MapPin, MessageCircle, Plus, Search, Settings, UserPlus, X } from "lucide-react";
+import { ArrowUp, CalendarDays, Check, ChevronRight, ChevronUp, Eye, MapPin, MessageCircle, Plus, Search, Settings, UserPlus, X } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
 import Parse from "@/lib/parse-client";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
@@ -540,25 +540,29 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             <section className="flex flex-col gap-3.5 lg:gap-5">
               <div className="flex items-center justify-between">
                 <SectionTitle>The book</SectionTitle>
-                <Link href={crewHref(auth, "book")} className="flex min-h-11 items-center gap-1 text-sm font-semibold text-fm-ink hover:text-white">
+                <Link href={`${crewHref(auth, "book")}?add=1`} className="flex min-h-11 items-center gap-1 text-sm font-semibold text-fm-ink hover:text-white">
                   <Plus size={16} strokeWidth={2.2} aria-hidden /> Add<span className="hidden lg:inline"> a place</span>
                 </Link>
               </div>
               {(data.watching?.length ?? 0) > 0 && (
-                <WatchingStrip items={data.watching!} auth={auth} canAdd={me.status === "in"} isOwner={me.isOwner} onChange={reload} />
+                <WatchingStrip items={data.watching!} auth={auth} isOwner={me.isOwner} onChange={reload} />
               )}
               {book.length === 0 ? (
-                <Link
-                  href={crewHref(auth, "book")}
-                  className="flex flex-col items-start gap-4 rounded-[28px] border border-dashed border-fm-line p-6 hover:border-fm-ink-2 lg:flex-row lg:items-center lg:justify-between lg:p-8"
-                >
+                <div className="flex flex-col items-start gap-4 rounded-[28px] border border-dashed border-fm-line p-6 lg:flex-row lg:items-center lg:justify-between lg:p-8">
                   <p className="m-0 max-w-[44ch] text-[15px] leading-relaxed text-fm-ink-2 lg:text-base">
-                    No places yet. Add a few you&rsquo;ve been wanting to try and Leaf will plan {nights} around them.
+                    No places yet. Add a few you&rsquo;ve been wanting to try and Leaf will plan {nights} around them. Or have Leaf watch for a game, a show or a tour.
                   </p>
-                  <span className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-fm-ink px-5 text-sm font-semibold text-fm-canvas">
-                    <Plus size={16} strokeWidth={2.2} aria-hidden /> Add a place
-                  </span>
-                </Link>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <Link href={`${crewHref(auth, "book")}?add=1`} className="inline-flex h-11 items-center gap-1.5 rounded-full bg-fm-ink px-5 text-sm font-semibold text-fm-canvas">
+                      <Plus size={16} strokeWidth={2.2} aria-hidden /> Add a place
+                    </Link>
+                    {me.status === "in" && (
+                      <Link href={`${crewHref(auth, "book")}?watch=1`} className="inline-flex h-11 items-center gap-1.5 rounded-full border border-fm-accent px-5 text-sm font-semibold text-fm-accent">
+                        <Eye size={16} strokeWidth={2.2} aria-hidden /> Watch for an event <span className="font-fm-mono text-[9px]">BETA</span>
+                      </Link>
+                    )}
+                  </div>
+                </div>
               ) : (
                 <ul className="no-scrollbar -mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 scroll-pl-5 lg:mx-0 lg:grid lg:grid-cols-4 lg:gap-4 lg:overflow-visible lg:px-0">
                   {book.map((s) => (

@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Check, ChevronLeft, ChevronUp, Lock, Plus, Search, Sun } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronUp, Eye, Lock, Plus, Search, Sun } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
 import PlacePhoto from "@/components/crew/PlacePhoto";
 import ShareFromInstagramHint from "@/components/crew/ShareFromInstagramHint";
@@ -51,6 +51,15 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
   const [sort, setSort] = useState<"wanted" | "new">("wanted");
   const [query, setQuery] = useState("");
   const [addingEvent, setAddingEvent] = useState(false);
+  // From the crew page's "+ Add": the search starts focused.
+  // From the crew page's empty book: "Watch for an event" opens Add an event on "No, Leaf finds it".
+  const [focusSearch, setFocusSearch] = useState(false);
+  const [watchFirst, setWatchFirst] = useState(false);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    setFocusSearch(q.has("add"));
+    if (q.has("watch")) { setWatchFirst(true); setAddingEvent(true); }
+  }, []);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   // "What are you in the mood for?" — real places for a vibe (searchCrewPlaces).
@@ -136,19 +145,39 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
                 value={query}
                 onChange={setQuery}
                 onSelect={(v) => act("search", async () => { await run("addToCrewBook", auth, { placeId: v.placeId, venue: v }); setQuery(""); })}
-                placeholder="Add a restaurant, bar, anything"
+                placeholder="Add a place, or something to watch for"
                 className="h-14 w-full rounded-full border pl-12 pr-5 text-[15px] outline-none"
+                autoFocus={focusSearch}
+                key={focusSearch ? "focus" : "plain"}
+                // A team, a comedian, a tour: watch for it (BETA).
+                extraOption={(q) => ({
+                  first: looksLikeEvent(q),
+                  onSelect: () => void act("watch", async () => { await run("addCrewEventWatch", auth, { query: q }); setQuery(""); }),
+                  content: (
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-fm-accent text-fm-canvas"><Eye size={18} strokeWidth={2.2} /></span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold">Watch for &ldquo;{q}&rdquo; <span className="font-fm-mono text-[9px] text-fm-accent">BETA</span></span>
+                        <span className="block text-xs text-fm-muted">Leaf finds the dates and asks when one fits</span>
+                      </span>
+                    </div>
+                  ),
+                })}
               />
             </label>
             <p className="mb-0 ml-5 mt-2 text-xs text-fm-muted">
               Goes into the book and your own saves.{" "}
-              {!addingEvent && <button type="button" className="font-semibold text-fm-ink-2 underline" onClick={() => setAddingEvent(true)}>Add a movie or event</button>}
+              {!addingEvent && <button type="button" className="font-semibold text-fm-ink-2 underline" onClick={() => setAddingEvent(true)}>Add an event</button>}
             </p>
             {addingEvent && (
               <EventForm
+                key={watchFirst ? "find" : "dated"}
+                find={watchFirst}
+                auth={auth}
                 busy={busy === "event"}
                 onCancel={() => setAddingEvent(false)}
                 onAdd={(p) => act("event", async () => { await run("addCrewEvent", auth, p); setAddingEvent(false); })}
+                onWatch={(q) => act("event", async () => { await run("addCrewEventWatch", auth, { query: q }); setAddingEvent(false); })}
               />
             )}
           </div>
@@ -157,9 +186,9 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
 
       {error && <p className="mt-4 rounded-2xl bg-[#3A2321] px-4 py-3 text-sm text-fm-danger">{error}</p>}
 
-      {(canAdd || (book.watching?.length ?? 0) > 0) && (
+      {(book.watching?.length ?? 0) > 0 && (
         <div className="mt-6 lg:mr-[428px]">
-          <WatchingStrip items={book.watching || []} auth={auth} canAdd={canAdd} isOwner={isOwner} onChange={refresh} />
+          <WatchingStrip items={book.watching!} auth={auth} isOwner={isOwner} onChange={refresh} />
         </div>
       )}
 
@@ -380,33 +409,93 @@ function windowLabel(start: string, end: string) {
 
 type PickedVenue = { placeId?: string | null; name: string; address?: string | null; lat?: number | null; lng?: number | null };
 
+/** Reads like a team, a show or a tour, not a place: the search's Watch for row goes first. */
+function looksLikeEvent(q: string) {
+  return /\b(vs\.?|versus|game|games|tour|tickets?|concert|comedy|comedian|show|live|festival|plays?|playing|season)\b/i.test(q);
+}
+
+type Found = { title: string; date: string; time: string | null; venueName: string; image: string | null };
+
+/** "Sat, Nov 15" for a 'YYYY-MM-DD'. */
+function shortDate(ymd: string) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+/** "19:30" → "7:30". */
+function clock12(hhmm: string) {
+  const [h, m] = hhmm.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m || 0).padStart(2, "0")}`;
+}
+
 /**
- * Add a movie or event: what it is, where, and its days (one night, or a run
- * like a movie in theaters). Leaf only polls dates inside them; for a movie,
- * at real showtimes when it has them.
+ * Add an event: what it is, then "Do you know the date?"
+ *   - One date / Date range: where and when (one night, or a run like a movie
+ *     in theaters). Leaf only polls dates inside them; for a movie, at real
+ *     showtimes when it has them.
+ *   - No, Leaf finds it: a watch (BETA), with a preview of what Leaf finds.
  */
-function EventForm({ onAdd, onCancel, busy }: { onAdd: (p: Record<string, unknown>) => void; onCancel: () => void; busy: boolean }) {
+function EventForm({ auth, onAdd, onWatch, onCancel, busy, find = false }: { auth: CrewAuth; onAdd: (p: Record<string, unknown>) => void; onWatch: (query: string) => void; onCancel: () => void; busy: boolean; find?: boolean }) {
   const today = new Date().toLocaleDateString("en-CA");
   const [kind, setKind] = useState<"event" | "movie">("event");
   const [title, setTitle] = useState("");
   const [placeQuery, setPlaceQuery] = useState("");
   const [place, setPlace] = useState<PickedVenue | null>(null);
-  const [run2, setRun2] = useState(false);
+  const [when, setWhen] = useState<"one" | "range" | "find">(find ? "find" : "one");
+  const run2 = when === "range";
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  // "No, Leaf finds it": what Leaf would find, looked up as they type.
+  const [lookup, setLookup] = useState<{ q: string; matches: Found[] } | null>(null);
+  const q = title.trim();
+  const found = when === "find" && lookup?.q === q ? lookup.matches : null;
+  useEffect(() => {
+    if (when !== "find" || q.length < 3) return;
+    let live = true;
+    const t = setTimeout(() => {
+      run<{ matches: Found[] }>("previewCrewEvent", auth, { query: q })
+        .then((r) => { if (live) setLookup({ q, matches: r.matches }); })
+        .catch(() => { if (live) setLookup({ q, matches: [] }); });
+    }, 700);
+    return () => { live = false; clearTimeout(t); };
+  }, [q, when, auth]);
   const field = "h-11 w-full rounded-xl border border-fm-line bg-fm-canvas px-3 text-[16px] text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none";
   const chip = (on: boolean) => `flex h-10 items-center rounded-full border px-4 text-sm font-semibold ${on ? "border-fm-accent bg-fm-accent text-fm-canvas" : "border-fm-line text-fm-ink hover:bg-fm-card"}`;
   const ready = title.trim() && place && start && (!run2 || (end && end >= start));
   return (
     <div className="mt-3 flex flex-col gap-3 rounded-[24px] border border-fm-line-dim bg-fm-surface p-4 lg:p-5">
-      <div className="flex gap-2">
-        <button type="button" className={chip(kind === "event")} aria-pressed={kind === "event"} onClick={() => setKind("event")}>Event</button>
-        <button type="button" className={chip(kind === "movie")} aria-pressed={kind === "movie"} onClick={() => { setKind("movie"); setRun2(true); }}>Movie</button>
-      </div>
+      {when !== "find" && (
+        <div className="flex gap-2">
+          <button type="button" className={chip(kind === "event")} aria-pressed={kind === "event"} onClick={() => setKind("event")}>Event</button>
+          <button type="button" className={chip(kind === "movie")} aria-pressed={kind === "movie"} onClick={() => { setKind("movie"); setWhen("range"); }}>Movie</button>
+        </div>
+      )}
       <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-semibold text-fm-ink-2">{kind === "movie" ? "Which movie?" : "What is it?"}</span>
-        <input className={field} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={kind === "movie" ? "The movie's title" : "A show, exhibit, game…"} maxLength={120} />
+        <span className="text-sm font-semibold text-fm-ink-2">{kind === "movie" && when !== "find" ? "Which movie?" : "What is it?"}</span>
+        <input className={field} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={kind === "movie" && when !== "find" ? "The movie's title" : "A show, exhibit, game: Nets vs. Rockets"} maxLength={when === "find" ? 80 : 120} />
       </label>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-semibold text-fm-ink-2">Do you know the date?</span>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={chip(when === "one")} aria-pressed={when === "one"} onClick={() => setWhen("one")}>One date</button>
+          <button type="button" className={chip(when === "range")} aria-pressed={when === "range"} onClick={() => setWhen("range")}>{kind === "movie" ? "In theaters" : "Date range"}</button>
+          <button type="button" className={chip(when === "find")} aria-pressed={when === "find"} onClick={() => { setWhen("find"); setKind("event"); }}>No, Leaf finds it</button>
+        </div>
+      </div>
+      {when === "find" ? (
+        <div className="flex flex-col gap-2 rounded-2xl border border-fm-line bg-fm-canvas p-3.5">
+          <span className="font-fm-mono text-[10px] uppercase tracking-[0.1em] text-fm-accent">{found?.length ? "Leaf found" : "Leaf looks every week"} · BETA</span>
+          {found?.map((f) => (
+            <div key={`${f.date}-${f.venueName}`} className="flex items-center justify-between gap-3 text-sm">
+              <span className="min-w-0 truncate">{f.venueName}</span>
+              <span className="shrink-0 text-fm-muted">{shortDate(f.date)}{f.time ? ` · ${clock12(f.time)}` : ""}</span>
+            </div>
+          ))}
+          {found && !found.length && title.trim().length >= 3 && <span className="text-sm text-fm-muted">No dates near you yet.</span>}
+          <span className="text-xs leading-relaxed text-fm-muted">Leaf keeps looking every week. When a date fits, the organizer gets &ldquo;It&rsquo;s a go?&rdquo; and one tap sends the invites.</span>
+        </div>
+      ) : (
+      <>
       <div className="flex flex-col gap-1.5">
         <span className="text-sm font-semibold text-fm-ink-2">{kind === "movie" ? "Which theater?" : "Where?"}</span>
         {place ? (
@@ -419,10 +508,6 @@ function EventForm({ onAdd, onCancel, busy }: { onAdd: (p: Record<string, unknow
         )}
       </div>
       <div className="flex flex-col gap-1.5">
-        <div className="flex gap-2">
-          <button type="button" className={chip(!run2)} aria-pressed={!run2} onClick={() => setRun2(false)}>One night</button>
-          <button type="button" className={chip(run2)} aria-pressed={run2} onClick={() => setRun2(true)}>{kind === "movie" ? "In theaters" : "Runs a while"}</button>
-        </div>
         <div className="flex flex-wrap items-center gap-2">
           <input type="date" className={`${field} max-w-[180px]`} min={today} value={start} onChange={(e) => setStart(e.target.value)} aria-label={run2 ? "From" : "Date"} />
           {run2 && (
@@ -434,10 +519,16 @@ function EventForm({ onAdd, onCancel, busy }: { onAdd: (p: Record<string, unknow
         </div>
         <p className="m-0 text-xs text-fm-muted">Leaf only suggests nights {run2 ? "between these dates" : "on this date"}{kind === "movie" ? ", at real showtimes when it has them" : ""}.</p>
       </div>
+      </>
+      )}
       <div className="flex gap-2">
-        <Button small disabled={!ready || busy} onClick={() => onAdd({ title: title.trim(), kind, start, end: run2 ? end : start, placeId: place?.placeId || null, venue: place })}>
-          {busy ? "Adding…" : "Add to the book"}
-        </Button>
+        {when === "find" ? (
+          <Button small disabled={title.trim().length < 2 || busy} onClick={() => onWatch(title.trim())}>{busy ? "Adding…" : "Watch for it"}</Button>
+        ) : (
+          <Button small disabled={!ready || busy} onClick={() => onAdd({ title: title.trim(), kind, start, end: run2 ? end : start, placeId: place?.placeId || null, venue: place })}>
+            {busy ? "Adding…" : "Add to the book"}
+          </Button>
+        )}
         <Button small kind="ghost" onClick={onCancel}>Cancel</Button>
       </div>
     </div>

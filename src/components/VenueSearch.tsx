@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, type ReactNode } from "react";
 
 declare global {
   interface Window {
@@ -39,6 +39,13 @@ interface VenueSearchProps {
    * into a real Place with placeId without forcing the user to click.
    */
   autoResolveInitial?: boolean;
+  /**
+   * One more row under the places for what's typed ("Watch for 'Nets vs
+   * Rockets'"), shown from 3 letters on even when Google finds nothing.
+   * `first` puts it above the places.
+   */
+  extraOption?: (query: string) => { content: ReactNode; onSelect: () => void; first?: boolean } | null;
+  autoFocus?: boolean;
 }
 
 let googleMapsLoading = false;
@@ -93,6 +100,8 @@ export default function VenueSearch({
   placeholder = "Search for a venue...",
   className = "",
   autoResolveInitial = false,
+  extraOption,
+  autoFocus = false,
 }: VenueSearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.AutocompleteService | null>(null);
@@ -157,7 +166,7 @@ export default function VenueSearch({
   const fetchSuggestions = useCallback((input: string) => {
     if (!autocompleteRef.current || input.length < 2) {
       setSuggestions([]);
-      setShowDropdown(false);
+      setShowDropdown(input.trim().length >= 3);
       return;
     }
 
@@ -170,7 +179,8 @@ export default function VenueSearch({
           setSelectedIndex(-1);
         } else {
           setSuggestions([]);
-          setShowDropdown(false);
+          // Nothing from Google: the extra row (if any) still shows.
+          setShowDropdown(input.trim().length >= 3);
         }
       }
     );
@@ -185,18 +195,30 @@ export default function VenueSearch({
     setShowDropdown(false);
   };
 
+  const extra = extraOption && value.trim().length >= 3 ? extraOption(value.trim()) : null;
+  // The rows in order, places and the extra one, for the keyboard.
+  const rows: ({ kind: "place"; p: google.maps.places.AutocompletePrediction } | { kind: "extra" })[] = [
+    ...(extra?.first ? [{ kind: "extra" as const }] : []),
+    ...suggestions.map((p) => ({ kind: "place" as const, p })),
+    ...(extra && !extra.first ? [{ kind: "extra" as const }] : []),
+  ];
+  const pick = (row: (typeof rows)[number]) => {
+    if (row.kind === "place") handleSelect(row.p);
+    else { extra?.onSelect(); setSuggestions([]); setShowDropdown(false); }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!showDropdown || suggestions.length === 0) return;
+    if (!showDropdown || rows.length === 0) return;
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedIndex((prev) => Math.min(prev + 1, suggestions.length - 1));
+      setSelectedIndex((prev) => Math.min(prev + 1, rows.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSelectedIndex((prev) => Math.max(prev - 1, 0));
     } else if (e.key === "Enter" && selectedIndex >= 0) {
       e.preventDefault();
-      handleSelect(suggestions[selectedIndex]);
+      pick(rows[selectedIndex]);
     } else if (e.key === "Escape") {
       setShowDropdown(false);
     }
@@ -221,6 +243,7 @@ export default function VenueSearch({
             fetchSuggestions(e.target.value);
           }}
           onKeyDown={handleKeyDown}
+          autoFocus={autoFocus}
           onFocus={() => {
             if (suggestions.length > 0) setShowDropdown(true);
             else if (value.trim().length >= 2) fetchSuggestions(value);
@@ -229,21 +252,32 @@ export default function VenueSearch({
           className={className}
         />
       </div>
-      {showDropdown && suggestions.length > 0 && (
-        <ul className="absolute z-50 left-0 right-0 bg-white border border-zinc-200 shadow-lg mt-1 max-h-60 overflow-y-auto rounded-lg">
-          {suggestions.map((s, i) => (
-            <li
-              key={s.place_id}
-              onMouseDown={() => handleSelect(s)}
-              onMouseEnter={() => setSelectedIndex(i)}
-              className={`px-4 py-3 text-sm cursor-pointer transition-colors ${
-                i === selectedIndex ? "bg-zinc-100" : "hover:bg-zinc-50"
-              }`}
-            >
-              <span className="font-medium">{s.structured_formatting.main_text}</span>
-              <span className="text-zinc-400 ml-1 text-xs">{s.structured_formatting.secondary_text}</span>
-            </li>
-          ))}
+      {showDropdown && rows.length > 0 && (
+        <ul className={`absolute z-50 left-0 right-0 bg-white border border-zinc-200 shadow-lg mt-1 overflow-y-auto rounded-lg ${extra ? "max-h-80" : "max-h-60"}`}>
+          {rows.map((row, i) =>
+            row.kind === "place" ? (
+              <li
+                key={row.p.place_id}
+                onMouseDown={() => pick(row)}
+                onMouseEnter={() => setSelectedIndex(i)}
+                className={`px-4 py-3 text-sm cursor-pointer transition-colors ${
+                  i === selectedIndex ? "bg-zinc-100" : "hover:bg-zinc-50"
+                }`}
+              >
+                <span className="font-medium">{row.p.structured_formatting.main_text}</span>
+                <span className="text-zinc-400 ml-1 text-xs">{row.p.structured_formatting.secondary_text}</span>
+              </li>
+            ) : (
+              <li
+                key="extra"
+                onMouseDown={() => pick(row)}
+                onMouseEnter={() => setSelectedIndex(i)}
+                className={`cursor-pointer transition-colors ${extra?.first ? "border-b" : "border-t"} border-zinc-200 ${i === selectedIndex ? "bg-zinc-100" : "hover:bg-zinc-50"}`}
+              >
+                {extra?.content}
+              </li>
+            ),
+          )}
         </ul>
       )}
     </div>
