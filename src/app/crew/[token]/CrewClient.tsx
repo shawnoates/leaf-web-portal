@@ -29,6 +29,7 @@ import CrewMoneyCard from "@/components/crew/CrewMoneyCard";
 import CrewAddOnCard from "@/components/crew/CrewAddOnCard";
 import FixedPlacePicker from "@/components/crew/FixedPlacePicker";
 import ShareFromInstagramHint from "@/components/crew/ShareFromInstagramHint";
+import WatchingStrip from "@/components/crew/WatchingStrip";
 import { AddPhotos, CrewPhotosSection, PhotoStrip } from "@/components/crew/CrewPhotos";
 import PlacePhoto from "@/components/crew/PlacePhoto";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
@@ -538,6 +539,9 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                   <Plus size={16} strokeWidth={2.2} aria-hidden /> Add<span className="hidden lg:inline"> a place</span>
                 </Link>
               </div>
+              {(data.watching?.length ?? 0) > 0 && (
+                <WatchingStrip items={data.watching!} auth={auth} canAdd={me.status === "in"} isOwner={me.isOwner} onChange={reload} />
+              )}
               {book.length === 0 ? (
                 <Link
                   href={crewHref(auth, "book")}

@@ -191,6 +191,8 @@ export type CrewPage = {
   addOns?: CrewAddOn[];
   /** The night that just happened, for a day and a half: the crew page's Last night card. */
   lastNight?: LastNight | null;
+  /** Events the crew watches for (BETA), above the places. */
+  watching?: WatchItem[];
   /** Watched events that found a date, waiting on the organizer's "It's a go?". */
   eventMatches?: EventMatch[];
 };
@@ -447,6 +449,18 @@ export type TellLeafResult = {
   dislikedAdded?: number;
   /** What happened to this round's open poll: new dates, or left alone because people already voted. */
   pollDates?: "refreshed" | "others_voted" | "unchanged" | null;
+  /** "Let us know when the Nets play the Rockets": a watch Leaf added to the book. */
+  watch?: { query: string; title: string; venueName: string | null; date: string | null } | null;
+};
+
+/** An event the crew watches for (BETA): the book's "Watching for" list. */
+export type WatchItem = {
+  spotId: string;
+  query: string | null;
+  title: string;
+  next: { venueName: string; date: string; time: string | null; image: string | null; url: string | null } | null;
+  addedBy: string | null;
+  addedByMe: boolean;
 };
 
 const DAY_NAMES = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
@@ -459,6 +473,13 @@ function listDays(days: number[]): string {
 }
 
 /** "12:00" → "noon", "18:30" → "6:30 PM". */
+/** "Fri 11/14" for a 'YYYY-MM-DD'. */
+function shortDayLabel(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  return `${wd} ${m}/${d}`;
+}
+
 function clockLabel(hhmm: string): string {
   const [h, m] = hhmm.split(":").map(Number);
   if (h === 12 && m === 0) return "noon";
@@ -490,6 +511,10 @@ export function tellLeafReceipt(r: TellLeafResult): string {
     : r.pollDates === "others_voted"
       ? " People already voted on this round's dates, so it starts with the next one."
       : "";
-  if (both) return `Got it: ${both}.${round}`;
+  const watch = r.watch
+    ? ` Watching for ${r.watch.title}${r.watch.venueName && r.watch.date ? ` (next: ${shortDayLabel(r.watch.date)} at ${r.watch.venueName})` : ""}. Leaf asks the organizer when there's a date that works.`
+    : "";
+  if (both) return `Got it: ${both}.${round}${watch}`;
+  if (watch) return `Got it.${watch}`;
   return `Got it. Thanks.${round}`;
 }

@@ -17,9 +17,10 @@ import { CalendarDays, Check, ChevronLeft, ChevronUp, Lock, Plus, Search, Sun } 
 import VenueSearch from "@/components/VenueSearch";
 import PlacePhoto from "@/components/crew/PlacePhoto";
 import ShareFromInstagramHint from "@/components/crew/ShareFromInstagramHint";
+import WatchingStrip from "@/components/crew/WatchingStrip";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import { Button, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Spinner, useInApp } from "@/components/crew/CrewShell";
-import { spotHref, crewHref, run, toDate, type BookSpot, type CrewAuth, type SavedPlace } from "@/lib/crew";
+import { spotHref, crewHref, run, toDate, type BookSpot, type CrewAuth, type SavedPlace, type WatchItem } from "@/lib/crew";
 
 /** A real place from Google Places (server: crew-places.js). */
 type Suggested = {
@@ -28,7 +29,7 @@ type Suggested = {
   /** Why it fits the ask (from the prompt search), or the place's own line. */
   blurb?: string | null;
 };
-type Book = { crew: { id: string; name: string }; shared: BookSpot[]; mine: SavedPlace[]; popular?: Suggested[] };
+type Book = { crew: { id: string; name: string }; shared: BookSpot[]; mine: SavedPlace[]; popular?: Suggested[]; watching?: WatchItem[] };
 
 export default function CrewBookClient({ token }: { token: string }) {
   const load = useCrewAuth(token);
@@ -50,9 +51,6 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
   const [sort, setSort] = useState<"wanted" | "new">("wanted");
   const [query, setQuery] = useState("");
   const [addingEvent, setAddingEvent] = useState(false);
-  // Organizer: watch for an event (BETA), a book entry Leaf searches weekly.
-  const [watching, setWatching] = useState(false);
-  const [watchFor, setWatchFor] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   // "What are you in the mood for?" — real places for a vibe (searchCrewPlaces).
@@ -145,24 +143,7 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
             <p className="mb-0 ml-5 mt-2 text-xs text-fm-muted">
               Goes into the book and your own saves.{" "}
               {!addingEvent && <button type="button" className="font-semibold text-fm-ink-2 underline" onClick={() => setAddingEvent(true)}>Add a movie or event</button>}
-              {isOwner && !watching && <>{" · "}<button type="button" className="font-semibold text-fm-accent underline" onClick={() => setWatching(true)}>Watch for an event</button> <span className="font-fm-mono text-[9px] text-fm-accent">BETA</span></>}
             </p>
-            {watching && (
-              <form
-                className="mt-3 flex flex-col gap-2 rounded-2xl border border-fm-line bg-fm-surface p-4"
-                onSubmit={(e) => { e.preventDefault(); void act("watch", async () => { await run("addCrewEventWatch", auth, { query: watchFor.trim() }); setWatching(false); setWatchFor(""); }); }}
-              >
-                <label htmlFor="watch-for" className="text-sm font-semibold text-fm-ink">What should Leaf watch for?</label>
-                <input id="watch-for" value={watchFor} onChange={(e) => setWatchFor(e.target.value)} maxLength={80}
-                  placeholder="A show, a comedian, a team: Sixers home games"
-                  className="h-11 w-full rounded-xl border border-fm-line bg-fm-canvas px-3 text-[16px] text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none" />
-                <p className="m-0 text-xs text-fm-muted">Every week Leaf looks for its next dates near you. When one fits your calendar, you get &ldquo;It&rsquo;s a go?&rdquo; One tap sends the crew the invites.</p>
-                <div className="flex gap-2">
-                  <Button small type="submit" disabled={busy !== null || watchFor.trim().length < 2}>{busy === "watch" ? "Adding…" : "Watch for it"}</Button>
-                  <Button small kind="ghost" onClick={() => setWatching(false)}>Cancel</Button>
-                </div>
-              </form>
-            )}
             {addingEvent && (
               <EventForm
                 busy={busy === "event"}
@@ -175,6 +156,12 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
       </div>
 
       {error && <p className="mt-4 rounded-2xl bg-[#3A2321] px-4 py-3 text-sm text-fm-danger">{error}</p>}
+
+      {(canAdd || (book.watching?.length ?? 0) > 0) && (
+        <div className="mt-6 lg:mr-[428px]">
+          <WatchingStrip items={book.watching || []} auth={auth} canAdd={canAdd} isOwner={isOwner} onChange={refresh} />
+        </div>
+      )}
 
       {canAdd && (
         <div className="mt-6 lg:mr-[428px]">
