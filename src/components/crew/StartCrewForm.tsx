@@ -228,7 +228,7 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
               )}
               {trigKind === "birthdays" && (
                 <p className="m-0 text-xs leading-relaxed text-fm-muted">
-                  About three weeks before someone in the crew has a birthday, Leaf asks them where they want to go, then finds a night that week that works for everyone. Members add their birthday when they join.
+                  About three weeks before someone in the crew has a birthday, Leaf asks them where they want to go, then finds a night that week that works for everyone. Leaf asks members for their birthday on the crew page.
                 </p>
               )}
               {trigKind === "weather" && (<>
