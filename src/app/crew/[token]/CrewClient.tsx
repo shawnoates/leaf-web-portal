@@ -38,7 +38,7 @@ import {
   type EventMatch,
   RHYTHM_LABELS, crewHref, crewIsEvening, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
   type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult,
-  type CrewAddOn, type CrewSplit, type LastNight,
+  type CrewAddOn, type CrewSplit, type LastNight, type FreeRule,
 } from "@/lib/crew";
 
 export default function CrewClient({ token }: { token: string }) {
@@ -189,7 +189,9 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
     setCalHidden(true);
     try { window.localStorage.setItem(calKey, "1"); } catch { /* private mode */ }
   };
-  const showCalNudge = me.status === "in" && !me.calendarSynced && !calHidden && !open.some((c) => c.state === "polling");
+  // When we're free counts only synced calendars: that ask stays until they sync.
+  const freeAsk = Boolean(me.needsCalendarForFree);
+  const showCalNudge = me.status === "in" && !me.calendarSynced && (freeAsk || (!calHidden && !open.some((c) => c.state === "polling")));
 
   const joined = members.filter((m) => m.status === "in");
   const invited = members.filter((m) => m.status === "invited");
@@ -464,14 +466,17 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               </span>
               <div className="flex min-w-0 flex-1 flex-col gap-3">
                 <div>
-                  <p className="m-0 text-[16px] font-semibold text-fm-ink">Connect your calendar</p>
+                  <p className="m-0 text-[16px] font-semibold text-fm-ink">{freeAsk ? "Sync your calendar so Leaf counts you" : "Connect your calendar"}</p>
                   <p className="m-0 mt-1 text-[14px] leading-relaxed text-fm-ink-2">
-                    Leaf finds {ev ? "nights" : "days"} that work for you and skips the ones you&rsquo;re busy. Your crew never sees your calendar, just which dates work.
+                    {freeAsk
+                      ? `This crew meets when ${crew.freeTrigger?.minFree ?? 3}+ of you are free the same day. Leaf can only count you if it can see when you're free.`
+                      : `Leaf finds ${ev ? "nights" : "days"} that work for you and skips the ones you're busy.`}{" "}
+                    Your crew never sees your calendar, just which dates work.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <Button small disabled={busy !== null} onClick={connectCalendar}>{busy === "gcal" ? "Opening…" : "Connect Google Calendar"}</Button>
-                  <button type="button" className="text-sm text-fm-muted underline underline-offset-4" onClick={hideCal}>Not now</button>
+                  {!freeAsk && <button type="button" className="text-sm text-fm-muted underline underline-offset-4" onClick={hideCal}>Not now</button>}
                 </div>
               </div>
             </section>
@@ -903,7 +908,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                       <option key={d} value={d}>{l}</option>
                     ))}
                     <option value="0">Just once</option>
-                    <option value="-1">On a trigger (BETA): only places with a rule</option>
+                    <option value="-1">On a trigger (BETA): only its triggers start nights</option>
                   </select>
                   <p className="mb-0 mt-2 text-xs text-fm-muted">Leaf starts each {night} on this rhythm. Members can set a slower pace of their own below.</p>
                 </div>
@@ -952,6 +957,16 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     onChange={(v) => act("rotation", () => run("setCrewHostRotation", auth, { calendarId: crew.id, enabled: v }))}
                   />
                 </div>
+              )}
+
+              {me.isOwner && (
+                <FreeRuleRow
+                  rule={crew.freeTrigger || null}
+                  label={crew.freeTriggerLabel || null}
+                  usualTime={crew.usualTime || null}
+                  busy={busy !== null}
+                  onSave={(rule) => act("free", () => run("setCrewFreeTrigger", auth, { calendarId: crew.id, rule }))}
+                />
               )}
 
               {me.isOwner && (
@@ -1136,7 +1151,8 @@ function CycleCard({
   const who = c.trigger === "member_proposal" ? `${names[c.hostId || ""] || "A member"}'s idea`
     : c.trigger === "weather" ? "Nice day ahead"
     : c.trigger === "birthday" ? `${names[c.birthdayOfId || ""] || "Someone"}'s birthday`
-    : c.trigger === "event" ? "It's on" : "Up next";
+    : c.trigger === "event" ? "It's on"
+    : c.trigger === "free" ? (c.freeCount ? `${c.freeCount} of you are free` : "You're free") : "Up next";
   const chosen = c.chosenOption ? dayParts(c.chosenOption.date) : null;
 
   return (
@@ -1891,5 +1907,82 @@ function AddBirthday({ auth, onDone }: { auth: CrewAuth; onDone: () => void }) {
       </div>
       {error && <p className="mb-0 mt-2 text-sm text-fm-danger">{error}</p>}
     </section>
+  );
+}
+
+const FREE_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
+const FREE_DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const FREE_TIMES = [{ time: "10:00", label: "Morning" }, { time: "14:00", label: "Afternoon" }, { time: "19:00", label: "Evening" }];
+
+/**
+ * Organizer: When we're free (BETA). On, Leaf plans a night when `minFree` of
+ * the crew are free the same day (synced calendars); turning it on asks the
+ * members who haven't synced to sync.
+ */
+function FreeRuleRow({ rule, label, usualTime, busy, onSave }: {
+  rule: FreeRule | null; label: string | null; usualTime: string | null; busy: boolean;
+  onSave: (rule: Omit<FreeRule, "kind" | "everyDays"> | null) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [minFree, setMinFree] = useState(rule?.minFree ?? 3);
+  const [days, setDays] = useState<number[]>(rule?.days ?? [5, 6]);
+  const [time, setTime] = useState(rule?.time ?? (FREE_TIMES.some((t) => t.time === usualTime) ? usualTime! : "19:00"));
+  return (
+    <div className="border-b border-fm-line-dim py-4">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-[15px] font-semibold">When we&rsquo;re free <span className="rounded-full bg-fm-card px-1.5 py-0.5 font-fm-mono text-[9px] tracking-[0.06em] text-fm-accent">BETA</span></div>
+          <div className="text-[13px] text-fm-muted">
+            {rule && label ? <>{label} · <button type="button" className="underline underline-offset-2" onClick={() => setEditing(!editing)}>{editing ? "Close" : "Edit"}</button></>
+              : "Leaf plans a night when enough of you are free the same day, from synced calendars."}
+          </div>
+        </div>
+        <FriendModeSwitch
+          label="When we're free"
+          checked={Boolean(rule)}
+          disabled={busy}
+          onChange={(v) => {
+            if (v) setEditing(true);
+            else { setEditing(false); void onSave(null); }
+          }}
+        />
+      </div>
+      {editing && (
+        <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-fm-line bg-fm-canvas p-3.5 text-sm">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-semibold text-fm-ink-2">At least</span>
+            <span className="flex items-center gap-2">
+              <button type="button" aria-label="Fewer people" onClick={() => setMinFree(Math.max(2, minFree - 1))} className="h-8 w-8 rounded-full border border-fm-line">&minus;</button>
+              <span className="w-20 text-center font-fm-serif text-[19px]">{minFree} free</span>
+              <button type="button" aria-label="More people" onClick={() => setMinFree(Math.min(10, minFree + 1))} className="h-8 w-8 rounded-full border border-fm-line">+</button>
+            </span>
+          </div>
+          <div className="flex gap-1">
+            {FREE_DAYS.map((d, i) => {
+              const on = days.includes(i);
+              return (
+                <button key={i} type="button" aria-label={FREE_DAY_NAMES[i]} aria-pressed={on} onClick={() => setDays(on ? days.filter((x) => x !== i) : [...days, i])}
+                  className={`h-9 flex-1 rounded-lg border text-xs font-semibold ${on ? "border-fm-accent bg-fm-accent text-fm-canvas" : "border-fm-line text-fm-ink-2"}`}>
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex gap-1.5">
+            {FREE_TIMES.map((t) => (
+              <button key={t.time} type="button" aria-pressed={time === t.time} onClick={() => setTime(t.time)}
+                className={`h-8 flex-1 rounded-full border text-xs font-semibold ${time === t.time ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink-2"}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <p className="m-0 text-xs text-fm-muted">Only Google Calendars count for now. Leaf asks everyone who hasn&rsquo;t synced theirs to sync.</p>
+          <div className="flex gap-2">
+            <Button small disabled={busy || days.length === 0} onClick={() => void onSave({ minFree, days, time }).then(() => setEditing(false))}>{rule ? "Save" : "Turn on"}</Button>
+            <Button small kind="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

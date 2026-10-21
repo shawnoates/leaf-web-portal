@@ -45,9 +45,11 @@ export type CycleState = "picking" | "polling" | "locked" | "booked" | "done" | 
 export type CycleView = {
   cycleId: string;
   state: CycleState;
-  trigger: "rhythm" | "member_ask" | "member_proposal" | "opportunity" | "weather" | "event" | "birthday";
+  trigger: "rhythm" | "member_ask" | "member_proposal" | "opportunity" | "weather" | "event" | "birthday" | "free";
   /** A birthday round: whose birthday. */
   birthdayOfId?: string | null;
+  /** A "when we're free" round: how many were free that date. */
+  freeCount?: number | null;
   venue: Venue | null;
   /** A movie or event from the book: its days ('YYYY-MM-DD'), so the dates stay inside them. */
   eventWindow?: { start: string; end: string; kind: "movie" | "event"; title: string | null } | null;
@@ -157,6 +159,9 @@ export type CrewPage = {
     triggerOnly?: boolean;
     /** Birthdays (BETA): the round nearest a member's birthday is theirs. */
     birthdays?: boolean;
+    /** When we're free (BETA): a night when `minFree` of the crew are free the same day. */
+    freeTrigger?: FreeRule | null;
+    freeTriggerLabel?: string | null;
     /** When the crew meets before a round sets it ("09:00" for a morning crew). */
     usualTime?: string | null;
     placeMode?: "book" | "fixed";
@@ -170,7 +175,9 @@ export type CrewPage = {
   };
   me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null; calendarSynced?: boolean; inviteLink?: string | null; needsSeed?: boolean; needsPace?: boolean; hiddenTips?: string[];
     /** Birthdays on: their own "where do you want to go?" (pickBirthdayPlace), and whether Leaf knows their birthday. */
-    birthdayAsk?: { date: string } | null; needsBirthday?: boolean };
+    birthdayAsk?: { date: string } | null; needsBirthday?: boolean;
+    /** When we're free is on and Leaf can't see their calendar: ask them to sync. */
+    needsCalendarForFree?: boolean };
   members: Member[];
   names: Record<string, string>;
   /** Tell Leaf pills: what the crew has said so far, with counts (never who). */
@@ -452,6 +459,9 @@ export type TellLeafResult = {
   /** "Let us know when the Nets play the Rockets": a watch Leaf added to the book. */
   watch?: { query: string; title: string; venueName: string | null; date: string | null } | null;
 };
+
+/** When we're free (BETA): days 0–6, Sunday first; time "HH:mm". */
+export type FreeRule = { kind: "free"; minFree: number; days: number[]; time: string; everyDays: number };
 
 /** An event the crew watches for (BETA): the book's "Watching for" list. */
 export type WatchItem = {

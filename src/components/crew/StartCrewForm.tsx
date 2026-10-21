@@ -28,6 +28,8 @@ const TRIGGER = -1;
 const WEEK = ["S", "M", "T", "W", "T", "F", "S"];
 const WEEK_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const TRIGGER_TIMES = [{ time: "14:00", label: "Afternoon" }, { time: "18:00", label: "Evening" }];
+const FREE_TIMES = [{ time: "10:00", label: "Morning" }, { time: "14:00", label: "Afternoon" }, { time: "19:00", label: "Evening" }];
+const TRIGGER_NAMES = { weather: "Weather", event: "An event", free: "When we're free", birthdays: "Birthdays" } as const;
 
 type Step = "crew" | "signin" | "done";
 /** Someone already on Leaf, picked before the form opened (people you go out with). */
@@ -57,8 +59,12 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
   const [place, setPlace] = useState<{ placeId?: string | null; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  // On a trigger: Weather (a rule and the place it's for) or An event (what to watch for).
-  const [trigKind, setTrigKind] = useState<"weather" | "event" | "birthdays">("weather");
+  // On a trigger: Weather (a rule and the place it's for), An event (what to
+  // watch for), When we're free (enough of the crew free the same day) or Birthdays.
+  const [trigKind, setTrigKind] = useState<keyof typeof TRIGGER_NAMES>("weather");
+  const [minFree, setMinFree] = useState(3);
+  const [freeDays, setFreeDays] = useState<number[]>([5, 6]);
+  const [freeTime, setFreeTime] = useState("19:00");
   const [watchFor, setWatchFor] = useState("");
   const [minF, setMinF] = useState(80);
   const [noRain, setNoRain] = useState(true);
@@ -87,6 +93,10 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
           triggerOnly: true,
           trigger: { kind: "event", query: watchFor.trim() },
         } : {}),
+        ...(pace === TRIGGER && trigKind === "free" ? {
+          triggerOnly: true,
+          trigger: { kind: "free", minFree, days: freeDays, time: freeTime },
+        } : {}),
         ...(pace === TRIGGER && trigKind === "birthdays" ? { triggerOnly: true, birthdays: true } : {}),
         invitees: people.map((p) => ({ userId: p.userId })),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -111,6 +121,7 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
     if (!crewName.trim()) { setError("Give the crew a name, like \"Thursday dinners\"."); return; }
     if (pace === TRIGGER && trigKind === "weather" && !place) { setError("Pick the place it's for, like the beach or a rooftop."); return; }
     if (pace === TRIGGER && trigKind === "weather" && days.length === 0) { setError("Pick at least one day."); return; }
+    if (pace === TRIGGER && trigKind === "free" && freeDays.length === 0) { setError("Pick at least one day."); return; }
     if (pace === TRIGGER && trigKind === "event" && watchFor.trim().length < 2) { setError("Say what to watch for, like a show or a team."); return; }
     setError("");
     trackMarketingEvent("friend_mode_cta_click", { surface: "friends_page_form" });
@@ -210,10 +221,10 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
           {pace === TRIGGER && (
             <div className="flex flex-col gap-3 rounded-2xl border border-fm-line bg-fm-surface p-4">
               <div role="group" aria-label="Trigger" className="flex flex-wrap gap-2">
-                {(["weather", "event", "birthdays"] as const).map((k) => (
+                {(Object.keys(TRIGGER_NAMES) as (keyof typeof TRIGGER_NAMES)[]).map((k) => (
                   <button key={k} type="button" aria-pressed={trigKind === k} onClick={() => setTrigKind(k)}
                     className={`h-9 rounded-full px-4 text-sm font-semibold ${trigKind === k ? "bg-fm-ink text-fm-canvas" : "border border-fm-line text-fm-ink-2"}`}>
-                    {k === "weather" ? "Weather" : k === "event" ? "An event" : "Birthdays"}
+                    {TRIGGER_NAMES[k]}{k === "free" && <span className="ml-1.5 font-fm-mono text-[9px] text-fm-accent">BETA</span>}
                   </button>
                 ))}
               </div>
@@ -223,6 +234,33 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
                   <input id="watch-for" className={field} value={watchFor} onChange={(e) => setWatchFor(e.target.value)} maxLength={80} placeholder="A show, a comedian, a team: Sixers home games" autoComplete="off" />
                   <p className="m-0 text-xs leading-relaxed text-fm-muted">
                     Every week Leaf looks for its next dates near you (Ticketmaster, then the web). When one fits your calendar, you get &ldquo;It&rsquo;s a go?&rdquo; One tap sends the invites to the crew.
+                  </p>
+                </div>
+              )}
+              {trigKind === "free" && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="font-semibold text-fm-ink-2">When at least</span>
+                    <span className="flex items-center gap-2">
+                      <button type="button" aria-label="Fewer people" onClick={() => setMinFree(Math.max(2, minFree - 1))} className="h-9 w-9 rounded-full border border-fm-line text-fm-ink">&minus;</button>
+                      <span className="w-24 text-center font-fm-serif text-[22px]">{minFree} are free</span>
+                      <button type="button" aria-label="More people" onClick={() => setMinFree(Math.min(10, minFree + 1))} className="h-9 w-9 rounded-full border border-fm-line text-fm-ink">+</button>
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <span className="text-sm font-semibold text-fm-ink-2">On</span>
+                    <DayChips days={freeDays} onChange={setFreeDays} />
+                  </div>
+                  <div className="flex gap-2">
+                    {FREE_TIMES.map((t) => (
+                      <button key={t.time} type="button" aria-pressed={freeTime === t.time} onClick={() => setFreeTime(t.time)}
+                        className={`h-9 flex-1 rounded-full border text-sm font-semibold ${freeTime === t.time ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink-2"}`}>
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="m-0 text-xs leading-relaxed text-fm-muted">
+                    Twice a day Leaf checks everyone&rsquo;s synced calendar 5 to 14 days out. When enough of you are free the same day, it picks a place from the book and sends the invites. Leaf asks members to sync their Google Calendar once they join.
                   </p>
                 </div>
               )}
@@ -246,23 +284,7 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
               </label>
               <div className="flex flex-col gap-2">
                 <span className="text-sm font-semibold text-fm-ink-2">On</span>
-                <div className="flex gap-1.5">
-                  {WEEK.map((d, i) => {
-                    const on = days.includes(i);
-                    return (
-                      <button
-                        key={i}
-                        type="button"
-                        aria-label={WEEK_NAMES[i]}
-                        aria-pressed={on}
-                        onClick={() => setDays(on ? days.filter((x) => x !== i) : [...days, i])}
-                        className={`h-10 flex-1 rounded-xl border text-sm font-semibold ${on ? "border-fm-accent bg-fm-accent text-fm-canvas" : "border-fm-line text-fm-ink-2"}`}
-                      >
-                        {d}
-                      </button>
-                    );
-                  })}
-                </div>
+                <DayChips days={days} onChange={setDays} />
               </div>
               <div className="flex gap-2">
                 {TRIGGER_TIMES.map((t) => (
@@ -349,6 +371,8 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
             <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">
               {pace === TRIGGER && trigKind === "birthdays"
                 ? "Send the link to the group. When someone's birthday is coming up, Leaf asks them where they want to go."
+                : pace === TRIGGER && trigKind === "free"
+                ? `Send the link to the group. Once people join, Leaf plans a night whenever ${minFree} of you are free the same day.`
                 : pace === TRIGGER && trigKind === "event"
                 ? `Send the link to the group. Leaf watches for ${watchFor.trim()} every week and asks you when there's a date that fits.`
                 : pace === TRIGGER && place
@@ -397,6 +421,29 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
       )}
 
       {error && <p role="alert" className="m-0 text-sm text-fm-danger">{error}</p>}
+    </div>
+  );
+}
+
+/** Which days of the week: one tap each, Sunday first. */
+function DayChips({ days, onChange }: { days: number[]; onChange: (days: number[]) => void }) {
+  return (
+    <div className="flex gap-1.5">
+      {WEEK.map((d, i) => {
+        const on = days.includes(i);
+        return (
+          <button
+            key={i}
+            type="button"
+            aria-label={WEEK_NAMES[i]}
+            aria-pressed={on}
+            onClick={() => onChange(on ? days.filter((x) => x !== i) : [...days, i])}
+            className={`h-10 flex-1 rounded-xl border text-sm font-semibold ${on ? "border-fm-accent bg-fm-accent text-fm-canvas" : "border-fm-line text-fm-ink-2"}`}
+          >
+            {d}
+          </button>
+        );
+      })}
     </div>
   );
 }
