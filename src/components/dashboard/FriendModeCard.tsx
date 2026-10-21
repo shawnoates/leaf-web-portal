@@ -212,6 +212,8 @@ export default function FriendModeCard({
         </div>
       )}
 
+      <FollowerCrews calendarId={calendarId} />
+
       {settingUp && (
         <FriendModeSetup
           calendarId={calendarId}
@@ -225,5 +227,47 @@ export default function FriendModeCard({
         />
       )}
     </section>
+  );
+}
+
+/**
+ * Followers' own crews: after an RSVP or on a recap, Leaf offers people who
+ * keep coming to plans together a crew of their own (getCrewNudge). On by
+ * default; the organizer can turn it off, and sees how many crews it started.
+ * Shown on any size calendar: big ones are where followers find their people.
+ */
+function FollowerCrews({ calendarId }: { calendarId: string }) {
+  const [state, setState] = useState<{ on: boolean; crewsStarted: number } | null>(null);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    Parse.Cloud.run("getCalendarCrewSuggestions", { calendarId })
+      .then((r: unknown) => setState(r as { on: boolean; crewsStarted: number }))
+      .catch(() => setState(null));
+  }, [calendarId]);
+  if (!state) return null;
+  const set = async (on: boolean) => {
+    setSaving(true);
+    setState({ ...state, on });
+    try {
+      await Parse.Cloud.run("setCalendarCrewSuggestions", { calendarId, on });
+    } catch {
+      setState({ ...state, on: !on });
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="mt-2 flex items-center gap-4 border-t pt-2.5 pb-1" style={{ borderColor: FM.lineDim }}>
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-medium" style={{ color: FM.ink }}>Suggest crews to your followers</p>
+        <p className="text-[12px]" style={{ color: FM.mutedText }}>
+          When followers keep coming to your plans together, Leaf offers to make them a crew. Their book starts with your places.
+          {state.crewsStarted > 0 && (
+            <span style={{ color: FM.accent }}> {state.crewsStarted} {state.crewsStarted === 1 ? "crew" : "crews"} started from your calendar.</span>
+          )}
+        </p>
+      </div>
+      <FriendModeSwitch label="Suggest crews to your followers" checked={state.on} disabled={saving} onChange={set} />
+    </div>
   );
 }

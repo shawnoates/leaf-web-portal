@@ -31,7 +31,7 @@ type Created = { crewId: string; link: string; inviteLink: string };
 const field = "h-12 w-full rounded-2xl border border-fm-line bg-fm-canvas px-4 text-base text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none";
 const primary = "flex h-12 w-full items-center justify-center gap-2 rounded-full bg-fm-accent px-6 text-[15px] font-bold text-fm-canvas transition hover:brightness-105 disabled:opacity-60";
 
-export default function StartCrewForm({ onOpenCrew, people = [], suggestedName = "", source = "landing" }: {
+export default function StartCrewForm({ onOpenCrew, people = [], suggestedName = "", source = "landing", fromCalendar = null }: {
   /** In the dashboard: open the new crew there instead of leaving for its page. */
   onOpenCrew?: (crewId: string) => void;
   /** Invited by account when the crew is made ("Start a crew with Maya and Dev"). */
@@ -39,7 +39,10 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
   suggestedName?: string;
   /** Where it started, for friendMode.enabledVia ("me", "landing", …). */
   source?: string;
+  /** Started from a calendar's prompt: credited to it, and its places can start the book. */
+  fromCalendar?: { id: string; name: string | null } | null;
 } = {}) {
+  const [seedBook, setSeedBook] = useState(true);
   const [step, setStep] = useState<Step>("crew");
   const [crewName, setCrewName] = useState(suggestedName);
   const [pace, setPace] = useState(14);
@@ -65,6 +68,7 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
         invitees: people.map((p) => ({ userId: p.userId })),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         source,
+        ...(fromCalendar ? { fromCalendarId: fromCalendar.id, seedFromCalendar: seedBook } : {}),
       })) as Created;
       if (place) {
         await Parse.Cloud.run("addToCrewBook", { crewId: r.crewId, placeId: place.placeId || null, venue: place }).catch(() => {});
@@ -148,6 +152,15 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
               </div>
               <span className="text-xs text-fm-muted">They get the invite from you. You can add more from the crew page.</span>
             </div>
+          )}
+          {fromCalendar && (
+            <label className="flex items-start gap-3 rounded-2xl border border-fm-line bg-fm-card px-4 py-3 text-sm">
+              <input type="checkbox" checked={seedBook} onChange={(e) => setSeedBook(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--color-fm-accent)]" />
+              <span className="flex flex-col gap-0.5">
+                <span className="font-semibold text-fm-ink">Start the book with {fromCalendar.name ? `${fromCalendar.name}\u2019s` : "the calendar\u2019s"} places</span>
+                <span className="text-xs text-fm-muted">The spots its plans go to. Add your own any time.</span>
+              </span>
+            </label>
           )}
           <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
             <legend className="mb-2 text-sm font-semibold text-fm-ink-2">How often?</legend>

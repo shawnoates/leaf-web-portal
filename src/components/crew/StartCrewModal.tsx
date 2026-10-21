@@ -5,12 +5,13 @@ import { X } from "lucide-react";
 import StartCrewForm, { type CrewPerson } from "@/components/crew/StartCrewForm";
 
 /** Start a crew from inside the dashboard: the /friends form in a sheet. */
-export default function StartCrewModal({ onClose, onOpenCrew, people, suggestedName, source }: {
+export default function StartCrewModal({ onClose, onOpenCrew, people, suggestedName, source, fromCalendar }: {
   onClose: () => void;
   onOpenCrew: (crewId: string) => void;
   people?: CrewPerson[];
   suggestedName?: string;
   source?: string;
+  fromCalendar?: { id: string; name: string | null } | null;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -23,7 +24,7 @@ export default function StartCrewModal({ onClose, onOpenCrew, people, suggestedN
         <button type="button" onClick={onClose} aria-label="Close" className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-fm-line bg-fm-surface text-fm-ink hover:bg-fm-card">
           <X size={20} aria-hidden />
         </button>
-        <StartCrewForm onOpenCrew={onOpenCrew} people={people} suggestedName={suggestedName} source={source} />
+        <StartCrewForm onOpenCrew={onOpenCrew} people={people} suggestedName={suggestedName} source={source} fromCalendar={fromCalendar} />
       </div>
     </div>
   );

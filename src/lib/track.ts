@@ -30,6 +30,8 @@ export type WebEvent =
   | "fm_intro_shown"
   | "fm_intro_cta"
   | "fm_setup_started"
+  | "crew_nudge_shown"
+  | "crew_nudge_start"
   | "fm_setup_completed"
   | "crew_pulse_share"
   | "crew_addon_add"

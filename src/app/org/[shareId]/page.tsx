@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
+import CrewNudgeCard from "@/components/crew/CrewNudgeCard";
 import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import { APP_LINK_URL, SITE_URL } from "@/lib/site";
@@ -1279,6 +1280,13 @@ function RsvpModal({
                 personal "come with me" text is easiest to send. */}
             {!isPendingResult && !isWaitlistResult && (
               <FriendInviteCard eventGroupId={plan.id} limitedSpots={plan.capacity != null} accent={brandColor} />
+            )}
+
+            {/* People they keep going to plans with: make it a crew (the
+                server decides: twice in 90 days, monthly at most, the
+                organizer can turn it off). */}
+            {!isPendingResult && !isWaitlistResult && calendarId && (
+              <CrewNudgeCard calendarId={calendarId} calendarName={calendarName || null} notificationId={notificationId || null} source="calendar_prompt" />
             )}
 
             {!isPendingResult && !isWaitlistResult && (

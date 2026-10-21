@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import CrewNudgeCard from "@/components/crew/CrewNudgeCard";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { MapPin, Calendar, X, Check, ShieldCheck, UserCheck, Star } from "lucide-react";
@@ -497,6 +498,13 @@ export default function MemoryClient({
 
       {info.calendar?.objectId && (
         <CalendarPromoBanner calendarId={info.calendar.objectId} className="pt-8" />
+      )}
+
+      {/* Do this again with the people you went with: a crew. */}
+      {info.viewerRole !== "staff_host" && (
+        <div className="pt-8">
+          <CrewNudgeCard calendarId={info.calendar?.objectId || null} calendarName={info.calendar?.name || null} notificationId={notificationId} source="recap" />
+        </div>
       )}
 
       {/* Host the next one — prefers a real plan idea, falls back to a
