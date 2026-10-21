@@ -194,3 +194,188 @@ export function CrewQuietCard({ rows }: { rows: CrewRow[] }) {
   );
 }
 
+
+// The card's own styles, on top of /me's dark Friend Mode card (.sinv.fm-dark).
+const GO_AGAIN_CSS = `
+.leafme .fm-dark .ga-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.leafme .fm-dark .ga-chip { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 999px; font-size: 14px; background: #1B2B25; color: #F2F1EC; border: 1px solid #3B5449; }
+.leafme .fm-dark .ga-chip.in { background: #3B5449; border-color: #3B5449; }
+.leafme .fm-dark .ga-chip.in.me { background: #C8F25A; border-color: #C8F25A; color: #101A16; font-weight: 600; }
+.leafme .fm-dark .ga-chip.add { background: transparent; border-style: dashed; color: #C9D1CB; cursor: pointer; }
+.leafme .fm-dark button.ga-chip { cursor: pointer; font-family: inherit; }
+.leafme .fm-dark .ga-chip:disabled { opacity: .6; cursor: default; }
+.leafme .fm-dark .ga-ask { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 12px; background: #1B2B25; }
+.leafme .fm-dark .ga-ask-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; color: #F2F1EC; }
+.leafme .fm-dark .ga-ask-row .sinv-btn { flex: none; padding: 6px 12px; font-size: 13px; }
+.leafme .fm-dark .ga-progress { display: flex; gap: 6px; margin-top: 6px; }
+.leafme .fm-dark .ga-progress span { flex: 1; height: 6px; border-radius: 3px; background: #1B2B25; }
+.leafme .fm-dark .ga-progress span.on { background: #C8F25A; }
+.leafme .fm-dark .sinv-btn.ga-start { background: #C8F25A; border-color: #C8F25A; color: #101A16; font-weight: 600; flex: 1; text-align: center; text-decoration: none; }
+.leafme .fm-dark .sinv-btn.ga-start:disabled { background: #3B5449; border-color: #3B5449; color: #8A928C; opacity: 1; }
+.leafme .fm-dark .ga-hide { background: none; border: 0; padding: 6px 0; font-size: 12px; color: #8A928C; cursor: pointer; font-family: inherit; }
+.leafme .fm-dark .ga-hide:hover { color: #F2F1EC; }
+`;
+
+/** "Do this again with the people you went with": a plan you went to (getMeDashboard.goAgain). */
+export type GoAgain = {
+  planId: string;
+  title: string;
+  place: string | null;
+  image: string | null;
+  endedAt: string | null;
+  went: number;
+  need: number;
+  inCount: number;
+  meIn: boolean;
+  people: { userId: string; name: string; photo: string | null; in: boolean; me: boolean }[];
+  nudged: string[];
+};
+
+/**
+ * After a plan: everyone who went taps themselves in, and once enough are in
+ * (3) any of them starts the crew. The others who tapped in are in it right
+ * away; everyone else who went gets an invite to hop in.
+ */
+export function GoAgainCards({ cards, onChanged }: { cards: GoAgain[]; onChanged: () => Promise<void> }) {
+  const [hidden, setHidden] = useState<string[]>([]);
+  // A card whose crew just started stays to say so; the refreshed page no longer lists it.
+  const [started, setStarted] = useState<GoAgain[]>([]);
+  const shown = [...cards, ...started.filter((k) => !cards.some((c) => c.planId === k.planId))]
+    .filter((c) => !hidden.includes(c.planId));
+  if (!shown.length) return null;
+  return (
+    <>
+      <style>{GO_AGAIN_CSS}</style>
+      {shown.map((c) => (
+        <GoAgainCard
+          key={c.planId}
+          card={c}
+          onGone={() => setHidden((h) => [...h, c.planId])}
+          onStarted={() => setStarted((k) => [...k, c])}
+          onChanged={onChanged}
+        />
+      ))}
+    </>
+  );
+}
+
+function GoAgainCard({ card: initial, onGone, onStarted, onChanged }: { card: GoAgain; onGone: () => void; onStarted: () => void; onChanged: () => Promise<void> }) {
+  const [card, setCard] = useState(initial);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [started, setStarted] = useState<{ link: string | null; invited: number } | null>(null);
+  const me = card.people.find((p) => p.me);
+  const inPeople = card.people.filter((p) => p.in && !p.me);
+  const notIn = card.people.filter((p) => !p.in && !p.me);
+  const left = Math.max(0, card.need - card.inCount);
+  const ready = card.meIn && left === 0;
+
+  const act = async (key: string, name: string, params: Record<string, unknown> = {}) => {
+    setBusy(key);
+    setError("");
+    try {
+      const r = (await Parse.Cloud.run(name, { planId: card.planId, ...params })) as { card?: GoAgain | null; link?: string | null; invited?: number };
+      if (r?.card) setCard(r.card);
+      return r;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+      return null;
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const start = async () => {
+    const r = await act("start", "startGoAgainCrew");
+    if (!r) return;
+    setStarted({ link: r.link ?? null, invited: r.invited ?? 0 });
+    onStarted();
+    // The new crew shows up in Your crews.
+    void onChanged();
+  };
+
+  if (started) {
+    return (
+      <section className="sinv fm-dark" role="region" aria-label="Crew started">
+        <div className="sinv-text">
+          <h2 className="sinv-title">Your crew is on</h2>
+          <div className="sinv-meta">
+            {inPeople.length ? `${inPeople.map((p) => p.name.split(" ")[0]).join(", ")} ${inPeople.length === 1 ? "is" : "are"} in with you.` : "You're in."}
+            {started.invited > 0 ? ` Leaf invited the other ${started.invited} who went.` : ""}
+          </div>
+          {started.link && (
+            <div className="sinv-act"><a className="sinv-btn primary ga-start" href={started.link}>Open the crew</a></div>
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="sinv fm-dark" role="region" aria-label="Do this again">
+      <div className="sinv-head">
+        <div className="eyebrow sinv-eyebrow">
+          <FriendModeMark width={32} />
+          {card.place || card.title} · {card.went} went
+        </div>
+        <button type="button" className="ga-hide" disabled={busy !== null} onClick={async () => { if (await act("hide", "dismissGoAgain")) onGone(); }}>
+          Not this one
+        </button>
+      </div>
+      <div className="sinv-text">
+        <h2 className="sinv-title">Do this again with the people you went with</h2>
+        <div className="ga-chips">
+          {inPeople.map((p) => (
+            <span key={p.userId} className="ga-chip in">{p.name.split(" ")[0]}</span>
+          ))}
+          {me && (
+            <button
+              type="button"
+              className={`ga-chip ${card.meIn ? "in me" : "add"}`}
+              aria-pressed={card.meIn}
+              disabled={busy !== null}
+              onClick={() => act("me", "setGoAgain", { in: !card.meIn })}
+            >
+              {card.meIn ? "You ✓" : "+ Add me"}
+            </button>
+          )}
+          {card.meIn && notIn.length > 0 && (
+            <button type="button" className="ga-chip add" aria-expanded={asking} onClick={() => setAsking((v) => !v)}>+ someone</button>
+          )}
+        </div>
+        {asking && (
+          <div className="ga-ask">
+            {notIn.map((p) => {
+              const asked = card.nudged.includes(p.userId);
+              return (
+                <div key={p.userId} className="ga-ask-row">
+                  <span>{p.name}</span>
+                  <button type="button" className="sinv-btn ghost" disabled={asked || busy !== null} onClick={() => act(`ask-${p.userId}`, "nudgeGoAgain", { userId: p.userId })}>
+                    {asked ? "Asked" : busy === `ask-${p.userId}` ? "Asking…" : "Ask"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div className="ga-progress" role="progressbar" aria-valuemin={0} aria-valuemax={card.need} aria-valuenow={Math.min(card.inCount, card.need)} aria-label="People in">
+          {Array.from({ length: card.need }, (_, i) => (
+            <span key={i} className={i < card.inCount ? "on" : ""} />
+          ))}
+        </div>
+        <div className="sinv-meta">
+          {left > 0
+            ? `${card.inCount} of ${card.need} in · ${left} more to start a crew`
+            : card.meIn ? `${card.inCount} in. Ready when you are.` : `${card.inCount} in. Add yourself to start it.`}
+        </div>
+        <div className="sinv-act">
+          <button type="button" className="sinv-btn primary ga-start" disabled={!ready || busy !== null} onClick={start}>
+            {busy === "start" ? "Starting…" : "Start a crew"}
+          </button>
+        </div>
+        {error && <div className="sinv-meta" style={{ color: "#F2A39A" }}>{error}</div>}
+      </div>
+    </section>
+  );
+}

@@ -30,8 +30,8 @@ import NewPlanModal, {
 } from "./NewPlanModal";
 import { PlanMiniMap, PlansRailMap, type MapPin } from "./PlanMaps";
 import {
-  CrewActionCard, CrewQuietCard,
-  type CrewAction, type CrewRow,
+  CrewActionCard, CrewQuietCard, GoAgainCards,
+  type CrewAction, type CrewRow, type GoAgain,
 } from "./CrewCards";
 import FriendModeIntro, { friendModeIntroDue, stampFriendModeIntro, type FriendModeSource } from "@/components/crew/FriendModeIntro";
 import FriendModeSetup from "@/components/dashboard/FriendModeSetup";
@@ -312,6 +312,8 @@ interface Dashboard {
   crewActions?: CrewAction[];
   /** No crew yet: people they keep going to plans with (twice in 90 days). */
   goOutWith?: CrewPerson[];
+  /** "Do this again with the people you went with": plans you went to lately. */
+  goAgain?: GoAgain[];
   hostInvites?: HostInvite[]; // may be absent while the server side ships
   // One prompt card at a time, chosen and flag-gated server-side. Only
   // community_qualifier renders here; other keys are ignored.
@@ -1115,6 +1117,11 @@ function DashboardView({
           ) : quietCrews.length > 0 ? (
             <CrewQuietCard rows={quietCrews} />
           ) : null}
+
+          {/* A plan you went to lately: tap in to make it a crew with the people who went. */}
+          {(data.goAgain || []).length > 0 && (
+            <GoAgainCards cards={data.goAgain || []} onChanged={onRefresh} />
+          )}
 
           {seriesInvites.length > 0 && (
             <SeriesInviteCard invites={seriesInvites} onAnswered={onRefresh} />
