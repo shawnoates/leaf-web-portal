@@ -30,8 +30,15 @@ export type Venue = {
 /** A crew's one place: a name, maybe a real place or one of the organizer's own (custom: Home). */
 export type FixedPlace = { label: string; address: string | null; locationId?: string | null; custom?: boolean; photo?: string | null };
 
-/** A place's weather rule (crew-triggers.js on the server). */
-export type WeatherTrigger = { kind: "weather"; minF: number; noRain: boolean; days: number[]; time: string; everyDays?: number };
+/** A place's weather rule, or an event the crew watches for (crew-triggers.js on the server). */
+export type WeatherTrigger =
+  | { kind: "weather"; minF: number; noRain: boolean; days: number[]; time: string; everyDays?: number }
+  | { kind: "event"; query: string };
+
+export type EventMatch = {
+  spotId: string; query: string | null; title: string; date: string; time: string | null;
+  venueName: string; address: string | null; url: string | null; image: string | null; free: boolean;
+};
 
 export type CycleState = "picking" | "polling" | "locked" | "booked" | "done" | "skipped" | "cancelled";
 
@@ -178,6 +185,8 @@ export type CrewPage = {
   addOns?: CrewAddOn[];
   /** The night that just happened, for a day and a half: the crew page's Last night card. */
   lastNight?: LastNight | null;
+  /** Watched events that found a date, waiting on the organizer's "It's a go?". */
+  eventMatches?: EventMatch[];
 };
 
 export type LastNight = {

@@ -57,7 +57,9 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
   const [place, setPlace] = useState<{ placeId?: string | null; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  // On a trigger · Weather: the rule and the place it's for.
+  // On a trigger: Weather (a rule and the place it's for) or An event (what to watch for).
+  const [trigKind, setTrigKind] = useState<"weather" | "event">("weather");
+  const [watchFor, setWatchFor] = useState("");
   const [minF, setMinF] = useState(80);
   const [noRain, setNoRain] = useState(true);
   const [days, setDays] = useState<number[]>([6, 0]);
@@ -76,10 +78,14 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
         name: crewName.trim(),
         rhythmDays: pace > 0 ? pace : 28,
         oneTime: pace === 0,
-        ...(pace === TRIGGER && place ? {
+        ...(pace === TRIGGER && trigKind === "weather" && place ? {
           triggerOnly: true,
           trigger: { kind: "weather", minF, noRain, days, time: trigTime },
           triggerPlace: { placeId: place.placeId || null, name: place.name },
+        } : {}),
+        ...(pace === TRIGGER && trigKind === "event" ? {
+          triggerOnly: true,
+          trigger: { kind: "event", query: watchFor.trim() },
         } : {}),
         invitees: people.map((p) => ({ userId: p.userId })),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -102,8 +108,9 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
 
   const next = async () => {
     if (!crewName.trim()) { setError("Give the crew a name, like \"Thursday dinners\"."); return; }
-    if (pace === TRIGGER && !place) { setError("Pick the place it's for, like the beach or a rooftop."); return; }
-    if (pace === TRIGGER && days.length === 0) { setError("Pick at least one day."); return; }
+    if (pace === TRIGGER && trigKind === "weather" && !place) { setError("Pick the place it's for, like the beach or a rooftop."); return; }
+    if (pace === TRIGGER && trigKind === "weather" && days.length === 0) { setError("Pick at least one day."); return; }
+    if (pace === TRIGGER && trigKind === "event" && watchFor.trim().length < 2) { setError("Say what to watch for, like a show or a team."); return; }
     setError("");
     trackMarketingEvent("friend_mode_cta_click", { surface: "friends_page_form" });
     if (Parse.User.current()) { await create(); return; }
@@ -202,10 +209,23 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
           {pace === TRIGGER && (
             <div className="flex flex-col gap-3 rounded-2xl border border-fm-line bg-fm-surface p-4">
               <div role="group" aria-label="Trigger" className="flex flex-wrap gap-2">
-                <button type="button" aria-pressed="true" className="h-9 rounded-full bg-fm-ink px-4 text-sm font-semibold text-fm-canvas">Weather</button>
-                <button type="button" disabled className="flex h-9 items-center gap-1.5 rounded-full border border-fm-line px-4 text-sm text-fm-muted">A game <span className="font-fm-mono text-[9px]">SOON</span></button>
-                <button type="button" disabled className="flex h-9 items-center gap-1.5 rounded-full border border-fm-line px-4 text-sm text-fm-muted">An event <span className="font-fm-mono text-[9px]">SOON</span></button>
+                {(["weather", "event"] as const).map((k) => (
+                  <button key={k} type="button" aria-pressed={trigKind === k} onClick={() => setTrigKind(k)}
+                    className={`h-9 rounded-full px-4 text-sm font-semibold ${trigKind === k ? "bg-fm-ink text-fm-canvas" : "border border-fm-line text-fm-ink-2"}`}>
+                    {k === "weather" ? "Weather" : "An event"}
+                  </button>
+                ))}
               </div>
+              {trigKind === "event" && (
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="watch-for" className="text-sm font-semibold text-fm-ink-2">What are you watching for?</label>
+                  <input id="watch-for" className={field} value={watchFor} onChange={(e) => setWatchFor(e.target.value)} maxLength={80} placeholder="A show, a comedian, a team: Sixers home games" autoComplete="off" />
+                  <p className="m-0 text-xs leading-relaxed text-fm-muted">
+                    Every week Leaf looks for its next dates near you (Ticketmaster, then the web). When one fits your calendar, you get &ldquo;It&rsquo;s a go?&rdquo; One tap sends the invites to the crew.
+                  </p>
+                </div>
+              )}
+              {trigKind === "weather" && (<>
               <div className="flex items-center justify-between gap-3 text-sm">
                 <span className="font-semibold text-fm-ink-2">When it&rsquo;s at least</span>
                 <span className="flex items-center gap-2">
@@ -264,8 +284,9 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
                 )}
               </div>
               <p className="m-0 text-xs leading-relaxed text-fm-muted">
-                Leaf watches the 10-day forecast there. When a day looks good it gives everyone a heads-up, then asks who&rsquo;s in 3 days before. If it cools off, Leaf calls it off.
+                Leaf watches the 10-day forecast there. When a day looks good it gives everyone a heads-up, then sends the invites 3 days before. If it cools off, Leaf calls it off.
               </p>
+              </>)}
             </div>
           )}
           {pace === 0 && (
@@ -320,8 +341,10 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
             <span className="font-fm-mono text-[11px] uppercase tracking-[0.1em] text-fm-accent">You&rsquo;re set</span>
             <h2 className="m-0 font-fm-serif text-[32px] font-normal leading-tight">{crewName.trim()} is ready.</h2>
             <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">
-              {pace === TRIGGER && place
-                ? `Send the link to the group. Leaf watches the forecast at ${place.name} and asks who's in when a good day comes up.`
+              {pace === TRIGGER && trigKind === "event"
+                ? `Send the link to the group. Leaf watches for ${watchFor.trim()} every week and asks you when there's a date that fits.`
+                : pace === TRIGGER && place
+                ? `Send the link to the group. Leaf watches the forecast at ${place.name} and invites everyone when a good day comes up.`
                 : "Send the link to the group. Leaf starts planning the first night once 3 of you are in."}
             </p>
           </div>

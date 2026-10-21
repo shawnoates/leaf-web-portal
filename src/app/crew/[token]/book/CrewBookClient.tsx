@@ -50,6 +50,9 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
   const [sort, setSort] = useState<"wanted" | "new">("wanted");
   const [query, setQuery] = useState("");
   const [addingEvent, setAddingEvent] = useState(false);
+  // Organizer: watch for an event (BETA), a book entry Leaf searches weekly.
+  const [watching, setWatching] = useState(false);
+  const [watchFor, setWatchFor] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   // "What are you in the mood for?" — real places for a vibe (searchCrewPlaces).
@@ -142,7 +145,24 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
             <p className="mb-0 ml-5 mt-2 text-xs text-fm-muted">
               Goes into the book and your own saves.{" "}
               {!addingEvent && <button type="button" className="font-semibold text-fm-ink-2 underline" onClick={() => setAddingEvent(true)}>Add a movie or event</button>}
+              {isOwner && !watching && <>{" · "}<button type="button" className="font-semibold text-fm-accent underline" onClick={() => setWatching(true)}>Watch for an event</button> <span className="font-fm-mono text-[9px] text-fm-accent">BETA</span></>}
             </p>
+            {watching && (
+              <form
+                className="mt-3 flex flex-col gap-2 rounded-2xl border border-fm-line bg-fm-surface p-4"
+                onSubmit={(e) => { e.preventDefault(); void act("watch", async () => { await run("addCrewEventWatch", auth, { query: watchFor.trim() }); setWatching(false); setWatchFor(""); }); }}
+              >
+                <label htmlFor="watch-for" className="text-sm font-semibold text-fm-ink">What should Leaf watch for?</label>
+                <input id="watch-for" value={watchFor} onChange={(e) => setWatchFor(e.target.value)} maxLength={80}
+                  placeholder="A show, a comedian, a team: Sixers home games"
+                  className="h-11 w-full rounded-xl border border-fm-line bg-fm-canvas px-3 text-[16px] text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none" />
+                <p className="m-0 text-xs text-fm-muted">Every week Leaf looks for its next dates near you. When one fits your calendar, you get &ldquo;It&rsquo;s a go?&rdquo; One tap sends the crew the invites.</p>
+                <div className="flex gap-2">
+                  <Button small type="submit" disabled={busy !== null || watchFor.trim().length < 2}>{busy === "watch" ? "Adding…" : "Watch for it"}</Button>
+                  <Button small kind="ghost" onClick={() => setWatching(false)}>Cancel</Button>
+                </div>
+              </form>
+            )}
             {addingEvent && (
               <EventForm
                 busy={busy === "event"}
@@ -452,10 +472,19 @@ const WEEK_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Fri
  */
 function WeatherRule({ s, act, auth, canEdit }: { s: BookSpot; act: (key: string, fn: () => Promise<unknown>) => Promise<void>; auth: CrewAuth; canEdit: boolean }) {
   const [open, setOpen] = useState(false);
-  const [minF, setMinF] = useState(s.trigger?.minF ?? 80);
-  const [noRain, setNoRain] = useState(s.trigger?.noRain ?? true);
-  const [days, setDays] = useState<number[]>(s.trigger?.days ?? [6, 0]);
-  const [time, setTime] = useState(s.trigger?.time ?? "14:00");
+  const wx = s.trigger?.kind === "weather" ? s.trigger : null;
+  const [minF, setMinF] = useState(wx?.minF ?? 80);
+  const [noRain, setNoRain] = useState(wx?.noRain ?? true);
+  const [days, setDays] = useState<number[]>(wx?.days ?? [6, 0]);
+  const [time, setTime] = useState(wx?.time ?? "14:00");
+  // A watched event: Leaf searches for it weekly; nothing to edit here (Remove drops it).
+  if (s.trigger?.kind === "event") {
+    return (
+      <span className="mt-0.5 flex h-[24px] w-fit max-w-full items-center gap-1 rounded-full border border-fm-accent px-2 text-[11px] text-fm-accent">
+        <Search size={12} aria-hidden className="shrink-0" /> <span className="truncate">{s.triggerLabel}</span>
+      </span>
+    );
+  }
   const save = (trigger: Record<string, unknown> | null) =>
     act(`wx-${s.spotId}`, async () => { await run("setCrewSpotTrigger", auth, { spotId: s.spotId, trigger }); setOpen(false); });
 

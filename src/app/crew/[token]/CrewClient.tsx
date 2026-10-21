@@ -34,6 +34,7 @@ import PlacePhoto from "@/components/crew/PlacePhoto";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
+  type EventMatch,
   RHYTHM_LABELS, crewHref, crewIsEvening, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
   type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult,
   type CrewAddOn, type CrewSplit, type LastNight,
@@ -394,6 +395,10 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <SectionTitle>Up next</SectionTitle>
               {canStart && !proposing && !fixedPlace && <div className="flex gap-2">{startButtons}</div>}
             </div>
+
+            {(data.eventMatches || []).map((m) => (
+              <EventMatchCard key={m.spotId} match={m} busy={busy} onAnswer={(go) => act(`ev-${m.spotId}`, () => run("answerCrewEventMatch", auth, { spotId: m.spotId, go }))} />
+            ))}
 
             {data.lastNight && (
               <LastNightCard
@@ -1719,5 +1724,41 @@ function SmsOptInBox({ checked, onChange, phone, onPhone, last4 }: {
         />
       </label>
     </div>
+  );
+}
+
+/**
+ * A watched event found a date (organizer only): "Apparently Kidding is Sat
+ * 11/14 at Union Hall. You look free. It's a go?" Go starts the night and
+ * sends the plan invites; Skip lets it pass. No answer in 2 days skips it.
+ */
+function EventMatchCard({ match: m, busy, onAnswer }: { match: EventMatch; busy: string | null; onAnswer: (go: boolean) => void }) {
+  const d = dayParts(m.date);
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <Eyebrow>{m.query ? `Watching for ${m.query}` : "An event"} · It&rsquo;s on</Eyebrow>
+        <span className="rounded-full bg-fm-card px-2 py-0.5 font-fm-mono text-[10px] tracking-[0.06em] text-fm-accent">BETA</span>
+      </div>
+      <div className="flex items-start gap-4">
+        <div className="flex h-[72px] w-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-fm-line bg-fm-card">
+          <Mono className="text-[10px] text-fm-muted">{d.month}</Mono>
+          <span className="font-fm-serif text-[32px] leading-none">{d.day}</span>
+        </div>
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 className="m-0 font-fm-serif text-[28px] font-normal leading-[1.05]">{m.title}</h2>
+          <p className="m-0 text-sm text-fm-muted">
+            {d.dow}{m.time ? ` · ${timeLabel(m.time)}` : ""} · {m.venueName}
+          </p>
+          {m.free && <p className="m-0 text-sm text-fm-accent">You look free.</p>}
+        </div>
+      </div>
+      <p className="m-0 text-sm text-fm-ink-2">It&rsquo;s a go? The crew gets the invite for this date, with the ticket link.</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button small disabled={busy !== null} onClick={() => onAnswer(true)}>{busy === `ev-${m.spotId}` ? "Sending…" : "It\u2019s a go"}</Button>
+        <Button small kind="ghost" disabled={busy !== null} onClick={() => onAnswer(false)}>Skip this one</Button>
+        {m.url && <a href={m.url} target="_blank" rel="noreferrer" className="ml-1 text-sm text-fm-ink-2 underline underline-offset-4">See tickets</a>}
+      </div>
+    </Card>
   );
 }
