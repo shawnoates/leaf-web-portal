@@ -1958,7 +1958,7 @@ function YourCrews({ crews, actions, people, onStart }: {
       </div>
       <div className="rows">
         {live.length === 0 ? (
-          <article className="row last">
+          <article className="row crew-row last">
             <div className="crew-ico" aria-hidden>
               {people.length > 0 ? (
                 people.slice(0, 2).map((p) => <span key={p.userId} className="crew-face">{initial(p.name)}</span>)
@@ -1982,7 +1982,7 @@ function YourCrews({ crews, actions, people, onStart }: {
           </article>
         ) : (
           shown.map((c, i) => (
-            <article key={c.crewId} className={`row ${i === shown.length - 1 ? "last" : ""}`}>
+            <article key={c.crewId} className={`row crew-row ${i === shown.length - 1 ? "last" : ""}`}>
               <div className="crew-ico" aria-hidden>
                 {c.image || c.iconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -3667,6 +3667,12 @@ const CSS = `
   .leafme .row-act{align-self:stretch;flex-basis:calc(100% - 46px);order:3;margin-left:46px;margin-top:-2px}
   .leafme .row-btn{margin-top:9px;font-size:11.5px;padding:12px 16px;border-radius:8px}
   .leafme .row-text{flex-basis:calc(100% - 46px)}
+  /* Crew rows stay on one line: icon, name and status, a small button. */
+  .leafme .row.crew-row{flex-wrap:nowrap;align-items:center}
+  .leafme .row.crew-row .crew-ico{width:40px;height:40px}
+  .leafme .row.crew-row .row-text{flex:1 1 auto;flex-basis:auto}
+  .leafme .row.crew-row .row-act{order:0;flex-basis:auto;margin:0;align-self:center}
+  .leafme .row.crew-row .row-btn{margin-top:0;padding:9px 14px}
 
   /* Prompt boxes stack, buttons go full width */
   .leafme .prompt-box{display:block;padding:16px 16px 18px;margin-top:20px}
