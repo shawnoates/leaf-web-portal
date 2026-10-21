@@ -414,7 +414,7 @@ function looksLikeEvent(q: string) {
   return /\b(vs\.?|versus|game|games|tour|tickets?|concert|comedy|comedian|show|live|festival|plays?|playing|season)\b/i.test(q);
 }
 
-type Found = { title: string; date: string; time: string | null; venueName: string; image: string | null };
+type Found = { title: string; date: string; time: string | null; venueName: string; image: string | null; watchParty?: boolean };
 
 /** "Sat, Nov 15" for a 'YYYY-MM-DD'. */
 function shortDate(ymd: string) {
@@ -487,7 +487,7 @@ function EventForm({ auth, onAdd, onWatch, onCancel, busy, find = false }: { aut
           <span className="font-fm-mono text-[10px] uppercase tracking-[0.1em] text-fm-accent">{found?.length ? "Leaf found" : "Leaf looks every week"} · BETA</span>
           {found?.map((f) => (
             <div key={`${f.date}-${f.venueName}`} className="flex items-center justify-between gap-3 text-sm">
-              <span className="min-w-0 truncate">{f.venueName}</span>
+              <span className="min-w-0 truncate">{f.title}{f.watchParty ? " · watch together" : ` · ${f.venueName}`}</span>
               <span className="shrink-0 text-fm-muted">{shortDate(f.date)}{f.time ? ` · ${clock12(f.time)}` : ""}</span>
             </div>
           ))}

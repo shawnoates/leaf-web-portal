@@ -1796,16 +1796,20 @@ function EventMatchCard({ match: m, busy, onAnswer }: { match: EventMatch; busy:
         <div className="flex min-w-0 flex-col gap-1">
           <h2 className="m-0 font-fm-serif text-[28px] font-normal leading-[1.05]">{m.title}</h2>
           <p className="m-0 text-sm text-fm-muted">
-            {d.dow}{m.time ? ` · ${timeLabel(m.time)}` : ""} · {m.venueName}
+            {d.dow}{m.time ? ` · ${timeLabel(m.time)}` : ""} · {m.watchParty ? "Away game" : m.venueName}
           </p>
           {m.free && <p className="m-0 text-sm text-fm-accent">You look free.</p>}
         </div>
       </div>
-      <p className="m-0 text-sm text-fm-ink-2">It&rsquo;s a go? The crew gets the invite for this date, with the ticket link.</p>
+      <p className="m-0 text-sm text-fm-ink-2">
+        {m.watchParty
+          ? "Watch it together? Leaf picks a spot from the book and the crew gets the invite for this date."
+          : "It\u2019s a go? The crew gets the invite for this date, with the ticket link."}
+      </p>
       <div className="flex flex-wrap items-center gap-2">
         <Button small disabled={busy !== null} onClick={() => onAnswer(true)}>{busy === `ev-${m.spotId}` ? "Sending…" : "It\u2019s a go"}</Button>
         <Button small kind="ghost" disabled={busy !== null} onClick={() => onAnswer(false)}>Skip this one</Button>
-        {m.url && <a href={m.url} target="_blank" rel="noreferrer" className="ml-1 text-sm text-fm-ink-2 underline underline-offset-4">See tickets</a>}
+        {m.url && <a href={m.url} target="_blank" rel="noreferrer" className="ml-1 text-sm text-fm-ink-2 underline underline-offset-4">{m.watchParty ? "Game details" : "See tickets"}</a>}
       </div>
     </Card>
   );

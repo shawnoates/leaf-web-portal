@@ -57,7 +57,7 @@ export default function WatchingStrip({ items, auth, isOwner, onChange }: {
                 <div className="truncate text-[15px] font-semibold">{w.title}</div>
                 <div className="truncate text-[13px] text-fm-muted">
                   {w.next
-                    ? <>Next: {w.next.url ? <a href={w.next.url} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-fm-ink">{dayLabel(w.next.date)}</a> : dayLabel(w.next.date)} · {w.next.venueName}</>
+                    ? <>Next: {w.next.url ? <a href={w.next.url} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-fm-ink">{dayLabel(w.next.date)}</a> : dayLabel(w.next.date)} · {w.next.watchParty ? `${w.next.venueName} (watch together)` : w.next.venueName}</>
                     : "Leaf looks for dates every week"}
                   {w.addedBy && !w.addedByMe ? ` · ${w.addedBy}` : ""}
                 </div>

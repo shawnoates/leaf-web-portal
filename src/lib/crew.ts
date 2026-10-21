@@ -38,6 +38,8 @@ export type WeatherTrigger =
 export type EventMatch = {
   spotId: string; query: string | null; title: string; date: string; time: string | null;
   venueName: string; address: string | null; url: string | null; image: string | null; free: boolean;
+  /** An away game: the crew watches it at a place from the book. */
+  watchParty?: boolean;
 };
 
 export type CycleState = "picking" | "polling" | "locked" | "booked" | "done" | "skipped" | "cancelled";
@@ -468,7 +470,7 @@ export type WatchItem = {
   spotId: string;
   query: string | null;
   title: string;
-  next: { venueName: string; date: string; time: string | null; image: string | null; url: string | null } | null;
+  next: { venueName: string; date: string; time: string | null; image: string | null; url: string | null; watchParty?: boolean } | null;
   addedBy: string | null;
   addedByMe: boolean;
 };
