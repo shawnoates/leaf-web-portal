@@ -873,11 +873,13 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                   <label htmlFor="crew-rhythm" className="block text-[15px] font-semibold">How often the crew goes out</label>
                   <select
                     id="crew-rhythm"
-                    value={crew.oneTime ? "0" : String(crew.rhythmDays)}
+                    value={crew.triggerOnly ? "-1" : crew.oneTime ? "0" : String(crew.rhythmDays)}
                     disabled={busy !== null}
                     onChange={(e) => {
                       const days = Number(e.target.value);
-                      act("rhythm", () => run("setCrewRhythm", auth, days === 0 ? { calendarId: crew.id, oneTime: true } : { calendarId: crew.id, rhythmDays: days }));
+                      act("rhythm", () => run("setCrewRhythm", auth, days === -1
+                        ? { calendarId: crew.id, triggerOnly: true }
+                        : days === 0 ? { calendarId: crew.id, oneTime: true } : { calendarId: crew.id, rhythmDays: days }));
                     }}
                     className="mt-2 h-11 w-full rounded-xl border px-3 text-sm"
                   >
@@ -885,6 +887,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                       <option key={d} value={d}>{l}</option>
                     ))}
                     <option value="0">Just once</option>
+                    <option value="-1">On a trigger (BETA): only places with a rule</option>
                   </select>
                   <p className="mb-0 mt-2 text-xs text-fm-muted">Leaf starts each {night} on this rhythm. Members can set a slower pace of their own below.</p>
                 </div>
@@ -1099,7 +1102,8 @@ function CycleCard({
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmSkip, setConfirmSkip] = useState(false);
   const stateWord = { picking: "Picking", polling: "Voting", locked: "Locked in", booked: "Booked" }[c.state as string];
-  const who = c.trigger === "member_proposal" ? `${names[c.hostId || ""] || "A member"}'s idea` : "Up next";
+  const who = c.trigger === "member_proposal" ? `${names[c.hostId || ""] || "A member"}'s idea`
+    : c.trigger === "weather" ? "Nice day ahead" : "Up next";
   const chosen = c.chosenOption ? dayParts(c.chosenOption.date) : null;
 
   return (

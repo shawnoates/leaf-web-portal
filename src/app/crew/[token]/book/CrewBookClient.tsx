@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Check, ChevronLeft, ChevronUp, Lock, Plus, Search } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronUp, Lock, Plus, Search, Sun } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
 import PlacePhoto from "@/components/crew/PlacePhoto";
 import ShareFromInstagramHint from "@/components/crew/ShareFromInstagramHint";
@@ -330,6 +330,9 @@ function SpotItem({ s, busy, act, auth, isOwner }: {
               <Check size={12} strokeWidth={2.6} aria-hidden /> {triedLabel}
             </span>
           )}
+          {(s.triggerLabel || ((s.addedByMe || isOwner) && !s.needsPlace)) && (
+            <WeatherRule s={s} act={act} auth={auth} canEdit={Boolean(s.addedByMe || isOwner)} />
+          )}
           {(s.addedByMe || isOwner) && (
             <button
               className="w-fit text-xs text-fm-muted hover:text-fm-danger"
@@ -438,6 +441,74 @@ function EventForm({ onAdd, onCancel, busy }: { onAdd: (p: Record<string, unknow
  * A shared plan with no place yet (an Instagram post that named none): ask
  * where it is, so Leaf can plan a night for it.
  */
+const WEEK = ["S", "M", "T", "W", "T", "F", "S"];
+const WEEK_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/**
+ * "Go when it's nice" (BETA): a weather rule on this place. Leaf watches the
+ * forecast here, gives the crew a heads-up when a day clears it, and asks
+ * who's in 3 days before. Shown as a chip; whoever added the place (or the
+ * organizer) sets or clears it.
+ */
+function WeatherRule({ s, act, auth, canEdit }: { s: BookSpot; act: (key: string, fn: () => Promise<unknown>) => Promise<void>; auth: CrewAuth; canEdit: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [minF, setMinF] = useState(s.trigger?.minF ?? 80);
+  const [noRain, setNoRain] = useState(s.trigger?.noRain ?? true);
+  const [days, setDays] = useState<number[]>(s.trigger?.days ?? [6, 0]);
+  const [time, setTime] = useState(s.trigger?.time ?? "14:00");
+  const save = (trigger: Record<string, unknown> | null) =>
+    act(`wx-${s.spotId}`, async () => { await run("setCrewSpotTrigger", auth, { spotId: s.spotId, trigger }); setOpen(false); });
+
+  if (!open) {
+    return s.triggerLabel ? (
+      <button type="button" disabled={!canEdit} onClick={() => setOpen(true)}
+        className="mt-0.5 flex h-[24px] w-fit max-w-full items-center gap-1 rounded-full border border-fm-accent px-2 text-[11px] text-fm-accent disabled:cursor-default">
+        <Sun size={12} aria-hidden className="shrink-0" /> <span className="truncate">Goes when it&rsquo;s nice · {s.triggerLabel}</span>
+      </button>
+    ) : (
+      <button type="button" onClick={() => setOpen(true)} className="mt-0.5 flex h-8 w-fit items-center gap-1.5 rounded-full border border-fm-line px-3 text-xs font-semibold text-fm-ink-2 hover:bg-fm-card">
+        <Sun size={13} aria-hidden /> Go when it&rsquo;s nice <span className="font-fm-mono text-[9px] text-fm-accent">BETA</span>
+      </button>
+    );
+  }
+  return (
+    <div className="mt-1 flex flex-col gap-2.5 rounded-xl border border-fm-line bg-fm-canvas p-3 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-semibold text-fm-ink-2">At least</span>
+        <span className="flex items-center gap-2">
+          <button type="button" aria-label="Cooler" onClick={() => setMinF(Math.max(50, minF - 5))} className="h-8 w-8 rounded-full border border-fm-line">&minus;</button>
+          <span className="w-10 text-center font-fm-serif text-[19px]">{minF}&deg;</span>
+          <button type="button" aria-label="Warmer" onClick={() => setMinF(Math.min(100, minF + 5))} className="h-8 w-8 rounded-full border border-fm-line">+</button>
+        </span>
+      </div>
+      <label className="flex items-center justify-between font-semibold text-fm-ink-2">No rain
+        <input type="checkbox" checked={noRain} onChange={(e) => setNoRain(e.target.checked)} className="h-5 w-5 accent-[var(--color-fm-accent)]" />
+      </label>
+      <div className="flex gap-1">
+        {WEEK.map((d, i) => {
+          const on = days.includes(i);
+          return (
+            <button key={i} type="button" aria-label={WEEK_NAMES[i]} aria-pressed={on} onClick={() => setDays(on ? days.filter((x) => x !== i) : [...days, i])}
+              className={`h-9 flex-1 rounded-lg border text-xs font-semibold ${on ? "border-fm-accent bg-fm-accent text-fm-canvas" : "border-fm-line text-fm-ink-2"}`}>{d}</button>
+          );
+        })}
+      </div>
+      <div className="flex gap-2">
+        {[{ t: "14:00", l: "Afternoon" }, { t: "18:00", l: "Evening" }].map((o) => (
+          <button key={o.t} type="button" aria-pressed={time === o.t} onClick={() => setTime(o.t)}
+            className={`h-8 flex-1 rounded-full border text-xs font-semibold ${time === o.t ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink-2"}`}>{o.l}</button>
+        ))}
+      </div>
+      <p className="m-0 text-xs text-fm-muted">Leaf watches the 10-day forecast here. When a day looks good, the crew gets a heads-up, then a &ldquo;who&rsquo;s in?&rdquo; 3 days before.</p>
+      <div className="flex flex-wrap gap-2">
+        <Button small disabled={days.length === 0} onClick={() => void save({ kind: "weather", minF, noRain, days, time })}>{s.triggerLabel ? "Save" : "Turn on"}</Button>
+        {s.triggerLabel && <Button small kind="ghost" onClick={() => void save(null)}>Turn off</Button>}
+        <Button small kind="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+      </div>
+    </div>
+  );
+}
+
 function PlaceForPlan({ s, act, auth }: { s: BookSpot; act: (key: string, fn: () => Promise<unknown>) => Promise<void>; auth: CrewAuth }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");

@@ -30,12 +30,15 @@ export type Venue = {
 /** A crew's one place: a name, maybe a real place or one of the organizer's own (custom: Home). */
 export type FixedPlace = { label: string; address: string | null; locationId?: string | null; custom?: boolean; photo?: string | null };
 
+/** A place's weather rule (crew-triggers.js on the server). */
+export type WeatherTrigger = { kind: "weather"; minF: number; noRain: boolean; days: number[]; time: string; everyDays?: number };
+
 export type CycleState = "picking" | "polling" | "locked" | "booked" | "done" | "skipped" | "cancelled";
 
 export type CycleView = {
   cycleId: string;
   state: CycleState;
-  trigger: "rhythm" | "member_ask" | "member_proposal" | "opportunity";
+  trigger: "rhythm" | "member_ask" | "member_proposal" | "opportunity" | "weather";
   venue: Venue | null;
   /** A movie or event from the book: its days ('YYYY-MM-DD'), so the dates stay inside them. */
   eventWindow?: { start: string; end: string; kind: "movie" | "event"; title: string | null } | null;
@@ -87,6 +90,9 @@ export type BookSpot = {
   /** Null for a shared plan that has no place yet (needsPlace). */
   locationId: string | null;
   needsPlace?: boolean;
+  /** A rule on this place ("when it's 80°+"), BETA. */
+  trigger?: WeatherTrigger | null;
+  triggerLabel?: string | null;
   name: string;
   address: string | null;
   neighborhood: string | null;
@@ -138,6 +144,8 @@ export type CrewPage = {
     /** 'friends': started with Start a crew (its calendar is hidden). 'calendar': Friend Mode on a real calendar. */
     origin?: "friends" | "calendar";
     /** 'fixed': venue rotation off, the crew always meets at `fixedPlace`. */
+    /** On a trigger (BETA): no rhythm rounds; places with a rule start them. */
+    triggerOnly?: boolean;
     /** When the crew meets before a round sets it ("09:00" for a morning crew). */
     usualTime?: string | null;
     placeMode?: "book" | "fixed";
