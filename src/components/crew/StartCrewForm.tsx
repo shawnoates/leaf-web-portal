@@ -21,7 +21,13 @@ const PACES = [
   { days: 14, label: "Every 2 weeks" },
   { days: 28, label: "Every month" },
   { days: 0, label: "Just once" },
+  { days: -1, label: "On a trigger" },
 ];
+/** "On a trigger" (BETA): no rhythm; a place in the book with a rule starts each night. */
+const TRIGGER = -1;
+const WEEK = ["S", "M", "T", "W", "T", "F", "S"];
+const WEEK_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const TRIGGER_TIMES = [{ time: "14:00", label: "Afternoon" }, { time: "18:00", label: "Evening" }];
 
 type Step = "crew" | "signin" | "done";
 /** Someone already on Leaf, picked before the form opened (people you go out with). */
@@ -51,6 +57,11 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
   const [place, setPlace] = useState<{ placeId?: string | null; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // On a trigger · Weather: the rule and the place it's for.
+  const [minF, setMinF] = useState(80);
+  const [noRain, setNoRain] = useState(true);
+  const [days, setDays] = useState<number[]>([6, 0]);
+  const [trigTime, setTrigTime] = useState("14:00");
   const [created, setCreated] = useState<Created | null>(null);
   const [copied, setCopied] = useState(false);
   const [how, setHow] = useState<SignInMethod | null>(null);
@@ -63,14 +74,19 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
     try {
       const r = (await Parse.Cloud.run("createFriendCrew", {
         name: crewName.trim(),
-        rhythmDays: pace || 28,
+        rhythmDays: pace > 0 ? pace : 28,
         oneTime: pace === 0,
+        ...(pace === TRIGGER && place ? {
+          triggerOnly: true,
+          trigger: { kind: "weather", minF, noRain, days, time: trigTime },
+          triggerPlace: { placeId: place.placeId || null, name: place.name },
+        } : {}),
         invitees: people.map((p) => ({ userId: p.userId })),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         source,
         ...(fromCalendar ? { fromCalendarId: fromCalendar.id, seedFromCalendar: seedBook } : {}),
       })) as Created;
-      if (place) {
+      if (place && pace !== TRIGGER) {
         await Parse.Cloud.run("addToCrewBook", { crewId: r.crewId, placeId: place.placeId || null, venue: place }).catch(() => {});
       }
       setCreated(r);
@@ -86,6 +102,8 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
 
   const next = async () => {
     if (!crewName.trim()) { setError("Give the crew a name, like \"Thursday dinners\"."); return; }
+    if (pace === TRIGGER && !place) { setError("Pick the place it's for, like the beach or a rooftop."); return; }
+    if (pace === TRIGGER && days.length === 0) { setError("Pick at least one day."); return; }
     setError("");
     trackMarketingEvent("friend_mode_cta_click", { surface: "friends_page_form" });
     if (Parse.User.current()) { await create(); return; }
@@ -171,13 +189,85 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
                   type="button"
                   onClick={() => setPace(p.days)}
                   aria-pressed={pace === p.days}
-                  className={`h-11 rounded-full border text-sm font-semibold transition ${pace === p.days ? "border-fm-accent bg-fm-accent text-fm-canvas" : "border-fm-line text-fm-ink hover:bg-fm-card"}`}
+                  className={`flex h-11 items-center justify-center gap-1.5 rounded-full border text-sm font-semibold transition ${p.days === TRIGGER ? "col-span-2 " : ""}${pace === p.days ? "border-fm-accent bg-fm-accent text-fm-canvas" : "border-fm-line text-fm-ink hover:bg-fm-card"}`}
                 >
                   {p.label}
+                  {p.days === TRIGGER && (
+                    <span className={`rounded-full px-1.5 py-0.5 font-fm-mono text-[9px] tracking-[0.06em] ${pace === TRIGGER ? "bg-fm-canvas text-fm-accent" : "bg-fm-card text-fm-accent"}`}>BETA</span>
+                  )}
                 </button>
               ))}
             </div>
           </fieldset>
+          {pace === TRIGGER && (
+            <div className="flex flex-col gap-3 rounded-2xl border border-fm-line bg-fm-surface p-4">
+              <div role="group" aria-label="Trigger" className="flex flex-wrap gap-2">
+                <button type="button" aria-pressed="true" className="h-9 rounded-full bg-fm-ink px-4 text-sm font-semibold text-fm-canvas">Weather</button>
+                <button type="button" disabled className="flex h-9 items-center gap-1.5 rounded-full border border-fm-line px-4 text-sm text-fm-muted">A game <span className="font-fm-mono text-[9px]">SOON</span></button>
+                <button type="button" disabled className="flex h-9 items-center gap-1.5 rounded-full border border-fm-line px-4 text-sm text-fm-muted">An event <span className="font-fm-mono text-[9px]">SOON</span></button>
+              </div>
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-semibold text-fm-ink-2">When it&rsquo;s at least</span>
+                <span className="flex items-center gap-2">
+                  <button type="button" aria-label="Cooler" onClick={() => setMinF(Math.max(50, minF - 5))} className="h-9 w-9 rounded-full border border-fm-line text-fm-ink">&minus;</button>
+                  <span className="w-12 text-center font-fm-serif text-[22px]">{minF}&deg;</span>
+                  <button type="button" aria-label="Warmer" onClick={() => setMinF(Math.min(100, minF + 5))} className="h-9 w-9 rounded-full border border-fm-line text-fm-ink">+</button>
+                </span>
+              </div>
+              <label className="flex items-center justify-between text-sm font-semibold text-fm-ink-2">
+                No rain
+                <input type="checkbox" checked={noRain} onChange={(e) => setNoRain(e.target.checked)} className="h-5 w-5 accent-[var(--color-fm-accent)]" />
+              </label>
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-semibold text-fm-ink-2">On</span>
+                <div className="flex gap-1.5">
+                  {WEEK.map((d, i) => {
+                    const on = days.includes(i);
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        aria-label={WEEK_NAMES[i]}
+                        aria-pressed={on}
+                        onClick={() => setDays(on ? days.filter((x) => x !== i) : [...days, i])}
+                        className={`h-10 flex-1 rounded-xl border text-sm font-semibold ${on ? "border-fm-accent bg-fm-accent text-fm-canvas" : "border-fm-line text-fm-ink-2"}`}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {TRIGGER_TIMES.map((t) => (
+                  <button key={t.time} type="button" aria-pressed={trigTime === t.time} onClick={() => setTrigTime(t.time)}
+                    className={`h-9 flex-1 rounded-full border text-sm font-semibold ${trigTime === t.time ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink-2"}`}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-semibold text-fm-ink-2">Where?</span>
+                {place ? (
+                  <div className="flex h-12 items-center justify-between gap-2 rounded-2xl border border-fm-line bg-fm-canvas px-4 text-[15px]">
+                    <span className="truncate">{place.name}</span>
+                    <button type="button" className="text-xs text-fm-muted underline" onClick={() => setPlace(null)}>Change</button>
+                  </div>
+                ) : (
+                  <VenueSearch
+                    value={placeQuery}
+                    onChange={setPlaceQuery}
+                    onSelect={(v) => setPlace(v as { placeId?: string | null; name: string })}
+                    placeholder="The beach, a rooftop, a park…"
+                    className={field}
+                  />
+                )}
+              </div>
+              <p className="m-0 text-xs leading-relaxed text-fm-muted">
+                Leaf watches the 10-day forecast there. When a day looks good it gives everyone a heads-up, then asks who&rsquo;s in 3 days before. If it cools off, Leaf calls it off.
+              </p>
+            </div>
+          )}
           {pace === 0 && (
             <div className="flex flex-col gap-2">
               <span className="text-sm font-semibold text-fm-ink-2">Where are you going?</span>
@@ -229,7 +319,11 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
           <div className="flex flex-col gap-1">
             <span className="font-fm-mono text-[11px] uppercase tracking-[0.1em] text-fm-accent">You&rsquo;re set</span>
             <h2 className="m-0 font-fm-serif text-[32px] font-normal leading-tight">{crewName.trim()} is ready.</h2>
-            <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">Send the link to the group. Leaf starts planning the first night once 3 of you are in.</p>
+            <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">
+              {pace === TRIGGER && place
+                ? `Send the link to the group. Leaf watches the forecast at ${place.name} and asks who's in when a good day comes up.`
+                : "Send the link to the group. Leaf starts planning the first night once 3 of you are in."}
+            </p>
           </div>
           <div className="flex items-center gap-2 rounded-2xl border border-fm-line bg-fm-canvas p-2 pl-4">
             <span className="min-w-0 flex-1 truncate font-fm-mono text-[13px] text-fm-ink-2">{created.inviteLink.replace(/^https?:\/\//, "")}</span>
