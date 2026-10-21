@@ -10,7 +10,7 @@
  */
 
 import { useState } from "react";
-import { CalendarCheck, Check, Copy, Share } from "lucide-react";
+import { CalendarCheck, Check, Copy, Eye, MapPin, Share, X } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { trackMarketingEvent } from "@/components/marketing/analytics";
 import LeafSignIn, { type SignInMethod } from "@/components/LeafSignIn";
@@ -23,13 +23,18 @@ const PACES = [
   { days: 0, label: "Just once" },
   { days: -1, label: "On a trigger" },
 ];
-/** "On a trigger" (BETA): no rhythm; a place in the book with a rule starts each night. */
+/**
+ * "On a trigger" (BETA): no rhythm. One question, "What should start a night?":
+ * a team, show or place from one search (a watch, or a place with a weather
+ * rule), and/or When we're free, and/or Birthdays.
+ */
 const TRIGGER = -1;
 const WEEK = ["S", "M", "T", "W", "T", "F", "S"];
 const WEEK_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const TRIGGER_TIMES = [{ time: "14:00", label: "Afternoon" }, { time: "18:00", label: "Evening" }];
 const FREE_TIMES = [{ time: "10:00", label: "Morning" }, { time: "14:00", label: "Afternoon" }, { time: "19:00", label: "Evening" }];
-const TRIGGER_NAMES = { weather: "Weather", event: "An event", free: "When we're free", birthdays: "Birthdays" } as const;
+/** Reads like a team, a show or a tour, not a place: the search's Watch for row goes first. */
+const EVENTISH = /\b(vs\.?|versus|game|games|tour|tickets?|concert|comedy|comedian|show|live|festival|plays?|playing|season)\b/i;
 
 type Step = "crew" | "signin" | "done";
 /** Someone already on Leaf, picked before the form opened (people you go out with). */
@@ -59,9 +64,12 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
   const [place, setPlace] = useState<{ placeId?: string | null; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  // On a trigger: Weather (a rule and the place it's for), An event (what to
-  // watch for), When we're free (enough of the crew free the same day) or Birthdays.
-  const [trigKind, setTrigKind] = useState<keyof typeof TRIGGER_NAMES>("weather");
+  // On a trigger: what the search picked (a place, with a weather rule, or
+  // something to watch for), plus the When we're free and Birthdays switches.
+  const [trigPick, setTrigPick] = useState<"place" | "watch" | null>(null);
+  const [trigQuery, setTrigQuery] = useState("");
+  const [freeOn, setFreeOn] = useState(false);
+  const [bdayOn, setBdayOn] = useState(false);
   const [minFree, setMinFree] = useState(3);
   const [freeDays, setFreeDays] = useState<number[]>([5, 6]);
   const [freeTime, setFreeTime] = useState("19:00");
@@ -84,20 +92,14 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
         name: crewName.trim(),
         rhythmDays: pace > 0 ? pace : 28,
         oneTime: pace === 0,
-        ...(pace === TRIGGER && trigKind === "weather" && place ? {
-          triggerOnly: true,
+        ...(pace === TRIGGER ? { triggerOnly: true } : {}),
+        ...(pace === TRIGGER && trigPick === "place" && place ? {
           trigger: { kind: "weather", minF, noRain, days, time: trigTime },
           triggerPlace: { placeId: place.placeId || null, name: place.name },
         } : {}),
-        ...(pace === TRIGGER && trigKind === "event" ? {
-          triggerOnly: true,
-          trigger: { kind: "event", query: watchFor.trim() },
-        } : {}),
-        ...(pace === TRIGGER && trigKind === "free" ? {
-          triggerOnly: true,
-          trigger: { kind: "free", minFree, days: freeDays, time: freeTime },
-        } : {}),
-        ...(pace === TRIGGER && trigKind === "birthdays" ? { triggerOnly: true, birthdays: true } : {}),
+        ...(pace === TRIGGER && trigPick === "watch" ? { trigger: { kind: "event", query: watchFor.trim() } } : {}),
+        ...(pace === TRIGGER && freeOn ? { freeTrigger: { minFree, days: freeDays, time: freeTime } } : {}),
+        ...(pace === TRIGGER && bdayOn ? { birthdays: true } : {}),
         invitees: people.map((p) => ({ userId: p.userId })),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         source,
@@ -119,10 +121,9 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
 
   const next = async () => {
     if (!crewName.trim()) { setError("Give the crew a name, like \"Thursday dinners\"."); return; }
-    if (pace === TRIGGER && trigKind === "weather" && !place) { setError("Pick the place it's for, like the beach or a rooftop."); return; }
-    if (pace === TRIGGER && trigKind === "weather" && days.length === 0) { setError("Pick at least one day."); return; }
-    if (pace === TRIGGER && trigKind === "free" && freeDays.length === 0) { setError("Pick at least one day."); return; }
-    if (pace === TRIGGER && trigKind === "event" && watchFor.trim().length < 2) { setError("Say what to watch for, like a show or a team."); return; }
+    if (pace === TRIGGER && !trigPick && !freeOn && !bdayOn) { setError("Pick what starts a night: a team, a show or a place, when you're free, or birthdays."); return; }
+    if (pace === TRIGGER && trigPick === "place" && days.length === 0) { setError("Pick at least one day."); return; }
+    if (pace === TRIGGER && freeOn && freeDays.length === 0) { setError("Pick at least one day."); return; }
     setError("");
     trackMarketingEvent("friend_mode_cta_click", { surface: "friends_page_form" });
     if (Parse.User.current()) { await create(); return; }
@@ -219,102 +220,109 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
             </div>
           </fieldset>
           {pace === TRIGGER && (
-            <div className="flex flex-col gap-3 rounded-2xl border border-fm-line bg-fm-surface p-4">
-              <div role="group" aria-label="Trigger" className="flex flex-wrap gap-2">
-                {(Object.keys(TRIGGER_NAMES) as (keyof typeof TRIGGER_NAMES)[]).map((k) => (
-                  <button key={k} type="button" aria-pressed={trigKind === k} onClick={() => setTrigKind(k)}
-                    className={`h-9 rounded-full px-4 text-sm font-semibold ${trigKind === k ? "bg-fm-ink text-fm-canvas" : "border border-fm-line text-fm-ink-2"}`}>
-                    {TRIGGER_NAMES[k]}{k === "free" && <span className="ml-1.5 font-fm-mono text-[9px] text-fm-accent">BETA</span>}
-                  </button>
-                ))}
+            <div className="flex flex-col gap-4 rounded-2xl border border-fm-line bg-fm-surface p-4">
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-semibold text-fm-ink-2">What should start a night?</span>
+                {trigPick ? (
+                  <div className="flex h-12 items-center gap-2.5 rounded-2xl border border-fm-accent bg-fm-canvas px-4 text-[15px]">
+                    {trigPick === "watch" ? <Eye size={16} aria-hidden className="shrink-0 text-fm-accent" /> : <MapPin size={16} aria-hidden className="shrink-0 text-fm-accent" />}
+                    <span className="min-w-0 flex-1 truncate">{trigPick === "watch" ? `Watching for ${watchFor}` : `${place?.name}, when it\u2019s nice`}</span>
+                    <button type="button" aria-label="Clear" onClick={() => { setTrigPick(null); setPlace(null); setWatchFor(""); setTrigQuery(""); }} className="text-fm-muted hover:text-fm-ink"><X size={16} aria-hidden /></button>
+                  </div>
+                ) : (
+                  <VenueSearch
+                    value={trigQuery}
+                    onChange={setTrigQuery}
+                    onSelect={(v) => { setPlace(v as { placeId?: string | null; name: string }); setTrigPick("place"); }}
+                    placeholder="A team, a show, or a place"
+                    className={field}
+                    extraOption={(q) => ({
+                      first: EVENTISH.test(q),
+                      onSelect: () => { setWatchFor(q); setTrigPick("watch"); },
+                      content: (
+                        <div className="flex items-center gap-3 px-4 py-3">
+                          <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-fm-accent text-fm-canvas"><Eye size={18} strokeWidth={2.2} /></span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold">Watch for &ldquo;{q}&rdquo;</span>
+                            <span className="block text-xs text-fm-muted">Leaf finds the dates and asks when one fits</span>
+                          </span>
+                        </div>
+                      ),
+                    })}
+                  />
+                )}
+                <p className="m-0 text-xs leading-relaxed text-fm-muted">
+                  {trigPick === "watch"
+                    ? "Leaf finds its dates (a team's whole season, or shows near you) and asks you when one fits. One tap sends the invites."
+                    : trigPick === "place"
+                    ? "Leaf watches the 10-day forecast there. When a day looks good it gives everyone a heads-up, then sends the invites 3 days before."
+                    : "Watch for a game or a show, or pick a place to go when the weather's nice. Optional."}
+                </p>
               </div>
-              {trigKind === "event" && (
-                <div className="flex flex-col gap-2">
-                  <label htmlFor="watch-for" className="text-sm font-semibold text-fm-ink-2">What are you watching for?</label>
-                  <input id="watch-for" className={field} value={watchFor} onChange={(e) => setWatchFor(e.target.value)} maxLength={80} placeholder="A show, a comedian, a team: Sixers home games" autoComplete="off" />
-                  <p className="m-0 text-xs leading-relaxed text-fm-muted">
-                    Every week Leaf looks for its next dates near you (Ticketmaster, then the web). When one fits your calendar, you get &ldquo;It&rsquo;s a go?&rdquo; One tap sends the invites to the crew.
-                  </p>
-                </div>
-              )}
-              {trigKind === "free" && (
-                <div className="flex flex-col gap-3">
+              {trigPick === "place" && (
+                <div className="flex flex-col gap-3 rounded-xl border border-fm-line-dim p-3">
                   <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="font-semibold text-fm-ink-2">When at least</span>
+                    <span className="font-semibold text-fm-ink-2">When it&rsquo;s at least</span>
                     <span className="flex items-center gap-2">
-                      <button type="button" aria-label="Fewer people" onClick={() => setMinFree(Math.max(2, minFree - 1))} className="h-9 w-9 rounded-full border border-fm-line text-fm-ink">&minus;</button>
-                      <span className="w-24 text-center font-fm-serif text-[22px]">{minFree} are free</span>
-                      <button type="button" aria-label="More people" onClick={() => setMinFree(Math.min(10, minFree + 1))} className="h-9 w-9 rounded-full border border-fm-line text-fm-ink">+</button>
+                      <button type="button" aria-label="Cooler" onClick={() => setMinF(Math.max(50, minF - 5))} className="h-9 w-9 rounded-full border border-fm-line text-fm-ink">&minus;</button>
+                      <span className="w-12 text-center font-fm-serif text-[22px]">{minF}&deg;</span>
+                      <button type="button" aria-label="Warmer" onClick={() => setMinF(Math.min(100, minF + 5))} className="h-9 w-9 rounded-full border border-fm-line text-fm-ink">+</button>
                     </span>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <span className="text-sm font-semibold text-fm-ink-2">On</span>
-                    <DayChips days={freeDays} onChange={setFreeDays} />
-                  </div>
+                  <label className="flex items-center justify-between text-sm font-semibold text-fm-ink-2">
+                    No rain
+                    <input type="checkbox" checked={noRain} onChange={(e) => setNoRain(e.target.checked)} className="h-5 w-5 accent-[var(--color-fm-accent)]" />
+                  </label>
+                  <DayChips days={days} onChange={setDays} />
                   <div className="flex gap-2">
-                    {FREE_TIMES.map((t) => (
-                      <button key={t.time} type="button" aria-pressed={freeTime === t.time} onClick={() => setFreeTime(t.time)}
-                        className={`h-9 flex-1 rounded-full border text-sm font-semibold ${freeTime === t.time ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink-2"}`}>
+                    {TRIGGER_TIMES.map((t) => (
+                      <button key={t.time} type="button" aria-pressed={trigTime === t.time} onClick={() => setTrigTime(t.time)}
+                        className={`h-9 flex-1 rounded-full border text-sm font-semibold ${trigTime === t.time ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink-2"}`}>
                         {t.label}
                       </button>
                     ))}
                   </div>
-                  <p className="m-0 text-xs leading-relaxed text-fm-muted">
-                    Twice a day Leaf checks everyone&rsquo;s synced calendar 5 to 14 days out. When enough of you are free the same day, it picks a place from the book and sends the invites. Leaf asks members to sync their Google Calendar once they join.
-                  </p>
                 </div>
               )}
-              {trigKind === "birthdays" && (
-                <p className="m-0 text-xs leading-relaxed text-fm-muted">
-                  About three weeks before someone in the crew has a birthday, Leaf asks them where they want to go, then finds a night that week that works for everyone. Leaf asks members for their birthday on the crew page.
-                </p>
-              )}
-              {trigKind === "weather" && (<>
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-semibold text-fm-ink-2">When it&rsquo;s at least</span>
-                <span className="flex items-center gap-2">
-                  <button type="button" aria-label="Cooler" onClick={() => setMinF(Math.max(50, minF - 5))} className="h-9 w-9 rounded-full border border-fm-line text-fm-ink">&minus;</button>
-                  <span className="w-12 text-center font-fm-serif text-[22px]">{minF}&deg;</span>
-                  <button type="button" aria-label="Warmer" onClick={() => setMinF(Math.min(100, minF + 5))} className="h-9 w-9 rounded-full border border-fm-line text-fm-ink">+</button>
-                </span>
-              </div>
-              <label className="flex items-center justify-between text-sm font-semibold text-fm-ink-2">
-                No rain
-                <input type="checkbox" checked={noRain} onChange={(e) => setNoRain(e.target.checked)} className="h-5 w-5 accent-[var(--color-fm-accent)]" />
-              </label>
-              <div className="flex flex-col gap-2">
-                <span className="text-sm font-semibold text-fm-ink-2">On</span>
-                <DayChips days={days} onChange={setDays} />
-              </div>
-              <div className="flex gap-2">
-                {TRIGGER_TIMES.map((t) => (
-                  <button key={t.time} type="button" aria-pressed={trigTime === t.time} onClick={() => setTrigTime(t.time)}
-                    className={`h-9 flex-1 rounded-full border text-sm font-semibold ${trigTime === t.time ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink-2"}`}>
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-col gap-2">
-                <span className="text-sm font-semibold text-fm-ink-2">Where?</span>
-                {place ? (
-                  <div className="flex h-12 items-center justify-between gap-2 rounded-2xl border border-fm-line bg-fm-canvas px-4 text-[15px]">
-                    <span className="truncate">{place.name}</span>
-                    <button type="button" className="text-xs text-fm-muted underline" onClick={() => setPlace(null)}>Change</button>
+              <div className="flex flex-col gap-3 border-t border-fm-line-dim pt-4">
+                <label className="flex items-center justify-between gap-3 text-sm font-semibold text-fm-ink">
+                  <span>When enough of us are free <span className="ml-1 font-fm-mono text-[9px] text-fm-accent">BETA</span></span>
+                  <input type="checkbox" checked={freeOn} onChange={(e) => setFreeOn(e.target.checked)} className="h-5 w-5 accent-[var(--color-fm-accent)]" />
+                </label>
+                {freeOn && (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="font-semibold text-fm-ink-2">At least</span>
+                      <span className="flex items-center gap-2">
+                        <button type="button" aria-label="Fewer people" onClick={() => setMinFree(Math.max(2, minFree - 1))} className="h-9 w-9 rounded-full border border-fm-line text-fm-ink">&minus;</button>
+                        <span className="w-24 text-center font-fm-serif text-[22px]">{minFree} are free</span>
+                        <button type="button" aria-label="More people" onClick={() => setMinFree(Math.min(10, minFree + 1))} className="h-9 w-9 rounded-full border border-fm-line text-fm-ink">+</button>
+                      </span>
+                    </div>
+                    <DayChips days={freeDays} onChange={setFreeDays} />
+                    <div className="flex gap-2">
+                      {FREE_TIMES.map((t) => (
+                        <button key={t.time} type="button" aria-pressed={freeTime === t.time} onClick={() => setFreeTime(t.time)}
+                          className={`h-9 flex-1 rounded-full border text-sm font-semibold ${freeTime === t.time ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink-2"}`}>
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="m-0 text-xs leading-relaxed text-fm-muted">
+                      Twice a day Leaf checks everyone&rsquo;s synced calendar 5 to 14 days out, and plans a night at a place from the book when enough of you are free. Leaf asks members to sync once they join.
+                    </p>
                   </div>
-                ) : (
-                  <VenueSearch
-                    value={placeQuery}
-                    onChange={setPlaceQuery}
-                    onSelect={(v) => setPlace(v as { placeId?: string | null; name: string })}
-                    placeholder="The beach, a rooftop, a park…"
-                    className={field}
-                  />
+                )}
+                <label className="flex items-center justify-between gap-3 text-sm font-semibold text-fm-ink">
+                  Birthdays
+                  <input type="checkbox" checked={bdayOn} onChange={(e) => setBdayOn(e.target.checked)} className="h-5 w-5 accent-[var(--color-fm-accent)]" />
+                </label>
+                {bdayOn && (
+                  <p className="m-0 text-xs leading-relaxed text-fm-muted">
+                    About three weeks before someone&rsquo;s birthday, Leaf asks them where they want to go, then finds a night that week that works for everyone.
+                  </p>
                 )}
               </div>
-              <p className="m-0 text-xs leading-relaxed text-fm-muted">
-                Leaf watches the 10-day forecast there. When a day looks good it gives everyone a heads-up, then sends the invites 3 days before. If it cools off, Leaf calls it off.
-              </p>
-              </>)}
             </div>
           )}
           {pace === 0 && (
@@ -369,14 +377,14 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
             <span className="font-fm-mono text-[11px] uppercase tracking-[0.1em] text-fm-accent">You&rsquo;re set</span>
             <h2 className="m-0 font-fm-serif text-[32px] font-normal leading-tight">{crewName.trim()} is ready.</h2>
             <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">
-              {pace === TRIGGER && trigKind === "birthdays"
-                ? "Send the link to the group. When someone's birthday is coming up, Leaf asks them where they want to go."
-                : pace === TRIGGER && trigKind === "free"
-                ? `Send the link to the group. Once people join, Leaf plans a night whenever ${minFree} of you are free the same day.`
-                : pace === TRIGGER && trigKind === "event"
-                ? `Send the link to the group. Leaf watches for ${watchFor.trim()} every week and asks you when there's a date that fits.`
-                : pace === TRIGGER && place
+              {pace === TRIGGER && trigPick === "watch"
+                ? `Send the link to the group. Leaf watches for ${watchFor.trim()} and asks you when there's a date that fits.`
+                : pace === TRIGGER && trigPick === "place" && place
                 ? `Send the link to the group. Leaf watches the forecast at ${place.name} and invites everyone when a good day comes up.`
+                : pace === TRIGGER && freeOn
+                ? `Send the link to the group. Once people join, Leaf plans a night whenever ${minFree} of you are free the same day.`
+                : pace === TRIGGER && bdayOn
+                ? "Send the link to the group. When someone's birthday is coming up, Leaf asks them where they want to go."
                 : "Send the link to the group. Leaf starts planning the first night once 3 of you are in."}
             </p>
           </div>

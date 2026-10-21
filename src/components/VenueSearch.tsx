@@ -240,6 +240,8 @@ export default function VenueSearch({
           value={value}
           onChange={(e) => {
             onChange(e.target.value);
+            // The extra row doesn't wait on Google (or need it to answer at all).
+            if (extraOption && e.target.value.trim().length >= 3) setShowDropdown(true);
             fetchSuggestions(e.target.value);
           }}
           onKeyDown={handleKeyDown}
