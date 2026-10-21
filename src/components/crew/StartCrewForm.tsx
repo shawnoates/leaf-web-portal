@@ -189,7 +189,7 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
                   type="button"
                   onClick={() => setPace(p.days)}
                   aria-pressed={pace === p.days}
-                  className={`flex h-11 items-center justify-center gap-1.5 rounded-full border text-sm font-semibold transition ${p.days === TRIGGER ? "col-span-2 " : ""}${pace === p.days ? "border-fm-accent bg-fm-accent text-fm-canvas" : "border-fm-line text-fm-ink hover:bg-fm-card"}`}
+                  className={`flex h-11 items-center justify-center gap-1.5 rounded-full border text-sm font-semibold transition ${p.days === TRIGGER ? "col-span-2 " : ""}${pace === p.days ? "border-fm-accent bg-fm-accent text-fm-canvas" : p.days === TRIGGER ? "border-fm-accent text-fm-accent hover:bg-fm-card" : "border-fm-line text-fm-ink hover:bg-fm-card"}`}
                 >
                   {p.label}
                   {p.days === TRIGGER && (
