@@ -38,7 +38,25 @@ export type CrewRow = {
 };
 
 
-export function CrewActionCard({ actions, onAnswered }: { actions: CrewAction[]; onAnswered: () => Promise<void> }) {
+/** "Sat, Oct 18" for when the plan was. */
+function wentDay(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+/** One page of the crew card's pager (CrewCardStack), when it shows more than one thing. */
+type StackPage = { index: number; count: number; next: () => void } | null;
+
+function PagerButton({ page }: { page: NonNullable<StackPage> }) {
+  return (
+    <button type="button" className="eyebrow sinv-count" style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }} onClick={page.next} aria-label="Next">
+      {page.index + 1} of {page.count} ›
+    </button>
+  );
+}
+
+export function CrewActionCard({ actions, onAnswered, page = null }: { actions: CrewAction[]; onAnswered: () => Promise<void>; page?: StackPage }) {
   const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
   const [picked, setPicked] = useState<Set<number>>(new Set());
@@ -85,7 +103,7 @@ export function CrewActionCard({ actions, onAnswered }: { actions: CrewAction[];
           <FriendModeMark width={32} />
           {a.crewName}
         </div>
-        {actions.length > 1 && <div className="eyebrow sinv-count">{index + 1} of {actions.length}</div>}
+        {page ? <PagerButton page={page} /> : actions.length > 1 && <div className="eyebrow sinv-count">{index + 1} of {actions.length}</div>}
       </div>
       <div className="sinv-text">
         {a.kind === "invite" && (
@@ -237,35 +255,48 @@ export type GoAgain = {
  * (3) any of them starts the crew. The others who tapped in are in it right
  * away; everyone else who went gets an invite to hop in.
  */
-export function GoAgainCards({ cards, onChanged }: { cards: GoAgain[]; onChanged: () => Promise<void> }) {
+/**
+ * The one green card on /me: what your crews need from you (join, vote,
+ * IN/OUT, book), then "Do this again" for plans you went to, paged with
+ * "1 of 3 ›" so they never stack up.
+ */
+export function CrewCardStack({ actions, goAgain, onRefresh }: { actions: CrewAction[]; goAgain: GoAgain[]; onRefresh: () => Promise<void> }) {
   const [hidden, setHidden] = useState<string[]>([]);
-  // A card whose crew just started stays to say so; the refreshed page no longer lists it.
+  // A "Do this again" whose crew just started stays to say so; the refreshed page no longer lists it.
   const [started, setStarted] = useState<GoAgain[]>([]);
-  const shown = [...cards, ...started.filter((k) => !cards.some((c) => c.planId === k.planId))]
-    .filter((c) => !hidden.includes(c.planId));
-  // One card at a time, like the crew card above it: several plans don't stack up.
   const [at, setAt] = useState(0);
-  if (!shown.length) return null;
-  const i = Math.min(at, shown.length - 1);
-  const c = shown[i];
+  const again = [...goAgain, ...started.filter((k) => !goAgain.some((c) => c.planId === k.planId))]
+    .filter((c) => !hidden.includes(c.planId));
+  const items: ({ kind: "action"; a: CrewAction } | { kind: "again"; g: GoAgain })[] = [
+    ...actions.map((a) => ({ kind: "action" as const, a })),
+    ...again.map((g) => ({ kind: "again" as const, g })),
+  ];
+  if (!items.length) return null;
+  const i = Math.min(at, items.length - 1);
+  const item = items[i];
+  const page = items.length > 1 ? { index: i, count: items.length, next: () => setAt((i + 1) % items.length) } : null;
   return (
     <>
       <style>{GO_AGAIN_CSS}</style>
-      <GoAgainCard
-        key={c.planId}
-        card={c}
-        page={shown.length > 1 ? { index: i, count: shown.length, next: () => setAt((i + 1) % shown.length) } : null}
-        onGone={() => setHidden((h) => [...h, c.planId])}
-        onStarted={() => setStarted((k) => [...k, c])}
-        onChanged={onChanged}
-      />
+      {item.kind === "action" ? (
+        <CrewActionCard key={`a-${i}`} actions={[item.a]} page={page} onAnswered={onRefresh} />
+      ) : (
+        <GoAgainCard
+          key={item.g.planId}
+          card={item.g}
+          page={page}
+          onGone={() => setHidden((h) => [...h, item.g.planId])}
+          onStarted={() => setStarted((k) => [...k, item.g])}
+          onChanged={onRefresh}
+        />
+      )}
     </>
   );
 }
 
 function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
   card: GoAgain;
-  page: { index: number; count: number; next: () => void } | null;
+  page: StackPage;
   onGone: () => void;
   onStarted: () => void;
   onChanged: () => Promise<void>;
@@ -323,25 +354,22 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
   }
 
   return (
-    <section className="sinv fm-dark" role="region" aria-label="Do this again">
+    <section className="sinv fm-dark" role="region" aria-label={`Do ${card.title} again`}>
       <div className="sinv-head">
         <div className="eyebrow sinv-eyebrow">
           <FriendModeMark width={32} />
-          {card.place || card.title} · {card.went} went
+          Do this again
         </div>
         <div className="ga-head-right">
-          {page && (
-            <button type="button" className="ga-hide" onClick={page.next} aria-label="Next plan">
-              {page.index + 1} of {page.count} ›
-            </button>
-          )}
+          {page && <PagerButton page={page} />}
           <button type="button" className="ga-hide" disabled={busy !== null} onClick={async () => { if (await act("hide", "dismissGoAgain")) onGone(); }}>
             Not this one
           </button>
         </div>
       </div>
       <div className="sinv-text">
-        <h2 className="sinv-title">Do this again with the people you went with</h2>
+        <h2 className="sinv-title">{card.title}</h2>
+        <div className="sinv-meta">{[card.place && card.place !== card.title ? card.place : null, wentDay(card.endedAt), `${card.went} went`].filter(Boolean).join(" · ")}</div>
         {/* Who went, so a card nobody has tapped yet still names people. */}
         {notIn.length > 0 && (
           <div className="sinv-meta">
@@ -349,7 +377,7 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
               const names = notIn.map((p) => p.name.split(" ")[0]);
               const shownNames = names.slice(0, 3);
               const more = card.went - 1 - inPeople.length - shownNames.length;
-              return `With ${shownNames.join(", ")}${more > 0 ? ` and ${more} more` : ""}`;
+              return `Go again with ${shownNames.join(", ")}${more > 0 ? ` and ${more} more` : ""}`;
             })()}
           </div>
         )}

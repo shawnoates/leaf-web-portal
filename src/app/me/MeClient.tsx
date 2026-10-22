@@ -30,7 +30,7 @@ import NewPlanModal, {
 } from "./NewPlanModal";
 import { PlanMiniMap, PlansRailMap, type MapPin } from "./PlanMaps";
 import {
-  CrewActionCard, CrewQuietCard, GoAgainCards,
+  CrewCardStack, CrewQuietCard,
   type CrewAction, type CrewRow, type GoAgain,
 } from "./CrewCards";
 import FriendModeIntro, { friendModeIntroDue, stampFriendModeIntro, type FriendModeSource } from "@/components/crew/FriendModeIntro";
@@ -1109,19 +1109,14 @@ function DashboardView({
 
           {/* Directly under the hero and above the promo strip: someone is
               waiting on this person's answer, which outranks a thank-you but
-              not their own next plan. */}
-          {/* A crew waiting on this person's answer (join, vote, IN/OUT, book)
-              sits first: it's the smallest ask and the most time-boxed. */}
-          {crewActions.length > 0 ? (
-            <CrewActionCard actions={crewActions} onAnswered={onRefresh} />
+              not their own next plan. One green card: a crew waiting on this person's answer (join, vote,
+              IN/OUT, book) first, then "Do this again" for plans they went to,
+              paged rather than stacked. */}
+          {crewActions.length > 0 || (data.goAgain || []).length > 0 ? (
+            <CrewCardStack actions={crewActions} goAgain={data.goAgain || []} onRefresh={onRefresh} />
           ) : quietCrews.length > 0 ? (
             <CrewQuietCard rows={quietCrews} />
           ) : null}
-
-          {/* A plan you went to lately: tap in to make it a crew with the people who went. */}
-          {(data.goAgain || []).length > 0 && (
-            <GoAgainCards cards={data.goAgain || []} onChanged={onRefresh} />
-          )}
 
           {seriesInvites.length > 0 && (
             <SeriesInviteCard invites={seriesInvites} onAnswered={onRefresh} />
