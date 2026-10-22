@@ -409,7 +409,7 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
       </div>
       <div className="sinv-text">
         {/* Forward-looking: what it could be, with the night it came from as the small print. */}
-        <h2 className="sinv-title">{card.crew ? `Hop in: ${card.crew.name}` : "Get this group together again"}</h2>
+        <h2 className="sinv-title">{card.crew ? `Hop in: ${card.crew.name}` : "Get the group together again"}</h2>
         {inPeople.length > 0 && (
           <div className="sinv-meta">
             {inPeople.map((p) => p.name.split(" ")[0]).join(" and ").replace(/ and (?=.* and )/g, ", ")}{" "}
