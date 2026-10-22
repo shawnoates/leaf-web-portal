@@ -380,13 +380,14 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
     return (
       <section className="sinv fm-dark" role="region" aria-label="Crew started">
         <div className="sinv-text">
-          <h2 className="sinv-title">Your crew is on</h2>
+          <h2 className="sinv-title">It&rsquo;s on</h2>
           <div className="sinv-meta">
             {inPeople.length ? `${inPeople.map((p) => p.name.split(" ")[0]).join(", ")} ${inPeople.length === 1 ? "is" : "are"} in with you.` : "You're in."}
+            {" "}Leaf finds a spot and a night that works for the group.
             {card.crew ? "" : " Everyone else who went can hop in from their Leaf page."}
           </div>
           {started.link && (
-            <div className="sinv-act"><a className="sinv-btn primary ga-start" href={started.link}>Open the crew</a></div>
+            <div className="sinv-act"><a className="sinv-btn primary ga-start" href={started.link}>Add places you&rsquo;d go</a></div>
           )}
         </div>
       </section>
@@ -464,10 +465,10 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
         )}
         {!card.crew && <div className="sinv-meta">
           {card.meIn
-            ? `You're in. ${left > 0 ? `${left} more and Leaf starts the crew.` : "Starting it now."}`
+            ? `You're in. ${left > 0 ? `${left} more and Leaf plans the next meetup.` : "Starting it now."}`
             : card.inCount === 0
               ? `Be the first in. We'll help plan the next meetup when ${card.need} join.`
-              : `${card.inCount} of ${card.need} in. ${left === 1 ? "Your tap starts the crew." : `${left} more and Leaf starts the crew.`}`}
+              : `${card.inCount} of ${card.need} in. ${left === 1 ? "Your tap gets it going." : `${left} more and Leaf plans the next meetup.`}`}
         </div>}
         {/* The one button: I'm In. The tap that makes it 3 starts the crew. */}
         <div className="sinv-act">
