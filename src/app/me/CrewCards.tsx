@@ -225,7 +225,7 @@ export function CrewQuietCard({ rows }: { rows: CrewRow[] }) {
 
 // The card's own styles, on top of /me's dark Friend Mode card (.sinv.fm-dark).
 const GO_AGAIN_CSS = `
-.leafme .fm-dark .ga-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.leafme .fm-dark .ga-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .leafme .fm-dark .ga-chip { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 999px; font-size: 14px; background: #1B2B25; color: #F2F1EC; border: 1px solid #3B5449; }
 .leafme .fm-dark .ga-chip.in { background: #3B5449; border-color: #3B5449; }
 .leafme .fm-dark .ga-chip.in.me { background: #C8F25A; border-color: #C8F25A; color: #101A16; font-weight: 600; }
@@ -235,18 +235,16 @@ const GO_AGAIN_CSS = `
 .leafme .fm-dark .ga-ask { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 12px; background: #1B2B25; }
 .leafme .fm-dark .ga-ask-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; color: #F2F1EC; }
 .leafme .fm-dark .ga-ask-row .sinv-btn { flex: none; padding: 6px 12px; font-size: 13px; }
-.leafme .fm-dark .ga-progress { display: flex; gap: 6px; margin-top: 6px; }
-.leafme .fm-dark .ga-progress span { flex: 1; height: 6px; border-radius: 3px; background: #1B2B25; }
-.leafme .fm-dark .ga-progress span.on { background: #C8F25A; }
 .leafme .fm-dark .sinv-btn.ga-start { background: #C8F25A; border-color: #C8F25A; color: #101A16; font-weight: 600; flex: 1; text-align: center; text-decoration: none; }
 .leafme .fm-dark .sinv-btn.ga-start:disabled { background: #3B5449; border-color: #3B5449; color: #8A928C; opacity: 1; }
 .leafme .fm-dark .ga-hide { background: none; border: 0; padding: 6px 0; font-size: 12px; color: #8A928C; cursor: pointer; font-family: inherit; }
 .leafme .fm-dark .ga-hide:hover { color: #F2F1EC; }
-.leafme .fm-dark .ga-faces { display: flex; align-items: center; padding-left: 6px; margin: 2px 0; }
-.leafme .fm-dark .ga-face { width: 34px; height: 34px; margin-left: -6px; border-radius: 999px; border: 2px solid #253A33; background: #1B2B25; color: #C9D1CB; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; flex: none; }
+.leafme .fm-dark .ga-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 4px 0 2px; }
+.leafme .fm-dark .ga-faces { display: flex; align-items: center; gap: 8px; }
+.leafme .fm-dark .ga-face { width: 40px; height: 40px; border-radius: 999px; border: 2px solid #253A33; background: #1B2B25; color: #C9D1CB; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; flex: none; }
 .leafme .fm-dark .ga-face img { width: 100%; height: 100%; object-fit: cover; }
 .leafme .fm-dark .ga-face.in { border-color: #C8F25A; }
-.leafme .fm-dark .ga-face.more { font-size: 11px; color: #8A928C; }
+.leafme .fm-dark .ga-face.open { background: transparent; border: 2px dashed #3B5449; }
 .leafme .fm-dark .ga-head-right { display: flex; align-items: center; gap: 14px; }
 `;
 
@@ -391,20 +389,6 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
       <div className="sinv-text">
         {/* Forward-looking: what it could be, with the night it came from as the small print. */}
         <h2 className="sinv-title">Get this group together again</h2>
-        {/* Everyone who went: a photo or their initial; a lime ring once they're in. */}
-        <div className="ga-faces" aria-label={`${card.went} went`}>
-          {card.people.slice(0, 8).map((p) => (
-            <span key={p.userId} className={`ga-face${p.in ? " in" : ""}`} title={p.me ? "You" : p.name}>
-              {p.photo
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={p.photo} alt="" />
-                : (p.me ? "You" : p.name.trim().charAt(0).toUpperCase())}
-            </span>
-          ))}
-          {card.went > Math.min(card.people.length, 8) && (
-            <span className="ga-face more">+{card.went - Math.min(card.people.length, 8)}</span>
-          )}
-        </div>
         {inPeople.length > 0 && (
           <div className="sinv-meta">{inPeople.map((p) => p.name.split(" ")[0]).join(" and ").replace(/ and (?=.* and )/g, ", ")} {inPeople.length === 1 ? "is" : "are"} in</div>
         )}
@@ -420,21 +404,38 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
             return [who, from ? `from ${from}` : null].filter(Boolean).join(" · ") || `${card.went} went`;
           })()}
         </div>
-        <div className="ga-chips">
-          {me && (
-            <button
-              type="button"
-              className={`ga-chip ${card.meIn ? "in me" : "add"}`}
-              aria-pressed={card.meIn}
-              disabled={busy !== null}
-              onClick={() => act("me", "setGoAgain", { in: !card.meIn })}
-            >
-              {card.meIn ? "You're in ✓" : "I'm in"}
-            </button>
-          )}
-          {card.meIn && notIn.length > 0 && (
-            <button type="button" className="ga-chip add" aria-expanded={asking} onClick={() => setAsking((v) => !v)}>+ someone</button>
-          )}
+        <div className="sinv-meta" style={{ fontSize: 13 }}>Leaf finds the next spot and a night that works for everyone.</div>
+        <div className="ga-row">
+          {/* Who's in, one circle each; empty dashed circles for the spots still open. */}
+          <div className="ga-faces" role="img" aria-label={`${Math.min(card.inCount, card.need)} of ${card.need} in`}>
+            {card.people.filter((p) => p.in).slice(0, 8).map((p) => (
+              <span key={p.userId} className="ga-face in" title={p.me ? "You" : p.name}>
+                {p.photo
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={p.photo} alt="" />
+                    : (p.me ? "You" : p.name.trim().charAt(0).toUpperCase())}
+              </span>
+            ))}
+            {Array.from({ length: Math.max(0, card.need - card.inCount) }, (_, i) => (
+              <span key={`open-${i}`} className="ga-face open" aria-hidden />
+            ))}
+          </div>
+          <div className="ga-chips">
+            {me && (
+              <button
+                type="button"
+                className={`ga-chip ${card.meIn ? "in me" : "add"}`}
+                aria-pressed={card.meIn}
+                disabled={busy !== null}
+                onClick={() => act("me", "setGoAgain", { in: !card.meIn })}
+              >
+                {card.meIn ? "You're in ✓" : "I'm in"}
+              </button>
+            )}
+            {card.meIn && notIn.length > 0 && (
+              <button type="button" className="ga-chip add" aria-expanded={asking} onClick={() => setAsking((v) => !v)}>+ someone</button>
+            )}
+          </div>
         </div>
         {asking && (
           <div className="ga-ask">
@@ -451,12 +452,6 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
             })}
           </div>
         )}
-        <div className="sinv-meta" style={{ fontSize: 13 }}>Leaf finds the next spot and a night that works for everyone.</div>
-        <div className="ga-progress" role="progressbar" aria-valuemin={0} aria-valuemax={card.need} aria-valuenow={Math.min(card.inCount, card.need)} aria-label="People in">
-          {Array.from({ length: card.need }, (_, i) => (
-            <span key={i} className={i < card.inCount ? "on" : ""} />
-          ))}
-        </div>
         <div className="sinv-meta">
           {left > 0
             ? `${card.inCount} of ${card.need} in · ${left} more to start a crew`
