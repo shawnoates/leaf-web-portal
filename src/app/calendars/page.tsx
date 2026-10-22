@@ -47,13 +47,29 @@ function trackCalendarsEvent(
     | "gallery_viewed"
     | "gallery_calendar_opened"
     | "gen_stub_shown"
-    | "gen_stub_fallback_gallery",
+    | "gen_stub_fallback_gallery"
+    | "gen_succeeded",
   detail?: Record<string, unknown>
 ) {
   if (typeof window === "undefined") return;
   const w = window as unknown as { dataLayer?: Array<Record<string, unknown>> };
   if (!Array.isArray(w.dataLayer)) w.dataLayer = [];
   w.dataLayer.push({ event: `calendars_${event}`, ...(detail || {}) });
+}
+
+// Google Ads conversion for "someone generated a calendar". The label comes
+// from the conversion action in Google Ads (Goals → Conversions → the action's
+// tag setup, the part after the slash in send_to). Until it is set the event
+// still lands in dataLayer but nothing is reported to Ads.
+const ADS_ID = "AW-18520912235";
+const ADS_GENERATE_LABEL = process.env.NEXT_PUBLIC_GADS_GENERATE_LABEL;
+
+function reportGenerateConversion() {
+  if (typeof window === "undefined" || !ADS_GENERATE_LABEL) return;
+  const w = window as unknown as { gtag?: (...args: unknown[]) => void };
+  w.gtag?.("event", "conversion", {
+    send_to: `${ADS_ID}/${ADS_GENERATE_LABEL}`,
+  });
 }
 
 export default function CalendarsPage() {
@@ -457,6 +473,8 @@ function GenerationSurface({ prompt }: { prompt: string }) {
           setGenerated(result.calendar);
           setSelectedEventIndexes(new Set(result.calendar.events.map((_, i) => i)));
           setPhase("success");
+          trackCalendarsEvent("gen_succeeded", { slug: result.calendar.slug });
+          reportGenerateConversion();
         } else {
           setReason(result.reason || "generation_failed");
           setPhase("fallback");
