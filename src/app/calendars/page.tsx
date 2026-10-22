@@ -57,18 +57,19 @@ function trackCalendarsEvent(
   w.dataLayer.push({ event: `calendars_${event}`, ...(detail || {}) });
 }
 
-// Google Ads conversion for "someone generated a calendar". The label comes
-// from the conversion action in Google Ads (Goals → Conversions → the action's
-// tag setup, the part after the slash in send_to). Until it is set the event
-// still lands in dataLayer but nothing is reported to Ads.
+// Google Ads conversion for "someone generated a calendar". The label is the
+// part after the slash in send_to on the conversion action's event snippet
+// (Goals → Conversions → "Sign-up" → Tag setup).
 const ADS_ID = "AW-18520912235";
-const ADS_GENERATE_LABEL = process.env.NEXT_PUBLIC_GADS_GENERATE_LABEL;
+const ADS_GENERATE_LABEL = "97kdCLTbjKYdEOviuv9E";
 
 function reportGenerateConversion() {
   if (typeof window === "undefined" || !ADS_GENERATE_LABEL) return;
   const w = window as unknown as { gtag?: (...args: unknown[]) => void };
   w.gtag?.("event", "conversion", {
     send_to: `${ADS_ID}/${ADS_GENERATE_LABEL}`,
+    value: 1.0,
+    currency: "USD",
   });
 }
 
