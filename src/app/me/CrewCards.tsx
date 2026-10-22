@@ -45,6 +45,16 @@ function wentDay(iso: string | null): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
+/** Sort key for a crew ask: its soonest date (ms), undated asks after, run-it-again last. */
+function actionUrgency(a: CrewAction): number {
+  const at = (d: string | null | undefined) => (d ? Date.parse(`${d}T12:00:00`) : NaN);
+  let t = NaN;
+  if (a.kind === "rsvp" || a.kind === "book") t = at(a.chosenOption?.date);
+  else if (a.kind === "poll") t = Math.min(...a.dateOptions.map((o) => at(o.date)).filter((n) => !Number.isNaN(n)));
+  if (Number.isFinite(t)) return t;
+  return a.kind === "again" ? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER - 1;
+}
+
 /** One page of the crew card's pager (CrewCardStack), when it shows more than one thing. */
 type StackPage = { index: number; count: number; next: () => void } | null;
 
@@ -272,9 +282,13 @@ export function CrewCardStack({ actions, goAgain, onRefresh }: { actions: CrewAc
   const [at, setAt] = useState(0);
   const again = [...goAgain, ...started.filter((k) => !goAgain.some((c) => c.planId === k.planId))]
     .filter((c) => !hidden.includes(c.planId));
+  // Most urgent first: crew asks with the soonest date (a night to RSVP to or
+  // book, a vote whose dates are close), then the rest of the crew asks, then
+  // Do this again, starting with ones where someone's already waiting on you.
   const items: ({ kind: "action"; a: CrewAction } | { kind: "again"; g: GoAgain })[] = [
-    ...actions.map((a) => ({ kind: "action" as const, a })),
-    ...again.map((g) => ({ kind: "again" as const, g })),
+    ...[...actions].sort((x, y) => actionUrgency(x) - actionUrgency(y)).map((a) => ({ kind: "action" as const, a })),
+    ...[...again].sort((x, y) => y.inCount - x.inCount || (Date.parse(y.endedAt || "") || 0) - (Date.parse(x.endedAt || "") || 0))
+      .map((g) => ({ kind: "again" as const, g })),
   ];
   if (!items.length) return null;
   const i = Math.min(at, items.length - 1);
@@ -374,7 +388,7 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
       </div>
       <div className="sinv-text">
         {/* Forward-looking: what it could be, with the night it came from as the small print. */}
-        <h2 className="sinv-title">{card.place ? `Make ${card.place} a regular thing` : `Make ${card.title} a regular thing`}</h2>
+        <h2 className="sinv-title">Get this group together again</h2>
         {/* Everyone who went: a photo or their initial; a lime ring once they're in. */}
         <div className="ga-faces" aria-label={`${card.went} went`}>
           {card.people.slice(0, 8).map((p) => (
@@ -399,8 +413,9 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
             const more = card.went - 1 - inPeople.length - shownNames.length;
             const who = shownNames.length ? `With ${shownNames.join(", ")}${more > 0 ? ` and ${more} more` : ""}` : null;
             const day = wentDay(card.endedAt);
-            const from = day ? `from ${day}` : null;
-            return [who, from].filter(Boolean).join(", ") || `${card.went} went`;
+            const where = card.place || card.title;
+            const from = [where, day].filter(Boolean).join(", ");
+            return [who, from ? `from ${from}` : null].filter(Boolean).join(" · ") || `${card.went} went`;
           })()}
         </div>
         <div className="ga-chips">
@@ -434,6 +449,7 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
             })}
           </div>
         )}
+        <div className="sinv-meta" style={{ fontSize: 13 }}>Leaf finds the next spot and a night that works for everyone.</div>
         <div className="ga-progress" role="progressbar" aria-valuemin={0} aria-valuemax={card.need} aria-valuenow={Math.min(card.inCount, card.need)} aria-label="People in">
           {Array.from({ length: card.need }, (_, i) => (
             <span key={i} className={i < card.inCount ? "on" : ""} />
