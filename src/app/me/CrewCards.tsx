@@ -14,7 +14,11 @@ import { FriendModeMark } from "@/components/crew/FriendModeGlyphs";
 import { dayLabel, optionLabel, type DateOption, type Venue } from "@/lib/crew";
 
 export type CrewAction =
-  | { kind: "invite"; crewId: string; crewName: string; inviterName: string }
+  | { kind: "invite"; crewId: string; crewName: string; inviterName: string;
+      /** Who's in already (first names), and how many. */
+      inNames?: string[]; inCount?: number;
+      /** A crew started from "Do this again": the plan it came from. */
+      fromPlan?: string | null }
   | { kind: "poll"; crewId: string; crewName: string; cycleId: string; venue: Venue | null; dateOptions: DateOption[]; votes: Record<string, number[]> | null;
       /** Dates their calendar says they're free for: pre-selected, never auto-voted. */
       myFree?: number[] | null; fit?: { free: number; known: number }[] | null }
@@ -118,8 +122,21 @@ export function CrewActionCard({ actions, onAnswered, page = null }: { actions: 
       <div className="sinv-text">
         {a.kind === "invite" && (
           <>
-            <h2 className="sinv-title">Plan with {a.inviterName}</h2>
-            <div className="sinv-meta">{a.crewName} · Leaf finds a night that works for the group and plans it.</div>
+            {a.fromPlan ? (
+              <>
+                <h2 className="sinv-title">Hop in: {a.crewName}</h2>
+                <div className="sinv-meta">
+                  {a.inNames && a.inNames.length
+                    ? `${a.inNames.join(", ").replace(/, ([^,]*)$/, " and $1")}${(a.inCount ?? 0) > a.inNames.length ? ` and ${(a.inCount ?? 0) - a.inNames.length} more` : ""} made it after ${a.fromPlan}.`
+                    : `Started after ${a.fromPlan}.`}{" "}Leaf finds the next spot and a night that works.
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="sinv-title">Plan with {a.inviterName}</h2>
+                <div className="sinv-meta">{a.crewName} · Leaf finds a night that works for the group and plans it.</div>
+              </>
+            )}
             <div className="sinv-act">
               <button className="sinv-btn primary" disabled={busy} onClick={() => run(() => joinWithTexts())}>Join</button>
               <button className="sinv-btn ghost" disabled={busy} onClick={() => run(() => call("respondToCrewInvite", { accept: false }))}>No thanks</button>
@@ -245,6 +262,8 @@ const GO_AGAIN_CSS = `
 .leafme .fm-dark .ga-face img { width: 100%; height: 100%; object-fit: cover; }
 .leafme .fm-dark .ga-face.in { border-color: #C8F25A; }
 .leafme .fm-dark .ga-face.open { background: transparent; border: 2px dashed #3B5449; }
+.leafme .fm-dark .ga-face.ask { color: #8A928C; font-size: 18px; cursor: pointer; font-family: inherit; }
+.leafme .fm-dark .ga-face.ask:hover { border-color: #C8F25A; color: #F2F1EC; }
 .leafme .fm-dark .ga-head-right { display: flex; align-items: center; gap: 14px; }
 `;
 
@@ -329,7 +348,6 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
   const inPeople = card.people.filter((p) => p.in && !p.me);
   const notIn = card.people.filter((p) => !p.in && !p.me);
   const left = Math.max(0, card.need - card.inCount);
-  const ready = card.meIn && left === 0;
 
   const act = async (key: string, name: string, params: Record<string, unknown> = {}) => {
     setBusy(key);
@@ -346,9 +364,10 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
     }
   };
 
-  const start = async () => {
-    const r = await act("start", "startGoAgainCrew");
-    if (!r) return;
+  const join = async () => {
+    const r = (await act("me", "setGoAgain", { in: true })) as { crewMade?: boolean; link?: string | null; invited?: number } | null;
+    if (!r?.crewMade) return;
+    // That tap made it 3: the crew is on.
     setStarted({ link: r.link ?? null, invited: r.invited ?? 0 });
     onStarted();
     // The new crew shows up in Your crews.
@@ -417,24 +436,10 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
               </span>
             ))}
             {Array.from({ length: Math.max(0, card.need - card.inCount) }, (_, i) => (
-              <span key={`open-${i}`} className="ga-face open" aria-hidden />
+              card.meIn && notIn.length > 0
+                ? <button key={`open-${i}`} type="button" className="ga-face open ask" aria-label="Ask someone who went" onClick={() => setAsking(true)}>+</button>
+                : <span key={`open-${i}`} className="ga-face open" aria-hidden />
             ))}
-          </div>
-          <div className="ga-chips">
-            {me && (
-              <button
-                type="button"
-                className={`ga-chip ${card.meIn ? "in me" : "add"}`}
-                aria-pressed={card.meIn}
-                disabled={busy !== null}
-                onClick={() => act("me", "setGoAgain", { in: !card.meIn })}
-              >
-                {card.meIn ? "You're in ✓" : "I'm in"}
-              </button>
-            )}
-            {card.meIn && notIn.length > 0 && (
-              <button type="button" className="ga-chip add" aria-expanded={asking} onClick={() => setAsking((v) => !v)}>+ someone</button>
-            )}
           </div>
         </div>
         {asking && (
@@ -453,14 +458,24 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
           </div>
         )}
         <div className="sinv-meta">
-          {left > 0
-            ? `${card.inCount} of ${card.need} in · ${left} more to start a crew`
-            : card.meIn ? `${card.inCount} in. Ready when you are.` : `${card.inCount} in. Add yourself to start it.`}
+          {card.meIn
+            ? `You're in. ${left > 0 ? `${left} more and Leaf starts the crew.` : "Starting it now."}`
+            : `${card.inCount} of ${card.need} in. ${left === 1 ? "Your tap starts the crew." : `${left} more and Leaf starts the crew.`}`}
         </div>
+        {/* The one button: I'm In. The tap that makes it 3 starts the crew. */}
         <div className="sinv-act">
-          <button type="button" className="sinv-btn primary ga-start" disabled={!ready || busy !== null} onClick={start}>
-            {busy === "start" ? "Starting…" : "Start a crew"}
-          </button>
+          {me && (
+            <button
+              type="button"
+              className={`sinv-btn ${card.meIn ? "ghost" : "primary ga-start"}`}
+              style={{ flex: 1 }}
+              aria-pressed={card.meIn}
+              disabled={busy !== null}
+              onClick={() => (card.meIn ? act("me", "setGoAgain", { in: false }) : join())}
+            >
+              {busy === "me" ? "One sec…" : card.meIn ? "You're In ✓" : left === 1 ? "Start Crew" : "I'm In"}
+            </button>
+          )}
         </div>
         {error && <div className="sinv-meta" style={{ color: "#F2A39A" }}>{error}</div>}
       </div>
