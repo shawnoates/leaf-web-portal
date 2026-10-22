@@ -232,6 +232,11 @@ const GO_AGAIN_CSS = `
 .leafme .fm-dark .sinv-btn.ga-start:disabled { background: #3B5449; border-color: #3B5449; color: #8A928C; opacity: 1; }
 .leafme .fm-dark .ga-hide { background: none; border: 0; padding: 6px 0; font-size: 12px; color: #8A928C; cursor: pointer; font-family: inherit; }
 .leafme .fm-dark .ga-hide:hover { color: #F2F1EC; }
+.leafme .fm-dark .ga-faces { display: flex; align-items: center; padding-left: 6px; margin: 2px 0; }
+.leafme .fm-dark .ga-face { width: 34px; height: 34px; margin-left: -6px; border-radius: 999px; border: 2px solid #253A33; background: #1B2B25; color: #C9D1CB; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; flex: none; }
+.leafme .fm-dark .ga-face img { width: 100%; height: 100%; object-fit: cover; }
+.leafme .fm-dark .ga-face.in { border-color: #C8F25A; }
+.leafme .fm-dark .ga-face.more { font-size: 11px; color: #8A928C; }
 .leafme .fm-dark .ga-head-right { display: flex; align-items: center; gap: 14px; }
 `;
 
@@ -368,23 +373,37 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
         </div>
       </div>
       <div className="sinv-text">
-        <h2 className="sinv-title">{card.title}</h2>
-        <div className="sinv-meta">{[card.place && card.place !== card.title ? card.place : null, wentDay(card.endedAt), `${card.went} went`].filter(Boolean).join(" · ")}</div>
-        {/* Who went, so a card nobody has tapped yet still names people. */}
-        {notIn.length > 0 && (
-          <div className="sinv-meta">
-            {(() => {
-              const names = notIn.map((p) => p.name.split(" ")[0]);
-              const shownNames = names.slice(0, 3);
-              const more = card.went - 1 - inPeople.length - shownNames.length;
-              return `Go again with ${shownNames.join(", ")}${more > 0 ? ` and ${more} more` : ""}`;
-            })()}
-          </div>
-        )}
-        <div className="ga-chips">
-          {inPeople.map((p) => (
-            <span key={p.userId} className="ga-chip in">{p.name.split(" ")[0]}</span>
+        {/* Forward-looking: what it could be, with the night it came from as the small print. */}
+        <h2 className="sinv-title">{card.place ? `Make ${card.place} a regular thing` : `Make ${card.title} a regular thing`}</h2>
+        {/* Everyone who went: a photo or their initial; a lime ring once they're in. */}
+        <div className="ga-faces" aria-label={`${card.went} went`}>
+          {card.people.slice(0, 8).map((p) => (
+            <span key={p.userId} className={`ga-face${p.in ? " in" : ""}`} title={p.me ? "You" : p.name}>
+              {p.photo
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={p.photo} alt="" />
+                : (p.me ? "You" : p.name.trim().charAt(0).toUpperCase())}
+            </span>
           ))}
+          {card.went > Math.min(card.people.length, 8) && (
+            <span className="ga-face more">+{card.went - Math.min(card.people.length, 8)}</span>
+          )}
+        </div>
+        {inPeople.length > 0 && (
+          <div className="sinv-meta">{inPeople.map((p) => p.name.split(" ")[0]).join(" and ").replace(/ and (?=.* and )/g, ", ")} {inPeople.length === 1 ? "is" : "are"} in</div>
+        )}
+        <div className="sinv-meta">
+          {(() => {
+            const names = notIn.map((p) => p.name.split(" ")[0]);
+            const shownNames = names.slice(0, 3);
+            const more = card.went - 1 - inPeople.length - shownNames.length;
+            const who = shownNames.length ? `With ${shownNames.join(", ")}${more > 0 ? ` and ${more} more` : ""}` : null;
+            const day = wentDay(card.endedAt);
+            const from = day ? `from ${day}` : null;
+            return [who, from].filter(Boolean).join(", ") || `${card.went} went`;
+          })()}
+        </div>
+        <div className="ga-chips">
           {me && (
             <button
               type="button"
@@ -393,7 +412,7 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
               disabled={busy !== null}
               onClick={() => act("me", "setGoAgain", { in: !card.meIn })}
             >
-              {card.meIn ? "You ✓" : "+ Add me"}
+              {card.meIn ? "You're in ✓" : "I'm in"}
             </button>
           )}
           {card.meIn && notIn.length > 0 && (
