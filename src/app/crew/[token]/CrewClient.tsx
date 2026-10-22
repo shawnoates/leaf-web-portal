@@ -89,6 +89,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const inApp = useInApp();
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  // "It's a go" on an event another crew already has a night for: this crew joined it.
+  const [eventNote, setEventNote] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [noteSent, setNoteSent] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -400,8 +402,17 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             </div>
 
             {(data.eventMatches || []).map((m) => (
-              <EventMatchCard key={m.spotId} match={m} busy={busy} onAnswer={(go) => act(`ev-${m.spotId}`, () => run("answerCrewEventMatch", auth, { spotId: m.spotId, go }))} />
+              <EventMatchCard
+                key={m.spotId}
+                match={m}
+                busy={busy}
+                onAnswer={(go) => act(`ev-${m.spotId}`, async () => {
+                  const r = await run<{ joined?: boolean; withCrew?: string | null }>("answerCrewEventMatch", auth, { spotId: m.spotId, go });
+                  if (r?.joined) setEventNote(`${m.title} is already on with ${r.withCrew || "another crew"}, so it's one night, not two. Everyone here gets that plan's invite.`);
+                })}
+              />
             ))}
+            {eventNote && <p className="m-0 rounded-2xl border border-fm-line px-4 py-3 text-sm text-fm-ink-2">{eventNote}</p>}
 
             {data.lastNight && (
               <LastNightCard
