@@ -214,6 +214,7 @@ const GO_AGAIN_CSS = `
 .leafme .fm-dark .sinv-btn.ga-start:disabled { background: #3B5449; border-color: #3B5449; color: #8A928C; opacity: 1; }
 .leafme .fm-dark .ga-hide { background: none; border: 0; padding: 6px 0; font-size: 12px; color: #8A928C; cursor: pointer; font-family: inherit; }
 .leafme .fm-dark .ga-hide:hover { color: #F2F1EC; }
+.leafme .fm-dark .ga-head-right { display: flex; align-items: center; gap: 14px; }
 `;
 
 /** "Do this again with the people you went with": a plan you went to (getMeDashboard.goAgain). */
@@ -242,24 +243,33 @@ export function GoAgainCards({ cards, onChanged }: { cards: GoAgain[]; onChanged
   const [started, setStarted] = useState<GoAgain[]>([]);
   const shown = [...cards, ...started.filter((k) => !cards.some((c) => c.planId === k.planId))]
     .filter((c) => !hidden.includes(c.planId));
+  // One card at a time, like the crew card above it: several plans don't stack up.
+  const [at, setAt] = useState(0);
   if (!shown.length) return null;
+  const i = Math.min(at, shown.length - 1);
+  const c = shown[i];
   return (
     <>
       <style>{GO_AGAIN_CSS}</style>
-      {shown.map((c) => (
-        <GoAgainCard
-          key={c.planId}
-          card={c}
-          onGone={() => setHidden((h) => [...h, c.planId])}
-          onStarted={() => setStarted((k) => [...k, c])}
-          onChanged={onChanged}
-        />
-      ))}
+      <GoAgainCard
+        key={c.planId}
+        card={c}
+        page={shown.length > 1 ? { index: i, count: shown.length, next: () => setAt((i + 1) % shown.length) } : null}
+        onGone={() => setHidden((h) => [...h, c.planId])}
+        onStarted={() => setStarted((k) => [...k, c])}
+        onChanged={onChanged}
+      />
     </>
   );
 }
 
-function GoAgainCard({ card: initial, onGone, onStarted, onChanged }: { card: GoAgain; onGone: () => void; onStarted: () => void; onChanged: () => Promise<void> }) {
+function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
+  card: GoAgain;
+  page: { index: number; count: number; next: () => void } | null;
+  onGone: () => void;
+  onStarted: () => void;
+  onChanged: () => Promise<void>;
+}) {
   const [card, setCard] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -319,12 +329,30 @@ function GoAgainCard({ card: initial, onGone, onStarted, onChanged }: { card: Go
           <FriendModeMark width={32} />
           {card.place || card.title} · {card.went} went
         </div>
-        <button type="button" className="ga-hide" disabled={busy !== null} onClick={async () => { if (await act("hide", "dismissGoAgain")) onGone(); }}>
-          Not this one
-        </button>
+        <div className="ga-head-right">
+          {page && (
+            <button type="button" className="ga-hide" onClick={page.next} aria-label="Next plan">
+              {page.index + 1} of {page.count} ›
+            </button>
+          )}
+          <button type="button" className="ga-hide" disabled={busy !== null} onClick={async () => { if (await act("hide", "dismissGoAgain")) onGone(); }}>
+            Not this one
+          </button>
+        </div>
       </div>
       <div className="sinv-text">
         <h2 className="sinv-title">Do this again with the people you went with</h2>
+        {/* Who went, so a card nobody has tapped yet still names people. */}
+        {notIn.length > 0 && (
+          <div className="sinv-meta">
+            {(() => {
+              const names = notIn.map((p) => p.name.split(" ")[0]);
+              const shownNames = names.slice(0, 3);
+              const more = card.went - 1 - inPeople.length - shownNames.length;
+              return `With ${shownNames.join(", ")}${more > 0 ? ` and ${more} more` : ""}`;
+            })()}
+          </div>
+        )}
         <div className="ga-chips">
           {inPeople.map((p) => (
             <span key={p.userId} className="ga-chip in">{p.name.split(" ")[0]}</span>
