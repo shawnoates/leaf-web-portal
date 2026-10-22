@@ -166,7 +166,7 @@ export function CrewActionCard({ actions, onAnswered, page = null }: { actions: 
         {a.kind === "book" && (
           <>
             <h2 className="sinv-title">Book {a.venue?.name} for {a.chosenOption ? dayLabel(a.chosenOption.date) : "the night"}</h2>
-            <div className="sinv-meta">{a.going} people. You&rsquo;re booking this one.</div>
+            <div className="sinv-meta">{a.going > 1 ? `${a.going} people going.` : "Just you so far."} You&rsquo;re booking this one.</div>
             <div className="sinv-act">
               {a.bookingUrl && <a className="sinv-btn ghost" href={a.bookingUrl} target="_blank" rel="noreferrer">Booking link ↗</a>}
               <button className="sinv-btn primary" disabled={busy} onClick={() => run(() => call("markCrewBooked", { cycleId: a.cycleId }))}>Booked ✓</button>
@@ -282,13 +282,15 @@ export function CrewCardStack({ actions, goAgain, onRefresh }: { actions: CrewAc
   const [at, setAt] = useState(0);
   const again = [...goAgain, ...started.filter((k) => !goAgain.some((c) => c.planId === k.planId))]
     .filter((c) => !hidden.includes(c.planId));
-  // Most urgent first: crew asks with the soonest date (a night to RSVP to or
-  // book, a vote whose dates are close), then the rest of the crew asks, then
-  // Do this again, starting with ones where someone's already waiting on you.
+  // Answers people are waiting on first: an RSVP or a vote (soonest date
+  // first), then invites and "Do it again?", then Do this again (someone
+  // already in first). Booking is the host's own to-do, so it goes last.
+  const sorted = [...actions].sort((x, y) => actionUrgency(x) - actionUrgency(y));
   const items: ({ kind: "action"; a: CrewAction } | { kind: "again"; g: GoAgain })[] = [
-    ...[...actions].sort((x, y) => actionUrgency(x) - actionUrgency(y)).map((a) => ({ kind: "action" as const, a })),
+    ...sorted.filter((a) => a.kind !== "book").map((a) => ({ kind: "action" as const, a })),
     ...[...again].sort((x, y) => y.inCount - x.inCount || (Date.parse(y.endedAt || "") || 0) - (Date.parse(x.endedAt || "") || 0))
       .map((g) => ({ kind: "again" as const, g })),
+    ...sorted.filter((a) => a.kind === "book").map((a) => ({ kind: "action" as const, a })),
   ];
   if (!items.length) return null;
   const i = Math.min(at, items.length - 1);
