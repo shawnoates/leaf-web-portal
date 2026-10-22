@@ -465,7 +465,9 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
         {!card.crew && <div className="sinv-meta">
           {card.meIn
             ? `You're in. ${left > 0 ? `${left} more and Leaf starts the crew.` : "Starting it now."}`
-            : `${card.inCount} of ${card.need} in. ${left === 1 ? "Your tap starts the crew." : `${left} more and Leaf starts the crew.`}`}
+            : card.inCount === 0
+              ? `Be the first in. We'll help plan the next meetup when ${card.need} join.`
+              : `${card.inCount} of ${card.need} in. ${left === 1 ? "Your tap starts the crew." : `${left} more and Leaf starts the crew.`}`}
         </div>}
         {/* The one button: I'm In. The tap that makes it 3 starts the crew. */}
         <div className="sinv-act">
