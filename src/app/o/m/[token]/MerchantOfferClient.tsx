@@ -37,6 +37,8 @@ import { MERCHANT_TERMS_URL, MERCHANT_TERMS_VERSION } from "@/lib/merchant-terms
 type DateOption = { dateKey: string; label: string };
 
 type Form = {
+  /** A Leaf rep is setting this business up in person: payment info goes to the owner by email, not here. */
+  repWalkthrough?: { cardStatus: string | null; cardEmail: string; cardDueAt: string | null; cardDays: number };
   /** What a Leaf host costs for a night (Hosted night). */
   leafHostFeeCents?: number;
   state: "drafted" | "sent" | "accepted" | "declined" | "expired" | "unavailable";
@@ -354,6 +356,9 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   // "Ask for a change" to our suggested night, at sign-up: goes to Leaf with their notes.
   const [ideaAsk, setIdeaAsk] = useState("");
   const [card, setCard] = useState<Card | null>(null);
+  // A rep's walkthrough: who gets the payment request, and the screen once it's sent.
+  const [cardEmail, setCardEmail] = useState("");
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [useOwn, setUseOwn] = useState(false);
   const [notices, setNotices] = useState<Notices | null>(null);
   // Merchants who said yes land on their dashboard; the form is one tap away.
@@ -430,6 +435,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         setNightNotes(o.nightNotes || "");
         setNightExtra(o.nightExtra || "");
         setCard(f.billing?.card ?? null);
+        if (f.repWalkthrough?.cardEmail) setCardEmail((cur) => cur || f.repWalkthrough!.cardEmail);
         if (f.notices) {
           // Texts go to the night's phone unless they've set another.
           setNotices({ ...f.notices, smsPhone: f.notices.smsPhone || o.contactPhone || "" });
@@ -486,6 +492,10 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   if (shop && range && (credit < range.minCents || credit > range.maxCents)) missing.push(`a ticket between ${dollars(range.minCents)} and ${dollars(range.maxCents)}`);
   if (form?.state !== "accepted" && !days.length) missing.push("your days");
   if (phoneDigits.length > 0 && phoneDigits.length < 10) missing.push("a full phone number (or leave it blank)");
+  // A rep sitting with them: the card (a bar) or payouts (a shop or studio) is asked of the owner by email.
+  const repPay = Boolean(form?.repWalkthrough) && form?.state !== "accepted";
+  const cardEmailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cardEmail.trim());
+  if (repPay && !cardEmailOk) missing.push("the owner or manager\u2019s email");
   const needsTerms = form?.state !== "accepted" && form?.terms?.agreed !== true;
   if (needsTerms && !agreeTerms) missing.push("your agreement to the Merchant Terms");
 
@@ -510,7 +520,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
     setError(null);
     setBusy(true);
     try {
-      if (perRsvp) await cardRef.current?.save();
+      if (perRsvp && !repPay) await cardRef.current?.save();
       if (notices) {
         const r = (await merchantRun("updateMerchantNotices", { token, ...noticePayload(notices) })) as { notices: Notices };
         setNotices(r.notices);
@@ -539,9 +549,16 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         ...(shop ? { nightExtra } : {}),
         ...(needsTerms && agreeTerms ? { agreedTerms: MERCHANT_TERMS_VERSION } : {}),
         weeklyBudgetCents: form?.state === "accepted" || !perRsvp ? undefined : weeklyBudget,
+        ...(repPay ? { cardEmail: cardEmail.trim() } : {}),
       })) as { state: string; bookedDate?: string | null; benched?: boolean; updated?: boolean; requested?: boolean; session?: string | null };
       // Saying yes signs this device in to the dashboard it's about to land on.
       if (r.session) saveSession(token, r.session, form?.merchantName || "");
+      // A rep's walkthrough signs no one in here: the owner finishes from the email.
+      if (repPay && r.state === "accepted") {
+        setSentTo(cardEmail.trim());
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
       setDone({ bookedDate: r.bookedDate ?? null, benched: Boolean(r.benched), updated: r.updated });
       // Straight to their dashboard, with what just happened at the top.
       if (r.state === "accepted" && !noDashboard) {
@@ -615,6 +632,17 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           Already with Leaf? Email me my sign-in link
         </a>
       </Closed>
+    );
+  }
+  if (sentTo) {
+    const days = form.repWalkthrough?.cardDays ?? 7;
+    const free = form.billing?.firstNightFree;
+    return (
+      <Closed
+        neighborhood={form.neighborhood}
+        title={`Almost done. We emailed ${sentTo}.`}
+        body={`${form.merchantName} is set up. The last step is theirs: ${perRsvp ? "adding a card" : "connecting payouts"}${free ? " to claim their free first Neighbor Hour" : ""}. They have ${days} days, and we'll remind them. Your rep can see when it's done and resend the email.`}
+      />
     );
   }
   if (form.state === "declined") {
@@ -830,9 +858,9 @@ export default function MerchantOfferClient({ token }: { token: string }) {
 
   const accepted = form.state === "accepted";
   // Bars and restaurants: days, about your place, card (+ how to reach you). Ticketed: night, days, welcome (+ reach).
-  const steps = 3 + (notices ? 1 : 0);
+  const steps = 3 + (repPay && !perRsvp ? 1 : 0) + (notices ? 1 : 0);
   const withHost = merchantHosts === false && hostFee ? ` + ${hostFee} host` : "";
-  const cta = accepted ? "Save changes" : perRsvp && form.billing?.firstNightFree ? `Hold my free Neighbor Hour${withHost}` : "Count me in";
+  const cta = accepted ? "Save changes" : repPay ? "Send the payment request" : perRsvp && form.billing?.firstNightFree ? `Hold my free Neighbor Hour${withHost}` : "Count me in";
   const freeWorth = perRsvp && !accepted && !withHost && form.billing?.firstNightFree ? dollars((form.billing?.rsvpFeeCents ?? 600) * TYPICAL_RSVPS) : null;
 
   return (
@@ -873,7 +901,9 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               ? [
                   { href: "#days", label: "Your slow days", done: days.length > 0 },
                   { href: "#place", label: "About your place", done: merchantHosts !== null && Number(capacity) > 0 },
-                  { href: "#card", label: "Hold it with a card", done: card !== null },
+                  repPay
+                    ? { href: "#payment", label: "Owner\u2019s payment request", done: cardEmailOk }
+                    : { href: "#card", label: "Hold it with a card", done: card !== null },
                 ]
               : [
                   { href: "#days", label: "Your days", done: days.length > 0 },
@@ -881,6 +911,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
                     ? { href: "#class", label: "About your night", done: nightNotes.trim().length > 0 && nightExtra.trim().length >= 3 }
                     : { href: "#class", label: "About your class", done: Number(price) > 0 && hasSpace !== null },
                   { href: "#place", label: "Who welcomes them", done: merchantHosts !== null },
+                  ...(repPay ? [{ href: "#payment", label: "Owner\u2019s payment request", done: cardEmailOk }] : []),
                 ]
           }
         />
@@ -1183,7 +1214,31 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           </div>
         </Section>
 
-        {perRsvp && (
+        {repPay && (
+          <Section
+            n={perRsvp ? 3 : steps - (notices ? 1 : 0)}
+            total={steps}
+            id="payment"
+            title="Who should we ask for payment info?"
+            sub={`${perRsvp ? "A card" : "Payout details"} come from the owner or manager, not from you. We email them a link to finish${form.billing?.firstNightFree ? ", and the first Neighbor Hour is free if they do it within 7 days" : ""}.`}
+          >
+            <Field label="Owner or manager email" hint="The person who can add the payment info. Not sure? Ask them now.">
+              <input
+                value={cardEmail}
+                onChange={(e) => setCardEmail(e.target.value)}
+                type="email"
+                inputMode="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoComplete="off"
+                className={input}
+              />
+            </Field>
+          </Section>
+        )}
+
+        {perRsvp && !repPay && (
           <Section
             n={3}
             total={steps}
@@ -1211,7 +1266,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
         )}
 
         {notices && (
-          <Section n={4} total={steps} id="notifications" title="How should we reach you?" sub="Only about your Neighbor Hours. Never marketing.">
+          <Section n={steps} total={steps} id="notifications" title="How should we reach you?" sub="Only about your Neighbor Hours. Never marketing.">
             <NoticePrefs token={token} value={notices} onChange={setNotices} />
           </Section>
         )}
