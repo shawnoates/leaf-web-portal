@@ -280,6 +280,8 @@ export type GoAgain = {
   meIn: boolean;
   people: { userId: string; name: string; photo: string | null; in: boolean; me: boolean }[];
   nudged: string[];
+  /** Started already: this person wasn't in it, so the card is "Hop in" (opt in, no invite was sent). */
+  crew?: { crewId: string; name: string } | null;
 };
 
 /**
@@ -381,7 +383,7 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
           <h2 className="sinv-title">Your crew is on</h2>
           <div className="sinv-meta">
             {inPeople.length ? `${inPeople.map((p) => p.name.split(" ")[0]).join(", ")} ${inPeople.length === 1 ? "is" : "are"} in with you.` : "You're in."}
-            {started.invited > 0 ? ` Leaf invited the other ${started.invited} who went.` : ""}
+            {card.crew ? "" : " Everyone else who went can hop in from their Leaf page."}
           </div>
           {started.link && (
             <div className="sinv-act"><a className="sinv-btn primary ga-start" href={started.link}>Open the crew</a></div>
@@ -407,11 +409,14 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
       </div>
       <div className="sinv-text">
         {/* Forward-looking: what it could be, with the night it came from as the small print. */}
-        <h2 className="sinv-title">Get this group together again</h2>
+        <h2 className="sinv-title">{card.crew ? `Hop in: ${card.crew.name}` : "Get this group together again"}</h2>
         {inPeople.length > 0 && (
-          <div className="sinv-meta">{inPeople.map((p) => p.name.split(" ")[0]).join(" and ").replace(/ and (?=.* and )/g, ", ")} {inPeople.length === 1 ? "is" : "are"} in</div>
+          <div className="sinv-meta">
+            {inPeople.map((p) => p.name.split(" ")[0]).join(" and ").replace(/ and (?=.* and )/g, ", ")}{" "}
+            {card.crew ? `started it after ${card.place || card.title}` : `${inPeople.length === 1 ? "is" : "are"} in`}
+          </div>
         )}
-        <div className="sinv-meta">
+        {!card.crew && <div className="sinv-meta">
           {(() => {
             const names = notIn.map((p) => p.name.split(" ")[0]);
             const shownNames = names.slice(0, 3);
@@ -422,7 +427,7 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
             const from = [where, day].filter(Boolean).join(", ");
             return [who, from ? `from ${from}` : null].filter(Boolean).join(" · ") || `${card.went} went`;
           })()}
-        </div>
+        </div>}
         <div className="sinv-meta" style={{ fontSize: 13 }}>Leaf finds the next spot and a night that works for everyone.</div>
         <div className="ga-row">
           {/* Who's in, one circle each; empty dashed circles for the spots still open. */}
@@ -435,7 +440,7 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
                     : (p.me ? "You" : p.name.trim().charAt(0).toUpperCase())}
               </span>
             ))}
-            {Array.from({ length: Math.max(0, card.need - card.inCount) }, (_, i) => (
+            {!card.crew && Array.from({ length: Math.max(0, card.need - card.inCount) }, (_, i) => (
               card.meIn && notIn.length > 0
                 ? <button key={`open-${i}`} type="button" className="ga-face open ask" aria-label="Ask someone who went" onClick={() => setAsking(true)}>+</button>
                 : <span key={`open-${i}`} className="ga-face open" aria-hidden />
@@ -457,23 +462,23 @@ function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
             })}
           </div>
         )}
-        <div className="sinv-meta">
+        {!card.crew && <div className="sinv-meta">
           {card.meIn
             ? `You're in. ${left > 0 ? `${left} more and Leaf starts the crew.` : "Starting it now."}`
             : `${card.inCount} of ${card.need} in. ${left === 1 ? "Your tap starts the crew." : `${left} more and Leaf starts the crew.`}`}
-        </div>
+        </div>}
         {/* The one button: I'm In. The tap that makes it 3 starts the crew. */}
         <div className="sinv-act">
           {me && (
             <button
               type="button"
-              className={`sinv-btn ${card.meIn ? "ghost" : "primary ga-start"}`}
+              className={`sinv-btn ${card.meIn && !card.crew ? "ghost" : "primary ga-start"}`}
               style={{ flex: 1 }}
               aria-pressed={card.meIn}
               disabled={busy !== null}
-              onClick={() => (card.meIn ? act("me", "setGoAgain", { in: false }) : join())}
+              onClick={() => (card.meIn && !card.crew ? act("me", "setGoAgain", { in: false }) : join())}
             >
-              {busy === "me" ? "One sec…" : card.meIn ? "You're In ✓" : left === 1 ? "Start Crew" : "I'm In"}
+              {busy === "me" ? "One sec…" : card.crew ? "Join" : card.meIn ? "You're In ✓" : left === 1 ? "Start Crew" : "I'm In"}
             </button>
           )}
         </div>
