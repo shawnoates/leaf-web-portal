@@ -51,6 +51,15 @@ const nextConfig: NextConfig = {
       // evaluated before routing, so there must never also be a
       // src/app/scorecard/page.tsx.
       { source: "/scorecard", destination: "/score", permanent: true },
+      // Google Ads sends "shareable calendar" searches to
+      // /social-calendar/free. There was never a page there, so every paid
+      // click landed on a 404. Point both the ad URL and its parent at the
+      // type-a-vibe creation flow the ad promises. Temporary on purpose: a
+      // dedicated landing page may replace this later. Next carries the
+      // query string (gclid, utm_*) through, so ad attribution survives.
+      // Same constraint as /scorecard: never add a page.tsx at these paths.
+      { source: "/social-calendar", destination: "/calendars", permanent: false },
+      { source: "/social-calendar/free", destination: "/calendars", permanent: false },
       // joinleaf.com is the canonical product domain. It used to 308 every
       // path except the legal pages and /help over to
       // os.joinleaf.com/personal; that catch-all is gone, so the apex now
