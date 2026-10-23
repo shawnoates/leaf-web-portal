@@ -108,6 +108,9 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const [proposing, setProposing] = useState(false);
   const inApp = useInApp();
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // Whoever started a crew deletes it rather than leaving it.
+  const canDelete = me.isOwner && crew.origin === "friends";
+  const [deleted, setDeleted] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   // "It's a go" on an event another crew already has a night for: this crew joined it.
   const [eventNote, setEventNote] = useState<string | null>(null);
@@ -335,6 +338,18 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             {error && <p className="mb-0 mt-3 text-sm text-fm-danger">{error}</p>}
           </div>
           <p className="mt-4 text-xs text-fm-muted">No thanks just means Leaf won&rsquo;t ask you about this crew.</p>
+        </div>
+      </CrewShell>
+    );
+  }
+
+  if (deleted) {
+    return (
+      <CrewShell>
+        <div className="flex min-h-[60vh] flex-col justify-center gap-3 py-6">
+          <Eyebrow>Deleted</Eyebrow>
+          <DisplayTitle>{crew.name}</DisplayTitle>
+          <p className="m-0 text-[15px] text-fm-ink-2">The crew, its book and anything being planned are gone. Nights already set stay on everyone&rsquo;s plans.</p>
         </div>
       </CrewShell>
     );
@@ -1125,8 +1140,14 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 {/* Confirm in-page: window.confirm() is silently false inside the app's web view. */}
                 {confirmLeave ? (
                   <>
-                    <button className="h-11 rounded-full bg-fm-danger px-4 text-sm font-semibold text-fm-canvas" disabled={busy !== null} onClick={() => act("leave", async () => { await run("leaveCrew", auth); window.location.reload(); })}>
-                      Yes, leave {crew.name}
+                    <button
+                      className="h-11 rounded-full bg-fm-danger px-4 text-sm font-semibold text-fm-canvas"
+                      disabled={busy !== null}
+                      onClick={() => canDelete
+                        ? act("delete", async () => { await run("deleteFriendCrew", auth, { crewId: crew.id }); setSettingsOpen(false); setDeleted(true); })
+                        : act("leave", async () => { await run("leaveCrew", auth); window.location.reload(); })}
+                    >
+                      {canDelete ? (busy === "delete" ? "Deleting…" : `Yes, delete ${crew.name}`) : `Yes, leave ${crew.name}`}
                     </button>
                     <button className="h-11 rounded-full px-3 text-sm font-medium text-fm-ink-2 hover:bg-fm-card" onClick={() => setConfirmLeave(false)}>
                       Stay
@@ -1134,11 +1155,17 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                   </>
                 ) : (
                   <button className="h-11 rounded-full px-3 text-sm font-medium text-fm-danger hover:bg-fm-card" onClick={() => setConfirmLeave(true)}>
-                    Leave
+                    {canDelete ? "Delete crew" : "Leave"}
                   </button>
                 )}
               </div>
-              {confirmLeave && <p className="mb-0 mt-1 text-xs text-fm-muted">Leaf will stop texting you about this crew.</p>}
+              {confirmLeave && (
+                <p className="mb-0 mt-1 text-xs text-fm-muted">
+                  {canDelete
+                    ? "Ends anything being planned, removes everyone, and deletes the crew's book. Nights already set stay on."
+                    : "Leaf will stop texting you about this crew."}
+                </p>
+              )}
             </div>
             </div>
           </div>
