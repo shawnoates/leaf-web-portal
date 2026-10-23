@@ -1109,6 +1109,12 @@ function CycleCard({
 }) {
   const inApp = useInApp();
   const ev = cycleIsEvening(c);
+  // Where the place opens: its page in the app, Google Maps on the web.
+  const placeHref = !c.venue?.name ? null
+    : inApp && c.venueLocationId ? `leaf://location/${c.venueLocationId}`
+    : c.venue.placeId ? `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(c.venue.placeId)}`
+    : c.venueLocationId || c.venue.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([c.venue.name, c.venue.address].filter(Boolean).join(" "))}`
+    : null;
   // Not voted yet: start from the dates their calendar says they're free.
   // Nothing pre-ticked: Leaf already picked these dates around everyone's
   // calendars, so a tap here is a preference, and it saves by itself.
@@ -1195,13 +1201,20 @@ function CycleCard({
             <a href={`/p/${c.planId}${c.myInviteId ? `?n=${c.myInviteId}` : ""}`} className="w-fit hover:underline decoration-fm-line underline-offset-4">
               <h2 className="m-0 font-fm-serif text-[34px] font-normal leading-[1.05] lg:text-[40px]">{c.venue?.name || (ev ? "Your night" : "Your plan")}</h2>
             </a>
+          ) : placeHref ? (
+            // While it's voting, the place opens its page: the app's location detail, else Google Maps.
+            <a href={placeHref} target={inApp ? undefined : "_blank"} rel="noreferrer" className="w-fit hover:underline decoration-fm-line underline-offset-4">
+              <h2 className="m-0 font-fm-serif text-[34px] font-normal leading-[1.05] lg:text-[40px]">{c.venue?.name}</h2>
+            </a>
           ) : (
             <h2 className="m-0 font-fm-serif text-[34px] font-normal leading-[1.05] lg:text-[40px]">{c.venue?.name || "Picking a place…"}</h2>
           )}
           <p className="m-0 text-sm text-fm-muted">
             {settled && c.chosenOption
               ? [chosen?.dow, timeLabel(c.chosenOption.time), c.venue?.address].filter(Boolean).join(" · ")
-              : c.venue?.address || cycleStatusLine(c, names)}
+              : c.venue?.address && placeHref
+                ? <a href={placeHref} target={inApp ? undefined : "_blank"} rel="noreferrer" className="hover:underline underline-offset-4">{c.venue.address}</a>
+                : c.venue?.address || cycleStatusLine(c, names)}
           </p>
           {settled && c.chosenOption && c.showtimes?.[c.chosenOption.date]?.bookingUrl && (
             <a href={c.showtimes[c.chosenOption.date].bookingUrl!} target="_blank" rel="noreferrer" className="w-fit text-sm font-semibold text-fm-ink underline underline-offset-4">

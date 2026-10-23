@@ -53,6 +53,8 @@ export type CycleView = {
   /** A "when we're free" round: how many were free that date. */
   freeCount?: number | null;
   venue: Venue | null;
+  /** The place's Leaf id: opens its place page (the app's location detail). */
+  venueLocationId?: string | null;
   /** A movie or event from the book: its days ('YYYY-MM-DD'), so the dates stay inside them. */
   eventWindow?: { start: string; end: string; kind: "movie" | "event"; title: string | null } | null;
   /** A movie night's real showtime and booking link, by date. */
