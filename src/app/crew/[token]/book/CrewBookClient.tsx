@@ -19,6 +19,7 @@ import { CalendarDays, Check, ChevronLeft, ChevronUp, Eye, Link2, Lock, Plus, Se
 import VenueSearch from "@/components/VenueSearch";
 import PlacePhoto from "@/components/crew/PlacePhoto";
 import ShareFromInstagramHint from "@/components/crew/ShareFromInstagramHint";
+import { importLink, isLink, linkHost } from "@/components/crew/PasteLinkToBook";
 import WatchingStrip from "@/components/crew/WatchingStrip";
 import { DiscoverRow } from "@/components/crew/BookRows";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
@@ -121,12 +122,10 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
   // the book — Places with a venue, Happenings without. It takes a minute, so
   // the book refreshes a couple of times while it lands.
   const addLink = (url: string) => act("link", async () => {
-    const full = /^https?:\/\//i.test(url) ? url : `https://${url}`;
-    const r = await run<{ started: boolean; crewName?: string }>("importLinkToCrew", auth, { url: full });
+    const note = await importLink(auth, url, refresh);
     setQuery("");
-    if (r.started) {
-      setLinkNote(`Adding ${linkHost(url)}… it'll be in the book in a minute.`);
-      for (const ms of [25000, 60000]) setTimeout(() => { refresh().catch(() => {}); }, ms);
+    if (note) {
+      setLinkNote(note);
       setTimeout(() => setLinkNote(""), 60000);
     }
   });
@@ -491,20 +490,6 @@ function windowLabel(start: string, end: string) {
 }
 
 type PickedVenue = { placeId?: string | null; name: string; address?: string | null; lat?: number | null; lng?: number | null };
-
-/** A pasted web link (the search offers "Add this link to the book"). */
-function isLink(q: string) {
-  return /^https?:\/\/\S+\.\S+$/i.test(q) || /^(www\.)?(instagram|tiktok|eventbrite|lu\.ma|luma|yelp|ticketmaster|seatgeek|fandango)\.\S+\/\S*$/i.test(q);
-}
-
-/** "instagram.com" from a link, for the row and the note. */
-function linkHost(q: string) {
-  try {
-    return new URL(/^https?:\/\//i.test(q) ? q : `https://${q}`).hostname.replace(/^www\./, "");
-  } catch {
-    return "the link";
-  }
-}
 
 /** Reads like a team, a show or a tour, not a place: the search's Watch for row goes first. */
 function looksLikeEvent(q: string) {

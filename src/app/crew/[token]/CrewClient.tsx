@@ -29,6 +29,7 @@ import CrewMoneyCard from "@/components/crew/CrewMoneyCard";
 import CrewAddOnCard from "@/components/crew/CrewAddOnCard";
 import FixedPlacePicker from "@/components/crew/FixedPlacePicker";
 import ShareFromInstagramHint from "@/components/crew/ShareFromInstagramHint";
+import PasteLinkToBook from "@/components/crew/PasteLinkToBook";
 import WatchingStrip from "@/components/crew/WatchingStrip";
 import { DiscoverRow, HappeningsCards } from "@/components/crew/BookRows";
 import SecondStop from "@/components/crew/SecondStop";
@@ -693,6 +694,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               {(data.discover?.length ?? 0) > 0 && (
                 <DiscoverRow items={data.discover!} auth={auth} canAdd={me.status === "in"} onAdded={reload} compact />
               )}
+              {me.status === "in" && <PasteLinkToBook auth={auth} onAdded={reload} />}
               {me.status === "in" && (
                 <ShareFromInstagramHint crewName={crew.name} inApp={inApp} auth={auth} hiddenTips={me.hiddenTips} />
               )}
