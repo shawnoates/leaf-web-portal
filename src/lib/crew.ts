@@ -336,8 +336,9 @@ export function rhythmLabel(days: number) {
   return RHYTHM_LABELS[days] || `Every ${days} days`;
 }
 
-/** "Just once" for a one-time crew, else its rhythm ("Every month"). */
-export function cadenceLabel(crew: { rhythmDays: number; oneTime?: boolean }) {
+/** "Just once" for a one-time crew, "When 3+ are free" / "On a trigger" for a trigger-only one, else its rhythm ("Every month"). */
+export function cadenceLabel(crew: { rhythmDays: number; oneTime?: boolean; triggerOnly?: boolean; freeTrigger?: { minFree: number } | null }) {
+  if (crew.triggerOnly) return crew.freeTrigger ? `When ${crew.freeTrigger.minFree}+ are free` : "On a trigger";
   return crew.oneTime ? "Just once" : rhythmLabel(crew.rhythmDays);
 }
 

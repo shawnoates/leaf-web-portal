@@ -430,9 +430,13 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <Card>
                 <Eyebrow>Nothing being planned</Eyebrow>
                 <p className="mt-3 text-[15px] leading-relaxed text-fm-ink-2">
-                  {crew.enabled === false ? "Friend Mode is off, so Leaf isn't planning anything for this crew." : crew.oneTime ? `Leaf starts planning the ${night} as soon as enough people are in.` : `Leaf starts the next ${night} on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()}). Got a place and a date in mind? Say so below.`}
+                  {crew.enabled === false ? "Friend Mode is off, so Leaf isn't planning anything for this crew."
+                    : crew.triggerOnly
+                      ? `${crew.freeTrigger ? `Leaf plans a ${night} when ${crew.freeTrigger.minFree}+ of you are free the same day${crew.freeTriggerLabel ? ` (${crew.freeTriggerLabel.replace(/^When \d+\+ are free · /, "")})` : ""}.` : `Leaf plans a ${night} when one of this crew's triggers comes true.`}${crew.birthdays ? " Birthdays count too." : ""} Got a place and a date in mind? Say so below.`
+                    : crew.oneTime ? `Leaf starts planning the ${night} as soon as enough people are in.`
+                    : `Leaf starts the next ${night} on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()})${crew.freeTrigger ? `, or sooner when ${crew.freeTrigger.minFree}+ of you are free` : ""}. Got a place and a date in mind? Say so below.`}
                 </p>
-                {me.isOwner && crew.enabled !== false && !crew.oneTime && crew.nextRoundAt && (
+                {me.isOwner && crew.enabled !== false && !crew.oneTime && !crew.triggerOnly && crew.nextRoundAt && (
                   <div className="mt-3 flex flex-wrap items-center gap-3">
                     <span className="text-sm text-fm-muted">
                       Next round starts around {new Date(crew.nextRoundAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}.
@@ -850,7 +854,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-fm-line bg-fm-surface px-5 pb-5 pt-4 sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-3">
+            {/* Stays put while the settings scroll. */}
+            <div className="sticky top-0 z-10 -mx-5 -mt-4 flex items-start justify-between gap-3 border-b border-fm-line-dim bg-fm-surface px-5 pb-3 pt-4">
               <div>
                 <div className="text-lg font-semibold">Your settings</div>
                 <div className="text-[13px] text-fm-muted">{crew.name} · only you see these</div>
@@ -926,7 +931,11 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     <option value="0">Just once</option>
                     <option value="-1">On a trigger (BETA): only its triggers start nights</option>
                   </select>
-                  <p className="mb-0 mt-2 text-xs text-fm-muted">Leaf starts each {night} on this rhythm. Members can set a slower pace of their own below.</p>
+                  <p className="mb-0 mt-2 text-xs text-fm-muted">
+                    {crew.triggerOnly
+                      ? `Only the crew's triggers start a ${night}: When we're free, Birthdays and anything the book watches for.`
+                      : `Leaf starts each ${night} on this rhythm. Members can set a slower pace of their own below.`}
+                  </p>
                 </div>
               )}
 
