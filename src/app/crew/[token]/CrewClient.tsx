@@ -42,6 +42,18 @@ import {
   type CrewAddOn, type CrewSplit, type LastNight, type FreeRule,
 } from "@/lib/crew";
 
+/**
+ * The app's "Choose from contacts" link. It carries who's already in, invited
+ * or said no (user ids), so the app opens its picker right away with them
+ * marked instead of loading the crew first.
+ */
+function crewInviteHref(crewId: string, crewName: string, members: Member[], myMembershipId: string) {
+  const ids = (status: Member["status"]) => members.filter((m) => m.status === status && m.userId).map((m) => m.userId).join(",");
+  const meId = members.find((m) => m.membershipId === myMembershipId)?.userId || "";
+  const q = new URLSearchParams({ in: ids("in"), invited: ids("invited"), declined: ids("declined"), me: meId, name: crewName });
+  return `leaf://crew-invite/${crewId}?${q.toString()}`;
+}
+
 export default function CrewClient({ token }: { token: string }) {
   const load = useCrewAuth(token);
   if (load.status === "loading") return <Spinner label="Loading your crew…" />;
@@ -769,7 +781,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
 
             {inApp && (
               <a
-                href={`leaf://crew-invite/${crew.id}`}
+                href={crewInviteHref(crew.id, crew.name, members, me.membershipId)}
                 className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-fm-line px-4 text-[15px] font-semibold text-fm-ink"
               >
                 Choose from contacts
