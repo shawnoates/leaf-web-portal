@@ -37,7 +37,7 @@ import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
   type EventMatch,
-  RHYTHM_LABELS, crewHref, crewIsEvening, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
+  RHYTHM_LABELS, crewHref, freeShareWords, pctLabel, crewIsEvening, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
   type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult,
   type CrewAddOn, type CrewSplit, type LastNight, type FreeRule,
 } from "@/lib/crew";
@@ -432,9 +432,9 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 <p className="mt-3 text-[15px] leading-relaxed text-fm-ink-2">
                   {crew.enabled === false ? "Friend Mode is off, so Leaf isn't planning anything for this crew."
                     : crew.triggerOnly
-                      ? `${crew.freeTrigger ? `Leaf plans a ${night} when ${crew.freeTrigger.minFree}+ of you are free the same day${crew.freeTriggerLabel ? ` (${crew.freeTriggerLabel.replace(/^When \d+\+ are free · /, "")})` : ""}.` : `Leaf plans a ${night} when one of this crew's triggers comes true.`}${crew.birthdays ? " Birthdays count too." : ""} Got a place and a date in mind? Say so below.`
+                      ? `${crew.freeTrigger ? `Leaf plans a ${night} when ${freeShareWords(crew.freeTrigger)} of you are free the same day${crew.freeTriggerLabel ? ` (${crew.freeTriggerLabel.replace(/^When [^·]+ are free · /, "")})` : ""}.` : `Leaf plans a ${night} when one of this crew's triggers comes true.`}${crew.birthdays ? " Birthdays count too." : ""} Got a place and a date in mind? Say so below.`
                     : crew.oneTime ? `Leaf starts planning the ${night} as soon as enough people are in.`
-                    : `Leaf starts the next ${night} on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()})${crew.freeTrigger ? `, or sooner when ${crew.freeTrigger.minFree}+ of you are free` : ""}. Got a place and a date in mind? Say so below.`}
+                    : `Leaf starts the next ${night} on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()})${crew.freeTrigger ? `, or sooner when ${freeShareWords(crew.freeTrigger)} of you are free` : ""}. Got a place and a date in mind? Say so below.`}
                 </p>
                 {me.isOwner && crew.enabled !== false && !crew.oneTime && !crew.triggerOnly && crew.nextRoundAt && (
                   <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -485,7 +485,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                   <p className="m-0 text-[16px] font-semibold text-fm-ink">{freeAsk ? "Sync your calendar so Leaf counts you" : "Connect your calendar"}</p>
                   <p className="m-0 mt-1 text-[14px] leading-relaxed text-fm-ink-2">
                     {freeAsk
-                      ? `This crew meets when ${crew.freeTrigger?.minFree ?? 3}+ of you are free the same day. Leaf can only count you if it can see when you're free.`
+                      ? `This crew meets when ${freeShareWords(crew.freeTrigger) || "half"} of you are free the same day. Leaf can only count you if it can see when you're free.`
                       : `Leaf finds ${ev ? "nights" : "days"} that work for you and skips the ones you're busy.`}{" "}
                     Your crew never sees your calendar, just which dates work.
                   </p>
@@ -1961,8 +1961,8 @@ const FREE_DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", 
 const FREE_TIMES = [{ time: "10:00", label: "Morning" }, { time: "14:00", label: "Afternoon" }, { time: "19:00", label: "Evening" }];
 
 /**
- * Organizer: When we're free (BETA). On, Leaf plans a night when `minFree` of
- * the crew are free the same day (synced calendars); turning it on asks the
+ * Organizer: When we're free (BETA). On, Leaf plans a night when a share of
+ * the crew (half, 60%…) are free the same day (synced calendars); turning it on asks the
  * members who haven't synced to sync.
  */
 function FreeRuleRow({ rule, label, usualTime, busy, onSave }: {
@@ -1970,7 +1970,7 @@ function FreeRuleRow({ rule, label, usualTime, busy, onSave }: {
   onSave: (rule: Omit<FreeRule, "kind" | "everyDays"> | null) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [minFree, setMinFree] = useState(rule?.minFree ?? 3);
+  const [minPct, setMinPct] = useState(rule?.minPct ?? 50);
   const [days, setDays] = useState<number[]>(rule?.days ?? [5, 6]);
   const [time, setTime] = useState(rule?.time ?? (FREE_TIMES.some((t) => t.time === usualTime) ? usualTime! : "19:00"));
   return (
@@ -1996,11 +1996,11 @@ function FreeRuleRow({ rule, label, usualTime, busy, onSave }: {
       {editing && (
         <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-fm-line bg-fm-canvas p-3.5 text-sm">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-semibold text-fm-ink-2">At least</span>
+            <span className="font-semibold text-fm-ink-2">When at least</span>
             <span className="flex items-center gap-2">
-              <button type="button" aria-label="Fewer people" onClick={() => setMinFree(Math.max(2, minFree - 1))} className="h-8 w-8 rounded-full border border-fm-line">&minus;</button>
-              <span className="w-20 text-center font-fm-serif text-[19px]">{minFree} free</span>
-              <button type="button" aria-label="More people" onClick={() => setMinFree(Math.min(10, minFree + 1))} className="h-8 w-8 rounded-full border border-fm-line">+</button>
+              <button type="button" aria-label="Fewer of the crew" onClick={() => setMinPct(Math.max(20, minPct - 10))} className="h-8 w-8 rounded-full border border-fm-line">&minus;</button>
+              <span className="w-28 text-center font-fm-serif text-[19px]">{pctLabel(minPct)} free</span>
+              <button type="button" aria-label="More of the crew" onClick={() => setMinPct(Math.min(100, minPct + 10))} className="h-8 w-8 rounded-full border border-fm-line">+</button>
             </span>
           </div>
           <div className="flex gap-1">
@@ -2022,9 +2022,9 @@ function FreeRuleRow({ rule, label, usualTime, busy, onSave }: {
               </button>
             ))}
           </div>
-          <p className="m-0 text-xs text-fm-muted">Only Google Calendars count for now. Leaf asks everyone who hasn&rsquo;t synced theirs to sync.</p>
+          <p className="m-0 text-xs text-fm-muted">Of the crew, so it keeps up as people join (never fewer than 2). Only Google Calendars count for now. Leaf asks everyone who hasn&rsquo;t synced theirs to sync.</p>
           <div className="flex gap-2">
-            <Button small disabled={busy || days.length === 0} onClick={() => void onSave({ minFree, days, time }).then(() => setEditing(false))}>{rule ? "Save" : "Turn on"}</Button>
+            <Button small disabled={busy || days.length === 0} onClick={() => void onSave({ minPct, days, time }).then(() => setEditing(false))}>{rule ? "Save" : "Turn on"}</Button>
             <Button small kind="ghost" onClick={() => setEditing(false)}>Cancel</Button>
           </div>
         </div>

@@ -163,7 +163,7 @@ export type CrewPage = {
     triggerOnly?: boolean;
     /** Birthdays (BETA): the round nearest a member's birthday is theirs. */
     birthdays?: boolean;
-    /** When we're free (BETA): a night when `minFree` of the crew are free the same day. */
+    /** When we're free (BETA): a night when enough of the crew (a share) are free the same day. */
     freeTrigger?: FreeRule | null;
     freeTriggerLabel?: string | null;
     /** When the crew meets before a round sets it ("09:00" for a morning crew). */
@@ -337,8 +337,8 @@ export function rhythmLabel(days: number) {
 }
 
 /** "Just once" for a one-time crew, "When 3+ are free" / "On a trigger" for a trigger-only one, else its rhythm ("Every month"). */
-export function cadenceLabel(crew: { rhythmDays: number; oneTime?: boolean; triggerOnly?: boolean; freeTrigger?: { minFree: number } | null }) {
-  if (crew.triggerOnly) return crew.freeTrigger ? `When ${crew.freeTrigger.minFree}+ are free` : "On a trigger";
+export function cadenceLabel(crew: { rhythmDays: number; oneTime?: boolean; triggerOnly?: boolean; freeTrigger?: Pick<FreeRule, "minPct" | "minFree"> | null }) {
+  if (crew.triggerOnly) return crew.freeTrigger ? `When ${freeShareWords(crew.freeTrigger)} are free` : "On a trigger";
   return crew.oneTime ? "Just once" : rhythmLabel(crew.rhythmDays);
 }
 
@@ -466,7 +466,20 @@ export type TellLeafResult = {
 };
 
 /** When we're free (BETA): days 0–6, Sunday first; time "HH:mm". */
-export type FreeRule = { kind: "free"; minFree: number; days: number[]; time: string; everyDays: number };
+/** When we're free: `minPct` of the crew (a share, so it keeps up as the crew grows), or an older rule's head count `minFree`. */
+export type FreeRule = { kind: "free"; minPct?: number; minFree?: number; days: number[]; time: string; everyDays: number };
+
+/** "half", "all", "60%", or "3+" for an older head-count rule: "when half of you are free". */
+export function freeShareWords(rule: Pick<FreeRule, "minPct" | "minFree"> | null | undefined): string {
+  if (!rule) return "";
+  if (rule.minPct) return rule.minPct === 50 ? "half" : rule.minPct === 100 ? "all" : `${rule.minPct}%`;
+  return `${rule.minFree ?? 3}+`;
+}
+
+/** A share of the crew as a stepper shows it: "Half", "Everyone", "60%". */
+export function pctLabel(pct: number): string {
+  return pct === 50 ? "Half" : pct === 100 ? "Everyone" : `${pct}%`;
+}
 
 /** An event the crew watches for (BETA): the book's "Watching for" list. */
 export type WatchItem = {
