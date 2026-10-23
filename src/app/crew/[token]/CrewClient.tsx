@@ -173,14 +173,18 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   // calendar to this account. Signed in as this member → straight to
   // Google; otherwise a phone code first, and only this member's account.
   const [verifyForCalendar, setVerifyForCalendar] = useState(false);
-  const goConnectCalendar = async () => {
-    const r = (await Parse.Cloud.run("createGoogleCalendarConnectUrl", { returnTo: window.location.href })) as { url: string };
+  // Google or Outlook: Leaf reads either to find when you're free.
+  const [calProvider, setCalProvider] = useState<"google" | "outlook">("google");
+  const goConnectCalendar = async (provider: "google" | "outlook" = "google") => {
+    const fn = provider === "outlook" ? "createOutlookCalendarConnectUrl" : "createGoogleCalendarConnectUrl";
+    const r = (await Parse.Cloud.run(fn, { returnTo: window.location.href })) as { url: string };
     window.location.href = r.url;
   };
-  const connectCalendar = () => {
+  const connectCalendar = (provider: "google" | "outlook" = "google") => {
+    setCalProvider(provider);
     const current = Parse.User.current();
     if (current && (!me.userId || current.id === me.userId)) {
-      void act("gcal", goConnectCalendar);
+      void act("gcal", () => goConnectCalendar(provider));
     } else {
       setVerifyForCalendar(true);
     }
@@ -349,7 +353,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               setError("That number belongs to a different Leaf account, so the calendar wasn't connected. Use the number this crew knows you by.");
               return;
             }
-            void act("gcal", goConnectCalendar);
+            void act("gcal", () => goConnectCalendar(calProvider));
           }}
         />
       )}
@@ -540,7 +544,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <Button small disabled={busy !== null} onClick={connectCalendar}>{busy === "gcal" ? "Opening…" : "Connect Google Calendar"}</Button>
+                  <Button small disabled={busy !== null} onClick={() => connectCalendar("google")}>{busy === "gcal" ? "Opening…" : "Connect Google Calendar"}</Button>
+                  <Button small kind="ghost" disabled={busy !== null} onClick={() => connectCalendar("outlook")}>Connect Outlook</Button>
                   {!freeAsk && <button type="button" className="text-sm text-fm-muted underline underline-offset-4" onClick={hideCal}>Not now</button>}
                 </div>
               </div>
@@ -972,19 +977,13 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <div className="flex items-center gap-3.5 py-4">
                 <div className="min-w-0 flex-1">
                   <div className="text-[15px] font-semibold">Your calendar</div>
-                  <div className="text-[13px] text-fm-muted">{me.calendarSynced ? `Synced · Leaf offers ${ev ? "nights" : "days"} you're free` : `Sync Google Calendar and Leaf offers ${ev ? "nights" : "days"} you're free`}</div>
+                  <div className="text-[13px] text-fm-muted">{me.calendarSynced ? `Synced · Leaf offers ${ev ? "nights" : "days"} you're free` : `Sync Google or Outlook and Leaf offers ${ev ? "nights" : "days"} you're free`}</div>
                 </div>
                 {!me.calendarSynced && (
-                  <Button
-                    small
-                    disabled={busy !== null}
-                    onClick={() => act("gcal", async () => {
-                      const r = (await Parse.Cloud.run("createGoogleCalendarConnectUrl", { returnTo: window.location.href })) as { url: string };
-                      window.location.href = r.url;
-                    })}
-                  >
-                    Connect
-                  </Button>
+                  <div className="flex shrink-0 gap-2">
+                    <Button small disabled={busy !== null} onClick={() => act("gcal", () => goConnectCalendar("google"))}>Google</Button>
+                    <Button small kind="ghost" disabled={busy !== null} onClick={() => act("gcal", () => goConnectCalendar("outlook"))}>Outlook</Button>
+                  </div>
                 )}
               </div>
               )}
@@ -1191,7 +1190,7 @@ function CycleCard({
   joined: number;
   /** The member's Google Calendar is connected (Leaf pre-ticks their free nights). */
   calendarSynced: boolean;
-  onConnectCalendar: () => void;
+  onConnectCalendar: (provider?: "google" | "outlook") => void;
   /** Host rotation is on: say whose turn this night is. */
   hostRotation?: boolean;
   /** The crew's owner: may answer a combine offer like the round's host. */
@@ -1379,14 +1378,22 @@ function CycleCard({
           </div>
           {!calendarSynced && (
             <div className="flex items-center gap-3 rounded-2xl border border-fm-line-dim px-3.5 py-2.5">
-              <p className="m-0 min-w-0 flex-1 text-[13px] leading-snug text-fm-ink-2">Connect Google Calendar and Leaf ticks the {ev ? "nights" : "days"} you&rsquo;re free.</p>
+              <p className="m-0 min-w-0 flex-1 text-[13px] leading-snug text-fm-ink-2">Connect your calendar and Leaf ticks the {ev ? "nights" : "days"} you&rsquo;re free.</p>
               <button
                 type="button"
-                onClick={onConnectCalendar}
+                onClick={() => onConnectCalendar("google")}
                 disabled={busy !== null}
                 className="h-9 shrink-0 rounded-full border border-fm-line px-3.5 text-[13px] font-semibold text-fm-ink hover:bg-fm-card disabled:opacity-50"
               >
-                Connect
+                Google
+              </button>
+              <button
+                type="button"
+                onClick={() => onConnectCalendar("outlook")}
+                disabled={busy !== null}
+                className="h-9 shrink-0 rounded-full border border-fm-line px-3.5 text-[13px] font-semibold text-fm-ink hover:bg-fm-card disabled:opacity-50"
+              >
+                Outlook
               </button>
             </div>
           )}
