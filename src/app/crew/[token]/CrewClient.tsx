@@ -1203,7 +1203,7 @@ function CycleCard({
             </a>
           ) : placeHref ? (
             // While it's voting, the place opens its page: the app's location detail, else Google Maps.
-            <a href={placeHref} target={inApp ? undefined : "_blank"} rel="noreferrer" className="w-fit hover:underline decoration-fm-line underline-offset-4">
+            <a href={placeHref} target={inApp ? undefined : "_blank"} rel="noreferrer" className="w-fit underline decoration-fm-line decoration-1 underline-offset-[6px] hover:decoration-fm-ink-2">
               <h2 className="m-0 font-fm-serif text-[34px] font-normal leading-[1.05] lg:text-[40px]">{c.venue?.name}</h2>
             </a>
           ) : (
@@ -1213,7 +1213,7 @@ function CycleCard({
             {settled && c.chosenOption
               ? [chosen?.dow, timeLabel(c.chosenOption.time), c.venue?.address].filter(Boolean).join(" · ")
               : c.venue?.address && placeHref
-                ? <a href={placeHref} target={inApp ? undefined : "_blank"} rel="noreferrer" className="hover:underline underline-offset-4">{c.venue.address}</a>
+                ? <a href={placeHref} target={inApp ? undefined : "_blank"} rel="noreferrer" className="underline decoration-fm-line underline-offset-4 hover:decoration-fm-ink-2">{c.venue.address}</a>
                 : c.venue?.address || cycleStatusLine(c, names)}
           </p>
           {settled && c.chosenOption && c.showtimes?.[c.chosenOption.date]?.bookingUrl && (
