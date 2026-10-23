@@ -306,6 +306,14 @@ function OfferCard({ form }: { form: Form }) {
 /** A dashboard Account row: title and a one-line summary, opening in place (or straight away from an email's #id link). */
 function AccountRow({ id, title, summary, children }: { id: string; title: string; summary: string; children: ReactNode }) {
   const [open, setOpen] = useState(() => typeof window !== "undefined" && window.location.hash === `#${id}`);
+  // A link to this row from elsewhere on the page ("Set up payouts") opens it.
+  useEffect(() => {
+    const onHash = () => {
+      if (window.location.hash === `#${id}`) setOpen(true);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, [id]);
   return (
     <div id={id} className="scroll-mt-6 py-3.5">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center justify-between gap-3 text-left">
@@ -496,7 +504,8 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   const repPay = Boolean(form?.repWalkthrough) && form?.state !== "accepted";
   const cardEmailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cardEmail.trim());
   if (repPay && !cardEmailOk) missing.push("the owner or manager\u2019s email");
-  const needsTerms = form?.state !== "accepted" && form?.terms?.agreed !== true;
+  // (A rep's walkthrough: the owner agrees when they add their payment info, on their dashboard.)
+  const needsTerms = form?.state !== "accepted" && form?.terms?.agreed !== true && !repPay;
   if (needsTerms && !agreeTerms) missing.push("your agreement to the Merchant Terms");
 
   const saveCardOnly = async () => {
@@ -849,7 +858,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
       <>
         <MerchantDashboard token={token} onEdit={showForm} onUnavailable={dashboardUnavailable} account={accountRows} details={detailsRow} welcome={welcome} preview={preview} />
         {/* Signed up before the Merchant Terms, or they changed since: agree here. */}
-        {form.terms && !form.terms.agreed && !preview && (
+        {form.terms && !form.terms.agreed && !preview && !["waiting", "lapsed"].includes(form.repWalkthrough?.cardStatus || "") && (
           <TermsPrompt token={token} name={form.merchantName} onAgreed={() => setForm({ ...form, terms: { version: MERCHANT_TERMS_VERSION, agreed: true } })} />
         )}
       </>

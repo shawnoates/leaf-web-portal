@@ -15,6 +15,7 @@ import MerchantDeals from "./MerchantDeals";
 import MerchantCampaign, { type CampaignSummary, windowLabel } from "./MerchantCampaign";
 import { merchantAuth, merchantRun } from "@/lib/merchant-session";
 import Parse from "@/lib/parse-client";
+import { MERCHANT_TERMS_URL, MERCHANT_TERMS_VERSION } from "@/lib/merchant-terms";
 import ResultsClient from "@/app/o/r/[token]/ResultsClient";
 import PlacardClient from "@/app/o/p/[token]/PlacardClient";
 
@@ -94,6 +95,8 @@ export type Dashboard = {
   night?: NightCopy | null;
   /** Setting up their free first night (four stages, moved on by Leaf); null once it's billed. */
   setup?: Setup | null;
+  /** A Leaf rep set them up in person and their card (a bar) or payouts (a shop or studio) is the one step left. */
+  paymentDue?: { kind: "card" | "payouts"; dueAt: string; lapsed: boolean; freeHour: boolean; needsTerms: boolean } | null;
   /** Nights they asked for that Leaf hasn't booked yet. */
   requests?: { id: string; kind: "first" | "rebook"; label: string; source?: "campaign" | null }[];
 };
@@ -197,6 +200,73 @@ type Setup = { stage: string; step: number; stages: { key: string; label: string
 
 /** A green per step, light to dark (leaf-300 to leaf-800); the setup emails use the same. */
 const STEP_GREENS = ["#9dbeb3", "#74a494", "#5a8c7b", "#426c5e", "#253a33"];
+
+/** The one step left after a rep set them up in person: their card or payouts, by a date, to keep the free hour. */
+function PaymentDue({ due, token, name }: { due: NonNullable<Dashboard["paymentDue"]>; token: string; name: string }) {
+  const payouts = due.kind === "payouts";
+  // The owner agrees to the Merchant Terms as they add their payment info (a rep set the page up).
+  const [needsTerms, setNeedsTerms] = useState(due.needsTerms);
+  const [checked, setChecked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const target = payouts ? "payouts" : "card";
+  const go = () => {
+    window.location.hash = target;
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const agree = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await merchantRun("merchantAcceptTerms", { token, version: MERCHANT_TERMS_VERSION });
+      setNeedsTerms(false);
+      go();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That didn\u2019t go through. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const by = new Date(due.dueAt).toLocaleDateString("en-US", { month: "long", day: "numeric" });
+  return (
+    <section aria-label="One step left" className="rounded-2xl bg-white p-4 text-stone-900 shadow-sm sm:p-5">
+      <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">One step left</p>
+      <p className="mt-2 text-[20px] font-semibold leading-snug">
+        {payouts ? "Connect payouts" : "Add your card"}
+        {due.freeHour ? " to claim your free first Neighbor Hour" : " to finish setting up"}
+      </p>
+      <p className="mt-1 text-[14px] leading-relaxed text-stone-600">
+        {due.lapsed
+          ? "The 7 days have passed, so the first hour isn't free any more, but you can still finish setting up."
+          : due.freeHour
+            ? `Do it by ${by} and the first one is on us. Then we pick a date together.`
+            : `Do it by ${by}. Then we pick a date together.`}
+      </p>
+      {needsTerms && (
+        <label className="mt-3 flex items-start gap-2.5 text-[14px] leading-snug text-stone-700">
+          <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-leaf-700" />
+          <span>
+            I agree to the{" "}
+            <a href={MERCHANT_TERMS_URL} target="_blank" rel="noreferrer" className="font-semibold text-leaf-700 underline">
+              Leaf Merchant Terms
+            </a>{" "}
+            for {name || "my business"}.
+          </span>
+        </label>
+      )}
+      {error && <p className="mt-2 text-[14px] text-red-600">{error}</p>}
+      <button
+        type="button"
+        onClick={needsTerms ? agree : go}
+        disabled={busy || (needsTerms && !checked)}
+        className="mt-3 inline-flex h-12 items-center justify-center rounded-xl bg-leaf-800 px-5 text-[15px] font-semibold text-white disabled:opacity-50"
+      >
+        {busy ? "One moment\u2026" : `${needsTerms ? "Agree and " : ""}${payouts ? (needsTerms ? "set up payouts" : "Set up payouts") : needsTerms ? "add your card" : "Add your card"}`}
+      </button>
+    </section>
+  );
+}
 
 /** The setup bar, in the header: where their free first Neighbor Hour is, step by step. */
 function SetupProgress({ setup }: { setup: Setup }) {
@@ -927,7 +997,7 @@ export default function MerchantDashboard({
                 <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-300">Your Neighbor Hours</p>
                 <h1 className="mt-2 font-fm-serif text-[36px] leading-[1.02] lg:text-[48px]">{d.merchantName}</h1>
               </div>
-              {d.setup ? <SetupProgress setup={d.setup} /> : <NextUp n={d.upcoming[0] || null} perRsvp={perRsvp} campaign={campaign} settingUp={false} />}
+              {d.paymentDue ? <PaymentDue due={d.paymentDue} token={token} name={d.merchantName} /> : d.setup ? <SetupProgress setup={d.setup} /> : <NextUp n={d.upcoming[0] || null} perRsvp={perRsvp} campaign={campaign} settingUp={false} />}
             </div>
             {/* The running totals, once there's something to count (a row of zeros reads as broken). */}
             {d.totals.nightsRun > 0 && (
