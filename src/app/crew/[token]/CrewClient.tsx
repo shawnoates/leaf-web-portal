@@ -115,6 +115,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const [seedDone, setSeedDone] = useState(false);
   // "How often for you?" — asked once, right after joining.
   const [paceDone, setPaceDone] = useState(false);
+  // The invite screen's "How often for you?": "" is the crew's own rhythm.
+  const [joinPace, setJoinPace] = useState("");
   // Invite: the owner picks followers not yet invited; anyone in can share the link.
   const [inviteOpen, setInviteOpen] = useState(false);
   const [invitable, setInvitable] = useState<{ userId: string; name: string; pending?: boolean }[] | null>(null);
@@ -231,6 +233,10 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
     const declined = me.status === "declined";
     const inviter = (crew.ownerId && names[crew.ownerId]) || members.find((m) => m.userId === crew.ownerId)?.name || "A friend";
     const faces = joined.filter((m) => m.userId !== me.userId).slice(0, 5);
+    // Picking a pace is part of joining (a crew on a rhythm only): the crew's
+    // own, or up to three slower ones. Leaf only asks them on that pace.
+    const askPace = !declined && !crew.oneTime && !crew.triggerOnly;
+    const slower = Object.entries(RHYTHM_LABELS).filter(([d]) => Number(d) > crew.rhythmDays).slice(0, 3);
     return (
       <CrewShell>
         <div className="flex min-h-[70vh] flex-col justify-center py-6">
@@ -273,9 +279,31 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 />
               </label>
             )}
+            {askPace && (
+              <fieldset className="mt-4 border-0 p-0">
+                <legend className="text-[15px] font-semibold text-fm-ink">How often for you?</legend>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[["", `${rhythmLabel(crew.rhythmDays)}, with the crew`] as const, ...slower].map(([d, l]) => (
+                    <button
+                      key={d || "crew"}
+                      type="button"
+                      aria-pressed={joinPace === d}
+                      onClick={() => setJoinPace(d)}
+                      className={`min-h-11 rounded-full px-4 text-sm font-semibold ${joinPace === d ? "bg-fm-ink text-fm-canvas" : "border border-fm-line text-fm-ink"}`}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                </div>
+                <p className="mb-0 mt-2 text-xs text-fm-muted">Leaf only asks you on your pace. Change it any time in settings.</p>
+              </fieldset>
+            )}
             <div className={`mt-4 grid gap-2 ${declined ? "grid-cols-1" : "grid-cols-2"}`}>
               <Button
-                onClick={() => act("join", () => run("respondToCrewInvite", auth, { accept: true, sms: true, phone: me.phoneLast4 ? null : smsPhone || null }))}
+                onClick={() => act("join", async () => {
+                  await run("respondToCrewInvite", auth, { accept: true, sms: true, phone: me.phoneLast4 ? null : smsPhone || null });
+                  if (askPace) await run("setCrewPace", auth, { weeks: joinPace ? Number(joinPace) / 7 : null }).catch(() => {});
+                })}
                 disabled={busy !== null || (!me.phoneLast4 && smsPhone.replace(/\D/g, "").length < 10)}
               >
                 {busy === "join" ? "Joining…" : "Join"}
