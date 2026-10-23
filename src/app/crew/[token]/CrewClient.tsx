@@ -30,6 +30,7 @@ import CrewAddOnCard from "@/components/crew/CrewAddOnCard";
 import FixedPlacePicker from "@/components/crew/FixedPlacePicker";
 import ShareFromInstagramHint from "@/components/crew/ShareFromInstagramHint";
 import WatchingStrip from "@/components/crew/WatchingStrip";
+import { DiscoverRow, HappeningsCards } from "@/components/crew/BookRows";
 import SecondStop from "@/components/crew/SecondStop";
 import { AddPhotos, CrewPhotosSection, PhotoStrip } from "@/components/crew/CrewPhotos";
 import PlacePhoto from "@/components/crew/PlacePhoto";
@@ -79,7 +80,11 @@ function splitName(name: string): [string, string | undefined] {
 
 function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; reload: () => Promise<void> }) {
   const embedded = useCrewEmbedded();
-  const { crew, me, members, names, open, past, book } = data;
+  const { crew, me, members, names, open, past } = data;
+  // The book's rows (newer servers): Places in the carousel, Happenings and
+  // Discover under it. Older ones send one list.
+  const book = data.bookPlaces ?? data.book;
+  const happenings = data.bookHappenings ?? [];
   // Daytime crews (coffee, brunch) aren't "nights": go by the latest round's
   // time, else when the crew usually meets (what members said, or its name).
   const ev = crewIsEvening(data);
@@ -600,10 +605,10 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                   <Plus size={16} strokeWidth={2.2} aria-hidden /> Add<span className="hidden lg:inline"> a place</span>
                 </Link>
               </div>
-              {(data.watching?.length ?? 0) > 0 && (
+              {!data.bookHappenings && (data.watching?.length ?? 0) > 0 && (
                 <WatchingStrip items={data.watching!} auth={auth} isOwner={me.isOwner} onChange={reload} />
               )}
-              {book.length === 0 ? (
+              {book.length === 0 && happenings.length === 0 ? (
                 <div className="flex flex-col items-start gap-4 rounded-[28px] border border-dashed border-fm-line p-6 lg:flex-row lg:items-center lg:justify-between lg:p-8">
                   <p className="m-0 max-w-[44ch] text-[15px] leading-relaxed text-fm-ink-2 lg:text-base">
                     No places yet. Add a few you&rsquo;ve been wanting to try and Leaf will plan {nights} around them. Or have Leaf watch for a game, a show or a tour.
@@ -619,7 +624,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     )}
                   </div>
                 </div>
-              ) : (
+              ) : book.length > 0 && (
                 <ul className="no-scrollbar -mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 scroll-pl-5 lg:mx-0 lg:grid lg:grid-cols-4 lg:gap-4 lg:overflow-visible lg:px-0">
                   {book.map((s) => (
                     <li key={s.spotId} className="flex w-[148px] shrink-0 snap-start flex-col gap-2 lg:w-auto lg:gap-2.5 lg:[&:nth-child(n+5)]:hidden">
@@ -659,6 +664,10 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 <Link href={crewHref(auth, "book")} className="hidden w-fit text-sm font-semibold text-fm-ink-2 underline underline-offset-4 hover:text-fm-ink lg:inline">
                   See all {data.bookTotal} places
                 </Link>
+              )}
+              <HappeningsCards items={happenings.slice(0, 3)} total={data.bookHappeningsTotal ?? happenings.length} auth={auth} />
+              {(data.discover?.length ?? 0) > 0 && (
+                <DiscoverRow items={data.discover!} auth={auth} canAdd={me.status === "in"} onAdded={reload} compact />
               )}
               {me.status === "in" && (
                 <ShareFromInstagramHint crewName={crew.name} inApp={inApp} auth={auth} hiddenTips={me.hiddenTips} />

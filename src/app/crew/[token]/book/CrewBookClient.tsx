@@ -3,9 +3,11 @@
 /**
  * The Crew Book — /crew/[token]/book
  *
- * Two lists. The crew's shared book (everyone sees it: who added each place,
- * upvotes, tried), and "Your saves" (only you see it) with a one-tap Add.
- * Nothing moves from your saves into the book unless you tap.
+ * The crew's shared book in rows: Discover (one-tap ideas: members' saves,
+ * places like the book's, popular nearby), Happenings (shared plans, events,
+ * movies, and events the crew watches for) and Places (who added each,
+ * upvotes, tried). Beside it, "Your saves" (only you see it) with a one-tap
+ * Add, and "Find places".
  *
  * Phone: one column, the book as rows. Desktop (lg+): the book as a 3-column
  * card grid with your saves in a sidebar.
@@ -18,9 +20,10 @@ import VenueSearch from "@/components/VenueSearch";
 import PlacePhoto from "@/components/crew/PlacePhoto";
 import ShareFromInstagramHint from "@/components/crew/ShareFromInstagramHint";
 import WatchingStrip from "@/components/crew/WatchingStrip";
+import { DiscoverRow } from "@/components/crew/BookRows";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
 import { Button, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Spinner, useInApp } from "@/components/crew/CrewShell";
-import { spotHref, crewHref, run, toDate, type BookSpot, type CrewAuth, type SavedPlace, type WatchItem } from "@/lib/crew";
+import { spotHref, crewHref, run, toDate, type BookSpot, type CrewAuth, type DiscoverItem, type SavedPlace, type WatchItem } from "@/lib/crew";
 
 /** A real place from Google Places (server: crew-places.js). */
 type Suggested = {
@@ -29,7 +32,11 @@ type Suggested = {
   /** Why it fits the ask (from the prompt search), or the place's own line. */
   blurb?: string | null;
 };
-type Book = { crew: { id: string; name: string }; shared: BookSpot[]; mine: SavedPlace[]; popular?: Suggested[]; watching?: WatchItem[] };
+type Book = {
+  crew: { id: string; name: string }; shared: BookSpot[]; mine: SavedPlace[]; popular?: Suggested[]; watching?: WatchItem[];
+  /** The book in rows (newer servers): Places, Happenings, and Discover. */
+  places?: BookSpot[]; happenings?: BookSpot[]; discover?: DiscoverItem[];
+};
 
 export default function CrewBookClient({ token }: { token: string }) {
   const load = useCrewAuth(token);
@@ -109,7 +116,10 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
   };
 
   if (!book) return <Spinner label="Opening the book…" />;
-  const shared = [...book.shared].sort((a, b) => (sort === "wanted" ? b.upvotes - a.upvotes : 0));
+  // Rows when the server sends them: Places on their own, Happenings above.
+  const rows = Boolean(book.places);
+  const shared = [...(rows ? book.places! : book.shared)].sort((a, b) => (sort === "wanted" ? b.upvotes - a.upvotes : 0));
+  const happenings = (book.happenings || []).filter((h) => h.kind !== "watch");
   // The same place saved twice (two bookmarks) shows once.
   const seen = new Set<string>();
   const mine = book.mine.filter((p) => !seen.has(p.locationId) && seen.add(p.locationId));
@@ -207,7 +217,13 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
 
       {error && <p className="mt-4 rounded-2xl bg-[#3A2321] px-4 py-3 text-sm text-fm-danger">{error}</p>}
 
-      {(book.watching?.length ?? 0) > 0 && (
+      {(book.discover?.length ?? 0) > 0 && (
+        <div className="mt-6 lg:mr-[428px]">
+          <DiscoverRow items={book.discover!} auth={auth} canAdd={canAdd} onAdded={refresh} />
+        </div>
+      )}
+
+      {!rows && (book.watching?.length ?? 0) > 0 && (
         <div className="mt-6 lg:mr-[428px]">
           <WatchingStrip items={book.watching!} auth={auth} isOwner={isOwner} onChange={refresh} />
         </div>
@@ -220,9 +236,21 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
       )}
 
       <div className="mt-8 grid grid-cols-1 gap-10 lg:mt-10 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-12">
+        <div className="flex min-w-0 flex-col gap-10">
+        {rows && (happenings.length > 0 || (book.watching?.length ?? 0) > 0) && (
+          <section id="happenings" className="flex min-w-0 scroll-mt-6 flex-col gap-3">
+            <Eyebrow>Happenings · {happenings.length + (book.watching?.length ?? 0)}</Eyebrow>
+            {(book.watching?.length ?? 0) > 0 && <WatchingStrip items={book.watching!} auth={auth} isOwner={isOwner} onChange={refresh} />}
+            {happenings.length > 0 && (
+              <ul className="divide-y divide-fm-line-dim lg:grid lg:grid-cols-3 lg:gap-4 lg:divide-y-0">
+                {happenings.map((s) => <SpotItem key={s.spotId} s={s} busy={busy} act={act} auth={auth} isOwner={isOwner} />)}
+              </ul>
+            )}
+          </section>
+        )}
         <section className="min-w-0">
           <div className="mb-2 flex items-center justify-between lg:mb-5">
-            <Eyebrow>In the book · {shared.length}</Eyebrow>
+            <Eyebrow>{rows ? "Places" : "In the book"} · {shared.length}</Eyebrow>
             <div role="group" aria-label="Sort" className="flex rounded-full border border-fm-line-dim bg-fm-surface p-[3px]">
               {([["wanted", "Most wanted"], ["new", "New"]] as const).map(([key, label]) => (
                 <button
@@ -239,9 +267,9 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
           </div>
           {shared.length === 0 ? (
             <div className="flex flex-col items-center gap-3 rounded-[28px] border border-dashed border-fm-line px-6 py-12 text-center lg:min-h-[320px] lg:justify-center">
-              <p className="m-0 font-fm-serif text-[28px] leading-tight lg:text-[32px]">Empty so far.</p>
+              <p className="m-0 font-fm-serif text-[28px] leading-tight lg:text-[32px]">{rows && happenings.length ? "No places yet." : "Empty so far."}</p>
               <p className="m-0 max-w-[36ch] text-[15px] leading-relaxed text-fm-ink-2">
-                {canAdd ? "Search for a place, or add one from your saves. Leaf plans nights from here first." : "Join the crew to add places."}
+                {canAdd ? `Search for a place, add one from your saves${book.discover?.length ? ", or tap + on one above" : ""}. Leaf plans nights from here first.` : "Join the crew to add places."}
               </p>
             </div>
           ) : (
@@ -250,6 +278,7 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
             </ul>
           )}
         </section>
+        </div>
 
         {/* On desktop the saves stick beside the book and scroll inside their own panel, however many there are. */}
         <aside className="min-w-0 rounded-[28px] border border-fm-line-dim bg-fm-surface px-5 pb-2 pt-5 lg:sticky lg:top-6 lg:max-h-[calc(100vh-48px)] lg:overflow-y-auto lg:px-6 lg:pt-6">
@@ -308,7 +337,7 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
             ) : <p className="mt-2 text-[15px] text-fm-ink-2">{findNote || "Nothing matched. Try different words."}</p>)}
           </div>
 
-          {(book.popular?.length ?? 0) > 0 && (
+          {!book.discover && (book.popular?.length ?? 0) > 0 && (
             <>
               <div className="mt-4 flex items-center justify-between border-t border-fm-line-dim pt-5">
                 <h2 className="m-0 font-fm-serif text-[28px] font-normal lg:text-[30px]">Popular nearby</h2>

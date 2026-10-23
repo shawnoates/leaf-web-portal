@@ -130,6 +130,35 @@ export type BookSpot = {
   eventKind?: "movie" | "event" | null;
   /** A plan someone shared into the book: its own title, description, video, cover and link. */
   plan?: { title: string | null; description: string | null; videoUrl: string | null; imageUrl: string | null; sourceUrl: string | null } | null;
+  /** Which row it belongs in: Places ("place") or Happenings (the rest). */
+  kind?: BookKind;
+  /** The shared import it came from: one object for every crew and calendar it went to. */
+  importedEventId?: string | null;
+  /** A watched event (kind "watch"): what Leaf looks for, and the next date it found. */
+  query?: string | null;
+  next?: WatchItem["next"];
+  addedAt?: string | { iso: string } | null;
+};
+
+export type BookKind = "place" | "plan" | "event" | "movie" | "watch";
+
+/** One-tap ideas for the book (server: discoverForCrew). */
+export type DiscoverItem = {
+  placeId: string | null;
+  /** A Leaf place (a member's save); null for one only Google knows yet. */
+  locationId?: string | null;
+  name: string;
+  address: string | null;
+  shortAddress: string | null;
+  category: string | null;
+  photo?: string | null;
+  lat: number | null;
+  lng: number | null;
+  /** Why it's here: a member saved it, it's like a place in the book, or it's popular nearby. */
+  why: "saved" | "like" | "popular";
+  reason: string;
+  isNew?: boolean;
+  rating?: number | null;
 };
 
 export type SavedPlace = {
@@ -190,6 +219,11 @@ export type CrewPage = {
   past: { cycleId: string; venue: Venue | null; startsAt: string | { iso: string } | null; headcount: number; planId: string | null }[];
   /** The newest few in the book (the crew page's row). */
   book: BookSpot[];
+  /** The book's rows for the crew page: Places, Happenings, and Discover (one tap adds). */
+  bookPlaces?: BookSpot[];
+  bookHappenings?: BookSpot[];
+  bookHappeningsTotal?: number;
+  discover?: DiscoverItem[];
   /** How many places the whole book holds. */
   bookTotal?: number;
   /** Crew Pulse: rings, score and stats from the last 90 days (null if it couldn't be worked out). */
