@@ -935,11 +935,11 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             role="dialog"
             aria-modal="true"
             aria-label="Your settings"
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-fm-line bg-fm-surface px-5 pb-5 pt-4 sm:rounded-3xl"
+            className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-fm-line bg-fm-surface sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Stays put while the settings scroll. */}
-            <div className="sticky top-0 z-10 -mx-5 -mt-4 flex items-start justify-between gap-3 border-b border-fm-line-dim bg-fm-surface px-5 pb-3 pt-4">
+            {/* Stays put while the settings scroll: only the body below scrolls (a sticky header left a gap on iOS that content showed through). */}
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-fm-line-dim px-5 pb-3 pt-4">
               <div>
                 <div className="text-lg font-semibold">Your settings</div>
                 <div className="text-[13px] text-fm-muted">{crew.name} · only you see these</div>
@@ -947,6 +947,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <button type="button" aria-label="Close" className="-mr-1.5 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-fm-card text-fm-ink hover:bg-fm-line" onClick={() => setSettingsOpen(false)}><X size={20} strokeWidth={2.2} aria-hidden /></button>
             </div>
 
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5">
             <div className="mt-2 divide-y divide-fm-line-dim">
               {me.status === "in" && (
                 <div className="py-4">
@@ -1138,6 +1139,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 )}
               </div>
               {confirmLeave && <p className="mb-0 mt-1 text-xs text-fm-muted">Leaf will stop texting you about this crew.</p>}
+            </div>
             </div>
           </div>
         </div>
