@@ -30,6 +30,7 @@ import CrewAddOnCard from "@/components/crew/CrewAddOnCard";
 import FixedPlacePicker from "@/components/crew/FixedPlacePicker";
 import ShareFromInstagramHint from "@/components/crew/ShareFromInstagramHint";
 import WatchingStrip from "@/components/crew/WatchingStrip";
+import SecondStop from "@/components/crew/SecondStop";
 import { AddPhotos, CrewPhotosSection, PhotoStrip } from "@/components/crew/CrewPhotos";
 import PlacePhoto from "@/components/crew/PlacePhoto";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
@@ -1457,6 +1458,10 @@ function CycleCard({
             )
           )}
         </>
+      )}
+      {/* A stop after the night's place: suggestions to upvote, the host adds one. */}
+      {["polling", "locked", "booked"].includes(c.state) && c.venueLocationId && !c.venue?.custom && (
+        <SecondStop auth={auth} cycleId={c.cycleId} inApp={inApp} />
       )}
       {["polling", "locked", "booked"].includes(c.state) && (c.isHost || isOwner) && (!c.venue?.fixed || c.venue?.custom) && (
         <ChangePlace cycle={c} auth={auth} busy={busy} onAct={onAct} />
