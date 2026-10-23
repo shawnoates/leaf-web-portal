@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Check, ChevronLeft, ChevronUp, Eye, Lock, Plus, Search, Sun } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronUp, Eye, Link2, Lock, Plus, Search, Sun } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
 import PlacePhoto from "@/components/crew/PlacePhoto";
 import ShareFromInstagramHint from "@/components/crew/ShareFromInstagramHint";
@@ -82,6 +82,8 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
     if (q.has("watch")) { setWatchFirst(true); setAddingEvent(true); }
   }, []);
   const [busy, setBusy] = useState<string | null>(null);
+  // A pasted link being imported on the server: lands in the book in a minute.
+  const [linkNote, setLinkNote] = useState("");
   const [error, setError] = useState("");
   // "What are you in the mood for?" — real places for a vibe (searchCrewPlaces).
   const [vibe, setVibe] = useState("");
@@ -114,6 +116,20 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
     setError("");
     try { await fn(); await refresh(); } catch (e) { setError(e instanceof Error ? e.message : "Something went wrong."); } finally { setBusy(null); }
   };
+
+  // Paste a link (a post, an event page): the server reads it and files it in
+  // the book — Places with a venue, Happenings without. It takes a minute, so
+  // the book refreshes a couple of times while it lands.
+  const addLink = (url: string) => act("link", async () => {
+    const full = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    const r = await run<{ started: boolean; crewName?: string }>("importLinkToCrew", auth, { url: full });
+    setQuery("");
+    if (r.started) {
+      setLinkNote(`Adding ${linkHost(url)}… it'll be in the book in a minute.`);
+      for (const ms of [25000, 60000]) setTimeout(() => { refresh().catch(() => {}); }, ms);
+      setTimeout(() => setLinkNote(""), 60000);
+    }
+  });
 
   if (!book) return <Spinner label="Opening the book…" />;
   // Rows when the server sends them: Places on their own, Happenings above.
@@ -173,8 +189,24 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
                 className="h-14 w-full rounded-full border pl-12 pr-5 text-[15px] outline-none"
                 autoFocus={focusSearch}
                 key={focusSearch ? "focus" : "plain"}
-                // A team, a comedian, a tour: watch for it (BETA).
+                // A pasted link: add the post or page. Otherwise a team, a
+                // comedian, a tour: watch for it (BETA).
                 extraOption={(q) => {
+                  if (isLink(q)) {
+                    return {
+                      first: true,
+                      onSelect: () => void addLink(q),
+                      content: (
+                        <div className="flex items-center gap-3 px-4 py-3">
+                          <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-fm-accent text-fm-canvas"><Link2 size={18} strokeWidth={2.2} /></span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold">Add this link to the book</span>
+                            <span className="block truncate text-xs text-fm-muted">{linkHost(q)} · Leaf reads it and finds the place or plan</span>
+                          </span>
+                        </div>
+                      ),
+                    };
+                  }
                   const next = eventLookup?.q === q ? eventLookup.matches[0] : undefined;
                   return {
                     first: Boolean(next) || looksLikeEvent(q),
@@ -197,7 +229,7 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
               />
             </label>
             <p className="mb-0 ml-5 mt-2 text-xs text-fm-muted">
-              Goes into the book and your own saves.{" "}
+              Goes into the book and your own saves. Paste a link to add a post or an event page.{" "}
               {!addingEvent && <button type="button" className="font-semibold text-fm-ink-2 underline" onClick={() => setAddingEvent(true)}>Add an event</button>}
             </p>
             {addingEvent && (
@@ -215,6 +247,7 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
         )}
       </div>
 
+      {linkNote && <p role="status" className="mt-4 rounded-2xl bg-fm-surface px-4 py-3 text-sm text-fm-ink-2">{linkNote}</p>}
       {error && <p className="mt-4 rounded-2xl bg-[#3A2321] px-4 py-3 text-sm text-fm-danger">{error}</p>}
 
       {(book.discover?.length ?? 0) > 0 && (
@@ -458,6 +491,20 @@ function windowLabel(start: string, end: string) {
 }
 
 type PickedVenue = { placeId?: string | null; name: string; address?: string | null; lat?: number | null; lng?: number | null };
+
+/** A pasted web link (the search offers "Add this link to the book"). */
+function isLink(q: string) {
+  return /^https?:\/\/\S+\.\S+$/i.test(q) || /^(www\.)?(instagram|tiktok|eventbrite|lu\.ma|luma|yelp|ticketmaster|seatgeek|fandango)\.\S+\/\S*$/i.test(q);
+}
+
+/** "instagram.com" from a link, for the row and the note. */
+function linkHost(q: string) {
+  try {
+    return new URL(/^https?:\/\//i.test(q) ? q : `https://${q}`).hostname.replace(/^www\./, "");
+  } catch {
+    return "the link";
+  }
+}
 
 /** Reads like a team, a show or a tour, not a place: the search's Watch for row goes first. */
 function looksLikeEvent(q: string) {
