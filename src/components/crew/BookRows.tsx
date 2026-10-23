@@ -107,7 +107,8 @@ export function DiscoverRow({ items, auth, canAdd, onAdded, compact = false }: {
             <div className="min-w-0">
               <div className="truncate text-[15px] font-semibold text-fm-ink-2">{d.name}</div>
               <div className="truncate text-[12px] text-fm-muted">{[d.category, d.shortAddress].filter(Boolean).join(" · ")}</div>
-              <div className={`truncate text-[12px] ${d.why === "saved" ? "text-fm-accent" : "text-fm-ink-2"}`}>{d.reason}</div>
+              {/* Discover is what's not in the book yet: no "Saved by …" (it reads like the book). */}
+              {d.why !== "saved" && d.reason && <div className="truncate text-[12px] text-fm-ink-2">{d.reason}</div>}
             </div>
           </li>
         ))}

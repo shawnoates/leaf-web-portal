@@ -274,8 +274,8 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
             <Eyebrow>Happenings · {happenings.length + (book.watching?.length ?? 0)}</Eyebrow>
             {(book.watching?.length ?? 0) > 0 && <WatchingStrip items={book.watching!} auth={auth} isOwner={isOwner} onChange={refresh} />}
             {happenings.length > 0 && (
-              <ul className="divide-y divide-fm-line-dim lg:grid lg:grid-cols-3 lg:gap-4 lg:divide-y-0">
-                {happenings.map((s) => <SpotItem key={s.spotId} s={s} busy={busy} act={act} auth={auth} isOwner={isOwner} />)}
+              <ul className="flex flex-col gap-2 lg:grid lg:grid-cols-2">
+                {happenings.map((s) => <HappeningItem key={s.spotId} s={s} busy={busy} act={act} auth={auth} isOwner={isOwner} />)}
               </ul>
             )}
           </section>
@@ -380,6 +380,70 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
         </aside>
       </div>
     </CrewShell>
+  );
+}
+
+/**
+ * A happening (a shared plan, an event, a movie) as a compact row, like the
+ * Watching for cards: picture, what it is, where and when, and its links on
+ * one line. Places keep the bigger SpotItem.
+ */
+function HappeningItem({ s, busy, act, auth, isOwner }: {
+  s: BookSpot; busy: string | null; act: (key: string, fn: () => Promise<unknown>) => Promise<void>; auth: CrewAuth; isOwner: boolean;
+}) {
+  const inApp = useInApp();
+  const title = s.plan?.title || s.eventTitle || s.name;
+  const when = s.eventPassed
+    ? `${s.eventKind === "movie" ? "Movie" : "Event"} passed`
+    : s.eventStart ? windowLabel(s.eventStart, s.eventEnd || s.eventStart) : null;
+  const where = s.needsPlace ? null : s.name !== title ? s.name : s.neighborhood || s.category;
+  const on = s.upvotedByMe;
+  const canRemove = s.addedByMe || isOwner;
+  const link = "underline underline-offset-2 hover:text-fm-ink";
+  return (
+    <li className={`flex flex-col gap-2 rounded-2xl border border-fm-line bg-fm-surface p-2.5 pr-3${s.eventPassed ? " opacity-60" : ""}`}>
+      <div className="flex items-center gap-3">
+        <a href={spotHref(s, inApp)} target={inApp ? undefined : "_blank"} rel="noreferrer" className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-fm-card">
+          <PlacePhoto
+            src={s.photo || s.plan?.imageUrl}
+            locationId={s.locationId}
+            fallback={<span aria-hidden className="absolute inset-0 flex items-center justify-center font-fm-serif text-[22px] text-fm-knob">{title.charAt(0)}</span>}
+          />
+        </a>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[15px] font-semibold">{title}</div>
+          <div className="truncate text-[13px] text-fm-muted">
+            {[where, when, !when && s.plan ? "Shared plan" : null].filter(Boolean).join(" · ")}
+          </div>
+          {(s.plan?.videoUrl || s.plan?.sourceUrl || canRemove) && (
+            <div className="mt-0.5 flex gap-3 text-xs text-fm-muted">
+              {s.plan?.videoUrl && <a href={s.plan.videoUrl} target="_blank" rel="noreferrer" className={link}>Video</a>}
+              {s.plan?.sourceUrl && <a href={s.plan.sourceUrl} target="_blank" rel="noreferrer" className={link}>Post</a>}
+              {canRemove && (
+                <button type="button" className="hover:text-fm-danger" disabled={busy !== null}
+                  onClick={() => act(`rm-${s.spotId}`, () => run("removeFromCrewBook", auth, { spotId: s.spotId }))}>
+                  Remove
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          aria-pressed={on}
+          aria-label={`Want to go to ${title}, ${s.upvotes} ${s.upvotes === 1 ? "vote" : "votes"}`}
+          disabled={busy !== null}
+          onClick={() => act(s.spotId, () => run("toggleCrewSpotUpvote", auth, { spotId: s.spotId }))}
+          className={`flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-[14px] border transition disabled:opacity-60 ${
+            on ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink hover:border-fm-ink-2"
+          }`}
+        >
+          <ChevronUp size={14} strokeWidth={2.4} aria-hidden />
+          <span className={`text-xs leading-none ${on ? "font-bold" : "font-semibold"}`}>{s.upvotes}</span>
+        </button>
+      </div>
+      {s.needsPlace && <PlaceForPlan s={s} act={act} auth={auth} />}
+    </li>
   );
 }
 
