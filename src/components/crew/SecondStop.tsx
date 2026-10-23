@@ -16,7 +16,7 @@ type Suggestion = {
   key: string; name: string; address: string | null; kind: string; kindLabel: string; walkMin: number;
   fromBook: boolean; votes: number; myVote: boolean; locationId: string | null; placeId: string | null;
 };
-type Added = { locationId: string; name: string; address: string | null; kindLabel: string | null; walkMin: number; addedByName: string | null };
+type Added = { locationId: string; name: string; address: string | null; kindLabel: string | null; walkMin: number | null; addedByName: string | null };
 type Stops = { canAdd: boolean; hostName?: string | null; venueName?: string | null; added: Added | null; suggestions: Suggestion[] };
 
 function placeHref(p: { locationId: string | null; placeId?: string | null; name: string; address: string | null }, inApp: boolean) {
@@ -106,7 +106,7 @@ export default function SecondStop({ auth, cycleId, inApp, onChanged }: { auth: 
             </a>
           </div>
           <p className="m-0 text-sm text-fm-muted">
-            {[added.kindLabel ? `${added.kindLabel} after` : null, `${added.walkMin} min walk`, added.addedByName ? `added by ${added.addedByName}` : null].filter(Boolean).join(" · ")}
+            {[added.kindLabel ? `${added.kindLabel} after` : null, added.walkMin ? `${added.walkMin} min walk` : null, added.addedByName ? `added by ${added.addedByName}` : "in the plan"].filter(Boolean).join(" · ")}
           </p>
           <div className="flex flex-wrap items-center gap-4">
             {suggestions.length > 0 && (
