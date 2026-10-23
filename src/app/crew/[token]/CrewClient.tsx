@@ -1213,7 +1213,7 @@ function CycleCard({
             {settled && c.chosenOption
               ? [chosen?.dow, timeLabel(c.chosenOption.time), c.venue?.address].filter(Boolean).join(" · ")
               : c.venue?.address && placeHref
-                ? <a href={placeHref} target={inApp ? undefined : "_blank"} rel="noreferrer" className="underline decoration-fm-line underline-offset-4 hover:decoration-fm-ink-2">{c.venue.address}</a>
+                ? <a href={placeHref} target={inApp ? undefined : "_blank"} rel="noreferrer" className="hover:underline underline-offset-4">{c.venue.address}</a>
                 : c.venue?.address || cycleStatusLine(c, names)}
           </p>
           {settled && c.chosenOption && c.showtimes?.[c.chosenOption.date]?.bookingUrl && (
