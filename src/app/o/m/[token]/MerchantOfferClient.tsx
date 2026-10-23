@@ -1135,16 +1135,18 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               <Field label="How many can you seat together?" hint="We never bill for more RSVPs than this.">
                 <input value={capacity} onChange={(e) => setCapacity(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className={input} />
               </Field>
-              <span className="-mb-1 block text-[14px] font-medium text-stone-700">Who welcomes the group?</span>
             </>
           )}
-          <div className="flex gap-2">
-            <Choice on={merchantHosts === true} onClick={() => setMerchantHosts(true)}>
-              We will
-            </Choice>
-            <Choice on={merchantHosts === false} onClick={() => setMerchantHosts(false)}>
-              {`Hosted night${hostFee ? ` \u00b7 ${hostFee}` : ""}`}
-            </Choice>
+          <div>
+            {perRsvp && <span className="mb-2 block text-[14px] font-medium text-stone-700">Who welcomes the group?</span>}
+            <div className="flex gap-2">
+              <Choice on={merchantHosts === true} onClick={() => setMerchantHosts(true)}>
+                We will
+              </Choice>
+              <Choice on={merchantHosts === false} onClick={() => setMerchantHosts(false)}>
+                {`Hosted night${hostFee ? ` \u00b7 ${hostFee}` : ""}`}
+              </Choice>
+            </div>
           </div>
           {merchantHosts === true && (
             <div className="rounded-2xl bg-leaf-50 p-4">
