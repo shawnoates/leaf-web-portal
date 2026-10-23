@@ -78,11 +78,13 @@ export function DiscoverRow({ items, auth, canAdd, onAdded, compact = false }: {
       </div>
       <ul className="no-scrollbar -mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 scroll-pl-5 lg:mx-0 lg:px-0">
         {shown.map((d) => (
-          <li key={keyOf(d)} className={`relative flex shrink-0 snap-start flex-col gap-2 ${compact ? "w-[140px]" : "w-[160px]"}`}>
-            <div className={`relative overflow-hidden rounded-[20px] border border-fm-line bg-fm-card ${compact ? "h-[110px]" : "h-[130px]"}`}>
+          <li key={keyOf(d)} className={`group relative flex shrink-0 snap-start flex-col gap-2 ${compact ? "w-[140px]" : "w-[160px]"}`}>
+            {/* Dimmed, with a dashed edge: ideas, not places already in the book. */}
+            <div className={`relative overflow-hidden rounded-[20px] border border-dashed border-fm-line bg-fm-card ${compact ? "h-[110px]" : "h-[130px]"}`}>
               <PlacePhoto
                 src={d.photo}
                 locationId={d.locationId}
+                className="h-full w-full object-cover opacity-50 saturate-50 transition group-hover:opacity-80 group-hover:saturate-100"
                 fallback={
                   <span aria-hidden className="absolute inset-0 flex flex-col justify-end p-3">
                     <span className="font-fm-serif text-[40px] leading-[0.8] text-fm-line">{d.name.charAt(0)}</span>
@@ -103,7 +105,7 @@ export function DiscoverRow({ items, auth, canAdd, onAdded, compact = false }: {
               )}
             </div>
             <div className="min-w-0">
-              <div className="truncate text-[15px] font-semibold">{d.name}</div>
+              <div className="truncate text-[15px] font-semibold text-fm-ink-2">{d.name}</div>
               <div className="truncate text-[12px] text-fm-muted">{[d.category, d.shortAddress].filter(Boolean).join(" · ")}</div>
               <div className={`truncate text-[12px] ${d.why === "saved" ? "text-fm-accent" : "text-fm-ink-2"}`}>{d.reason}</div>
             </div>
