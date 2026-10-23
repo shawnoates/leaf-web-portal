@@ -6,16 +6,16 @@
  * The crew's shared book in rows: Discover (one-tap ideas: members' saves,
  * places like the book's, popular nearby), Happenings (shared plans, events,
  * movies, and events the crew watches for) and Places (who added each,
- * upvotes, tried). Beside it, "Your saves" (only you see it) with a one-tap
- * Add, and "Find places".
+ * upvotes, tried). Beside it, "Find places". Members' own saves come up in
+ * Discover, so there's no separate saves list.
  *
  * Phone: one column, the book as rows. Desktop (lg+): the book as a 3-column
- * card grid with your saves in a sidebar.
+ * card grid with Find places in a sidebar.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Check, ChevronLeft, ChevronUp, Eye, Link2, Lock, Plus, Search, Sun } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronUp, Eye, Link2, Plus, Search, Sun } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
 import PlacePhoto from "@/components/crew/PlacePhoto";
 import ShareFromInstagramHint from "@/components/crew/ShareFromInstagramHint";
@@ -93,7 +93,6 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
   // both used to read as "Nothing matched", which hid the real cause.
   const [findNote, setFindNote] = useState("");
   const [finding, setFinding] = useState(false);
-  const [showAllSaves, setShowAllSaves] = useState(false);
   const inApp = useInApp();
   const findPlaces = async () => {
     if (vibe.trim().length < 3) return;
@@ -135,9 +134,6 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
   const rows = Boolean(book.places);
   const shared = [...(rows ? book.places! : book.shared)].sort((a, b) => (sort === "wanted" ? b.upvotes - a.upvotes : 0));
   const happenings = (book.happenings || []).filter((h) => h.kind !== "watch");
-  // The same place saved twice (two bookmarks) shows once.
-  const seen = new Set<string>();
-  const mine = book.mine.filter((p) => !seen.has(p.locationId) && seen.add(p.locationId));
 
   const suggestionRow = (p: Suggested) => (
     <li key={p.placeId} className="flex items-center gap-3 py-3.5">
@@ -176,7 +172,7 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
           <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">Places the crew wants to go. Leaf plans nights from here first.</p>
         </div>
         {canAdd && (
-          <div className="lg:mr-[428px]" /* same width as the book column: page minus the 380px saves panel + 48px gap */>
+          <div className="lg:mr-[428px]" /* same width as the book column: page minus the 380px side panel + 48px gap */>
             <label className="relative block">
               <span className="sr-only">Add a place</span>
               <Search size={18} aria-hidden className="pointer-events-none absolute left-[18px] top-1/2 z-10 -translate-y-1/2 text-fm-muted" />
@@ -228,7 +224,7 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
               />
             </label>
             <p className="mb-0 ml-5 mt-2 text-xs text-fm-muted">
-              Goes into the book and your own saves. Paste a link to add a post or an event page.{" "}
+              Goes into the book. Paste a link to add a post or an event page.{" "}
               {!addingEvent && <button type="button" className="font-semibold text-fm-ink-2 underline" onClick={() => setAddingEvent(true)}>Add an event</button>}
             </p>
             {addingEvent && (
@@ -312,47 +308,9 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
         </section>
         </div>
 
-        {/* On desktop the saves stick beside the book and scroll inside their own panel, however many there are. */}
+        {/* Find places: on desktop it sticks beside the book in its own panel. */}
         <aside className="min-w-0 rounded-[28px] border border-fm-line-dim bg-fm-surface px-5 pb-2 pt-5 lg:sticky lg:top-6 lg:max-h-[calc(100vh-48px)] lg:overflow-y-auto lg:px-6 lg:pt-6">
-          <div className="flex items-center justify-between">
-            <h2 className="m-0 font-fm-serif text-[28px] font-normal lg:text-[30px]">Your saves</h2>
-            <span className="flex items-center gap-1.5 text-xs text-fm-muted"><Lock size={13} aria-hidden /> Only you see this</span>
-          </div>
-          {mine.length === 0 ? (
-            <p className="mb-4 mt-2 text-[15px] text-fm-ink-2">Nothing saved yet. Places you save on Leaf show up here, ready to add in one tap.</p>
-          ) : (
-            <ul className="divide-y divide-fm-line-dim">
-              {(showAllSaves ? mine : mine.slice(0, 8)).map((p) => (
-                <li key={p.bookmarkId} className="flex items-center gap-3 py-3.5">
-                  <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-fm-line bg-fm-card">
-                    <PlacePhoto
-                      src={p.photo}
-                      locationId={p.locationId}
-                      fallback={<span aria-hidden className="absolute inset-0 flex items-center justify-center font-fm-serif text-[22px] text-fm-knob">{p.name.charAt(0)}</span>}
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-base font-semibold lg:text-[15px]">{p.name}</div>
-                    <div className="truncate text-[13px] text-fm-muted">{[p.neighborhood, p.category].filter(Boolean).join(" · ")}</div>
-                  </div>
-                  {p.inBook ? (
-                    <span className="flex shrink-0 items-center gap-1.5 text-[13px] text-fm-ink-2"><Check size={14} strokeWidth={2.4} aria-hidden /> In the book</span>
-                  ) : (
-                    <Button small disabled={busy !== null || !canAdd} onClick={() => act(p.bookmarkId, () => run("addToCrewBook", auth, { bookmarkId: p.bookmarkId }))}>
-                      <Plus size={14} strokeWidth={2.4} aria-hidden /> Add<span className="sr-only"> {p.name} to {crewName}</span>
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-          {mine.length > 8 && (
-            <button className="mb-2 mt-1 text-sm font-medium text-fm-ink underline underline-offset-4" onClick={() => setShowAllSaves(!showAllSaves)}>
-              {showAllSaves ? "Show fewer" : `Show all ${mine.length}`}
-            </button>
-          )}
-
-          <div className="mt-4 border-t border-fm-line-dim pt-5">
+          <div>
             <h2 className="m-0 font-fm-serif text-[28px] font-normal lg:text-[30px]">Find places</h2>
             <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); void findPlaces(); }}>
               <input
