@@ -76,6 +76,8 @@ export type CycleView = {
   waitingForQuorum: boolean;
   /** false when this member sat the cycle out (their own pace); they can still answer from the page */
   invited?: boolean;
+  /** While voting: members who are in but sitting this round out on their own pace, by name. */
+  sittingOut?: string[];
   votes: Record<string, number[]> | null;
   myVotes: number[] | null;
   /** Dates this person looks free for (synced calendar / Leaf plans); pre-selected, never auto-voted. */
@@ -98,6 +100,8 @@ export type Member = {
   name: string;
   avatar: string | null;
   status: "invited" | "in" | "declined" | "left";
+  /** Their own pace when it's slower than the crew's (days), else null. */
+  paceDays?: number | null;
 };
 
 export type BookSpot = {

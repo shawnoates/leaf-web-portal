@@ -51,7 +51,9 @@ import {
 function crewInviteHref(crewId: string, crewName: string, members: Member[], myMembershipId: string) {
   const ids = (status: Member["status"]) => members.filter((m) => m.status === status && m.userId).map((m) => m.userId).join(",");
   const meId = members.find((m) => m.membershipId === myMembershipId)?.userId || "";
-  const q = new URLSearchParams({ in: ids("in"), invited: ids("invited"), declined: ids("declined"), me: meId, name: crewName });
+  // Slower paces, "userId:days", so the picker can say "In crew · every 2 weeks".
+  const pace = members.filter((m) => m.status === "in" && m.userId && m.paceDays).map((m) => `${m.userId}:${m.paceDays}`).join(",");
+  const q = new URLSearchParams({ in: ids("in"), invited: ids("invited"), declined: ids("declined"), me: meId, name: crewName, pace });
   return `leaf://crew-invite/${crewId}?${q.toString()}`;
 }
 
@@ -124,6 +126,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const [joinPace, setJoinPace] = useState("");
   // Invite: the owner picks followers not yet invited; anyone in can share the link.
   const [inviteOpen, setInviteOpen] = useState(false);
+  // Phones have no member list beside the page: the avatars open one.
+  const [membersOpen, setMembersOpen] = useState(false);
   const [invitable, setInvitable] = useState<{ userId: string; name: string; pending?: boolean }[] | null>(null);
   const [invitePicked, setInvitePicked] = useState<Set<string>>(new Set());
   const [inviteNote, setInviteNote] = useState("");
@@ -381,16 +385,16 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 </button>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex lg:hidden">
+            <button type="button" onClick={() => setMembersOpen(true)} aria-label={`See who's in ${crew.name}`} className="flex items-center gap-3 text-left lg:pointer-events-none">
+              <span className="flex lg:hidden">
                 {[...joined, ...invited].slice(0, 5).map((m, i) => (
                   <span key={m.membershipId} className={i ? "-ml-2.5" : ""}>
                     <Avatar name={m.name} src={m.avatar} invited={m.status === "invited"} ring="ring-2 ring-fm-canvas" />
                   </span>
                 ))}
-              </div>
-              <p className="m-0 text-sm text-fm-ink-2 lg:text-[15px]">{summary}</p>
-            </div>
+              </span>
+              <span className="text-sm text-fm-ink-2 underline decoration-fm-line underline-offset-4 lg:text-[15px] lg:no-underline">{summary}</span>
+            </button>
           </div>
 
           {me.isOwner && (
@@ -498,7 +502,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <div className={`grid grid-cols-1 gap-3 lg:gap-4 ${open.length > 1 ? "lg:grid-cols-2" : ""}`}>
                 {open.map((c) => (
                   <div key={c.cycleId} className="flex min-w-0 flex-col gap-3">
-                    <CycleCard key={`${c.cycleId}:${c.options.length}`} cycle={c} names={names} members={members} busy={busy} onAct={act} auth={auth} quorum={crew.quorum} joined={joined.length} calendarSynced={Boolean(me.calendarSynced)} onConnectCalendar={connectCalendar} hostRotation={Boolean(crew.hostRotation)} isOwner={me.isOwner} canSkip={me.isOwner && !crew.oneTime && crew.enabled !== false} crewId={crew.id} />
+                    <CycleCard key={`${c.cycleId}:${c.options.length}`} cycle={c} names={names} members={members} busy={busy} onAct={act} auth={auth} quorum={crew.quorum} joined={joined.length} calendarSynced={Boolean(me.calendarSynced)} onConnectCalendar={connectCalendar} hostRotation={Boolean(crew.hostRotation)} isOwner={me.isOwner} canSkip={me.isOwner && !crew.oneTime && crew.enabled !== false} crewId={crew.id} meName={me.name} />
                     {costs[c.cycleId] && (
                       <CrewMoneyCard kind="cost" split={costs[c.cycleId]!} auth={auth} onChange={(next) => setCosts((m) => ({ ...m, [c.cycleId]: next }))} />
                     )}
@@ -798,6 +802,32 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
           </div>
         </div>
       </div>
+
+      {membersOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-6" onClick={() => setMembersOpen(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Who's in ${crew.name}`}
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-fm-line bg-fm-surface px-5 pb-5 pt-4 sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-lg font-semibold">Who&rsquo;s in</div>
+                <div className="text-[13px] text-fm-muted">{summary}</div>
+              </div>
+              <button type="button" aria-label="Close" className="-mr-1.5 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-fm-card text-fm-ink hover:bg-fm-line" onClick={() => setMembersOpen(false)}><X size={20} strokeWidth={2.2} aria-hidden /></button>
+            </div>
+            <ul className="mt-2">
+              {joined.map((m) => (
+                <MemberRow key={m.membershipId} m={m} note={m.userId === crew.ownerId ? "Started it" : m.membershipId === me.membershipId ? "You" : undefined} />
+              ))}
+              {invited.map((m) => <MemberRow key={m.membershipId} m={m} note="Invited" />)}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {inviteOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-6" onClick={() => setInviteOpen(false)}>
@@ -1135,6 +1165,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
 
 function MemberRow({ m, note }: { m: Member; note?: string }) {
   const inv = m.status === "invited";
+  // A slower pace than the crew's shows next to them: "every 2 weeks".
+  note = [note, m.paceDays ? rhythmLabel(m.paceDays).toLowerCase() : null].filter(Boolean).join(" · ") || undefined;
   return (
     <li className="flex items-center gap-3 border-b border-fm-line-dim py-2.5">
       <Avatar name={m.name} src={m.avatar} invited={inv} />
@@ -1145,9 +1177,11 @@ function MemberRow({ m, note }: { m: Member; note?: string }) {
 }
 
 function CycleCard({
-  cycle: c, names, members, busy, onAct, auth, quorum, joined, calendarSynced, onConnectCalendar, hostRotation = false, isOwner = false, canSkip = false, crewId = "",
+  cycle: c, names, members, busy, onAct, auth, quorum, joined, calendarSynced, onConnectCalendar, hostRotation = false, isOwner = false, canSkip = false, crewId = "", meName = "",
 }: {
   cycle: CycleView;
+  /** This member's name, left out of "… sitting this one out" (they get their own line). */
+  meName?: string;
   names: Record<string, string>;
   members: Member[];
   busy: string | null;
@@ -1289,6 +1323,16 @@ function CycleCard({
       {c.invited === false && (
         <p className="m-0 text-xs text-fm-muted">You&rsquo;re sitting this one out (your pace). Answer here anyway if you want in.</p>
       )}
+      {(() => {
+        // Others off this round on their own pace, so nobody wonders why they haven't voted.
+        const out = [...(c.sittingOut || [])];
+        const mine = c.invited === false && meName ? out.indexOf(meName) : -1;
+        if (mine >= 0) out.splice(mine, 1);
+        if (!out.length) return null;
+        const firsts = out.map((n) => n.split(" ")[0]);
+        const who = firsts.length === 1 ? firsts[0] : `${firsts.slice(0, -1).join(", ")} and ${firsts[firsts.length - 1]}`;
+        return <p className="m-0 text-xs text-fm-muted">{who} {firsts.length === 1 ? "is" : "are"} sitting this one out (their pace).</p>;
+      })()}
 
       {c.state === "picking" && (
         <p className="m-0 text-[15px] text-fm-ink-2">
