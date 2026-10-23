@@ -195,7 +195,7 @@ function OurIdea({ idea, ask, setAsk }: { idea: Suggested; ask: string; setAsk: 
   const [open, setOpen] = useState(Boolean(ask));
   return (
     <div className="rounded-2xl bg-leaf-50 p-4 ring-1 ring-leaf-100">
-      <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">Our idea for your night</p>
+      <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-leaf-600">Our suggested idea</p>
       <p className="mt-1.5 font-fm-serif text-[22px] leading-tight text-stone-900">{idea.title}</p>
       {idea.description && <p className="mt-1 text-[14px] leading-snug text-stone-600">{idea.description}</p>}
       {open ? (
@@ -903,7 +903,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
               ? "We bring neighbors from your neighborhood\u2019s Leaf calendar to you, in your slowest hours. Your first Neighbor Hour is on us."
               : shop
                 ? "An evening in your shop for neighbors who\u2019ve walked past and never come in. Each ticket is theirs to spend with you that night; Leaf keeps $6 of each, and nothing on your first one."
-                : "A short taster of what you teach, for neighbors on your neighborhood\u2019s Leaf calendar. They buy tickets; Leaf keeps $6 a ticket, and nothing on your first one."
+                : "A short taster of what you do, for neighbors on your neighborhood\u2019s Leaf calendar. They buy tickets; Leaf keeps $6 a ticket, and nothing on your first one."
           }
           steps={
             perRsvp
@@ -918,7 +918,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
                   { href: "#days", label: "Your days", done: days.length > 0 },
                   shop
                     ? { href: "#class", label: "About your night", done: nightNotes.trim().length > 0 && nightExtra.trim().length >= 3 }
-                    : { href: "#class", label: "About your class", done: Number(price) > 0 && hasSpace !== null },
+                    : { href: "#class", label: "About your taster", done: Number(price) > 0 && hasSpace !== null },
                   { href: "#place", label: "Who welcomes them", done: merchantHosts !== null },
                   ...(repPay ? [{ href: "#payment", label: "Owner\u2019s payment request", done: cardEmailOk }] : []),
                 ]
@@ -984,7 +984,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
           n={2}
           total={steps}
           id="class"
-          title={shop ? "About your night" : "About your class"}
+          title={shop ? "About your night" : "About your taster"}
           sub={shop ? "What you\u2019d show neighbors and how long it runs. Leaf writes your night from this." : "What the taster is, its price and length, and where. Leaf writes your night from this."}
         >
           {!accepted && suggested && <OurIdea idea={suggested} ask={ideaAsk} setAsk={setIdeaAsk} />}
