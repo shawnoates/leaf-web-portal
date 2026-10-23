@@ -364,7 +364,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   // "Ask for a change" to our suggested night, at sign-up: goes to Leaf with their notes.
   const [ideaAsk, setIdeaAsk] = useState("");
   const [card, setCard] = useState<Card | null>(null);
-  // A rep's walkthrough: who gets the payment request, and the screen once it's sent.
+  // A rep's walkthrough: who gets the link to connect payment, and the screen once it's sent.
   const [cardEmail, setCardEmail] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [useOwn, setUseOwn] = useState(false);
@@ -869,7 +869,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
   // Bars and restaurants: days, about your place, card (+ how to reach you). Ticketed: night, days, welcome (+ reach).
   const steps = 3 + (repPay && !perRsvp ? 1 : 0) + (notices ? 1 : 0);
   const withHost = merchantHosts === false && hostFee ? ` + ${hostFee} host` : "";
-  const cta = accepted ? "Save changes" : repPay ? "Send the payment request" : perRsvp && form.billing?.firstNightFree ? `Hold my free Neighbor Hour${withHost}` : "Count me in";
+  const cta = accepted ? "Save changes" : repPay ? "Send link to connect payment" : perRsvp && form.billing?.firstNightFree ? `Hold my free Neighbor Hour${withHost}` : "Count me in";
   const freeWorth = perRsvp && !accepted && !withHost && form.billing?.firstNightFree ? dollars((form.billing?.rsvpFeeCents ?? 600) * TYPICAL_RSVPS) : null;
 
   return (
@@ -911,7 +911,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
                   { href: "#days", label: "Your slow days", done: days.length > 0 },
                   { href: "#place", label: "About your place", done: merchantHosts !== null && Number(capacity) > 0 },
                   repPay
-                    ? { href: "#payment", label: "Owner\u2019s payment request", done: cardEmailOk }
+                    ? { href: "#payment", label: "Owner connects payment", done: cardEmailOk }
                     : { href: "#card", label: "Hold it with a card", done: card !== null },
                 ]
               : [
@@ -920,26 +920,27 @@ export default function MerchantOfferClient({ token }: { token: string }) {
                     ? { href: "#class", label: "About your night", done: nightNotes.trim().length > 0 && nightExtra.trim().length >= 3 }
                     : { href: "#class", label: "About your taster", done: Number(price) > 0 && hasSpace !== null },
                   { href: "#place", label: "Who welcomes them", done: merchantHosts !== null },
-                  ...(repPay ? [{ href: "#payment", label: "Owner\u2019s payment request", done: cardEmailOk }] : []),
+                  ...(repPay ? [{ href: "#payment", label: "Owner connects payment", done: cardEmailOk }] : []),
                 ]
           }
         />
       )}
 
-      {perRsvp && form.billing && !accepted && form.billing.freeNightState && (
+      {perRsvp && form.billing && (
         <div className="mt-7">
+          <OfferCard form={form} />
+        </div>
+      )}
+
+      {/* The free-night clock sits under the green "how it works" box. */}
+      {perRsvp && form.billing && !accepted && form.billing.freeNightState && (
+        <div className="mt-4">
           <FreeNightCountdown
             deadline={form.billing.freeNightDeadline ?? null}
             state={form.billing.freeNightState}
             feeLabel={dollars(form.billing.rsvpFeeCents)}
             worthLabel={dollars(form.billing.rsvpFeeCents * TYPICAL_RSVPS)}
           />
-        </div>
-      )}
-
-      {perRsvp && form.billing && (
-        <div className="mt-4">
-          <OfferCard form={form} />
         </div>
       )}
       {accepted && form.billing?.cardFailed && (
@@ -1228,7 +1229,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
             n={perRsvp ? 3 : steps - (notices ? 1 : 0)}
             total={steps}
             id="payment"
-            title="Who should we ask for payment info?"
+            title="Who should connect payment?"
             sub={`${perRsvp ? "A card" : "Payout details"} come from the owner or manager, not from you. We email them a link to finish${form.billing?.firstNightFree ? ", and the first Neighbor Hour is free if they do it within 7 days" : ""}.`}
           >
             <Field label="Owner or manager email" hint="The person who can add the payment info. Not sure? Ask them now.">
