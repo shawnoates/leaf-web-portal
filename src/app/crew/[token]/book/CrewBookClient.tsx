@@ -76,6 +76,16 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
   // From the crew page's "+ Add": the search starts focused.
   // From the crew page's empty book: "Watch for an event" opens Add an event on "No, Leaf finds it".
   const [focusSearch, setFocusSearch] = useState(false);
+  // The link icon in the search box: adds a link already on the clipboard,
+  // else turns the box into "Paste a link" and focuses it.
+  const [linkMode, setLinkMode] = useState(false);
+  const pasteLink = async () => {
+    try {
+      const t = (await navigator.clipboard?.readText())?.trim();
+      if (t && isLink(t)) { void addLink(t); return; }
+    } catch { /* no clipboard access: paste by hand */ }
+    setLinkMode(true);
+  };
   const [watchFirst, setWatchFirst] = useState(false);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -123,6 +133,7 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
   const addLink = (url: string) => act("link", async () => {
     const note = await importLink(auth, url, refresh);
     setQuery("");
+    setLinkMode(false);
     if (note) {
       setLinkNote(note);
       setTimeout(() => setLinkNote(""), 60000);
@@ -180,10 +191,10 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
                 value={query}
                 onChange={setQuery}
                 onSelect={(v) => act("search", async () => { await run("addToCrewBook", auth, { placeId: v.placeId, venue: v }); setQuery(""); })}
-                placeholder="Add a place, or something to watch for"
-                className="h-14 w-full rounded-full border pl-12 pr-5 text-[15px] outline-none"
-                autoFocus={focusSearch}
-                key={focusSearch ? "focus" : "plain"}
+                placeholder={linkMode ? "Paste a link: a post or an event page" : "Add a place, or something to watch for"}
+                className="h-14 w-full rounded-full border pl-12 pr-14 text-[15px] outline-none"
+                autoFocus={focusSearch || linkMode}
+                key={`${focusSearch ? "focus" : "plain"}-${linkMode ? "link" : "place"}`}
                 // A pasted link: add the post or page. Otherwise a team, a
                 // comedian, a tour: watch for it (BETA).
                 extraOption={(q) => {
@@ -222,9 +233,18 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
                   };
                 }}
               />
+              <button
+                type="button"
+                onClick={() => void pasteLink()}
+                aria-label="Add a link: a post or an event page"
+                title="Add a link"
+                className={`absolute right-2 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full hover:bg-fm-card ${linkMode ? "text-fm-accent" : "text-fm-muted hover:text-fm-ink"}`}
+              >
+                <Link2 size={19} strokeWidth={2.2} aria-hidden />
+              </button>
             </label>
             <p className="mb-0 ml-5 mt-2 text-xs text-fm-muted">
-              Goes into the book. Paste a link to add a post or an event page.{" "}
+              Goes into the book. Tap the link icon (or paste one) to add a post or an event page.{" "}
               {!addingEvent && <button type="button" className="font-semibold text-fm-ink-2 underline" onClick={() => setAddingEvent(true)}>Add an event</button>}
             </p>
             {addingEvent && (
