@@ -80,10 +80,7 @@ export function DiscoverRow({ items, auth, canAdd, onAdded, compact = false }: {
 
   return (
     <section aria-label="Discover" className="flex flex-col gap-2.5">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="font-fm-mono text-[11px] uppercase tracking-[0.12em] text-fm-muted">Discover</span>
-        <span className="text-xs text-fm-muted">One tap adds it to the book</span>
-      </div>
+      <span className="font-fm-mono text-[11px] uppercase tracking-[0.12em] text-fm-muted">Discover</span>
       <ul className="no-scrollbar -mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 scroll-pl-5 lg:mx-0 lg:px-0">
         {shown.map((d) => (
           <li key={keyOf(d)} className={`group relative flex shrink-0 snap-start flex-col gap-2 ${compact ? "w-[140px]" : "w-[160px]"}`}>
