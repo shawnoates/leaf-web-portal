@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Check, ChevronLeft, ChevronUp, Eye, Link2, Plus, Search, Sun } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronUp, ClipboardPaste, Eye, Link2, Plus, Search, Sun, X } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
 import PlacePhoto from "@/components/crew/PlacePhoto";
 import ShareFromInstagramHint from "@/components/crew/ShareFromInstagramHint";
@@ -76,16 +76,9 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
   // From the crew page's "+ Add": the search starts focused.
   // From the crew page's empty book: "Watch for an event" opens Add an event on "No, Leaf finds it".
   const [focusSearch, setFocusSearch] = useState(false);
-  // The link icon in the search box: adds a link already on the clipboard,
-  // else turns the box into "Paste a link" and focuses it.
-  const [linkMode, setLinkMode] = useState(false);
-  const pasteLink = async () => {
-    try {
-      const t = (await navigator.clipboard?.readText())?.trim();
-      if (t && isLink(t)) { void addLink(t); return; }
-    } catch { /* no clipboard access: paste by hand */ }
-    setLinkMode(true);
-  };
+  // The link icon in the search box opens a sheet to paste a post or event page into.
+  const [linkSheet, setLinkSheet] = useState(false);
+  const [linkText, setLinkText] = useState("");
   const [watchFirst, setWatchFirst] = useState(false);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -133,7 +126,8 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
   const addLink = (url: string) => act("link", async () => {
     const note = await importLink(auth, url, refresh);
     setQuery("");
-    setLinkMode(false);
+    setLinkSheet(false);
+    setLinkText("");
     if (note) {
       setLinkNote(note);
       setTimeout(() => setLinkNote(""), 60000);
@@ -191,10 +185,10 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
                 value={query}
                 onChange={setQuery}
                 onSelect={(v) => act("search", async () => { await run("addToCrewBook", auth, { placeId: v.placeId, venue: v }); setQuery(""); })}
-                placeholder={linkMode ? "Paste a link: a post or an event page" : "Add a place, or something to watch for"}
+                placeholder="Add a place, or something to watch for"
                 className="h-14 w-full rounded-full border pl-12 pr-14 text-[15px] outline-none"
-                autoFocus={focusSearch || linkMode}
-                key={`${focusSearch ? "focus" : "plain"}-${linkMode ? "link" : "place"}`}
+                autoFocus={focusSearch}
+                key={focusSearch ? "focus" : "plain"}
                 // A pasted link: add the post or page. Otherwise a team, a
                 // comedian, a tour: watch for it (BETA).
                 extraOption={(q) => {
@@ -235,16 +229,16 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
               />
               <button
                 type="button"
-                onClick={() => void pasteLink()}
+                onClick={() => setLinkSheet(true)}
                 aria-label="Add a link: a post or an event page"
                 title="Add a link"
-                className={`absolute right-2 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full hover:bg-fm-card ${linkMode ? "text-fm-accent" : "text-fm-muted hover:text-fm-ink"}`}
+                className="absolute right-2 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-fm-muted hover:bg-fm-card hover:text-fm-ink"
               >
                 <Link2 size={19} strokeWidth={2.2} aria-hidden />
               </button>
             </label>
             <p className="mb-0 ml-5 mt-2 text-xs text-fm-muted">
-              Goes into the book. Tap the link icon (or paste one) to add a post or an event page.{" "}
+              Goes into the book. Got a post or an event page? Tap the link icon.{" "}
               {!addingEvent && <button type="button" className="font-semibold text-fm-ink-2 underline" onClick={() => setAddingEvent(true)}>Add an event</button>}
             </p>
             {addingEvent && (
@@ -357,6 +351,55 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
           )}
         </aside>
       </div>
+      {linkSheet && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-6" onClick={() => setLinkSheet(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add a link"
+            className="w-full max-w-md rounded-t-3xl border border-fm-line bg-fm-surface px-5 pb-6 pt-4 sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-lg font-semibold">Add a link</div>
+                <div className="text-[13px] text-fm-muted">A post (Instagram, TikTok) or an event page. Leaf reads it and adds the place or plan.</div>
+              </div>
+              <button type="button" aria-label="Close" className="-mr-1.5 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-fm-card text-fm-ink hover:bg-fm-line" onClick={() => setLinkSheet(false)}><X size={20} strokeWidth={2.2} aria-hidden /></button>
+            </div>
+            <form
+              className="mt-4 flex flex-col gap-3"
+              onSubmit={(e) => { e.preventDefault(); if (isLink(linkText.trim())) void addLink(linkText.trim()); }}
+            >
+              <div className="relative">
+                <Link2 size={18} aria-hidden className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-fm-muted" />
+                <input
+                  autoFocus
+                  type="url"
+                  inputMode="url"
+                  value={linkText}
+                  onChange={(e) => setLinkText(e.target.value)}
+                  placeholder="Paste the link here"
+                  aria-label="Link"
+                  className="h-14 w-full rounded-full border border-fm-line bg-fm-canvas pl-11 pr-24 text-[16px] text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none"
+                />
+                {/* Paste from the clipboard in one tap (iOS asks first). */}
+                <button
+                  type="button"
+                  onClick={async () => { try { const t = await navigator.clipboard?.readText(); if (t) setLinkText(t.trim()); } catch { /* paste by hand */ } }}
+                  className="absolute right-2 top-1/2 flex h-10 -translate-y-1/2 items-center gap-1.5 rounded-full bg-fm-card px-3 text-sm font-semibold text-fm-ink hover:bg-fm-line"
+                >
+                  <ClipboardPaste size={15} aria-hidden /> Paste
+                </button>
+              </div>
+              {linkText.trim() && !isLink(linkText.trim()) && <p className="m-0 px-1 text-xs text-fm-danger">That doesn&rsquo;t look like a link.</p>}
+              <Button disabled={busy !== null || !isLink(linkText.trim())} type="submit">
+                {busy === "link" ? "Adding…" : "Add to the book"}
+              </Button>
+            </form>
+          </div>
+        </div>
+      )}
     </CrewShell>
   );
 }

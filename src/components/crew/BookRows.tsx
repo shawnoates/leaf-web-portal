@@ -49,7 +49,7 @@ export function DiscoverRow({ items, auth, canAdd, onAdded, compact = false }: {
   const [added, setAdded] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const keyOf = (d: DiscoverItem) => d.locationId || d.placeId || d.name;
+  const keyOf = (d: DiscoverItem) => d.locationId || d.placeId || `${d.name}:${d.event?.date || ""}`;
   const shown = items.filter((d) => !added.has(keyOf(d)));
   if (!shown.length) return null;
 
@@ -58,9 +58,17 @@ export function DiscoverRow({ items, auth, canAdd, onAdded, compact = false }: {
     setBusy(key);
     setError("");
     try {
-      await run("addToCrewBook", auth, d.locationId
-        ? { locationId: d.locationId }
-        : { placeId: d.placeId, venue: { placeId: d.placeId, name: d.name, address: d.address, lat: d.lat, lng: d.lng } });
+      if (d.event) {
+        // An event nearby goes in as a dated event at its venue: Leaf polls that date.
+        await run("addCrewEvent", auth, {
+          title: d.name, kind: "event", start: d.event.date,
+          venue: { name: d.event.venueName || d.name, address: d.address, lat: d.lat, lng: d.lng },
+        });
+      } else {
+        await run("addToCrewBook", auth, d.locationId
+          ? { locationId: d.locationId }
+          : { placeId: d.placeId, venue: { placeId: d.placeId, name: d.name, address: d.address, lat: d.lat, lng: d.lng } });
+      }
       setAdded((s) => new Set(s).add(key));
       await onAdded();
     } catch (e) {
@@ -105,8 +113,10 @@ export function DiscoverRow({ items, auth, canAdd, onAdded, compact = false }: {
               )}
             </div>
             <div className="min-w-0">
-              <div className="truncate text-[15px] font-semibold text-fm-ink-2">{d.name}</div>
-              <div className="truncate text-[12px] text-fm-muted">{[d.category, d.shortAddress].filter(Boolean).join(" · ")}</div>
+              {d.event?.url
+                ? <a href={d.event.url} target="_blank" rel="noreferrer" className="block truncate text-[15px] font-semibold text-fm-ink-2 hover:underline">{d.name}</a>
+                : <div className="truncate text-[15px] font-semibold text-fm-ink-2">{d.name}</div>}
+              <div className="truncate text-[12px] text-fm-muted">{d.event ? "Event nearby" : [d.category, d.shortAddress].filter(Boolean).join(" · ")}</div>
               {/* Discover is what's not in the book yet: no "Saved by …" (it reads like the book). */}
               {d.why !== "saved" && d.reason && <div className="truncate text-[12px] text-fm-ink-2">{d.reason}</div>}
             </div>

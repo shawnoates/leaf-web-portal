@@ -158,9 +158,11 @@ export type DiscoverItem = {
   photo?: string | null;
   lat: number | null;
   lng: number | null;
-  /** Why it's here: a member saved it, it's like a place in the book, or it's popular nearby. */
-  why: "saved" | "like" | "popular";
+  /** Why it's here: a member saved it, it's like a place the crew has been, it's popular nearby, or it's an event nearby. */
+  why: "saved" | "like" | "popular" | "event";
   reason: string;
+  /** For an event nearby: when and where, and its ticket page. */
+  event?: { date: string; time: string | null; venueName: string | null; url: string | null } | null;
   isNew?: boolean;
   rating?: number | null;
 };

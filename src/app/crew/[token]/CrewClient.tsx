@@ -22,7 +22,6 @@ import {
   Avatar, Button, Card, CrewShell, CrewTopBar, DeadState, DisplayTitle, Eyebrow, Mono, SectionTitle, Spinner, useInApp, useCrewEmbedded,
 } from "@/components/crew/CrewShell";
 import ProposeNight from "@/components/crew/ProposeNight";
-import SeedPlaces from "@/components/crew/SeedPlaces";
 import CrewPulseCard from "@/components/crew/CrewPulseCard";
 import { EMPTY_PULSE } from "@/lib/crew-pulse";
 import CrewMoneyCard from "@/components/crew/CrewMoneyCard";
@@ -122,7 +121,6 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Someone who joined by text or in the app never saw the tap-to-add step.
   // Offer it once here, dismissible, above the book it feeds.
-  const [seedDone, setSeedDone] = useState(false);
   // "How often for you?" — asked once, right after joining.
   const [paceDone, setPaceDone] = useState(false);
   // The invite screen's "How often for you?": "" is the crew's own rhythm.
@@ -690,9 +688,6 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 </Link>
               )}
               <HappeningsCards items={happenings.slice(0, 3)} total={data.bookHappeningsTotal ?? happenings.length} auth={auth} />
-              {(data.discover?.length ?? 0) > 0 && (
-                <DiscoverRow items={data.discover!} auth={auth} canAdd={me.status === "in"} onAdded={reload} compact />
-              )}
               {me.status === "in" && (
                 <ShareFromInstagramHint crewName={crew.name} inApp={inApp} auth={auth} hiddenTips={me.hiddenTips} />
               )}
@@ -774,15 +769,10 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             evening={ev}
           />
 
-          {me.needsSeed && !seedDone && (
-            <section className="rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
-              <SeedPlaces
-                auth={auth}
-                crewName={crew.name}
-                heading="Where would you go?"
-                onDone={() => { setSeedDone(true); void reload(); }}
-              />
-            </section>
+          {/* Ideas for the book: the crew's saves, places like where it's been,
+              events nearby and popular places, mixed (this replaced "Where would you go?"). */}
+          {!fixedPlace && (data.discover?.length ?? 0) > 0 && (
+            <DiscoverRow items={data.discover!} auth={auth} canAdd={me.status === "in"} onAdded={reload} />
           )}
 
           {me.status === "in" && <CrewPhotosSection auth={auth} meId={me.userId || null} title="Photos" skipCycleId={data.lastNight?.cycleId ?? null} />}
