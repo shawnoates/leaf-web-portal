@@ -490,7 +490,9 @@ function SpotItem({ s, busy, act, auth, isOwner }: {
               <Check size={12} strokeWidth={2.6} aria-hidden /> {triedLabel}
             </span>
           )}
-          {(s.triggerLabel || ((s.addedByMe || isOwner) && !s.needsPlace)) && (
+          {/* Only a rule already set shows (and can be edited). No "Go when it's nice" pill on
+              every place: weather is set when starting a crew. */}
+          {s.triggerLabel && (
             <WeatherRule s={s} act={act} auth={auth} canEdit={Boolean(s.addedByMe || isOwner)} />
           )}
           {(s.addedByMe || isOwner) && (
