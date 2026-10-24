@@ -691,6 +691,11 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               {me.status === "in" && (
                 <ShareFromInstagramHint crewName={crew.name} inApp={inApp} auth={auth} hiddenTips={me.hiddenTips} />
               )}
+              {/* At the bottom of the book: ideas for it (the crew's saves, places
+                  like where it's been, events nearby, popular), and Search. */}
+              {(data.discover?.length ?? 0) > 0 && (
+                <DiscoverRow items={data.discover!} auth={auth} canAdd={me.status === "in"} onAdded={reload} searchHref={`${crewHref(auth, "book")}?add=1`} />
+              )}
             </section>
           )}
 
@@ -769,11 +774,6 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             evening={ev}
           />
 
-          {/* Ideas for the book: the crew's saves, places like where it's been,
-              events nearby and popular places, mixed (this replaced "Where would you go?"). */}
-          {!fixedPlace && (data.discover?.length ?? 0) > 0 && (
-            <DiscoverRow items={data.discover!} auth={auth} canAdd={me.status === "in"} onAdded={reload} />
-          )}
 
           {me.status === "in" && <CrewPhotosSection auth={auth} meId={me.userId || null} title="Photos" skipCycleId={data.lastNight?.cycleId ?? null} />}
 

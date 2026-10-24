@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Check, Eye, MapPin, Plus } from "lucide-react";
+import { CalendarDays, Check, Eye, MapPin, Plus, Search } from "lucide-react";
 import PlacePhoto from "@/components/crew/PlacePhoto";
 import { crewHref, run, type BookSpot, type CrewAuth, type DiscoverItem } from "@/lib/crew";
 
@@ -39,8 +39,10 @@ const KIND_LABEL: Record<string, string> = { plan: "Shared plan", event: "Event"
  * Discover: a carousel of ideas, one tap each. Adding hides the card right
  * away, then `onAdded` refreshes the book.
  */
-export function DiscoverRow({ items, auth, canAdd, onAdded, compact = false }: {
+export function DiscoverRow({ items, auth, canAdd, onAdded, compact = false, searchHref }: {
   items: DiscoverItem[];
+  /** The crew page: a "Search" link to the book with its search box focused. */
+  searchHref?: string;
   auth: CrewAuth;
   canAdd: boolean;
   onAdded: () => void | Promise<void>;
@@ -80,7 +82,14 @@ export function DiscoverRow({ items, auth, canAdd, onAdded, compact = false }: {
 
   return (
     <section aria-label="Discover" className="flex flex-col gap-2.5">
-      <span className="font-fm-mono text-[11px] uppercase tracking-[0.12em] text-fm-muted">Discover</span>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="font-fm-mono text-[11px] uppercase tracking-[0.12em] text-fm-muted">Discover</span>
+        {searchHref && (
+          <Link href={searchHref} className="flex min-h-11 items-center gap-1.5 text-sm font-semibold text-fm-ink-2 hover:text-fm-ink">
+            <Search size={15} strokeWidth={2.2} aria-hidden /> Search
+          </Link>
+        )}
+      </div>
       <ul className="no-scrollbar -mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 scroll-pl-5 lg:mx-0 lg:px-0">
         {shown.map((d) => (
           <li key={keyOf(d)} className={`group relative flex shrink-0 snap-start flex-col gap-2 ${compact ? "w-[140px]" : "w-[160px]"}`}>
