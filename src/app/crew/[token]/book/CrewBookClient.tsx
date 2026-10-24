@@ -259,12 +259,6 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
       {linkNote && <p role="status" className="mt-4 rounded-2xl bg-fm-surface px-4 py-3 text-sm text-fm-ink-2">{linkNote}</p>}
       {error && <p className="mt-4 rounded-2xl bg-[#3A2321] px-4 py-3 text-sm text-fm-danger">{error}</p>}
 
-      {(book.discover?.length ?? 0) > 0 && (
-        <div className="mt-6 lg:mr-[428px]">
-          <DiscoverRow items={book.discover!} auth={auth} canAdd={canAdd} onAdded={refresh} />
-        </div>
-      )}
-
       {!rows && (book.watching?.length ?? 0) > 0 && (
         <div className="mt-6 lg:mr-[428px]">
           <WatchingStrip items={book.watching!} auth={auth} isOwner={isOwner} onChange={refresh} />
@@ -311,7 +305,7 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
             <div className="flex flex-col items-center gap-3 rounded-[28px] border border-dashed border-fm-line px-6 py-12 text-center lg:min-h-[320px] lg:justify-center">
               <p className="m-0 font-fm-serif text-[28px] leading-tight lg:text-[32px]">{rows && happenings.length ? "No places yet." : "Empty so far."}</p>
               <p className="m-0 max-w-[36ch] text-[15px] leading-relaxed text-fm-ink-2">
-                {canAdd ? `Search for a place, add one from your saves${book.discover?.length ? ", or tap + on one above" : ""}. Leaf plans nights from here first.` : "Join the crew to add places."}
+                {canAdd ? `Search for a place${book.discover?.length ? ", or tap + on one below" : ""}. Leaf plans nights from here first.` : "Join the crew to add places."}
               </p>
             </div>
           ) : (
@@ -320,6 +314,11 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
             </ul>
           )}
         </section>
+        {/* Ideas for the book, at its bottom: the crew's saves, places like
+            where it's been, events nearby, popular. */}
+        {(book.discover?.length ?? 0) > 0 && (
+          <DiscoverRow items={book.discover!} auth={auth} canAdd={canAdd} onAdded={refresh} />
+        )}
         </div>
 
         {/* Find places: on desktop it sticks beside the book in its own panel. */}
