@@ -79,7 +79,7 @@ export type CycleView = {
   /** While voting: members who are in but sitting this round out on their own pace, by name. */
   sittingOut?: string[];
   /** A theme night: the theme that picked this night's place ("Drinks under $10"). */
-  theme?: { label: string } | null;
+  theme?: { label: string; special?: string | null } | null;
   votes: Record<string, number[]> | null;
   myVotes: number[] | null;
   /** Dates this person looks free for (synced calendar / Leaf plans); pre-selected, never auto-voted. */

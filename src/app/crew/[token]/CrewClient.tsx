@@ -1319,6 +1319,8 @@ function CycleCard({
             <Mono className="text-fm-accent">{c.eventWindow.kind === "movie" ? "Movie" : "Event"} · {c.eventWindow.title}</Mono>
           )}
           {c.theme?.label && <Mono className="text-fm-accent">Theme · {c.theme.label}</Mono>}
+          {/* A specials theme: the special that made this place fit ("Happy hour, Daily 9 PM–close"). */}
+          {c.theme?.special && <p className="m-0 text-sm text-fm-ink-2">{c.theme.special}</p>}
           {settled && c.planId ? (
             // A set night is a plan: its title opens it (the app opens it natively).
             <a href={`/p/${c.planId}${c.myInviteId ? `?n=${c.myInviteId}` : ""}`} className="w-fit hover:underline decoration-fm-line underline-offset-4">
