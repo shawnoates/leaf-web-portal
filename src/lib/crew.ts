@@ -78,6 +78,8 @@ export type CycleView = {
   invited?: boolean;
   /** While voting: members who are in but sitting this round out on their own pace, by name. */
   sittingOut?: string[];
+  /** A theme night: the theme that picked this night's place ("Drinks under $10"). */
+  theme?: { label: string } | null;
   votes: Record<string, number[]> | null;
   myVotes: number[] | null;
   /** Dates this person looks free for (synced calendar / Leaf plans); pre-selected, never auto-voted. */
@@ -207,6 +209,10 @@ export type CrewPage = {
     fixedPlace?: FixedPlace | null;
     /** Each round Leaf starts goes to the next member to host. */
     hostRotation?: boolean;
+    /** Theme nights: the crew's themes in order; each night Leaf plans takes the next one and picks places that fit. */
+    themesOn?: boolean;
+    themes?: { id: string; label: string }[];
+    nextTheme?: string | null;
     /** When Leaf starts the next round on its own (recurring crews that are on). */
     nextRoundAt?: string | null;
     /** A one-time crew after its night: offer "Do it again?". */

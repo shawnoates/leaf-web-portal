@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, CalendarDays, Check, ChevronRight, ChevronUp, Eye, MapPin, MessageCircle, Plus, Search, Settings, UserPlus, X } from "lucide-react";
+import { ArrowUp, CalendarDays, Check, ChevronDown, ChevronRight, ChevronUp, Eye, MapPin, MessageCircle, Plus, Search, Settings, UserPlus, X } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
 import Parse from "@/lib/parse-client";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
@@ -500,7 +500,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     : crew.triggerOnly
                       ? `${crew.freeTrigger ? `Leaf plans a ${night} when ${freeShareWords(crew.freeTrigger)} of you are free the same day${crew.freeTriggerLabel ? ` (${crew.freeTriggerLabel.replace(/^When [^·]+ are free · /, "")})` : ""}.` : `Leaf plans a ${night} when one of this crew's triggers comes true.`}${crew.birthdays ? " Birthdays count too." : ""} Got a place and a date in mind? Say so below.`
                     : crew.oneTime ? `Leaf starts planning the ${night} as soon as enough people are in.`
-                    : `Leaf starts the next ${night} on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()})${crew.freeTrigger ? `, or sooner when ${freeShareWords(crew.freeTrigger)} of you are free` : ""}. Got a place and a date in mind? Say so below.`}
+                    : `Leaf starts the next ${night} on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()})${crew.freeTrigger ? `, or sooner when ${freeShareWords(crew.freeTrigger)} of you are free` : ""}.${crew.themesOn && crew.nextTheme ? ` Next theme: ${crew.nextTheme}.` : ""} Got a place and a date in mind? Say so below.`}
                 </p>
                 {me.isOwner && crew.enabled !== false && !crew.oneTime && !crew.triggerOnly && crew.nextRoundAt && (
                   <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -1068,6 +1068,17 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 </div>
               )}
 
+              {me.isOwner && !crew.oneTime && crew.placeMode !== "fixed" && (
+                <ThemeNightsRow
+                  on={Boolean(crew.themesOn)}
+                  themes={crew.themes || []}
+                  nextTheme={crew.nextTheme || null}
+                  night={night}
+                  busy={busy !== null}
+                  onChange={(params) => act("themes", () => run("setCrewThemes", auth, { calendarId: crew.id, ...params }))}
+                />
+              )}
+
               {me.isOwner && (
                 <FreeRuleRow
                   rule={crew.freeTrigger || null}
@@ -1307,6 +1318,7 @@ function CycleCard({
           {c.eventWindow?.title && (
             <Mono className="text-fm-accent">{c.eventWindow.kind === "movie" ? "Movie" : "Event"} · {c.eventWindow.title}</Mono>
           )}
+          {c.theme?.label && <Mono className="text-fm-accent">Theme · {c.theme.label}</Mono>}
           {settled && c.planId ? (
             // A set night is a plan: its title opens it (the app opens it natively).
             <a href={`/p/${c.planId}${c.myInviteId ? `?n=${c.myInviteId}` : ""}`} className="w-fit hover:underline decoration-fm-line underline-offset-4">
@@ -2084,6 +2096,69 @@ const FREE_TIMES = [{ time: "10:00", label: "Morning" }, { time: "14:00", label:
  * the crew (half, 60%…) are free the same day (synced calendars); turning it on asks the
  * members who haven't synced to sync.
  */
+/**
+ * Theme nights (organizer): a list of themes ("Meals under $10", "Only
+ * nautical"); each night Leaf plans takes the next one, and only places that
+ * fit it, from the book or found nearby. Some themes are more than one stop.
+ */
+function ThemeNightsRow({ on, themes, nextTheme, night, busy, onChange }: {
+  on: boolean;
+  themes: { id: string; label: string }[];
+  nextTheme: string | null;
+  night: string;
+  busy: boolean;
+  onChange: (params: Record<string, unknown>) => Promise<void> | void;
+}) {
+  const [draft, setDraft] = useState("");
+  const add = async () => {
+    const label = draft.trim();
+    if (!label) return;
+    await onChange({ add: label, ...(themes.length === 0 ? { on: true } : {}) });
+    setDraft("");
+  };
+  return (
+    <div className="flex flex-col gap-3 border-b border-fm-line-dim py-4">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-semibold">Theme nights</div>
+          <div className="text-[13px] text-fm-muted">Each {night} takes the next theme, and Leaf picks places that fit it.</div>
+        </div>
+        <FriendModeSwitch label="Theme nights" checked={on} disabled={busy || themes.length === 0} onChange={(v) => onChange({ on: v })} />
+      </div>
+      {themes.length > 0 && (
+        <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
+          {themes.map((t, i) => (
+            <li key={t.id} className="flex items-center gap-2 rounded-2xl border border-fm-line bg-fm-card py-1.5 pl-3.5 pr-1.5">
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">{t.label}</span>
+              {on && nextTheme === t.label && <Mono className="shrink-0 text-[10px] text-fm-accent">Next</Mono>}
+              <button type="button" aria-label={`Move ${t.label} up`} disabled={busy || i === 0} onClick={() => onChange({ move: { id: t.id, by: -1 } })} className="flex h-9 w-9 items-center justify-center rounded-full text-fm-muted hover:bg-fm-line hover:text-fm-ink disabled:opacity-30">
+                <ChevronUp size={16} aria-hidden />
+              </button>
+              <button type="button" aria-label={`Move ${t.label} down`} disabled={busy || i === themes.length - 1} onClick={() => onChange({ move: { id: t.id, by: 1 } })} className="flex h-9 w-9 items-center justify-center rounded-full text-fm-muted hover:bg-fm-line hover:text-fm-ink disabled:opacity-30">
+                <ChevronDown size={16} aria-hidden />
+              </button>
+              <button type="button" aria-label={`Remove ${t.label}`} disabled={busy} onClick={() => onChange({ remove: t.id })} className="flex h-9 w-9 items-center justify-center rounded-full text-fm-muted hover:bg-fm-line hover:text-fm-danger disabled:opacity-30">
+                <X size={16} aria-hidden />
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); void add(); }}>
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          maxLength={60}
+          placeholder={themes.length ? "Add a theme" : "Meals under $10, Only nautical…"}
+          aria-label="Add a theme"
+          className="h-11 min-w-0 flex-1 rounded-xl border px-3 text-sm"
+        />
+        <Button small type="submit" disabled={busy || !draft.trim()}>Add</Button>
+      </form>
+    </div>
+  );
+}
+
 function FreeRuleRow({ rule, label, usualTime, busy, onSave }: {
   rule: FreeRule | null; label: string | null; usualTime: string | null; busy: boolean;
   onSave: (rule: Omit<FreeRule, "kind" | "everyDays"> | null) => Promise<void>;
