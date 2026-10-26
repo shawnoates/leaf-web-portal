@@ -747,6 +747,14 @@ function buildIcsHref(opts: {
 const attendingLabel = (plan: Pick<Plan, "attendeeCount" | "businessHosted">) =>
   plan.businessHosted && plan.attendeeCount === 0 ? "Be the first to join" : `${plan.attendeeCount} attending`;
 
+/** All-in ticket price ("$43"), booking fee included so the number matches what checkout charges; null for free plans. */
+function ticketPriceTotal(plan: Pick<Plan, "ticketPriceCents" | "bookingFeeCents">): string | null {
+  const price = plan.ticketPriceCents ?? 0;
+  if (price <= 0) return null;
+  const cents = price + Math.max(plan.bookingFeeCents ?? 0, 0);
+  return `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
+}
+
 function AvatarStack({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-3">
@@ -5221,6 +5229,12 @@ export default function OrgCalendarPage() {
                             />
                           </div>
                         )}
+                        {ticketPriceTotal(plan) && (
+                          <p className="-mt-3 flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-zinc-900">
+                            <span className="flex w-8 justify-center"><Wallet className="w-3.5 h-3.5" /></span>
+                            {ticketPriceTotal(plan)} a ticket
+                          </p>
+                        )}
                         {p2pPriceShort(plan.p2pAmountCents, plan.p2pSplit) && (
                           // Under the attending count, icon centred on the avatar so the two read as one block.
                           <p className="-mt-3 flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-zinc-900">
@@ -6181,6 +6195,12 @@ export default function OrgCalendarPage() {
                       </span>
                     </>
                   )}
+                  {ticketPriceTotal(selectedEvent) && (
+                    <span className="flex items-center gap-2 whitespace-nowrap text-zinc-900 font-normal">
+                      <Wallet className="w-4 h-4 flex-shrink-0" />
+                      {ticketPriceTotal(selectedEvent)} a ticket
+                    </span>
+                  )}
                   {/* The price, before anyone RSVPs — the full "paid to the host" sentence is in the RSVP step. */}
                   {p2pPriceShort(selectedEvent.p2pAmountCents, selectedEvent.p2pSplit) && (
                     <span className="flex items-center gap-2 whitespace-nowrap text-zinc-900 font-normal">
@@ -6528,7 +6548,7 @@ export default function OrgCalendarPage() {
                         className="flex-1 text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90"
                         style={{ backgroundColor: org.brandColor || "#18181b" }}
                       >
-                        {planIsFull(selectedEvent) ? "Join Waitlist" : selectedEvent.requireApproval ? "Request to Attend" : "I\u0027m Attending"}
+                        {planIsFull(selectedEvent) ? "Join Waitlist" : selectedEvent.requireApproval ? "Request to Attend" : ticketPriceTotal(selectedEvent) ? `RSVP \u00b7 ${ticketPriceTotal(selectedEvent)}` : "I\u0027m Attending"}
                       </button>
                     )}
                     <button
