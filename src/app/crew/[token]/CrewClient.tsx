@@ -2054,7 +2054,7 @@ function AddBirthday({ auth, onDone }: { auth: CrewAuth; onDone: () => void }) {
   return (
     <section className="rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
       <h2 className="m-0 font-fm-serif text-[24px] font-normal leading-tight">When&rsquo;s your birthday?</h2>
-      <p className="mb-0 mt-2 text-[14px] leading-relaxed text-fm-ink-2">This crew celebrates birthdays: the night nearest yours is yours, and you pick where. Month and day only.</p>
+      <p className="mb-0 mt-2 text-[14px] leading-relaxed text-fm-ink-2">When yours is near a night, the crew gets a birthday celebration idea. Month and day only, asked once.</p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <label className="sr-only" htmlFor="bday-month">Month</label>
         <select id="bday-month" className={field} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
@@ -2067,7 +2067,8 @@ function AddBirthday({ auth, onDone }: { auth: CrewAuth; onDone: () => void }) {
           {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
         </select>
         <Button small disabled={busy || !month || !day} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</Button>
-        <Button small kind="ghost" onClick={() => setHidden(true)}>Not now</Button>
+        {/* Not now: never asked again, in any crew. */}
+        <Button small kind="ghost" onClick={() => { setHidden(true); void run("skipMyBirthday", auth).catch(() => {}); }}>Not now</Button>
       </div>
       {error && <p className="mb-0 mt-2 text-sm text-fm-danger">{error}</p>}
     </section>
