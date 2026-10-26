@@ -814,7 +814,17 @@ function DashboardView({
   const spine = data.plans.slice(1); // hero is plans[0]
   // Crew nights sit in the spine but a crew isn't a calendar you "follow".
   const calCount = new Set(data.plans.filter((p) => !p.crew).map((p) => p.calendarId).filter(Boolean)).size;
-  const [openPlanId, setOpenPlanId] = useState<string | null>(null);
+  // A reminder text links `/me?plan=<id>`: land on that plan, not the dashboard.
+  const [openPlanId, setOpenPlanId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("plan");
+  });
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("plan")) return;
+    url.searchParams.delete("plan");
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }, []);
   const [showAll, setShowAll] = useState(false);
 
   // ---- New plan ----------------------------------------------------------
