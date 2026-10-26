@@ -209,10 +209,9 @@ export type CrewPage = {
     fixedPlace?: FixedPlace | null;
     /** Each round Leaf starts goes to the next member to host. */
     hostRotation?: boolean;
-    /** Theme nights: the crew's themes in order; each night Leaf plans takes the next one and picks places that fit. */
-    themesOn?: boolean;
-    themes?: { id: string; label: string }[];
-    nextTheme?: string | null;
+    /** Theme nights: the next night's theme (anyone in picks it), and ideas for it from the crew's name and history. */
+    nextTheme?: { label: string; byName: string | null } | null;
+    themeIdeas?: string[];
     /** When Leaf starts the next round on its own (recurring crews that are on). */
     nextRoundAt?: string | null;
     /** A one-time crew after its night: offer "Do it again?". */

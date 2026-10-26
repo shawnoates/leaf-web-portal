@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, CalendarDays, Check, ChevronDown, ChevronRight, ChevronUp, Eye, MapPin, MessageCircle, Plus, Search, Settings, UserPlus, X } from "lucide-react";
+import { ArrowUp, CalendarDays, Check, ChevronRight, ChevronUp, Eye, MapPin, MessageCircle, Plus, Search, Settings, UserPlus, X } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
 import Parse from "@/lib/parse-client";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
@@ -500,7 +500,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     : crew.triggerOnly
                       ? `${crew.freeTrigger ? `Leaf plans a ${night} when ${freeShareWords(crew.freeTrigger)} of you are free the same day${crew.freeTriggerLabel ? ` (${crew.freeTriggerLabel.replace(/^When [^·]+ are free · /, "")})` : ""}.` : `Leaf plans a ${night} when one of this crew's triggers comes true.`}${crew.birthdays ? " Birthdays count too." : ""} Got a place and a date in mind? Say so below.`
                     : crew.oneTime ? `Leaf starts planning the ${night} as soon as enough people are in.`
-                    : `Leaf starts the next ${night} on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()})${crew.freeTrigger ? `, or sooner when ${freeShareWords(crew.freeTrigger)} of you are free` : ""}.${crew.themesOn && crew.nextTheme ? ` Next theme: ${crew.nextTheme}.` : ""} Got a place and a date in mind? Say so below.`}
+                    : `Leaf starts the next ${night} on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()})${crew.freeTrigger ? `, or sooner when ${freeShareWords(crew.freeTrigger)} of you are free` : ""}.${crew.nextTheme ? ` Next theme: ${crew.nextTheme.label}.` : ""} Got a place and a date in mind? Say so below.`}
                 </p>
                 {me.isOwner && crew.enabled !== false && !crew.oneTime && !crew.triggerOnly && crew.nextRoundAt && (
                   <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -513,6 +513,19 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                   </div>
                 )}
               </Card>
+            )}
+
+            {/* Before the next night's place is picked: give it a theme (ideas from
+                the crew's name and history, or your own). */}
+            {me.status === "in" && !crew.oneTime && !fixedPlace && crew.enabled !== false
+              && open.every((c) => c.state === "picking") && (crew.nextTheme || (crew.themeIdeas?.length ?? 0) > 0) && (
+              <NextThemeCard
+                theme={crew.nextTheme || null}
+                ideas={crew.themeIdeas || []}
+                night={night}
+                busy={busy}
+                onSet={(label) => act("theme", () => run("setCrewNextTheme", auth, { label }))}
+              />
             )}
 
             {open.length > 0 && (
@@ -1061,17 +1074,6 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     onChange={(v) => act("rotation", () => run("setCrewHostRotation", auth, { calendarId: crew.id, enabled: v }))}
                   />
                 </div>
-              )}
-
-              {me.isOwner && !crew.oneTime && crew.placeMode !== "fixed" && (
-                <ThemeNightsRow
-                  on={Boolean(crew.themesOn)}
-                  themes={crew.themes || []}
-                  nextTheme={crew.nextTheme || null}
-                  night={night}
-                  busy={busy !== null}
-                  onChange={(params) => act("themes", () => run("setCrewThemes", auth, { calendarId: crew.id, ...params }))}
-                />
               )}
 
               {me.isOwner && (
@@ -2103,65 +2105,66 @@ const FREE_TIMES = [{ time: "10:00", label: "Morning" }, { time: "14:00", label:
  * members who haven't synced to sync.
  */
 /**
- * Theme nights (organizer): a list of themes ("Meals under $10", "Only
- * nautical"); each night Leaf plans takes the next one, and only places that
- * fit it, from the book or found nearby. Some themes are more than one stop.
+ * The next night's theme: pick one of Leaf's ideas (made from the crew's name
+ * and history) or type your own; Leaf then picks places that fit it. Once
+ * one's set, it shows who picked it, with Change and No theme.
  */
-function ThemeNightsRow({ on, themes, nextTheme, night, busy, onChange }: {
-  on: boolean;
-  themes: { id: string; label: string }[];
-  nextTheme: string | null;
+function NextThemeCard({ theme, ideas, night, busy, onSet }: {
+  theme: { label: string; byName: string | null } | null;
+  ideas: string[];
   night: string;
-  busy: boolean;
-  onChange: (params: Record<string, unknown>) => Promise<void> | void;
+  busy: string | null;
+  onSet: (label: string | null) => Promise<void> | void;
 }) {
-  const [draft, setDraft] = useState("");
-  const add = async () => {
-    const label = draft.trim();
-    if (!label) return;
-    await onChange({ add: label, ...(themes.length === 0 ? { on: true } : {}) });
-    setDraft("");
-  };
-  return (
-    <div className="flex flex-col gap-3 border-b border-fm-line-dim py-4">
-      <div className="flex items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-semibold">Theme nights</div>
-          <div className="text-[13px] text-fm-muted">Each {night} takes the next theme, and Leaf picks places that fit it.</div>
+  const [changing, setChanging] = useState(false);
+  const [own, setOwn] = useState("");
+  const [typing, setTyping] = useState(false);
+  const pick = async (label: string | null) => { await onSet(label); setChanging(false); setTyping(false); setOwn(""); };
+  if (theme && !changing) {
+    return (
+      <Card className="flex flex-col gap-2">
+        <Eyebrow>Next {night}&rsquo;s theme</Eyebrow>
+        <div className="font-fm-serif text-[28px] leading-tight">{theme.label}</div>
+        <p className="m-0 text-sm text-fm-muted">{theme.byName ? `${theme.byName} picked it. ` : ""}Leaf picks places that fit.</p>
+        <div className="flex flex-wrap gap-4">
+          <button type="button" disabled={busy !== null} onClick={() => setChanging(true)} className="min-h-11 text-sm text-fm-ink-2 underline underline-offset-4 hover:text-fm-ink">Change</button>
+          <button type="button" disabled={busy !== null} onClick={() => void pick(null)} className="min-h-11 text-sm text-fm-muted underline underline-offset-4 hover:text-fm-danger">No theme</button>
         </div>
-        <FriendModeSwitch label="Theme nights" checked={on} disabled={busy || themes.length === 0} onChange={(v) => onChange({ on: v })} />
+      </Card>
+    );
+  }
+  return (
+    <Card className="flex flex-col gap-3">
+      <div>
+        <Eyebrow>A theme for the next {night}?</Eyebrow>
+        <p className="mb-0 mt-2 text-[15px] text-fm-ink-2">Pick one and Leaf finds places that fit. Ideas from what this crew is into.</p>
       </div>
-      {themes.length > 0 && (
-        <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
-          {themes.map((t, i) => (
-            <li key={t.id} className="flex items-center gap-2 rounded-2xl border border-fm-line bg-fm-card py-1.5 pl-3.5 pr-1.5">
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">{t.label}</span>
-              {on && nextTheme === t.label && <Mono className="shrink-0 text-[10px] text-fm-accent">Next</Mono>}
-              <button type="button" aria-label={`Move ${t.label} up`} disabled={busy || i === 0} onClick={() => onChange({ move: { id: t.id, by: -1 } })} className="flex h-9 w-9 items-center justify-center rounded-full text-fm-muted hover:bg-fm-line hover:text-fm-ink disabled:opacity-30">
-                <ChevronUp size={16} aria-hidden />
-              </button>
-              <button type="button" aria-label={`Move ${t.label} down`} disabled={busy || i === themes.length - 1} onClick={() => onChange({ move: { id: t.id, by: 1 } })} className="flex h-9 w-9 items-center justify-center rounded-full text-fm-muted hover:bg-fm-line hover:text-fm-ink disabled:opacity-30">
-                <ChevronDown size={16} aria-hidden />
-              </button>
-              <button type="button" aria-label={`Remove ${t.label}`} disabled={busy} onClick={() => onChange({ remove: t.id })} className="flex h-9 w-9 items-center justify-center rounded-full text-fm-muted hover:bg-fm-line hover:text-fm-danger disabled:opacity-30">
-                <X size={16} aria-hidden />
-              </button>
-            </li>
-          ))}
-        </ol>
+      <div className="flex flex-wrap gap-2">
+        {ideas.map((l) => (
+          <button
+            key={l}
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void pick(l)}
+            className={`min-h-11 rounded-full border px-4 text-sm font-semibold disabled:opacity-60 ${theme?.label === l ? "border-fm-accent text-fm-accent" : "border-fm-line text-fm-ink hover:bg-fm-card"}`}
+          >
+            {busy === "theme" ? "…" : l}
+          </button>
+        ))}
+        {!typing && (
+          <button type="button" onClick={() => setTyping(true)} className="min-h-11 rounded-full border border-dashed border-fm-line px-4 text-sm font-semibold text-fm-ink-2 hover:bg-fm-card">
+            Your own
+          </button>
+        )}
+      </div>
+      {typing && (
+        <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (own.trim()) void pick(own.trim()); }}>
+          <input autoFocus value={own} onChange={(e) => setOwn(e.target.value)} maxLength={60} placeholder="Only nautical, Meals under $10…" aria-label="Your own theme" className="h-11 min-w-0 flex-1 rounded-xl border px-3 text-sm" />
+          <Button small type="submit" disabled={busy !== null || !own.trim()}>Set</Button>
+        </form>
       )}
-      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); void add(); }}>
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          maxLength={60}
-          placeholder={themes.length ? "Add a theme" : "Meals under $10, Only nautical…"}
-          aria-label="Add a theme"
-          className="h-11 min-w-0 flex-1 rounded-xl border px-3 text-sm"
-        />
-        <Button small type="submit" disabled={busy || !draft.trim()}>Add</Button>
-      </form>
-    </div>
+      {changing && <button type="button" onClick={() => setChanging(false)} className="w-fit text-sm text-fm-muted underline underline-offset-4">Keep {theme?.label}</button>}
+    </Card>
   );
 }
 
