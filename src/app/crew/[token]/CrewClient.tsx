@@ -515,13 +515,23 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               </Card>
             )}
 
+            {canStart && !proposing && !fixedPlace && <div className="flex lg:hidden">{startButtons}</div>}
+            {proposing && (
+              <ProposeNight
+                auth={auth}
+                onDone={async () => { setProposing(false); await reload(); }}
+                onCancel={() => setProposing(false)}
+              />
+            )}
+
             {/* Before the next night's place is picked: give it a theme (ideas from
                 the crew's name and history, or your own). */}
             {me.status === "in" && !crew.oneTime && !fixedPlace && crew.enabled !== false
-              && open.every((c) => c.state === "picking") && ((crew.themeVotes?.length ?? 0) > 0 || (crew.themeIdeas?.length ?? 0) > 0) && (
+              && open.every((c) => c.state === "picking") && ((crew.themeVotes?.length ?? 0) > 0 || (crew.themeIdeas?.length ?? 0) > 0 || (crew.bookThemes?.length ?? 0) > 0) && (
               <NextThemeCard
                 votes={crew.themeVotes || []}
                 ideas={crew.themeIdeas || []}
+                fromBook={crew.bookThemes || []}
                 night={night}
                 busy={busy}
                 onVote={(label, on) => act(`theme-${label}`, () => run("voteCrewTheme", auth, { label, on }))}
@@ -544,14 +554,6 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               </div>
             )}
 
-            {canStart && !proposing && !fixedPlace && <div className="flex lg:hidden">{startButtons}</div>}
-            {proposing && (
-              <ProposeNight
-                auth={auth}
-                onDone={async () => { setProposing(false); await reload(); }}
-                onCancel={() => setProposing(false)}
-              />
-            )}
           </section>
 
           {showCalNudge && (
@@ -2110,9 +2112,11 @@ const FREE_TIMES = [{ time: "10:00", label: "Morning" }, { time: "14:00", label:
  * upvoted is the night's theme when Leaf starts planning it, and Leaf picks
  * places that fit.
  */
-function NextThemeCard({ votes, ideas, night, busy, onVote }: {
+function NextThemeCard({ votes, ideas, fromBook, night, busy, onVote }: {
   votes: ThemeVote[];
   ideas: string[];
+  /** Themes the book can fill: first, with how many of its places fit. */
+  fromBook: { label: string; count: number }[];
   night: string;
   busy: string | null;
   onVote: (label: string, on: boolean) => Promise<void> | void;
@@ -2120,7 +2124,14 @@ function NextThemeCard({ votes, ideas, night, busy, onVote }: {
   const [own, setOwn] = useState("");
   const [typing, setTyping] = useState(false);
   const voted = new Set(votes.map((v) => v.label.toLowerCase()));
-  const rows: ThemeVote[] = [...votes, ...ideas.filter((l) => !voted.has(l.toLowerCase())).map((label) => ({ label, votes: 0, myVote: false, byName: null }))];
+  const bookCount = new Map(fromBook.map((b) => [b.label.toLowerCase(), b.count]));
+  const unvoted = (l: string) => !voted.has(l.toLowerCase());
+  // Voted first, then what the book can fill, then Leaf's other ideas.
+  const rows: ThemeVote[] = [
+    ...votes,
+    ...fromBook.map((b) => b.label).filter(unvoted),
+    ...ideas.filter((l) => unvoted(l) && !bookCount.has(l.toLowerCase())),
+  ].map((t) => (typeof t === "string" ? { label: t, votes: 0, myVote: false, byName: null } : t));
   const leading = votes[0]?.label || null;
   return (
     <Card className="flex flex-col gap-3">
@@ -2136,7 +2147,9 @@ function NextThemeCard({ votes, ideas, night, busy, onVote }: {
           <li key={t.label} className="flex min-h-11 items-center gap-2.5 rounded-full border border-fm-line bg-fm-card py-1 pl-4 pr-1.5">
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-sm font-semibold text-fm-ink">{t.label}</span>
-              {t.byName && <span className="truncate text-xs text-fm-muted">Suggested by {t.byName}</span>}
+              {bookCount.has(t.label.toLowerCase())
+                ? <span className="truncate text-xs text-fm-accent">From the book · {bookCount.get(t.label.toLowerCase())} places</span>
+                : t.byName && <span className="truncate text-xs text-fm-muted">Suggested by {t.byName}</span>}
             </span>
             <button
               type="button"

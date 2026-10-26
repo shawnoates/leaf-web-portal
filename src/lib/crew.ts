@@ -215,6 +215,8 @@ export type CrewPage = {
     nextTheme?: { label: string } | null;
     themeVotes?: ThemeVote[];
     themeIdeas?: string[];
+    /** Themes the book itself can fill, with how many of its places fit ("Sushi night · 3 places"). */
+    bookThemes?: { label: string; count: number }[];
     /** When Leaf starts the next round on its own (recurring crews that are on). */
     nextRoundAt?: string | null;
     /** A one-time crew after its night: offer "Do it again?". */
