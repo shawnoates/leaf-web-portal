@@ -1593,6 +1593,7 @@ function CycleCard({
       {["polling", "locked", "booked"].includes(c.state) && (c.isHost || isOwner) && (!c.venue?.fixed || c.venue?.custom) && (
         <ChangePlace cycle={c} auth={auth} busy={busy} onAct={onAct} />
       )}
+      {settled && (c.isHost || isOwner) && <ChangeDate cycle={c} auth={auth} busy={busy} onAct={onAct} />}
     </Card>
   );
 }
@@ -1788,6 +1789,66 @@ function SuggestDate({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: 
       </form>
       <p className="m-0 text-xs text-fm-muted">It joins the poll for everyone, counted as yours. Votes on the other dates stay.</p>
       <button type="button" onClick={() => setOpen(false)} className="min-h-11 w-fit text-sm text-fm-muted underline underline-offset-4">Never mind</button>
+    </div>
+  );
+}
+
+type MoveOption = { date: string; time: string; free: number | null; known: number | null; clash: boolean; weather: { temp: string | null; text: string | null; icon: string | null; rain: number | null } | null };
+
+/**
+ * A set night's "Change the date" (host or organizer): the best dates in the
+ * next two weeks at the night's time, by who's free, with the forecast at the
+ * place. Tap one, confirm, and the plan moves; the crew hears about it.
+ */
+function ChangeDate({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: CrewAuth; busy: string | null; onAct: (key: string, fn: () => Promise<unknown>) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [options, setOptions] = useState<MoveOption[] | null>(null);
+  const [failed, setFailed] = useState("");
+  const [picked, setPicked] = useState<MoveOption | null>(null);
+  const show = async () => {
+    setOpen(true);
+    setFailed("");
+    try {
+      setOptions((await run<{ options: MoveOption[] }>("getCrewMoveOptions", auth, { cycleId: c.cycleId })).options);
+    } catch (e) {
+      setFailed(e instanceof Error ? e.message : "Couldn't load dates.");
+      setOptions([]);
+    }
+  };
+  const close = () => { setOpen(false); setPicked(null); setOptions(null); };
+  const label = (o: MoveOption) => { const p = dayParts(o.date); return `${p.dow}, ${p.month} ${p.day} · ${timeLabel(o.time)}`; };
+  if (!open) return <div><Button small kind="ghost" onClick={() => void show()}>Change the date</Button></div>;
+  return (
+    <div className="flex flex-col gap-2.5 rounded-[18px] border border-fm-line p-3">
+      <Mono className="px-1 text-fm-muted">Same place and time · best dates for the crew</Mono>
+      {options === null && <p className="m-0 px-1 text-sm text-fm-muted">Checking who&rsquo;s free…</p>}
+      {failed && <p className="m-0 px-1 text-sm text-fm-danger">{failed}</p>}
+      {picked ? (
+        <div className="flex flex-col gap-2.5 px-1">
+          <p className="m-0 text-sm leading-snug text-fm-ink">Move it to <b>{label(picked)}</b>? Leaf tells everyone invited, and who said yes stays yes.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button small disabled={busy !== null} onClick={() => void onAct("moveNight", () => run("moveCrewNight", auth, { cycleId: c.cycleId, date: picked.date, time: picked.time })).then(close)}>
+              {busy === "moveNight" ? "Moving…" : "Yes, move it"}
+            </Button>
+            <Button small kind="ghost" disabled={busy !== null} onClick={() => setPicked(null)}>Pick another</Button>
+          </div>
+        </div>
+      ) : (
+        <ul className="m-0 flex list-none flex-col gap-2 p-0">
+          {(options || []).map((o) => (
+            <li key={o.date}>
+              <button type="button" onClick={() => setPicked(o)} className="flex w-full flex-col items-start gap-0.5 rounded-2xl border border-fm-line bg-fm-canvas px-4 py-3 text-left hover:border-fm-ink-2">
+                <span className="text-[15px] font-semibold text-fm-ink">{label(o)}</span>
+                <span className="text-xs text-fm-muted">
+                  {[o.known ? `${o.free} of ${o.known} free` : "No calendars to check", o.weather ? [o.weather.temp ? `${String(o.weather.temp).replace(/[^\d-]/g, "")}°` : null, o.weather.rain != null && o.weather.rain >= 40 ? `${o.weather.rain}% rain` : o.weather.text].filter(Boolean).join(" · ") : null].filter(Boolean).join(" · ")}
+                </span>
+                {o.clash && <span className="text-xs text-fm-danger">Someone here has another crew&rsquo;s night that day</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button type="button" onClick={close} className="min-h-11 w-fit text-sm text-fm-muted underline underline-offset-4">Never mind</button>
     </div>
   );
 }
