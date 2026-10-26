@@ -691,11 +691,6 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               {me.status === "in" && (
                 <ShareFromInstagramHint crewName={crew.name} inApp={inApp} auth={auth} hiddenTips={me.hiddenTips} />
               )}
-              {/* At the bottom of the book: ideas for it (the crew's saves, places
-                  like where it's been, events nearby, popular), and Search. */}
-              {(data.discover?.length ?? 0) > 0 && (
-                <DiscoverRow items={data.discover!} auth={auth} canAdd={me.status === "in"} onAdded={reload} searchHref={`${crewHref(auth, "book")}?add=1`} />
-              )}
             </section>
           )}
 
@@ -1171,6 +1166,15 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             </div>
           </div>
         </div>
+      )}
+
+      {/* Ideas for the book (the crew's saves, places like where it's been,
+          events nearby, popular) and Search: at the bottom, right above Start
+          your own crew. */}
+      {(data.discover?.length ?? 0) > 0 && (
+        <section className="mt-12 lg:mt-16">
+          <DiscoverRow items={data.discover!} auth={auth} canAdd={me.status === "in"} onAdded={reload} searchHref={`${crewHref(auth, "book")}?add=1`} />
+        </section>
       )}
 
       {/* Everyone here has other groups: the way to start one for them. In the
