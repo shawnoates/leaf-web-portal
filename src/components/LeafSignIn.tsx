@@ -83,9 +83,18 @@ export default function LeafSignIn({
     return me;
   };
 
-  const email = useEmailCodeSignIn(async () => {
+  const finishEmail = async () => {
     const me = await nameIt();
     if (me) await onSignedIn(me, "email");
+  };
+
+  // Signed in by email with no phone on the account: they may already be an
+  // app user (phone sign-up), and a bare email account would be a second
+  // Leaf account for the same person. Offer the phone step before finishing.
+  const [linking, setLinking] = useState(false);
+  const email = useEmailCodeSignIn(async (who) => {
+    if (!who.hasPhone) { setLinking(true); setPhoneStep("phone"); setPhoneCode(""); setError(""); return; }
+    await finishEmail();
   });
 
   const sendPhoneCode = async () => {
@@ -128,6 +137,32 @@ export default function LeafSignIn({
       <input id="signin-name" className={st.field} value={name} onChange={(e) => setName(e.target.value)} placeholder="First and last" autoComplete="name" />
     </div>
   );
+
+  if (linking) {
+    return (
+      <div className="flex flex-col gap-4">
+        {phoneStep === "phone" ? (
+          <>
+            <p className={`m-0 ${st.label}`}>Do you use the Leaf app? Confirm your phone and we&rsquo;ll bring your account together.</p>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="signin-link-phone" className={st.label}>Your phone</label>
+              <input id="signin-link-phone" className={st.field} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 123-4567" inputMode="tel" autoComplete="tel-national" />
+            </div>
+            <button type="button" className={st.primary} onClick={sendPhoneCode} disabled={busy}>{busy ? "Sending…" : "Text me a code"}</button>
+          </>
+        ) : (
+          <>
+            <p className={`m-0 ${st.label}`}>Enter the code we texted to ({digits.slice(-10, -7)}) {digits.slice(-7, -4)}-{digits.slice(-4)}.</p>
+            <input className={`${st.field} text-center font-mono tracking-[0.4em]`} value={phoneCode} onChange={(e) => setPhoneCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" inputMode="numeric" autoComplete="one-time-code" aria-label="Code" />
+            <button type="button" className={st.primary} onClick={verifyPhone} disabled={busy || phoneCode.length < 4}>{busy ? "Checking…" : "Continue"}</button>
+            <button type="button" className={`self-start ${st.link}`} onClick={() => { setPhoneStep("phone"); setPhoneCode(""); setError(""); }}><ArrowLeft size={15} aria-hidden /> Different number</button>
+          </>
+        )}
+        {error && <p role="alert" className={`m-0 ${st.error}`}>{error}</p>}
+        <button type="button" className={`self-start ${st.link}`} disabled={busy} onClick={() => { setError(""); void finishEmail(); }}>I don&rsquo;t use the app</button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
