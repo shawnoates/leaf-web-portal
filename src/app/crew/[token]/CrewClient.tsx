@@ -2123,6 +2123,7 @@ function NextThemeCard({ votes, ideas, fromBook, night, busy, onVote }: {
 }) {
   const [own, setOwn] = useState("");
   const [typing, setTyping] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const voted = new Set(votes.map((v) => v.label.toLowerCase()));
   const bookCount = new Map(fromBook.map((b) => [b.label.toLowerCase(), b.count]));
   const unvoted = (l: string) => !voted.has(l.toLowerCase());
@@ -2133,6 +2134,9 @@ function NextThemeCard({ votes, ideas, fromBook, night, busy, onVote }: {
     ...ideas.filter((l) => unvoted(l) && !bookCount.has(l.toLowerCase())),
   ].map((t) => (typeof t === "string" ? { label: t, votes: 0, myVote: false, byName: null } : t));
   const leading = votes[0]?.label || null;
+  // Four at a time (the leading one always among them); the rest behind "More ideas".
+  const SHOWN = 4;
+  const shown = showAll ? rows : rows.slice(0, SHOWN);
   return (
     <Card className="flex flex-col gap-3">
       <div>
@@ -2143,7 +2147,7 @@ function NextThemeCard({ votes, ideas, fromBook, night, busy, onVote }: {
         </p>
       </div>
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
-        {rows.map((t) => (
+        {shown.map((t) => (
           <li key={t.label} className="flex min-h-11 items-center gap-2.5 rounded-full border border-fm-line bg-fm-card py-1 pl-4 pr-1.5">
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-sm font-semibold text-fm-ink">{t.label}</span>
@@ -2164,6 +2168,11 @@ function NextThemeCard({ votes, ideas, fromBook, night, busy, onVote }: {
           </li>
         ))}
       </ul>
+      {rows.length > SHOWN && (
+        <button type="button" aria-expanded={showAll} onClick={() => setShowAll((v) => !v)} className="min-h-11 w-fit text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink">
+          {showAll ? "Fewer ideas" : `More ideas · ${rows.length - SHOWN}`}
+        </button>
+      )}
       {typing ? (
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); const l = own.trim(); if (l) void Promise.resolve(onVote(l, true)).then(() => { setOwn(""); setTyping(false); }); }}>
           <input autoFocus value={own} onChange={(e) => setOwn(e.target.value)} maxLength={60} placeholder="Only nautical, Meals under $10…" aria-label="Suggest a theme" className="h-11 min-w-0 flex-1 rounded-xl border px-3 text-sm" />
