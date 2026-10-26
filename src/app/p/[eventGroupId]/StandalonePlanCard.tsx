@@ -67,6 +67,9 @@ type Props = {
   /** Host collects peer to peer: price per spot, paid to them after RSVP. */
   p2pAmountCents?: number | null;
   p2pSplit?: P2pSplitSummary | null;
+  /** Paid night: RSVP is a ticket purchase, and the app can't sell one yet. */
+  ticketPriceCents?: number | null;
+  bookingFeeCents?: number | null;
   // RSVP closes at start time; replaces the button with a disabled state.
   rsvpClosed: boolean;
   // Set when /p/<id>?rsvp=1 — the visitor was bounced back from
@@ -97,9 +100,12 @@ export default function StandalonePlanCard({
   capacity,
   p2pAmountCents = null,
   p2pSplit = null,
+  ticketPriceCents = null,
+  bookingFeeCents = null,
   rsvpClosed,
   autoOpenRsvp,
 }: Props) {
+  const paidTicket = (ticketPriceCents ?? 0) > 0;
   const showWhen = variant !== "copy" && expiryDate !== null;
   const blurDetails = variant === "privateCalendar";
   const isFull = capacity != null && rsvpCount >= capacity;
@@ -318,6 +324,9 @@ export default function StandalonePlanCard({
                 requireApproval={requireApproval}
                 p2pAmountCents={p2pAmountCents}
                 p2pSplit={p2pSplit}
+                ticketPriceCents={ticketPriceCents}
+                bookingFeeCents={bookingFeeCents}
+                planImage={image}
                 isFull={isFull}
                 limitedSpots={capacity != null}
                 rsvpClosed={rsvpClosed}
@@ -333,15 +342,26 @@ export default function StandalonePlanCard({
                   page server-redirects to the App Store. Plain <a> (not next
                   Link) so the browser does a full navigation that Safari can
                   hand off to iOS's UL machinery. */}
-              <a
-                href={`/open/p/${eventGroupId}`}
-                className="block w-full text-center border border-zinc-200 text-zinc-900 rounded-full py-3 text-sm font-medium hover:bg-zinc-50 transition"
-              >
-                Open in Leaf
-              </a>
-              <p className="text-xs text-center text-zinc-500">
-                RSVP in the browser, or open Leaf to chat with the host.
-              </p>
+              {/* Paid nights stay in the browser until the app can sell the
+                  ticket: an installed build would open the plan, then fail
+                  Accept with "this plan needs a ticket". */}
+              {paidTicket ? (
+                <p className="text-xs text-center text-zinc-500">
+                  Tickets are sold here in the browser. After you pay, you&apos;ll get a link to the plan chat in Leaf.
+                </p>
+              ) : (
+                <>
+                  <a
+                    href={`/open/p/${eventGroupId}`}
+                    className="block w-full text-center border border-zinc-200 text-zinc-900 rounded-full py-3 text-sm font-medium hover:bg-zinc-50 transition"
+                  >
+                    Open in Leaf
+                  </a>
+                  <p className="text-xs text-center text-zinc-500">
+                    RSVP in the browser, or open Leaf to chat with the host.
+                  </p>
+                </>
+              )}
             </>
           ) : null}
 

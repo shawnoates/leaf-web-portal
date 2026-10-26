@@ -9,6 +9,7 @@ import { collectsMoney, p2pPriceLine, type P2pSplitSummary } from "@/lib/p2p";
 import { track } from "@/lib/track";
 import { setVerifiedUserCookie } from "@/lib/verified-user";
 import { ContactStep, usePhoneVerify, type ContactChoice } from "@/components/ContactStep";
+import PaidRsvp from "@/components/PaidRsvp";
 import {
   Calendar as CalendarIcon,
   CheckCircle2,
@@ -56,6 +57,10 @@ type Props = {
   /** Host collects peer to peer: the success step shows how to pay them. */
   p2pAmountCents?: number | null;
   p2pSplit?: P2pSplitSummary | null;
+  /** Paid night: RSVPing means buying a ticket (verified phone, then checkout). */
+  ticketPriceCents?: number | null;
+  bookingFeeCents?: number | null;
+  planImage?: string | null;
   /** A host hello was on the page when this RSVP happened. Reported with
    *  the event so the watch → RSVP funnel can tell those plans apart. */
   hadIntroVideo?: boolean;
@@ -110,6 +115,9 @@ export default function StandalonePlanRsvp({
   requireApproval,
   p2pAmountCents = null,
   p2pSplit = null,
+  ticketPriceCents = null,
+  bookingFeeCents = null,
+  planImage = null,
   hadIntroVideo,
   isFull,
   limitedSpots = false,
@@ -118,6 +126,9 @@ export default function StandalonePlanRsvp({
   onLocationRevealed,
 }: Props) {
   const [open, setOpen] = useState(autoOpenRsvp);
+  const paidTicket = (ticketPriceCents ?? 0) > 0;
+  const ticketTotal = (ticketPriceCents ?? 0) + (bookingFeeCents ?? 0);
+  const ticketLabel = `Get a ticket · $${ticketTotal % 100 ? (ticketTotal / 100).toFixed(2) : ticketTotal / 100}`;
 
   // Strip the rsvp=1 query the bouncer added so a refresh / share doesn't
   // re-pop the modal. The cookie/state hydration inside RsvpModal still
@@ -147,6 +158,16 @@ export default function StandalonePlanRsvp({
         >
           No longer accepting RSVPs
         </div>
+      ) : paidTicket ? (
+        // No app bouncer for a paid night: shipped iOS builds can't sell the
+        // ticket yet, so the purchase happens here.
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="block w-full text-center bg-zinc-900 text-white rounded-full py-3 text-sm font-medium hover:bg-zinc-800 transition"
+        >
+          {isFull ? "Sold out" : ticketLabel}
+        </button>
       ) : (
         <a
           href={`/open/p/${eventGroupId}?rsvp=1`}
@@ -165,6 +186,9 @@ export default function StandalonePlanRsvp({
           requireApproval={requireApproval}
           p2pAmountCents={p2pAmountCents}
           p2pSplit={p2pSplit}
+          ticketPriceCents={ticketPriceCents}
+          bookingFeeCents={bookingFeeCents}
+          planImage={planImage}
           hadIntroVideo={hadIntroVideo}
           isFull={isFull}
           limitedSpots={limitedSpots}
@@ -185,6 +209,9 @@ function RsvpModal({
   requireApproval,
   p2pAmountCents,
   p2pSplit,
+  ticketPriceCents,
+  bookingFeeCents,
+  planImage,
   hadIntroVideo,
   isFull,
   limitedSpots,
@@ -193,6 +220,9 @@ function RsvpModal({
 }: {
   p2pAmountCents: number | null;
   p2pSplit: P2pSplitSummary | null;
+  ticketPriceCents: number | null;
+  bookingFeeCents: number | null;
+  planImage: string | null;
   hadIntroVideo?: boolean;
   eventGroupId: string;
   planTitle: string;
@@ -216,7 +246,10 @@ function RsvpModal({
   );
   const collectsP2p = collectsMoney(p2pAmountCents, p2pSplit);
   // Same contact step as the calendar page's sheets: Text me / Email me.
-  const verify = usePhoneVerify();
+  // A paid night needs the one-time code: the server only sells a ticket to a
+  // verified session, never to a phone number typed in.
+  const paidTicket = (ticketPriceCents ?? 0) > 0;
+  const verify = usePhoneVerify(paidTicket ? { requireSession: true } : undefined);
   const [contact, setContact] = useState<ContactChoice | null>(null);
   const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
   const [errorMsg, setErrorMsg] = useState("");
@@ -322,6 +355,29 @@ function RsvpModal({
                 email: "We'll email your confirmation and a reminder.",
               }}
               onConfirmed={(who) => rsvp(who)}
+              allowEmail={!paidTicket}
+              renderVerifiedAction={paidTicket ? () => (
+                verify.sessionToken ? (
+                  <PaidRsvp
+                    planId={eventGroupId}
+                    sessionToken={verify.sessionToken}
+                    name={verify.name}
+                    phone={verify.phone}
+                    priceCents={ticketPriceCents ?? 0}
+                    feeCents={bookingFeeCents ?? 0}
+                    summary={{
+                      title: planTitle,
+                      when: expiryDate ? new Date(expiryDate).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "",
+                      place: revealedName,
+                      image: planImage,
+                    }}
+                    onPaid={() => {
+                      setContact({ name: verify.name, phone: verify.phone, notify: "text" });
+                      setFormStep("success");
+                    }}
+                  />
+                ) : null
+              ) : undefined}
               extras={({ method, verified }) => (
                 <>
                   {requireApproval ? (
