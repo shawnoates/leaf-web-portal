@@ -315,9 +315,18 @@ export default function ChatShell({
       // Fire-and-forget: notify other attendees via push (and one-time SMS
       // nudge for web RSVPers without the app). Same cloud function the iOS
       // app calls when it sends a chat message — keeps notification parity.
+      // iOS prefixes the push with "<first name> sent a message: " — without
+      // it the notification shows only the raw text.
+      const me = Parse.User.current();
+      const fullName =
+        (me?.get("name") as string) ||
+        (me?.get("full_name") as string) ||
+        (me?.get("first_name") as string) ||
+        "";
+      const firstName = fullName.trim().split(/\s+/)[0] || "Someone";
       Parse.Cloud.run("sendPushNotificationsToAttendeesOfGroup", {
         groupId: eventGroupId,
-        message: text,
+        message: `${firstName} sent a message: ${text}`,
       }).catch((err: unknown) => {
         console.warn("[chat] push notification failed:", err);
       });
