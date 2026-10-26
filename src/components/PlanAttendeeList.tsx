@@ -10,6 +10,8 @@ export type Attendee = {
   sharePhoneWithHost: boolean;
   status: string;
   waitlisted?: boolean;
+  /** Tapped "I'm still coming" on a reminder. Absent on older servers. */
+  reconfirmed?: boolean;
   rsvpNote: string | null;
 };
 
@@ -53,9 +55,10 @@ function paletteFor(id: string) {
   return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
 }
 
-function statusPill(status: string, waitlisted: boolean) {
+function statusPill(status: string, waitlisted: boolean, reconfirmed = false) {
   const s = status.toLowerCase();
   if (s === "accepted" || s === "going") {
+    if (reconfirmed) return { label: "Confirmed", cls: "bg-emerald-100 text-emerald-900", dot: "bg-emerald-800" };
     return { label: "Going", cls: "bg-emerald-50 text-emerald-800", dot: "bg-emerald-700" };
   }
   if (s === "maybe") return { label: "Maybe", cls: "bg-amber-50 text-amber-800", dot: "bg-amber-600" };
@@ -219,7 +222,7 @@ function AttendeeRow({
   onRemove,
 }: RowProps) {
   const waitlisted = isPendingStatus(a.status) && a.waitlisted === true;
-  const pill = statusPill(a.status, waitlisted);
+  const pill = statusPill(a.status, waitlisted, a.reconfirmed === true);
   const hasNote = !!a.rsvpNote;
   const firstName = a.name.trim().split(/\s+/)[0] || a.name;
   const pending = isPendingStatus(a.status) && !waitlisted;

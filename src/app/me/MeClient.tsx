@@ -136,6 +136,10 @@ interface Plan {
   /** A seat opened and the server offered it to this viewer (rsvpState is
    *  "waitlisted"). First to claim wins — see claimWaitlistSpot. */
   waitlistOffered?: boolean;
+  /** Inside 24h of the start and the viewer (going) hasn't said "I'm still
+   *  coming" yet — the server only sets it on plans that reconfirm (not
+   *  ticketed or p2p-paid). Absent on older servers. */
+  reconfirmNeeded?: boolean;
   /** Cohort the originating idea was aimed at ("moms", …). Null when the plan
    *  has no idea behind it; "any" and unknown slugs render no chip. */
   audienceTag?: string | null;
@@ -663,7 +667,8 @@ export default function MeClient() {
   }, []);
 
   const onRsvp = useCallback((planId: string, next: RsvpState) => {
-    patchPlan(planId, (p) => ({ ...p, rsvpState: next }));
+    // "going" on a plan already going is the "I'm still coming" confirm.
+    patchPlan(planId, (p) => ({ ...p, rsvpState: next, reconfirmNeeded: next === "going" && p.rsvpState === "going" ? false : p.reconfirmNeeded }));
   }, [patchPlan]);
 
   let body: React.ReactNode = null;
@@ -1887,6 +1892,20 @@ function HeroActions({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: Rsv
     }
   }
 
+  // "Are you still coming?" — the reminder texts link here. Only the tap counts.
+  async function reconfirm() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await Parse.Cloud.run("confirmMyRsvp", { eventGroupId: plan.id });
+      onRsvp(plan.id, "going");
+    } catch {
+      // Leave the button up; the next tap retries.
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const primaryLabel = hosting ? "You're hosting"
     : going ? "Going ✓"
     : pending ? "Requested ✓"
@@ -1905,6 +1924,11 @@ function HeroActions({ plan, onRsvp }: { plan: Plan; onRsvp: (id: string, s: Rsv
       >
         {primaryLabel}
       </button>
+      {going && !hosting && plan.reconfirmNeeded === true && (
+        <button className="btn primary" disabled={busy} onClick={reconfirm}>
+          I&apos;m still coming
+        </button>
+      )}
       {dir && (
         <a className="btn ghost" href={dir} target="_blank" rel="noopener noreferrer">Getting there</a>
       )}

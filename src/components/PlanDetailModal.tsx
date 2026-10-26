@@ -110,6 +110,8 @@ type Rsvp = {
   status: string;
   /** Requested row queued for a spot on a full plan, not awaiting approval. */
   waitlisted?: boolean;
+  /** Tapped "I'm still coming" on a reminder. */
+  reconfirmed?: boolean;
   rsvpNote: string | null;
 };
 
