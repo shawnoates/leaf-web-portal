@@ -1023,6 +1023,12 @@ function DashboardView({
   const hostInvites = data.hostInvites || [];
   const firstName = (data.person.firstName || "").trim().split(/\s+/)[0] || "";
   const rail = data.needsHost;
+  // A reminder links `/me?plan=<id>` but the dashboard only carries upcoming
+  // plans: once the plan has started it's gone from the list, so land on the
+  // plan page itself rather than a dashboard that doesn't mention it.
+  useEffect(() => {
+    if (openPlanId && !openPlan) window.location.replace(`/p/${encodeURIComponent(openPlanId)}`);
+  }, [openPlanId, openPlan]);
 
   // Pins for the rail map — the hero plus everything upcoming with a visible
   // venue. Plans with a gated venue carry no coordinates by design (server
