@@ -1600,7 +1600,8 @@ function CycleCard({
       {["polling", "locked", "booked"].includes(c.state) && (c.isHost || isOwner) && (!c.venue?.fixed || c.venue?.custom) && (
         <ChangePlace cycle={c} auth={auth} busy={busy} onAct={onAct} />
       )}
-      {settled && (c.isHost || isOwner) && <ChangeDate cycle={c} auth={auth} busy={busy} onAct={onAct} />}
+      {settled && c.redate && <RedateVote cycle={c} auth={auth} busy={busy} onAct={onAct} canDecide={Boolean(c.isHost || isOwner)} />}
+      {settled && !c.redate && (c.isHost || isOwner) && <ChangeDate cycle={c} auth={auth} busy={busy} onAct={onAct} />}
     </Card>
   );
 }
@@ -1855,7 +1856,78 @@ function ChangeDate({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: C
           ))}
         </ul>
       )}
+      {!picked && (
+        <div className="flex flex-col gap-1 border-t border-fm-line-dim px-1 pt-2.5">
+          <Button small kind="ghost" disabled={busy !== null} onClick={() => void onAct("redate", () => run("startCrewRedate", auth, { cycleId: c.cycleId })).then(close)}>
+            {busy === "redate" ? "Asking…" : "Let the crew vote instead"}
+          </Button>
+          <p className="m-0 text-xs text-fm-muted">Everyone invited votes on this date and the best others for a day. The night stays set meanwhile.</p>
+        </div>
+      )}
       <button type="button" onClick={close} className="min-h-11 w-fit text-sm text-fm-muted underline underline-offset-4">Never mind</button>
+    </div>
+  );
+}
+
+/**
+ * A set night's date vote: tap the dates that work (saved as you tap), see
+ * how many each has, and the forecast. It closes after a day, or once
+ * everyone's voted; the host can decide early. A tie keeps the current date.
+ */
+function RedateVote({ cycle: c, auth, busy, onAct, canDecide }: { cycle: CycleView; auth: CrewAuth; busy: string | null; onAct: (key: string, fn: () => Promise<unknown>) => Promise<void>; canDecide: boolean }) {
+  const r = c.redate!;
+  const [mine, setMine] = useState<Set<number>>(new Set(r.myVotes || []));
+  const save = (next: Set<number>) => {
+    setMine(next);
+    void onAct("redateVote", () => run("voteCrewRedate", auth, { cycleId: c.cycleId, picks: [...next] }));
+  };
+  const toggle = (i: number) => { const next = new Set(mine); if (next.has(i)) next.delete(i); else next.add(i); save(next); };
+  const closes = new Date(r.closesAt);
+  return (
+    <div className="flex flex-col gap-2.5 rounded-[18px] border border-fm-accent p-3">
+      <div className="px-1">
+        <Mono className="text-fm-accent">New date?</Mono>
+        <p className="mb-0 mt-1 text-sm text-fm-ink-2">
+          {r.byName ? `${r.byName} asked the crew.` : "The crew is voting."} Tap the dates that work. Closes {closes.toLocaleDateString("en-US", { weekday: "short", hour: "numeric" })}.
+        </p>
+      </div>
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        {r.options.map((o, i) => {
+          const p = dayParts(o.date);
+          const on = mine.has(i);
+          const count = o.votes - (r.myVotes?.includes(i) ? 1 : 0) + (on ? 1 : 0);
+          const w = o.weather;
+          return (
+            <li key={o.date}>
+              <button
+                type="button"
+                aria-pressed={on}
+                disabled={busy !== null && busy !== "redateVote"}
+                onClick={() => toggle(i)}
+                className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left ${on ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line bg-fm-canvas text-fm-ink hover:border-fm-ink-2"}`}
+              >
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-[15px] font-semibold">{p.dow}, {p.month} {p.day} · {timeLabel(o.time)}{o.current ? " · now" : ""}</span>
+                  <span className={`text-xs ${on ? "" : "text-fm-muted"}`}>
+                    {[o.known ? `${o.free} of ${o.known} free` : null, w ? [w.temp ? `${String(w.temp).replace(/[^\d-]/g, "")}°` : null, w.rain != null && w.rain >= 40 ? `${w.rain}% rain` : w.text].filter(Boolean).join(" · ") : null].filter(Boolean).join(" · ") || (o.current ? "The date it's set for" : "")}
+                  </span>
+                </span>
+                <span className={`shrink-0 text-xs font-semibold ${on ? "" : "text-fm-ink-2"}`}>{count} can</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="flex flex-wrap items-center gap-4 px-1">
+        {mine.size === 0 && r.myVotes === null && (
+          <button type="button" onClick={() => save(new Set())} className="min-h-11 text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink">None of these work</button>
+        )}
+        {canDecide && (
+          <button type="button" disabled={busy !== null} onClick={() => void onAct("redateDecide", () => run("decideCrewRedate", auth, { cycleId: c.cycleId }))} className="min-h-11 text-sm font-semibold text-fm-ink-2 underline underline-offset-4 hover:text-fm-ink">
+            {busy === "redateDecide" ? "Deciding…" : `Decide now · ${r.voters} voted`}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -80,6 +80,14 @@ export type CycleView = {
   sittingOut?: string[];
   /** A theme night: the theme that picked this night's place ("Drinks under $10"). */
   theme?: { label: string; special?: string | null } | null;
+  /** A set night's date vote ("Let the crew vote instead"): the current date first, then the others. */
+  redate?: {
+    options: { date: string; time: string; current: boolean; votes: number; free?: number | null; known?: number | null; weather?: { temp: string | null; text: string | null; icon: string | null; rain: number | null } | null }[];
+    myVotes: number[] | null;
+    voters: number;
+    byName: string | null;
+    closesAt: string;
+  } | null;
   /** While voting: the forecast at the place for each date option (within ~10 days), by 'YYYY-MM-DD'. */
   weather?: Record<string, { temp: string | null; text: string | null; icon: string | null; rain: number | null }>;
   votes: Record<string, number[]> | null;
