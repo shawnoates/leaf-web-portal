@@ -1325,6 +1325,13 @@ function CycleCard({
                 ? <a href={placeHref} target={inApp ? undefined : "_blank"} rel="noreferrer" className="hover:underline underline-offset-4">{c.venue.address}</a>
                 : c.venue?.address || cycleStatusLine(c, names)}
           </p>
+          {/* The set night's forecast, once it's within ~10 days (refreshed every few hours). */}
+          {settled && c.chosenOption && c.weather?.[c.chosenOption.date] && (
+            <p className="m-0 flex items-center gap-1.5 text-sm text-fm-ink-2">
+              <span className="font-fm-mono text-[10px] uppercase tracking-[0.1em] text-fm-muted">Forecast</span>
+              <WeatherLine w={c.weather[c.chosenOption.date]} on={false} />
+            </p>
+          )}
           {settled && c.chosenOption && c.showtimes?.[c.chosenOption.date]?.bookingUrl && (
             <a href={c.showtimes[c.chosenOption.date].bookingUrl!} target="_blank" rel="noreferrer" className="w-fit text-sm font-semibold text-fm-ink underline underline-offset-4">
               Get tickets for the {timeLabel(c.showtimes[c.chosenOption.date].time)} showing
