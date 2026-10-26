@@ -37,9 +37,9 @@ import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
   type EventMatch,
-  type ThemeVote, RHYTHM_LABELS, crewHref, freeShareWords, pctLabel, crewIsEvening, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
+  type ThemeVote, RHYTHM_LABELS, crewHref, freeShareWords, crewIsEvening, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
   type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult,
-  type CrewAddOn, type CrewSplit, type LastNight, type FreeRule,
+  type CrewAddOn, type CrewSplit, type LastNight,
 } from "@/lib/crew";
 
 /**
@@ -527,14 +527,15 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             {/* Before the next night's place is picked: give it a theme (ideas from
                 the crew's name and history, or your own). */}
             {me.status === "in" && !crew.oneTime && !fixedPlace && crew.enabled !== false
-              && open.every((c) => c.state === "picking") && ((crew.themeVotes?.length ?? 0) > 0 || (crew.themeIdeas?.length ?? 0) > 0 || (crew.bookThemes?.length ?? 0) > 0) && (
+              && open.every((c) => c.state === "picking") && ((crew.themeVotes?.length ?? 0) > 0 || (crew.themeIdeas?.length ?? 0) > 0 || (crew.bookThemes?.length ?? 0) > 0 || (crew.birthdayThemes?.length ?? 0) > 0) && (
               <NextThemeCard
                 votes={crew.themeVotes || []}
                 ideas={crew.themeIdeas || []}
                 fromBook={crew.bookThemes || []}
+                birthdays={crew.birthdayThemes || []}
                 night={night}
                 busy={busy}
-                onVote={(label, on) => act(`theme-${label}`, () => run("voteCrewTheme", auth, { label, on }))}
+                onVote={(label, on, birthdayOf) => act(`theme-${label}`, () => run("voteCrewTheme", auth, { label, on, ...(birthdayOf ? { birthdayOf } : {}) }))}
               />
             )}
 
@@ -1078,31 +1079,6 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 </div>
               )}
 
-              {me.isOwner && (
-                <FreeRuleRow
-                  rule={crew.freeTrigger || null}
-                  label={crew.freeTriggerLabel || null}
-                  usualTime={crew.usualTime || null}
-                  busy={busy !== null}
-                  onSave={(rule) => act("free", () => run("setCrewFreeTrigger", auth, { calendarId: crew.id, rule }))}
-                />
-              )}
-
-              {me.isOwner && (
-                <div className="flex items-center gap-3 border-b border-fm-line-dim py-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 text-[15px] font-semibold">Birthdays <span className="rounded-full bg-fm-card px-1.5 py-0.5 font-fm-mono text-[9px] tracking-[0.06em] text-fm-accent">BETA</span></div>
-                    <div className="text-[13px] text-fm-muted">The {night} nearest someone&rsquo;s birthday is theirs: they pick where, Leaf finds a date that week.</div>
-                  </div>
-                  <FriendModeSwitch
-                    label="Birthdays"
-                    checked={Boolean(crew.birthdays)}
-                    disabled={busy !== null}
-                    onChange={(v) => act("birthdays", () => run("setCrewBirthdays", auth, { calendarId: crew.id, on: v }))}
-                  />
-                </div>
-              )}
-
               <div className="py-4">
                 <label htmlFor="my-pace" className="block text-[15px] font-semibold">Your pace</label>
                 <select
@@ -1476,6 +1452,7 @@ function CycleCard({
                   >
                     <Mono className={`whitespace-nowrap ${on ? "" : "text-fm-muted"}`}>{p.dow}{o.time ? ` ${timeLabel(o.time)}` : ""}</Mono>
                     <span className="font-fm-serif text-[34px] leading-none lg:text-[38px]">{p.month} {p.day}</span>
+                    {c.weather?.[o.date] && <WeatherLine w={c.weather[o.date]} on={on} />}
                     <span className={`text-xs ${on ? "font-semibold" : "text-fm-muted"}`}>
                       {count} can
                       {c.fit?.[i] && c.fit[i].known > 0 ? ` · ${c.fit[i].free} of ${c.fit[i].known} free` : ""}
@@ -2097,29 +2074,22 @@ function AddBirthday({ auth, onDone }: { auth: CrewAuth; onDone: () => void }) {
   );
 }
 
-const FREE_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
-const FREE_DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const FREE_TIMES = [{ time: "10:00", label: "Morning" }, { time: "14:00", label: "Afternoon" }, { time: "19:00", label: "Evening" }];
-
-/**
- * Organizer: When we're free (BETA). On, Leaf plans a night when a share of
- * the crew (half, 60%…) are free the same day (synced calendars); turning it on asks the
- * members who haven't synced to sync.
- */
 /**
  * Themes for the next night, like second stops: upvote one of Leaf's ideas
  * (made from the crew's name and history) or suggest your own. The most
  * upvoted is the night's theme when Leaf starts planning it, and Leaf picks
  * places that fit.
  */
-function NextThemeCard({ votes, ideas, fromBook, night, busy, onVote }: {
+function NextThemeCard({ votes, ideas, fromBook, birthdays, night, busy, onVote }: {
   votes: ThemeVote[];
   ideas: string[];
   /** Themes the book can fill: first, with how many of its places fit. */
   fromBook: { label: string; count: number }[];
+  /** A member's birthday around the next night: "Shawn's Birthday Celebration", with its date. */
+  birthdays: { userId: string; label: string; date: string }[];
   night: string;
   busy: string | null;
-  onVote: (label: string, on: boolean) => Promise<void> | void;
+  onVote: (label: string, on: boolean, birthdayOf?: string) => Promise<void> | void;
 }) {
   const [own, setOwn] = useState("");
   const [typing, setTyping] = useState(false);
@@ -2127,9 +2097,11 @@ function NextThemeCard({ votes, ideas, fromBook, night, busy, onVote }: {
   const voted = new Set(votes.map((v) => v.label.toLowerCase()));
   const bookCount = new Map(fromBook.map((b) => [b.label.toLowerCase(), b.count]));
   const unvoted = (l: string) => !voted.has(l.toLowerCase());
-  // Voted first, then what the book can fill, then Leaf's other ideas.
+  const birthdayOf = new Map(birthdays.map((b) => [b.label.toLowerCase(), b]));
+  // Voted first, then birthdays coming up, then what the book can fill, then Leaf's other ideas.
   const rows: ThemeVote[] = [
     ...votes,
+    ...birthdays.map((b) => b.label).filter(unvoted),
     ...fromBook.map((b) => b.label).filter(unvoted),
     ...ideas.filter((l) => unvoted(l) && !bookCount.has(l.toLowerCase())),
   ].map((t) => (typeof t === "string" ? { label: t, votes: 0, myVote: false, byName: null } : t));
@@ -2151,7 +2123,9 @@ function NextThemeCard({ votes, ideas, fromBook, night, busy, onVote }: {
           <li key={t.label} className="flex min-h-11 items-center gap-2.5 rounded-full border border-fm-line bg-fm-card py-1 pl-4 pr-1.5">
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-sm font-semibold text-fm-ink">{t.label}</span>
-              {bookCount.has(t.label.toLowerCase())
+              {birthdayOf.has(t.label.toLowerCase())
+                ? <span className="truncate text-xs text-fm-accent">{birthdayOf.get(t.label.toLowerCase())!.date}</span>
+                : bookCount.has(t.label.toLowerCase())
                 ? <span className="truncate text-xs text-fm-accent">From the book · {bookCount.get(t.label.toLowerCase())} places</span>
                 : t.byName && <span className="truncate text-xs text-fm-muted">Suggested by {t.byName}</span>}
             </span>
@@ -2160,7 +2134,7 @@ function NextThemeCard({ votes, ideas, fromBook, night, busy, onVote }: {
               aria-pressed={t.myVote}
               aria-label={t.myVote ? `Take back your upvote for ${t.label}` : `Upvote ${t.label}`}
               disabled={busy !== null}
-              onClick={() => void onVote(t.label, !t.myVote)}
+              onClick={() => void onVote(t.label, !t.myVote, birthdayOf.get(t.label.toLowerCase())?.userId)}
               className={`h-9 shrink-0 rounded-full px-3 text-xs font-bold disabled:opacity-60 ${t.myVote ? "bg-fm-accent text-fm-canvas" : "border border-fm-line text-fm-ink"}`}
             >
               ▲ {t.votes}
@@ -2187,70 +2161,11 @@ function NextThemeCard({ votes, ideas, fromBook, night, busy, onVote }: {
   );
 }
 
-function FreeRuleRow({ rule, label, usualTime, busy, onSave }: {
-  rule: FreeRule | null; label: string | null; usualTime: string | null; busy: boolean;
-  onSave: (rule: Omit<FreeRule, "kind" | "everyDays"> | null) => Promise<void>;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [minPct, setMinPct] = useState(rule?.minPct ?? 50);
-  const [days, setDays] = useState<number[]>(rule?.days ?? [5, 6]);
-  const [time, setTime] = useState(rule?.time ?? (FREE_TIMES.some((t) => t.time === usualTime) ? usualTime! : "19:00"));
-  return (
-    <div className="border-b border-fm-line-dim py-4">
-      <div className="flex items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-[15px] font-semibold">When we&rsquo;re free <span className="rounded-full bg-fm-card px-1.5 py-0.5 font-fm-mono text-[9px] tracking-[0.06em] text-fm-accent">BETA</span></div>
-          <div className="text-[13px] text-fm-muted">
-            {rule && label ? <>{label} · <button type="button" className="underline underline-offset-2" onClick={() => setEditing(!editing)}>{editing ? "Close" : "Edit"}</button></>
-              : "Leaf plans a night when enough of you are free the same day, from synced calendars."}
-          </div>
-        </div>
-        <FriendModeSwitch
-          label="When we're free"
-          checked={Boolean(rule)}
-          disabled={busy}
-          onChange={(v) => {
-            if (v) setEditing(true);
-            else { setEditing(false); void onSave(null); }
-          }}
-        />
-      </div>
-      {editing && (
-        <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-fm-line bg-fm-canvas p-3.5 text-sm">
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-semibold text-fm-ink-2">When at least</span>
-            <span className="flex items-center gap-2">
-              <button type="button" aria-label="Fewer of the crew" onClick={() => setMinPct(Math.max(20, minPct - 10))} className="h-8 w-8 rounded-full border border-fm-line">&minus;</button>
-              <span className="w-28 text-center font-fm-serif text-[19px]">{pctLabel(minPct)} free</span>
-              <button type="button" aria-label="More of the crew" onClick={() => setMinPct(Math.min(100, minPct + 10))} className="h-8 w-8 rounded-full border border-fm-line">+</button>
-            </span>
-          </div>
-          <div className="flex gap-1">
-            {FREE_DAYS.map((d, i) => {
-              const on = days.includes(i);
-              return (
-                <button key={i} type="button" aria-label={FREE_DAY_NAMES[i]} aria-pressed={on} onClick={() => setDays(on ? days.filter((x) => x !== i) : [...days, i])}
-                  className={`h-9 flex-1 rounded-lg border text-xs font-semibold ${on ? "border-fm-accent bg-fm-accent text-fm-canvas" : "border-fm-line text-fm-ink-2"}`}>
-                  {d}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex gap-1.5">
-            {FREE_TIMES.map((t) => (
-              <button key={t.time} type="button" aria-pressed={time === t.time} onClick={() => setTime(t.time)}
-                className={`h-8 flex-1 rounded-full border text-xs font-semibold ${time === t.time ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink-2"}`}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-          <p className="m-0 text-xs text-fm-muted">Of the crew, so it keeps up as people join (never fewer than 2). Only Google Calendars count for now. Leaf asks everyone who hasn&rsquo;t synced theirs to sync.</p>
-          <div className="flex gap-2">
-            <Button small disabled={busy || days.length === 0} onClick={() => void onSave({ minPct, days, time }).then(() => setEditing(false))}>{rule ? "Save" : "Turn on"}</Button>
-            <Button small kind="ghost" onClick={() => setEditing(false)}>Cancel</Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+/** The forecast for a poll date: "72° · Sunny", or the rain chance when it's likely ("64° · 60% rain"). */
+function WeatherLine({ w, on }: { w: { temp: string | null; text: string | null; icon: string | null; rain: number | null }; on: boolean }) {
+  const temp = w.temp ? `${String(w.temp).replace(/[^\d-]/g, "")}°` : null;
+  const sky = w.rain != null && w.rain >= 40 ? `${w.rain}% rain` : w.text;
+  const line = [temp, sky].filter(Boolean).join(" · ");
+  if (!line) return null;
+  return <span className={`text-xs ${on ? "" : "text-fm-ink-2"}`}>{line}</span>;
 }

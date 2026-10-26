@@ -80,6 +80,8 @@ export type CycleView = {
   sittingOut?: string[];
   /** A theme night: the theme that picked this night's place ("Drinks under $10"). */
   theme?: { label: string; special?: string | null } | null;
+  /** While voting: the forecast at the place for each date option (within ~10 days), by 'YYYY-MM-DD'. */
+  weather?: Record<string, { temp: string | null; text: string | null; icon: string | null; rain: number | null }>;
   votes: Record<string, number[]> | null;
   myVotes: number[] | null;
   /** Dates this person looks free for (synced calendar / Leaf plans); pre-selected, never auto-voted. */
@@ -217,6 +219,8 @@ export type CrewPage = {
     themeIdeas?: string[];
     /** Themes the book itself can fill, with how many of its places fit ("Sushi night · 3 places"). */
     bookThemes?: { label: string; count: number }[];
+    /** A member's birthday around the next night, as a theme idea ("Shawn's Birthday Celebration", "Sat, Nov 8"). */
+    birthdayThemes?: { userId: string; label: string; date: string }[];
     /** When Leaf starts the next round on its own (recurring crews that are on). */
     nextRoundAt?: string | null;
     /** A one-time crew after its night: offer "Do it again?". */
