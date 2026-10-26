@@ -65,6 +65,7 @@ export type PlanDetailData = {
   pollVoteCount?: number;
   hideVenueUntilRsvp?: boolean;
   requireApproval?: boolean;
+  reconfirmMode?: "off" | "ask" | "ask_and_release";
   /** Max attendees; null/undefined = no limit. Threaded into the edit
    *  pre-fill — updatePlanDetails treats a missing capacity as "clear it". */
   capacity?: number | null;

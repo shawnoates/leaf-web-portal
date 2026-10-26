@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import SubscriptionModal from "@/components/SubscriptionModal";
-import CreatePlanModal, { type CreatePlanPrefill } from "@/components/CreatePlanModal";
+import CreatePlanModal, { type CreatePlanPrefill, type ReconfirmMode } from "@/components/CreatePlanModal";
 import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailModal";
 import HostIdeaModal from "@/components/HostIdeaModal";
 import PlanChatDrawer from "@/components/PlanChatDrawer";
@@ -209,6 +209,7 @@ interface PastPlan {
   time?: string | null;
   capacity?: number | null;
   requireApproval?: boolean;
+  reconfirmMode?: ReconfirmMode;
   hideVenueUntilRsvp?: boolean;
 }
 
@@ -262,6 +263,7 @@ interface UpcomingPlan {
   pollClosesAt?: string | null;
   hideVenueUntilRsvp?: boolean;
   requireApproval?: boolean;
+  reconfirmMode?: ReconfirmMode;
   capacity?: number | null;
   hostNote?: string | null;
   planSeriesId?: string | null;
@@ -972,6 +974,7 @@ export default function PlansManager({
         pollClosesAt?: string | null;
         hideVenueUntilRsvp?: boolean;
         requireApproval?: boolean;
+        reconfirmMode?: ReconfirmMode;
         capacity?: number | null;
         hostNote?: string | null;
         planSeriesId?: string | null;
@@ -996,6 +999,7 @@ export default function PlansManager({
         pollClosesAt: p.pollClosesAt,
         hideVenueUntilRsvp: p.hideVenueUntilRsvp,
         requireApproval: p.requireApproval,
+        reconfirmMode: p.reconfirmMode,
         capacity: p.capacity ?? null,
         hostNote: p.hostNote ?? null,
         planSeriesId: p.planSeriesId,
@@ -1645,6 +1649,7 @@ export default function PlansManager({
       hostNote: plan.hostNote || undefined,
       hideVenueUntilRsvp: plan.hideVenueUntilRsvp,
       requireApproval: plan.requireApproval,
+      reconfirmMode: plan.reconfirmMode,
       additionalStops: extraStops.length > 0 ? extraStops : undefined,
     });
     setEditingPlanId(plan.objectId);
@@ -1695,6 +1700,7 @@ export default function PlansManager({
       imageUrl: plan.image,
       hideVenueUntilRsvp: plan.hideVenueUntilRsvp,
       requireApproval: plan.requireApproval,
+      reconfirmMode: plan.reconfirmMode,
       additionalStops: extraStops.length > 0 ? extraStops : undefined,
       coverSeed: plan.title,
       // Repeat carries the whole subject over; only the date is open, so the
@@ -2422,6 +2428,7 @@ export default function PlansManager({
             pollClosesAt: selectedPlan.pollClosesAt,
             hideVenueUntilRsvp: selectedPlan.hideVenueUntilRsvp,
             requireApproval: selectedPlan.requireApproval,
+            reconfirmMode: selectedPlan.reconfirmMode,
             capacity: selectedPlan.capacity ?? null,
             hostNote: selectedPlan.hostNote ?? null,
             planSeriesId: selectedPlan.planSeriesId,

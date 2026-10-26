@@ -115,6 +115,8 @@ export interface CreatePlanPrefill {
   hideVenueUntilRsvp?: boolean;
   /** Plan's current requireApproval value (used when editing an existing plan). */
   requireApproval?: boolean;
+  /** Plan's "still coming?" setting (editing only). Absent = ask. */
+  reconfirmMode?: ReconfirmMode;
   /** Extra stops beyond the primary venue (multi-stop itineraries added on
    *  iOS). Rendered as a stops list under the primary Venue field; passed
    *  through as part of `locations` on save so the dashboard can edit them
@@ -278,6 +280,10 @@ function pillLabel(pill: { text: string; label?: string | null }): string {
   return `${(lastSpace > 12 ? cut.slice(0, lastSpace) : cut).replace(/[\s,]+$/, "")}…`;
 }
 
+/** "Still coming?" on the 24h/4h reminders: off, ask only, or ask and release
+ *  guests who never answer (leaflets-server cloud/reconfirm.js). */
+export type ReconfirmMode = "off" | "ask" | "ask_and_release";
+
 export default function CreatePlanModal({ calendarId, calendars, hostCandidates, tier, prefill, hideVenueDefault, requireApprovalDefault, editMode, eventGroupId, hostRequestMode, hostRequestId, pollConvertMode, pollEventGroupId, pollWinningDate, pollWinningTime, onClose, onCreated, onUpgrade, autoSyncOnMount }: CreatePlanModalProps) {
   const [selectedCalendarId, setSelectedCalendarId] = useState(calendarId);
   const [hideVenue, setHideVenue] = useState(prefill?.hideVenueUntilRsvp ?? hideVenueDefault ?? true);
@@ -316,6 +322,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   );
   const [pollClosesAt, setPollClosesAt] = useState(prefill?.pollClosesAt || "");
   const [requireApproval, setRequireApproval] = useState(prefill?.requireApproval ?? requireApprovalDefault ?? false);
+  const [reconfirmMode, setReconfirmMode] = useState<ReconfirmMode>(prefill?.reconfirmMode ?? "ask");
   // Recurring plan series — only valid in create-mode for hosted plans.
   // Editing an existing plan or approving a host request doesn't currently
   // support converting to a series; that's a future flow.
@@ -1261,6 +1268,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           hostNote: hostNote.trim() || undefined,
           hideVenueUntilRsvp: hideVenue,
           requireApproval,
+          reconfirmMode,
         });
         // Push the edit to the manager's Google Calendar too. Fire-and-forget:
         // if the token was only granted freebusy (pre-scope-upgrade), Google
@@ -2624,6 +2632,28 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
               >
                 <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${requireApproval ? "left-5" : "left-0.5"}`} />
               </button>
+            </div>
+          )}
+
+
+          {/* "Still coming?" reminders — editing a plan only; skipped for polls and
+              paid tickets, where the server never asks. */}
+          {isHosted && editMode && (
+            <div className="py-1">
+              <label htmlFor="reconfirm-mode" className="block text-xs font-medium text-zinc-700">Ask guests to reconfirm</label>
+              <p className="text-xs text-zinc-400 mb-1.5">
+                The 24-hour and 4-hour reminders ask guests who RSVP&apos;d earlier &ldquo;Still coming?&rdquo;. Not used for ticketed plans.
+              </p>
+              <select
+                id="reconfirm-mode"
+                value={reconfirmMode}
+                onChange={(e) => setReconfirmMode(e.target.value as ReconfirmMode)}
+                className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800"
+              >
+                <option value="ask">Ask; release no-replies only if someone is on the waitlist</option>
+                <option value="ask_and_release">Ask; always release guests who don&apos;t reply</option>
+                <option value="off">Don&apos;t ask</option>
+              </select>
             </div>
           )}
 
