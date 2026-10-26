@@ -72,8 +72,8 @@ export default function PointsPage() {
           <h2 style={h2}>Host a plan, earn when people come</h2>
           <p style={p}>
             When a plan you host has run, you earn points, and the more people who show up, the more you earn.
-            People count once they&rsquo;ve checked in or you&rsquo;ve marked them as attended. A plan nobody came
-            to earns nothing, and your own check-in doesn&rsquo;t count.
+            People count once they&rsquo;ve checked in at the plan themselves. A plan nobody checked in at earns
+            nothing, and your own accounts don&rsquo;t count.
           </p>
           <p style={p}>Points for a hosted plan arrive a few hours after it ends.</p>
         </section>
