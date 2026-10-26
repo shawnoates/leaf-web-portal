@@ -37,7 +37,7 @@ import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
   type EventMatch,
-  RHYTHM_LABELS, crewHref, freeShareWords, pctLabel, crewIsEvening, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
+  type ThemeVote, RHYTHM_LABELS, crewHref, freeShareWords, pctLabel, crewIsEvening, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
   type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult,
   type CrewAddOn, type CrewSplit, type LastNight, type FreeRule,
 } from "@/lib/crew";
@@ -518,13 +518,13 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             {/* Before the next night's place is picked: give it a theme (ideas from
                 the crew's name and history, or your own). */}
             {me.status === "in" && !crew.oneTime && !fixedPlace && crew.enabled !== false
-              && open.every((c) => c.state === "picking") && (crew.nextTheme || (crew.themeIdeas?.length ?? 0) > 0) && (
+              && open.every((c) => c.state === "picking") && ((crew.themeVotes?.length ?? 0) > 0 || (crew.themeIdeas?.length ?? 0) > 0) && (
               <NextThemeCard
-                theme={crew.nextTheme || null}
+                votes={crew.themeVotes || []}
                 ideas={crew.themeIdeas || []}
                 night={night}
                 busy={busy}
-                onSet={(label) => act("theme", () => run("setCrewNextTheme", auth, { label }))}
+                onVote={(label, on) => act(`theme-${label}`, () => run("voteCrewTheme", auth, { label, on }))}
               />
             )}
 
@@ -2105,65 +2105,62 @@ const FREE_TIMES = [{ time: "10:00", label: "Morning" }, { time: "14:00", label:
  * members who haven't synced to sync.
  */
 /**
- * The next night's theme: pick one of Leaf's ideas (made from the crew's name
- * and history) or type your own; Leaf then picks places that fit it. Once
- * one's set, it shows who picked it, with Change and No theme.
+ * Themes for the next night, like second stops: upvote one of Leaf's ideas
+ * (made from the crew's name and history) or suggest your own. The most
+ * upvoted is the night's theme when Leaf starts planning it, and Leaf picks
+ * places that fit.
  */
-function NextThemeCard({ theme, ideas, night, busy, onSet }: {
-  theme: { label: string; byName: string | null } | null;
+function NextThemeCard({ votes, ideas, night, busy, onVote }: {
+  votes: ThemeVote[];
   ideas: string[];
   night: string;
   busy: string | null;
-  onSet: (label: string | null) => Promise<void> | void;
+  onVote: (label: string, on: boolean) => Promise<void> | void;
 }) {
-  const [changing, setChanging] = useState(false);
   const [own, setOwn] = useState("");
   const [typing, setTyping] = useState(false);
-  const pick = async (label: string | null) => { await onSet(label); setChanging(false); setTyping(false); setOwn(""); };
-  if (theme && !changing) {
-    return (
-      <Card className="flex flex-col gap-2">
-        <Eyebrow>Next {night}&rsquo;s theme</Eyebrow>
-        <div className="font-fm-serif text-[28px] leading-tight">{theme.label}</div>
-        <p className="m-0 text-sm text-fm-muted">{theme.byName ? `${theme.byName} picked it. ` : ""}Leaf picks places that fit.</p>
-        <div className="flex flex-wrap gap-4">
-          <button type="button" disabled={busy !== null} onClick={() => setChanging(true)} className="min-h-11 text-sm text-fm-ink-2 underline underline-offset-4 hover:text-fm-ink">Change</button>
-          <button type="button" disabled={busy !== null} onClick={() => void pick(null)} className="min-h-11 text-sm text-fm-muted underline underline-offset-4 hover:text-fm-danger">No theme</button>
-        </div>
-      </Card>
-    );
-  }
+  const voted = new Set(votes.map((v) => v.label.toLowerCase()));
+  const rows: ThemeVote[] = [...votes, ...ideas.filter((l) => !voted.has(l.toLowerCase())).map((label) => ({ label, votes: 0, myVote: false, byName: null }))];
+  const leading = votes[0]?.label || null;
   return (
     <Card className="flex flex-col gap-3">
       <div>
         <Eyebrow>A theme for the next {night}?</Eyebrow>
-        <p className="mb-0 mt-2 text-[15px] text-fm-ink-2">Pick one and Leaf finds places that fit. Ideas from what this crew is into.</p>
+        <p className="mb-0 mt-2 text-[15px] text-fm-ink-2">
+          {leading ? <>Leading: <span className="font-semibold text-fm-ink">{leading}</span>. </> : null}
+          Upvote one or suggest your own. The top one is used when Leaf plans the {night}, and Leaf picks places that fit.
+        </p>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {ideas.map((l) => (
-          <button
-            key={l}
-            type="button"
-            disabled={busy !== null}
-            onClick={() => void pick(l)}
-            className={`min-h-11 rounded-full border px-4 text-sm font-semibold disabled:opacity-60 ${theme?.label === l ? "border-fm-accent text-fm-accent" : "border-fm-line text-fm-ink hover:bg-fm-card"}`}
-          >
-            {busy === "theme" ? "…" : l}
-          </button>
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        {rows.map((t) => (
+          <li key={t.label} className="flex min-h-11 items-center gap-2.5 rounded-full border border-fm-line bg-fm-card py-1 pl-4 pr-1.5">
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-sm font-semibold text-fm-ink">{t.label}</span>
+              {t.byName && <span className="truncate text-xs text-fm-muted">Suggested by {t.byName}</span>}
+            </span>
+            <button
+              type="button"
+              aria-pressed={t.myVote}
+              aria-label={t.myVote ? `Take back your upvote for ${t.label}` : `Upvote ${t.label}`}
+              disabled={busy !== null}
+              onClick={() => void onVote(t.label, !t.myVote)}
+              className={`h-9 shrink-0 rounded-full px-3 text-xs font-bold disabled:opacity-60 ${t.myVote ? "bg-fm-accent text-fm-canvas" : "border border-fm-line text-fm-ink"}`}
+            >
+              ▲ {t.votes}
+            </button>
+          </li>
         ))}
-        {!typing && (
-          <button type="button" onClick={() => setTyping(true)} className="min-h-11 rounded-full border border-dashed border-fm-line px-4 text-sm font-semibold text-fm-ink-2 hover:bg-fm-card">
-            Your own
-          </button>
-        )}
-      </div>
-      {typing && (
-        <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (own.trim()) void pick(own.trim()); }}>
-          <input autoFocus value={own} onChange={(e) => setOwn(e.target.value)} maxLength={60} placeholder="Only nautical, Meals under $10…" aria-label="Your own theme" className="h-11 min-w-0 flex-1 rounded-xl border px-3 text-sm" />
-          <Button small type="submit" disabled={busy !== null || !own.trim()}>Set</Button>
+      </ul>
+      {typing ? (
+        <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); const l = own.trim(); if (l) void Promise.resolve(onVote(l, true)).then(() => { setOwn(""); setTyping(false); }); }}>
+          <input autoFocus value={own} onChange={(e) => setOwn(e.target.value)} maxLength={60} placeholder="Only nautical, Meals under $10…" aria-label="Suggest a theme" className="h-11 min-w-0 flex-1 rounded-xl border px-3 text-sm" />
+          <Button small type="submit" disabled={busy !== null || !own.trim()}>Suggest</Button>
         </form>
+      ) : (
+        <button type="button" onClick={() => setTyping(true)} className="min-h-11 w-fit text-sm font-semibold text-fm-ink-2 underline underline-offset-4 hover:text-fm-ink">
+          Suggest your own
+        </button>
       )}
-      {changing && <button type="button" onClick={() => setChanging(false)} className="w-fit text-sm text-fm-muted underline underline-offset-4">Keep {theme?.label}</button>}
     </Card>
   );
 }

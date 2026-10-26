@@ -96,6 +96,8 @@ export type CycleView = {
   myRsvp: "in" | "out" | null;
 };
 
+export type ThemeVote = { label: string; votes: number; myVote: boolean; byName: string | null };
+
 export type Member = {
   membershipId: string;
   userId: string | null;
@@ -209,8 +211,9 @@ export type CrewPage = {
     fixedPlace?: FixedPlace | null;
     /** Each round Leaf starts goes to the next member to host. */
     hostRotation?: boolean;
-    /** Theme nights: the next night's theme (anyone in picks it), and ideas for it from the crew's name and history. */
-    nextTheme?: { label: string; byName: string | null } | null;
+    /** Theme nights: the leading theme for the next night, the themes with upvotes, and Leaf's ideas (from the crew's name and history). */
+    nextTheme?: { label: string } | null;
+    themeVotes?: ThemeVote[];
     themeIdeas?: string[];
     /** When Leaf starts the next round on its own (recurring crews that are on). */
     nextRoundAt?: string | null;
