@@ -10,8 +10,14 @@ export const metadata: Metadata = {
 export default async function HostBoardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ t?: string }>;
+  searchParams: Promise<{ t?: string; plan?: string }>;
 }) {
-  const { t } = await searchParams;
-  return <HostBoardClient linkToken={typeof t === "string" ? t : null} />;
+  const { t, plan } = await searchParams;
+  // `plan` comes from a plan's link in the digest: the board opens on it.
+  return (
+    <HostBoardClient
+      linkToken={typeof t === "string" ? t : null}
+      focusKey={typeof plan === "string" && plan ? plan : null}
+    />
+  );
 }

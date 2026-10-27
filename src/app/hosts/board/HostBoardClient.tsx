@@ -78,8 +78,26 @@ function Shell({ children, wide = false }: { children: React.ReactNode; wide?: b
   // The board itself is a grid and uses the width; the small screens around
   // it (get a link, not available) stay a readable single column.
   return (
-    <main className={`mx-auto px-5 py-10 pb-24 ${wide ? "max-w-6xl" : "max-w-lg"}`}>{children}</main>
+    <main className={`mx-auto w-full min-w-0 px-5 py-10 pb-24 ${wide ? "max-w-6xl" : "max-w-lg"}`}>{children}</main>
   );
+}
+
+// Plans without a picture get a colour from this set, picked by the plan's
+// key so a plan keeps its colour between visits. Leaf's greens plus two warm
+// accents, all dark enough for white text.
+const PLACEHOLDER_GRADIENTS = [
+  "linear-gradient(135deg, #2f6b4f, #1a2924)",
+  "linear-gradient(135deg, #3f7d6a, #1f4a3d)",
+  "linear-gradient(135deg, #5b7f3a, #2c4a1f)",
+  "linear-gradient(135deg, #2b6777, #173b47)",
+  "linear-gradient(135deg, #a55a2a, #5e2f14)",
+  "linear-gradient(135deg, #7a4d7d, #3e2442)",
+];
+
+function placeholderGradient(key: string) {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return PLACEHOLDER_GRADIENTS[h % PLACEHOLDER_GRADIENTS.length];
 }
 
 /** One plan: picture, the facts, a teaser, then price and the action on one line. */
@@ -100,19 +118,23 @@ function PlanCard({
 }) {
   const place = [row.neighborhoods.slice(0, 2).join(", "), row.calendarName].filter(Boolean).join(" · ");
   return (
-    <article className="flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+    <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white">
       <div className="relative aspect-[5/2] w-full overflow-hidden bg-leaf-50 sm:aspect-[2/1]">
         {row.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={row.imageUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/leaf-mark.png" alt="" className="h-12 w-12 opacity-60" />
+          <div
+            className="absolute inset-0 flex items-end p-4"
+            style={{ background: placeholderGradient(row.key) }}
+          >
+            <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-white/95 drop-shadow-sm">
+              {row.title}
+            </span>
           </div>
         )}
       </div>
-      <div className="flex flex-1 flex-col p-4">
+      <div className="flex min-w-0 flex-1 flex-col p-4">
         <h2 className="line-clamp-2 text-[16px] font-semibold leading-snug text-leaf-900">{row.title}</h2>
         <p className="mt-1 text-[14px] text-zinc-700">{row.whenLabel}</p>
         {place && <p className="mt-0.5 truncate text-[13px] text-zinc-500">{place}</p>}
@@ -229,7 +251,16 @@ function GetLink({ lost }: { lost: boolean }) {
   );
 }
 
-export default function HostBoardClient({ linkToken }: { linkToken: string | null }) {
+export default function HostBoardClient({
+  linkToken,
+  focusKey = null,
+}: {
+  linkToken: string | null;
+  /** A plan to open on (`kind:objectId`), from that plan's link in the digest. */
+  focusKey?: string | null;
+}) {
+  // Cleared by "See all plans", so the board can go back to the plain grid.
+  const [focus, setFocus] = useState<string | null>(focusKey);
   const [token, setToken] = useState<string | null>(null);
   const [resolved, setResolved] = useState(false);
   const [board, setBoard] = useState<Board | null>(null);
@@ -322,9 +353,26 @@ export default function HostBoardClient({ linkToken }: { linkToken: string | nul
     );
   }
 
-  const rows = board.rows ?? [];
+  const allRows = board.rows ?? [];
   const applications = board.applications ?? [];
   const busyHosting = Boolean(board.openJob);
+  const focused = focus ? allRows.find((r) => r.key === focus) ?? null : null;
+  // The picked plan sits on its own at the top, so it is not repeated below.
+  const rows = focused ? allRows.filter((r) => r.key !== focused.key) : allRows;
+  const cardFor = (row: BoardRow) => {
+    const myApplication = applications.find((a) => a.key === row.key);
+    return (
+      <PlanCard
+        key={row.key}
+        row={row}
+        application={myApplication}
+        busy={busyKey === row.key || (!!myApplication && busyKey === myApplication.applicationId)}
+        disabled={busyHosting || busyKey === row.key}
+        onApply={() => apply(row)}
+        onWithdraw={withdraw}
+      />
+    );
+  };
 
   return (
     <Shell wide>
@@ -362,7 +410,32 @@ export default function HostBoardClient({ linkToken }: { linkToken: string | nul
 
       {error && <p className="mt-4 text-[14px] text-red-700">{error}</p>}
 
-      {rows.length === 0 ? (
+      {focused && (
+        <section className="mt-6 rounded-3xl bg-leaf-50 p-4 sm:p-6">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-[15px] font-semibold text-leaf-900">The plan you picked</h2>
+            <button className="text-[14px] font-medium text-leaf-800 underline" onClick={() => setFocus(null)}>
+              See all plans
+            </button>
+          </div>
+          <div className="mt-3 min-w-0 max-w-md">{cardFor(focused)}</div>
+        </section>
+      )}
+
+      {focus && !focused && (
+        <div className="mt-6 flex items-start justify-between gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-[15px] leading-relaxed text-zinc-700">
+          <span>That plan is not open any more, so here is everything else near you.</span>
+          <button className="shrink-0 text-[14px] font-medium text-leaf-800 underline" onClick={() => setFocus(null)}>
+            OK
+          </button>
+        </div>
+      )}
+
+      {focused && rows.length > 0 && (
+        <h2 className="mt-8 text-[15px] font-semibold text-leaf-900">More plans near you</h2>
+      )}
+
+      {rows.length === 0 && focused ? null : rows.length === 0 ? (
         <div className={`${card} mt-6`}>
           <p className="text-[15px] leading-relaxed text-zinc-700">
             {scope === "near"
@@ -372,20 +445,7 @@ export default function HostBoardClient({ linkToken }: { linkToken: string | nul
         </div>
       ) : (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {rows.map((row) => {
-            const myApplication = applications.find((a) => a.key === row.key);
-            return (
-              <PlanCard
-                key={row.key}
-                row={row}
-                application={myApplication}
-                busy={busyKey === row.key || (!!myApplication && busyKey === myApplication.applicationId)}
-                disabled={busyHosting || busyKey === row.key}
-                onApply={() => apply(row)}
-                onWithdraw={withdraw}
-              />
-            );
-          })}
+          {rows.map((row) => cardFor(row))}
         </div>
       )}
 
