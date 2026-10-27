@@ -30,7 +30,7 @@ import NewPlanModal, {
 } from "./NewPlanModal";
 import { PlanMiniMap, PlansRailMap, type MapPin } from "./PlanMaps";
 import {
-  CrewCardStack, CrewQuietCard,
+  CrewCardStack, CrewQuietCard, GoAgainPopup,
   type CrewAction, type CrewRow, type GoAgain,
 } from "./CrewCards";
 import FriendModeIntro, { friendModeIntroDue, stampFriendModeIntro, type FriendModeSource } from "@/components/crew/FriendModeIntro";
@@ -933,10 +933,37 @@ function DashboardView({
   // Same one-shot contract as the probe popup below, and it outranks it: this
   // is about something that already happened and stops being askable, where a
   // spot probe keeps. Only ONE modal may auto-open per load.
+  // The recap text links `/me?recap=<notificationId>`: that plan's recap opens
+  // first (even if its popup was shown before), then — unless they said they
+  // didn't attend — "Want to see this group again?", then the dashboard.
+  const [recapLink] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("recap");
+  });
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("recap")) return;
+    url.searchParams.delete("recap");
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }, []);
+  const linkedRecap = recapLink
+    ? (data.pendingRecaps || []).find((r) => r && r.notificationId === recapLink) || null
+    : null;
   const [popupRecap, setPopupRecap] = useState<PendingRecap | null>(
-    () => firstUnseenRecap(data.pendingRecaps),
+    () => linkedRecap || firstUnseenRecap(data.pendingRecaps),
   );
   const [answeredRecapIds, setAnsweredRecapIds] = useState<string[]>([]);
+  // Step 2 of the link flow: the plan whose go-again card opens after the recap.
+  const [goAgainPlanId, setGoAgainPlanId] = useState<string | null>(null);
+  const recapOutcome = useRef<"rated" | "declined" | null>(null);
+  const closeRecap = () => {
+    const closing = popupRecap;
+    setPopupRecap(null);
+    if (linkedRecap && closing && closing.notificationId === linkedRecap.notificationId && recapOutcome.current !== "declined") {
+      setGoAgainPlanId(closing.planId);
+    }
+  };
+  const goAgainPopup = goAgainPlanId ? (data.goAgain || []).find((g) => g.planId === goAgainPlanId) || null : null;
   useEffect(() => {
     if (!popupRecap) return;
     Parse.Cloud.run("markRecapPromptSeen", {
@@ -977,7 +1004,7 @@ function DashboardView({
     const first = (data.person.firstName || "").trim().split(/\s+/)[0];
     return first ? `${first}'s crew` : "My crew";
   };
-  const [fmIntro, setFmIntro] = useState(() => !fmStart && (data.crews || []).length === 0 && friendModeIntroDue());
+  const [fmIntro, setFmIntro] = useState(() => !fmStart && !recapLink && (data.crews || []).length === 0 && friendModeIntroDue());
   const [fmPick, setFmPick] = useState(() => Boolean(fmStart && data.person.ownsCalendars));
   const [fmSetup, setFmSetup] = useState<{ calendarId: string | null; name: string } | null>(
     () => (fmStart && !data.person.ownsCalendars ? { calendarId: null, name: newCrewName() } : null),
@@ -991,7 +1018,7 @@ function DashboardView({
     window.history.replaceState(null, "", url.pathname + url.search);
   }, [fmStart]);
   const [popupIdea, setPopupIdea] = useState<HostPlan | null>(
-    () => (fmStart || fmIntro || firstUnseenRecap(data.pendingRecaps) ? null : data.needsHost?.popup || null),
+    () => (fmStart || fmIntro || recapLink || firstUnseenRecap(data.pendingRecaps) ? null : data.needsHost?.popup || null),
   );
   const [popupAnsweredId, setPopupAnsweredId] = useState<string | null>(null);
   useEffect(() => {
@@ -1317,11 +1344,16 @@ function DashboardView({
           calendarName={popupRecap.calendarName}
           image={popupRecap.image}
           endedAt={popupRecap.endedAt}
-          onClose={() => setPopupRecap(null)}
-          onAnswered={(id) =>
-            setAnsweredRecapIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
-          }
+          onClose={closeRecap}
+          onAnswered={(id, outcome) => {
+            recapOutcome.current = outcome || null;
+            setAnsweredRecapIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+          }}
         />
+      )}
+
+      {goAgainPopup && !popupRecap && (
+        <GoAgainPopup card={goAgainPopup} onClose={() => setGoAgainPlanId(null)} onChanged={onRefresh} />
       )}
 
       {createOpen && (

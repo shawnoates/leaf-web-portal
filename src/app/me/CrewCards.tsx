@@ -334,6 +334,21 @@ export function CrewCardStack({ actions, goAgain, onRefresh }: { actions: CrewAc
   );
 }
 
+/** The same card as a popup: the recap text's second step, "Want to see this group again?". */
+export function GoAgainPopup({ card, onClose, onChanged }: { card: GoAgain; onClose: () => void; onChanged: () => Promise<void> }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <style>{GO_AGAIN_CSS}</style>
+      <div style={{ width: "100%", maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+        <GoAgainCard card={card} page={null} onGone={onClose} onStarted={() => {}} onChanged={onChanged} />
+        <button type="button" className="ga-hide" style={{ display: "block", margin: "12px auto 0", color: "#fff" }} onClick={onClose}>
+          Not now
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function GoAgainCard({ card: initial, page, onGone, onStarted, onChanged }: {
   card: GoAgain;
   page: StackPage;

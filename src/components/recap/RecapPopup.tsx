@@ -73,7 +73,7 @@ export default function RecapPopup({
   endedAt: string | null;
   onClose: () => void;
   /** Fired once this plan no longer owes an answer — rated, or "didn't attend". */
-  onAnswered: (notificationId: string) => void;
+  onAnswered: (notificationId: string, outcome?: "rated" | "declined") => void;
 }) {
   const [mounted, setMounted] = useState(false);
   const [info, setInfo] = useState<MemoryInfo | null>(null);
@@ -116,7 +116,7 @@ export default function RecapPopup({
     try {
       await Parse.Cloud.run("reportSelfAttendance", { notificationId, attended: false });
       setDeclined(true);
-      onAnswered(notificationId);
+      onAnswered(notificationId, "declined");
       window.setTimeout(onClose, 1200);
     } catch {
       // A failed self-report shouldn't trap them in the modal — the ask simply
@@ -231,7 +231,7 @@ export default function RecapPopup({
                         variant="bare"
                         onSaved={() => {
                           setRated(true);
-                          onAnswered(notificationId);
+                          onAnswered(notificationId, "rated");
                         }}
                       />
                     </div>
