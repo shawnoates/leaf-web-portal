@@ -80,6 +80,23 @@ function Shell({ children, wide = false }: { children: React.ReactNode; wide?: b
   );
 }
 
+// The top of the board: what a host does, what happens next, and how pay
+// works. Matches the server's PAY_TERMS (host-marketplace-helpers.js).
+const HOW_IT_WORKS = [
+  {
+    title: "Apply to the plans you want",
+    body: "Pick as many as you like. You host one at a time.",
+  },
+  {
+    title: "We pick a host",
+    body: "If it's you, we email the details and you confirm.",
+  },
+  {
+    title: "Get paid the amount shown",
+    body: "Once people RSVP and you've hosted. No RSVPs 3 hours before, it's called off and not paid.",
+  },
+];
+
 // Plans without a picture get a colour from this set, picked by the plan's
 // key so a plan keeps its colour between visits. Leaf's greens plus two warm
 // accents, all dark enough for white text.
@@ -376,6 +393,7 @@ export default function HostBoardClient({
   }
 
   const allRows = board.rows ?? [];
+  const count = board.nearCount ?? allRows.length;
   const applications = board.applications ?? [];
   const busyHosting = Boolean(board.openJob);
   const focused = focus ? allRows.find((r) => r.key === focus) ?? null : null;
@@ -399,16 +417,27 @@ export default function HostBoardClient({
 
   return (
     <Shell wide>
-      <div className="max-w-2xl">
+      <div>
         <h1 className="text-2xl font-semibold text-leaf-900">
-          {board.host?.firstName ? `Hi ${board.host.firstName}, ` : ""}plans that need a host
+          {board.host?.firstName ? `Hi ${board.host.firstName}, ` : ""}
+          {count} {count === 1 ? "plan near you needs" : "plans near you need"} a host
         </h1>
-        <p className="mt-1 text-[15px] font-medium text-leaf-800">
-          {board.nearCount ?? allRows.length} {(board.nearCount ?? allRows.length) === 1 ? "plan" : "plans"} near you
-        </p>
-        <p className="mt-2 text-[14px] leading-relaxed text-zinc-600">
-          What each plan pays is shown on it. {board.payTerms}
-        </p>
+        {/* How it works, in the order it happens. Kept short and scannable:
+            the full pay terms are what hosts ask about, so they get a line of
+            their own rather than the end of a paragraph. */}
+        <ol className="mt-4 grid gap-3 sm:grid-cols-3">
+          {HOW_IT_WORKS.map((step, i) => (
+            <li key={step.title} className="flex gap-3 rounded-2xl border border-zinc-200 bg-white p-4">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-leaf-800 text-[13px] font-semibold text-white">
+                {i + 1}
+              </span>
+              <div>
+                <p className="text-[15px] font-semibold text-leaf-900">{step.title}</p>
+                <p className="mt-0.5 text-[14px] leading-snug text-zinc-600">{step.body}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
       </div>
 
       {busyHosting && board.openJob && (
