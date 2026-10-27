@@ -425,15 +425,23 @@ function HappeningItem({ s, busy, act, auth, isOwner }: {
   const [start, setStart] = useState(s.eventStart || "");
   const [end, setEnd] = useState(s.eventEnd && s.eventEnd !== s.eventStart ? s.eventEnd : "");
   const dated = Boolean(s.eventStart) && !s.eventPassed;
+  const postUrl = s.plan?.sourceUrl || null;
+  const isVideoPost = Boolean(postUrl && /tiktok\.com|instagram\.com\/(reels?|tv)\/|facebook\.com\/.*(videos?|watch|reel)|fb\.watch/i.test(postUrl));
   return (
     <li className={`flex flex-col gap-2 rounded-2xl border border-fm-line bg-fm-surface p-2.5 pr-3${s.eventPassed ? " opacity-60" : ""}`}>
       <div className="flex items-center gap-3">
-        <a href={spotHref(s, inApp)} target={inApp ? undefined : "_blank"} rel="noreferrer" className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-fm-card">
+        {/* A shared post's picture opens the post itself (its video isn't copied into Leaf). */}
+        <a href={postUrl || spotHref(s, inApp)} target={inApp && !postUrl ? undefined : "_blank"} rel="noreferrer" className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-fm-card">
           <PlacePhoto
             src={s.photo || s.plan?.imageUrl}
             locationId={s.locationId}
             fallback={<span aria-hidden className="absolute inset-0 flex items-center justify-center font-fm-serif text-[22px] text-fm-knob">{title.charAt(0)}</span>}
           />
+          {isVideoPost && (
+            <span aria-label="Watch on the post" className="absolute inset-0 flex items-center justify-center bg-black/25">
+              <svg viewBox="0 0 24 24" className="h-5 w-5 fill-white drop-shadow" aria-hidden><path d="M8 5.5v13l11-6.5z" /></svg>
+            </span>
+          )}
         </a>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15px] font-semibold">{title}</div>
