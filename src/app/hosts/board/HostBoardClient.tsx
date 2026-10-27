@@ -26,6 +26,11 @@ type BoardRow = {
   neighborhoods: string[];
   interestedCount: number;
   rateLabel: string;
+  priceLabel?: string;
+  /** The plan's own picture; null when it has none (the Leaf mark stands in). */
+  imageUrl?: string | null;
+  /** A short teaser from the plan's description. */
+  blurb?: string | null;
   applied: boolean;
 };
 
@@ -58,13 +63,91 @@ const btnPrimary =
 const btnQuiet =
   "rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-[15px] " +
   "font-medium text-leaf-900 transition-colors hover:border-zinc-400 disabled:opacity-50";
+const btnSmallPrimary =
+  "shrink-0 rounded-lg bg-leaf-800 px-3.5 py-2 text-[14px] font-medium text-white " +
+  "transition-colors hover:bg-leaf-900 disabled:opacity-50";
+const btnSmallQuiet =
+  "shrink-0 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-[14px] " +
+  "font-medium text-leaf-900 transition-colors hover:border-zinc-400 disabled:opacity-50";
 const inputClass =
   "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-[16px] " +
   "text-leaf-900 placeholder:text-zinc-400 outline-none " +
   "focus:border-leaf-600 focus:ring-2 focus:ring-leaf-600/20";
 
-function Shell({ children }: { children: React.ReactNode }) {
-  return <main className="mx-auto max-w-lg px-5 py-10 pb-24">{children}</main>;
+function Shell({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
+  // The board itself is a grid and uses the width; the small screens around
+  // it (get a link, not available) stay a readable single column.
+  return (
+    <main className={`mx-auto px-5 py-10 pb-24 ${wide ? "max-w-6xl" : "max-w-lg"}`}>{children}</main>
+  );
+}
+
+/** One plan: picture, the facts, a teaser, then price and the action on one line. */
+function PlanCard({
+  row,
+  application,
+  busy,
+  disabled,
+  onApply,
+  onWithdraw,
+}: {
+  row: BoardRow;
+  application: Application | undefined;
+  busy: boolean;
+  disabled: boolean;
+  onApply: () => void;
+  onWithdraw: (applicationId: string) => void;
+}) {
+  const place = [row.neighborhoods.slice(0, 2).join(", "), row.calendarName].filter(Boolean).join(" · ");
+  return (
+    <article className="flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+      <div className="relative aspect-[5/2] w-full overflow-hidden bg-leaf-50 sm:aspect-[2/1]">
+        {row.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={row.imageUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/leaf-mark.png" alt="" className="h-12 w-12 opacity-60" />
+          </div>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col p-4">
+        <h2 className="line-clamp-2 text-[16px] font-semibold leading-snug text-leaf-900">{row.title}</h2>
+        <p className="mt-1 text-[14px] text-zinc-700">{row.whenLabel}</p>
+        {place && <p className="mt-0.5 truncate text-[13px] text-zinc-500">{place}</p>}
+        {row.blurb && (
+          <p className="mt-2 line-clamp-2 text-[14px] leading-snug text-zinc-600">{row.blurb}</p>
+        )}
+        <div className="mt-auto flex items-center justify-between gap-3 pt-4">
+          <div>
+            <p className="text-[17px] font-semibold text-leaf-800">{row.priceLabel ?? row.rateLabel}</p>
+            {row.interestedCount > 0 && (
+              <p className="text-[12px] text-zinc-500">{row.interestedCount} interested</p>
+            )}
+          </div>
+          {row.applied ? (
+            <div className="flex items-center gap-2">
+              <span className="text-[14px] font-medium text-leaf-800">Applied</span>
+              {application && (
+                <button
+                  className={btnSmallQuiet}
+                  disabled={busy}
+                  onClick={() => onWithdraw(application.applicationId)}
+                >
+                  Withdraw
+                </button>
+              )}
+            </div>
+          ) : (
+            <button className={btnSmallPrimary} disabled={disabled} onClick={onApply}>
+              Apply to host
+            </button>
+          )}
+        </div>
+      </div>
+    </article>
+  );
 }
 
 function readStored(): string | null {
@@ -244,13 +327,31 @@ export default function HostBoardClient({ linkToken }: { linkToken: string | nul
   const busyHosting = Boolean(board.openJob);
 
   return (
-    <Shell>
-      <h1 className="text-2xl font-semibold text-leaf-900">
-        {board.host?.firstName ? `Hi ${board.host.firstName}, ` : ""}plans that need a host
-      </h1>
-      <p className="mt-2 text-[15px] leading-relaxed text-zinc-700">
-        What each plan pays is shown on it. {board.payTerms}
-      </p>
+    <Shell wide>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="max-w-2xl">
+          <h1 className="text-2xl font-semibold text-leaf-900">
+            {board.host?.firstName ? `Hi ${board.host.firstName}, ` : ""}plans that need a host
+          </h1>
+          <p className="mt-2 text-[14px] leading-relaxed text-zinc-600">
+            What each plan pays is shown on it. {board.payTerms}
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <button
+            className={scope === "near" ? btnSmallPrimary : btnSmallQuiet}
+            onClick={() => setScope("near")}
+          >
+            Near me ({board.nearCount ?? 0})
+          </button>
+          <button
+            className={scope === "all" ? btnSmallPrimary : btnSmallQuiet}
+            onClick={() => setScope("all")}
+          >
+            Everywhere ({board.totalCount ?? 0})
+          </button>
+        </div>
+      </div>
 
       {busyHosting && board.openJob && (
         <div className="mt-5 rounded-2xl border border-leaf-200 bg-leaf-50 p-4 text-[15px] leading-relaxed text-leaf-900">
@@ -259,80 +360,34 @@ export default function HostBoardClient({ linkToken }: { linkToken: string | nul
         </div>
       )}
 
-      <div className="mt-6 flex gap-2">
-        <button
-          className={scope === "near" ? btnPrimary : btnQuiet}
-          onClick={() => setScope("near")}
-        >
-          Near me ({board.nearCount ?? 0})
-        </button>
-        <button
-          className={scope === "all" ? btnPrimary : btnQuiet}
-          onClick={() => setScope("all")}
-        >
-          Everywhere ({board.totalCount ?? 0})
-        </button>
-      </div>
-
       {error && <p className="mt-4 text-[14px] text-red-700">{error}</p>}
 
-      <div className="mt-5 space-y-3">
-        {rows.length === 0 && (
-          <div className={card}>
-            <p className="text-[15px] leading-relaxed text-zinc-700">
-              {scope === "near"
-                ? "Nothing open near you right now. We email new plans every couple of weeks, or look everywhere."
-                : "Nothing is open right now. Check back soon."}
-            </p>
-          </div>
-        )}
-        {rows.map((row) => {
-          const myApplication = applications.find((a) => a.key === row.key);
-          return (
-            <div key={row.key} className={card}>
-              <h2 className="text-[17px] font-semibold text-leaf-900">{row.title}</h2>
-              <p className="mt-1 text-[15px] text-zinc-700">{row.whenLabel}</p>
-              <p className="mt-1 text-[14px] text-zinc-500">
-                {[row.neighborhoods.slice(0, 2).join(", "), row.calendarName]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-              <p className="mt-3 text-[15px] font-medium text-leaf-900">
-                {row.rateLabel}
-                {row.interestedCount > 0 && (
-                  <span className="ml-2 font-normal text-zinc-500">
-                    {row.interestedCount} interested
-                  </span>
-                )}
-              </p>
-              <div className="mt-4">
-                {row.applied ? (
-                  <div className="flex items-center gap-3">
-                    <span className="text-[15px] font-medium text-leaf-800">Applied</span>
-                    {myApplication && (
-                      <button
-                        className={btnQuiet}
-                        disabled={busyKey === myApplication.applicationId}
-                        onClick={() => withdraw(myApplication.applicationId)}
-                      >
-                        Withdraw
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <button
-                    className={btnPrimary}
-                    disabled={busyHosting || busyKey === row.key}
-                    onClick={() => apply(row)}
-                  >
-                    Apply to host
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {rows.length === 0 ? (
+        <div className={`${card} mt-6`}>
+          <p className="text-[15px] leading-relaxed text-zinc-700">
+            {scope === "near"
+              ? "Nothing open near you right now. We email new plans every couple of weeks, or look everywhere."
+              : "Nothing is open right now. Check back soon."}
+          </p>
+        </div>
+      ) : (
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {rows.map((row) => {
+            const myApplication = applications.find((a) => a.key === row.key);
+            return (
+              <PlanCard
+                key={row.key}
+                row={row}
+                application={myApplication}
+                busy={busyKey === row.key || (!!myApplication && busyKey === myApplication.applicationId)}
+                disabled={busyHosting || busyKey === row.key}
+                onApply={() => apply(row)}
+                onWithdraw={withdraw}
+              />
+            );
+          })}
+        </div>
+      )}
 
       {applications.length > 0 && (
         <section className="mt-10">
@@ -340,7 +395,7 @@ export default function HostBoardClient({ linkToken }: { linkToken: string | nul
           <p className="mt-1 text-[14px] text-zinc-600">
             If you are picked we email you the details and you say yes or no.
           </p>
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {applications.map((a) => (
               <div key={a.applicationId} className={`${card} flex items-center justify-between gap-3`}>
                 <div>
