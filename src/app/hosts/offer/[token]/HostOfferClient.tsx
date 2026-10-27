@@ -325,7 +325,13 @@ export default function HostOfferClient({ token }: { token: string }) {
     setBusy(true);
     setError(null);
     try {
-      const r = await linkRun<{ hasPaymentDetails?: boolean; session?: string | null }>("acceptHostOffer", {
+      const r = await linkRun<{
+        ok?: boolean;
+        state?: string;
+        message?: string;
+        hasPaymentDetails?: boolean;
+        session?: string | null;
+      }>("acceptHostOffer", {
         token,
         agreed: true,
         agreementVersion: offer?.agreementVersion,
@@ -335,6 +341,11 @@ export default function HostOfferClient({ token }: { token: string }) {
         addons: offer?.addons?.length ? chosenAddons : undefined,
         payHandles: chosenAddons.length && (handlesTouched || !offer?.payHandles?.saved) ? addonHandles : undefined,
       });
+      // One plan at a time: nothing was claimed, so stay on the offer and say why.
+      if (r.ok === false && r.state === "has_open_job") {
+        setError(r.message || "You're already hosting another plan. You can take this one once that's over.");
+        return;
+      }
       // Accepting signs this device in, so the page still opens once it's locked.
       saveLinkSession(token, r.session);
       setPaymentSaved(Boolean(r.hasPaymentDetails));
