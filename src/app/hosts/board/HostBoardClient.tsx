@@ -45,9 +45,7 @@ type Application = {
 type Board = {
   state: "ok" | "unavailable";
   host?: { firstName: string | null; tier: "new" | "returning"; neighborhoods: string[] };
-  scope?: "near" | "all";
   nearCount?: number;
-  totalCount?: number;
   payTerms?: string;
   openJob?: { title: string; whenLabel: string } | null;
   rows?: BoardRow[];
@@ -100,7 +98,11 @@ function placeholderGradient(key: string) {
   return PLACEHOLDER_GRADIENTS[h % PLACEHOLDER_GRADIENTS.length];
 }
 
-/** One plan: picture, the facts, a teaser, then price and the action on one line. */
+/**
+ * One plan: picture, the facts, a teaser, then price and the action on one
+ * line. `featured` is the plan picked from the email: full width, picture
+ * beside the text on larger screens, and more of the description.
+ */
 function PlanCard({
   row,
   application,
@@ -108,6 +110,7 @@ function PlanCard({
   disabled,
   onApply,
   onWithdraw,
+  featured = false,
 }: {
   row: BoardRow;
   application: Application | undefined;
@@ -115,11 +118,20 @@ function PlanCard({
   disabled: boolean;
   onApply: () => void;
   onWithdraw: (applicationId: string) => void;
+  featured?: boolean;
 }) {
   const place = [row.neighborhoods.slice(0, 2).join(", "), row.calendarName].filter(Boolean).join(" · ");
   return (
-    <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-      <div className="relative aspect-[5/2] w-full overflow-hidden bg-leaf-50 sm:aspect-[2/1]">
+    <article
+      className={`flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-white ${
+        featured ? "border-leaf-300 shadow-sm sm:flex-row" : "border-zinc-200"
+      }`}
+    >
+      <div
+        className={`relative w-full overflow-hidden bg-leaf-50 ${
+          featured ? "aspect-[5/2] sm:aspect-auto sm:min-h-[240px] sm:w-2/5 sm:shrink-0" : "aspect-[5/2] sm:aspect-[2/1]"
+        }`}
+      >
         {row.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={row.imageUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
@@ -134,12 +146,22 @@ function PlanCard({
           </div>
         )}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col p-4">
-        <h2 className="line-clamp-2 text-[16px] font-semibold leading-snug text-leaf-900">{row.title}</h2>
+      <div className={`flex min-w-0 flex-1 flex-col ${featured ? "p-5 sm:p-6" : "p-4"}`}>
+        <h2
+          className={`line-clamp-2 font-semibold leading-snug text-leaf-900 ${
+            featured ? "text-[20px]" : "text-[16px]"
+          }`}
+        >
+          {row.title}
+        </h2>
         <p className="mt-1 text-[14px] text-zinc-700">{row.whenLabel}</p>
         {place && <p className="mt-0.5 truncate text-[13px] text-zinc-500">{place}</p>}
         {row.blurb && (
-          <p className="mt-2 line-clamp-2 text-[14px] leading-snug text-zinc-600">{row.blurb}</p>
+          <p
+            className={`mt-2 text-[14px] leading-snug text-zinc-600 ${featured ? "line-clamp-4" : "line-clamp-2"}`}
+          >
+            {row.blurb}
+          </p>
         )}
         <div className="mt-auto flex items-center justify-between gap-3 pt-4">
           <div>
@@ -264,7 +286,6 @@ export default function HostBoardClient({
   const [token, setToken] = useState<string | null>(null);
   const [resolved, setResolved] = useState(false);
   const [board, setBoard] = useState<Board | null>(null);
-  const [scope, setScope] = useState<"near" | "all">("near");
   const [loading, setLoading] = useState(false);
   const [lost, setLost] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -280,10 +301,11 @@ export default function HostBoardClient({
   }, [linkToken]);
 
   const load = useCallback(
-    async (t: string, s: "near" | "all") => {
+    async (t: string) => {
       setLoading(true);
       try {
-        const r = (await Parse.Cloud.run("getHostBoard", { token: t, scope: s })) as Board;
+        // Only plans in the host's own city: the board has no "everywhere".
+        const r = (await Parse.Cloud.run("getHostBoard", { token: t, scope: "near" })) as Board;
         setBoard(r);
         setLost(false);
       } catch {
@@ -298,8 +320,8 @@ export default function HostBoardClient({
   );
 
   useEffect(() => {
-    if (token) void load(token, scope);
-  }, [token, scope, load]);
+    if (token) void load(token);
+  }, [token, load]);
 
   const apply = async (row: BoardRow) => {
     if (!token) return;
@@ -311,7 +333,7 @@ export default function HostBoardClient({
       setError(e instanceof Error ? e.message : "Could not apply.");
     } finally {
       setBusyKey(null);
-      await load(token, scope);
+      await load(token);
     }
   };
 
@@ -325,7 +347,7 @@ export default function HostBoardClient({
       setError(e instanceof Error ? e.message : "Could not withdraw.");
     } finally {
       setBusyKey(null);
-      await load(token, scope);
+      await load(token);
     }
   };
 
@@ -359,7 +381,7 @@ export default function HostBoardClient({
   const focused = focus ? allRows.find((r) => r.key === focus) ?? null : null;
   // The picked plan sits on its own at the top, so it is not repeated below.
   const rows = focused ? allRows.filter((r) => r.key !== focused.key) : allRows;
-  const cardFor = (row: BoardRow) => {
+  const cardFor = (row: BoardRow, featured = false) => {
     const myApplication = applications.find((a) => a.key === row.key);
     return (
       <PlanCard
@@ -370,35 +392,23 @@ export default function HostBoardClient({
         disabled={busyHosting || busyKey === row.key}
         onApply={() => apply(row)}
         onWithdraw={withdraw}
+        featured={featured}
       />
     );
   };
 
   return (
     <Shell wide>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="max-w-2xl">
-          <h1 className="text-2xl font-semibold text-leaf-900">
-            {board.host?.firstName ? `Hi ${board.host.firstName}, ` : ""}plans that need a host
-          </h1>
-          <p className="mt-2 text-[14px] leading-relaxed text-zinc-600">
-            What each plan pays is shown on it. {board.payTerms}
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <button
-            className={scope === "near" ? btnSmallPrimary : btnSmallQuiet}
-            onClick={() => setScope("near")}
-          >
-            Near me ({board.nearCount ?? 0})
-          </button>
-          <button
-            className={scope === "all" ? btnSmallPrimary : btnSmallQuiet}
-            onClick={() => setScope("all")}
-          >
-            Everywhere ({board.totalCount ?? 0})
-          </button>
-        </div>
+      <div className="max-w-2xl">
+        <h1 className="text-2xl font-semibold text-leaf-900">
+          {board.host?.firstName ? `Hi ${board.host.firstName}, ` : ""}plans that need a host
+        </h1>
+        <p className="mt-1 text-[15px] font-medium text-leaf-800">
+          {board.nearCount ?? allRows.length} {(board.nearCount ?? allRows.length) === 1 ? "plan" : "plans"} near you
+        </p>
+        <p className="mt-2 text-[14px] leading-relaxed text-zinc-600">
+          What each plan pays is shown on it. {board.payTerms}
+        </p>
       </div>
 
       {busyHosting && board.openJob && (
@@ -411,14 +421,14 @@ export default function HostBoardClient({
       {error && <p className="mt-4 text-[14px] text-red-700">{error}</p>}
 
       {focused && (
-        <section className="mt-6 rounded-3xl bg-leaf-50 p-4 sm:p-6">
+        <section className="mt-6">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-[15px] font-semibold text-leaf-900">The plan you picked</h2>
             <button className="text-[14px] font-medium text-leaf-800 underline" onClick={() => setFocus(null)}>
               See all plans
             </button>
           </div>
-          <div className="mt-3 min-w-0 max-w-md">{cardFor(focused)}</div>
+          <div className="mt-3 min-w-0">{cardFor(focused, true)}</div>
         </section>
       )}
 
@@ -438,9 +448,7 @@ export default function HostBoardClient({
       {rows.length === 0 && focused ? null : rows.length === 0 ? (
         <div className={`${card} mt-6`}>
           <p className="text-[15px] leading-relaxed text-zinc-700">
-            {scope === "near"
-              ? "Nothing open near you right now. We email new plans every couple of weeks, or look everywhere."
-              : "Nothing is open right now. Check back soon."}
+            Nothing open near you right now. We email new plans every couple of weeks.
           </p>
         </div>
       ) : (
