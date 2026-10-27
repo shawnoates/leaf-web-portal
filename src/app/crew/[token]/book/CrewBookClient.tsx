@@ -420,6 +420,11 @@ function HappeningItem({ s, busy, act, auth, isOwner }: {
   const on = s.upvotedByMe;
   const canRemove = s.addedByMe || isOwner;
   const link = "underline underline-offset-2 hover:text-fm-ink";
+  // Fixing a shared post's date by hand: one day, or a run.
+  const [fixing, setFixing] = useState(false);
+  const [start, setStart] = useState(s.eventStart || "");
+  const [end, setEnd] = useState(s.eventEnd && s.eventEnd !== s.eventStart ? s.eventEnd : "");
+  const dated = Boolean(s.eventStart) && !s.eventPassed;
   return (
     <li className={`flex flex-col gap-2 rounded-2xl border border-fm-line bg-fm-surface p-2.5 pr-3${s.eventPassed ? " opacity-60" : ""}`}>
       <div className="flex items-center gap-3">
@@ -435,6 +440,18 @@ function HappeningItem({ s, busy, act, auth, isOwner }: {
           <div className="truncate text-[13px] text-fm-muted">
             {[where, when, !when && s.plan ? "Shared plan" : null].filter(Boolean).join(" · ")}
           </div>
+          {dated && (s.eventDateCheck || s.eventDateFrom === "image") && (
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs">
+              {/* Where the date came from: read off the post's flyer, or the caption and flyer disagreed. */}
+              <span className={s.eventDateCheck ? "text-fm-danger" : "text-fm-accent"}>
+                {s.eventDateCheck ? "The caption and the flyer disagree. Check the date" : "Date from the flyer"}
+              </span>
+              {!fixing && <button type="button" onClick={() => setFixing(true)} className="text-fm-muted underline underline-offset-2 hover:text-fm-ink">Fix</button>}
+            </div>
+          )}
+          {!dated && !s.eventPassed && s.plan && !fixing && (
+            <button type="button" onClick={() => setFixing(true)} className="mt-0.5 text-xs text-fm-muted underline underline-offset-2 hover:text-fm-ink">Add the date</button>
+          )}
           {(s.plan?.videoUrl || s.plan?.sourceUrl || canRemove) && (
             <div className="mt-0.5 flex gap-3 text-xs text-fm-muted">
               {s.plan?.videoUrl && <a href={s.plan.videoUrl} target="_blank" rel="noreferrer" className={link}>Video</a>}
@@ -462,6 +479,27 @@ function HappeningItem({ s, busy, act, auth, isOwner }: {
           <span className={`text-xs leading-none ${on ? "font-bold" : "font-semibold"}`}>{s.upvotes}</span>
         </button>
       </div>
+      {fixing && (
+        <form
+          className="flex flex-wrap items-end gap-2 pl-[60px]"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!start) return;
+            void act(`date-${s.spotId}`, () => run("setCrewSpotDates", auth, { spotId: s.spotId, start, end: end || null })).then(() => setFixing(false));
+          }}
+        >
+          <label className="flex flex-col gap-1 text-xs text-fm-muted">
+            Date
+            <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="h-10 rounded-xl border border-fm-line bg-fm-canvas px-2 text-sm text-fm-ink" />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-fm-muted">
+            Through (optional)
+            <input type="date" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} className="h-10 rounded-xl border border-fm-line bg-fm-canvas px-2 text-sm text-fm-ink" />
+          </label>
+          <Button small type="submit" disabled={busy !== null || !start}>Save</Button>
+          <button type="button" onClick={() => setFixing(false)} className="h-10 text-sm text-fm-muted underline underline-offset-2">Cancel</button>
+        </form>
+      )}
       {s.needsPlace && <PlaceForPlan s={s} act={act} auth={auth} />}
     </li>
   );

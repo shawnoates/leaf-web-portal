@@ -146,6 +146,9 @@ export type BookSpot = {
   eventStart?: string | null;
   eventEnd?: string | null;
   eventKind?: "movie" | "event" | null;
+  /** A shared post's date: read off its flyer ('image'), its caption, both, or set by a member; and whether caption and flyer disagreed. */
+  eventDateFrom?: "image" | "caption" | "both" | "member" | null;
+  eventDateCheck?: boolean;
   /** A plan someone shared into the book: its own title, description, video, cover and link. */
   plan?: { title: string | null; description: string | null; videoUrl: string | null; imageUrl: string | null; sourceUrl: string | null } | null;
   /** Which row it belongs in: Places ("place") or Happenings (the rest). */
