@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
+import PitchSection, { type Pitch, type PitchOption } from "./PitchSection";
 
 type BoardRow = {
   key: string;
@@ -50,6 +51,9 @@ type Board = {
   openJob?: { title: string; whenLabel: string } | null;
   rows?: BoardRow[];
   applications?: Application[];
+  /** Neighborhoods this host may pitch their own event in. */
+  pitchOptions?: PitchOption[];
+  pitches?: Pitch[];
 };
 
 const STORAGE_KEY = "leaf.hostBoardToken";
@@ -485,6 +489,14 @@ export default function HostBoardClient({
           {rows.map((row) => cardFor(row))}
         </div>
       )}
+
+      <PitchSection
+        token={token}
+        options={board.pitchOptions ?? []}
+        pitches={board.pitches ?? []}
+        busyHosting={busyHosting}
+        onChanged={() => load(token)}
+      />
 
       {applications.length > 0 && (
         <section className="mt-10">
