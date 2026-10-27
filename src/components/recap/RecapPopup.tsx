@@ -7,6 +7,7 @@ import { Loader2, X, Check, CalendarX } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import SurveyCard from "./SurveyCard";
 import PhotoUpload from "./PhotoUpload";
+import ShareCard from "./ShareCard";
 import CalendarPromoBanner from "@/components/CalendarPromoBanner";
 import type { PhotoLimits, SurveyState } from "./types";
 
@@ -254,6 +255,8 @@ export default function RecapPopup({
                       />
                     </div>
                   )}
+
+                  <ShareCard notificationId={notificationId} />
 
                   {/* The thank-you lands at the end of the flow, after they've
                       been asked for a rating rather than instead of it. */}
