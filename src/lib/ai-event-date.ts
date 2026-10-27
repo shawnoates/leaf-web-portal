@@ -39,6 +39,15 @@ import { tzOffsetMs, floatingIsoToInstant } from "./wall-clock";
  */
 export const FLOATING_EVENT_TZ = "UTC";
 
+/**
+ * How many weekly occurrences a starter card may advertise before it retires.
+ * A weekly card has no end of its own — it rolls to "next Wed" forever — so a
+ * calendar nobody hosts would show the same "Morning Stroll" every week for
+ * good. The count runs from the stored isoDatetime, which the server stamps
+ * with the first occurrence at generate time.
+ */
+export const MAX_WEEKLY_STARTER_REPEATS = 4;
+
 export interface AIEventDateInput {
   time?: string;
   isoDatetime?: string | null;
@@ -182,6 +191,17 @@ export function resolveAIEventDate(
       0,
     ),
   );
+  // Retire a weekly card once it would be its Nth showing. Rows with no
+  // usable anchor keep the old behavior (no cap) rather than vanish.
+  if (ev.isoDatetime) {
+    const anchor = new Date(ev.isoDatetime);
+    if (!Number.isNaN(anchor.getTime())) {
+      const weeksSince = Math.round(
+        (date.getTime() - anchor.getTime()) / (7 * 24 * 60 * 60 * 1000),
+      );
+      if (weeksSince >= MAX_WEEKLY_STARTER_REPEATS) return NO_AI_EVENT_DATE;
+    }
+  }
   return {
     date,
     instant: floatingIsoToInstant(date.toISOString(), timeZone) ?? date,
