@@ -13,13 +13,30 @@ import Parse from "@/lib/parse-client";
 type ShareLink = {
   link: string | null;
   calendarName?: string | null;
+  planTitle?: string | null;
+  venueName?: string | null;
+  neighborhood?: string | null;
   pointsPerFollow?: number;
   monthlyCap?: number;
 };
 
+// "Thursday run at Still Studio was great. More events in Williamsburg: <link>"
+// Built from what the server knows about the plan; every piece is optional.
+function captionFor(share: ShareLink, link: string): string {
+  const title = share.planTitle?.trim();
+  const venue = share.venueName?.trim();
+  const hood = share.neighborhood?.trim();
+  const opener = title ? (venue && !title.includes(venue) ? `${title} at ${venue} was great.` : `${title} was great.`) : "Had a great time.";
+  const more = hood
+    ? `More events in ${hood}`
+    : share.calendarName ? `More from ${share.calendarName}` : "More events like this";
+  return `${opener} ${more}, follow along: ${link}`;
+}
+
 export default function ShareCard({ notificationId }: { notificationId: string }) {
   const [share, setShare] = useState<ShareLink | null>(null);
   const [copied, setCopied] = useState(false);
+  const [captionCopied, setCaptionCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,9 +67,21 @@ export default function ShareCard({ notificationId }: { notificationId: string }
     }
   }
 
+  const caption = captionFor(share, link);
+
+  async function copyCaption() {
+    try {
+      await navigator.clipboard.writeText(caption);
+      setCaptionCopied(true);
+      window.setTimeout(() => setCaptionCopied(false), 2000);
+    } catch {
+      // Clipboard blocked: the caption is shown below to select by hand.
+    }
+  }
+
   async function send() {
     try {
-      await navigator.share({ title: name, url: link });
+      await navigator.share({ title: name, text: caption });
     } catch {
       // Cancelled.
     }
@@ -94,6 +123,14 @@ export default function ShareCard({ notificationId }: { notificationId: string }
           </button>
         )}
       </div>
+      <p className="mt-3 rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-600 select-all">{caption}</p>
+      <button
+        type="button"
+        onClick={copyCaption}
+        className="mt-2 text-xs font-medium text-zinc-600 underline hover:text-zinc-900"
+      >
+        {captionCopied ? "Caption copied" : "Copy caption"}
+      </button>
     </div>
   );
 }
