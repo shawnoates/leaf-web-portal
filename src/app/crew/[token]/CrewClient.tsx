@@ -965,6 +965,9 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5">
             <div className="mt-2 divide-y divide-fm-line-dim">
+              {me.isOwner && (
+                <CrewNameRow name={crew.name} busy={busy} onSave={(name) => act("rename", () => run("setCrewName", auth, { calendarId: crew.id, name }))} />
+              )}
               {me.status === "in" && (
                 <div className="py-4">
                   <div className="text-[15px] font-semibold">Texts about this crew</div>
@@ -1798,6 +1801,29 @@ function SuggestDate({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: 
       <p className="m-0 text-xs text-fm-muted">It joins the poll for everyone, counted as yours. Votes on the other dates stay.</p>
       <button type="button" onClick={() => setOpen(false)} className="min-h-11 w-fit text-sm text-fm-muted underline underline-offset-4">Never mind</button>
     </div>
+  );
+}
+
+/** Organizer: the crew's name, edited in place. Its page, texts and plans follow. */
+function CrewNameRow({ name, busy, onSave }: { name: string; busy: string | null; onSave: (name: string) => Promise<void> }) {
+  const [draft, setDraft] = useState(name);
+  const clean = draft.replace(/\s+/g, " ").trim();
+  const changed = clean.length >= 2 && clean !== name;
+  return (
+    <form className="py-4" onSubmit={(e) => { e.preventDefault(); if (changed) void onSave(clean); }}>
+      <label htmlFor="crew-name" className="block text-[15px] font-semibold">Crew name</label>
+      <div className="mt-2 flex gap-2">
+        <input
+          id="crew-name"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          maxLength={60}
+          className="h-11 min-w-0 flex-1 rounded-xl border px-3 text-[16px]"
+        />
+        <Button small type="submit" disabled={busy !== null || !changed}>{busy === "rename" ? "Saving…" : "Save"}</Button>
+      </div>
+      <p className="mb-0 mt-2 text-xs text-fm-muted">Everyone sees it: the crew page, Leaf&rsquo;s texts, and new plans.</p>
+    </form>
   );
 }
 
