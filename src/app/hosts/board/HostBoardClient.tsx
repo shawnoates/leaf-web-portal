@@ -43,7 +43,6 @@ type Board = {
   scope?: "near" | "all";
   nearCount?: number;
   totalCount?: number;
-  rateLabel?: string;
   payTerms?: string;
   openJob?: { title: string; whenLabel: string } | null;
   rows?: BoardRow[];
@@ -250,8 +249,7 @@ export default function HostBoardClient({ linkToken }: { linkToken: string | nul
         {board.host?.firstName ? `Hi ${board.host.firstName}, ` : ""}plans that need a host
       </h1>
       <p className="mt-2 text-[15px] leading-relaxed text-zinc-700">
-        Each of these pays {board.rateLabel?.replace(" for the plan", "") ?? "a set amount"}.{" "}
-        {board.payTerms}
+        What each plan pays is shown on it. {board.payTerms}
       </p>
 
       {busyHosting && board.openJob && (
