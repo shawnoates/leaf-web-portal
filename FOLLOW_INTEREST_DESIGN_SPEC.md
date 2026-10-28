@@ -24,7 +24,19 @@ It shows on **every** follow (no once-per-calendar flag — dropped 2026-09-14);
 
 If suggestions are off or the list is empty: skip straight to the Share Kit (neighborhood) or the public page (everything else).
 
-Copy never mentions hosts, hosting, or that a plan is unhosted. Do not surface how many other people are interested.
+The hearts screen never mentions hosts, hosting, or that a plan is unhosted. Do not surface how many other people are interested.
+
+## Host invite (added 2026-10-28)
+When the viewer may host on this calendar (owner, co-host, or `allowFollowersToHost`, and the calendar isn't at its RSVP limit), **Done** opens a popup over the hearts screen about **one** plan instead of closing:
+- The plan: the first one they marked (list order), else the top of the list. Ideas someone already hosted (`eventGroupId`) are skipped; nothing hostable → Done closes as before.
+- Photo header: title, date · place, and *♥ {n} neighbors want to go* only when **3 or more other people** are interested (live count minus the viewer's own heart).
+- Headline **Want to make it happen?**, subline *Host it and the group comes to you.* (desktop adds the calendar name as eyebrow).
+- Four rows: you pick the night and the place; it goes on {calendar}, followers hear about it and RSVP; the host checklist walks you through it; *Earn Leaf points. More for every guest who checks in. Soon you'll be able to use them for money off ticketed events.*
+- One button, **Host {title}**, with a mint badge half off its top edge: *Earn up to {hostMax} pts* (`getPointsConfig`; "Earn Leaf points" until it loads). It opens the calendar's own host flow (plan idea → host idea modal; starter card → Host This Event modal) and skips the share kit.
+- No second button: ✕, Esc and the scrim close it and continue as Done (share kit / calendar).
+- Phone: bottom sheet, 150px photo on top. Desktop (≥768px): 820px two-column card, photo left, copy right.
+- ✕ / Esc / scrim on the hearts screen skip the invite. The hearts screen itself still shows no hosting copy and no counts.
+- Events: `follow_host_ask_shown` {itemIds: [id], marked}, `follow_host_ask_pick` {itemId, marked}.
 
 ## Ordering
 Sort suggested plans by **interest count, descending** (internal count — not displayed), then by soonest date, then by plan id for stability. Cap the list at 6; the list scrolls. Order is fixed when the modal opens — a tap must not re-sort the cards under the user's finger.
