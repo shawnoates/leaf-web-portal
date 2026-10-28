@@ -1762,6 +1762,14 @@ function FollowModal({
     pending: ReadonlySet<string>;
     onToggle: (id: string) => void;
     onClosed: (via: InterestPromptCloseVia, marked: number) => void;
+    /** The one-plan host invite after Done; absent when the viewer can't
+     *  host. `onPick` opens the page's host flow once this modal has closed. */
+    host?: {
+      canHost: (id: string) => boolean;
+      interestCount: (id: string) => number;
+      onShown: (itemIds: string[], marked: number) => void;
+      onPick: (id: string) => void;
+    };
   };
 }) {
   const verify = usePhoneVerify();
@@ -1848,6 +1856,7 @@ function FollowModal({
   // Standalone surface with its own chrome (full-screen dark on mobile, wide
   // light grid on desktop) — not the follow card.
   if (formStep === "interest" && interestItems && interest) {
+    const host = interest.host;
     return (
       <InterestPrompt
         calendarName={calendarName}
@@ -1856,6 +1865,17 @@ function FollowModal({
         pending={interest.pending}
         onToggle={interest.onToggle}
         onClose={finishInterest}
+        host={
+          host && {
+            ...host,
+            // Hosting takes over from here: no share kit after it.
+            onPick: (id, marked) => {
+              interest.onClosed("done", marked);
+              onClose();
+              host.onPick(id);
+            },
+          }
+        }
       />
     );
   }
@@ -4421,6 +4441,60 @@ export default function OrgCalendarPage() {
   // Page-level mount for the one-tap follow popup, which doesn't go through
   // FollowModal (and never chains the share kit).
   const [interestPrompt, setInterestPrompt] = useState<InterestPromptItem[] | null>(null);
+
+  // The host invite after the interest modal's Done ("Want to make it
+  // happen?" for one plan) — same permission as the calendar's own Host this
+  // buttons. A pick opens the same host flow those buttons do (plan idea →
+  // hostingIdea modal, starter card → the Host This Event modal). A placard
+  // idea someone already hosted (eventGroupId) is never offered; counts are
+  // the live ones, so a heart from this session is included.
+  const interestHost = useMemo(() => {
+    if (!org || org.rsvpLimitReached) return undefined;
+    if (!(org.isOwner || org.isHost || org.allowFollowersToHost)) return undefined;
+    const ideaFor = (id: string) =>
+      id.startsWith("idea:") ? org.planIdeas.find((i) => i.id === id.slice(5)) : undefined;
+    return {
+      canHost: (id: string) => {
+        if (id.startsWith("ai:")) return true;
+        const idea = ideaFor(id);
+        return !!idea && !idea.eventGroupId;
+      },
+      interestCount: (id: string) => {
+        if (id.startsWith("ai:")) {
+          const idx = Number(id.slice(3));
+          return aiInterestCounts[idx] ?? org.aiSourceEventInterests?.[idx] ?? 0;
+        }
+        const idea = ideaFor(id);
+        if (!idea) return 0;
+        return planIdeaInterestCounts[idea.id] ?? idea.interestCount ?? 0;
+      },
+      onShown: (itemIds: string[], marked: number) => {
+        track("follow_host_ask_shown", { itemIds, marked }, org.objectId);
+      },
+      onPick: (id: string) => {
+        track(
+          "follow_host_ask_pick",
+          { itemId: id, marked: interestMarked.has(id) },
+          org.objectId,
+        );
+        if (id.startsWith("idea:")) {
+          const idea = ideaFor(id);
+          if (!idea) return;
+          setHostingIdea(idea);
+          setHostSubmitting(false);
+          setHostError(null);
+          setHostSuccess(false);
+          setHostNote("");
+          setSelectedVenue(null);
+        } else if (id.startsWith("ai:")) {
+          const idx = Number(id.slice(3));
+          if (!Number.isInteger(idx)) return;
+          setHostThisNote("");
+          setHostThisEventIndex(idx);
+        }
+      },
+    };
+  }, [org, interestMarked, aiInterestCounts, planIdeaInterestCounts]);
 
   // Plans a guest could still get into, for the "or join a plan with spots
   // open" carousel shown when the plan they picked is full (RSVP modal and
@@ -7728,6 +7802,7 @@ export default function OrgCalendarPage() {
             pending: interestPending,
             onToggle: toggleInterest,
             onClosed: onInterestPromptClosed,
+            host: interestHost,
           }}
           onClose={() => {
             setShowFollowModal(false);
@@ -7775,6 +7850,16 @@ export default function OrgCalendarPage() {
             onInterestPromptClosed(via, marked);
             setInterestPrompt(null);
           }}
+          host={
+            interestHost && {
+              ...interestHost,
+              onPick: (id, marked) => {
+                onInterestPromptClosed("done", marked);
+                setInterestPrompt(null);
+                interestHost.onPick(id);
+              },
+            }
+          }
         />
       )}
 

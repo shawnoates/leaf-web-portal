@@ -21,6 +21,8 @@ export type WebEvent =
   | "follow_interest_list_shown"
   | "follow_interest_tap"
   | "follow_interest_list_closed"
+  | "follow_host_ask_shown"
+  | "follow_host_ask_pick"
   | "plan_share_arrival"
   | "calendar_src_arrival"
   | "cross_promo_share_sent"

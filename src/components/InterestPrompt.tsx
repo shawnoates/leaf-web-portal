@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { AnimationItem } from "lottie-web";
+import { usePointsConfig } from "@/lib/points-config";
 
 // ============================================================================
 // Post-follow interest modal — "Which of these would you go to?" (handoff turn
@@ -14,7 +15,15 @@ import type { AnimationItem } from "lottie-web";
 // the order must not move under the user's finger, so it is snapshotted once
 // at open), the marked/pending sets, and the per-tap writes. Every tap is one
 // independent optimistic write; Done and Skip differ only in what has already
-// been written. Copy never mentions hosts, and no counts are shown.
+// been written. No counts are shown.
+//
+// Host invite: when the parent passes `host` (the viewer may host on this
+// calendar), Done opens a popup over this screen for ONE plan — the first
+// one they marked, else the top of the list — that says what hosting
+// involves, what a host earns (the number comes from the server), and has a
+// single button into the calendar's own host flow. ✕ / Esc / the scrim close
+// it and continue as Done would. The hearts screen itself still never
+// mentions hosting or counts; ✕ / Esc / the scrim on it skip the invite.
 // ============================================================================
 
 export interface InterestPromptItem {
@@ -30,6 +39,10 @@ export interface InterestPromptItem {
 
 export type InterestPromptCloseVia = "done" | "skip";
 
+/** Other people's interest needed before the invite shows a count: "1 wants
+ *  to go" makes a plan look empty, and the viewer's own heart never counts. */
+const HOST_INVITE_MIN_OTHERS = 3;
+
 export default function InterestPrompt({
   calendarName,
   items,
@@ -37,6 +50,7 @@ export default function InterestPrompt({
   pending,
   onToggle,
   onClose,
+  host,
 }: {
   calendarName: string;
   items: InterestPromptItem[];
@@ -46,12 +60,25 @@ export default function InterestPrompt({
   /** Done → "done"; ✕, Esc and the scrim → "skip". Both continue to the same
    *  next step; `marked` is how many cards were on at close. */
   onClose: (via: InterestPromptCloseVia, marked: number) => void;
+  /** Present when the viewer can host here. `onPick` replaces onClose for
+   *  that path: the parent closes the prompt and opens its host flow. */
+  host?: {
+    /** False for a plan someone already hosts; the invite never offers it. */
+    canHost: (id: string) => boolean;
+    /** Live interest count for the plan, the viewer's own heart included. */
+    interestCount: (id: string) => number;
+    onShown: (itemIds: string[], marked: number) => void;
+    onPick: (id: string, marked: number) => void;
+  };
 }) {
   // Cards toggled during THIS mount get the fill-and-pop; cards that arrive
   // already marked (seeded from existing interest records) render filled with
   // no animation.
   const [animated, setAnimated] = useState<Set<string>>(() => new Set());
   const reducedMotion = usePrefersReducedMotion();
+  // The plan the invite is about, fixed when it opens. Null = hearts screen.
+  const [hostItem, setHostItem] = useState<InterestPromptItem | null>(null);
+  const phase = hostItem ? "host" : "interest";
 
   const count = items.reduce((n, it) => (marked.has(it.id) ? n + 1 : n), 0);
   // Esc reads the live count without re-binding the listener on every tap.
@@ -60,13 +87,15 @@ export default function InterestPrompt({
     countRef.current = count;
   }, [count]);
 
+  // The host invite binds its own Esc (it closes as Done).
   useEffect(() => {
+    if (phase !== "interest") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose("skip", countRef.current);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, phase]);
 
   // The mobile surface is full-screen; the page under it must not scroll.
   useEffect(() => {
@@ -78,7 +107,20 @@ export default function InterestPrompt({
   }, []);
 
   const skip = () => onClose("skip", countRef.current);
-  const done = () => onClose("done", countRef.current);
+  const done = () => {
+    if (!host || phase === "host") {
+      onClose("done", countRef.current);
+      return;
+    }
+    const hostable = items.filter((it) => host.canHost(it.id));
+    const pick = hostable.find((it) => marked.has(it.id)) ?? hostable[0];
+    if (!pick) {
+      onClose("done", countRef.current);
+      return;
+    }
+    setHostItem(pick);
+    host.onShown([pick.id], countRef.current);
+  };
 
   const tap = (id: string) => {
     if (pending.has(id)) return;
@@ -91,7 +133,21 @@ export default function InterestPrompt({
     onToggle(id);
   };
 
+  const others = hostItem && host
+    ? host.interestCount(hostItem.id) - (marked.has(hostItem.id) ? 1 : 0)
+    : 0;
+
   return (
+    <>
+    {hostItem && host && (
+      <HostInvite
+        calendarName={calendarName}
+        item={hostItem}
+        others={others >= HOST_INVITE_MIN_OTHERS ? others : null}
+        onPick={() => host.onPick(hostItem.id, countRef.current)}
+        onClose={done}
+      />
+    )}
     <div className="ip-scrim" onClick={skip}>
       <InterestPromptStyles />
       <div
@@ -170,8 +226,230 @@ export default function InterestPrompt({
         </footer>
       </div>
     </div>
+    </>
   );
 }
+
+// The host invite: a popup over the hearts screen about ONE plan, with one
+// button (Host <title>) into the calendar's host flow. Bottom sheet on a
+// phone, a two-column card (photo | copy) on desktop. The count line shows
+// only when the parent passes `others` (enough other people already want to
+// go); points copy never states a formula, only the server's host max.
+function HostInvite({
+  calendarName,
+  item,
+  others,
+  onPick,
+  onClose,
+}: {
+  calendarName: string;
+  item: InterestPromptItem;
+  others: number | null;
+  onPick: () => void;
+  onClose: () => void;
+}) {
+  const cfg = usePointsConfig();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="hi-scrim" onClick={onClose}>
+      <style>{HOST_INVITE_CSS}</style>
+      <div
+        className="hi"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="hi-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button type="button" className="hi-x" aria-label="Close" onClick={onClose}>
+          <X size={17} strokeWidth={2} />
+        </button>
+        <div className="hi-photo">
+          {item.image && <CardImage src={item.image} />}
+          <span className="ip-shade" aria-hidden />
+          <span className="hi-photo-text">
+            {others !== null && (
+              <span className="hi-count">
+                <HeartGlyph />
+                {others} neighbors want to go
+              </span>
+            )}
+            {(item.dateLabel || item.place) && (
+              <span className="ip-meta">
+                {[item.dateLabel, item.place].filter(Boolean).join(" · ")}
+              </span>
+            )}
+            <span className="hi-photo-title">{item.title}</span>
+          </span>
+        </div>
+
+        <div className="hi-body">
+          <p className="hi-eyebrow">{calendarName}</p>
+          <h2 id="hi-title" className="hi-h">
+            Want to make it happen?
+          </h2>
+          <p className="hi-sub">Host it and the group comes to you.</p>
+
+          <ul className="hi-rows">
+            <li>
+              <span className="hi-ic" aria-hidden>
+                <svg viewBox="0 0 24 24" {...STROKE}>
+                  <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+                  <path d="M3.5 10h17M8 3v4M16 3v4" />
+                </svg>
+              </span>
+              <p>
+                <b>You pick the night and the place.</b>{" "}
+                We&rsquo;ve suggested both; change
+                either.
+              </p>
+            </li>
+            <li>
+              <span className="hi-ic" aria-hidden>
+                <svg viewBox="0 0 24 24" {...STROKE}>
+                  <circle cx="9" cy="8.5" r="3.2" />
+                  <path d="M3.5 19c.6-3 2.8-4.8 5.5-4.8s4.9 1.8 5.5 4.8" />
+                  <circle cx="17" cy="9.5" r="2.5" />
+                  <path d="M16 14.4c2.3.1 4 1.6 4.5 4.1" />
+                </svg>
+              </span>
+              <p>
+                <b>It goes on {calendarName}.</b>{" "}
+                Followers hear about it and RSVP.
+              </p>
+            </li>
+            <li>
+              <span className="hi-ic" aria-hidden>
+                <svg viewBox="0 0 24 24" {...STROKE}>
+                  <rect x="5" y="4" width="14" height="17" rx="2.5" />
+                  <path d="M9 4.5V3h6v1.5M8.5 11l1.8 1.8 3.5-3.6M8.5 16.5h7" />
+                </svg>
+              </span>
+              <p>
+                <b>We&rsquo;ll walk you through it.</b>{" "}
+                Your host checklist says what to do and
+                when, with messages to your guests drafted for you.
+              </p>
+            </li>
+            <li>
+              <span className="hi-ic hi-ic-pts" aria-hidden>
+                <StarGlyph size={17} />
+              </span>
+              <p>
+                <b>Earn Leaf points.</b>{" "}
+                More for every guest who checks in. Soon you&rsquo;ll
+                be able to use them for money off ticketed events.
+              </p>
+            </li>
+          </ul>
+
+          <button type="button" className="hi-cta" onClick={onPick}>
+            <span className="hi-cta-label">Host {item.title}</span>
+            <span className="hi-badge">
+              <StarGlyph size={11} />
+              {cfg ? `Earn up to ${cfg.hostMax} pts` : "Earn Leaf points"}
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const STROKE = {
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.8,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
+
+function StarGlyph({ size }: { size: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden focusable="false">
+      <path
+        d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function HeartGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden focusable="false">
+      <path
+        d="M12 21s-6.7-4.3-9.3-8.2C.6 9.6 1.6 5.6 5 4.3c2.2-.8 4.5 0 7 2.6 2.5-2.6 4.8-3.4 7-2.6 3.4 1.3 4.4 5.3 2.3 8.5C18.7 16.7 12 21 12 21z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+const HOST_INVITE_CSS = `
+.hi-scrim{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center;
+  background:rgba(0,0,0,.62)}
+.hi{--hi-serif:var(--font-newsreader),Georgia,serif;position:relative;display:flex;flex-direction:column;
+  width:100%;max-height:calc(100svh - 24px);overflow-y:auto;background:#fbfaf7;color:#18181b;
+  border-radius:24px 24px 0 0}
+.hi *{box-sizing:border-box}
+.hi button{font:inherit;cursor:pointer;touch-action:manipulation}
+.hi-photo{position:relative;flex:none;height:150px;background:#4a3f35;overflow:hidden;color:#fff}
+.hi-photo>.ip-img,.hi-photo>.ip-shade{pointer-events:none}
+.hi-x{position:absolute;top:8px;right:8px;z-index:3;display:flex;align-items:center;justify-content:center;
+  width:44px;height:44px;padding:0;border:0;border-radius:22px;background:rgba(0,0,0,.35);color:#fff}
+.hi-photo-text{position:absolute;left:18px;right:60px;bottom:14px;display:flex;flex-direction:column;gap:4px}
+.hi-photo-text .ip-meta{margin:0}
+.hi-count{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;margin-bottom:4px;padding:6px 10px;
+  border-radius:999px;background:rgba(255,255,255,.16);font-size:12.5px;font-weight:600;line-height:1}
+.hi-photo-title{font-family:var(--hi-serif);font-size:22px;line-height:1.15;display:-webkit-box;
+  -webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.hi-body{display:flex;flex-direction:column;padding:22px 24px calc(30px + env(safe-area-inset-bottom))}
+.hi-eyebrow{display:none;margin:0 0 8px;font-size:10.5px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:#a1a1aa}
+.hi-h{margin:0;font-family:var(--hi-serif);font-weight:400;font-size:26px;line-height:1.15}
+.hi-sub{margin:6px 0 0;font-size:14.5px;line-height:1.45;color:#52525b}
+.hi-rows{list-style:none;margin:18px 0 0;padding:0;display:flex;flex-direction:column;gap:14px}
+.hi-rows li{display:flex;gap:12px;align-items:flex-start}
+.hi-rows p{margin:0;font-size:14px;line-height:1.45;color:#3f3f46}
+.hi-rows b{font-weight:600;color:#18181b}
+.hi-ic{flex:none;display:flex;align-items:center;justify-content:center;width:32px;height:32px;
+  border-radius:10px;background:#f0efea;color:#3f3f46}
+.hi-ic svg{width:17px;height:17px}
+.hi-ic-pts{background:#e3f1ea;color:#047857}
+.hi-cta{position:relative;display:flex;align-items:center;justify-content:center;height:52px;margin-top:28px;
+  padding:0 20px;border:0;border-radius:14px;background:#18181b;color:#fff;font-size:15.5px;font-weight:600}
+.hi-cta:hover{background:#27272a}
+.hi-cta-label{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hi-badge{position:absolute;top:0;right:14px;transform:translateY(-50%);display:inline-flex;align-items:center;
+  gap:4px;padding:6px 10px;border:2px solid #fbfaf7;border-radius:999px;background:#d1fae5;color:#065f46;
+  font-size:12px;font-weight:700;line-height:1;white-space:nowrap}
+
+@media(min-width:768px){
+  .hi-scrim{align-items:center;padding:32px 24px;background:rgba(40,30,10,.32)}
+  .hi{flex-direction:row;max-width:820px;max-height:calc(100vh - 64px);border-radius:14px;
+    box-shadow:0 20px 60px rgba(0,0,0,.22)}
+  .hi-photo{width:50%;height:auto;min-height:520px}
+  .hi-photo-text{left:24px;right:24px;bottom:22px;gap:6px}
+  .hi-photo-title{font-size:30px;line-height:1.12}
+  .hi-x{top:10px;right:10px;background:none;color:#a1a1aa}
+  .hi-x:hover{color:#18181b}
+  .hi-body{width:50%;padding:40px 40px 36px}
+  .hi-eyebrow{display:block}
+  .hi-h{font-size:32px;line-height:1.12}
+  .hi-rows{gap:16px;margin-top:22px}
+  .hi-rows p{line-height:1.5}
+  .hi-rows{margin-bottom:28px}
+  .hi-cta{margin-top:auto;height:50px;border-radius:10px;font-size:15px}
+}
+`;
 
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false);
