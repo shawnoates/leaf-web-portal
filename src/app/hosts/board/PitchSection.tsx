@@ -9,7 +9,7 @@
  * pay is Leaf's own quote, shown once the pitch is in.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Parse from "@/lib/parse-client";
 
 export type PitchOption = { calendarId: string; neighborhoodName: string; calendarName: string | null };
@@ -68,6 +68,18 @@ export default function PitchSection({
   onChanged: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // The digest's "Pitch your event" link lands on #pitch: open the form and
+  // bring it into view (the board renders after load, so the browser's own
+  // anchor jump has nothing to jump to).
+  useEffect(() => {
+    if (typeof window === "undefined" || window.location.hash !== "#pitch") return;
+    if (!busyHosting && options.length > 0) setOpen(true);
+    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [form, setForm] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,12 +125,16 @@ export default function PitchSection({
   const shownPitches = pitches.filter((p) => p.status !== "withdrawn");
 
   return (
-    <section className="mt-10">
+    <section id="pitch" ref={sectionRef} className="mt-10 scroll-mt-6">
       <div className={`${card} bg-leaf-50/60`}>
         <h2 className="text-lg font-semibold text-leaf-900">Have your own idea? Pitch an event</h2>
         <p className="mt-1 text-[15px] leading-relaxed text-zinc-700">
           Tell us what you&apos;d run and when. If we go with it, we find the venue and email you an
           offer at our usual rate.
+        </p>
+        {/* Matches NEW_PEOPLE_BONUS on the server (host-marketplace-helpers.js). */}
+        <p className="mt-2 rounded-lg bg-white px-3 py-2 text-[15px] text-leaf-900">
+          <strong>+$50 bonus:</strong> if 10 people new to Leaf RSVP to your event, we add $50 to your pay.
         </p>
 
         {sent && (
