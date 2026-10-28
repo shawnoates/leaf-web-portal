@@ -108,7 +108,7 @@ function FriendsDashboard() {
         <FriendModeIcon size={28} className="shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="m-0 truncate text-sm font-semibold text-zinc-900">{name}</p>
-          <p className="m-0 text-[10px] text-zinc-400">Friend Mode</p>
+          <p className="m-0 text-[10px] text-zinc-400">Crews</p>
         </div>
       </header>
       <main className="min-w-0">
@@ -126,8 +126,8 @@ function FriendsDashboard() {
             <div className="mb-8 flex items-center gap-3">
               <FriendModeIcon size={36} />
               <div>
-                <h1 className="m-0 text-2xl font-semibold tracking-tight text-zinc-900">Friend Mode</h1>
-                <p className="m-0 text-sm text-zinc-500">Your crews. Leaf plans the nights; you show up.</p>
+                <h1 className="m-0 text-2xl font-semibold tracking-tight text-zinc-900">Crews</h1>
+                <p className="m-0 text-sm text-zinc-500">Leaf plans the nights; you show up.</p>
               </div>
             </div>
             {!loaded ? (
