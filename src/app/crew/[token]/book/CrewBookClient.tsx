@@ -457,7 +457,8 @@ function HappeningItem({ s, busy, act, auth, isOwner }: {
               {!fixing && <button type="button" onClick={() => setFixing(true)} className="text-fm-muted underline underline-offset-2 hover:text-fm-ink">Fix</button>}
             </div>
           )}
-          {!dated && !s.eventPassed && s.plan && !fixing && (
+          {!dated && s.planRepeats && <div className="mt-0.5 truncate text-xs text-fm-accent">{s.planRepeats}</div>}
+          {!dated && !s.eventPassed && s.plan && !s.planRepeats && !fixing && (
             <button type="button" onClick={() => setFixing(true)} className="mt-0.5 text-xs text-fm-muted underline underline-offset-2 hover:text-fm-ink">Add the date</button>
           )}
           {(s.plan?.videoUrl || s.plan?.sourceUrl || canRemove) && (

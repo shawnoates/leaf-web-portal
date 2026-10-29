@@ -150,6 +150,8 @@ export type BookSpot = {
   eventDateFrom?: "image" | "caption" | "both" | "member" | null;
   eventDateCheck?: boolean;
   /** A plan someone shared into the book: its own title, description, video, cover and link. */
+  /** A shared post that repeats weekly: "Every Tue · 9 PM–close" (no date to ask for). */
+  planRepeats?: string | null;
   plan?: { title: string | null; description: string | null; videoUrl: string | null; imageUrl: string | null; sourceUrl: string | null } | null;
   /** Which row it belongs in: Places ("place") or Happenings (the rest). */
   kind?: BookKind;
