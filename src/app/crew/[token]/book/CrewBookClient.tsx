@@ -449,7 +449,7 @@ function HappeningItem({ s, busy, act, auth, isOwner }: {
   const on = s.upvotedByMe;
   const canRemove = s.addedByMe || isOwner;
   const link = "underline underline-offset-2 hover:text-fm-ink";
-  // Fixing a shared post's date by hand: one day, or a run.
+  // Fixing a date Leaf read off a shared post: one day, or a run.
   const [fixing, setFixing] = useState(false);
   const [start, setStart] = useState(s.eventStart || "");
   const [end, setEnd] = useState(s.eventEnd && s.eventEnd !== s.eventStart ? s.eventEnd : "");
@@ -487,9 +487,6 @@ function HappeningItem({ s, busy, act, auth, isOwner }: {
             </div>
           )}
           {!dated && s.planRepeats && <div className="mt-0.5 truncate text-xs text-fm-accent">{s.planRepeats}</div>}
-          {!dated && !s.eventPassed && s.plan && !s.planRepeats && !fixing && (
-            <button type="button" onClick={() => setFixing(true)} className="mt-0.5 text-xs text-fm-muted underline underline-offset-2 hover:text-fm-ink">Add the date</button>
-          )}
           {(s.plan?.videoUrl || s.plan?.sourceUrl || canRemove) && (
             <div className="mt-0.5 flex gap-3 text-xs text-fm-muted">
               {s.plan?.videoUrl && <a href={s.plan.videoUrl} target="_blank" rel="noreferrer" className={link}>Video</a>}
