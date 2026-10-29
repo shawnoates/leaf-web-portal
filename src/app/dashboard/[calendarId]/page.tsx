@@ -3127,6 +3127,7 @@ export default function OrgDashboardPage() {
               idea: "Suggestion added · it waits for a host, no one has been notified",
               "idea-series": "Recurring suggestion added · each cycle waits for a host, no one has been notified",
               poll: "Poll published · followers are being texted to vote",
+              pending: "Sent to the organizer · it goes live once they approve it",
               edited: null,
             };
             const copy = banner[result.kind];

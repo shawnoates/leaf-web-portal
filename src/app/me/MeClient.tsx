@@ -1139,7 +1139,9 @@ function DashboardView({
           {justCreated && !qualifierActive && (
             <div className="created" role="status">
               <div>
-                <b>{justCreated.title}</b> is live on your calendar.
+                {justCreated.pending
+                  ? <><b>{justCreated.title}</b> is with the organizer. It goes live once they approve it.</>
+                  : <><b>{justCreated.title}</b> is live on your calendar.</>}
               </div>
               {justCreated.eventGroupId && (
                 <Link className="created-link" href={`/p/${justCreated.eventGroupId}`}>

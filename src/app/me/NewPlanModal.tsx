@@ -74,7 +74,9 @@ function daysOut(iso: string): number {
   return Math.round((target.getTime() - start.getTime()) / 86400000);
 }
 
-export interface CreatedPlan { eventGroupId: string | null; inviteUrl: string | null; title: string }
+/** `pending`: sent to the organizer for approval (a follower on an admin
+ *  neighborhood calendar) — not live, so no plan id or invite link yet. */
+export interface CreatedPlan { eventGroupId: string | null; inviteUrl: string | null; title: string; pending?: boolean }
 
 export interface NewPlanDraftSnapshot {
   prompt?: string;
@@ -429,8 +431,9 @@ export default function NewPlanModal({
         date: when,
         isHosted: true,
         clientTimeZone: tz,
-      })) as { eventGroupId?: string };
+      })) as { eventGroupId?: string; type?: string };
       const eventGroupId: string | null = res?.eventGroupId || null;
+      const pending = res?.type === "pending";
 
       // Collecting is set after the plan exists. If it fails the plan still
       // stands; say so, and point at the plan's Payments page to retry.
@@ -456,12 +459,14 @@ export default function NewPlanModal({
         eventGroupId,
         inviteUrl: eventGroupId ? `${APP_LINK_URL}/p/${eventGroupId}` : null,
         title: title.trim(),
+        pending,
       });
 
       onCreated({
         eventGroupId,
         inviteUrl: eventGroupId ? `${APP_LINK_URL}/p/${eventGroupId}` : null,
         title: title.trim(),
+        pending,
       });
       if (collectError) {
         setErrors({ form: `Plan created, but collecting money didn't turn on: ${collectError} You can turn it on from the plan's Payments page.` });
@@ -826,7 +831,7 @@ export default function NewPlanModal({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="np-head">
-              <span className="np-head-t">PLAN IS LIVE</span>
+              <span className="np-head-t">{created.pending ? "SENT FOR APPROVAL" : "PLAN IS LIVE"}</span>
               <button className="np-x" onClick={onClose} aria-label="Close">×</button>
             </div>
             <div className="np-body">
@@ -863,6 +868,10 @@ export default function NewPlanModal({
                     </div>
                   ) : null}
                 </>
+              ) : created.pending ? (
+                <p className="np-done-foot">
+                  The organizer reviews it first. You&rsquo;ll get the invite link once it&rsquo;s approved.
+                </p>
               ) : (
                 <p className="np-done-foot">It&rsquo;s on your calendar.</p>
               )}

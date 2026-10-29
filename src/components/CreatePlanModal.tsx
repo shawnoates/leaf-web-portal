@@ -40,7 +40,7 @@ type PlanMode = "plan" | "idea" | "poll";
 /** What a successful save produced. `edited` covers every update path
  *  (plan edit, poll edit, host-request approval, poll → plan conversion). */
 export type CreatePlanResult = {
-  kind: "hosted" | "hosted-series" | "idea" | "idea-series" | "poll" | "edited";
+  kind: "hosted" | "hosted-series" | "idea" | "idea-series" | "poll" | "edited" | "pending";
   eventGroupId?: string;
 };
 
@@ -421,6 +421,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   const seriesHostFirstName = seriesHostName.trim().split(/\s+/)[0] || "They";
   const [creating, setCreating] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [sentForApproval, setSentForApproval] = useState(false);
   // A hosted plan just created with the creator as its host. The drawer
   // stays open on the "record a 30-second hello" card instead of closing:
   // the ask belongs to the moment the plan went live.
@@ -1353,9 +1354,13 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           aiSourceEventIndex: prefill?.aiSourceEventIndex,
         })) as { success?: boolean; type?: string; eventGroupId?: string };
         // Trust the server's `type` over local `isHosted` — it's what got written.
-        result = created?.type === "idea" || !isHosted
-          ? { kind: "idea" }
-          : { kind: "hosted", eventGroupId: created?.eventGroupId };
+        // "pending": a follower on an admin neighborhood calendar — the plan
+        // went to the organizer for approval and isn't live yet.
+        result = created?.type === "pending"
+          ? { kind: "pending" }
+          : created?.type === "idea" || !isHosted
+            ? { kind: "idea" }
+            : { kind: "hosted", eventGroupId: created?.eventGroupId };
         // Collecting is set once the plan exists; a failure leaves the plan
         // standing and says where to retry.
         if (collecting && created?.type !== "idea" && created?.eventGroupId) {
@@ -1389,6 +1394,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           });
         }
       }
+      setSentForApproval(result.kind === "pending");
       setSuccess(true);
       onCreated(result);
       if (result.kind === "hosted" && result.eventGroupId && !hostIsOther) {
@@ -1481,7 +1487,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
         <div className={helloPlanId ? "hidden" : "flex-1 overflow-y-auto px-6 py-5 space-y-5"}>
           {success && (
             <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg text-sm">
-              <Check className="w-4 h-4" /> {pollConvertMode ? "Poll converted — voters notified" : hostRequestMode ? "Approved — requester notified" : editMode ? (isPoll ? "Poll updated!" : "Plan updated!") : isPoll ? "Poll created — followers notified" : "Plan created successfully!"}
+              <Check className="w-4 h-4" /> {pollConvertMode ? "Poll converted — voters notified" : hostRequestMode ? "Approved — requester notified" : editMode ? (isPoll ? "Poll updated!" : "Plan updated!") : isPoll ? "Poll created — followers notified" : sentForApproval ? "Sent to the organizer — it goes live once they approve it" : "Plan created successfully!"}
             </div>
           )}
 
