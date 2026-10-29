@@ -57,6 +57,8 @@ function GoTo({ href }: { href: string }) {
 function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewAuth; crewName: string; canAdd: boolean; isOwner: boolean; hiddenTips?: string[] }) {
   const [book, setBook] = useState<Book | null>(null);
   const [sort, setSort] = useState<"wanted" | "new">("wanted");
+  // A filter pill ("Happy hours", "Rooftops"): only entries with that tag.
+  const [tag, setTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   // What Leaf finds for what's typed (a team's next game, a show's next date),
   // so the search's "Watch for" row can show it and move to the top.
@@ -137,8 +139,18 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
   if (!book) return <Spinner label="Opening the book…" />;
   // Rows when the server sends them: Places on their own, Happenings above.
   const rows = Boolean(book.places);
-  const shared = [...(rows ? book.places! : book.shared)].sort((a, b) => (sort === "wanted" ? b.upvotes - a.upvotes : 0));
-  const happenings = (book.happenings || []).filter((h) => h.kind !== "watch");
+  const allShared = [...(rows ? book.places! : book.shared)].sort((a, b) => (sort === "wanted" ? b.upvotes - a.upvotes : 0));
+  const allHappenings = (book.happenings || []).filter((h) => h.kind !== "watch");
+  // Pills: tags two or more entries share, most common first, six at most.
+  const tagCounts = new Map<string, number>();
+  for (const s of [...allShared, ...allHappenings]) for (const t of s.tags || []) tagCounts.set(t, (tagCounts.get(t) || 0) + 1);
+  const pills = [...tagCounts].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t]) => t);
+  const activeTag = tag && pills.includes(tag) ? tag : null;
+  const tagged = (s: BookSpot) => !activeTag || (s.tags || []).includes(activeTag);
+  const shared = allShared.filter(tagged);
+  const happenings = allHappenings.filter(tagged);
+  // Watched events count as events.
+  const watching = !activeTag || activeTag === "Events" ? book.watching || [] : [];
 
   const suggestionRow = (p: Suggested) => (
     <li key={p.placeId} className="flex items-center gap-3 py-3.5">
@@ -273,10 +285,25 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
 
       <div className="mt-8 grid grid-cols-1 gap-10 lg:mt-10 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-12">
         <div className="flex min-w-0 flex-col gap-10">
-        {rows && (happenings.length > 0 || (book.watching?.length ?? 0) > 0) && (
+        {pills.length > 0 && (
+          <div role="group" aria-label="Filter the book" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-wrap lg:px-0">
+            {pills.map((t) => (
+              <button
+                key={t}
+                type="button"
+                aria-pressed={activeTag === t}
+                onClick={() => setTag(activeTag === t ? null : t)}
+                className={`h-9 shrink-0 rounded-full border px-3.5 text-[13px] ${activeTag === t ? "border-fm-ink bg-fm-ink font-semibold text-fm-canvas" : "border-fm-line bg-fm-surface font-medium text-fm-ink-2 hover:text-fm-ink"}`}
+              >
+                {t} <span className={activeTag === t ? "text-fm-canvas/70" : "text-fm-muted"}>{tagCounts.get(t)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {rows && (happenings.length > 0 || watching.length > 0) && (
           <section id="happenings" className="flex min-w-0 scroll-mt-6 flex-col gap-3">
-            <Eyebrow>Happenings · {happenings.length + (book.watching?.length ?? 0)}</Eyebrow>
-            {(book.watching?.length ?? 0) > 0 && <WatchingStrip items={book.watching!} auth={auth} isOwner={isOwner} onChange={refresh} />}
+            <Eyebrow>Happenings · {happenings.length + watching.length}</Eyebrow>
+            {watching.length > 0 && <WatchingStrip items={watching} auth={auth} isOwner={isOwner} onChange={refresh} />}
             {happenings.length > 0 && (
               <ul className="flex flex-col gap-2 lg:grid lg:grid-cols-2">
                 {happenings.map((s) => <HappeningItem key={s.spotId} s={s} busy={busy} act={act} auth={auth} isOwner={isOwner} />)}
@@ -284,6 +311,7 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
             )}
           </section>
         )}
+        {!(activeTag && shared.length === 0) && (
         <section className="min-w-0">
           <div className="mb-2 flex items-center justify-between lg:mb-5">
             <Eyebrow>{rows ? "Places" : "In the book"} · {shared.length}</Eyebrow>
@@ -314,6 +342,7 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
             </ul>
           )}
         </section>
+        )}
         {/* Ideas for the book, at its bottom: the crew's saves, places like
             where it's been, events nearby, popular. */}
         {(book.discover?.length ?? 0) > 0 && (
