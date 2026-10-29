@@ -180,6 +180,9 @@ export default function PlanDetailModal({
   // follower/member, or themselves). Candidates load on open; the override
   // reflects the new host name immediately without waiting for a parent refetch.
   const [showChangeHost, setShowChangeHost] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelNote, setCancelNote] = useState("");
+  const [cancelling, setCancelling] = useState(false);
   const [hostCandidates, setHostCandidates] = useState<
     { id: string; name: string; isCurrentHost: boolean; isSelf: boolean; suffix?: string; hasPhone?: boolean }[] | null
   >(null);
@@ -380,21 +383,40 @@ export default function PlanDetailModal({
     }
   };
 
+  // Plans open a confirm sheet with an optional note to the host; polls keep
+  // the plain confirm (no host to tell).
   const handleCancel = async () => {
-    const isPoll = !!plan.isPoll;
-    const confirmMsg = isPoll
-      ? "Cancel this poll? Voters won't be notified. This cannot be undone."
-      : plan.planSeriesId
-        ? "Cancel just this occurrence? Future occurrences will continue. This cannot be undone."
-        : "Cancel this plan? Attendees will be notified. This cannot be undone.";
-    if (!confirm(confirmMsg)) return;
+    if (!plan.isPoll) {
+      setCancelNote("");
+      setCancelOpen(true);
+      return;
+    }
+    if (!confirm("Cancel this poll? Voters won't be notified. This cannot be undone.")) return;
     try {
       await Parse.Cloud.run("removePlanFromCalendar", { eventGroupId: plan.objectId });
       onClose();
       onChanged();
     } catch (err) {
       console.error("Failed to cancel:", err);
-      alert(isPoll ? "Failed to cancel poll." : "Failed to cancel plan.");
+      alert("Failed to cancel poll.");
+    }
+  };
+
+  const confirmCancelPlan = async () => {
+    setCancelling(true);
+    try {
+      await Parse.Cloud.run("removePlanFromCalendar", {
+        eventGroupId: plan.objectId,
+        reason: cancelNote.trim() || undefined,
+      });
+      setCancelOpen(false);
+      onClose();
+      onChanged();
+    } catch (err) {
+      console.error("Failed to cancel:", err);
+      alert("Failed to cancel plan.");
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -1068,6 +1090,62 @@ export default function PlanDetailModal({
           </div>
         </div>
       </div>
+      {cancelOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-zinc-900/40" onClick={() => !cancelling && setCancelOpen(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cancel-plan-title"
+            className="w-full max-w-md bg-white rounded-2xl shadow-xl p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h3 id="cancel-plan-title" className="text-base font-semibold text-zinc-900">
+                {plan.planSeriesId ? "Cancel this occurrence?" : "Cancel this plan?"}
+              </h3>
+              <p className="text-sm text-zinc-500 mt-1">
+                {plan.planSeriesId
+                  ? "Future occurrences will continue. Attendees will be notified. This cannot be undone."
+                  : "Attendees will be notified. This cannot be undone."}
+              </p>
+            </div>
+            <label className="block">
+              <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">
+                Note to the host (optional)
+              </span>
+              <textarea
+                value={cancelNote}
+                onChange={(e) => setCancelNote(e.target.value)}
+                maxLength={300}
+                rows={3}
+                placeholder="e.g. Plans here need a set location. Pick a spot and resubmit."
+                className={`mt-1.5 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 ${FOCUS_RING}`}
+              />
+              <span className="block text-xs text-zinc-400 mt-1">
+                If someone else is hosting, they&apos;re told it was taken down, with this note. Attendees don&apos;t see it.
+              </span>
+            </label>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCancelOpen(false)}
+                disabled={cancelling}
+                className={`h-9 px-3 rounded-lg text-[13px] font-medium text-zinc-600 hover:bg-zinc-100 transition-colors ${FOCUS_RING}`}
+              >
+                Keep plan
+              </button>
+              <button
+                type="button"
+                onClick={confirmCancelPlan}
+                disabled={cancelling}
+                className={`h-9 px-3 rounded-lg text-[13px] font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 transition-colors ${FOCUS_RING}`}
+              >
+                {cancelling ? "Cancelling…" : plan.planSeriesId ? "Cancel occurrence" : "Cancel plan"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
