@@ -17,6 +17,7 @@ import CommunityQualifierCard, {
 } from "./CommunityQualifierCard";
 import RecapPopup from "@/components/recap/RecapPopup";
 import CalendarPromoBanner from "@/components/CalendarPromoBanner";
+import { MyDrops } from "@/components/DropCard";
 import NamePrompt from "@/components/NamePrompt";
 import { setVerifiedUserCookie } from "@/lib/verified-user";
 import { useEmailCodeSignIn } from "@/lib/email-code";
@@ -1150,6 +1151,10 @@ function DashboardView({
               )}
             </div>
           )}
+
+          {/* Above the hero on purpose: a Drop is a countdown, and it only
+              lands if it's the first thing seen. Nothing renders without one. */}
+          <MyDrops className="pb-5" />
 
           {hero ? (
             <Hero plan={hero} onRsvp={onRsvp} onOpen={() => setOpenPlanId(hero.id)} />

@@ -12,6 +12,7 @@ import { ContactStep, usePhoneVerify, formatPhoneNumber, type ContactChoice } fr
 import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
+import { CalendarDropBar } from "@/components/DropCard";
 import LeafHostPlanThread from "@/components/LeafHostPlanThread";
 import NamePrompt from "@/components/NamePrompt";
 import ShareKitPrompt, { type ShareKitPayload } from "@/components/ShareKitPrompt";
@@ -4951,6 +4952,10 @@ export default function OrgCalendarPage() {
         </main>
       ) : (
       <>
+      {/* A Drop: flush under the header, first thing on the page, since it's
+          a countdown. Renders nothing unless the calendar has one coming. */}
+      <CalendarDropBar calendarId={org.objectId} className="max-w-6xl mx-auto px-4 sm:px-6 pt-4" />
+
       {/* Partner thank-you — the server returns it only to followers and
           past attendees of this calendar. */}
       <CalendarPromoBanner
