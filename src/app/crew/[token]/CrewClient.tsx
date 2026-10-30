@@ -2261,6 +2261,18 @@ function NextThemeCard({ votes, ideas, fromBook, birthdays, night, busy, onVote 
   const [own, setOwn] = useState("");
   const [typing, setTyping] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  // Your taps show at once; the server's answer (after the page reloads) takes over.
+  const [tapped, setTapped] = useState<Map<string, boolean>>(new Map());
+  const asTapped = (t: ThemeVote): ThemeVote => {
+    const on = tapped.get(t.label.toLowerCase());
+    return on === undefined || on === t.myVote ? t : { ...t, myVote: on, votes: Math.max(0, t.votes + (on ? 1 : -1)) };
+  };
+  const vote = (t: ThemeVote) => {
+    const key = t.label.toLowerCase();
+    setTapped((m) => new Map(m).set(key, !t.myVote));
+    void Promise.resolve(onVote(t.label, !t.myVote, birthdayOf.get(key)?.userId))
+      .finally(() => setTapped((m) => { const n = new Map(m); n.delete(key); return n; }));
+  };
   const voted = new Set(votes.map((v) => v.label.toLowerCase()));
   const bookCount = new Map(fromBook.map((b) => [b.label.toLowerCase(), b.count]));
   const unvoted = (l: string) => !voted.has(l.toLowerCase());
@@ -2271,7 +2283,7 @@ function NextThemeCard({ votes, ideas, fromBook, birthdays, night, busy, onVote 
     ...birthdays.map((b) => b.label).filter(unvoted),
     ...fromBook.map((b) => b.label).filter(unvoted),
     ...ideas.filter((l) => unvoted(l) && !bookCount.has(l.toLowerCase())),
-  ].map((t) => (typeof t === "string" ? { label: t, votes: 0, myVote: false, byName: null } : t));
+  ].map((t) => asTapped(typeof t === "string" ? { label: t, votes: 0, myVote: false, byName: null } : t));
   const leading = votes[0]?.label || null;
   // Four at a time (the leading one always among them); the rest behind "More ideas".
   const SHOWN = 4;
@@ -2300,8 +2312,8 @@ function NextThemeCard({ votes, ideas, fromBook, birthdays, night, busy, onVote 
               type="button"
               aria-pressed={t.myVote}
               aria-label={t.myVote ? `Take back your upvote for ${t.label}` : `Upvote ${t.label}`}
-              disabled={busy !== null}
-              onClick={() => void onVote(t.label, !t.myVote, birthdayOf.get(t.label.toLowerCase())?.userId)}
+              disabled={tapped.has(t.label.toLowerCase())}
+              onClick={() => vote(t)}
               className={`h-9 shrink-0 rounded-full px-3 text-xs font-bold disabled:opacity-60 ${t.myVote ? "bg-fm-accent text-fm-canvas" : "border border-fm-line text-fm-ink"}`}
             >
               ▲ {t.votes}
