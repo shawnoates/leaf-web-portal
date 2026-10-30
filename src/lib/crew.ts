@@ -35,6 +35,20 @@ export type WeatherTrigger =
   | { kind: "weather"; minF: number; noRain: boolean; days: number[]; time: string; everyDays?: number }
   | { kind: "event"; query: string };
 
+/** Leaf's offer of one night with another crew that shares someone. */
+export type MeetupOffer = {
+  id: string;
+  withCrew: string;
+  /** First names of the people in both crews. */
+  bridge: string[];
+  /** This crew's answer, and the other crew's (null: not yet). */
+  mine: boolean | null;
+  theirs: boolean | null;
+  /** This crew's round is the one the other joins. */
+  hosting: boolean;
+  expiresAt: string | { iso: string } | null;
+};
+
 export type EventMatch = {
   spotId: string; query: string | null; title: string; date: string; time: string | null;
   venueName: string; address: string | null; url: string | null; image: string | null; free: boolean;
@@ -80,6 +94,8 @@ export type CycleView = {
   sittingOut?: string[];
   /** A theme night: the theme that picked this night's place ("Drinks under $10"). */
   theme?: { label: string; special?: string | null } | null;
+  /** A shared night with another crew: its name ("Date Night"). */
+  withCrew?: string | null;
   /** A set night's date vote ("Let the crew vote instead"): the current date first, then the others. */
   redate?: {
     options: { date: string; time: string; current: boolean; votes: number; free?: number | null; known?: number | null; weather?: { temp: string | null; text: string | null; icon: string | null; rain: number | null } | null }[];
@@ -228,6 +244,8 @@ export type CrewPage = {
     fixedPlace?: FixedPlace | null;
     /** Each round Leaf starts goes to the next member to host. */
     hostRotation?: boolean;
+    /** Leaf suggests shared nights with crews that share someone. */
+    meetups?: boolean;
     /** Theme nights: the leading theme for the next night, the themes with upvotes, and Leaf's ideas (from the crew's name and history). */
     nextTheme?: { label: string } | null;
     themeVotes?: ThemeVote[];
@@ -275,6 +293,8 @@ export type CrewPage = {
   watching?: WatchItem[];
   /** Watched events that found a date, waiting on the organizer's "It's a go?". */
   eventMatches?: EventMatch[];
+  /** A shared night offered with another crew, for the organizer to answer. */
+  meetupOffer?: MeetupOffer | null;
 };
 
 export type LastNight = {

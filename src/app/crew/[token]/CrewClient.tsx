@@ -37,6 +37,7 @@ import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
   type EventMatch,
+  type MeetupOffer,
   type ThemeVote, RHYTHM_LABELS, crewHref, freeShareWords, crewIsEvening, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
   type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult,
   type CrewAddOn, type CrewSplit, type LastNight,
@@ -480,6 +481,14 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               />
             ))}
             {eventNote && <p className="m-0 rounded-2xl border border-fm-line px-4 py-3 text-sm text-fm-ink-2">{eventNote}</p>}
+            {me.isOwner && data.meetupOffer && (
+              <MeetupOfferCard
+                offer={data.meetupOffer}
+                crewName={crew.name}
+                busy={busy}
+                onAnswer={(yes) => act("meetup", () => run("answerCrewMeetup", auth, { calendarId: crew.id, meetupId: data.meetupOffer!.id, yes }))}
+              />
+            )}
 
             {data.lastNight && (
               <LastNightCard
@@ -1082,6 +1091,21 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 </div>
               )}
 
+              {me.isOwner && !crew.oneTime && (
+                <div className="flex items-center gap-3 border-b border-fm-line-dim py-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] font-semibold">Nights with other crews</div>
+                    <div className="text-[13px] text-fm-muted">When someone here is in another crew too, Leaf can suggest doing a {night} together. You say yes or no each time.</div>
+                  </div>
+                  <FriendModeSwitch
+                    label="Nights with other crews"
+                    checked={crew.meetups !== false}
+                    disabled={busy !== null}
+                    onChange={(v) => act("meetups", () => run("setCrewMeetups", auth, { calendarId: crew.id, on: v }))}
+                  />
+                </div>
+              )}
+
               <div className="py-4">
                 <label htmlFor="my-pace" className="block text-[15px] font-semibold">Your pace</label>
                 <select
@@ -1305,6 +1329,7 @@ function CycleCard({
           {c.eventWindow?.title && (
             <Mono className="text-fm-accent">{c.eventWindow.kind === "movie" ? "Movie" : "Event"} · {c.eventWindow.title}</Mono>
           )}
+          {c.withCrew && <Mono className="text-fm-accent">With {c.withCrew}</Mono>}
           {c.theme?.label && <Mono className="text-fm-accent">Theme · {c.theme.label}</Mono>}
           {/* A specials theme: the special that made this place fit ("Happy hour, Daily 9 PM–close"). */}
           {c.theme?.special && <p className="m-0 text-sm text-fm-ink-2">{c.theme.special}</p>}
@@ -2102,6 +2127,30 @@ function SmsOptInBox({ checked, onChange, phone, onPhone, last4 }: {
  * 11/14 at Union Hall. You look free. It's a go?" Go starts the night and
  * sends the plan invites; Skip lets it pass. No answer in 2 days skips it.
  */
+/** Leaf's offer of one night with another crew that shares someone (crew-meetups.js). */
+function MeetupOfferCard({ offer: o, crewName, busy, onAnswer }: { offer: MeetupOffer; crewName: string; busy: string | null; onAnswer: (yes: boolean) => void }) {
+  const who = o.bridge.length ? `${o.bridge.slice(0, 2).join(" and ")} ${o.bridge.length === 1 ? "is" : "are"} in both crews` : "You share people";
+  return (
+    <Card className="flex flex-col gap-3">
+      <Eyebrow>A night with another crew?</Eyebrow>
+      <h2 className="m-0 font-fm-serif text-[28px] font-normal leading-[1.05]">{crewName} × {o.withCrew}</h2>
+      <p className="m-0 text-sm text-fm-ink-2">
+        {who}. Do your next night together: one place, both crews invited, everyone votes on the date.
+        {o.hosting ? ` ${o.withCrew} joins your round.` : ` You join ${o.withCrew}'s round, and it counts as yours.`}
+      </p>
+      {o.mine === true ? (
+        <p className="m-0 text-sm text-fm-accent">You said yes. Waiting on {o.withCrew}&rsquo;s organizer.</p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button small disabled={busy !== null} onClick={() => onAnswer(true)}>{busy === "meetup" ? "Saving…" : "Yes, together"}</Button>
+          <Button small kind="ghost" disabled={busy !== null} onClick={() => onAnswer(false)}>Not this time</Button>
+        </div>
+      )}
+      {o.theirs === true && o.mine !== true && <p className="m-0 text-xs text-fm-muted">{o.withCrew} already said yes.</p>}
+    </Card>
+  );
+}
+
 function EventMatchCard({ match: m, busy, onAnswer }: { match: EventMatch; busy: string | null; onAnswer: (go: boolean) => void }) {
   const d = dayParts(m.date);
   return (
