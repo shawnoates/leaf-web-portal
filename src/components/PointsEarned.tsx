@@ -76,7 +76,7 @@ export default function PointsEarned() {
   };
 
   const where = award.businessName || award.planTitle || "this plan";
-  const regular = award.kind === "attend" && award.visitNumber === 3;
+  const regular = (award.kind === "attend" || award.kind === "ticket") && award.visitNumber === 3;
 
   if (!award.first) {
     return (
