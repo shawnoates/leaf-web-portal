@@ -32,6 +32,7 @@ import NudgeModal from "@/components/dashboard/NudgeModal";
 import CreateCalendarModal from "@/components/dashboard/CreateCalendarModal";
 import SeriesHostModal, { type SeriesLimit } from "@/components/dashboard/SeriesHostModal";
 import P2pIntroModal from "@/components/dashboard/P2pIntroModal";
+import PromotePrompt, { PROMOTE_GOAL, promotePromptSnoozed } from "@/components/dashboard/PromotePrompt";
 import { seriesCountsTowardLimit, type SeriesSummary } from "@/lib/series";
 import GrowPerformance from "@/components/dashboard/GrowPerformance";
 import SharePlanSheet from "@/components/dashboard/SharePlanSheet";
@@ -1277,7 +1278,27 @@ export default function OrgDashboardPage() {
   const [showP2pIntro, setShowP2pIntro] = useState(false);
   const [p2pIntroDue, setP2pIntroDue] = useState(false);
   const p2pIntroShown = useRef(false);
-  const anotherModalOpen = showCreatePlanModal || showSubscription || showAddCalendar || showPhoneModal || Boolean(nudgeFor?.length);
+  const [showPromote, setShowPromote] = useState(false);
+  const promoteShown = useRef(false);
+  const anotherModalOpen = showCreatePlanModal || showSubscription || showAddCalendar || showPhoneModal || showPromote || Boolean(nudgeFor?.length);
+
+  // "Get your first 10 followers" share kit, for the owner of a calendar
+  // still under PROMOTE_GOAL followers. Snoozed per org in localStorage
+  // (3 days on dismiss, 7 after a share); `?promote=1` — the welcome email's
+  // link — opens it regardless. Never over another modal or the P2P intro,
+  // and it goes first: a calendar with no followers has no one to collect from.
+  useEffect(() => {
+    if (!dashboard?.isOwner || promoteShown.current) return;
+    if (anotherModalOpen || showP2pIntro) return;
+    let forced = false;
+    try { forced = new URLSearchParams(window.location.search).get("promote") === "1"; } catch { /* no window */ }
+    if (!forced && (dashboard.followerCount >= PROMOTE_GOAL || promotePromptSnoozed(dashboard.objectId))) return;
+    const t = setTimeout(() => {
+      promoteShown.current = true;
+      setShowPromote(true);
+    }, forced ? 400 : 1200);
+    return () => clearTimeout(t);
+  }, [dashboard, anotherModalOpen, showP2pIntro]);
   useEffect(() => {
     if (!canHostSeries) return;
     let forced = false;
@@ -1291,13 +1312,15 @@ export default function OrgDashboardPage() {
   }, [canHostSeries]);
   useEffect(() => {
     if (!p2pIntroDue || anotherModalOpen || p2pIntroShown.current) return;
+    // Let the promote prompt have this visit when it's due.
+    if (promoteShown.current === false && dashboard?.isOwner && dashboard.followerCount < PROMOTE_GOAL && !promotePromptSnoozed(dashboard.objectId)) return;
     const t = setTimeout(() => {
       p2pIntroShown.current = true;
       setShowP2pIntro(true);
       Parse.Cloud.run("markP2pIntroSeen", {}).catch(() => {});
     }, 1200);
     return () => clearTimeout(t);
-  }, [p2pIntroDue, anotherModalOpen]);
+  }, [p2pIntroDue, anotherModalOpen, dashboard]);
 
   // Home NEEDS YOU prompt cards. Both open the same composer the Community
   // tab uses; the server addresses the send by the membership id it handed
@@ -2859,6 +2882,17 @@ export default function OrgDashboardPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {showPromote && dashboard && (
+        <PromotePrompt
+          orgId={dashboard.objectId}
+          calendarName={dashboard.name}
+          shareId={dashboard.shareId}
+          orgType={dashboard.orgType}
+          followerCount={dashboard.followerCount}
+          onClose={() => setShowPromote(false)}
+        />
       )}
 
       {showP2pIntro && (
