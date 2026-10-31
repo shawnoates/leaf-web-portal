@@ -20,10 +20,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AnimationItem } from "lottie-web";
-import { Instrument_Sans } from "next/font/google";
+import { instrumentSans } from "@/app/fonts";
 import { Check, Heart, MapPin, Store, X } from "lucide-react";
-
-const instrumentSans = Instrument_Sans({ subsets: ["latin"], weight: ["400", "500", "600"], display: "swap" });
 
 const C = {
   green: "#253A33",

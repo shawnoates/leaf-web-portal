@@ -1,44 +1,9 @@
 import type { Metadata } from "next";
-import { Inter, Instrument_Serif, JetBrains_Mono, Manrope, Newsreader } from "next/font/google";
+import { inter, instrumentSerif, jetbrainsMono, manrope, newsreader } from "./fonts";
 import "./globals.css";
 import UserActivityBeacon from "@/components/UserActivityBeacon";
 import PointsEarned from "@/components/PointsEarned";
 import { SITE_URL } from "@/lib/site";
-
-const inter = Inter({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-// Marketing typeface set — used by /personal and /organizations via the
-// `.mkt` scope in globals.css. Self-hosted by next/font so the landing
-// pages don't block on a Google Fonts round trip.
-const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const instrumentSerif = Instrument_Serif({
-  variable: "--font-instrument-serif",
-  subsets: ["latin"],
-  weight: "400",
-  style: ["normal", "italic"],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
-
-// Share-kit headline (post-follow modal, /me card). Variable font; the
-// optical-size axis is what makes it read as a display face at 24–32px.
-const newsreader = Newsreader({
-  variable: "--font-newsreader",
-  subsets: ["latin"],
-  axes: ["opsz"],
-});
 
 const SITE_TITLE = "Leaf OS — Community Calendars";
 const SITE_DESCRIPTION =
