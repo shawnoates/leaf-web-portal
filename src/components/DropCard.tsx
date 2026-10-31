@@ -3,12 +3,15 @@
 /**
  * A Drop: a curated experience Leaf drops on a calendar. Counts down to when
  * spots open (tap Notify me to get a text), then first come, first served for
- * a small attendance-guarantee fee, paid on the plan page (/p/<id>).
+ * a small attendance-guarantee fee, paid on the plan page (/p/<id>). When
+ * it's full, followers can join a free waitlist: if a spot opens they're all
+ * texted and the first to pay gets it.
  *
- * "card" is the full card above the hero on /me; "bar" is the slim strip at
- * the top of a calendar page.
+ * "card" is the card above the hero on /me; "bar" is the slim strip at the
+ * top of a calendar page. /me also gets DropPopup, once per Drop, when one on
+ * a calendar they follow goes live.
  *
- * Only followers of the calendar get the alert (the server refuses anyone
+ * Only followers of the calendar get the texts (the server refuses anyone
  * else). On a calendar page, beforeNotify runs the page's follow gate first
  * and calls go once they follow, with the phone they followed with.
  */
@@ -19,7 +22,8 @@ import { Bell, Check, Loader2, Ticket } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { useCountdown } from "@/app/o/m/[token]/FreeNightCountdown";
 import { getVerifiedUserCookie } from "@/lib/verified-user";
-import { dropWhen, interestCookie, money, type Drop } from "@/lib/drops";
+import { dropGets, dropWhen, interestCookie, money, sendDropInterest, type Drop } from "@/lib/drops";
+import DropPopup from "@/components/DropPopup";
 
 function countdownLabel(left: number) {
   const s = Math.floor(left / 1000);
@@ -46,20 +50,20 @@ export default function DropCard({
   // The countdown ran out while the page was open: it's open now.
   const status = drop.status === "scheduled" && left === null ? "open" : drop.status;
   const [notified, setNotified] = useState(drop.notified);
+  const [waitlisted, setWaitlisted] = useState(drop.waitlisted);
   const [askPhone, setAskPhone] = useState(false);
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const notify = async (typedPhone?: string) => {
+  const waitlist = status === "sold_out";
+  const tap = async (typedPhone?: string) => {
     const signedIn = Boolean(Parse.User.current());
-    const known = getVerifiedUserCookie();
-    // The calendar page's follow flow keeps the phone they followed with.
     let followedWith = "";
     try {
       followedWith = localStorage.getItem("leaf_follower_phone") || "";
     } catch {}
-    const usePhone = typedPhone || known?.phone || followedWith;
+    const usePhone = typedPhone || getVerifiedUserCookie()?.phone || followedWith;
     if (!signedIn && usePhone.replace(/\D/g, "").length < 10) {
       setAskPhone(true);
       return;
@@ -67,13 +71,9 @@ export default function DropCard({
     setBusy(true);
     setError(null);
     try {
-      await Parse.Cloud.run("notifyMeForDrop", {
-        planId: drop.id,
-        cookie: interestCookie(),
-        ...(usePhone ? { phone: usePhone } : {}),
-        ...(known?.name ? { name: known.name } : {}),
-      });
-      setNotified(true);
+      await sendDropInterest(waitlist ? "joinDropWaitlist" : "notifyMeForDrop", drop.id, usePhone);
+      if (waitlist) setWaitlisted(true);
+      else setNotified(true);
       setAskPhone(false);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Couldn't save that. Try again.");
@@ -81,11 +81,13 @@ export default function DropCard({
       setBusy(false);
     }
   };
+  const onTap = () => (beforeNotify ? beforeNotify((p) => void tap(p)) : void tap());
 
-  const value = drop.valueCents > drop.feeCents ? `${money(drop.valueCents)} value` : null;
+  const gets = dropGets(drop);
+  const value = drop.valueCents > drop.feeCents ? `${money(drop.valueCents)} value` : "";
   const live = (status === "scheduled" || status === "open") && !drop.pass;
   const spots =
-    !live || drop.spotsLeft === null ? null : drop.spotsLeft === 1 ? "1 spot left" : `${drop.spotsLeft} spots`;
+    !live || drop.spotsLeft === null ? null : drop.spotsLeft === 1 ? "1 left" : `${drop.spotsLeft} left`;
 
   const action = (() => {
     if (drop.pass?.status === "paid" && drop.pass.token) {
@@ -102,7 +104,6 @@ export default function DropCard({
         </span>
       );
     }
-    if (status === "sold_out") return <span className="text-sm font-medium text-white/70">Sold out</span>;
     if (status === "done") return null;
     if (status === "open") {
       return (
@@ -111,10 +112,10 @@ export default function DropCard({
         </Link>
       );
     }
-    if (notified) {
+    if ((waitlist && waitlisted) || (!waitlist && notified)) {
       return (
         <span className="drop-btn drop-btn-quiet" aria-live="polite">
-          <Check className="w-3.5 h-3.5" /> We&apos;ll text you
+          <Check className="w-3.5 h-3.5" /> {waitlist ? "On the waitlist" : "We'll text you"}
         </span>
       );
     }
@@ -124,7 +125,7 @@ export default function DropCard({
           className="flex items-center gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            void notify(phone);
+            void tap(phone);
           }}
         >
           <input
@@ -133,7 +134,7 @@ export default function DropCard({
             autoComplete="tel"
             autoFocus
             placeholder="Your phone"
-            aria-label="Phone number to text when it opens"
+            aria-label={waitlist ? "Phone number to text if a spot opens" : "Phone number to text when it opens"}
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             className="w-36 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
@@ -145,29 +146,22 @@ export default function DropCard({
       );
     }
     return (
-      <button
-        onClick={() => (beforeNotify ? beforeNotify((p) => void notify(p)) : void notify())}
-        disabled={busy} className="drop-btn drop-btn-dark">
-        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bell className="w-3.5 h-3.5" />}
-        Notify me
+      <button onClick={onTap} disabled={busy} className="drop-btn drop-btn-dark">
+        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : !waitlist && <Bell className="w-3.5 h-3.5" />}
+        {waitlist ? "Join the waitlist" : "Notify me"}
       </button>
     );
   })();
 
-  const timer =
-    status === "scheduled" && left !== null ? (
-      <span className="tabular-nums" role="timer" aria-live="off">
-        Opens in {countdownLabel(left)}
-      </span>
-    ) : status === "open" ? (
-      <span>Open now · first come, first served</span>
-    ) : null;
-
-  const eyebrow = (
-    <span className="drop-eyebrow">
-      <span aria-hidden>◆</span> Drop{drop.calendar?.name ? ` · ${drop.calendar.name}` : ""}
-    </span>
-  );
+  // One short status, opposite the eyebrow.
+  const statusLine =
+    drop.pass?.status === "paid" ? null
+      : status === "scheduled" && left !== null ? (
+        <span className="tabular-nums" role="timer" aria-live="off">Opens in {countdownLabel(left)}</span>
+      )
+      : status === "open" ? <span className="drop-live"><span className="drop-dot" aria-hidden />Live{spots ? ` · ${spots}` : ""}</span>
+      : status === "sold_out" ? <span>Full</span>
+      : null;
 
   if (variant === "bar") {
     return (
@@ -179,7 +173,7 @@ export default function DropCard({
           </span>
           <span className="text-[15px] font-medium text-white truncate">{drop.title}</span>
           <span className="text-xs text-white/70">
-            {[timer, value, spots].filter(Boolean).map((x, i) => (
+            {[statusLine, gets || null].filter(Boolean).map((x, i) => (
               <span key={i}>{i > 0 && " · "}{x}</span>
             ))}
           </span>
@@ -195,26 +189,33 @@ export default function DropCard({
   return (
     <section aria-label={`Drop: ${drop.title}`} className="drop drop-card">
       <style>{STYLES}</style>
-      {eyebrow}
-      <h2 className="text-xl font-medium text-white leading-snug">{drop.title}</h2>
-      {drop.teaser && <p className="text-sm text-white/80">{drop.teaser}</p>}
+      <div className="flex items-center justify-between gap-2">
+        <span className="drop-eyebrow">
+          <span aria-hidden>◆</span> Drop{drop.calendar?.name ? ` · ${drop.calendar.name}` : ""}
+        </span>
+        {statusLine && <span className="drop-status">{statusLine}</span>}
+      </div>
+      <h2 className="drop-title">{drop.title}</h2>
       <p className="text-xs text-white/60">{[dropWhen(drop.startsAt), drop.place].filter(Boolean).join(" · ")}</p>
-      {timer && <p className="drop-timer">{timer}</p>}
-      <p className="text-sm text-white">
-        {money(drop.feeCents)} holds your spot
-        {drop.includes ? ` → ${drop.includes}` : ""}
-        {value ? ` (${value})` : ""}
-      </p>
-      <div className="flex flex-wrap items-center gap-3 pt-1">
+      <div className="drop-foot">
+        {(drop.includes || value) && (
+          <span className="drop-gets">
+            {drop.includes}
+            {drop.includes && value && <br />}
+            {value}
+          </span>
+        )}
         {action}
-        {spots && <span className="text-xs text-white/60">{spots}</span>}
       </div>
       {error && <p className="text-xs text-red-300">{error}</p>}
     </section>
   );
 }
 
-/** /me: the viewer's Drops (calendars they follow, passes they hold). Nothing when there are none. */
+/**
+ * /me: the viewer's Drops (calendars they follow, passes they hold), plus the
+ * once-per-Drop popup when one goes live. Nothing when there are none.
+ */
 export function MyDrops({ className = "" }: { className?: string }) {
   const [drops, setDrops] = useState<Drop[]>([]);
   useEffect(() => {
@@ -223,10 +224,12 @@ export function MyDrops({ className = "" }: { className?: string }) {
       .catch(() => setDrops([]));
   }, []);
   if (drops.length === 0) return null;
+  const popup = <DropPopup drops={drops} />;
   if (drops.length === 1) {
     return (
       <div className={className}>
         <DropCard drop={drops[0]} />
+        {popup}
       </div>
     );
   }
@@ -237,6 +240,7 @@ export function MyDrops({ className = "" }: { className?: string }) {
           <DropCard drop={d} />
         </div>
       ))}
+      {popup}
     </div>
   );
 }
@@ -270,12 +274,17 @@ export function CalendarDropBar({
 // Tailwind's margin utilities.
 const STYLES = `
 .drop { background: #131714; color: #fff; border-radius: 16px; }
-.drop-card { display: flex; flex-direction: column; gap: 6px; padding: 18px 20px; }
+.drop-card { display: flex; flex-direction: column; gap: 4px; padding: 18px 20px 20px; }
 .drop-bar { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; }
 @media (min-width: 640px) { .drop-bar { flex-direction: row; align-items: center; justify-content: space-between; } }
 .drop-eyebrow { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: #C9F27B; }
-.drop-timer { font-family: var(--font-fm-serif); font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.drop-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 999px; white-space: nowrap; }
+.drop-status { font-size: 11px; font-weight: 500; color: #C9F27B; white-space: nowrap; }
+.drop-live { display: inline-flex; align-items: center; gap: 6px; }
+.drop-dot { width: 6px; height: 6px; border-radius: 3px; background: #C9F27B; }
+.drop-title { font-size: 20px; line-height: 1.3; font-weight: 500; color: #fff; padding-top: 2px; }
+.drop-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; }
+.drop-gets { font-size: 12px; line-height: 1.4; color: rgba(255,255,255,.7); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.drop-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 11px 16px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
 .drop-btn:disabled { opacity: .6; }
 .drop-btn-dark { background: #fff; color: #131714; }
 .drop-btn-accent { background: #C9F27B; color: #131714; }
