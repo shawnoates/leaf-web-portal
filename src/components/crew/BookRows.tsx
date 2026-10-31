@@ -12,6 +12,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { CalendarDays, Check, Eye, MapPin, Plus, Search } from "lucide-react";
 import PlacePhoto from "@/components/crew/PlacePhoto";
+import { useInApp } from "@/components/crew/CrewShell";
 import { crewHref, run, type BookSpot, type CrewAuth, type DiscoverItem } from "@/lib/crew";
 
 const fmtYmd = (ymd: string, weekday = false) =>
@@ -51,7 +52,21 @@ export function DiscoverRow({ items, auth, canAdd, onAdded, compact = false, sea
   const [added, setAdded] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const inApp = useInApp();
   const keyOf = (d: DiscoverItem) => d.locationId || d.placeId || `${d.name}:${d.event?.date || ""}`;
+  // Tapping a card: an event's ticket page; a place's screen in the app
+  // (a Google-only one is looked up first, leaf://place); on the web, Maps.
+  const detailHref = (d: DiscoverItem) => {
+    if (d.event?.url) return d.event.url;
+    if (inApp && d.locationId) return `leaf://location/${d.locationId}`;
+    if (inApp && d.placeId) {
+      const q = new URLSearchParams({ name: d.name, ...(d.address ? { address: d.address } : {}), ...(d.lat != null ? { lat: String(d.lat) } : {}), ...(d.lng != null ? { lng: String(d.lng) } : {}) });
+      return `leaf://place/${encodeURIComponent(d.placeId)}?${q}`;
+    }
+    if (d.placeId) return `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(d.placeId)}`;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([d.name, d.address].filter(Boolean).join(" "))}`;
+  };
+  const opensHere = (href: string) => href.startsWith("leaf://");
   const shown = items.filter((d) => !added.has(keyOf(d)));
   if (!shown.length) return null;
 
@@ -95,6 +110,7 @@ export function DiscoverRow({ items, auth, canAdd, onAdded, compact = false, sea
           <li key={keyOf(d)} className={`group relative flex shrink-0 snap-start flex-col gap-2 ${compact ? "w-[140px]" : "w-[160px]"}`}>
             {/* Dimmed, with a dashed edge: ideas, not places already in the book. */}
             <div className={`relative overflow-hidden rounded-[20px] border border-dashed border-fm-line bg-fm-card ${compact ? "h-[110px]" : "h-[130px]"}`}>
+              <a href={detailHref(d)} target={opensHere(detailHref(d)) ? undefined : "_blank"} rel="noreferrer" aria-label={`More about ${d.name}`} className="absolute inset-0 block">
               <PlacePhoto
                 src={d.photo}
                 locationId={d.locationId}
@@ -105,6 +121,7 @@ export function DiscoverRow({ items, auth, canAdd, onAdded, compact = false, sea
                   </span>
                 }
               />
+              </a>
               {d.isNew && <span className="absolute left-2 top-2 rounded-full bg-fm-accent px-1.5 py-0.5 font-fm-mono text-[9px] tracking-[0.06em] text-fm-canvas">NEW</span>}
               {canAdd && (
                 <button
@@ -119,9 +136,7 @@ export function DiscoverRow({ items, auth, canAdd, onAdded, compact = false, sea
               )}
             </div>
             <div className="min-w-0">
-              {d.event?.url
-                ? <a href={d.event.url} target="_blank" rel="noreferrer" className="block truncate text-[15px] font-semibold text-fm-ink-2 hover:underline">{d.name}</a>
-                : <div className="truncate text-[15px] font-semibold text-fm-ink-2">{d.name}</div>}
+              <a href={detailHref(d)} target={opensHere(detailHref(d)) ? undefined : "_blank"} rel="noreferrer" className="block truncate text-[15px] font-semibold text-fm-ink-2 hover:underline">{d.name}</a>
               <div className="truncate text-[12px] text-fm-muted">{d.event ? "Event nearby" : [d.category, d.shortAddress].filter(Boolean).join(" · ")}</div>
               {/* Discover is what's not in the book yet: no "Saved by …" (it reads like the book). */}
               {d.why !== "saved" && d.reason && <div className="truncate text-[12px] text-fm-ink-2">{d.reason}</div>}
