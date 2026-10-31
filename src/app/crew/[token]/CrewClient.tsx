@@ -1184,6 +1184,25 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
         </section>
       )}
 
+      {/* Find places: what's typed is searched on the book page (searchCrewPlaces). */}
+      {me.status === "in" && !fixedPlace && (
+        <section className={(data.discover?.length ?? 0) > 0 ? "mt-8" : "mt-12 lg:mt-16"}>
+          <h2 className="m-0 font-fm-serif text-[28px] font-normal lg:text-[30px]">Find places</h2>
+          <form action={crewHref(auth, "book")} method="get" className="mt-3 flex gap-2">
+            <input
+              name="find"
+              required
+              minLength={3}
+              placeholder="What are you in the mood for?"
+              aria-label="Find places"
+              className="min-w-0 flex-1 rounded-full border border-fm-line bg-fm-card px-4 py-2.5 text-[15px] text-fm-ink placeholder:text-fm-muted"
+            />
+            <Button small type="submit">Find</Button>
+          </form>
+          <p className="mb-0 mt-2 text-[13px] text-fm-muted">Try &ldquo;coffee shops in Boerum Hill&rdquo; or &ldquo;cheap Thai near Atlantic Ave&rdquo;.</p>
+        </section>
+      )}
+
       {/* Everyone here has other groups: the way to start one for them. In the
           app, the /friends link opens its own Start a crew screen. Not inside
           the dashboard, which has Start a crew in its sidebar. */}

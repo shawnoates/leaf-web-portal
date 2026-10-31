@@ -86,7 +86,11 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
     const q = new URLSearchParams(window.location.search);
     setFocusSearch(q.has("add"));
     if (q.has("watch")) { setWatchFirst(true); setAddingEvent(true); }
+    // From the crew page's Find places box: search for what was typed there.
+    const find = (q.get("find") || "").trim();
+    if (find.length >= 3) setAutoFind(find);
   }, []);
+  const [autoFind, setAutoFind] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   // A pasted link being imported on the server: lands in the book in a minute.
   const [linkNote, setLinkNote] = useState("");
@@ -99,12 +103,12 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
   const [findNote, setFindNote] = useState("");
   const [finding, setFinding] = useState(false);
   const inApp = useInApp();
-  const findPlaces = async () => {
-    if (vibe.trim().length < 3) return;
+  const findPlaces = async (text = vibe) => {
+    if (text.trim().length < 3) return;
     setFinding(true);
     setFindNote("");
     try {
-      const r = await run<{ results: Suggested[]; limited?: boolean }>("searchCrewPlaces", auth, { query: vibe.trim() });
+      const r = await run<{ results: Suggested[]; limited?: boolean }>("searchCrewPlaces", auth, { query: text.trim() });
       setFound(r.results);
       if (r.limited) setFindNote("This crew has used today's searches. More tomorrow.");
     } catch (e) {
@@ -112,6 +116,16 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
       setFindNote(e instanceof Error ? e.message : "Search isn't working right now.");
     } finally { setFinding(false); }
   };
+
+  useEffect(() => {
+    if (!autoFind) return;
+    setVibe(autoFind);
+    setAutoFind(null);
+    void findPlaces(autoFind);
+    // Once the book has drawn, bring the Find places panel into view.
+    setTimeout(() => document.getElementById("find-places")?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFind]);
 
   const refresh = useCallback(async () => setBook(await run<Book>("getCrewBook", auth)), [auth]);
   useEffect(() => { refresh().catch((e) => setError(e.message)); }, [refresh]);
@@ -351,7 +365,7 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
         </div>
 
         {/* Find places: on desktop it sticks beside the book in its own panel. */}
-        <aside className="min-w-0 rounded-[28px] border border-fm-line-dim bg-fm-surface px-5 pb-2 pt-5 lg:sticky lg:top-6 lg:max-h-[calc(100vh-48px)] lg:overflow-y-auto lg:px-6 lg:pt-6">
+        <aside id="find-places" className="min-w-0 scroll-mt-6 rounded-[28px] border border-fm-line-dim bg-fm-surface px-5 pb-2 pt-5 lg:sticky lg:top-6 lg:max-h-[calc(100vh-48px)] lg:overflow-y-auto lg:px-6 lg:pt-6">
           <div>
             <h2 className="m-0 font-fm-serif text-[28px] font-normal lg:text-[30px]">Find places</h2>
             <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); void findPlaces(); }}>
