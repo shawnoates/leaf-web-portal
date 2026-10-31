@@ -180,6 +180,26 @@ export function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
   const showVideo = Boolean(drop.videoUrl) && motionOk;
   const hasMedia = showVideo || Boolean(drop.imageUrl);
 
+  // Over the video on phones; beside it on desktop, so a host talking to
+  // camera isn't covered. Only one copy shows (the other is display:none).
+  const head = (
+    <>
+      <span className="dp-eyebrow">◆ Drop{drop.calendar?.name ? ` · ${drop.calendar.name}` : ""}</span>
+      <h2 className="dp-title">{drop.title}</h2>
+      <p className="dp-when">{[dropWhen(drop.startsAt), drop.place].filter(Boolean).join(" · ")}</p>
+      <p className="dp-status">
+        <span className={`dp-dot${full ? " dp-dot-off" : ""}`} aria-hidden="true" />
+        {full ? (
+          <span>Full{drop.capacity ? ` · all ${drop.capacity} spots claimed` : ""}</span>
+        ) : (
+          <span>
+            It&apos;s live{spots ? <> · <span className="dp-accent">{spots}</span></> : null} · first come, first served
+          </span>
+        )}
+      </p>
+    </>
+  );
+
   return (
     <div className="dp-scrim" onClick={onClose}>
       <style>{STYLES}</style>
@@ -187,7 +207,7 @@ export function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-label={full ? `${drop.title} is full` : `${drop.title} is live`}
-        className="dp-card"
+        className={`dp-card${hasMedia ? " dp-split" : ""}`}
         onClick={(e) => e.stopPropagation()}
       >
         <button type="button" className="dp-x" aria-label="Close" onClick={onClose}>×</button>
@@ -213,22 +233,11 @@ export function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
             <img className="dp-media" src={drop.imageUrl} alt="" />
           ) : null}
           {hasMedia && <div className="dp-shade" aria-hidden="true" />}
-          <span className="dp-eyebrow">◆ Drop{drop.calendar?.name ? ` · ${drop.calendar.name}` : ""}</span>
-          <h2 className="dp-title">{drop.title}</h2>
-          <p className="dp-when">{[dropWhen(drop.startsAt), drop.place].filter(Boolean).join(" · ")}</p>
-          <p className="dp-status">
-            <span className={`dp-dot${full ? " dp-dot-off" : ""}`} aria-hidden="true" />
-            {full ? (
-              <span>Full{drop.capacity ? ` · all ${drop.capacity} spots claimed` : ""}</span>
-            ) : (
-              <span>
-                It&apos;s live{spots ? <> · <span className="dp-accent">{spots}</span></> : null} · first come, first served
-              </span>
-            )}
-          </p>
+          <div className="dp-head dp-head-over">{head}</div>
         </div>
 
         <div className="dp-body">
+          <div className="dp-head dp-head-side">{head}</div>
           {about && (
             <div className="dp-about">
               <p className={more ? "" : "dp-clamp"}>{about}</p>
@@ -303,6 +312,8 @@ const STYLES = `
 .dp-shade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(19,23,20,.15) 0%,rgba(19,23,20,.6) 45%,rgba(19,23,20,.94) 100%)}
 .dp-hero>*:not(.dp-media):not(.dp-shade){position:relative}
 .dp-x{position:absolute;top:8px;right:8px;width:44px;height:44px;border-radius:22px;border:none;background:rgba(19,23,20,.55);color:#fff;font-size:22px;line-height:1;cursor:pointer;z-index:3}
+.dp-head{display:flex;flex-direction:column;gap:6px}
+.dp-head-side{display:none}
 .dp-eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#C9F27B}
 .dp-title{margin:2px 0 0;font-size:26px;line-height:1.2;font-weight:600;color:#fff}
 .dp-when{margin:0;font-size:13px;color:rgba(255,255,255,.8)}
@@ -331,11 +342,19 @@ const STYLES = `
 .dp-later{background:none;border:none;padding:10px 0;font-size:13px;color:#6f6a5f;cursor:pointer;font-family:inherit}
 .dp-fine{margin:0;text-align:center;font-size:11px;color:#8b8578}
 .dp-error{margin:0;font-size:12px;color:#b91c1c;text-align:center}
-/* Wide screens: two columns, the video at full height on the left. */
+/* Wide screens with a video or photo: two columns, the media alone at full
+   height on the left and everything else on the right. */
 @media (min-width:768px){
-.dp-card{width:min(720px,100%);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-.dp-hero{min-height:480px;padding:56px 28px 28px}
-.dp-title{font-size:28px}
-.dp-body{padding:60px 28px 22px;justify-content:center}
+.dp-split{width:min(720px,100%);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.dp-split .dp-hero{min-height:520px;padding:0}
+.dp-split .dp-head-over,.dp-split .dp-shade{display:none}
+.dp-split .dp-head-side{display:flex;padding-right:40px}
+.dp-head-side .dp-eyebrow,.dp-head-side .dp-accent{color:#3f6212}
+.dp-head-side .dp-title{color:#131714}
+.dp-head-side .dp-when{color:#6f6a5f}
+.dp-head-side .dp-status{margin-top:4px}
+.dp-head-side .dp-dot:not(.dp-dot-off){background:#65a30d}
+.dp-head-side .dp-dot-off{background:#a8a29e}
+.dp-split .dp-body{padding:28px 28px 22px;justify-content:center}
 }
 `;
