@@ -187,15 +187,9 @@ export function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
       <span className="dp-eyebrow">◆ Drop{drop.calendar?.name ? ` · ${drop.calendar.name}` : ""}</span>
       <h2 className="dp-title">{drop.title}</h2>
       <p className="dp-when">{[dropWhen(drop.startsAt), drop.place].filter(Boolean).join(" · ")}</p>
-      <p className="dp-status">
+      <p className={`dp-status${full ? " dp-status-off" : ""}`}>
         <span className={`dp-dot${full ? " dp-dot-off" : ""}`} aria-hidden="true" />
-        {full ? (
-          <span>Full{drop.capacity ? ` · all ${drop.capacity} spots claimed` : ""}</span>
-        ) : (
-          <span>
-            It&apos;s live{spots ? <> · <span className="dp-accent">{spots}</span></> : null} · first come, first served
-          </span>
-        )}
+        {full ? `Full · ${drop.capacity ? `all ${drop.capacity} spots claimed` : "all spots claimed"}` : `Live${spots ? ` · ${spots}` : ""}`}
       </p>
     </>
   );
@@ -293,7 +287,7 @@ export function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
           {error && <p className="dp-error">{error}</p>}
           {!joined && <button type="button" className="dp-later" onClick={onClose}>Maybe later</button>}
           <p className="dp-fine">
-            {full ? "The waitlist closes 3 hours before it starts" : "Only refunded if Leaf calls it off"}
+            {full ? "The waitlist closes 3 hours before it starts" : "First come, first served · only refunded if Leaf calls it off"}
           </p>
         </div>
       </div>
@@ -317,10 +311,10 @@ const STYLES = `
 .dp-eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#C9F27B}
 .dp-title{margin:2px 0 0;font-size:26px;line-height:1.2;font-weight:600;color:#fff}
 .dp-when{margin:0;font-size:13px;color:rgba(255,255,255,.8)}
-.dp-status{margin:8px 0 0;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500}
-.dp-dot{flex:none;width:8px;height:8px;border-radius:4px;background:#C9F27B}
+.dp-status{margin:8px 0 0;align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:rgba(201,242,123,.16);color:#C9F27B;font-size:12px;font-weight:600}
+.dp-status-off{background:rgba(255,255,255,.12);color:#fff}
+.dp-dot{flex:none;width:6px;height:6px;border-radius:3px;background:#C9F27B}
 .dp-dot-off{background:rgba(255,255,255,.5)}
-.dp-accent{color:#C9F27B}
 .dp-body{padding:20px 24px 18px;display:flex;flex-direction:column;gap:14px}
 .dp-about{display:flex;flex-direction:column;gap:4px}
 .dp-about p{margin:0;font-size:14px;line-height:1.55;color:#3d3a33;white-space:pre-line}
@@ -349,10 +343,11 @@ const STYLES = `
 .dp-split .dp-hero{min-height:520px;padding:0}
 .dp-split .dp-head-over,.dp-split .dp-shade{display:none}
 .dp-split .dp-head-side{display:flex;padding-right:40px}
-.dp-head-side .dp-eyebrow,.dp-head-side .dp-accent{color:#3f6212}
+.dp-head-side .dp-eyebrow{color:#3f6212}
+.dp-head-side .dp-status{background:#ecfccb;color:#3f6212}
+.dp-head-side .dp-status-off{background:#f4f4f5;color:#52525b}
 .dp-head-side .dp-title{color:#131714}
 .dp-head-side .dp-when{color:#6f6a5f}
-.dp-head-side .dp-status{margin-top:4px}
 .dp-head-side .dp-dot:not(.dp-dot-off){background:#65a30d}
 .dp-head-side .dp-dot-off{background:#a8a29e}
 .dp-split .dp-body{padding:28px 28px 22px;justify-content:center}
