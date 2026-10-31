@@ -4,8 +4,8 @@
  * A Drop: a curated experience Leaf drops on a calendar. Counts down to when
  * spots open (tap Notify me to get a text), then first come, first served for
  * a small attendance-guarantee fee, paid on the plan page (/p/<id>). When
- * it's full, followers can join a free waitlist: if a spot opens they're all
- * texted and the first to pay gets it.
+ * it's full, Join the waitlist opens the Drop's popup to save a card (signed
+ * in only): if a spot opens, the next in line is charged and gets the pass.
  *
  * "card" is the card above the hero on /me; "bar" is the slim strip at the
  * top of a calendar page. /me also gets DropPopup, once per Drop, when one on
@@ -23,7 +23,7 @@ import Parse from "@/lib/parse-client";
 import { useCountdown } from "@/app/o/m/[token]/FreeNightCountdown";
 import { getVerifiedUserCookie } from "@/lib/verified-user";
 import { dropGets, dropWhen, interestCookie, money, sendDropInterest, type Drop } from "@/lib/drops";
-import DropPopup from "@/components/DropPopup";
+import DropPopup, { Popup } from "@/components/DropPopup";
 
 function countdownLabel(left: number) {
   const s = Math.floor(left / 1000);
@@ -51,6 +51,7 @@ export default function DropCard({
   const status = drop.status === "scheduled" && left === null ? "open" : drop.status;
   const [notified, setNotified] = useState(drop.notified);
   const [waitlisted, setWaitlisted] = useState(drop.waitlisted);
+  const [joining, setJoining] = useState(false);
   const [askPhone, setAskPhone] = useState(false);
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
@@ -71,9 +72,8 @@ export default function DropCard({
     setBusy(true);
     setError(null);
     try {
-      await sendDropInterest(waitlist ? "joinDropWaitlist" : "notifyMeForDrop", drop.id, usePhone);
-      if (waitlist) setWaitlisted(true);
-      else setNotified(true);
+      await sendDropInterest("notifyMeForDrop", drop.id, usePhone);
+      setNotified(true);
       setAskPhone(false);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Couldn't save that. Try again.");
@@ -112,6 +112,15 @@ export default function DropCard({
         </Link>
       );
     }
+    if (waitlist && !waitlisted) {
+      // Saving a card needs an account: signed-out visitors sign in on /me,
+      // where the Drop shows again.
+      return Parse.User.current() ? (
+        <button onClick={() => setJoining(true)} className="drop-btn drop-btn-dark">Join the waitlist</button>
+      ) : (
+        <Link href="/me" className="drop-btn drop-btn-dark">Sign in to join the waitlist</Link>
+      );
+    }
     if ((waitlist && waitlisted) || (!waitlist && notified)) {
       return (
         <span className="drop-btn drop-btn-quiet" aria-live="polite">
@@ -134,7 +143,7 @@ export default function DropCard({
             autoComplete="tel"
             autoFocus
             placeholder="Your phone"
-            aria-label={waitlist ? "Phone number to text if a spot opens" : "Phone number to text when it opens"}
+            aria-label="Phone number to text when it opens"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             className="w-36 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
@@ -147,8 +156,8 @@ export default function DropCard({
     }
     return (
       <button onClick={onTap} disabled={busy} className="drop-btn drop-btn-dark">
-        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : !waitlist && <Bell className="w-3.5 h-3.5" />}
-        {waitlist ? "Join the waitlist" : "Notify me"}
+        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bell className="w-3.5 h-3.5" />}
+        Notify me
       </button>
     );
   })();
@@ -162,6 +171,19 @@ export default function DropCard({
       : status === "open" ? <span className="drop-live"><span className="drop-dot" aria-hidden />Live{spots ? ` · ${spots}` : ""}</span>
       : status === "sold_out" ? <span>Full</span>
       : null;
+
+  const joinSheet = joining && (
+    <Popup
+      drop={{ ...drop, status: "sold_out", waitlisted }}
+      onClose={() => {
+        setJoining(false);
+        // Their card step may have finished: show the saved state.
+        Parse.Cloud.run("getActiveDropForCalendar", { calendarId: drop.calendar?.id, cookie: interestCookie() })
+          .then((r: { drop?: Drop | null }) => r?.drop?.id === drop.id && setWaitlisted(Boolean(r.drop.waitlisted)))
+          .catch(() => {});
+      }}
+    />
+  );
 
   if (variant === "bar") {
     return (
@@ -182,6 +204,7 @@ export default function DropCard({
           {action}
           {error && <span className="text-xs text-red-300">{error}</span>}
         </div>
+        {joinSheet}
       </section>
     );
   }
@@ -208,6 +231,7 @@ export default function DropCard({
         {action}
       </div>
       {error && <p className="text-xs text-red-300">{error}</p>}
+      {joinSheet}
     </section>
   );
 }

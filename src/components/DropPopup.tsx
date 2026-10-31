@@ -3,8 +3,8 @@
 /**
  * "It's live": the first time someone opens /me after a Drop on a calendar
  * they follow goes live, once per Drop. Open: Hold your spot. Full: Join the
- * waitlist (free; if a spot opens they're texted and the first to pay gets
- * it). The Drop's video loops silently behind the top (photo if none); there
+ * waitlist by saving a card; nothing is charged unless a spot opens for them,
+ * in the order people joined. The Drop's video loops silently behind the top (photo if none); there
  * is deliberately no sound control.
  *
  * Skipped when they hold a pass or are already waitlisted, and on a visit
@@ -16,8 +16,9 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, Loader2 } from "lucide-react";
+import { loadStripe, type Stripe, type StripeElements } from "@stripe/stripe-js";
 import Parse from "@/lib/parse-client";
-import { dropGets, dropWhen, money, sendDropInterest, type Drop } from "@/lib/drops";
+import { dropGets, dropWhen, money, type Drop } from "@/lib/drops";
 import type { PointsUnseen } from "@/lib/points";
 
 const SEEN = (id: string) => `leaf_drop_popup_seen_${id}`;
@@ -70,17 +71,27 @@ export default function DropPopup({ drops }: { drops: Drop[] }) {
   return <Popup drop={drop} onClose={() => setDrop(null)} />;
 }
 
-function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
+type Setup = { clientSecret: string; publishableKey: string | null };
+
+/** A full Drop's popup also opens from its card's Join the waitlist. */
+export function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
   const full = drop.status === "sold_out";
-  const [joined, setJoined] = useState(false);
+  const [joined, setJoined] = useState(drop.waitlisted);
+  const [setup, setSetup] = useState<Setup | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const stripeRef = useRef<Stripe | null>(null);
+  const elementsRef = useRef<StripeElements | null>(null);
   const primary = useRef<HTMLElement | null>(null);
   const [motionOk, setMotionOk] = useState(false);
 
   useEffect(() => {
     setMotionOk(!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
     primary.current?.focus();
+  }, []);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -88,18 +99,79 @@ function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // Step 1: a SetupIntent to save their card. Nothing is charged.
   const join = async () => {
     setBusy(true);
     setError(null);
     try {
-      await sendDropInterest("joinDropWaitlist", drop.id);
+      const r = (await Parse.Cloud.run("startDropWaitlist", { planId: drop.id })) as { state: string } & Partial<Setup>;
+      if (r.state === "waitlisted") setJoined(true);
+      else if (r.clientSecret) setSetup({ clientSecret: r.clientSecret, publishableKey: r.publishableKey || null });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Couldn't start that. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!setup || !cardRef.current) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!setup.publishableKey) throw new Error("Payments are not configured.");
+        const stripe = stripeRef.current || (await loadStripe(setup.publishableKey));
+        if (cancelled || !stripe) return;
+        stripeRef.current = stripe;
+        const elements = stripe.elements({
+          clientSecret: setup.clientSecret,
+          appearance: { theme: "stripe", variables: { borderRadius: "10px", colorPrimary: "#131714", fontFamily: "inherit", fontSizeBase: "15px" } },
+        });
+        elementsRef.current = elements;
+        elements
+          .create("payment", { layout: "tabs", fields: { billingDetails: { address: { country: "never", postalCode: "auto" } } } })
+          .mount(cardRef.current!);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Couldn't load card entry.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [setup]);
+
+  // Step 2: save the card, then they're in line.
+  const saveCard = async () => {
+    const stripe = stripeRef.current;
+    const elements = elementsRef.current;
+    if (!stripe || !elements) return;
+    setBusy(true);
+    setError(null);
+    const { error: err } = await stripe.confirmSetup({
+      elements,
+      confirmParams: {
+        return_url: window.location.href,
+        payment_method_data: { billing_details: { address: { country: "US" } } },
+      },
+      redirect: "if_required",
+    });
+    if (err) {
+      setError(err.message || "That card didn't go through.");
+      setBusy(false);
+      return;
+    }
+    try {
+      await Parse.Cloud.run("confirmDropWaitlist", { planId: drop.id });
       setJoined(true);
+      setSetup(null);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Couldn't add you. Try again.");
     } finally {
       setBusy(false);
     }
   };
+
+  const charge = money(drop.feeCents);
 
   const gets = dropGets(drop);
   const spots = drop.spotsLeft === null ? null : drop.spotsLeft === 1 ? "1 spot left" : `${drop.spotsLeft} spots left`;
@@ -166,12 +238,12 @@ function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
             joined ? (
               <div className="dp-note" aria-live="polite">
                 <strong><Check className="dp-check" aria-hidden="true" /> You&apos;re on the waitlist</strong>
-                <span>If a spot opens, we&apos;ll text you. First to pay {money(drop.feeCents)} gets it.</span>
+                <span>If a spot opens, we&apos;ll charge your card {charge} and text you your pass. Nothing&apos;s charged otherwise.</span>
               </div>
             ) : (
               <div className="dp-note">
-                <strong>Free to join</strong>
-                <span>If a spot opens, we&apos;ll text you. First to pay {money(drop.feeCents)} gets it.</span>
+                <strong>Save a card to get in line</strong>
+                <span>We only charge {charge} if a spot opens for you, then text you your pass. Spots go in the order people join.</span>
               </div>
             )
           ) : (
@@ -181,9 +253,14 @@ function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
             </div>
           )}
 
+          {full && setup && !joined && <div ref={cardRef} className="dp-cardform" />}
           {full ? (
             joined ? (
               <button type="button" className="dp-cta" onClick={onClose} ref={(el) => { primary.current = el; }}>Done</button>
+            ) : setup ? (
+              <button type="button" className="dp-cta" onClick={saveCard} disabled={busy}>
+                {busy && <Loader2 className="dp-spin" aria-hidden="true" />} Save card · join the waitlist
+              </button>
             ) : (
               <button type="button" className="dp-cta" onClick={join} disabled={busy} ref={(el) => { primary.current = el; }}>
                 {busy && <Loader2 className="dp-spin" aria-hidden="true" />} Join the waitlist
@@ -196,7 +273,9 @@ function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
           )}
           {error && <p className="dp-error">{error}</p>}
           {!joined && <button type="button" className="dp-later" onClick={onClose}>Maybe later</button>}
-          {!full && <p className="dp-fine">Only refunded if Leaf calls it off</p>}
+          <p className="dp-fine">
+            {full ? "The waitlist closes 3 hours before it starts" : "Only refunded if Leaf calls it off"}
+          </p>
         </div>
       </div>
     </div>
@@ -234,6 +313,7 @@ const STYLES = `
 .dp-cta{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px 14px;border:none;border-radius:10px;background:#131714;color:#fff;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;font-family:inherit;box-sizing:border-box}
 .dp-cta:disabled{opacity:.6}
 .dp-spin{width:16px;height:16px;animation:spin 1s linear infinite}
+.dp-cardform{min-height:120px}
 .dp-later{background:none;border:none;padding:10px 0;font-size:13px;color:#6f6a5f;cursor:pointer;font-family:inherit}
 .dp-fine{margin:0;text-align:center;font-size:11px;color:#8b8578}
 .dp-error{margin:0;font-size:12px;color:#b91c1c;text-align:center}

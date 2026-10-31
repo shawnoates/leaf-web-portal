@@ -64,8 +64,8 @@ export function interestCookie(): string {
   return random;
 }
 
-/** Notify me / Join the waitlist: the same follower-gated interest row. */
-export async function sendDropInterest(fn: "notifyMeForDrop" | "joinDropWaitlist", planId: string, typedPhone?: string) {
+/** Notify me: a follower-gated interest row, by session or the phone they followed with. */
+export async function sendDropInterest(fn: "notifyMeForDrop", planId: string, typedPhone?: string) {
   const known = getVerifiedUserCookie();
   // The calendar page's follow flow keeps the phone they followed with.
   let followedWith = "";
