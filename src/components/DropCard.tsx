@@ -7,6 +7,10 @@
  *
  * "card" is the full card above the hero on /me; "bar" is the slim strip at
  * the top of a calendar page.
+ *
+ * Only followers of the calendar get the alert (the server refuses anyone
+ * else). On a calendar page, beforeNotify runs the page's follow gate first
+ * and calls go once they follow, with the phone they followed with.
  */
 
 import { useEffect, useState } from "react";
@@ -27,7 +31,17 @@ function countdownLabel(left: number) {
   return d > 0 ? `${d}d ${pad(h)}h ${pad(m)}m` : `${pad(h)}:${pad(m)}:${pad(sec)}`;
 }
 
-export default function DropCard({ drop, variant = "card" }: { drop: Drop; variant?: "card" | "bar" }) {
+type BeforeNotify = (go: (phone?: string) => void) => void;
+
+export default function DropCard({
+  drop,
+  variant = "card",
+  beforeNotify,
+}: {
+  drop: Drop;
+  variant?: "card" | "bar";
+  beforeNotify?: BeforeNotify;
+}) {
   const left = useCountdown(drop.opensAt, drop.status === "scheduled");
   // The countdown ran out while the page was open: it's open now.
   const status = drop.status === "scheduled" && left === null ? "open" : drop.status;
@@ -40,7 +54,12 @@ export default function DropCard({ drop, variant = "card" }: { drop: Drop; varia
   const notify = async (typedPhone?: string) => {
     const signedIn = Boolean(Parse.User.current());
     const known = getVerifiedUserCookie();
-    const usePhone = typedPhone || known?.phone || "";
+    // The calendar page's follow flow keeps the phone they followed with.
+    let followedWith = "";
+    try {
+      followedWith = localStorage.getItem("leaf_follower_phone") || "";
+    } catch {}
+    const usePhone = typedPhone || known?.phone || followedWith;
     if (!signedIn && usePhone.replace(/\D/g, "").length < 10) {
       setAskPhone(true);
       return;
@@ -126,7 +145,9 @@ export default function DropCard({ drop, variant = "card" }: { drop: Drop; varia
       );
     }
     return (
-      <button onClick={() => void notify()} disabled={busy} className="drop-btn drop-btn-dark">
+      <button
+        onClick={() => (beforeNotify ? beforeNotify((p) => void notify(p)) : void notify())}
+        disabled={busy} className="drop-btn drop-btn-dark">
         {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bell className="w-3.5 h-3.5" />}
         Notify me
       </button>
@@ -221,7 +242,15 @@ export function MyDrops({ className = "" }: { className?: string }) {
 }
 
 /** A calendar page: its next Drop, as a slim bar. */
-export function CalendarDropBar({ calendarId, className = "" }: { calendarId: string; className?: string }) {
+export function CalendarDropBar({
+  calendarId,
+  beforeNotify,
+  className = "",
+}: {
+  calendarId: string;
+  beforeNotify?: BeforeNotify;
+  className?: string;
+}) {
   const [drop, setDrop] = useState<Drop | null>(null);
   useEffect(() => {
     if (!calendarId) return;
@@ -232,7 +261,7 @@ export function CalendarDropBar({ calendarId, className = "" }: { calendarId: st
   if (!drop || drop.status === "done") return null;
   return (
     <div className={className}>
-      <DropCard drop={drop} variant="bar" />
+      <DropCard drop={drop} variant="bar" beforeNotify={beforeNotify} />
     </div>
   );
 }

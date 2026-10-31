@@ -2135,7 +2135,10 @@ export default function OrgCalendarPage() {
   // Replayed by the FollowModal's onFollowed once the follow actually lands, so
   // the tap costs one click, not two.
   const [pendingInterest, setPendingInterest] = useState<
-    { kind: "ai"; eventIndex: number } | { kind: "idea"; ideaId: string } | null
+    | { kind: "ai"; eventIndex: number }
+    | { kind: "idea"; ideaId: string }
+    | { kind: "drop"; go: (phone?: string) => void }
+    | null
   >(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followRequestPending, setFollowRequestPending] = useState(false);
@@ -2623,6 +2626,19 @@ export default function OrgCalendarPage() {
       void runPlanIdeaInterest(ideaId);
     },
     [isFollowing, runPlanIdeaInterest],
+  );
+
+  // Follow gate for a Drop's Notify me: the open alert is for followers only.
+  const handleDropNotify = useCallback(
+    (go: (phone?: string) => void) => {
+      if (!isFollowing) {
+        setPendingInterest({ kind: "drop", go });
+        setShowFollowModal(true);
+        return;
+      }
+      go();
+    },
+    [isFollowing],
   );
 
   // Undo halves of the two interest taps above — the post-follow interest
@@ -4954,7 +4970,10 @@ export default function OrgCalendarPage() {
       <>
       {/* A Drop: flush under the header, first thing on the page, since it's
           a countdown. Renders nothing unless the calendar has one coming. */}
-      <CalendarDropBar calendarId={org.objectId} className="max-w-6xl mx-auto px-4 sm:px-6 pt-4" />
+      <CalendarDropBar
+        calendarId={org.objectId}
+        beforeNotify={handleDropNotify}
+        className="max-w-6xl mx-auto px-4 sm:px-6 pt-4" />
 
       {/* Partner thank-you — the server returns it only to followers and
           past attendees of this calendar. */}
@@ -7814,7 +7833,7 @@ export default function OrgCalendarPage() {
             // Dismissing the gate abandons the tap that opened it.
             setPendingInterest(null);
           }}
-          onFollowed={(_name, _phone, pending, _intro, keepOpen) => {
+          onFollowed={(_name, phone, pending, _intro, keepOpen) => {
             if (pending) {
               setFollowRequestPending(true);
               // Private calendar: this is a request, not a follow, so the gate
@@ -7830,6 +7849,8 @@ export default function OrgCalendarPage() {
                 void runAIEventInterest(pendingInterest.eventIndex);
               } else if (pendingInterest?.kind === "idea") {
                 void runPlanIdeaInterest(pendingInterest.ideaId);
+              } else if (pendingInterest?.kind === "drop") {
+                pendingInterest.go(phone || undefined);
               }
               setPendingInterest(null);
             }
