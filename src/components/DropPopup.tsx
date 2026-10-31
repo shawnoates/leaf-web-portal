@@ -190,6 +190,7 @@ export function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
         className="dp-card"
         onClick={(e) => e.stopPropagation()}
       >
+        <button type="button" className="dp-x" aria-label="Close" onClick={onClose}>×</button>
         <div className={`dp-hero${hasMedia ? " dp-hero-media" : ""}`}>
           {showVideo ? (
             <video
@@ -212,7 +213,6 @@ export function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
             <img className="dp-media" src={drop.imageUrl} alt="" />
           ) : null}
           {hasMedia && <div className="dp-shade" aria-hidden="true" />}
-          <button type="button" className="dp-x" aria-label="Close" onClick={onClose}>×</button>
           <span className="dp-eyebrow">◆ Drop{drop.calendar?.name ? ` · ${drop.calendar.name}` : ""}</span>
           <h2 className="dp-title">{drop.title}</h2>
           <p className="dp-when">{[dropWhen(drop.startsAt), drop.place].filter(Boolean).join(" · ")}</p>
@@ -296,13 +296,13 @@ export function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
 // Tailwind margins don't fight it.
 const STYLES = `
 .dp-scrim{position:fixed;inset:0;z-index:1000;background:rgba(23,21,15,.55);display:flex;align-items:center;justify-content:center;padding:16px;font-family:var(--font-geist-sans,-apple-system,BlinkMacSystemFont,sans-serif)}
-.dp-card{width:min(358px,100%);max-height:calc(100vh - 32px);overflow-y:auto;background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.3);color:#17150f}
+.dp-card{position:relative;width:min(358px,100%);max-height:calc(100vh - 32px);overflow-y:auto;background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.3);color:#17150f}
 .dp-hero{position:relative;overflow:hidden;background:#131714;color:#fff;padding:56px 24px 22px;display:flex;flex-direction:column;justify-content:flex-end;gap:6px}
 .dp-hero-media{min-height:260px;box-sizing:border-box}
 .dp-media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .dp-shade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(19,23,20,.15) 0%,rgba(19,23,20,.6) 45%,rgba(19,23,20,.94) 100%)}
-.dp-hero>*:not(.dp-media):not(.dp-shade):not(.dp-x){position:relative}
-.dp-x{position:absolute;top:8px;right:8px;width:44px;height:44px;border-radius:22px;border:none;background:rgba(19,23,20,.55);color:#fff;font-size:22px;line-height:1;cursor:pointer;z-index:2}
+.dp-hero>*:not(.dp-media):not(.dp-shade){position:relative}
+.dp-x{position:absolute;top:8px;right:8px;width:44px;height:44px;border-radius:22px;border:none;background:rgba(19,23,20,.55);color:#fff;font-size:22px;line-height:1;cursor:pointer;z-index:3}
 .dp-eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#C9F27B}
 .dp-title{margin:2px 0 0;font-size:26px;line-height:1.2;font-weight:600;color:#fff}
 .dp-when{margin:0;font-size:13px;color:rgba(255,255,255,.8)}
@@ -331,4 +331,11 @@ const STYLES = `
 .dp-later{background:none;border:none;padding:10px 0;font-size:13px;color:#6f6a5f;cursor:pointer;font-family:inherit}
 .dp-fine{margin:0;text-align:center;font-size:11px;color:#8b8578}
 .dp-error{margin:0;font-size:12px;color:#b91c1c;text-align:center}
+/* Wide screens: two columns, the video at full height on the left. */
+@media (min-width:768px){
+.dp-card{width:min(720px,100%);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.dp-hero{min-height:480px;padding:56px 28px 28px}
+.dp-title{font-size:28px}
+.dp-body{padding:60px 28px 22px;justify-content:center}
+}
 `;
