@@ -85,6 +85,8 @@ export function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
   const elementsRef = useRef<StripeElements | null>(null);
   const primary = useRef<HTMLElement | null>(null);
   const [motionOk, setMotionOk] = useState(false);
+  const [more, setMore] = useState(false);
+  const about = (drop.description || drop.teaser || "").trim();
 
   useEffect(() => {
     setMotionOk(!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
@@ -227,6 +229,14 @@ export function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
         </div>
 
         <div className="dp-body">
+          {about && (
+            <div className="dp-about">
+              <p className={more ? "" : "dp-clamp"}>{about}</p>
+              {!more && about.length > 140 && (
+                <button type="button" className="dp-more" onClick={() => setMore(true)}>More</button>
+              )}
+            </div>
+          )}
           {gets && (
             <div className="dp-gets">
               <span className="dp-label">You get</span>
@@ -301,6 +311,10 @@ const STYLES = `
 .dp-dot-off{background:rgba(255,255,255,.5)}
 .dp-accent{color:#C9F27B}
 .dp-body{padding:20px 24px 18px;display:flex;flex-direction:column;gap:14px}
+.dp-about{display:flex;flex-direction:column;gap:4px}
+.dp-about p{margin:0;font-size:14px;line-height:1.55;color:#3d3a33;white-space:pre-line}
+.dp-clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.dp-more{align-self:flex-start;background:none;border:none;padding:4px 0;font-size:13px;font-weight:500;color:#253a33;text-decoration:underline;text-underline-offset:2px;cursor:pointer;font-family:inherit}
 .dp-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#6f6a5f}
 .dp-gets{display:flex;flex-direction:column;gap:4px}
 .dp-gets p{margin:0;font-size:15px;line-height:1.5}

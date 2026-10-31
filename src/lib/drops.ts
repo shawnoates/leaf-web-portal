@@ -12,6 +12,8 @@ export type Drop = {
   id: string;
   title: string;
   teaser: string;
+  /** The longer write-up (the event description); the popup clamps it to 3 lines. */
+  description: string;
   includes: string;
   valueCents: number;
   /** The attendance-guarantee fee: the whole charge, no booking fee on top. */
