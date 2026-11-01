@@ -216,7 +216,7 @@ interface Plan {
   /** Offer Pipeline paid tickets: RSVPing means paying price + booking fee. */
   ticketPriceCents?: number | null;
   /** A Leaf Drop: what you get, what it's worth, and the spots left. */
-  drop?: { includes: string; valueCents: number; spotsLeft: number | null } | null;
+  drop?: { includes: string; valueCents: number; cta?: string; spotsLeft: number | null } | null;
   bookingFeeCents?: number | null;
   /** Host collects peer to peer (Venmo/Cash App/PayPal/Zelle): price per spot. */
   p2pAmountCents?: number | null;
@@ -6414,6 +6414,7 @@ export default function OrgCalendarPage() {
                       includes={selectedEvent.drop.includes}
                       valueCents={selectedEvent.drop.valueCents}
                       feeCents={selectedEvent.ticketPriceCents ?? 0}
+                      cta={selectedEvent.drop.cta}
                       capacity={selectedEvent.capacity ?? null}
                       spotsLeft={selectedEvent.drop.spotsLeft}
                       brandColor={org.brandColor || undefined}

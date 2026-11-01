@@ -22,7 +22,7 @@ import { Bell, Check, Loader2, Ticket } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { useCountdown } from "@/app/o/m/[token]/FreeNightCountdown";
 import { getVerifiedUserCookie } from "@/lib/verified-user";
-import { dropWhere, interestCookie, money, sendDropInterest, type Drop } from "@/lib/drops";
+import { dropCta, dropWhere, interestCookie, money, sendDropInterest, type Drop } from "@/lib/drops";
 import DropPopup, { Popup } from "@/components/DropPopup";
 
 function countdownLabel(left: number) {
@@ -106,7 +106,7 @@ export default function DropCard({
     if (status === "open") {
       return (
         <Link href={`/p/${drop.id}`} className="drop-btn drop-btn-accent">
-          Get your pass · {money(drop.feeCents)}
+          {dropCta(drop.cta)} · {money(drop.feeCents)}
         </Link>
       );
     }

@@ -18,6 +18,8 @@ export type Drop = {
   valueCents: number;
   /** The attendance-guarantee fee: the whole charge, no booking fee on top. */
   feeCents: number;
+  /** The admin's button words ("Join the table"); empty means the default. */
+  cta?: string;
   imageUrl: string | null;
   /** Loops silently behind the /me popup (the plan's invitationVideo). */
   videoUrl: string | null;
@@ -37,6 +39,11 @@ export type Drop = {
   waitlisted: boolean;
   pass: { token: string | null; status: "paid" | "cancelled"; refundedCents: number } | null;
 };
+
+/** The claim button's words, without the price: "Join the table" or "Get your pass". */
+export function dropCta(cta?: string | null): string {
+  return cta?.trim() || "Get your pass";
+}
 
 export function money(cents: number): string {
   const d = (cents || 0) / 100;

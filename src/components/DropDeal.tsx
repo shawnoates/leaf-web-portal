@@ -5,12 +5,13 @@
  * comes with the pass.
  */
 
-import { money } from "@/lib/drops";
+import { dropCta, money } from "@/lib/drops";
 
 export default function DropDeal({
   includes,
   valueCents,
   feeCents,
+  cta,
   capacity,
   spotsLeft,
   brandColor,
@@ -19,6 +20,7 @@ export default function DropDeal({
   includes: string;
   valueCents: number;
   feeCents: number;
+  cta?: string;
   capacity: number | null;
   spotsLeft: number | null;
   brandColor?: string;
@@ -46,7 +48,7 @@ export default function DropDeal({
           className="w-full text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90"
           style={{ backgroundColor: brandColor || "#18181b" }}
         >
-          Get your pass · {money(feeCents)}
+          {dropCta(cta)} · {money(feeCents)}
         </button>
       )}
       <p className="text-xs text-zinc-500">
