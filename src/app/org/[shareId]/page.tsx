@@ -13,6 +13,7 @@ import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
 import { CalendarDrop } from "@/components/DropCard";
+import DropDeal from "@/components/DropDeal";
 import LeafHostPlanThread from "@/components/LeafHostPlanThread";
 import NamePrompt from "@/components/NamePrompt";
 import ShareKitPrompt, { type ShareKitPayload } from "@/components/ShareKitPrompt";
@@ -206,6 +207,8 @@ interface Plan {
    */
   /** Offer Pipeline paid tickets: RSVPing means paying price + booking fee. */
   ticketPriceCents?: number | null;
+  /** A Leaf Drop: what you get, what it's worth, and the spots left. */
+  drop?: { includes: string; valueCents: number; spotsLeft: number | null } | null;
   bookingFeeCents?: number | null;
   /** Host collects peer to peer (Venmo/Cash App/PayPal/Zelle): price per spot. */
   p2pAmountCents?: number | null;
@@ -3388,6 +3391,7 @@ export default function OrgCalendarPage() {
         meetingSpot: (p.meetingSpot as string | null) || null,
         requireApproval: p.requireApproval as boolean || false,
         ticketPriceCents: typeof p.ticketPriceCents === "number" ? p.ticketPriceCents : null,
+        drop: (p.drop as Plan["drop"]) || null,
         bookingFeeCents: typeof p.bookingFeeCents === "number" ? p.bookingFeeCents : null,
         p2pAmountCents: typeof p.p2pAmountCents === "number" ? p.p2pAmountCents : null,
         p2pSplit: parseP2pSplit(p.p2pSplit),
@@ -6291,15 +6295,18 @@ export default function OrgCalendarPage() {
                           {selectedEvent.date}{selectedEvent.time ? ` at ${selectedEvent.time}` : ""}
                         </span>
                       </span>
-                      <span className="flex items-center gap-2 whitespace-nowrap">
-                        <Users className="w-4 h-4 flex-shrink-0" /> {attendingLabel(selectedEvent)}
-                        {planIsFull(selectedEvent) && (
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600">· Full</span>
-                        )}
-                      </span>
+                      {/* A Drop's spots and price are in its deal box below. */}
+                      {!selectedEvent.drop && (
+                        <span className="flex items-center gap-2 whitespace-nowrap">
+                          <Users className="w-4 h-4 flex-shrink-0" /> {attendingLabel(selectedEvent)}
+                          {planIsFull(selectedEvent) && (
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600">· Full</span>
+                          )}
+                        </span>
+                      )}
                     </>
                   )}
-                  {ticketPriceTotal(selectedEvent) && (
+                  {!selectedEvent.drop && ticketPriceTotal(selectedEvent) && (
                     <span className="flex items-center gap-2 whitespace-nowrap text-zinc-900 font-normal">
                       <Wallet className="w-4 h-4 flex-shrink-0" />
                       {ticketPriceTotal(selectedEvent)} a ticket
@@ -6316,6 +6323,15 @@ export default function OrgCalendarPage() {
               </div>
 
               <div className="space-y-6">
+                {selectedEvent.drop && (
+                  <DropDeal
+                    includes={selectedEvent.drop.includes}
+                    valueCents={selectedEvent.drop.valueCents}
+                    feeCents={selectedEvent.ticketPriceCents ?? 0}
+                    capacity={selectedEvent.capacity ?? null}
+                    spotsLeft={selectedEvent.drop.spotsLeft}
+                  />
+                )}
                 <p className="text-xl font-light leading-relaxed text-zinc-600 whitespace-pre-wrap">
                   {renderLinkedText(selectedEvent.description)}
                 </p>
