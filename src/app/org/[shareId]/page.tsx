@@ -89,6 +89,7 @@ import { PhotoCredit } from "@/components/PhotoCredit";
 import HostPointsTag, { HostPointsNote } from "@/components/HostPointsTag";
 import PointsChip from "@/components/PointsChip";
 import CheckInPill from "@/components/CheckInPill";
+import { runHostPlanIdea } from "@/lib/host-plan-idea";
 
 
 // --- Types ---
@@ -4140,7 +4141,7 @@ export default function OrgCalendarPage() {
     }
 
     try {
-      const result = await Parse.Cloud.run("hostPlanIdea", {
+      const result = await runHostPlanIdea({
         calendarPlanId: hostingIdea.id,
         date: dateTime,
         capacity: hostingIdea.suggestedCapacity || 20,
@@ -4160,6 +4161,10 @@ export default function OrgCalendarPage() {
           rating: selectedVenue.rating,
         } : undefined,
       });
+      if (result === null) {
+        setHostSubmitting(false);
+        return;
+      }
       setHostSuccess(result?.pendingApproval ? "pending" : true);
       const hostSeat = result?.pendingApproval ? null : ((result as { hostNotificationId?: string | null })?.hostNotificationId ?? null);
       setHostHelloSeat(hostSeat);

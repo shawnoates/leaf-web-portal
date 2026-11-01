@@ -8,6 +8,7 @@ import { zoneOffsetSuffix } from "@/lib/wall-clock";
 import PlanIntroSection from "@/components/PlanIntroSection";
 import { HostPointsNote } from "@/components/HostPointsTag";
 import FittedImage from "@/components/FittedImage";
+import { runHostPlanIdea } from "@/lib/host-plan-idea";
 import {
   AlertTriangle,
   Calendar,
@@ -374,7 +375,7 @@ export default function HostIdeaModal({
     setError(null);
 
     try {
-      const result = await Parse.Cloud.run("hostPlanIdea", {
+      const params = {
         calendarPlanId: idea.objectId,
         date: dateTime,
         capacity: idea.suggestedCapacity || 20,
@@ -393,7 +394,12 @@ export default function HostIdeaModal({
               rating: selectedVenue.rating,
             }
           : undefined,
-      });
+      };
+      const result = await runHostPlanIdea(params);
+      if (result === null) {
+        setSubmitting(false);
+        return;
+      }
       setSuccess(true);
       // Refresh the parent behind the success screen, then auto-close —
       // unless the plan is live with this person as host, in which case the
