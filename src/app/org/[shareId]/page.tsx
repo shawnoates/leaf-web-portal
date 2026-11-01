@@ -12,7 +12,7 @@ import { ContactStep, usePhoneVerify, formatPhoneNumber, type ContactChoice } fr
 import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
-import { CalendarDropBar } from "@/components/DropCard";
+import { CalendarDrop } from "@/components/DropCard";
 import LeafHostPlanThread from "@/components/LeafHostPlanThread";
 import NamePrompt from "@/components/NamePrompt";
 import ShareKitPrompt, { type ShareKitPayload } from "@/components/ShareKitPrompt";
@@ -2628,6 +2628,9 @@ export default function OrgCalendarPage() {
     [isFollowing, runPlanIdeaInterest],
   );
 
+  // The Drop shown at the top of the page, if any: its plan row is skipped.
+  const [dropPlanId, setDropPlanId] = useState<string | null>(null);
+
   // Follow gate for a Drop's Notify me: the open alert is for followers only.
   const handleDropNotify = useCallback(
     (go: (phone?: string) => void) => {
@@ -4968,12 +4971,15 @@ export default function OrgCalendarPage() {
         </main>
       ) : (
       <>
-      {/* A Drop: flush under the header, first thing on the page, since it's
-          a countdown. Renders nothing unless the calendar has one coming. */}
-      <CalendarDropBar
+      {/* A Drop: the first row on the page, in the plan rows' own style,
+          since it's a countdown. Its plan row is skipped below. Renders
+          nothing unless the calendar has one coming. */}
+      <CalendarDrop
         calendarId={org.objectId}
         beforeNotify={handleDropNotify}
-        className="max-w-6xl mx-auto px-4 sm:px-6 pt-4" />
+        brandColor={org.brandColor || undefined}
+        onDrop={setDropPlanId}
+        className="max-w-6xl mx-auto px-6 pt-12" />
 
       {/* Partner thank-you — the server returns it only to followers and
           past attendees of this calendar. */}
@@ -5366,6 +5372,8 @@ export default function OrgCalendarPage() {
               </article>
           );
           org.plans.forEach((plan) => {
+            // Shown as the Drop row at the top already.
+            if (plan.id === dropPlanId) return;
             streamItems.push({
               key: `plan-${plan.id}`,
               date: plan.dateISO
