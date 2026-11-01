@@ -18,7 +18,7 @@ import Link from "next/link";
 import { Check, Loader2 } from "lucide-react";
 import { loadStripe, type Stripe, type StripeElements } from "@stripe/stripe-js";
 import Parse from "@/lib/parse-client";
-import { dropGets, dropWhen, money, type Drop } from "@/lib/drops";
+import { dropGets, dropWhen, dropWhere, money, type Drop } from "@/lib/drops";
 import type { PointsUnseen } from "@/lib/points";
 
 const SEEN = (id: string) => `leaf_drop_popup_seen_${id}`;
@@ -184,9 +184,9 @@ export function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
   // camera isn't covered. Only one copy shows (the other is display:none).
   const head = (
     <>
-      <span className="dp-eyebrow">◆ Drop{drop.calendar?.name ? ` · ${drop.calendar.name}` : ""}</span>
+      <span className="dp-eyebrow">◆ The Drop{drop.calendar?.name ? ` · ${drop.calendar.name}` : ""}</span>
       <h2 className="dp-title">{drop.title}</h2>
-      <p className="dp-when">{[dropWhen(drop.startsAt), drop.place].filter(Boolean).join(" · ")}</p>
+      <p className="dp-when">{[dropWhen(drop.startsAt), dropWhere(drop)].filter(Boolean).join(" · ")}</p>
       <p className={`dp-status${full ? " dp-status-off" : ""}`}>
         <span className={`dp-dot${full ? " dp-dot-off" : ""}`} aria-hidden="true" />
         {full ? `Full · ${drop.capacity ? `all ${drop.capacity} spots claimed` : "all spots claimed"}` : `Live${spots ? ` · ${spots}` : ""}`}

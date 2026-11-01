@@ -23,7 +23,7 @@ import { Bell, Check, Loader2, Ticket } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { useCountdown } from "@/app/o/m/[token]/FreeNightCountdown";
 import { getVerifiedUserCookie } from "@/lib/verified-user";
-import { dropGets, dropWhen, interestCookie, money, sendDropInterest, type Drop } from "@/lib/drops";
+import { dropGets, dropWhen, dropWhere, interestCookie, money, sendDropInterest, type Drop } from "@/lib/drops";
 import DropPopup, { Popup } from "@/components/DropPopup";
 
 function countdownLabel(left: number) {
@@ -224,7 +224,7 @@ export default function DropCard({
           <div className="flex-1 min-w-0 flex flex-col gap-1.5">
             <div className="flex flex-wrap items-center gap-3 text-[9px] leading-none font-medium uppercase tracking-[0.16em] whitespace-nowrap">
               <span className="border border-[#3a3a3a] px-[7px] py-1 text-white">
-                <span aria-hidden>◆</span> Leaf drop
+                <span aria-hidden>◆</span> The Drop
               </span>
               {dateLabel && <span className="text-[#8f8f8a]">{dateLabel}</span>}
               {/* No "Live": the spots meter by the button says it's open. */}
@@ -237,7 +237,7 @@ export default function DropCard({
             <div className="flex gap-2.5 text-xs leading-[1.4] overflow-hidden">
               {gets && <span className="shrink-0 whitespace-nowrap text-[#d9d9d5]">{gets}</span>}
               <span className="flex-1 min-w-0 truncate text-[#6d6d68]">
-                {["Hosted by Leaf", drop.place].filter(Boolean).join(" · ")}
+                {["Hosted by Leaf", dropWhere(drop)].filter(Boolean).join(" · ")}
               </span>
             </div>
           </div>
@@ -259,12 +259,12 @@ export default function DropCard({
       <style>{STYLES}</style>
       <div className="flex items-center justify-between gap-2">
         <span className="drop-eyebrow">
-          <span aria-hidden>◆</span> Drop{drop.calendar?.name ? ` · ${drop.calendar.name}` : ""}
+          <span aria-hidden>◆</span> The Drop{drop.calendar?.name ? ` · ${drop.calendar.name}` : ""}
         </span>
         {statusLine && <span className="drop-status">{statusLine}</span>}
       </div>
       <h2 className="drop-title">{drop.title}</h2>
-      <p className="text-xs text-white/60">{[dropWhen(drop.startsAt), drop.place].filter(Boolean).join(" · ")}</p>
+      <p className="text-xs text-white/60">{[dropWhen(drop.startsAt), dropWhere(drop)].filter(Boolean).join(" · ")}</p>
       <div className="drop-foot">
         {(drop.includes || value) && (
           <span className="drop-gets">

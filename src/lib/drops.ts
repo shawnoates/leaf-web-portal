@@ -45,6 +45,12 @@ export function dropGets(drop: Pick<Drop, "includes" | "valueCents" | "feeCents"
   return [drop.includes, value].filter(Boolean).join(" · ");
 }
 
+/** Where it is: the venue once they hold a pass (the server sends it only then), else that it's coming. */
+export function dropWhere(drop: Pick<Drop, "place" | "pass">): string {
+  if (drop.place) return drop.place;
+  return drop.pass?.status === "paid" ? "" : "Venue revealed with your pass";
+}
+
 /** "Sat, Nov 8 · 7:30 PM" */
 export function dropWhen(iso: string | null): string {
   if (!iso) return "";
