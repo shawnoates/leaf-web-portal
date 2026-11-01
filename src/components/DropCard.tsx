@@ -106,7 +106,7 @@ export default function DropCard({
     if (status === "open") {
       return (
         <Link href={`/p/${drop.id}`} className="drop-btn drop-btn-accent">
-          Hold your spot · {money(drop.feeCents)}
+          Get your pass · {money(drop.feeCents)}
         </Link>
       );
     }

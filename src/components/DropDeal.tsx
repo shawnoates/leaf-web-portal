@@ -46,7 +46,7 @@ export default function DropDeal({
           className="w-full text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90"
           style={{ backgroundColor: brandColor || "#18181b" }}
         >
-          Hold your spot · {money(feeCents)}
+          Get your pass · {money(feeCents)}
         </button>
       )}
       <p className="text-xs text-zinc-500">

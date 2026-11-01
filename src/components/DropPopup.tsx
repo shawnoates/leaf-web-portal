@@ -2,7 +2,7 @@
 
 /**
  * "It's live": /me's only Drop surface, a popup at most once a week (across
- * all Drops) while one on a calendar they follow is open or full. Open: Hold your spot. Full: Join the
+ * all Drops) while one on a calendar they follow is open or full. Open: Get your pass. Full: Join the
  * waitlist by saving a card; nothing is charged unless a spot opens for them,
  * in the order people joined. The Drop's video loops silently behind the top (photo if none); there
  * is deliberately no sound control.
@@ -282,7 +282,7 @@ export function Popup({ drop, onClose }: { drop: Drop; onClose: () => void }) {
             )
           ) : (
             <Link href={`/p/${drop.id}`} className="dp-cta" ref={(el) => { primary.current = el; }}>
-              Hold your spot · {money(drop.feeCents)}
+              Get your pass · {money(drop.feeCents)}
             </Link>
           )}
           {error && <p className="dp-error">{error}</p>}
@@ -358,7 +358,7 @@ const STYLES = `
 .dp-check{width:14px;height:14px}
 .dp-cta{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px 14px;border:none;border-radius:10px;background:#131714;color:#fff;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;font-family:inherit;box-sizing:border-box}
 .dp-cta:disabled{opacity:.6}
-/* /me sets every link to color:inherit; the Hold your spot link needs its white. */
+/* /me sets every link to color:inherit; the Get your pass link needs its white. */
 .dp-card a.dp-cta{color:#fff}
 .dp-spin{width:16px;height:16px;animation:spin 1s linear infinite}
 .dp-cardform{min-height:120px}
