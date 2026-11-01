@@ -13,12 +13,17 @@ export default function DropDeal({
   feeCents,
   capacity,
   spotsLeft,
+  brandColor,
+  onHold,
 }: {
   includes: string;
   valueCents: number;
   feeCents: number;
   capacity: number | null;
   spotsLeft: number | null;
+  brandColor?: string;
+  /** Opens checkout; no button when there's nothing to hold (full, held, past). */
+  onHold?: () => void;
 }) {
   const worth = valueCents > feeCents ? money(valueCents) : null;
   return (
@@ -34,6 +39,16 @@ export default function DropDeal({
         </p>
       </div>
       {capacity && spotsLeft !== null && <Seats capacity={capacity} left={spotsLeft} />}
+      {onHold && (
+        <button
+          type="button"
+          onClick={onHold}
+          className="w-full text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90"
+          style={{ backgroundColor: brandColor || "#18181b" }}
+        >
+          Hold your spot · {money(feeCents)}
+        </button>
+      )}
       <p className="text-xs text-zinc-500">
         Venue revealed with your pass · First come, first served · Full refund if you cancel 48+ hours before
       </p>

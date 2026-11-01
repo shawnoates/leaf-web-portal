@@ -6320,18 +6320,34 @@ export default function OrgCalendarPage() {
                     </span>
                   )}
                 </div>
+                {/* A Drop's deal sits right under the date, with its own Hold
+                    your spot: the sheet's RSVP button is far down the page. */}
+                {selectedEvent.drop && (
+                  <div className="pt-2">
+                    <DropDeal
+                      includes={selectedEvent.drop.includes}
+                      valueCents={selectedEvent.drop.valueCents}
+                      feeCents={selectedEvent.ticketPriceCents ?? 0}
+                      capacity={selectedEvent.capacity ?? null}
+                      spotsLeft={selectedEvent.drop.spotsLeft}
+                      brandColor={org.brandColor || undefined}
+                      onHold={
+                        planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "upcoming"
+                          && !planIsFull(selectedEvent)
+                          && selectedEvent.drop.spotsLeft !== 0
+                          && !rsvpedPlanIds.has(selectedEvent.id)
+                          ? () => {
+                              setRsvpPlan(selectedEvent);
+                              setSelectedEvent(null);
+                            }
+                          : undefined
+                      }
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-6">
-                {selectedEvent.drop && (
-                  <DropDeal
-                    includes={selectedEvent.drop.includes}
-                    valueCents={selectedEvent.drop.valueCents}
-                    feeCents={selectedEvent.ticketPriceCents ?? 0}
-                    capacity={selectedEvent.capacity ?? null}
-                    spotsLeft={selectedEvent.drop.spotsLeft}
-                  />
-                )}
                 <p className="text-xl font-light leading-relaxed text-zinc-600 whitespace-pre-wrap">
                   {renderLinkedText(selectedEvent.description)}
                 </p>
