@@ -227,7 +227,9 @@ export default function DropCard({
                 <span aria-hidden>◆</span> Leaf drop
               </span>
               {dateLabel && <span className="text-[#8f8f8a]">{dateLabel}</span>}
-              {statusLine && <span className="drop-band-status text-[#7fd6a8]">{statusLine}</span>}
+              {/* No "Live": the spots meter by the button says it's open. */}
+              {status === "scheduled" && statusLine && <span className="text-[#7fd6a8]">{statusLine}</span>}
+              {status === "sold_out" && <span className="text-[#8f8f8a]">Full</span>}
             </div>
             <h3 className="text-[21px] leading-[1.1] font-normal tracking-[-0.01em] text-white truncate">
               {drop.title}
@@ -239,13 +241,12 @@ export default function DropCard({
               </span>
             </div>
           </div>
-          <div className="flex-none flex flex-col items-start sm:items-end gap-1.5 whitespace-nowrap">
+          <div className="flex-none flex flex-col items-start sm:items-end gap-2 whitespace-nowrap">
+            {status === "open" && !drop.pass && drop.capacity && drop.spotsLeft !== null && (
+              <SpotsMeter capacity={drop.capacity} left={drop.spotsLeft} />
+            )}
             {action}
-            {error ? (
-              <span className="text-[10px] text-red-300">{error}</span>
-            ) : live ? (
-              <span className="text-[10px] text-[#6d6d68]">First come, first served</span>
-            ) : null}
+            {error && <span className="text-[10px] text-red-300">{error}</span>}
           </div>
         </div>
         {joinSheet}
@@ -277,6 +278,32 @@ export default function DropCard({
       {error && <p className="text-xs text-red-300">{error}</p>}
       {joinSheet}
     </section>
+  );
+}
+
+/**
+ * Spots left as a row of seats right over the button: open ones lit, taken
+ * ones dim. Past 24 seats it's a bar, so a big Drop doesn't run off the band.
+ */
+function SpotsMeter({ capacity, left }: { capacity: number; left: number }) {
+  const label = `${left} of ${capacity} spot${capacity === 1 ? "" : "s"} left`;
+  return (
+    <div className="flex items-center gap-2" role="img" aria-label={label}>
+      {capacity <= 24 ? (
+        <span className="flex gap-[3px]" aria-hidden>
+          {Array.from({ length: capacity }, (_, i) => (
+            <span key={i} className={`w-[6px] h-[10px] ${i < capacity - left ? "bg-[#2e2e2e]" : "bg-[#7fd6a8]"}`} />
+          ))}
+        </span>
+      ) : (
+        <span className="w-24 h-[4px] bg-[#2e2e2e]" aria-hidden>
+          <span className="block h-full bg-[#7fd6a8]" style={{ width: `${(left / capacity) * 100}%` }} />
+        </span>
+      )}
+      <span className="text-[9px] leading-none font-medium uppercase tracking-[0.16em] text-[#7fd6a8]" aria-hidden>
+        {left} left
+      </span>
+    </div>
   );
 }
 
@@ -371,5 +398,4 @@ const STYLES = `
 .drop-band .drop-btn-dark:hover, .drop-band .drop-btn-accent:hover { background: #dcdcd8; }
 .drop-band .drop-btn-quiet { background: transparent; border: 1px solid #3a3a3a; color: #7fd6a8; }
 .drop-band input { border-radius: 0; font-size: 12px; padding: 7px 10px; }
-.drop-band-status .drop-dot { background: #7fd6a8; }
 `;
