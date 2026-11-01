@@ -35,7 +35,7 @@ type InterestGroupInfo = {
   booked: boolean;
   bookingAskOpen: boolean;
 };
-type InterestAnswer = "going" | "snooze" | "not_interested";
+type InterestAnswer = "going" | "cant_make_it";
 type DeviceType = "ios" | "android" | "desktop";
 const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
 
@@ -100,8 +100,8 @@ export default function ChatShell({
   const [planCancelled, setPlanCancelled] = useState(false);
   const [interestGroup, setInterestGroup] = useState<InterestGroupInfo | null>(null);
   const [answering, setAnswering] = useState<InterestAnswer | null>(null);
-  // Snoozed or out: they're no longer in this chat, so say where they stand.
-  const [leftGroup, setLeftGroup] = useState<"snoozed" | "removed" | null>(null);
+  // Said they can't make it: no longer in this chat.
+  const [leftGroup, setLeftGroup] = useState(false);
   const [answerError, setAnswerError] = useState<string | null>(null);
   const [notificationId, setNotificationId] = useState<string | null>(null);
   const [device, setDevice] = useState<DeviceType>("desktop");
@@ -142,7 +142,7 @@ export default function ChatShell({
             prev ? { ...prev, viewer: false, confirmed: result.confirmed ?? prev.confirmed + 1 } : prev,
           );
         } else {
-          setLeftGroup(result.state === "snoozed" ? "snoozed" : "removed");
+          setLeftGroup(true);
         }
       } catch (err) {
         setAnswerError(err instanceof Error ? err.message : "Couldn’t save that — try again.");
@@ -745,23 +745,21 @@ export default function ChatShell({
 
         {leftGroup ? (
           <div role="status" className="bg-zinc-50 border-t border-zinc-200 px-4 md:px-6 py-4 shrink-0 text-center">
-            <p className="text-sm font-medium text-zinc-900">
-              {leftGroup === "snoozed" ? "Snoozed" : "You’re out of this one"}
-            </p>
-            <p className="mt-0.5 text-xs text-zinc-500">
-              {leftGroup === "snoozed"
-                ? "We’ll ask you about the next date instead."
-                : "You won’t hear about this plan again."}
-            </p>
+            <p className="text-sm font-medium text-zinc-900">You&rsquo;re out of this one</p>
+            <p className="mt-0.5 text-xs text-zinc-500">Thanks for letting the group know.</p>
           </div>
-        ) : interestGroup?.state === "gathering" && interestGroup.viewer && !planCancelled ? (
+        ) : interestGroup && interestGroup.state !== "off" && interestGroup.viewer && !planCancelled ? (
           // A viewer reads but can't post until they say they're going (the
           // RTDB rules hold that line too).
           <div className="bg-white border-t border-zinc-200 px-4 md:px-6 py-3 shrink-0 space-y-2.5">
             <p className="text-sm text-zinc-900">
               <span className="font-medium">Going{interestGroup.nightLabel ? ` ${interestGroup.nightLabel}` : ""}?</span>
               <span className="text-zinc-500">
-                {interestGroup.deadlineLabel ? ` Answer by ${interestGroup.deadlineLabel} to chat with the group.` : " Answer to chat with the group."}
+                {interestGroup.state === "on"
+                  ? " It’s on. Say you’re going to chat with the group."
+                  : interestGroup.deadlineLabel
+                    ? ` It’s decided ${interestGroup.deadlineLabel}. Say you’re going to chat with the group.`
+                    : " Say you’re going to chat with the group."}
               </span>
             </p>
             <div className="flex gap-2">
@@ -775,19 +773,11 @@ export default function ChatShell({
               </button>
               <button
                 type="button"
-                onClick={() => answerInterest("snooze")}
+                onClick={() => answerInterest("cant_make_it")}
                 disabled={answering !== null}
                 className="flex-1 rounded-lg border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-900 disabled:opacity-50"
               >
-                {answering === "snooze" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Next time"}
-              </button>
-              <button
-                type="button"
-                onClick={() => answerInterest("not_interested")}
-                disabled={answering !== null}
-                className="rounded-lg px-3 py-2.5 text-xs text-zinc-500 disabled:opacity-50"
-              >
-                Not for me
+                {answering === "cant_make_it" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Can’t make it"}
               </button>
             </div>
             {answerError && <p className="text-xs text-rose-600">{answerError}</p>}
@@ -800,7 +790,7 @@ export default function ChatShell({
             {interestGroup?.state === "off" ? (
               <>
                 <p className="text-sm font-medium text-zinc-900">Not enough people this time</p>
-                <p className="mt-0.5 text-xs text-zinc-500">We&rsquo;ll ask everyone about the next date.</p>
+                <p className="mt-0.5 text-xs text-zinc-500">This one&rsquo;s off. Earlier messages are still here.</p>
               </>
             ) : (
               <>

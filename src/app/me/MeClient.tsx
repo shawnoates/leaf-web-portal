@@ -2296,8 +2296,7 @@ async function joinInterestGroup(p: HostPlan): Promise<string | null> {
     window.location.assign(`/chat/${occ.eventGroupId}?from=me`);
     return null;
   }
-  if (occ?.state === "later") return "Too close to plan this date. We’ll ask you about the next one.";
-  if (occ?.state === "on") return "This one’s already on. RSVP to it from the calendar.";
+  if (occ?.state === "later") return "Too close to start a group for this one.";
   return "Saved. The group for this one isn’t open right now.";
 }
 
@@ -2309,12 +2308,13 @@ type MyInterestGroup = {
   viewer: boolean;
   nightLabel: string | null;
   deadlineLabel: string | null;
+  state: "gathering" | "on";
   confirmed: number;
   minConfirmed: number;
 };
 
-// The nights this person is gathering for, viewer or going. Not plans yet —
-// they reach the calendar (and the rows above) only once enough people are in.
+// The nights this person is in a group for, viewer or going, until they start.
+// A gathering one isn't a plan yet; it reaches the calendar once enough are in.
 function InterestGroupsRail() {
   const [groups, setGroups] = useState<MyInterestGroup[]>([]);
   useEffect(() => {
@@ -2343,7 +2343,9 @@ function InterestGroupsRail() {
                 <span className={`interest ${g.viewer ? "" : "on"}`}>
                   {g.viewer ? "Say if you’re going" : "You’re going"} · {g.confirmed} of {g.minConfirmed}
                 </span>
-                {g.deadlineLabel && <span className="urgent">Decided {g.deadlineLabel}</span>}
+                {g.state === "on"
+                  ? <span className="urgent">It&rsquo;s on</span>
+                  : g.deadlineLabel && <span className="urgent">Decided {g.deadlineLabel}</span>}
               </div>
             </div>
             <div className="hostact">

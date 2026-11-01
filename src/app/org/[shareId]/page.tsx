@@ -96,7 +96,9 @@ import { runHostPlanIdea } from "@/lib/host-plan-idea";
 
 // Where an interest tap landed (leaflets-server cloud/interest-group.js).
 type InterestOccurrence = {
-  state: "gathering" | "on" | "later" | "disabled" | "gone" | "closed" | "no_date" | "no_user";
+  state: "gathering" | "later" | "disabled" | "gone" | "closed" | "no_date" | "no_user";
+  /** The night itself: still gathering, or already on (open until it starts). */
+  nightState?: "gathering" | "on";
   eventGroupId?: string;
   going?: boolean;
 };
@@ -2301,12 +2303,7 @@ export default function OrgCalendarPage() {
         return true;
       }
       if (occurrence.state === "later") {
-        setToast("Too close to plan this date. We’ll ask you about the next one.");
-        setTimeout(() => setToast(null), 5000);
-        return true;
-      }
-      if (occurrence.state === "on") {
-        setToast("This one’s already on. RSVP to it on the calendar.");
+        setToast("Too close to start a group for this one.");
         setTimeout(() => setToast(null), 5000);
         return true;
       }
@@ -8471,8 +8468,8 @@ export default function OrgCalendarPage() {
               </h3>
               <p className="text-sm text-zinc-500 font-light leading-relaxed">
                 See who else is in, and tap Going to count yourself in. It goes
-                ahead once enough people are going. We&rsquo;ll text you before
-                it&rsquo;s decided.
+                ahead once enough people are going, and you can say Going right
+                up until it starts.
               </p>
             </div>
             <a
