@@ -7,10 +7,9 @@
  * it's full, Join the waitlist opens the Drop's popup to save a card (signed
  * in only): if a spot opens, the next in line is charged and gets the pass.
  *
- * "card" is the card above the hero on /me; "band" is the calendar page's
- * featured-band design (the "Around the city" strip under the header), where
- * it stands in for the Drop's plain plan row. /me also gets DropPopup, once per Drop, when one on
- * a calendar they follow goes live.
+ * This is the calendar page's band, in its featured-band design (the "Around
+ * the city" strip under the header), standing in for the Drop's plain plan
+ * row. /me shows no card: just DropPopup, at most once a week.
  *
  * Only followers of the calendar get the texts (the server refuses anyone
  * else). On a calendar page, beforeNotify runs the page's follow gate first
@@ -23,7 +22,7 @@ import { Bell, Check, Loader2, Ticket } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { useCountdown } from "@/app/o/m/[token]/FreeNightCountdown";
 import { getVerifiedUserCookie } from "@/lib/verified-user";
-import { dropGets, dropWhen, dropWhere, interestCookie, money, sendDropInterest, type Drop } from "@/lib/drops";
+import { dropGets, dropWhere, interestCookie, money, sendDropInterest, type Drop } from "@/lib/drops";
 import DropPopup, { Popup } from "@/components/DropPopup";
 
 function countdownLabel(left: number) {
@@ -40,11 +39,9 @@ type BeforeNotify = (go: (phone?: string) => void) => void;
 
 export default function DropCard({
   drop,
-  variant = "card",
   beforeNotify,
 }: {
   drop: Drop;
-  variant?: "card" | "band";
   beforeNotify?: BeforeNotify;
 }) {
   const left = useCountdown(drop.opensAt, drop.status === "scheduled");
@@ -85,7 +82,6 @@ export default function DropCard({
   const onTap = () => (beforeNotify ? beforeNotify((p) => void tap(p)) : void tap());
 
   const gets = dropGets(drop);
-  const value = drop.valueCents > drop.feeCents ? `${money(drop.valueCents)} value` : "";
   const live = (status === "scheduled" || status === "open") && !drop.pass;
   const spots =
     !live || drop.spotsLeft === null ? null : drop.spotsLeft === 1 ? "1 left" : `${drop.spotsLeft} left`;
@@ -169,7 +165,7 @@ export default function DropCard({
       : status === "scheduled" && left !== null ? (
         <span className="tabular-nums" role="timer" aria-live="off">Opens in {countdownLabel(left)}</span>
       )
-      : status === "open" ? <span className="drop-live"><span className="drop-dot" aria-hidden />Live{spots ? ` · ${spots}` : ""}</span>
+      : status === "open" ? (spots ? <span>{spots}</span> : null)
       : status === "sold_out" ? <span>Full</span>
       : null;
 
@@ -186,7 +182,7 @@ export default function DropCard({
     />
   );
 
-  if (variant === "band") {
+  {
     // Same build as the page's "Around the city" band: 122px, black, the
     // media in a 232px column, chips over a one-line title, the action right.
     const when = drop.startsAt ? new Date(drop.startsAt) : null;
@@ -253,32 +249,6 @@ export default function DropCard({
       </article>
     );
   }
-
-  return (
-    <section aria-label={`Drop: ${drop.title}`} className="drop drop-card">
-      <style>{STYLES}</style>
-      <div className="flex items-center justify-between gap-2">
-        <span className="drop-eyebrow">
-          <span aria-hidden>◆</span> The Drop{drop.calendar?.name ? ` · ${drop.calendar.name}` : ""}
-        </span>
-        {statusLine && <span className="drop-status">{statusLine}</span>}
-      </div>
-      <h2 className="drop-title">{drop.title}</h2>
-      <p className="text-xs text-white/60">{[dropWhen(drop.startsAt), dropWhere(drop)].filter(Boolean).join(" · ")}</p>
-      <div className="drop-foot">
-        {(drop.includes || value) && (
-          <span className="drop-gets">
-            {drop.includes}
-            {drop.includes && value && <br />}
-            {value}
-          </span>
-        )}
-        {action}
-      </div>
-      {error && <p className="text-xs text-red-300">{error}</p>}
-      {joinSheet}
-    </section>
-  );
 }
 
 /**
@@ -308,10 +278,10 @@ function SpotsMeter({ capacity, left }: { capacity: number; left: number }) {
 }
 
 /**
- * /me: the viewer's Drops (calendars they follow, passes they hold), plus the
- * once-per-Drop popup when one goes live. Nothing when there are none.
+ * /me: the popup for the viewer's Drops (calendars they follow, passes they
+ * hold), at most once a week. No card on the page itself.
  */
-export function MyDrops({ className = "" }: { className?: string }) {
+export function MyDrops() {
   const [drops, setDrops] = useState<Drop[]>([]);
   useEffect(() => {
     Parse.Cloud.run("getMyDrops")
@@ -319,25 +289,7 @@ export function MyDrops({ className = "" }: { className?: string }) {
       .catch(() => setDrops([]));
   }, []);
   if (drops.length === 0) return null;
-  const popup = <DropPopup drops={drops} />;
-  if (drops.length === 1) {
-    return (
-      <div className={className}>
-        <DropCard drop={drops[0]} />
-        {popup}
-      </div>
-    );
-  }
-  return (
-    <div className={`${className} flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-1 px-1`}>
-      {drops.map((d) => (
-        <div key={d.id} className="snap-start shrink-0 w-[88%] sm:w-[70%]">
-          <DropCard drop={d} />
-        </div>
-      ))}
-      {popup}
-    </div>
-  );
+  return <DropPopup drops={drops} />;
 }
 
 /**
@@ -369,23 +321,13 @@ export function CalendarDrop({
   if (!shown) return null;
   return (
     <div className={className}>
-      <DropCard drop={shown} variant="band" beforeNotify={beforeNotify} />
+      <DropCard drop={shown} beforeNotify={beforeNotify} />
     </div>
   );
 }
 
-// Spacing is gap, not margin: /me's `.leafme p { margin: 0 }` reset outranks
-// Tailwind's margin utilities.
+// The action button's states; the band restyles them below.
 const STYLES = `
-.drop { background: #131714; color: #fff; border-radius: 16px; }
-.drop-card { display: flex; flex-direction: column; gap: 4px; padding: 18px 20px 20px; }
-.drop-eyebrow { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: #C9F27B; }
-.drop-status { font-size: 11px; font-weight: 500; color: #C9F27B; white-space: nowrap; }
-.drop-live { display: inline-flex; align-items: center; gap: 6px; }
-.drop-dot { width: 6px; height: 6px; border-radius: 3px; background: #C9F27B; }
-.drop-title { font-size: 20px; line-height: 1.3; font-weight: 500; color: #fff; padding-top: 2px; }
-.drop-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; }
-.drop-gets { font-size: 12px; line-height: 1.4; color: rgba(255,255,255,.7); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .drop-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 11px 16px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
 .drop-btn:disabled { opacity: .6; }
 .drop-btn-dark { background: #fff; color: #131714; }

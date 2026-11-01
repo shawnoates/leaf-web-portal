@@ -1152,9 +1152,8 @@ function DashboardView({
             </div>
           )}
 
-          {/* Above the hero on purpose: a Drop is a countdown, and it only
-              lands if it's the first thing seen. Nothing renders without one. */}
-          <MyDrops className="pb-5" />
+          {/* A Drop shows here only as a popup, at most once a week. */}
+          <MyDrops />
 
           {hero ? (
             <Hero plan={hero} onRsvp={onRsvp} onOpen={() => setOpenPlanId(hero.id)} />
