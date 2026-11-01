@@ -4736,18 +4736,13 @@ export default function OrgCalendarPage() {
               <Sparkles className="w-6 h-6 text-zinc-600" />
             </div>
           )}
-          {/* Both kinds get the heart, but they write through different cloud
-              functions — a featured suggestion has no CalendarGeneratedPlan for
-              a PlanIdeaInterest to point at, so it goes to
-              expressFeaturedInterest (and verifies phone first, since that one
-              needs a real account rather than the interest cookie). */}
+          {/* Featured suggestions keep the heart (expressFeaturedInterest: no
+              CalendarGeneratedPlan to point at, and it needs a real account).
+              Plan ideas use the I'm interested button instead. */}
+          {idea.isFeatured && (
           <button
             type="button"
-            onClick={() =>
-              idea.isFeatured
-                ? handleFeaturedInterest(idea.id, idea.title)
-                : handlePlanIdeaInterest(idea.id)
-            }
+            onClick={() => handleFeaturedInterest(idea.id, idea.title)}
             disabled={isInterested || isPending}
             aria-label={isInterested ? "You're interested" : "I'm interested"}
             className={`absolute top-[10px] right-[10px] w-7 h-7 rounded-full border flex items-center justify-center transition-colors disabled:cursor-default ${
@@ -4765,6 +4760,7 @@ export default function OrgCalendarPage() {
               />
             )}
           </button>
+          )}
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 px-5 py-[14px] min-w-0">
           <div className="flex-1 min-w-0 flex flex-col gap-1.5">
@@ -5629,31 +5625,6 @@ export default function OrgCalendarPage() {
                                   </p>
                                 </div>
                               </div>
-                              {/* Interest heart — top-right of the title
-                                  (replaces the old inline "I'm interested"
-                                  button). Public; cookie-deduped server-side,
-                                  optimistic here. Badge shows the count. */}
-                              <button
-                                type="button"
-                                onClick={() => handleAIEventInterest(originalIndex)}
-                                disabled={isInterested || isPending}
-                                aria-label={isInterested ? "You're interested" : "I'm interested"}
-                                className={`relative shrink-0 w-12 h-12 rounded-full border flex items-center justify-center transition-colors disabled:cursor-default ${isInterested ? "bg-emerald-50 border-emerald-300" : "border-zinc-200 hover:border-zinc-300"}`}
-                              >
-                                {isPending ? (
-                                  <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
-                                ) : (
-                                  <Heart
-                                    className={`w-5 h-5 ${isInterested ? "text-emerald-700" : "text-zinc-400"}`}
-                                    fill={isInterested ? "currentColor" : "none"}
-                                  />
-                                )}
-                                {interestCount > 0 && (
-                                  <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-emerald-700 text-white text-[11px] font-bold flex items-center justify-center">
-                                    {interestCount}
-                                  </span>
-                                )}
-                              </button>
                             </div>
 
                             <div className="space-y-2">
@@ -5695,6 +5666,7 @@ export default function OrgCalendarPage() {
                                   style={{ backgroundColor: org.brandColor || "#18181b" }}
                                 >
                                   {isInterested ? <><MessageCircle className="w-4 h-4" /> Open group chat</> : "I’m interested"}
+                                  {interestCount > 0 && <span className="font-normal opacity-80">· {interestCount}</span>}
                                 </button>
                                 {/* Host This (owner / co-host) — permission matrix:
                                       owner/co-host                   → active
@@ -5935,41 +5907,6 @@ export default function OrgCalendarPage() {
                           )}
                         </div>
                       </div>
-                      {/* Interest heart — top-right of the title (replaces the
-                          old inline "I'm interested" button). Public; cookie-
-                          deduped server-side, optimistic here. Badge shows the
-                          running interest count.
-
-                          Hidden for Featured: this writes a PlanIdeaInterest
-                          pointing at a CalendarGeneratedPlan, and a featured
-                          suggestion has no such row. Featured interest is also
-                          authenticated-only by design — it feeds cohort
-                          matching, which needs a real user, not a cookie. So
-                          web offers Host This and the app offers Mark
-                          Interested, per the spec's split. */}
-                      {!idea.isFeatured && (
-                      <button
-                        type="button"
-                        onClick={() => handlePlanIdeaInterest(idea.id)}
-                        disabled={isInterested || isPending}
-                        aria-label={isInterested ? "You're interested" : "I'm interested"}
-                        className={`relative shrink-0 w-12 h-12 rounded-full border flex items-center justify-center transition-colors disabled:cursor-default ${isInterested ? "bg-emerald-50 border-emerald-300" : "border-zinc-200 hover:border-zinc-300"}`}
-                      >
-                        {isPending ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
-                        ) : (
-                          <Heart
-                            className={`w-5 h-5 ${isInterested ? "text-emerald-700" : "text-zinc-400"}`}
-                            fill={isInterested ? "currentColor" : "none"}
-                          />
-                        )}
-                        {priorCount > 0 && (
-                          <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-emerald-700 text-white text-[11px] font-bold flex items-center justify-center">
-                            {priorCount}
-                          </span>
-                        )}
-                      </button>
-                      )}
                     </div>
                     <div className="space-y-2">
                       {idea.description && (
@@ -6009,6 +5946,7 @@ export default function OrgCalendarPage() {
                             style={{ backgroundColor: org.brandColor || "#18181b" }}
                           >
                             {isInterested ? <><MessageCircle className="w-4 h-4" /> Open group chat</> : "I’m interested"}
+                            {priorCount > 0 && <span className="font-normal opacity-80">· {priorCount}</span>}
                           </button>
                         )}
                         {/* Host This (owner / co-host) — opens the existing
