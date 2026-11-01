@@ -10,6 +10,8 @@ interface Props {
   user?: UserLite;
   isFromCurrentUser: boolean;
   hideAvatar: boolean;
+  /** Interest groups: a confirmed member takes the booking the admin asked for. */
+  onClaimBooking?: () => void;
 }
 
 export default function MessageRow({
@@ -17,8 +19,19 @@ export default function MessageRow({
   user,
   isFromCurrentUser,
   hideAvatar,
+  onClaimBooking,
 }: Props) {
   const type = message.type;
+
+  // Interest groups (leaflets-server cloud/interest-group.js): the ask, the
+  // decision, and the admin's "can one of you book it?". The Going / Snooze
+  // answers live in the bar under the messages, so these are just Leaf cards.
+  if (type === "occurrenceAsk" || type === "occurrenceOn" || type === "occurrenceOff") {
+    return <LeafCardRow text={message.text || ""} />;
+  }
+  if (type === "bookingAsk") {
+    return <LeafCardRow text={message.text || ""} cta={onClaimBooking ? { label: "I’ll book it", onClick: onClaimBooking } : undefined} />;
+  }
 
   if (type === "response") return <ResponseRow text={message.text || ""} />;
   if (type === "checkIn" || type === "reservation") {
@@ -171,6 +184,29 @@ function LeafAddOnRow({ message }: { message: FirMessage }) {
               <a href={href} className="self-start rounded-full bg-zinc-900 px-4 py-2 text-[13px] font-semibold text-white">
                 {cta}
               </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Interest-group cards: Leaf's text, optionally one action ---
+
+function LeafCardRow({ text, cta }: { text: string; cta?: { label: string; onClick: () => void } }) {
+  return (
+    <div className="flex items-start gap-2">
+      <div className="w-8 shrink-0"><LeafAvatar /></div>
+      <div className="max-w-[80%] flex flex-col items-start">
+        <span className="text-[11px] mb-0.5 px-1 text-zinc-900">Leaf</span>
+        <div className="rounded-2xl border border-zinc-200 bg-white text-sm text-zinc-900">
+          <div className="flex flex-col gap-2.5 px-3.5 py-3">
+            <p className="m-0 leading-relaxed whitespace-pre-wrap">{text.trim()}</p>
+            {cta && (
+              <button type="button" onClick={cta.onClick} className="self-start rounded-full bg-zinc-900 px-4 py-2 text-[13px] font-semibold text-white">
+                {cta.label}
+              </button>
             )}
           </div>
         </div>

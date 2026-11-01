@@ -94,6 +94,13 @@ import { runHostPlanIdea } from "@/lib/host-plan-idea";
 
 // --- Types ---
 
+// Where an interest tap landed (leaflets-server cloud/interest-group.js).
+type InterestOccurrence = {
+  state: "gathering" | "on" | "later" | "disabled" | "gone" | "closed" | "no_date" | "no_user";
+  eventGroupId?: string;
+  going?: boolean;
+};
+
 interface Plan {
   id: string;
   title: string;
@@ -2272,13 +2279,41 @@ export default function OrgCalendarPage() {
   // this page: an unverified number means texting someone who never asked.
   // The cost is paid once per browser — verifying sets leaf_verified_user, so
   // every later interest tap is identified with no prompt at all.
+  // `open`: the tap was "Open group chat", so go straight there once verified.
   const [notifyPromptFor, setNotifyPromptFor] = useState<
-    { kind: "ai"; eventIndex: number; title: string }
-    | { kind: "idea"; ideaId: string; title: string }
+    { kind: "ai"; eventIndex: number; title: string; open?: boolean }
+    | { kind: "idea"; ideaId: string; title: string; open?: boolean }
     | null
   >(null);
   const notifyVerify = usePhoneVerify();
   const [notifyAttaching, setNotifyAttaching] = useState(false);
+
+  // Interest groups (leaflets-server cloud/interest-group.js): a signed-in
+  // interest tap joins the suggestion's next night as a viewer of its group
+  // chat. The express* calls return where that landed; this says so.
+  const [groupJoined, setGroupJoined] = useState<{ eventGroupId: string; title: string } | null>(null);
+  const handleOccurrence = useCallback(
+    (occurrence: InterestOccurrence | null | undefined, title: string, open = false) => {
+      if (!occurrence) return false;
+      if (occurrence.state === "gathering" && occurrence.eventGroupId) {
+        if (open) window.location.href = `/chat/${occurrence.eventGroupId}`;
+        else setGroupJoined({ eventGroupId: occurrence.eventGroupId, title });
+        return true;
+      }
+      if (occurrence.state === "later") {
+        setToast("Too close to plan this date. We’ll ask you about the next one.");
+        setTimeout(() => setToast(null), 5000);
+        return true;
+      }
+      if (occurrence.state === "on") {
+        setToast("This one’s already on. RSVP to it on the calendar.");
+        setTimeout(() => setToast(null), 5000);
+        return true;
+      }
+      return false;
+    },
+    [],
+  );
   // Guards the attach against re-firing. A `notifyAttaching` dep would loop on
   // failure: the flag flips back to false, the effect re-runs, it retries
   // forever. Keyed by prompt so a second card in the same session still works.
@@ -2303,23 +2338,24 @@ export default function OrgCalendarPage() {
       try {
         const cookie = getOrCreateAIInterestCookie();
         const identity = interestIdentityParams();
-        if (notifyPromptFor.kind === "ai") {
-          await Parse.Cloud.run("expressInterestOnAIEvent", {
+        const result = (notifyPromptFor.kind === "ai"
+          ? await Parse.Cloud.run("expressInterestOnAIEvent", {
             groupShareId: shareId,
             eventIndex: notifyPromptFor.eventIndex,
             cookie,
             ...identity,
-          });
-        } else {
-          await Parse.Cloud.run("expressInterestOnPlanIdea", {
+          })
+          : await Parse.Cloud.run("expressInterestOnPlanIdea", {
             ideaId: notifyPromptFor.ideaId,
             cookie,
             ...identity,
-          });
-        }
+          })) as { occurrence?: InterestOccurrence | null };
         setNotifyPromptFor(null);
-        setToast("Got it — we’ll text you when this gets a host, or once a few others are in.");
-        setTimeout(() => setToast(null), 5000);
+        // Verifying signed them in, so the call joined the night's group.
+        if (!handleOccurrence(result?.occurrence, notifyPromptFor.title, notifyPromptFor.open)) {
+          setToast("Got it. We’ll text you about this plan.");
+          setTimeout(() => setToast(null), 5000);
+        }
       } catch (err) {
         console.error("[org] attaching identity to interest failed:", err);
         // The tap itself is already recorded, so this failing costs the text,
@@ -2331,7 +2367,7 @@ export default function OrgCalendarPage() {
         setNotifyAttaching(false);
       }
     })();
-  }, [notifyPromptFor, notifyVerify.isVerified, shareId]);
+  }, [notifyPromptFor, notifyVerify.isVerified, shareId, handleOccurrence]);
 
   // AI-event interest tap. Optimistic: bump count + mark local
   // immediately so the button state doesn't wait on the round-trip.
@@ -2373,22 +2409,22 @@ export default function OrgCalendarPage() {
           eventIndex,
           cookie,
           ...interestIdentityParams(),
-        })) as { count?: number; alreadyInterested?: boolean };
+        })) as { count?: number; alreadyInterested?: boolean; occurrence?: InterestOccurrence | null };
         if (typeof result?.count === "number") {
           setAIInterestCounts((prev) => ({
             ...prev,
             [eventIndex]: result.count!,
           }));
         }
-        // Only for a browser we can't already reach. Checked AFTER the write
-        // lands, so the prompt never appears on a tap that failed to record.
-        if (!interestIdentityParams().phone) {
-          const ev = org?.aiSourceEvents?.[eventIndex];
-          setNotifyPromptFor({
-            kind: "ai",
-            eventIndex,
-            title: ev?.title || ev?.name || "this plan",
-          });
+        const ev = org?.aiSourceEvents?.[eventIndex];
+        const title = ev?.title || ev?.name || "this plan";
+        // The group chat needs an account, so a browser without a session is
+        // asked for a phone. Checked AFTER the write lands, so the prompt
+        // never appears on a tap that failed to record.
+        if (!Parse.User.current()) {
+          setNotifyPromptFor({ kind: "ai", eventIndex, title });
+        } else {
+          handleOccurrence(result?.occurrence, title);
         }
       } catch (err) {
         console.error("[org] expressInterestOnAIEvent failed:", err);
@@ -2420,6 +2456,7 @@ export default function OrgCalendarPage() {
       org?.aiSourceEventInterests,
       // Read for the notify prompt's title.
       org?.aiSourceEvents,
+      handleOccurrence,
     ]
   );
 
@@ -2594,17 +2631,15 @@ export default function OrgCalendarPage() {
           ideaId,
           cookie,
           ...interestIdentityParams(),
-        })) as { count?: number; alreadyInterested?: boolean };
+        })) as { count?: number; alreadyInterested?: boolean; occurrence?: InterestOccurrence | null };
         if (typeof result?.count === "number") {
           setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: result.count! }));
         }
-        if (!interestIdentityParams().phone) {
-          setNotifyPromptFor({
-            kind: "idea",
-            ideaId,
-            title:
-              org?.planIdeas.find((i) => i.id === ideaId)?.title || "this plan",
-          });
+        const title = org?.planIdeas.find((i) => i.id === ideaId)?.title || "this plan";
+        if (!Parse.User.current()) {
+          setNotifyPromptFor({ kind: "idea", ideaId, title });
+        } else {
+          handleOccurrence(result?.occurrence, title);
         }
       } catch (err) {
         console.error("[org] expressInterestOnPlanIdea failed:", err);
@@ -2629,6 +2664,7 @@ export default function OrgCalendarPage() {
       planIdeaLocallyInterested,
       planIdeaInterestPending,
       org?.planIdeas,
+      handleOccurrence,
     ],
   );
 
@@ -2643,6 +2679,37 @@ export default function OrgCalendarPage() {
       void runPlanIdeaInterest(ideaId);
     },
     [isFollowing, runPlanIdeaInterest],
+  );
+
+  // "Open group chat" on a card the viewer is already interested in. The
+  // express* calls are idempotent and return the night's group, so asking
+  // again is how this page finds it after a reload.
+  const openInterestGroup = useCallback(
+    async (target: { kind: "ai"; eventIndex: number } | { kind: "idea"; ideaId: string }, title: string) => {
+      if (!Parse.User.current()) {
+        setNotifyPromptFor({ ...target, title, open: true });
+        return;
+      }
+      try {
+        const cookie = getOrCreateAIInterestCookie();
+        const result = (target.kind === "ai"
+          ? await Parse.Cloud.run("expressInterestOnAIEvent", {
+            groupShareId: shareId, eventIndex: target.eventIndex, cookie, ...interestIdentityParams(),
+          })
+          : await Parse.Cloud.run("expressInterestOnPlanIdea", {
+            ideaId: target.ideaId, cookie, ...interestIdentityParams(),
+          })) as { occurrence?: InterestOccurrence | null };
+        if (!handleOccurrence(result?.occurrence, title, true)) {
+          setToast("The group for this one isn’t open right now.");
+          setTimeout(() => setToast(null), 4000);
+        }
+      } catch (err) {
+        console.error("[org] opening the interest group failed:", err);
+        setToast("Couldn’t open the group — try again.");
+        setTimeout(() => setToast(null), 4000);
+      }
+    },
+    [shareId, handleOccurrence],
   );
 
   // The Drop shown at the top of the page, if any: its plan row is skipped.
@@ -4509,7 +4576,9 @@ export default function OrgCalendarPage() {
   // the live ones, so a heart from this session is included.
   const interestHost = useMemo(() => {
     if (!org || org.rsvpLimitReached) return undefined;
-    if (!(org.isOwner || org.isHost || org.allowFollowersToHost)) return undefined;
+    // Owner and co-hosts only: followers are gathered into the night's group
+    // by their interest tap instead of being asked to host.
+    if (!(org.isOwner || org.isHost)) return undefined;
     const ideaFor = (id: string) =>
       id.startsWith("idea:") ? org.planIdeas.find((i) => i.id === id.slice(5)) : undefined;
     return {
@@ -4633,7 +4702,9 @@ export default function OrgCalendarPage() {
       planIdeaInterestCounts[idea.id] ?? idea.interestCount ?? 0;
     const isInterested = planIdeaLocallyInterested.has(idea.id);
     const isPending = planIdeaInterestPending.has(idea.id);
-    const canHost = org.isOwner || org.isHost || !!org.allowFollowersToHost;
+    // Hosting stays with the owner and co-hosts; everyone else joins the
+    // night's group (interest groups).
+    const canHost = org.isOwner || org.isHost;
     // Same entitlement split as the tall card — the server already nulled
     // name+address for viewers who don't get the venue, so this just renders
     // whatever survived, collapsed to one line.
@@ -4730,6 +4801,20 @@ export default function OrgCalendarPage() {
             )}
           </div>
           <div className="flex-none flex flex-col gap-1.5 whitespace-nowrap">
+            {!idea.isFeatured && (
+              <button
+                type="button"
+                onClick={() =>
+                  isInterested
+                    ? openInterestGroup({ kind: "idea", ideaId: idea.id }, idea.title)
+                    : handlePlanIdeaInterest(idea.id)
+                }
+                disabled={isPending}
+                className="px-4 py-[9px] text-[10px] leading-none font-medium uppercase tracking-[0.16em] transition-colors bg-white text-[#0a0a0a] hover:bg-[#dcdcd8]"
+              >
+                {isInterested ? "Group chat" : "I’m interested"}
+              </button>
+            )}
             {canHost && (
               <button
                 type="button"
@@ -5540,7 +5625,7 @@ export default function OrgCalendarPage() {
                                           org.brandColor || "#1B4332",
                                       }}
                                     />
-                                    Waiting on host
+                                    Looking for people
                                   </p>
                                 </div>
                               </div>
@@ -5595,7 +5680,23 @@ export default function OrgCalendarPage() {
 
                             <div className="pt-2 flex flex-col gap-6">
                               <div className="flex flex-col sm:flex-row gap-4">
-                                {/* Host This — permission matrix:
+                                {/* Interest group: the interested are gathered
+                                    into this night's chat and asked if they're
+                                    going (leaflets-server interest-group.js). */}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    isInterested
+                                      ? openInterestGroup({ kind: "ai", eventIndex: originalIndex }, ev.title || ev.name || "this plan")
+                                      : handleAIEventInterest(originalIndex)
+                                  }
+                                  disabled={isPending}
+                                  className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 transition-opacity text-white hover:opacity-90 disabled:opacity-60"
+                                  style={{ backgroundColor: org.brandColor || "#18181b" }}
+                                >
+                                  {isInterested ? <><MessageCircle className="w-4 h-4" /> Open group chat</> : "I’m interested"}
+                                </button>
+                                {/* Host This (owner / co-host) — permission matrix:
                                       owner/co-host                   → active
                                       allowFollowersToHost            → active
                                       not allowed                     → hidden
@@ -5615,8 +5716,9 @@ export default function OrgCalendarPage() {
                                     hosting; the confirmation modal says so. */}
                                 {(() => {
                                   const canHostAsHost = org.isOwner || org.isHost;
-                                  const active =
-                                    canHostAsHost || !!org.allowFollowersToHost;
+                                  // Followers join the night's group instead
+                                  // (the button before this one).
+                                  const active = canHostAsHost;
                                   if (!active) return null;
                                   return (
                                     <button
@@ -5645,7 +5747,7 @@ export default function OrgCalendarPage() {
                                   <span className="text-xs font-bold uppercase tracking-widest">Share</span>
                                 </button>
                               </div>
-                              {(org.isOwner || org.isHost || !!org.allowFollowersToHost) && (
+                              {(org.isOwner || org.isHost) && (
                                 <div className="-mt-3"><HostPointsTag /></div>
                               )}
                             </div>
@@ -5817,7 +5919,7 @@ export default function OrgCalendarPage() {
                               className="w-2 h-2 rounded-full"
                               style={{ backgroundColor: org.brandColor || "#1B4332" }}
                             />
-                            Waiting on host
+                            Looking for people
                           </p>
                           {/* Featured has no interest BUTTON here (see below),
                               but the count still means something: it's how many
@@ -5892,18 +5994,29 @@ export default function OrgCalendarPage() {
                     </div>
                     <div className="pt-2 flex flex-col gap-6">
                       <div className="flex flex-col sm:flex-row gap-4">
-                        {/* Host This — same permission matrix as
-                            AI-suggested events. Tapping opens the
-                            existing hostingIdea flow (create-plan
-                            modal prefilled from the idea). */}
+                        {/* Interest group, as on the starter cards. Featured
+                            suggestions have no plan idea to gather around. */}
+                        {!idea.isFeatured && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              isInterested
+                                ? openInterestGroup({ kind: "idea", ideaId: idea.id }, idea.title)
+                                : handlePlanIdeaInterest(idea.id)
+                            }
+                            disabled={isPending}
+                            className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 transition-opacity text-white hover:opacity-90 disabled:opacity-60"
+                            style={{ backgroundColor: org.brandColor || "#18181b" }}
+                          >
+                            {isInterested ? <><MessageCircle className="w-4 h-4" /> Open group chat</> : "I’m interested"}
+                          </button>
+                        )}
+                        {/* Host This (owner / co-host) — opens the existing
+                            hostingIdea flow (create-plan modal prefilled from
+                            the idea). Followers join the group instead. */}
                         {(() => {
                           const canHostAsHost = org.isOwner || org.isHost;
-                          // Hosting implies following: a non-follower gets an
-                          // ACTIVE button, and the server creates the follow as
-                          // part of hosting. See the AI-suggested-events block
-                          // above for why the old disabled state was a dead end.
-                          const active =
-                            canHostAsHost || !!org.allowFollowersToHost;
+                          const active = canHostAsHost;
                           if (!active) return null;
                           return (
                             <button
@@ -5943,7 +6056,7 @@ export default function OrgCalendarPage() {
                           </button>
                         )}
                       </div>
-                      {!org.rsvpLimitReached && (org.isOwner || org.isHost || !!org.allowFollowersToHost) && (
+                      {!org.rsvpLimitReached && (org.isOwner || org.isHost) && (
                         <div className="-mt-3"><HostPointsTag /></div>
                       )}
                     </div>
@@ -8154,7 +8267,7 @@ export default function OrgCalendarPage() {
           photoUrl={org.placardWelcome.photoUrl}
           // A hosted idea needs its plan on this page to RSVP to; one that isn't here is left out.
           ideas={(org.placardIdeas || []).filter((i) => !i.eventGroupId || org.plans.some((p) => p.id === i.eventGroupId))}
-          canHost={(org.isOwner || org.isHost || !!org.allowFollowersToHost) && !org.rsvpLimitReached}
+          canHost={(org.isOwner || org.isHost) && !org.rsvpLimitReached}
           counts={planIdeaInterestCounts}
           interested={planIdeaLocallyInterested}
           pending={planIdeaInterestPending}
@@ -8236,9 +8349,7 @@ export default function OrgCalendarPage() {
                 </p>
               )}
               {(() => {
-                const canHost =
-                  (org.isOwner || org.isHost || !!org.allowFollowersToHost) &&
-                  !org.rsvpLimitReached;
+                const canHost = (org.isOwner || org.isHost) && !org.rsvpLimitReached;
                 const count =
                   planIdeaInterestCounts[popupIdea.id] ?? popupIdea.interestCount ?? 0;
                 const interested = planIdeaLocallyInterested.has(popupIdea.id);
@@ -8265,8 +8376,12 @@ export default function OrgCalendarPage() {
                     {!popupIdea.isFeatured && (
                       <button
                         type="button"
-                        onClick={() => handlePlanIdeaInterest(popupIdea.id)}
-                        disabled={interested || pending}
+                        onClick={() =>
+                          interested
+                            ? openInterestGroup({ kind: "idea", ideaId: popupIdea.id }, popupIdea.title)
+                            : handlePlanIdeaInterest(popupIdea.id)
+                        }
+                        disabled={pending}
                         className={`w-full py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg border flex items-center justify-center gap-2 transition-colors disabled:cursor-default ${interested ? "bg-emerald-50 border-emerald-300 text-emerald-700" : "border-zinc-200 text-zinc-700 hover:border-zinc-300"}`}
                       >
                         {pending ? (
@@ -8274,7 +8389,7 @@ export default function OrgCalendarPage() {
                         ) : (
                           <Heart className="w-4 h-4" fill={interested ? "currentColor" : "none"} />
                         )}
-                        {interested ? "You're interested" : "I'm interested"}
+                        {interested ? "Open group chat" : "I'm interested"}
                         {count > 0 && <span className="text-[11px] font-normal">· {count}</span>}
                       </button>
                     )}
@@ -8299,7 +8414,7 @@ export default function OrgCalendarPage() {
         const ev = org.aiSourceEvents?.[popupAiEventIndex];
         if (!ev) return null;
         const idx = popupAiEventIndex;
-        const canHost = org.isOwner || org.isHost || !!org.allowFollowersToHost;
+        const canHost = org.isOwner || org.isHost;
         const count =
           aiInterestCounts[idx] ?? org.aiSourceEventInterests?.[idx] ?? 0;
         const interested = aiLocallyInterested.has(idx);
@@ -8357,8 +8472,12 @@ export default function OrgCalendarPage() {
                   )}
                   <button
                     type="button"
-                    onClick={() => handleAIEventInterest(idx)}
-                    disabled={interested || pending}
+                    onClick={() =>
+                      interested
+                        ? openInterestGroup({ kind: "ai", eventIndex: idx }, ev.title || ev.name || "this plan")
+                        : handleAIEventInterest(idx)
+                    }
+                    disabled={pending}
                     className={`w-full py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg border flex items-center justify-center gap-2 transition-colors disabled:cursor-default ${interested ? "bg-emerald-50 border-emerald-300 text-emerald-700" : "border-zinc-200 text-zinc-700 hover:border-zinc-300"}`}
                   >
                     {pending ? (
@@ -8366,7 +8485,7 @@ export default function OrgCalendarPage() {
                     ) : (
                       <Heart className="w-4 h-4" fill={interested ? "currentColor" : "none"} />
                     )}
-                    {interested ? "You're interested" : "I'm interested"}
+                    {interested ? "Open group chat" : "I'm interested"}
                     {count > 0 && <span className="text-[11px] font-normal">· {count}</span>}
                   </button>
                 </div>
@@ -8393,11 +8512,51 @@ export default function OrgCalendarPage() {
         </div>
       )}
 
-      {/* "Text me when this gets hosted" — shown after an interest tap from a
-          browser with no identity. Deliberately AFTER the tap: the count is
-          already saved, so this is a bonus ask and "No thanks" costs nothing.
-          Compact and dismissible on purpose — an anonymous tap that stays
-          anonymous is the status quo, not a failure. */}
+      {/* Joined the night's group (interest groups). Over the placard sheet
+          and the popups, under the toast. */}
+      {groupJoined && (
+        <div
+          className="fixed inset-0 z-[55] flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm"
+          onClick={() => setGroupJoined(null)}
+        >
+          <div
+            className="bg-white w-full max-w-md p-8 md:p-10 space-y-6 shadow-2xl rounded-t-3xl md:rounded-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="space-y-2">
+              <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                You&rsquo;re in the group
+              </p>
+              <h3 className="text-2xl font-light tracking-tight">
+                <span className="font-medium">{groupJoined.title}</span>
+              </h3>
+              <p className="text-sm text-zinc-500 font-light leading-relaxed">
+                See who else is in, and tap Going to count yourself in. It goes
+                ahead once enough people are going. We&rsquo;ll text you before
+                it&rsquo;s decided.
+              </p>
+            </div>
+            <a
+              href={`/chat/${groupJoined.eventGroupId}`}
+              className="w-full py-3 text-xs font-bold uppercase tracking-widest text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90"
+              style={{ backgroundColor: org?.brandColor || "#18181b" }}
+            >
+              <MessageCircle className="w-4 h-4" /> Open group chat
+            </a>
+            <button
+              onClick={() => setGroupJoined(null)}
+              className="w-full py-2 text-[11px] uppercase tracking-widest text-zinc-400 hover:text-zinc-600 transition-colors"
+            >
+              Later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Phone ask after an interest tap from a browser with no session.
+          Deliberately AFTER the tap: the count is already saved, so this is a
+          bonus ask and "No thanks" costs nothing. Verifying signs them in, and
+          the replayed tap then joins the night's group chat. */}
       {notifyPromptFor && (
         <div
           className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm"
@@ -8412,14 +8571,13 @@ export default function OrgCalendarPage() {
                 You&rsquo;re interested
               </p>
               <h3 className="text-2xl font-light tracking-tight">
-                Want a text when{" "}
-                <span className="font-medium">{notifyPromptFor.title}</span>{" "}
-                gets a host?
+                Join the group chat for{" "}
+                <span className="font-medium">{notifyPromptFor.title}</span>
               </h3>
               <p className="text-sm text-zinc-500 font-light leading-relaxed">
-                We&rsquo;ll also let you know once a few others are in, in case
-                you want to run it. Only about this plan. Your interest is
-                already counted either way.
+                Add your number to see who else is in and say if you&rsquo;re
+                going. We&rsquo;ll only text you about this plan. Your interest
+                is already counted either way.
               </p>
             </div>
 

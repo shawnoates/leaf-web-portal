@@ -5,7 +5,6 @@ import Link from "next/link";
 import { CalendarPlus, Heart, Repeat } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { inviteCodeFor } from "@/lib/plan-invite";
-import HostIdeaModal from "@/components/HostIdeaModal";
 import P2pPayCard from "@/components/P2pPayCard";
 import { collectsMoney, type P2pSplitSummary } from "@/lib/p2p";
 import { HostIntroPlayer } from "@/components/HostIntroTile";
@@ -40,7 +39,6 @@ import StartCrewModal from "@/components/crew/StartCrewModal";
 import type { CrewPerson } from "@/components/crew/StartCrewForm";
 import FriendModeCalendarPicker from "@/components/crew/FriendModeCalendarPicker";
 import { useInApp } from "@/components/crew/CrewShell";
-import HostPointsTag from "@/components/HostPointsTag";
 import PointsChip from "@/components/PointsChip";
 import CheckInPill from "@/components/CheckInPill";
 import { awardDetail, type PointsSummary } from "@/lib/points";
@@ -1280,8 +1278,9 @@ function DashboardView({
                 <PlansRailMap pins={mapPins} onOpen={(id) => setOpenPlanId(id)} />
               </section>
             )}
+            <InterestGroupsRail />
             {rail && rail.tier1.length > 0 && (
-              <NeedsHostRail plans={rail.tier1} onHosted={onRefresh} />
+              <NeedsHostRail plans={rail.tier1} />
             )}
             {places.length > 0 && (
               <PlacesRail probes={places} onAnswered={(id) => setPopupAnsweredId(id)} />
@@ -1339,7 +1338,6 @@ function DashboardView({
         <NeedsHostPopup
           idea={popupIdea}
           onClose={() => setPopupIdea(null)}
-          onHosted={onRefresh}
         />
       )}
 
@@ -2118,14 +2116,14 @@ function PlanRow({
     // has a venue, so an `||` chain here silently hid every attendee count.
     plan.attendeeCount > 0 ? `${plan.attendeeCount} going` : null,
   ].filter(Boolean).join(" · ");
-  const hostHref = plan.calendarShareId
-    ? `/org/${plan.calendarShareId}?host=${encodeURIComponent(plan.id)}`
-    : `/p/${plan.id}`;
   // A virtual host fronts the hosting, so the real owner counts as "not
   // hosting" here too and still gets the RSVP CTA.
+  // A plan waiting on a host takes RSVPs like any other (a night that went
+  // ahead from an interest group is booked by Leaf or a member, not hosted
+  // by whoever opens /me).
   const canAttend = !hosting
     && plan.rsvpState !== "going" && plan.rsvpState !== "pending" && plan.rsvpState !== "waitlisted"
-    && plan.hostState !== "waiting_on_host" && plan.hostState !== "leaf_hosted";
+    && plan.hostState !== "leaf_hosted";
   const unread = unreadCount(plan);
 
   return (
@@ -2177,12 +2175,7 @@ function PlanRow({
         </div>
       </div>
       <div className="row-act">
-        {plan.hostState === "waiting_on_host" ? (
-          <>
-            <Link className="row-btn host" href={hostHref} onClick={bridgeIdentityToOrgPage}>Host this</Link>
-            <HostPointsTag short className="pts-host" />
-          </>
-        ) : canAttend ? (
+        {canAttend ? (
           <AttendCta plan={plan} onRsvp={onRsvp} />
         ) : canChat(plan) ? (
           <Link className="row-btn ghost" href={`/chat/${plan.id}?from=me`}>
@@ -2284,14 +2277,109 @@ function setPlanIdeaLocalInterest(ideaId: string, on: boolean) {
   }
 }
 
-function NeedsHostRail({ plans, onHosted }: { plans: HostPlan[]; onHosted: () => Promise<void> }) {
+// Interest groups (leaflets-server cloud/interest-group.js): an interest tap
+// from a signed-in viewer joins the suggestion's next night as a viewer of its
+// group chat. The express* calls are idempotent, so this is also how a card
+// already marked interested finds its chat. Returns a line to show when the
+// group isn't open, or null after sending them to the chat.
+async function joinInterestGroup(p: HostPlan): Promise<string | null> {
+  const cookie = getOrCreateInterestCookie();
+  const result = (await Parse.Cloud.run(
+    p.kind === "aiEvent" ? "expressInterestOnAIEvent" : "expressInterestOnPlanIdea",
+    p.kind === "aiEvent"
+      ? { groupShareId: p.calendarShareId, eventIndex: p.aiEventIndex, cookie }
+      : { ideaId: p.ideaId, cookie },
+  )) as { occurrence?: { state: string; eventGroupId?: string } | null };
+  setPlanIdeaLocalInterest(p.ideaId, true);
+  const occ = result?.occurrence;
+  if (occ?.state === "gathering" && occ.eventGroupId) {
+    window.location.assign(`/chat/${occ.eventGroupId}?from=me`);
+    return null;
+  }
+  if (occ?.state === "later") return "Too close to plan this date. We’ll ask you about the next one.";
+  if (occ?.state === "on") return "This one’s already on. RSVP to it from the calendar.";
+  return "Saved. The group for this one isn’t open right now.";
+}
+
+type MyInterestGroup = {
+  eventGroupId: string;
+  title: string;
+  calendarName: string;
+  image: string | null;
+  viewer: boolean;
+  nightLabel: string | null;
+  deadlineLabel: string | null;
+  confirmed: number;
+  minConfirmed: number;
+};
+
+// The nights this person is gathering for, viewer or going. Not plans yet —
+// they reach the calendar (and the rows above) only once enough people are in.
+function InterestGroupsRail() {
+  const [groups, setGroups] = useState<MyInterestGroup[]>([]);
+  useEffect(() => {
+    Parse.Cloud.run("getMyInterestGroups", {})
+      .then((r: { groups?: MyInterestGroup[] }) => setGroups(r?.groups || []))
+      .catch(() => undefined);
+  }, []);
+  if (groups.length === 0) return null;
+  return (
+    <section className="rail">
+      <div className="eyebrow">Your groups</div>
+      <div className="hostcards">
+        {groups.map((g) => (
+          <div className="hostcard" key={g.eventGroupId}>
+            {g.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="hostthumb" src={g.image} alt="" />
+            ) : (
+              <div className="hostthumb ph" />
+            )}
+            <div className="hostbody">
+              <div className="row-cal">{g.calendarName}</div>
+              <h3 className="hostcard-title">{g.title}</h3>
+              <div className="hostcard-when">{g.nightLabel}</div>
+              <div className="hostcard-meta">
+                <span className={`interest ${g.viewer ? "" : "on"}`}>
+                  {g.viewer ? "Say if you’re going" : "You’re going"} · {g.confirmed} of {g.minConfirmed}
+                </span>
+                {g.deadlineLabel && <span className="urgent">Decided {g.deadlineLabel}</span>}
+              </div>
+            </div>
+            <div className="hostact">
+              <Link className="hostbtn" href={`/chat/${g.eventGroupId}?from=me`}>Chat</Link>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function NeedsHostRail({ plans }: { plans: HostPlan[] }) {
   // Local copy so a hosted card can leave the rail immediately on success.
   const [list, setList] = useState<HostPlan[]>(plans);
   useEffect(() => { setList(plans); }, [plans]);
-  const [hostingIdea, setHostingIdea] = useState<HostPlan | null>(null);
   const [interested, setInterested] = useState<Set<string>>(new Set());
   const [pendingInterest, setPendingInterest] = useState<Set<string>>(new Set());
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [joining, setJoining] = useState<string | null>(null);
+  const [railNote, setRailNote] = useState<string | null>(null);
+
+  async function join(p: HostPlan) {
+    if (joining) return;
+    setJoining(p.ideaId);
+    setRailNote(null);
+    try {
+      const note = await joinInterestGroup(p);
+      setInterested((s) => new Set(s).add(p.ideaId));
+      if (note) setRailNote(note);
+    } catch {
+      setRailNote("Couldn’t join the group — try again.");
+    } finally {
+      setJoining(null);
+    }
+  }
 
   // Hydrate "already interested" from localStorage (same key expressInterestOnPlanIdea's
   // org/[shareId] caller uses), so the heart renders filled across reloads.
@@ -2341,7 +2429,8 @@ function NeedsHostRail({ plans, onHosted }: { plans: HostPlan[]; onHosted: () =>
 
   return (
     <section className="rail">
-      <div className="eyebrow">Plans that need a host</div>
+      <div className="eyebrow">Plans people want to do</div>
+      {railNote && <p className="hostcard-when" role="status">{railNote}</p>}
       <div className="hostcards">
         {list.map((p) => {
           const count = counts[p.ideaId] ?? p.interestedCount;
@@ -2369,15 +2458,10 @@ function NeedsHostRail({ plans, onHosted }: { plans: HostPlan[]; onHosted: () =>
                 </div>
               </div>
               <div className="hostact">
-                {p.kind === "aiEvent" && p.calendarShareId ? (
-                  // A starter card is hosted on its own calendar page — the
-                  // ?aiEvent deep link opens that card's host/interest sheet.
-                  <Link className="hostbtn" href={`/org/${p.calendarShareId}?aiEvent=${encodeURIComponent(p.aiEventUid || "")}`} onClick={bridgeIdentityToOrgPage}>
-                    Host this
-                  </Link>
-                ) : (
-                  <button className="hostbtn" onClick={() => setHostingIdea(p)}>Host this</button>
-                )}
+                {/* Join the night's group instead of hosting it. */}
+                <button className="hostbtn" onClick={() => join(p)} disabled={joining === p.ideaId}>
+                  {joining === p.ideaId ? "…" : on ? "Group chat" : "I’m in"}
+                </button>
                 <button
                   type="button"
                   className={`heart-toggle ${on ? "on" : ""}`}
@@ -2394,29 +2478,6 @@ function NeedsHostRail({ plans, onHosted }: { plans: HostPlan[]; onHosted: () =>
         })}
       </div>
 
-      {hostingIdea && (
-        <HostIdeaModal
-          idea={{
-            objectId: hostingIdea.ideaId,
-            title: hostingIdea.title,
-            image: hostingIdea.image,
-            category: hostingIdea.category,
-            centroid: hostingIdea.venueAddress,
-            location: hostingIdea.venueName && hostingIdea.venueAddress
-              ? { name: hostingIdea.venueName, address: hostingIdea.venueAddress }
-              : null,
-            preferredTime: hostingIdea.time,
-          }}
-          prefillDate={parse(hostingIdea.date)}
-          hostName={Parse.User.current()?.get("full_name") || null}
-          hostPhone={Parse.User.current()?.get("phone") || null}
-          onClose={() => setHostingIdea(null)}
-          onHosted={() => {
-            setList((l) => l.filter((x) => x.ideaId !== hostingIdea.ideaId));
-            onHosted().catch(() => {});
-          }}
-        />
-      )}
     </section>
   );
 }
@@ -2790,14 +2851,26 @@ function CalendarsRail({ rows }: { rows: HostCalRow[] }) {
 // this person's own queue (queuePlanIdeaVenue), so a yes leaves them something
 // they can see later instead of evaporating into the calendar's tally.
 function NeedsHostPopup({
-  idea, onClose, onHosted,
+  idea, onClose,
 }: {
   idea: HostPlan;
   onClose: () => void;
-  onHosted: () => Promise<void>;
 }) {
   const [done, setDone] = useState<"interested" | null>(null);
-  const [hosting, setHosting] = useState(false);
+  const [joining, setJoining] = useState(false);
+  const [joinNote, setJoinNote] = useState<string | null>(null);
+
+  async function joinGroup() {
+    if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    setJoining(true);
+    try {
+      setJoinNote(await joinInterestGroup(idea));
+    } catch {
+      setJoinNote("Couldn’t join the group — try again.");
+    } finally {
+      setJoining(false);
+    }
+  }
   const closeTimer = useRef<number | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -2848,40 +2921,6 @@ function NeedsHostPopup({
     }
   }
 
-  // A starter card hosts on its calendar page (the ?aiEvent deep link opens
-  // its sheet there); only CalendarGeneratedPlan ideas host in place.
-  useEffect(() => {
-    if (hosting && isStarterCard && idea.calendarShareId) {
-      bridgeIdentityToOrgPage();
-      window.location.assign(`/org/${idea.calendarShareId}?aiEvent=${encodeURIComponent(idea.aiEventUid || "")}`);
-    }
-  }, [hosting, isStarterCard, idea.calendarShareId, idea.aiEventUid]);
-
-  // The host flow replaces the popup rather than stacking on it — two modals
-  // deep for one tap is a trap on mobile.
-  if (hosting && !isStarterCard) {
-    return (
-      <HostIdeaModal
-        idea={{
-          objectId: idea.ideaId,
-          title: idea.title,
-          image: idea.image,
-          category: idea.category,
-          centroid: idea.venueAddress,
-          location: idea.venueName && idea.venueAddress
-            ? { name: idea.venueName, address: idea.venueAddress }
-            : null,
-          preferredTime: idea.time,
-        }}
-        prefillDate={parse(idea.date)}
-        hostName={Parse.User.current()?.get("full_name") || null}
-        hostPhone={Parse.User.current()?.get("phone") || null}
-        onClose={onClose}
-        onHosted={() => { onHosted().catch(() => {}); onClose(); }}
-      />
-    );
-  }
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card probe-pop" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
@@ -2908,9 +2947,8 @@ function NeedsHostPopup({
                 <div className="hero-ctx">{[when, where].filter(Boolean).join(" · ")}</div>
               )}
               <p className="modal-blurb">
-                Nobody&rsquo;s hosting this yet
-                {idea.interestedCount > 0 ? ` — ${idea.interestedCount} interested` : ""}.
-                Want to take it?
+                {idea.interestedCount > 0 ? `${idea.interestedCount} interested. ` : ""}
+                Join the group to see who&rsquo;s in and say if you&rsquo;re going.
               </p>
               <div className="popup-actions-grid">
                 <button
@@ -2924,9 +2962,11 @@ function NeedsHostPopup({
                   <Heart className="w-4 h-4" fill={done === "interested" ? "currentColor" : "none"} />
                   <span>Interested</span>
                 </button>
-                <button className="btn popup-host" onClick={() => setHosting(true)}>Host this</button>
+                <button className="btn popup-host" onClick={joinGroup} disabled={joining}>
+                  {joining ? "Joining…" : "Join the group"}
+                </button>
               </div>
-              <div className="pts-popup"><HostPointsTag /></div>
+              {joinNote && <p className="modal-blurb" role="status">{joinNote}</p>}
             </>
           )}
         </div>

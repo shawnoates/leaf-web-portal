@@ -22,6 +22,20 @@ import { HostOtpModal } from "@/app/m/[notificationId]/MemoryClient";
 import type { FirMessage, UserLite } from "./types";
 
 type AuthState = "checking" | "ready" | "denied" | "error";
+
+// getChatToken's `interestGroup` (leaflets-server cloud/interest-group.js):
+// set when this chat gathers the people interested in one night.
+type InterestGroupInfo = {
+  state: "gathering" | "on" | "off";
+  viewer: boolean;
+  nightLabel: string | null;
+  deadlineLabel: string | null;
+  minConfirmed: number;
+  confirmed: number;
+  booked: boolean;
+  bookingAskOpen: boolean;
+};
+type InterestAnswer = "going" | "snooze" | "not_interested";
 type DeviceType = "ios" | "android" | "desktop";
 const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
 
@@ -84,6 +98,11 @@ export default function ChatShell({
   // by a notice. The RTDB rules refuse the write anyway (groups/{id}/closed);
   // this is so the page says why instead of a send that silently fails.
   const [planCancelled, setPlanCancelled] = useState(false);
+  const [interestGroup, setInterestGroup] = useState<InterestGroupInfo | null>(null);
+  const [answering, setAnswering] = useState<InterestAnswer | null>(null);
+  // Snoozed or out: they're no longer in this chat, so say where they stand.
+  const [leftGroup, setLeftGroup] = useState<"snoozed" | "removed" | null>(null);
+  const [answerError, setAnswerError] = useState<string | null>(null);
   const [notificationId, setNotificationId] = useState<string | null>(null);
   const [device, setDevice] = useState<DeviceType>("desktop");
   const [showQrModal, setShowQrModal] = useState(false);
@@ -109,6 +128,40 @@ export default function ChatShell({
 
   // Tell the server the user has caught up. Failures are silent — stale read
   // state just means an extra digest email, not a user-visible error.
+  const answerInterest = useCallback(
+    async (answer: InterestAnswer) => {
+      setAnswering(answer);
+      setAnswerError(null);
+      try {
+        const result = (await Parse.Cloud.run("answerInterestGroup", { eventGroupId, answer })) as {
+          state: string;
+          confirmed?: number;
+        };
+        if (result.state === "going") {
+          setInterestGroup((prev) =>
+            prev ? { ...prev, viewer: false, confirmed: result.confirmed ?? prev.confirmed + 1 } : prev,
+          );
+        } else {
+          setLeftGroup(result.state === "snoozed" ? "snoozed" : "removed");
+        }
+      } catch (err) {
+        setAnswerError(err instanceof Error ? err.message : "Couldn’t save that — try again.");
+      } finally {
+        setAnswering(null);
+      }
+    },
+    [eventGroupId],
+  );
+
+  const claimBooking = useCallback(async () => {
+    try {
+      await Parse.Cloud.run("claimInterestGroupBooking", { eventGroupId });
+      setInterestGroup((prev) => (prev ? { ...prev, bookingAskOpen: false } : prev));
+    } catch (err) {
+      setAnswerError(err instanceof Error ? err.message : "Couldn’t take the booking.");
+    }
+  }, [eventGroupId]);
+
   const markRead = useCallback(() => {
     Parse.Cloud.run("markChatRead", { eventGroupId }).catch(() => undefined);
   }, [eventGroupId]);
@@ -140,6 +193,7 @@ export default function ChatShell({
           notificationId?: string | null;
           planCancelled?: boolean;
           users?: Record<string, { name: string; profilePictureUrl?: string | null }>;
+          interestGroup?: InterestGroupInfo | null;
         };
 
         await signInToChat(tokenResult.firebaseToken);
@@ -187,6 +241,7 @@ export default function ChatShell({
         if (typeof tokenResult.attendeeCount === "number") setAttendeeCount(tokenResult.attendeeCount);
         if (tokenResult.notificationId) setNotificationId(tokenResult.notificationId);
         setPlanCancelled(tokenResult.planCancelled === true);
+        setInterestGroup(tokenResult.interestGroup || null);
         // The persona name/avatar and the servicing timeline were read here.
         // Both went with the virtual host (2026-09-02); getVirtualHostTimeline
         // no longer exists server-side.
@@ -352,9 +407,10 @@ export default function ChatShell({
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-6">
         <div className="max-w-md w-full bg-white border border-zinc-200 rounded-xl p-8 text-center space-y-4">
-          <h2 className="text-lg font-medium">You need to RSVP first</h2>
+          <h2 className="text-lg font-medium">You&rsquo;re not in this chat yet</h2>
           <p className="text-sm text-zinc-500">
-            This chat is for confirmed attendees. RSVP from the plan page to join.
+            This chat is for the people going. RSVP, or tap I&rsquo;m interested on the
+            calendar, to join.
           </p>
           <a
             href={APP_STORE_URL}
@@ -631,6 +687,27 @@ export default function ChatShell({
           </div>
         </header>
 
+        {interestGroup && interestGroup.state !== "off" && !leftGroup && (
+          <div className="bg-emerald-50 border-b border-emerald-100 px-4 md:px-6 py-2.5 shrink-0 text-xs text-emerald-900">
+            {interestGroup.state === "on" ? (
+              <>
+                <span className="font-semibold">It&rsquo;s on</span>
+                {interestGroup.nightLabel ? ` · ${interestGroup.nightLabel}` : ""}
+                {` · ${interestGroup.confirmed} going`}
+                {interestGroup.booked ? " · Booked" : " · Booking in progress"}
+              </>
+            ) : (
+              <>
+                <span className="font-semibold">
+                  {interestGroup.confirmed} of {interestGroup.minConfirmed} going
+                </span>
+                {interestGroup.nightLabel ? ` for ${interestGroup.nightLabel}` : ""}
+                {interestGroup.deadlineLabel ? ` · decided ${interestGroup.deadlineLabel}` : ""}
+              </>
+            )}
+          </div>
+        )}
+
         <div
           ref={messagesContainerRef}
           className="flex-1 overflow-y-auto px-4 md:px-6 py-4 space-y-3"
@@ -655,19 +732,82 @@ export default function ChatShell({
                   user={users.get(msg.from)}
                   isFromCurrentUser={msg.from === currentUserIdRef.current}
                   hideAvatar={Boolean(sameUser)}
+                  onClaimBooking={
+                    interestGroup?.state === "on" && interestGroup.bookingAskOpen && !interestGroup.viewer
+                      ? claimBooking
+                      : undefined
+                  }
                 />
               );
             })
           )}
         </div>
 
-        {planCancelled ? (
+        {leftGroup ? (
+          <div role="status" className="bg-zinc-50 border-t border-zinc-200 px-4 md:px-6 py-4 shrink-0 text-center">
+            <p className="text-sm font-medium text-zinc-900">
+              {leftGroup === "snoozed" ? "Snoozed" : "You’re out of this one"}
+            </p>
+            <p className="mt-0.5 text-xs text-zinc-500">
+              {leftGroup === "snoozed"
+                ? "We’ll ask you about the next date instead."
+                : "You won’t hear about this plan again."}
+            </p>
+          </div>
+        ) : interestGroup?.state === "gathering" && interestGroup.viewer && !planCancelled ? (
+          // A viewer reads but can't post until they say they're going (the
+          // RTDB rules hold that line too).
+          <div className="bg-white border-t border-zinc-200 px-4 md:px-6 py-3 shrink-0 space-y-2.5">
+            <p className="text-sm text-zinc-900">
+              <span className="font-medium">Going{interestGroup.nightLabel ? ` ${interestGroup.nightLabel}` : ""}?</span>
+              <span className="text-zinc-500">
+                {interestGroup.deadlineLabel ? ` Answer by ${interestGroup.deadlineLabel} to chat with the group.` : " Answer to chat with the group."}
+              </span>
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => answerInterest("going")}
+                disabled={answering !== null}
+                className="flex-1 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {answering === "going" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Going"}
+              </button>
+              <button
+                type="button"
+                onClick={() => answerInterest("snooze")}
+                disabled={answering !== null}
+                className="flex-1 rounded-lg border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-900 disabled:opacity-50"
+              >
+                {answering === "snooze" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Next time"}
+              </button>
+              <button
+                type="button"
+                onClick={() => answerInterest("not_interested")}
+                disabled={answering !== null}
+                className="rounded-lg px-3 py-2.5 text-xs text-zinc-500 disabled:opacity-50"
+              >
+                Not for me
+              </button>
+            </div>
+            {answerError && <p className="text-xs text-rose-600">{answerError}</p>}
+          </div>
+        ) : planCancelled ? (
           <div
             role="status"
             className="bg-zinc-50 border-t border-zinc-200 px-4 md:px-6 py-4 shrink-0 text-center"
           >
-            <p className="text-sm font-medium text-zinc-900">This plan was cancelled</p>
-            <p className="mt-0.5 text-xs text-zinc-500">The chat is closed. Earlier messages are still here.</p>
+            {interestGroup?.state === "off" ? (
+              <>
+                <p className="text-sm font-medium text-zinc-900">Not enough people this time</p>
+                <p className="mt-0.5 text-xs text-zinc-500">We&rsquo;ll ask everyone about the next date.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-zinc-900">This plan was cancelled</p>
+                <p className="mt-0.5 text-xs text-zinc-500">The chat is closed. Earlier messages are still here.</p>
+              </>
+            )}
           </div>
         ) : (
         <div className="bg-white border-t border-zinc-200 px-4 md:px-6 py-3 shrink-0">
