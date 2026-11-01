@@ -75,7 +75,7 @@ export default function DropPassPage({ params }: { params: Promise<{ token: stri
             ◆ Drop pass{drop.calendar?.name ? ` · ${drop.calendar.name}` : ""}
           </span>
           <h1 className="text-2xl font-medium leading-snug">{drop.title}</h1>
-          <p className="text-sm text-white/70">{[dropWhen(drop.startsAt), drop.place].filter(Boolean).join(" · ")}</p>
+          <p className="text-sm text-white/70">{dropWhen(drop.startsAt)}</p>
           {drop.includes && <p className="text-sm">Includes: {drop.includes}</p>}
           <p className="text-xs text-white/60">
             {pass.name ? `${pass.name} · ` : ""}
@@ -87,6 +87,19 @@ export default function DropPassPage({ params }: { params: Promise<{ token: stri
           <p className="text-sm text-zinc-600 text-center">This drop was called off and your fee was refunded.</p>
         ) : (
           <>
+            {/* The reveal: the venue only comes with the pass. */}
+            {drop.place && (
+              <section className="rounded-2xl border border-zinc-200 bg-white p-4 flex flex-col gap-1">
+                <span className="text-[10px] tracking-[0.12em] uppercase font-bold text-zinc-500">Where</span>
+                <p className="text-sm font-medium text-zinc-900">{drop.place}</p>
+                {drop.address && <p className="text-sm text-zinc-600">{drop.address}</p>}
+                {drop.mapUrl && (
+                  <a href={drop.mapUrl} target="_blank" rel="noopener noreferrer" className="self-start text-sm font-medium text-zinc-900 underline underline-offset-2">
+                    Open in Maps
+                  </a>
+                )}
+              </section>
+            )}
             {pass.accessNote && (
               <section className="rounded-2xl border border-zinc-200 bg-white p-4 flex flex-col gap-1">
                 <span className="text-[10px] tracking-[0.12em] uppercase font-bold text-zinc-500">How to get in</span>

@@ -21,7 +21,11 @@ export type Drop = {
   imageUrl: string | null;
   /** Loops silently behind the /me popup (the plan's invitationVideo). */
   videoUrl: string | null;
+  /** The venue: only sent once they hold a pass (empty until then). */
   place: string;
+  address: string;
+  /** Google Maps link for the venue, with the pass. */
+  mapUrl: string | null;
   opensAt: string | null;
   startsAt: string | null;
   capacity: number | null;
