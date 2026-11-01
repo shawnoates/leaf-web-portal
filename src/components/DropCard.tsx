@@ -7,8 +7,8 @@
  * it's full, Join the waitlist opens the Drop's popup to save a card (signed
  * in only): if a spot opens, the next in line is charged and gets the pass.
  *
- * "card" is the card above the hero on /me; "feature" is the first row of a
- * calendar page, in that page's own row style (media beside the copy), where
+ * "card" is the card above the hero on /me; "band" is the calendar page's
+ * featured-band design (the "Around the city" strip under the header), where
  * it stands in for the Drop's plain plan row. /me also gets DropPopup, once per Drop, when one on
  * a calendar they follow goes live.
  *
@@ -42,13 +42,10 @@ export default function DropCard({
   drop,
   variant = "card",
   beforeNotify,
-  brandColor,
 }: {
   drop: Drop;
-  variant?: "card" | "feature";
+  variant?: "card" | "band";
   beforeNotify?: BeforeNotify;
-  /** The calendar's button color, for the feature row. */
-  brandColor?: string;
 }) {
   const left = useCountdown(drop.opensAt, drop.status === "scheduled");
   // The countdown ran out while the page was open: it's open now.
@@ -189,20 +186,21 @@ export default function DropCard({
     />
   );
 
-  if (variant === "feature") {
+  if (variant === "band") {
+    // Same build as the page's "Around the city" band: 122px, black, the
+    // media in a 232px column, chips over a one-line title, the action right.
     const when = drop.startsAt ? new Date(drop.startsAt) : null;
-    const kicker = when
+    const dateLabel = when
       ? `${when.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })} · ${when.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
       : "";
-    const blurb = drop.teaser || drop.description;
     return (
       <article
         aria-label={`Drop: ${drop.title}`}
-        className="drop-feature flex flex-col md:flex-row gap-12 md:items-center"
-        style={{ "--drop-brand": brandColor || "#18181b" } as React.CSSProperties}
+        className="drop-band grid grid-cols-1 sm:grid-cols-[232px_1fr] sm:h-[122px] overflow-hidden bg-[#0a0a0a]"
+        style={{ fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' }}
       >
         <style>{STYLES}</style>
-        <div className="relative w-full md:w-3/5 aspect-[16/10] overflow-hidden bg-zinc-900 shadow-sm">
+        <div className="relative h-40 sm:h-[122px] bg-[#161616]">
           {drop.videoUrl ? (
             <video
               ref={(el) => {
@@ -221,34 +219,34 @@ export default function DropCard({
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={drop.imageUrl} alt="" className="w-full h-full object-cover" />
           ) : null}
-          <span className="drop-tag">
-            <span aria-hidden>◆</span> Leaf drop
-          </span>
         </div>
-        <div className="w-full md:w-2/5 space-y-6">
-          <div className="space-y-2">
-            <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">{kicker}</p>
-            <h3 className="text-3xl font-light tracking-tight">{drop.title}</h3>
-            <p className="pt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs tracking-wider uppercase font-bold text-zinc-900">
-              <span>Hosted by Leaf</span>
-              {statusLine && <span className="drop-feature-status">{statusLine}</span>}
-            </p>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 px-5 py-[14px] min-w-0">
+          <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-3 text-[9px] leading-none font-medium uppercase tracking-[0.16em] whitespace-nowrap">
+              <span className="border border-[#3a3a3a] px-[7px] py-1 text-white">
+                <span aria-hidden>◆</span> Leaf drop
+              </span>
+              {dateLabel && <span className="text-[#8f8f8a]">{dateLabel}</span>}
+              {statusLine && <span className="drop-band-status text-[#7fd6a8]">{statusLine}</span>}
+            </div>
+            <h3 className="text-[21px] leading-[1.1] font-normal tracking-[-0.01em] text-white truncate">
+              {drop.title}
+            </h3>
+            <div className="flex gap-2.5 text-xs leading-[1.4] overflow-hidden">
+              {gets && <span className="shrink-0 whitespace-nowrap text-[#d9d9d5]">{gets}</span>}
+              <span className="flex-1 min-w-0 truncate text-[#6d6d68]">
+                {["Hosted by Leaf", drop.place].filter(Boolean).join(" · ")}
+              </span>
+            </div>
           </div>
-          {blurb && <p className="text-zinc-500 leading-relaxed font-light text-lg line-clamp-3">{blurb}</p>}
-          {gets && (
-            <p className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-zinc-900">
-              <Ticket className="w-3.5 h-3.5 shrink-0" /> {gets}
-            </p>
-          )}
-          <div className="flex flex-col items-start gap-2">
+          <div className="flex-none flex flex-col items-start sm:items-end gap-1.5 whitespace-nowrap">
             {action}
-            {error && <span className="text-xs text-red-600">{error}</span>}
+            {error ? (
+              <span className="text-[10px] text-red-300">{error}</span>
+            ) : live ? (
+              <span className="text-[10px] text-[#6d6d68]">First come, first served</span>
+            ) : null}
           </div>
-          {live && (
-            <p className="text-xs text-zinc-400 font-light">
-              First come, first served · {money(drop.feeCents)} holds your spot
-            </p>
-          )}
         </div>
         {joinSheet}
       </article>
@@ -316,19 +314,17 @@ export function MyDrops({ className = "" }: { className?: string }) {
 }
 
 /**
- * A calendar page: its next Drop, as the page's first row. onDrop hands the
+ * A calendar page: its next Drop, as a featured band under the header. onDrop hands the
  * page the Drop's id so its plan list skips the same plan.
  */
 export function CalendarDrop({
   calendarId,
   beforeNotify,
-  brandColor,
   onDrop,
   className = "",
 }: {
   calendarId: string;
   beforeNotify?: BeforeNotify;
-  brandColor?: string;
   onDrop?: (id: string | null) => void;
   className?: string;
 }) {
@@ -346,7 +342,7 @@ export function CalendarDrop({
   if (!shown) return null;
   return (
     <div className={className}>
-      <DropCard drop={shown} variant="feature" beforeNotify={beforeNotify} brandColor={brandColor} />
+      <DropCard drop={shown} variant="band" beforeNotify={beforeNotify} />
     </div>
   );
 }
@@ -368,14 +364,12 @@ const STYLES = `
 .drop-btn-dark { background: #fff; color: #131714; }
 .drop-btn-accent { background: #C9F27B; color: #131714; }
 .drop-btn-quiet { background: rgba(255,255,255,.12); color: #fff; }
-/* The calendar page's row: square buttons and small caps, like its plan rows. */
-.drop-feature { color: #18181b; }
-.drop-feature .drop-btn { border-radius: 0; padding: 12px 24px; font-size: 12px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; }
-.drop-feature .drop-btn-dark, .drop-feature .drop-btn-accent { background: var(--drop-brand); color: #fff; }
-.drop-feature .drop-btn-dark:hover, .drop-feature .drop-btn-accent:hover { opacity: .9; }
-.drop-feature .drop-btn-quiet { background: transparent; color: #059669; padding-left: 0; padding-right: 0; }
-.drop-feature .text-white\/70 { color: #71717a; }
-.drop-feature-status { color: #18181b; }
-.drop-feature-status .drop-dot { background: #22c55e; }
-.drop-tag { position: absolute; top: 16px; left: 16px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: #fff; color: #18181b; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+/* The calendar page's featured band: square white buttons in small caps, like its Host this. */
+.drop-band .drop-btn { border-radius: 0; padding: 9px 16px; font-size: 10px; line-height: 1; font-weight: 500; letter-spacing: .16em; text-transform: uppercase; }
+.drop-band .drop-btn svg { width: 12px; height: 12px; }
+.drop-band .drop-btn-dark, .drop-band .drop-btn-accent { background: #fff; color: #0a0a0a; }
+.drop-band .drop-btn-dark:hover, .drop-band .drop-btn-accent:hover { background: #dcdcd8; }
+.drop-band .drop-btn-quiet { background: transparent; border: 1px solid #3a3a3a; color: #7fd6a8; }
+.drop-band input { border-radius: 0; font-size: 12px; padding: 7px 10px; }
+.drop-band-status .drop-dot { background: #7fd6a8; }
 `;

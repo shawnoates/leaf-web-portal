@@ -4971,15 +4971,13 @@ export default function OrgCalendarPage() {
         </main>
       ) : (
       <>
-      {/* A Drop: the first row on the page, in the plan rows' own style,
-          since it's a countdown. Its plan row is skipped below. Renders
-          nothing unless the calendar has one coming. */}
+      {/* A Drop: a featured band flush under the header, the same design as
+          "Around the city" below. Its plan row is skipped in the list.
+          Renders nothing unless the calendar has one coming. */}
       <CalendarDrop
         calendarId={org.objectId}
         beforeNotify={handleDropNotify}
-        brandColor={org.brandColor || undefined}
-        onDrop={setDropPlanId}
-        className="max-w-6xl mx-auto px-6 pt-12" />
+        onDrop={setDropPlanId} />
 
       {/* Partner thank-you — the server returns it only to followers and
           past attendees of this calendar. */}
