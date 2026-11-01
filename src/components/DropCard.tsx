@@ -22,7 +22,7 @@ import { Bell, Check, Loader2, Ticket } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { useCountdown } from "@/app/o/m/[token]/FreeNightCountdown";
 import { getVerifiedUserCookie } from "@/lib/verified-user";
-import { dropGets, dropWhere, interestCookie, money, sendDropInterest, type Drop } from "@/lib/drops";
+import { dropWhere, interestCookie, money, sendDropInterest, type Drop } from "@/lib/drops";
 import DropPopup, { Popup } from "@/components/DropPopup";
 
 function countdownLabel(left: number) {
@@ -81,7 +81,8 @@ export default function DropCard({
   };
   const onTap = () => (beforeNotify ? beforeNotify((p) => void tap(p)) : void tap());
 
-  const gets = dropGets(drop);
+  // The value sits struck through beside the button's price, not in the text line.
+  const worth = drop.valueCents > drop.feeCents ? money(drop.valueCents) : null;
   const live = (status === "scheduled" || status === "open") && !drop.pass;
   const spots =
     !live || drop.spotsLeft === null ? null : drop.spotsLeft === 1 ? "1 left" : `${drop.spotsLeft} left`;
@@ -231,7 +232,7 @@ export default function DropCard({
               {drop.title}
             </h3>
             <div className="flex gap-2.5 text-xs leading-[1.4] overflow-hidden">
-              {gets && <span className="shrink-0 whitespace-nowrap text-[#d9d9d5]">{gets}</span>}
+              {drop.includes && <span className="shrink-0 whitespace-nowrap text-[#d9d9d5]">{drop.includes}</span>}
               <span className="flex-1 min-w-0 truncate text-[#6d6d68]">
                 {["Hosted by Leaf", dropWhere(drop)].filter(Boolean).join(" · ")}
               </span>
@@ -241,7 +242,14 @@ export default function DropCard({
             {status === "open" && !drop.pass && drop.capacity && drop.spotsLeft !== null && (
               <SpotsMeter capacity={drop.capacity} left={drop.spotsLeft} />
             )}
-            {action}
+            {status === "open" && worth && !drop.pass ? (
+              <div className="flex items-center gap-3">
+                <s className="text-[13px] text-[#8f8f8a]" aria-label={`worth ${worth}`}>{worth}</s>
+                {action}
+              </div>
+            ) : (
+              action
+            )}
             {error && <span className="text-[10px] text-red-300">{error}</span>}
           </div>
         </div>
