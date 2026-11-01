@@ -2060,6 +2060,19 @@ export default function OrgCalendarPage() {
   const [hostEmail, setHostEmail] = useState("");
   const [hostRequireApproval, setHostRequireApproval] = useState(false);
   const hostVerify = usePhoneVerify();
+  // Collecting money when hosting a suggestion — the same ask as the
+  // custom-plan form below (customCollect), paid to whoever hosts.
+  const [hostCollect, setHostCollect] = useState<CollectAsk>(EMPTY_COLLECT_ASK);
+  const [hostHandles, setHostHandles] = useState<PayHandles | null | undefined>(undefined);
+  const [hostHandlesTouched, setHostHandlesTouched] = useState(false);
+  const [hostEditingHandles, setHostEditingHandles] = useState(false);
+  const hostSession = hostVerify.sessionToken || Parse.User.current()?.getSessionToken() || null;
+  useEffect(() => {
+    if (!hostCollect.on || !hostSession || hostHandles !== undefined) return;
+    Parse.Cloud.run("getMyPayHandles", {}, { sessionToken: hostSession })
+      .then((r: { handles: PayHandles | null }) => setHostHandles(r.handles))
+      .catch(() => setHostHandles(null));
+  }, [hostCollect.on, hostSession, hostHandles]);
   const [nearbyVenues, setNearbyVenues] = useState<NearbyVenue[]>([]);
   const [venuesLoading, setVenuesLoading] = useState(false);
   // Cover photo for the hosting suggestion's own venue — saved venues store no
@@ -4072,6 +4085,16 @@ export default function OrgCalendarPage() {
     // Non-owners must verify phone first
     if (!isOwnerOrHost && !hostVerify.isVerified) return;
 
+    const collectAsk = collectAskPayload(hostCollect);
+    if (collectAsk.error) { setHostError(collectAsk.error); return; }
+    if (collectAsk.p2p && !hostSession) { setHostError("Confirm your phone by text to collect money."); return; }
+    if (collectAsk.p2p && !hostHandles) { setHostError("Add how you get paid (Venmo, Cash App, PayPal or Zelle)."); return; }
+    const p2pParams = collectAsk.p2p
+      ? { p2p: collectAsk.p2p, payHandles: hostHandlesTouched ? hostHandles : undefined }
+      : {};
+    // Collecting runs as the signed-in host (the server pays whoever hosts).
+    const p2pOptions = collectAsk.p2p && hostSession ? { sessionToken: hostSession } : undefined;
+
     setHostSubmitting(true);
     setHostError(null);
 
@@ -4106,8 +4129,9 @@ export default function OrgCalendarPage() {
           description: hostingIdea.description || hostingIdea.title,
           imageUrl: hostingIdea.image || undefined,
           date: dateTime,
-          capacity: hostingIdea.suggestedCapacity || 20,
+          capacity: collectAsk.p2p ? undefined : hostingIdea.suggestedCapacity || 20,
           hostNote: hostNote.trim() || undefined,
+          ...p2pParams,
           name: !isOwnerOrHost ? hostVerify.name.trim() : undefined,
           phoneNumber: !isOwnerOrHost ? `+1${hostVerify.phone.replace(/\D/g, "")}` : undefined,
           email: !isOwnerOrHost && hostEmail.trim() ? hostEmail.trim() : undefined,
@@ -4121,8 +4145,9 @@ export default function OrgCalendarPage() {
                 rating: selectedVenue.rating,
               }
             : undefined,
-        });
+        }, p2pOptions);
         setHostSuccess(result?.pendingApproval ? "pending" : true);
+        setHostCollect(EMPTY_COLLECT_ASK);
         setHostHelloSeat(result?.pendingApproval ? null : ((result as { hostNotificationId?: string | null })?.hostNotificationId ?? null));
         setHostNote("");
         setHostEmail("");
@@ -4160,12 +4185,17 @@ export default function OrgCalendarPage() {
           photoUrl: selectedVenue.photoUrl,
           rating: selectedVenue.rating,
         } : undefined,
-      });
+        ...p2pParams,
+      }, p2pOptions);
       if (result === null) {
         setHostSubmitting(false);
         return;
       }
+      if (result?.p2pError) {
+        setToast(`Plan created, but collecting money didn't turn on: ${result.p2pError} Turn it on from the plan's Payments page.`);
+      }
       setHostSuccess(result?.pendingApproval ? "pending" : true);
+      setHostCollect(EMPTY_COLLECT_ASK);
       const hostSeat = result?.pendingApproval ? null : ((result as { hostNotificationId?: string | null })?.hostNotificationId ?? null);
       setHostHelloSeat(hostSeat);
       setHostNote("");
@@ -7187,6 +7217,37 @@ export default function OrgCalendarPage() {
                       />
                       <p className="text-xs text-zinc-400 text-right">{hostNote.length}/500</p>
                     </div>
+                    <CollectAskFields
+                      value={hostCollect}
+                      onChange={(v) => { setHostCollect(v); setHostError(null); }}
+                      subtitle={org.isOwner || org.isHost
+                        ? "Guests pay you back directly on Venmo, Cash App, PayPal or Zelle. No fees."
+                        : `Guests pay you back directly on Venmo, Cash App, PayPal or Zelle. ${org.name || "The calendar"} approves the price with your plan.`}
+                    >
+                      {!hostSession ? (
+                        <div className="text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+                          <span>Confirm your phone by text to collect money.</span>
+                          {hostVerify.isVerified && (
+                            <button type="button" onClick={hostVerify.reset} className="underline text-zinc-900 shrink-0">Text me a code</button>
+                          )}
+                        </div>
+                      ) : hostHandles === undefined ? null : !hostHandles || hostEditingHandles ? (
+                        <div className="border border-zinc-200 rounded-xl p-3">
+                          <PayHandlesForm
+                            initial={hostHandles}
+                            saveLabel="Use these"
+                            onCancel={hostHandles ? () => setHostEditingHandles(false) : undefined}
+                            onSaved={() => {}}
+                            onSubmit={(h) => { setHostHandles(h); setHostHandlesTouched(true); setHostEditingHandles(false); }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-3 text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2">
+                          <span>Paid to {describeHandles(hostHandles)}</span>
+                          <button type="button" onClick={() => setHostEditingHandles(true)} className="underline text-zinc-400 hover:text-zinc-900">Edit</button>
+                        </div>
+                      )}
+                    </CollectAskFields>
                     <div className="flex items-center justify-between py-1">
                       <div>
                         <p className="text-xs tracking-wider uppercase font-bold">Require approval to attend</p>

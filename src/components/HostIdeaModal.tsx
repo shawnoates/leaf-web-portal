@@ -9,6 +9,8 @@ import PlanIntroSection from "@/components/PlanIntroSection";
 import { HostPointsNote } from "@/components/HostPointsTag";
 import FittedImage from "@/components/FittedImage";
 import { runHostPlanIdea } from "@/lib/host-plan-idea";
+import CollectAskFields, { EMPTY_COLLECT_ASK, collectAskPayload, type CollectAsk } from "@/components/p2p/CollectAskFields";
+import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
 import {
   AlertTriangle,
   Calendar,
@@ -165,6 +167,20 @@ export default function HostIdeaModal({
   const [hostedSeatId, setHostedSeatId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [coverFailed, setCoverFailed] = useState(false);
+  // Collecting money, as on /org's custom-plan form: live right away for an
+  // owner/co-host, approved with the plan for a follower — paid to whoever
+  // hosts either way. Both callers are signed in, so that session decides
+  // where the money goes.
+  const [collect, setCollect] = useState<CollectAsk>(EMPTY_COLLECT_ASK);
+  const [payHandles, setPayHandles] = useState<PayHandles | null | undefined>(undefined);
+  const [payHandlesTouched, setPayHandlesTouched] = useState(false);
+  const [editingHandles, setEditingHandles] = useState(false);
+  useEffect(() => {
+    if (!collect.on || payHandles !== undefined) return;
+    Parse.Cloud.run("getMyPayHandles", {})
+      .then((r: { handles: PayHandles | null }) => setPayHandles(r.handles))
+      .catch(() => setPayHandles(null));
+  }, [collect.on, payHandles]);
 
   const dateRef = useRef<HTMLInputElement>(null);
   const timeRef = useRef<HTMLInputElement>(null);
@@ -324,6 +340,13 @@ export default function HostIdeaModal({
     }
     const dateTime = `${dateVal}T${timeVal}${offsetSuffix}`;
 
+    const collectAsk = collectAskPayload(collect);
+    if (collectAsk.error) { setError(collectAsk.error); return; }
+    if (collectAsk.p2p && !payHandles) { setError("Add how you get paid (Venmo, Cash App, PayPal or Zelle)."); return; }
+    const p2pParams = collectAsk.p2p
+      ? { p2p: collectAsk.p2p, payHandles: payHandlesTouched ? payHandles : undefined }
+      : {};
+
     // Featured suggestions have no CalendarGeneratedPlan row, so hostPlanIdea
     // (which looks one up by id) would 404. Route them through the free-form
     // custom-plan path instead — same resulting EventGroup, same approval flow.
@@ -347,8 +370,9 @@ export default function HostIdeaModal({
           description: idea.description || idea.title,
           imageUrl: idea.image || undefined,
           date: dateTime,
-          capacity: idea.suggestedCapacity || 20,
+          capacity: collectAsk.p2p ? undefined : idea.suggestedCapacity || 20,
           hostNote: hostNote.trim() || undefined,
+          ...p2pParams,
           name: hostName || undefined,
           phoneNumber: hostPhone || undefined,
           requireApproval: hostRequireApproval,
@@ -379,6 +403,7 @@ export default function HostIdeaModal({
         calendarPlanId: idea.objectId,
         date: dateTime,
         capacity: idea.suggestedCapacity || 20,
+        ...p2pParams,
         hostNote: hostNote.trim() || undefined,
         requireApproval: hostRequireApproval,
         hostName: hostName || undefined,
@@ -404,7 +429,10 @@ export default function HostIdeaModal({
       // Refresh the parent behind the success screen, then auto-close —
       // unless the plan is live with this person as host, in which case the
       // screen stays on the hello card until they record or pass.
-      const hosted = result as { pendingApproval?: boolean; eventGroupId?: string; hostNotificationId?: string | null } | undefined;
+      const hosted = result as { pendingApproval?: boolean; eventGroupId?: string; hostNotificationId?: string | null; p2pError?: string } | undefined;
+      if (hosted?.p2pError) {
+        alert(`Plan created, but collecting money didn't turn on: ${hosted.p2pError} Turn it on from the plan's Payments page.`);
+      }
       onHosted(hosted);
       if (hosted?.eventGroupId && hosted.pendingApproval !== true) {
         setHostedPlanId(hosted.eventGroupId);
@@ -675,6 +703,29 @@ export default function HostIdeaModal({
                   />
                   <p className="text-xs text-zinc-400 text-right">{hostNote.length}/500</p>
                 </div>
+
+                <CollectAskFields
+                  value={collect}
+                  onChange={(v) => { setCollect(v); setError(null); }}
+                  subtitle="Guests pay you back directly on Venmo, Cash App, PayPal or Zelle. No fees."
+                >
+                  {payHandles === undefined ? null : !payHandles || editingHandles ? (
+                    <div className="border border-zinc-200 rounded-xl p-3">
+                      <PayHandlesForm
+                        initial={payHandles}
+                        saveLabel="Use these"
+                        onCancel={payHandles ? () => setEditingHandles(false) : undefined}
+                        onSaved={() => {}}
+                        onSubmit={(h) => { setPayHandles(h); setPayHandlesTouched(true); setEditingHandles(false); }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-3 text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2">
+                      <span>Paid to {describeHandles(payHandles)}</span>
+                      <button type="button" onClick={() => setEditingHandles(true)} className="underline text-zinc-400 hover:text-zinc-900">Edit</button>
+                    </div>
+                  )}
+                </CollectAskFields>
 
                 <div className="flex items-center justify-between py-1">
                   <div>
