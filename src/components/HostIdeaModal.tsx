@@ -7,6 +7,7 @@ import { ensureGooglePlaces, fetchVenuePhotoUrl } from "@/lib/google-places";
 import { zoneOffsetSuffix } from "@/lib/wall-clock";
 import PlanIntroSection from "@/components/PlanIntroSection";
 import { HostPointsNote } from "@/components/HostPointsTag";
+import FittedImage from "@/components/FittedImage";
 import {
   AlertTriangle,
   Calendar,
@@ -479,8 +480,7 @@ export default function HostIdeaModal({
         {/* Cover */}
         <div className="hidden md:block w-1/2 h-full bg-zinc-100">
           {idea.image && !coverFailed ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={idea.image} className="w-full h-full object-cover" alt="" onError={() => setCoverFailed(true)} />
+            <FittedImage src={idea.image} onError={() => setCoverFailed(true)} />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Sparkles className="w-20 h-20 text-zinc-300" />
