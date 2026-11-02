@@ -1486,6 +1486,7 @@ function CycleCard({
               </div>
             </div>
           )}
+          {(c.placeOptions?.length ?? 0) > 1 && <PlaceVote c={c} auth={auth} />}
           <ul className="grid grid-cols-3 gap-2 lg:gap-2.5">
             {c.options.map((o, i) => {
               const clash = c.clashes?.[String(i)];
@@ -2146,6 +2147,59 @@ function SmsOptInBox({ checked, onChange, phone, onPhone, last4 }: {
  * 11/14 at Union Hall. You look free. It's a go?" Go starts the night and
  * sends the plan invites; Skip lets it pass. No answer in 2 days skips it.
  */
+/**
+ * Where, not just when: the vote's places, Leaf's pick first. A tap shows at
+ * once; the server keeps it (crewPlaceVote). Nobody has to pick: Leaf's pick
+ * counts for anyone who doesn't, and the most-voted place wins at close.
+ */
+function PlaceVote({ c, auth }: { c: CycleView; auth: CrewAuth }) {
+  const inApp = useInApp();
+  const [mine, setMine] = useState<number | null>(c.myPlaceVote ?? null);
+  const [error, setError] = useState("");
+  const opts = c.placeOptions || [];
+  const pick = (i: number) => {
+    const next = mine === i ? null : i;
+    const before = mine;
+    setMine(next);
+    setError("");
+    run("crewPlaceVote", auth, { cycleId: c.cycleId, index: next }).catch((e) => {
+      setMine(before);
+      setError(e instanceof Error ? e.message : "Couldn't save that.");
+    });
+  };
+  return (
+    <div className="flex flex-col gap-2">
+      <Eyebrow>Where?</Eyebrow>
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        {opts.map((o, i) => {
+          const on = (mine ?? 0) === i;
+          const count = o.votes - (c.myPlaceVote === i ? 1 : 0) + (mine === i ? 1 : 0);
+          return (
+            <li key={o.locationId}>
+              <div className={`flex items-center gap-3 rounded-[18px] border p-2 pr-3 ${on ? "border-fm-ink bg-fm-card" : "border-fm-line"}`}>
+                <a href={inApp ? `leaf://location/${o.locationId}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.name)}`} target={inApp ? undefined : "_blank"} rel="noreferrer" className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-fm-card" aria-label={`About ${o.name}`}>
+                  <PlacePhoto src={o.photo} locationId={o.locationId} fallback={<span aria-hidden className="absolute inset-0 flex items-center justify-center font-fm-serif text-[22px] text-fm-knob">{o.name.charAt(0)}</span>} />
+                </a>
+                <button type="button" aria-pressed={on} onClick={() => pick(i)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-[15px] font-semibold text-fm-ink">{o.name}</span>
+                    <span className="truncate text-xs text-fm-muted">{[i === 0 ? "Leaf's pick" : null, o.neighborhood || o.category].filter(Boolean).join(" · ")}</span>
+                  </span>
+                  {count > 0 && <span className="shrink-0 text-xs text-fm-ink-2">{count}</span>}
+                  <span aria-hidden className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${on ? "border-fm-accent bg-fm-accent text-fm-canvas" : "border-fm-line"}`}>{on && <Check size={14} strokeWidth={3} />}</span>
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="m-0 text-xs text-fm-muted">{mine === null ? "Leaf's pick unless you choose another. " : ""}The most votes wins when the vote closes.</p>
+      {error && <p className="m-0 text-xs text-fm-danger">{error}</p>}
+      <Eyebrow>When?</Eyebrow>
+    </div>
+  );
+}
+
 /** Leaf's offer of one night with another crew that shares someone (crew-meetups.js). */
 function MeetupOfferCard({ offer: o, crewName, busy, onAnswer }: { offer: MeetupOffer; crewName: string; busy: string | null; onAnswer: (yes: boolean) => void }) {
   const who = o.bridge.length ? `${o.bridge.slice(0, 2).join(" and ")} ${o.bridge.length === 1 ? "is" : "are"} in both crews` : "You share people";

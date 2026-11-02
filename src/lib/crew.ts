@@ -108,6 +108,10 @@ export type CycleView = {
   weather?: Record<string, { temp: string | null; text: string | null; icon: string | null; rain: number | null }>;
   votes: Record<string, number[]> | null;
   myVotes: number[] | null;
+  /** While voting: the places on the vote, Leaf's pick first (it counts for anyone who doesn't pick), with counts. */
+  placeOptions?: { spotId: string | null; locationId: string; name: string; neighborhood: string | null; category: string | null; photo: string | null; votes: number }[];
+  /** This member's place pick (index), or null for Leaf's pick by default. */
+  myPlaceVote?: number | null;
   /** Dates this person looks free for (synced calendar / Leaf plans); pre-selected, never auto-voted. */
   myFree?: number[] | null;
   /** Per option: members Leaf knows about that night, and how many look free. */
