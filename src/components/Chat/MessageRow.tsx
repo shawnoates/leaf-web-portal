@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, CheckCircle2, ExternalLink, Smartphone, Loader2 } from "lucide-react";
+import { MapPin, CheckCircle2, ExternalLink, Smartphone, Loader2, CalendarDays } from "lucide-react";
 import type { FirMessage, UserLite } from "./types";
 
 const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
@@ -14,6 +14,17 @@ interface Props {
   onClaimBooking?: () => void;
   /** Interest groups: Going / Can't make it under the ask, for a viewer. */
   answer?: InterestAnswerProps;
+  /** Interest groups: the night the ask / on / off cards are about. */
+  night?: NightInfo;
+}
+
+export interface NightInfo {
+  title: string | null;
+  nightLabel: string | null;
+  deadlineLabel: string | null;
+  minConfirmed: number;
+  confirmed: number;
+  youreGoing: boolean;
 }
 
 export interface InterestAnswerProps {
@@ -29,12 +40,16 @@ export default function MessageRow({
   hideAvatar,
   onClaimBooking,
   answer,
+  night,
 }: Props) {
   const type = message.type;
 
   // Interest groups (leaflets-server cloud/interest-group.js): the ask, the
   // decision, and the admin's "can one of you book it?". The Going / Snooze
   // answers live in the bar under the messages, so these are just Leaf cards.
+  if ((type === "occurrenceAsk" || type === "occurrenceOn" || type === "occurrenceOff") && night?.title && night.nightLabel) {
+    return <NightCardRow type={type} night={night} answer={answer} />;
+  }
   if (type === "occurrenceAsk" || type === "occurrenceOn" || type === "occurrenceOff") {
     return <LeafCardRow text={message.text || ""} answer={answer} />;
   }
@@ -251,6 +266,67 @@ function LeafCardRow({
               {answer.error && <p className="text-xs text-rose-600">{answer.error}</p>}
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Interest-group night card: the plan as an invitation, answer below ---
+
+function NightCardRow({ type, night, answer }: { type: string; night: NightInfo; answer?: InterestAnswerProps }) {
+  const eyebrow =
+    type === "occurrenceOn" ? "It’s on" : type === "occurrenceOff" ? "Called off" : "Are you going?";
+  const fine =
+    type === "occurrenceOn"
+      ? `${night.confirmed} going · you can still say Going until it starts`
+      : type === "occurrenceOff"
+        ? "Not enough people said they were going"
+        : `Goes ahead if ${night.minConfirmed} are going${night.deadlineLabel ? ` · decided ${night.deadlineLabel}` : ""}`;
+  return (
+    <div className="flex items-start gap-2">
+      <div className="w-8 shrink-0"><LeafAvatar /></div>
+      <div className="w-full max-w-[360px] flex flex-col items-stretch">
+        <span className="text-[11px] mb-0.5 px-1 text-zinc-900">Leaf</span>
+        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+          <div className="px-4 pt-4 pb-3.5">
+            <p className={`m-0 text-[11px] font-semibold uppercase tracking-wider ${type === "occurrenceOff" ? "text-zinc-400" : "text-emerald-700"}`}>
+              {eyebrow}
+            </p>
+            <p className="m-0 mt-1 text-base font-semibold leading-snug text-zinc-900">{night.title}</p>
+            <p className="m-0 mt-1.5 flex items-center gap-1.5 text-sm text-zinc-600">
+              <CalendarDays className="w-4 h-4 text-zinc-400" />
+              {night.nightLabel}
+            </p>
+            <p className="m-0 mt-2 text-xs text-zinc-500">{fine}</p>
+          </div>
+          {answer ? (
+            <div className="border-t border-zinc-100 bg-zinc-50/60 px-3 py-3">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => answer.onAnswer("going")}
+                  disabled={answer.answering !== null}
+                  className="h-10 rounded-xl bg-zinc-900 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  {answer.answering === "going" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Going"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => answer.onAnswer("cant_make_it")}
+                  disabled={answer.answering !== null}
+                  className="h-10 rounded-xl border border-zinc-200 bg-white text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  {answer.answering === "cant_make_it" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Can’t make it"}
+                </button>
+              </div>
+              {answer.error && <p className="m-0 mt-2 text-center text-xs text-rose-600">{answer.error}</p>}
+            </div>
+          ) : night.youreGoing && type !== "occurrenceOff" ? (
+            <div className="flex items-center gap-1.5 border-t border-zinc-100 bg-emerald-50/60 px-4 py-2.5 text-sm font-medium text-emerald-800">
+              <CheckCircle2 className="w-4 h-4" /> You&rsquo;re going
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

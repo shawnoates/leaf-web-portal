@@ -765,6 +765,18 @@ export default function ChatShell({
                       ? { onAnswer: answerInterest, answering, error: answerError }
                       : undefined
                   }
+                  night={
+                    interestGroup
+                      ? {
+                          title: planTitle,
+                          nightLabel: interestGroup.nightLabel,
+                          deadlineLabel: interestGroup.deadlineLabel,
+                          minConfirmed: interestGroup.minConfirmed,
+                          confirmed: interestGroup.confirmed,
+                          youreGoing: !interestGroup.viewer,
+                        }
+                      : undefined
+                  }
                 />
               );
             })
