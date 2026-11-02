@@ -550,6 +550,8 @@ function HappeningItem({ s, busy, act, auth, isOwner }: {
         </form>
       )}
       {s.needsPlace && <PlaceForPlan s={s} act={act} auth={auth} />}
+      {/* A shared post Leaf matched to the wrong place ("Aldy's" → ALDI): fix it once, for every crew it's in. */}
+      {!s.needsPlace && s.plan && s.locationId && s.importedEventId && <PlaceForPlan s={s} act={act} auth={auth} fix />}
     </li>
   );
 }
@@ -609,6 +611,7 @@ function SpotItem({ s, busy, act, auth, isOwner }: {
             </div>
           )}
           {s.needsPlace && <PlaceForPlan s={s} act={act} auth={auth} />}
+          {!s.needsPlace && s.plan && s.locationId && s.importedEventId && <PlaceForPlan s={s} act={act} auth={auth} fix />}
           {eventLabel && (
             <span className={`mt-0.5 flex h-[22px] w-fit max-w-full items-center gap-1 rounded-full border px-2 text-[11px] ${s.eventPassed ? "border-fm-line-dim text-fm-muted" : "border-fm-line text-fm-ink-2"}`}>
               <CalendarDays size={12} aria-hidden className="shrink-0" /> <span className="truncate">{eventLabel}</span>
@@ -871,9 +874,16 @@ function WeatherRule({ s, act, auth, canEdit }: { s: BookSpot; act: (key: string
   );
 }
 
-function PlaceForPlan({ s, act, auth }: { s: BookSpot; act: (key: string, fn: () => Promise<unknown>) => Promise<void>; auth: CrewAuth }) {
+function PlaceForPlan({ s, act, auth, fix = false }: { s: BookSpot; act: (key: string, fn: () => Promise<unknown>) => Promise<void>; auth: CrewAuth; fix?: boolean }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  if (!open && fix) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="w-fit pl-[60px] text-xs text-fm-muted underline underline-offset-2 hover:text-fm-ink">
+        Wrong place?
+      </button>
+    );
+  }
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className="mt-1 flex h-9 w-fit items-center gap-1.5 rounded-full border border-fm-line px-3 text-xs font-semibold text-fm-ink hover:bg-fm-card">
@@ -887,10 +897,13 @@ function PlaceForPlan({ s, act, auth }: { s: BookSpot; act: (key: string, fn: ()
         value={q}
         onChange={setQ}
         onSelect={(v) => act(`place:${s.spotId}`, async () => { await run("setCrewSpotPlace", auth, { spotId: s.spotId, placeId: v.placeId, venue: v }); setOpen(false); })}
-        placeholder="Search for the place"
+        placeholder={fix ? `Where is it, if not ${s.name}?` : "Search for the place"}
         className="h-10 w-full rounded-xl border px-3 text-[15px] outline-none"
       />
-      <span className="text-[11px] text-fm-muted">Leaf plans a night for it once it has a place.</span>
+      <span className="text-[11px] text-fm-muted">
+        {fix ? "The post moves to that place in every crew's book it's in." : "Leaf plans a night for it once it has a place."}
+        {fix && <button type="button" onClick={() => setOpen(false)} className="ml-2 underline underline-offset-2">Cancel</button>}
+      </span>
     </div>
   );
 }
