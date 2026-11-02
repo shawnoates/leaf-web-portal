@@ -5619,6 +5619,28 @@ export default function OrgCalendarPage() {
                                       }}
                                     />
                                     Looking for people
+                                    {/* Owner / co-host: turn the suggestion into
+                                        their own plan. Followers join the group
+                                        with I'm interested instead. */}
+                                    {(org.isOwner || org.isHost) && (
+                                      <>
+                                        <span className="text-zinc-300 font-normal">·</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            // Blank, never prefilled: a canned
+                                            // attribution line used to sit here
+                                            // and most hosts confirmed it
+                                            // untouched.
+                                            setHostThisNote("");
+                                            setHostThisEventIndex(originalIndex);
+                                          }}
+                                          className="normal-case tracking-normal font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-900"
+                                        >
+                                          Host this
+                                        </button>
+                                      </>
+                                    )}
                                   </p>
                                 </div>
                               </div>
@@ -5665,48 +5687,6 @@ export default function OrgCalendarPage() {
                                   {isInterested ? <><MessageCircle className="w-4 h-4" /> Open group chat</> : "I’m interested"}
                                   {interestCount > 0 && <span className="font-normal opacity-80">· {interestCount}</span>}
                                 </button>
-                                {/* Host This (owner / co-host) — permission matrix:
-                                      owner/co-host                   → active
-                                      allowFollowersToHost            → active
-                                      not allowed                     → hidden
-
-                                    Non-followers get an ACTIVE button, not a
-                                    disabled one. Hosting is a strictly stronger
-                                    commitment than following, so requiring the
-                                    follow first gated the most valuable action
-                                    behind the weaker one — and the explanation
-                                    lived in a `title` tooltip, which does not
-                                    exist on a phone, so the reader saw a dead
-                                    grey button and no reason why. It bit hardest
-                                    on the host-ask SMS, which deep-links exactly
-                                    the people who have not followed yet.
-
-                                    The server creates the follow as part of
-                                    hosting; the confirmation modal says so. */}
-                                {(() => {
-                                  const canHostAsHost = org.isOwner || org.isHost;
-                                  // Followers join the night's group instead
-                                  // (the button before this one).
-                                  const active = canHostAsHost;
-                                  if (!active) return null;
-                                  return (
-                                    <button
-                                      onClick={() => {
-                                        // Blank, never prefilled: a canned
-                                        // attribution line used to sit here
-                                        // and most hosts confirmed it
-                                        // untouched, so plans shipped with a
-                                        // template as the "note from host".
-                                        setHostThisNote("");
-                                        setHostThisEventIndex(originalIndex);
-                                      }}
-                                      className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 transition-opacity text-white hover:opacity-90"
-                                      style={{ backgroundColor: org.brandColor || "#18181b" }}
-                                    >
-                                      Host This
-                                    </button>
-                                  );
-                                })()}
                                 <button
                                   type="button"
                                   onClick={() => handleShareAiEvent(ev, originalIndex)}
@@ -5716,9 +5696,6 @@ export default function OrgCalendarPage() {
                                   <span className="text-xs font-bold uppercase tracking-widest">Share</span>
                                 </button>
                               </div>
-                              {(org.isOwner || org.isHost) && (
-                                <div className="-mt-3"><HostPointsTag /></div>
-                              )}
                             </div>
                           </div>
                         </article>
@@ -5889,6 +5866,26 @@ export default function OrgCalendarPage() {
                               style={{ backgroundColor: org.brandColor || "#1B4332" }}
                             />
                             Looking for people
+                            {/* Owner / co-host: host it as their own plan. */}
+                            {(org.isOwner || org.isHost) && !org.rsvpLimitReached && (
+                              <>
+                                <span className="text-zinc-300 font-normal">·</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setHostingIdea(idea);
+                                    setHostSubmitting(false);
+                                    setHostError(null);
+                                    setHostSuccess(false);
+                                    setHostNote("");
+                                    setSelectedVenue(null);
+                                  }}
+                                  className="normal-case tracking-normal font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-900"
+                                >
+                                  Host this
+                                </button>
+                              </>
+                            )}
                           </p>
                           {/* Featured has no interest BUTTON here (see below),
                               but the count still means something: it's how many
@@ -5946,40 +5943,6 @@ export default function OrgCalendarPage() {
                             {priorCount > 0 && <span className="font-normal opacity-80">· {priorCount}</span>}
                           </button>
                         )}
-                        {/* Host This (owner / co-host) — opens the existing
-                            hostingIdea flow (create-plan modal prefilled from
-                            the idea). Followers join the group instead. */}
-                        {(() => {
-                          const canHostAsHost = org.isOwner || org.isHost;
-                          const active = canHostAsHost;
-                          if (!active) return null;
-                          return (
-                            <button
-                              onClick={() => {
-                                if (org.rsvpLimitReached) return;
-                                setHostingIdea(idea);
-                                setHostSubmitting(false);
-                                setHostError(null);
-                                setHostSuccess(false);
-                                setHostNote("");
-                                setSelectedVenue(null);
-                              }}
-                              disabled={org.rsvpLimitReached}
-                              className={`px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 transition-opacity ${
-                                !org.rsvpLimitReached
-                                  ? "text-white hover:opacity-90"
-                                  : "text-zinc-400 border border-zinc-200 bg-white cursor-not-allowed"
-                              }`}
-                              style={
-                                !org.rsvpLimitReached
-                                  ? { backgroundColor: org.brandColor || "#18181b" }
-                                  : undefined
-                              }
-                            >
-                              Host This
-                            </button>
-                          );
-                        })()}
                         {!idea.isFeatured && (
                           <button
                             type="button"
@@ -5991,9 +5954,6 @@ export default function OrgCalendarPage() {
                           </button>
                         )}
                       </div>
-                      {!org.rsvpLimitReached && (org.isOwner || org.isHost) && (
-                        <div className="-mt-3"><HostPointsTag /></div>
-                      )}
                     </div>
                   </div>
                 </article>
