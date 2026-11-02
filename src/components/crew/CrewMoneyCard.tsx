@@ -149,12 +149,28 @@ export default function CrewMoneyCard({
     );
   }
 
+  // Done looking at this night's bill: hidden for this member (it comes back with the next night).
+  const hide = async () => {
+    setBusy("hide");
+    await run("hideCrewTip", auth, { tip: `split:${split.cycleId}` }).catch(() => {});
+    setBusy(null);
+    onChange(null);
+  };
+  const hideButton = (
+    <button type="button" onClick={() => void hide()} disabled={busy !== null} className="min-h-11 text-xs text-fm-muted underline underline-offset-4 hover:text-fm-ink">
+      {busy === "hide" ? "Hiding…" : "Hide"}
+    </button>
+  );
+
   // ── After a night, no receipt yet ──
   if (!r) {
     if (!split.went) return null;
     return (
       <section className="rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
-        <Eyebrow>Split the bill</Eyebrow>
+        <div className="flex items-center justify-between gap-2">
+          <Eyebrow>Split the bill</Eyebrow>
+          {hideButton}
+        </div>
         <h3 className="m-0 mt-2 font-fm-serif text-[28px] font-normal leading-tight">How was {split.venue}?</h3>
         <p className="m-0 mt-2 text-[15px] text-fm-ink-2">Snap the receipt and Leaf works out who owes what, tax and tip included.</p>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -190,7 +206,10 @@ export default function CrewMoneyCard({
             <span className="ml-2 font-fm-sans text-sm text-fm-muted">{r.isPayer ? "you paid" : `${payer} paid`}</span>
           </p>
         </div>
-        {r.photo && <a href={r.photo} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-fm-muted underline">Receipt <ExternalLink size={12} aria-hidden /></a>}
+        <div className="flex items-center gap-4">
+          {r.photo && <a href={r.photo} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-fm-muted underline">Receipt <ExternalLink size={12} aria-hidden /></a>}
+          {!isCost && hideButton}
+        </div>
       </div>
 
       {!isCost && (

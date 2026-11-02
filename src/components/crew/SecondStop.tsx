@@ -17,7 +17,11 @@ type Suggestion = {
   fromBook: boolean; votes: number; myVote: boolean; locationId: string | null; placeId: string | null;
 };
 type Added = { locationId: string; name: string; address: string | null; kindLabel: string | null; walkMin: number | null; addedByName: string | null };
-type Stops = { canAdd: boolean; hostName?: string | null; venueName?: string | null; added: Added | null; suggestions: Suggestion[] };
+type Stops = {
+  canAdd: boolean; hostName?: string | null; venueName?: string | null; added: Added | null; suggestions: Suggestion[];
+  /** A plan made in the app with more stops: the ones after `added`, in order. */
+  later?: { locationId: string; name: string }[];
+};
 
 function placeHref(p: { locationId: string | null; placeId?: string | null; name: string; address: string | null }, inApp: boolean) {
   if (inApp && p.locationId) return `leaf://location/${p.locationId}`;
@@ -108,6 +112,17 @@ export default function SecondStop({ auth, cycleId, inApp, onChanged }: { auth: 
           <p className="m-0 text-sm text-fm-muted">
             {[added.kindLabel ? `${added.kindLabel} after` : null, added.walkMin ? `${added.walkMin} min walk` : null, added.addedByName ? `added by ${added.addedByName}` : "in the plan"].filter(Boolean).join(" · ")}
           </p>
+          {(stops.later?.length ?? 0) > 0 && (
+            <p className="m-0 flex flex-wrap items-baseline gap-x-1.5 text-sm text-fm-ink-2">
+              <span className="font-fm-mono text-[11px] uppercase tracking-[0.08em] text-fm-muted">After that</span>
+              {stops.later!.map((l, i) => (
+                <span key={l.locationId}>
+                  <a href={placeHref({ locationId: l.locationId, name: l.name, address: null }, inApp)} target={inApp ? undefined : "_blank"} rel="noreferrer" className="underline decoration-fm-line underline-offset-4 hover:text-fm-ink">{l.name}</a>
+                  {i < stops.later!.length - 1 ? " →" : ""}
+                </span>
+              ))}
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-4">
             {suggestions.length > 0 && (
               <button type="button" aria-expanded={showOthers} onClick={() => setShowOthers((v) => !v)} className="min-h-11 text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink">
