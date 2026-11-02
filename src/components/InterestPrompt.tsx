@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { MessageCircle, X } from "lucide-react";
 import type { AnimationItem } from "lottie-web";
 import { usePointsConfig } from "@/lib/points-config";
 
@@ -24,6 +24,12 @@ import { usePointsConfig } from "@/lib/points-config";
 // single button into the calendar's own host flow. ✕ / Esc / the scrim close
 // it and continue as Done would. The hearts screen itself still never
 // mentions hosting or counts; ✕ / Esc / the scrim on it skip the invite.
+//
+// Interested summary: everyone else who marked something gets "You're
+// interested in N upcoming plans" after Done — each marked plan with its date,
+// "Needs 3 · RSVP by …" and a Chat link into that night's chat (the tap
+// already put them in it; leaflets-server interest-group.js). Its Done, ✕,
+// Esc and scrim all continue as Done.
 // ============================================================================
 
 export interface InterestPromptItem {
@@ -39,6 +45,18 @@ export interface InterestPromptItem {
 
 export type InterestPromptCloseVia = "done" | "skip";
 
+/** Where a marked plan's tap landed: its night's chat, if it has one. */
+export interface InterestPromptNight {
+  eventGroupId: string | null;
+  /** The night is already on (enough said they're going). */
+  on: boolean;
+  /** ISO; when "going?" is decided. Null once it's on. */
+  rsvpBy: string | null;
+  needs: number | null;
+  /** Too close to the night to join its chat. */
+  closed: boolean;
+}
+
 /** Other people's interest needed before the invite shows a count: "1 wants
  *  to go" makes a plan look empty, and the viewer's own heart never counts. */
 const HOST_INVITE_MIN_OTHERS = 3;
@@ -51,6 +69,8 @@ export default function InterestPrompt({
   onToggle,
   onClose,
   host,
+  nights,
+  notifyVia = "text",
 }: {
   calendarName: string;
   items: InterestPromptItem[];
@@ -70,6 +90,11 @@ export default function InterestPrompt({
     onShown: (itemIds: string[], marked: number) => void;
     onPick: (id: string, marked: number) => void;
   };
+  /** Per marked item, where its tap landed. Present = show the interested
+   *  summary after Done (when there's no host invite). */
+  nights?: Readonly<Record<string, InterestPromptNight>>;
+  /** How they'll hear when it's time to answer. */
+  notifyVia?: "text" | "email";
 }) {
   // Cards toggled during THIS mount get the fill-and-pop; cards that arrive
   // already marked (seeded from existing interest records) render filled with
@@ -78,7 +103,9 @@ export default function InterestPrompt({
   const reducedMotion = usePrefersReducedMotion();
   // The plan the invite is about, fixed when it opens. Null = hearts screen.
   const [hostItem, setHostItem] = useState<InterestPromptItem | null>(null);
-  const phase = hostItem ? "host" : "interest";
+  // The marked plans, fixed when the summary opens. Null = not showing.
+  const [summary, setSummary] = useState<InterestPromptItem[] | null>(null);
+  const phase = hostItem ? "host" : summary ? "summary" : "interest";
 
   const count = items.reduce((n, it) => (marked.has(it.id) ? n + 1 : n), 0);
   // Esc reads the live count without re-binding the listener on every tap.
@@ -108,7 +135,12 @@ export default function InterestPrompt({
 
   const skip = () => onClose("skip", countRef.current);
   const done = () => {
-    if (!host || phase === "host") {
+    if (!host || phase === "host" || phase === "summary") {
+      const markedItems = items.filter((it) => marked.has(it.id));
+      if (!host && nights && phase === "interest" && markedItems.length > 0) {
+        setSummary(markedItems);
+        return;
+      }
       onClose("done", countRef.current);
       return;
     }
@@ -139,6 +171,14 @@ export default function InterestPrompt({
 
   return (
     <>
+    {summary && (
+      <InterestedSummary
+        items={summary}
+        nights={nights || {}}
+        notifyVia={notifyVia}
+        onClose={done}
+      />
+    )}
     {hostItem && host && (
       <HostInvite
         calendarName={calendarName}
@@ -362,6 +402,145 @@ function HostInvite({
     </div>
   );
 }
+
+// "Wed 9 AM" / "Wed 9:30 AM", in the viewer's zone like the rest of the page.
+function rsvpLabel(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const day = d.toLocaleDateString("en-US", { weekday: "short" });
+  const time = d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    ...(d.getMinutes() ? { minute: "2-digit" } : {}),
+  });
+  return `${day} ${time}`;
+}
+
+function nightLine(night: InterestPromptNight | undefined) {
+  if (!night) return null;
+  if (night.closed) return "Starts soon";
+  if (night.on) return "It’s on";
+  const by = night.rsvpBy ? rsvpLabel(night.rsvpBy) : null;
+  const parts = [night.needs ? `Needs ${night.needs}` : null, by ? `RSVP by ${by}` : null].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+// After Done: the plans they marked, each with a way into its chat. Bottom
+// sheet on a phone, a centered card on desktop, over the hearts screen.
+function InterestedSummary({
+  items,
+  nights,
+  notifyVia,
+  onClose,
+}: {
+  items: InterestPromptItem[];
+  nights: Readonly<Record<string, InterestPromptNight>>;
+  notifyVia: "text" | "email";
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const n = items.length;
+  return (
+    <div className="is-scrim" onClick={onClose}>
+      <style>{INTERESTED_SUMMARY_CSS}</style>
+      <div
+        className="is"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="is-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button type="button" className="is-x" aria-label="Close" onClick={onClose}>
+          <X size={17} strokeWidth={2} />
+        </button>
+        <h2 id="is-title" className="is-h">
+          You&rsquo;re interested in {n} upcoming plan{n === 1 ? "" : "s"}
+        </h2>
+        <p className="is-sub">
+          See who else is in from each plan&rsquo;s chat. A plan goes ahead once enough people say
+          they&rsquo;re going.
+        </p>
+        <ul className="is-rows">
+          {items.map((item) => {
+            const night = nights[item.id];
+            const line = nightLine(night);
+            const chat = night && !night.closed && night.eventGroupId ? night.eventGroupId : null;
+            return (
+              <li key={item.id} className="is-row">
+                <span className="is-thumb" aria-hidden>
+                  {item.image && <CardImage src={item.image} />}
+                </span>
+                <span className="is-text">
+                  <span className="is-title">{item.title}</span>
+                  {item.dateLabel && <span className="is-date">{item.dateLabel}</span>}
+                  {line && <span className={`is-line${night?.closed ? " muted" : ""}`}>{line}</span>}
+                </span>
+                {chat && (
+                  <a className="is-chat" href={`/chat/${chat}`}>
+                    <MessageCircle size={16} strokeWidth={2} aria-hidden />
+                    Chat
+                  </a>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        <p className="is-note">
+          {`We’ll ${notifyVia === "email" ? "email" : "text"} you before each RSVP date to ask if you’re going.`}
+        </p>
+        <button type="button" className="is-done" onClick={onClose}>
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const INTERESTED_SUMMARY_CSS = `
+.is-scrim{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center;
+  background:rgba(0,0,0,.62)}
+.is{--is-serif:var(--font-newsreader),Georgia,serif;position:relative;width:100%;max-height:calc(100svh - 24px);
+  overflow-y:auto;background:#fbfaf7;color:#18181b;border-radius:24px 24px 0 0;
+  padding:26px 22px calc(26px + env(safe-area-inset-bottom))}
+.is *{box-sizing:border-box}
+.is button,.is a{font:inherit;cursor:pointer;touch-action:manipulation}
+.is-x{position:absolute;top:8px;right:8px;display:flex;align-items:center;justify-content:center;width:44px;
+  height:44px;padding:0;border:0;background:none;color:#a1a1aa}
+.is-x:hover{color:#18181b}
+.is-h{margin:0;padding-right:36px;font-family:var(--is-serif);font-weight:400;font-size:26px;line-height:1.15;
+  text-wrap:pretty}
+.is-sub{margin:8px 0 0;font-size:14px;line-height:1.45;color:#52525b}
+.is-rows{list-style:none;margin:18px 0 0;padding:0;border-top:1px solid rgba(0,0,0,.08)}
+.is-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(0,0,0,.08)}
+.is-thumb{position:relative;flex:none;width:48px;height:48px;border-radius:10px;overflow:hidden;background:#e4e4e7}
+.is-thumb .ip-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .35s ease}
+.is-thumb .ip-img.in{opacity:1}
+.is-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.is-title{font-size:15px;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.is-date{font-size:13px;color:#52525b}
+.is-line{font-size:12.5px;color:#92400e}
+.is-line.muted{color:#a1a1aa}
+.is-chat{flex:none;display:inline-flex;align-items:center;gap:5px;min-height:44px;padding:0 4px;
+  font-size:14px;font-weight:600;color:#065f46;text-decoration:none}
+.is-chat:hover{text-decoration:underline}
+.is-note{margin:16px 0 0;font-size:13px;line-height:1.45;color:#71717a}
+.is-done{display:block;width:100%;height:50px;margin-top:18px;border:0;border-radius:14px;background:#18181b;
+  color:#fff;font-size:15px;font-weight:600}
+.is-done:hover{background:#27272a}
+@media(min-width:768px){
+  .is-scrim{align-items:center;padding:32px 24px;background:rgba(40,30,10,.32)}
+  .is{max-width:480px;max-height:calc(100vh - 64px);border-radius:14px;padding:32px 32px 28px;
+    box-shadow:0 20px 60px rgba(0,0,0,.22)}
+  .is-h{font-size:28px}
+  .is-done{height:46px;border-radius:10px;font-size:14.5px}
+}
+`;
 
 const STROKE = {
   fill: "none",

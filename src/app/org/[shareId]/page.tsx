@@ -20,6 +20,7 @@ import ShareKitPrompt, { type ShareKitPayload } from "@/components/ShareKitPromp
 import InterestPrompt, {
   type InterestPromptItem,
   type InterestPromptCloseVia,
+  type InterestPromptNight,
 } from "@/components/InterestPrompt";
 import { track } from "@/lib/track";
 import { captureFollowSource, followSource } from "@/lib/follow-source";
@@ -101,7 +102,26 @@ type InterestOccurrence = {
   nightState?: "gathering" | "on";
   eventGroupId?: string;
   going?: boolean;
+  /** ISO; when "going?" is decided while the night is gathering. */
+  triggerAt?: string | null;
+  minConfirmed?: number;
 };
+
+function promptNightFrom(occ: InterestOccurrence | null | undefined): InterestPromptNight | null {
+  if (!occ) return null;
+  if (occ.state === "later" || occ.state === "closed") {
+    return { eventGroupId: null, on: false, rsvpBy: null, needs: null, closed: true };
+  }
+  if (occ.state !== "gathering" || !occ.eventGroupId) return null;
+  const on = occ.nightState === "on";
+  return {
+    eventGroupId: occ.eventGroupId,
+    on,
+    rsvpBy: on ? null : occ.triggerAt || null,
+    needs: on ? null : occ.minConfirmed ?? null,
+    closed: false,
+  };
+}
 
 interface Plan {
   id: string;
@@ -1783,6 +1803,8 @@ function FollowModal({
     pending: ReadonlySet<string>;
     onToggle: (id: string) => void;
     onClosed: (via: InterestPromptCloseVia, marked: number) => void;
+    /** Where each marked plan's tap landed, for the summary after Done. */
+    nights: Readonly<Record<string, InterestPromptNight>>;
     /** The one-plan host invite after Done; absent when the viewer can't
      *  host. `onPick` opens the page's host flow once this modal has closed. */
     host?: {
@@ -1801,6 +1823,7 @@ function FollowModal({
   const [intro, setIntro] = useState<ShareKitPayload | null>(null);
   // Fixed at open — a tap must not re-sort the cards under the user's finger.
   const [interestItems, setInterestItems] = useState<InterestPromptItem[] | null>(null);
+  const [notifyVia, setNotifyVia] = useState<"text" | "email">("text");
 
   // Done / Skip / ✕ / Esc / scrim all continue to the same next step: the
   // share kit on a neighborhood calendar, otherwise the calendar page itself
@@ -1817,6 +1840,7 @@ function FollowModal({
   /** `phone` is "" when following by email (as the signed-in account). */
   const follow = async ({ name, phone, notify }: { name: string; phone: string; notify: "text" | "email" }) => {
     setFormStep("submitting");
+    setNotifyVia(notify);
     try {
       const digits = phone.replace(/\D/g, "");
       const followResult = (await Parse.Cloud.run("followCalendarViaWeb", {
@@ -1886,6 +1910,8 @@ function FollowModal({
         pending={interest.pending}
         onToggle={interest.onToggle}
         onClose={finishInterest}
+        nights={interest.nights}
+        notifyVia={notifyVia}
         host={
           host && {
             ...host,
@@ -2301,6 +2327,16 @@ export default function OrgCalendarPage() {
   // interest tap joins the suggestion's next night as a viewer of its group
   // chat. The express* calls return where that landed; this says so.
   const [groupJoined, setGroupJoined] = useState<{ eventGroupId: string; title: string } | null>(null);
+  // Hearts tapped in the post-follow interest prompt ("idea:<id>" / "ai:<i>"),
+  // and where each landed. Those taps don't pop the one-plan "you're in" sheet;
+  // the prompt lists them all after Done instead.
+  const promptTapIds = useRef<Set<string>>(new Set());
+  const [promptNights, setPromptNights] = useState<Record<string, InterestPromptNight>>({});
+  const notePromptNight = useCallback((key: string, occ: InterestOccurrence | null | undefined) => {
+    const night = promptNightFrom(occ);
+    if (!night) return;
+    setPromptNights((prev) => ({ ...prev, [key]: night }));
+  }, []);
   const handleOccurrence = useCallback(
     (occurrence: InterestOccurrence | null | undefined, title: string, open = false) => {
       if (!occurrence) return false;
@@ -2425,9 +2461,10 @@ export default function OrgCalendarPage() {
         // The group chat needs an account, so a browser without a session is
         // asked for a phone. Checked AFTER the write lands, so the prompt
         // never appears on a tap that failed to record.
+        notePromptNight(`ai:${eventIndex}`, result?.occurrence);
         if (!Parse.User.current()) {
           setNotifyPromptFor({ kind: "ai", eventIndex, title });
-        } else {
+        } else if (!promptTapIds.current.has(`ai:${eventIndex}`)) {
           handleOccurrence(result?.occurrence, title);
         }
       } catch (err) {
@@ -2461,6 +2498,7 @@ export default function OrgCalendarPage() {
       // Read for the notify prompt's title.
       org?.aiSourceEvents,
       handleOccurrence,
+      notePromptNight,
     ]
   );
 
@@ -2640,9 +2678,10 @@ export default function OrgCalendarPage() {
           setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: result.count! }));
         }
         const title = org?.planIdeas.find((i) => i.id === ideaId)?.title || "this plan";
+        notePromptNight(`idea:${ideaId}`, result?.occurrence);
         if (!Parse.User.current()) {
           setNotifyPromptFor({ kind: "idea", ideaId, title });
-        } else {
+        } else if (!promptTapIds.current.has(`idea:${ideaId}`)) {
           handleOccurrence(result?.occurrence, title);
         }
       } catch (err) {
@@ -2669,6 +2708,7 @@ export default function OrgCalendarPage() {
       planIdeaInterestPending,
       org?.planIdeas,
       handleOccurrence,
+      notePromptNight,
     ],
   );
 
@@ -4509,6 +4549,7 @@ export default function OrgCalendarPage() {
   const toggleInterest = useCallback(
     (id: string) => {
       const on = interestMarked.has(id);
+      promptTapIds.current.add(id);
       track(
         "follow_interest_tap",
         {
@@ -7948,6 +7989,7 @@ export default function OrgCalendarPage() {
             pending: interestPending,
             onToggle: toggleInterest,
             onClosed: onInterestPromptClosed,
+            nights: promptNights,
             host: interestHost,
           }}
           onClose={() => {
@@ -7967,6 +8009,9 @@ export default function OrgCalendarPage() {
               setFollowerCount((c) => c + 1);
               // FollowModal writes leaf_follower_phone before calling this, so
               // the replayed tap carries identity and skips the notify prompt.
+              // With the interest prompt up next, it lists this one after Done.
+              if (keepOpen && pendingInterest?.kind === "ai") promptTapIds.current.add(`ai:${pendingInterest.eventIndex}`);
+              if (keepOpen && pendingInterest?.kind === "idea") promptTapIds.current.add(`idea:${pendingInterest.ideaId}`);
               if (pendingInterest?.kind === "ai") {
                 void runAIEventInterest(pendingInterest.eventIndex);
               } else if (pendingInterest?.kind === "idea") {
@@ -7994,6 +8039,7 @@ export default function OrgCalendarPage() {
           marked={interestMarked}
           pending={interestPending}
           onToggle={toggleInterest}
+          nights={promptNights}
           onClose={(via, marked) => {
             onInterestPromptClosed(via, marked);
             setInterestPrompt(null);
