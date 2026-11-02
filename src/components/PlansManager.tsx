@@ -8,6 +8,7 @@ import SubscriptionModal from "@/components/SubscriptionModal";
 import CreatePlanModal, { type CreatePlanPrefill, type ReconfirmMode } from "@/components/CreatePlanModal";
 import PlanDetailModal, { type PlanDetailData } from "@/components/PlanDetailModal";
 import HostIdeaModal from "@/components/HostIdeaModal";
+import CopyHostLinkButton from "@/components/CopyHostLinkButton";
 import PlanChatDrawer from "@/components/PlanChatDrawer";
 import NudgeModal from "@/components/dashboard/NudgeModal";
 import SharePlanSheet from "@/components/dashboard/SharePlanSheet";
@@ -2516,6 +2517,15 @@ export default function PlansManager({
             {assignError && (
               <p className="text-xs text-red-500 px-5 pt-3">{assignError}</p>
             )}
+            {/* For someone who isn't on the list yet (they asked you to post
+                their event): send them a link and they take it themselves. */}
+            <div className="px-5 py-3 border-b border-zinc-100">
+              <p className="text-xs text-zinc-500 mb-1.5">Not on the list? Send them a link to host it.</p>
+              <CopyHostLinkButton
+                ideaId={assigningIdea.objectId}
+                className="px-3 py-1.5 rounded-full border border-zinc-200 text-xs font-medium text-zinc-700 hover:border-zinc-400 transition-colors"
+              />
+            </div>
             <div className="overflow-y-auto p-2">
               {/* An "AI-assisted host" option led this list until 2026-09-02.
                   A plan is handed to a person now, so the list is only people. */}

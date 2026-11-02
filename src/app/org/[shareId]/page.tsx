@@ -17,6 +17,8 @@ import DropDeal from "@/components/DropDeal";
 import LeafHostPlanThread from "@/components/LeafHostPlanThread";
 import NamePrompt from "@/components/NamePrompt";
 import ShareKitPrompt, { type ShareKitPayload } from "@/components/ShareKitPrompt";
+import CopyHostLinkButton from "@/components/CopyHostLinkButton";
+import HostLinkSheet from "@/components/HostLinkSheet";
 import InterestPrompt, {
   type InterestPromptItem,
   type InterestPromptCloseVia,
@@ -2327,6 +2329,12 @@ export default function OrgCalendarPage() {
   // interest tap joins the suggestion's next night as a viewer of its group
   // chat. The express* calls return where that landed; this says so.
   const [groupJoined, setGroupJoined] = useState<{ eventGroupId: string; title: string } | null>(null);
+  // ?host=<token>: someone the owner sent a host link (HostLinkSheet).
+  const [hostLinkToken, setHostLinkToken] = useState<string | null>(null);
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("host");
+    if (t) setHostLinkToken(t);
+  }, []);
   // Hearts tapped in the post-follow interest prompt ("idea:<id>" / "ai:<i>"),
   // and where each landed. Those taps don't pop the one-plan "you're in" sheet;
   // the prompt lists them all after Done instead.
@@ -3263,6 +3271,8 @@ export default function OrgCalendarPage() {
     if (!org) return;
     // The placard welcome is up: don't stack a second popup on it.
     if (showPlacardWelcome) return;
+    // A host link landing owns the screen.
+    if (hostLinkToken) return;
     // Suppress: already following, owner/host, or recently dismissed
     if (isFollowing) return;
     if (org.isOwner || org.isHost) return;
@@ -3273,7 +3283,7 @@ export default function OrgCalendarPage() {
     } catch { /* localStorage unavailable */ }
     const timer = setTimeout(() => setShowFollowPopup(true), 5000);
     return () => clearTimeout(timer);
-  }, [org, isFollowing, showPlacardWelcome]);
+  }, [org, isFollowing, showPlacardWelcome, hostLinkToken]);
 
   function dismissFollowPopup() {
     setShowFollowPopup(false);
@@ -3292,7 +3302,7 @@ export default function OrgCalendarPage() {
     // A ?idea= arrival owns the popup; re-running here after a refetch would
     // swap the linked suggestion for a random one mid-view.
     const landing = new URLSearchParams(window.location.search);
-    if (landing.get("idea") || landing.get("aiEvent")) return;
+    if (landing.get("idea") || landing.get("aiEvent") || landing.get("host")) return;
     const dismissKey = `leaf_idea_popup_dismiss_${org.objectId}`;
     try {
       const dismissed = localStorage.getItem(dismissKey);
@@ -7063,6 +7073,15 @@ export default function OrgCalendarPage() {
                     <p className="text-zinc-500 font-light">
                       Bring &ldquo;{hostingIdea.title}&rdquo; to your community.
                     </p>
+                    {(org?.isOwner || org?.isHost) && (
+                      <div className="mt-3 text-sm">
+                        <CopyHostLinkButton
+                          ideaId={hostingIdea.id}
+                          label="Someone else hosting? Copy a host link"
+                          className="text-zinc-600 underline underline-offset-2 hover:text-zinc-900"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Venue Carousel. With a venue already chosen, the card
@@ -8504,6 +8523,24 @@ export default function OrgCalendarPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {hostLinkToken && org && (
+        <HostLinkSheet
+          token={hostLinkToken}
+          image={(id) => org.planIdeas.find((i) => i.id === id)?.image || null}
+          place={(id) => {
+            const loc = org.planIdeas.find((i) => i.id === id)?.location;
+            return loc?.name || loc?.neighborhood || null;
+          }}
+          PhoneFields={PhoneVerifyFields}
+          onClose={() => {
+            setHostLinkToken(null);
+            const url = new URL(window.location.href);
+            url.searchParams.delete("host");
+            window.history.replaceState(null, "", url.pathname + url.search);
+          }}
+        />
       )}
 
       {/* Phone ask after an interest tap from a browser with no session.
