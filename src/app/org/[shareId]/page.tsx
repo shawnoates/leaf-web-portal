@@ -296,6 +296,13 @@ function WeatherChip({ weather }: { weather: PlanWeather }) {
   );
 }
 
+// Joining a night's group closes a day before it (leaflets-server
+// interest-group.js JOIN_CUTOFF_MS); people already in keep their button.
+const JOIN_CUTOFF_MS = 24 * 60 * 60 * 1000;
+function joinClosed(date: Date | null | undefined) {
+  return !!date && date.getTime() - Date.now() < JOIN_CUTOFF_MS;
+}
+
 interface PlanIdea {
   id: string;
   title: string;
@@ -2303,7 +2310,7 @@ export default function OrgCalendarPage() {
         return true;
       }
       if (occurrence.state === "later") {
-        setToast("Too close to start a group for this one.");
+        setToast("Joining closes a day before the night.");
         setTimeout(() => setToast(null), 5000);
         return true;
       }
@@ -4794,7 +4801,7 @@ export default function OrgCalendarPage() {
             )}
           </div>
           <div className="flex-none flex flex-col gap-1.5 whitespace-nowrap">
-            {!idea.isFeatured && (
+            {!idea.isFeatured && (isInterested || !joinClosed(spreadDate)) && (
               <button
                 type="button"
                 onClick={() =>
@@ -5673,6 +5680,7 @@ export default function OrgCalendarPage() {
                                 {/* Interest group: the interested are gathered
                                     into this night's chat and asked if they're
                                     going (leaflets-server interest-group.js). */}
+                                {(isInterested || !joinClosed(validDate)) && (
                                 <button
                                   type="button"
                                   onClick={() =>
@@ -5687,6 +5695,7 @@ export default function OrgCalendarPage() {
                                   {isInterested ? <><MessageCircle className="w-4 h-4" /> Open group chat</> : "I’m interested"}
                                   {interestCount > 0 && <span className="font-normal opacity-80">· {interestCount}</span>}
                                 </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => handleShareAiEvent(ev, originalIndex)}
@@ -5927,7 +5936,7 @@ export default function OrgCalendarPage() {
                       <div className="flex flex-col sm:flex-row gap-4">
                         {/* Interest group, as on the starter cards. Featured
                             suggestions have no plan idea to gather around. */}
-                        {!idea.isFeatured && (
+                        {!idea.isFeatured && (isInterested || !joinClosed(spreadIdeaDates.get(idea.id) ?? (idea.date ? new Date(idea.date) : null))) && (
                           <button
                             type="button"
                             onClick={() =>
@@ -8269,7 +8278,7 @@ export default function OrgCalendarPage() {
                         Host This Plan
                       </button>
                     )}
-                    {!popupIdea.isFeatured && (
+                    {!popupIdea.isFeatured && (interested || !joinClosed(spreadIdeaDates.get(popupIdea.id) ?? (popupIdea.date ? new Date(popupIdea.date) : null))) && (
                       <button
                         type="button"
                         onClick={() =>
@@ -8366,6 +8375,7 @@ export default function OrgCalendarPage() {
                       Host This Plan
                     </button>
                   )}
+                  {(interested || !joinClosed(resolvedDate)) && (
                   <button
                     type="button"
                     onClick={() =>
@@ -8384,6 +8394,7 @@ export default function OrgCalendarPage() {
                     {interested ? "Open group chat" : "I'm interested"}
                     {count > 0 && <span className="text-[11px] font-normal">· {count}</span>}
                   </button>
+                  )}
                 </div>
                 <button
                   onClick={close}

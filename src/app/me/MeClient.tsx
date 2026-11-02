@@ -2296,7 +2296,7 @@ async function joinInterestGroup(p: HostPlan): Promise<string | null> {
     window.location.assign(`/chat/${occ.eventGroupId}?from=me`);
     return null;
   }
-  if (occ?.state === "later") return "Too close to start a group for this one.";
+  if (occ?.state === "later") return "Joining closes a day before the night.";
   return "Saved. The group for this one isn’t open right now.";
 }
 
