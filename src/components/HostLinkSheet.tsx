@@ -108,6 +108,8 @@ export default function HostLinkSheet({
   const ideaId = info && info.state === "open" ? info.ideaId : null;
   const img = ideaId ? image(ideaId) : null;
   const where = ideaId ? place(ideaId) : null;
+  // Desktop: the poster on the left, the form beside it.
+  const wide = !!img && !hosted;
 
   return (
     <div
@@ -117,7 +119,7 @@ export default function HostLinkSheet({
       <div
         role="dialog"
         aria-modal="true"
-        className="bg-white w-full max-w-md max-h-[92vh] overflow-y-auto shadow-2xl rounded-t-3xl md:rounded-2xl relative"
+        className={`bg-white w-full max-w-md ${wide ? "md:max-w-4xl md:overflow-hidden" : ""} max-h-[92vh] overflow-y-auto shadow-2xl rounded-t-3xl md:rounded-2xl relative`}
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -168,12 +170,17 @@ export default function HostLinkSheet({
             </>
           )
         ) : (
-          <>
+          <div className={wide ? "md:grid md:grid-cols-2 md:h-[min(92vh,720px)]" : ""}>
             {img && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={img} alt="" referrerPolicy="no-referrer" className="w-full h-40 object-cover rounded-t-3xl md:rounded-t-2xl" />
+              <img
+                src={img}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="w-full h-40 md:h-full object-cover rounded-t-3xl md:rounded-none bg-zinc-100"
+              />
             )}
-            <div className="p-6 md:p-8 space-y-5">
+            <div className={`p-6 md:p-8 space-y-5 ${wide ? "md:overflow-y-auto" : ""}`}>
               <div className="space-y-1.5 pr-8">
                 <p className="text-[11px] tracking-wider uppercase font-bold text-emerald-700">
                   You&rsquo;re invited to host
@@ -221,7 +228,7 @@ export default function HostLinkSheet({
                 It goes live on the calendar right away. The date, time and place stay as posted.
               </p>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
