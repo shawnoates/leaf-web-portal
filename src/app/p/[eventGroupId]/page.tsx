@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import Parse from "@/lib/parse";
 import { APP_LINK_URL, SITE_URL } from "@/lib/site";
 import PlanShareRedirect from "./PlanShareRedirect";
@@ -12,6 +13,8 @@ type ShareMode = "invite" | "copy";
 type PlanShareInfo = {
   mode: ShareMode;
   objectId: string;
+  /** Set on an interest group (leaflets-server interest-group.js). */
+  interestGroup?: { state: "gathering" | "on" | "off"; calendarShareId: string | null } | null;
   title: string;
   description: string;
   image: string | null;
@@ -280,6 +283,12 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
         This plan is no longer available.
       </div>
     );
+  }
+
+  // A night still gathering isn't a plan with a host and an RSVP yet: people
+  // join it with I'm interested on its calendar.
+  if (mode === "invite" && info.interestGroup?.state === "gathering" && info.interestGroup.calendarShareId) {
+    redirect(`/org/${info.interestGroup.calendarShareId}`);
   }
 
   const isPrivateForViewer =

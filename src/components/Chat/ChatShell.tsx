@@ -27,6 +27,7 @@ type AuthState = "checking" | "ready" | "denied" | "error";
 // set when this chat gathers the people interested in one night.
 type InterestGroupInfo = {
   state: "gathering" | "on" | "off";
+  calendarShareId: string | null;
   viewer: boolean;
   nightLabel: string | null;
   deadlineLabel: string | null;
@@ -494,6 +495,12 @@ export default function ChatShell({
   }
 
   const handleBack = () => {
+    // A group chat goes back to its calendar: the plan page is for plans
+    // with a host and an RSVP, which a gathering group isn't yet.
+    if (!fromMe && interestGroup?.calendarShareId) {
+      router.push(`/org/${interestGroup.calendarShareId}`);
+      return;
+    }
     router.push(fromMe ? "/me" : `/p/${eventGroupId}`);
   };
 
