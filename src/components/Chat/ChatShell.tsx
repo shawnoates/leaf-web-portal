@@ -36,6 +36,12 @@ type InterestGroupInfo = {
   bookingAskOpen: boolean;
 };
 type InterestAnswer = "going" | "cant_make_it";
+
+/** "Be the first" beats "0 attendees" on a plan nobody has joined yet. */
+function attendeeLabel(n: number) {
+  if (n === 0) return "Be the first";
+  return `${n} attendee${n === 1 ? "" : "s"}`;
+}
 type DeviceType = "ios" | "android" | "desktop";
 const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
 
@@ -521,7 +527,7 @@ export default function ChatShell({
         <div className="flex-1 min-w-0">
           <h1 className="text-sm font-medium truncate">{planTitle || "Plan chat"}</h1>
           <p className="text-xs text-zinc-500">
-            {attendeeCount != null ? `${attendeeCount} attendee${attendeeCount === 1 ? "" : "s"}` : `${messages.length} message${messages.length === 1 ? "" : "s"}`}
+            {attendeeCount != null ? attendeeLabel(attendeeCount) : `${messages.length} message${messages.length === 1 ? "" : "s"}`}
           </p>
         </div>
         {device === "ios" && iosDeepLink && (
@@ -575,7 +581,7 @@ export default function ChatShell({
               <div className="flex items-start gap-2.5">
                 <Users className="w-4 h-4 mt-0.5 text-zinc-400 shrink-0" />
                 <div className="text-zinc-700">
-                  {attendeeCount} attendee{attendeeCount === 1 ? "" : "s"}
+                  {attendeeLabel(attendeeCount)}
                 </div>
               </div>
             )}
@@ -707,10 +713,18 @@ export default function ChatShell({
               </>
             ) : (
               <>
-                <span className="font-semibold">
-                  {interestGroup.confirmed} of {interestGroup.minConfirmed} going
-                </span>
-                {interestGroup.nightLabel ? ` for ${interestGroup.nightLabel}` : ""}
+                {/* No "0 of 3": until someone's in, just the night and when
+                    it's decided. */}
+                {interestGroup.confirmed > 0 ? (
+                  <>
+                    <span className="font-semibold">
+                      {interestGroup.confirmed} of {interestGroup.minConfirmed} going
+                    </span>
+                    {interestGroup.nightLabel ? ` for ${interestGroup.nightLabel}` : ""}
+                  </>
+                ) : (
+                  <span className="font-semibold">{interestGroup.nightLabel || "This night"}</span>
+                )}
                 {interestGroup.deadlineLabel ? ` · decided ${interestGroup.deadlineLabel}` : ""}
               </>
             )}

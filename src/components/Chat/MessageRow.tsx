@@ -217,7 +217,9 @@ function LeafCardRow({
       <div className="w-8 shrink-0"><LeafAvatar /></div>
       <div className="max-w-[80%] flex flex-col items-stretch">
         <span className="text-[11px] mb-0.5 px-1 text-zinc-900">Leaf</span>
-        <div className="rounded-2xl border border-zinc-200 bg-white text-sm text-zinc-900">
+        {/* One card: Leaf's text, then (for a viewer) the answer buttons
+            under a hairline. */}
+        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white text-sm text-zinc-900">
           <div className="flex flex-col gap-2.5 px-3.5 py-3">
             <p className="m-0 leading-relaxed whitespace-pre-wrap">{text.trim()}</p>
             {cta && (
@@ -226,30 +228,30 @@ function LeafCardRow({
               </button>
             )}
           </div>
-        </div>
-        {answer && (
-          <div className="mt-3 flex flex-col items-center gap-2">
-            <div className="flex justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => answer.onAnswer("going")}
-                disabled={answer.answering !== null}
-                className="min-w-[132px] rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {answer.answering === "going" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Going"}
-              </button>
-              <button
-                type="button"
-                onClick={() => answer.onAnswer("cant_make_it")}
-                disabled={answer.answering !== null}
-                className="min-w-[132px] rounded-full border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-900 disabled:opacity-50"
-              >
-                {answer.answering === "cant_make_it" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Can’t make it"}
-              </button>
+          {answer && (
+            <div className="flex flex-col items-center gap-2 border-t border-zinc-100 px-3.5 py-3">
+              <div className="flex justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => answer.onAnswer("going")}
+                  disabled={answer.answering !== null}
+                  className="min-w-[132px] rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {answer.answering === "going" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Going"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => answer.onAnswer("cant_make_it")}
+                  disabled={answer.answering !== null}
+                  className="min-w-[132px] rounded-full border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-900 disabled:opacity-50"
+                >
+                  {answer.answering === "cant_make_it" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Can’t make it"}
+                </button>
+              </div>
+              {answer.error && <p className="text-xs text-rose-600">{answer.error}</p>}
             </div>
-            {answer.error && <p className="text-xs text-rose-600">{answer.error}</p>}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
