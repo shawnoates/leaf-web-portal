@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, CalendarDays, Check, ChevronRight, ChevronUp, Eye, MapPin, MessageCircle, Plus, Search, Settings, UserPlus, X } from "lucide-react";
+import { ArrowUp, CalendarDays, Check, ChevronUp, Eye, MapPin, MessageCircle, Plus, Search, Settings, UserPlus, X } from "lucide-react";
 import VenueSearch from "@/components/VenueSearch";
 import Parse from "@/lib/parse-client";
 import { useCrewAuth } from "@/components/crew/useCrewAuth";
@@ -648,8 +648,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             <section className="flex flex-col gap-3.5 lg:gap-5">
               <div className="flex items-center justify-between">
                 <SectionTitle>The book</SectionTitle>
-                <Link href={`${crewHref(auth, "book")}?add=1`} className="flex min-h-11 items-center gap-1 text-sm font-semibold text-fm-ink hover:text-white">
-                  <Plus size={16} strokeWidth={2.2} aria-hidden /> Add<span className="hidden lg:inline"> a place</span>
+                <Link href={crewHref(auth, "book")} className="flex min-h-11 items-center text-sm font-semibold text-fm-ink-2 underline underline-offset-4 hover:text-fm-ink">
+                  See all{(data.bookTotal ?? 0) > 0 ? ` ${data.bookTotal}` : ""}
                 </Link>
               </div>
               {!data.bookHappenings && (data.watching?.length ?? 0) > 0 && (
@@ -673,6 +673,16 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 </div>
               ) : book.length > 0 && (
                 <ul className="no-scrollbar -mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 scroll-pl-5 lg:mx-0 lg:grid lg:grid-cols-4 lg:gap-4 lg:overflow-visible lg:px-0">
+                  {/* Adding comes first: the book's search, focused. */}
+                  <li className="flex w-[148px] shrink-0 snap-start flex-col gap-2 lg:w-auto">
+                    <Link
+                      href={`${crewHref(auth, "book")}?add=1`}
+                      className="flex h-[148px] flex-col items-center justify-center gap-2 rounded-[20px] border border-dashed border-fm-line text-center text-fm-ink hover:border-fm-ink-2 lg:h-[168px] lg:rounded-[22px]"
+                    >
+                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-fm-card" aria-hidden><Plus size={18} strokeWidth={2.4} /></span>
+                      <span className="text-[15px] font-semibold">Add a place</span>
+                    </Link>
+                  </li>
                   {book.map((s) => (
                     <li key={s.spotId} className="flex w-[148px] shrink-0 snap-start flex-col gap-2 lg:w-auto lg:gap-2.5 lg:[&:nth-child(n+5)]:hidden">
                      <a href={spotHref(s, inApp)} target={inApp ? undefined : "_blank"} rel="noreferrer" className="flex flex-col gap-2 lg:gap-2.5">
@@ -694,23 +704,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                      </a>
                     </li>
                   ))}
-                  {/* The rest of the book: newest are shown here, everything is there. */}
-                  <li className="flex w-[148px] shrink-0 snap-start flex-col gap-2 lg:hidden">
-                    <Link
-                      href={crewHref(auth, "book")}
-                      className="flex h-[148px] flex-col items-center justify-center gap-2 rounded-[20px] border border-dashed border-fm-line text-center text-fm-ink hover:border-fm-ink-2"
-                    >
-                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-fm-card" aria-hidden><ChevronRight size={18} strokeWidth={2.2} /></span>
-                      <span className="text-[15px] font-semibold">{(data.bookTotal ?? book.length) > book.length ? "See more" : "See the book"}</span>
-                      {(data.bookTotal ?? book.length) > book.length && <span className="text-xs text-fm-muted">{data.bookTotal} places</span>}
-                    </Link>
-                  </li>
                 </ul>
-              )}
-              {book.length > 0 && (data.bookTotal ?? book.length) > 4 && (
-                <Link href={crewHref(auth, "book")} className="hidden w-fit text-sm font-semibold text-fm-ink-2 underline underline-offset-4 hover:text-fm-ink lg:inline">
-                  See all {data.bookTotal} places
-                </Link>
               )}
               <HappeningsCards items={happenings.slice(0, 3)} total={data.bookHappeningsTotal ?? happenings.length} auth={auth} />
               {me.status === "in" && (
