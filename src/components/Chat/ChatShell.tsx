@@ -178,6 +178,26 @@ export default function ChatShell({
     let unsubscribe: (() => void) | undefined;
 
     async function init() {
+      // A signed link (u + t, the same pair /me takes) signs the reader in
+      // first: interest-group pushes open the chat in the app's in-app
+      // browser, which has no web session of its own.
+      const params = new URLSearchParams(window.location.search);
+      const linkUser = params.get("u");
+      const linkToken = params.get("t");
+      if (linkUser && linkToken) {
+        if (Parse.User.current()?.id !== linkUser) {
+          try {
+            const r = (await Parse.Cloud.run("getDashboardSession", { userId: linkUser, token: linkToken })) as {
+              sessionToken?: string;
+            };
+            if (r?.sessionToken?.startsWith("r:")) await Parse.User.become(r.sessionToken);
+          } catch { /* fall through to the signed-out screen */ }
+        }
+        params.delete("u");
+        params.delete("t");
+        const rest = params.toString();
+        window.history.replaceState(null, "", window.location.pathname + (rest ? `?${rest}` : ""));
+      }
       const user = Parse.User.current();
       if (!user) {
         setAuthState("denied");
