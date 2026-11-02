@@ -297,7 +297,8 @@ export default function CrewMoneyCard({
                 ) : p.paid ? (
                   <button type="button" className="rounded-full bg-fm-ink px-3 py-1.5 text-xs font-semibold text-fm-canvas" disabled={busy !== null} onClick={() => call(`c${p.userId}`, "confirmSplitPaid", { userId: p.userId })}>Confirm</button>
                 ) : (
-                  <span className="text-xs text-fm-muted">Not yet</span>
+                  // Paid outside Leaf (a Venmo request, cash): whoever paid marks it.
+                  <button type="button" className="rounded-full border border-fm-line px-3 py-1.5 text-xs font-semibold text-fm-ink hover:border-fm-ink-2" disabled={busy !== null} onClick={() => call(`c${p.userId}`, "confirmSplitPaid", { userId: p.userId })}>{busy === `c${p.userId}` ? "Saving…" : "Mark paid"}</button>
                 )}
               </li>
             ))}
