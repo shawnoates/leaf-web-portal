@@ -403,6 +403,15 @@ export default function ChatShell({
     );
   }
 
+  // A viewer answers under the latest of Leaf's night cards (the ask, or
+  // "it's on"); the bottom bar only carries the buttons when that card isn't
+  // in the loaded history.
+  const viewerCanAnswer =
+    !!interestGroup && interestGroup.state !== "off" && interestGroup.viewer && !planCancelled && !leftGroup;
+  const answerAnchorId = [...messages]
+    .reverse()
+    .find((m) => m.type === "occurrenceAsk" || m.type === "occurrenceOn")?.message_id;
+
   if (authState === "denied") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-6">
@@ -737,6 +746,11 @@ export default function ChatShell({
                       ? claimBooking
                       : undefined
                   }
+                  answer={
+                    viewerCanAnswer && msg.message_id === answerAnchorId
+                      ? { onAnswer: answerInterest, answering, error: answerError }
+                      : undefined
+                  }
                 />
               );
             })
@@ -748,7 +762,13 @@ export default function ChatShell({
             <p className="text-sm font-medium text-zinc-900">You&rsquo;re out of this one</p>
             <p className="mt-0.5 text-xs text-zinc-500">Thanks for letting the group know.</p>
           </div>
-        ) : interestGroup && interestGroup.state !== "off" && interestGroup.viewer && !planCancelled ? (
+        ) : viewerCanAnswer && answerAnchorId ? (
+          // The buttons sit under Leaf's ask in the thread; this just says why
+          // there's no composer.
+          <div className="bg-white border-t border-zinc-200 px-4 md:px-6 py-3 shrink-0 text-center text-sm text-zinc-500">
+            Tap Going above to chat with the group.
+          </div>
+        ) : viewerCanAnswer ? (
           // A viewer reads but can't post until they say they're going (the
           // RTDB rules hold that line too).
           <div className="bg-white border-t border-zinc-200 px-4 md:px-6 py-3 shrink-0 space-y-2.5">

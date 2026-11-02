@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, CheckCircle2, ExternalLink, Smartphone } from "lucide-react";
+import { MapPin, CheckCircle2, ExternalLink, Smartphone, Loader2 } from "lucide-react";
 import type { FirMessage, UserLite } from "./types";
 
 const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
@@ -12,6 +12,14 @@ interface Props {
   hideAvatar: boolean;
   /** Interest groups: a confirmed member takes the booking the admin asked for. */
   onClaimBooking?: () => void;
+  /** Interest groups: Going / Can't make it under the ask, for a viewer. */
+  answer?: InterestAnswerProps;
+}
+
+export interface InterestAnswerProps {
+  onAnswer: (answer: "going" | "cant_make_it") => void;
+  answering: "going" | "cant_make_it" | null;
+  error: string | null;
 }
 
 export default function MessageRow({
@@ -20,6 +28,7 @@ export default function MessageRow({
   isFromCurrentUser,
   hideAvatar,
   onClaimBooking,
+  answer,
 }: Props) {
   const type = message.type;
 
@@ -27,7 +36,7 @@ export default function MessageRow({
   // decision, and the admin's "can one of you book it?". The Going / Snooze
   // answers live in the bar under the messages, so these are just Leaf cards.
   if (type === "occurrenceAsk" || type === "occurrenceOn" || type === "occurrenceOff") {
-    return <LeafCardRow text={message.text || ""} />;
+    return <LeafCardRow text={message.text || ""} answer={answer} />;
   }
   if (type === "bookingAsk") {
     return <LeafCardRow text={message.text || ""} cta={onClaimBooking ? { label: "I’ll book it", onClick: onClaimBooking } : undefined} />;
@@ -194,11 +203,19 @@ function LeafAddOnRow({ message }: { message: FirMessage }) {
 
 // --- Interest-group cards: Leaf's text, optionally one action ---
 
-function LeafCardRow({ text, cta }: { text: string; cta?: { label: string; onClick: () => void } }) {
+function LeafCardRow({
+  text,
+  cta,
+  answer,
+}: {
+  text: string;
+  cta?: { label: string; onClick: () => void };
+  answer?: InterestAnswerProps;
+}) {
   return (
     <div className="flex items-start gap-2">
       <div className="w-8 shrink-0"><LeafAvatar /></div>
-      <div className="max-w-[80%] flex flex-col items-start">
+      <div className="max-w-[80%] flex flex-col items-stretch">
         <span className="text-[11px] mb-0.5 px-1 text-zinc-900">Leaf</span>
         <div className="rounded-2xl border border-zinc-200 bg-white text-sm text-zinc-900">
           <div className="flex flex-col gap-2.5 px-3.5 py-3">
@@ -210,6 +227,29 @@ function LeafCardRow({ text, cta }: { text: string; cta?: { label: string; onCli
             )}
           </div>
         </div>
+        {answer && (
+          <div className="mt-3 flex flex-col items-center gap-2">
+            <div className="flex justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => answer.onAnswer("going")}
+                disabled={answer.answering !== null}
+                className="min-w-[132px] rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {answer.answering === "going" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Going"}
+              </button>
+              <button
+                type="button"
+                onClick={() => answer.onAnswer("cant_make_it")}
+                disabled={answer.answering !== null}
+                className="min-w-[132px] rounded-full border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-900 disabled:opacity-50"
+              >
+                {answer.answering === "cant_make_it" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Can’t make it"}
+              </button>
+            </div>
+            {answer.error && <p className="text-xs text-rose-600">{answer.error}</p>}
+          </div>
+        )}
       </div>
     </div>
   );
