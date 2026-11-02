@@ -29,6 +29,8 @@ type InterestGroupInfo = {
   state: "gathering" | "on" | "off";
   calendarShareId: string | null;
   viewer: boolean;
+  /** Said Can't make it: still read-only here, and can change their mind. */
+  declined?: boolean;
   nightLabel: string | null;
   deadlineLabel: string | null;
   minConfirmed: number;
@@ -146,8 +148,10 @@ export default function ChatShell({
         };
         if (result.state === "going") {
           setInterestGroup((prev) =>
-            prev ? { ...prev, viewer: false, confirmed: result.confirmed ?? prev.confirmed + 1 } : prev,
+            prev ? { ...prev, viewer: false, declined: false, confirmed: result.confirmed ?? prev.confirmed + 1 } : prev,
           );
+        } else if (result.state === "declined") {
+          setInterestGroup((prev) => (prev ? { ...prev, viewer: false, declined: true } : prev));
         } else {
           setLeftGroup(true);
         }
@@ -435,6 +439,9 @@ export default function ChatShell({
   // in the loaded history.
   const viewerCanAnswer =
     !!interestGroup && interestGroup.state !== "off" && interestGroup.viewer && !planCancelled && !leftGroup;
+  // Said Can't make it: the conversation stays blurred, with a way back in.
+  const declinedView =
+    !!interestGroup && interestGroup.state !== "off" && !!interestGroup.declined && !planCancelled && !leftGroup;
   const answerAnchorId = [...messages]
     .reverse()
     .find((m) => m.type === "occurrenceAsk" || m.type === "occurrenceOn")?.message_id;
@@ -752,7 +759,7 @@ export default function ChatShell({
                 ) : (
                   <span className="font-semibold">{interestGroup.nightLabel || "This night"}</span>
                 )}
-                {interestGroup.deadlineLabel ? ` · decided ${interestGroup.deadlineLabel}` : ""}
+                {interestGroup.deadlineLabel ? ` · RSVP by ${interestGroup.deadlineLabel}` : ""}
               </>
             )}
           </div>
@@ -777,7 +784,7 @@ export default function ChatShell({
                 Math.abs((msg.timestamp || 0) - (prev.timestamp || 0)) < 60;
               // Someone who hasn't answered sees Leaf's cards (to answer) but
               // only a blur of the conversation until they say Going.
-              const blurred = viewerCanAnswer && msg.from !== "leaf_ai";
+              const blurred = (viewerCanAnswer || declinedView) && msg.from !== "leaf_ai";
               const row = (
                 <MessageRow
                   key={msg.message_id || `${msg.timestamp}-${idx}`}
@@ -829,6 +836,19 @@ export default function ChatShell({
             <p className="text-sm font-medium text-zinc-900">You&rsquo;re out of this one</p>
             <p className="mt-0.5 text-xs text-zinc-500">Thanks for letting the group know.</p>
           </div>
+        ) : declinedView ? (
+          <div role="status" className="bg-zinc-50 border-t border-zinc-200 px-4 md:px-6 py-3 shrink-0 flex items-center justify-center gap-3 text-sm">
+            <span className="text-zinc-600">You said you can&rsquo;t make it.</span>
+            <button
+              type="button"
+              onClick={() => answerInterest("going")}
+              disabled={answering !== null}
+              className="font-medium text-zinc-900 underline underline-offset-2 disabled:opacity-50"
+            >
+              {answering === "going" ? "Saving…" : "I can go after all"}
+            </button>
+            {answerError && <span className="text-xs text-rose-600">{answerError}</span>}
+          </div>
         ) : viewerCanAnswer && answerAnchorId ? (
           // The buttons sit under Leaf's ask in the thread; this just says why
           // there's no composer.
@@ -845,7 +865,7 @@ export default function ChatShell({
                 {interestGroup.state === "on"
                   ? " It’s on. Say you’re going to chat with the group."
                   : interestGroup.deadlineLabel
-                    ? ` It’s decided ${interestGroup.deadlineLabel}. Say you’re going to chat with the group.`
+                    ? ` Needs ${interestGroup.minConfirmed} · RSVP by ${interestGroup.deadlineLabel}.`
                     : " Say you’re going to chat with the group."}
               </span>
             </p>

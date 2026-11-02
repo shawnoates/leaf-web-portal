@@ -2345,7 +2345,7 @@ function InterestGroupsRail() {
                 </span>
                 {g.state === "on"
                   ? <span className="urgent">It&rsquo;s on</span>
-                  : g.deadlineLabel && <span className="urgent">Decided {g.deadlineLabel}</span>}
+                  : g.deadlineLabel && <span className="urgent">RSVP by {g.deadlineLabel}</span>}
               </div>
             </div>
             <div className="hostact">

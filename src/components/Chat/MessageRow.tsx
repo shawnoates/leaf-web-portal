@@ -282,7 +282,7 @@ function NightCardRow({ type, night, answer }: { type: string; night: NightInfo;
       ? `${night.confirmed} going · you can still say Going until it starts`
       : type === "occurrenceOff"
         ? "Not enough people said they were going"
-        : `Goes ahead if ${night.minConfirmed} are going${night.deadlineLabel ? ` · decided ${night.deadlineLabel}` : ""}`;
+        : `Needs ${night.minConfirmed}${night.deadlineLabel ? ` · RSVP by ${night.deadlineLabel}` : ""}`;
   return (
     <div className="flex items-start gap-2">
       <div className="w-8 shrink-0"><LeafAvatar /></div>
