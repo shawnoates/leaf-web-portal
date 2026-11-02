@@ -72,7 +72,17 @@ export function computeSpreadIdeaDates(
   // reserved so a fanned AI idea won't land on top of them.
   const toFan: { id: string; date: string | null }[] = [];
   for (const idea of ideas) {
-    if ((idea.isManual || idea.datePinned) && idea.date) {
+    // The server now gives generated ideas real dates (leaflets-server
+    // plan-idea-dates.js), and interest groups, texts and the app all use
+    // them, so a re-spread here would show a day nobody else agrees with.
+    // Only an idea still on the generator's placeholder slot (14:00 UTC on
+    // the hour) is fanned; everything else keeps the date it was given.
+    const placeholder = (() => {
+      if (!idea.date) return false;
+      const d = new Date(idea.date);
+      return d.getUTCHours() === 14 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+    })();
+    if ((idea.isManual || idea.datePinned || !placeholder) && idea.date) {
       const d = new Date(idea.date);
       if (!Number.isNaN(d.getTime())) {
         result.set(idea.id, d);
