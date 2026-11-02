@@ -775,7 +775,10 @@ export default function ChatShell({
                 !prev.type &&
                 !msg.type &&
                 Math.abs((msg.timestamp || 0) - (prev.timestamp || 0)) < 60;
-              return (
+              // Someone who hasn't answered sees Leaf's cards (to answer) but
+              // only a blur of the conversation until they say Going.
+              const blurred = viewerCanAnswer && msg.from !== "leaf_ai";
+              const row = (
                 <MessageRow
                   key={msg.message_id || `${msg.timestamp}-${idx}`}
                   message={msg}
@@ -806,6 +809,17 @@ export default function ChatShell({
                   }
                 />
               );
+              return blurred ? (
+                <div
+                  key={msg.message_id || `${msg.timestamp}-${idx}`}
+                  aria-hidden="true"
+                  className="blur-[5px] select-none pointer-events-none"
+                >
+                  {row}
+                </div>
+              ) : (
+                row
+              );
             })
           )}
         </div>
@@ -819,7 +833,7 @@ export default function ChatShell({
           // The buttons sit under Leaf's ask in the thread; this just says why
           // there's no composer.
           <div className="bg-white border-t border-zinc-200 px-4 md:px-6 py-3 shrink-0 text-center text-sm text-zinc-500">
-            Tap Going above to chat with the group.
+            Tap Going above to see the conversation and chat with the group.
           </div>
         ) : viewerCanAnswer ? (
           // A viewer reads but can't post until they say they're going (the
