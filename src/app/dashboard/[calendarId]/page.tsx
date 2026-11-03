@@ -22,7 +22,7 @@ import PlanDetailModal from "@/components/PlanDetailModal";
 import PhoneVerificationModal from "@/components/PhoneVerificationModal";
 import DashboardSidebar, { type DashboardSidebarProps } from "@/components/dashboard/DashboardSidebar";
 import CrewClient from "@/app/crew/[token]/CrewClient";
-import { CrewEmbed } from "@/components/crew/CrewShell";
+import { CrewEmbed, useInApp } from "@/components/crew/CrewShell";
 import StartCrewModal from "@/components/crew/StartCrewModal";
 import { useMyCrews } from "@/lib/my-crews";
 import DashboardMobileMenu from "@/components/dashboard/DashboardMobileMenu";
@@ -159,6 +159,9 @@ export default function OrgDashboardPage() {
 
   const [user, setUser] = useState<Parse.User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  // Inside the app's calendar web view: its nav bar already names the
+  // calendar, and the app owns sign-in, so the page drops both.
+  const inApp = useInApp();
   const [dashboard, setDashboard] = useState<OrgDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   // Mirror of `dashboard` for use inside stable callbacks without re-creating
@@ -1539,7 +1542,7 @@ export default function OrgDashboardPage() {
           <h1 className="text-2xl font-light tracking-tight mb-2">Sign in to continue</h1>
           {/* Google blocks its sign-in inside the app's web view; the app signs
               this page in through its link, so a miss there means reopening. */}
-          {/LeafApp\//.test(navigator.userAgent) ? (
+          {inApp ? (
             <p className="text-sm text-zinc-500">Go back and open the calendar again.</p>
           ) : (
             <>
@@ -1644,7 +1647,7 @@ export default function OrgDashboardPage() {
   const homeTopSlot = (
     <div className="space-y-3 mb-4 empty:mb-0 empty:hidden">
       {conciergeEntryCard}
-      {!leafAppConnected && (
+      {!leafAppConnected && !inApp && (
         <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
           <Smartphone className="w-4 h-4 text-amber-600 shrink-0" />
           <p className="text-xs text-amber-800 flex-1">
@@ -1782,7 +1785,9 @@ export default function OrgDashboardPage() {
         {/* Mobile header */}
         <header className="lg:hidden border-b border-zinc-100 px-4 py-3.5 flex items-center gap-3">
           <DashboardMobileMenu {...sidebarProps} />
-          {dashboard.profilePhoto ? (
+          {inApp ? (
+            <div className="flex-1" />
+          ) : dashboard.profilePhoto ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={dashboard.profilePhoto}
@@ -1798,12 +1803,14 @@ export default function OrgDashboardPage() {
               </span>
             </div>
           )}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-zinc-900 truncate">
-              {dashboard.name}
-            </p>
-            <p className="text-[10px] text-zinc-400">{tierLabel} Plan · all calendars</p>
-          </div>
+          {!inApp && (
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-zinc-900 truncate">
+                {dashboard.name}
+              </p>
+              <p className="text-[10px] text-zinc-400">{tierLabel} Plan · all calendars</p>
+            </div>
+          )}
           <Link
             href="/inbox"
             aria-label={`Inbox${inboxUnread > 0 ? ` (${inboxUnread} unread)` : ""}`}
@@ -2370,7 +2377,7 @@ export default function OrgDashboardPage() {
                   <div className="flex items-center gap-2">
                     <Smartphone className="w-3.5 h-3.5 text-zinc-400" />
                     <span className="text-xs text-zinc-500">Connected to Leaf app</span>
-                    <a href="https://apps.apple.com/us/app/leaf-build-your-community/id1040588046" target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-400 hover:text-zinc-600 underline">Visit App Store</a>
+                    {!inApp && <a href="https://apps.apple.com/us/app/leaf-build-your-community/id1040588046" target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-400 hover:text-zinc-600 underline">Visit App Store</a>}
                   </div>
                   {leafAppConnected ? (
                     <div className="flex items-center gap-1.5">
@@ -2800,7 +2807,7 @@ export default function OrgDashboardPage() {
 
                 {/* Account — shown to everyone; the only logout on mobile,
                     where the sidebar footer is hidden */}
-                {(!dashboard.isOwner || settingsSection === "general") && (
+                {!inApp && (!dashboard.isOwner || settingsSection === "general") && (
                 <section className={`border border-zinc-200 rounded-xl p-6 ${dashboard.isOwner ? "mt-8" : ""}`}>
                   <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 mb-1">
                     Account

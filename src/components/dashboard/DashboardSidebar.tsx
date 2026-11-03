@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { DashboardCrew, DashboardTab, OrgDashboardCalendar } from "./types";
 import { FriendModeIcon } from "@/components/crew/FriendModeGlyphs";
+import { useInApp } from "@/components/crew/CrewShell";
 
 // Persistent desktop sidebar (≥1024px) for the redesigned dashboard.
 // Carries the org switcher block, the five places, the calendar list, and the
@@ -76,6 +77,8 @@ export default function DashboardSidebar({
   orgless = false,
   variant = "desktop",
 }: DashboardSidebarProps) {
+  // The app owns sign-in; logging the web view out would strand the page.
+  const inApp = useInApp();
   // Crews that are switched off or paused sit at the bottom, folded away
   // (open when one of them is the one being looked at).
   const isOff = (c: DashboardCrew) => c.status === "off" || c.status === "paused";
@@ -316,12 +319,14 @@ export default function DashboardSidebar({
         >
           Help
         </Link>
-        <button
-          onClick={onLogout}
-          className="px-2.5 py-2 rounded-lg text-left text-xs text-zinc-500 hover:bg-zinc-100 hover:text-red-700 transition-colors"
-        >
-          Log out
-        </button>
+        {!inApp && (
+          <button
+            onClick={onLogout}
+            className="px-2.5 py-2 rounded-lg text-left text-xs text-zinc-500 hover:bg-zinc-100 hover:text-red-700 transition-colors"
+          >
+            Log out
+          </button>
+        )}
       </div>
     </aside>
   );
