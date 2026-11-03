@@ -2052,6 +2052,9 @@ export default function OrgCalendarPage() {
     if (!orgIdForSource) return;
     const src = captureFollowSource(orgIdForSource);
     if (src) track("calendar_src_arrival", { src }, orgIdForSource);
+    // A friend's texted invite (Text your friends): tell the host it was opened.
+    const invite = src && /^i-([a-z0-9]{8})$/.exec(src);
+    if (invite) Parse.Cloud.run("textInviteOpened", { token: invite[1] }).catch(() => {});
   }, [orgIdForSource]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -92,6 +92,12 @@ export default function PromotePrompt({
     } catch { /* dismissed */ }
   };
 
+  // An app build with the native "Text your friends" queue says so in its user
+  // agent (LeafText/1): there, "Text a friend" picks contacts and texts each
+  // one their own tracked link from the host's iMessage. Elsewhere it's the
+  // plain sms: link.
+  const [nativeText] = useState(() => typeof navigator !== "undefined" && /LeafText\//.test(navigator.userAgent));
+
   const pct = Math.min(100, Math.round((Math.min(followerCount, PROMOTE_GOAL) / PROMOTE_GOAL) * 100));
   const smsHref = `sms:?&body=${encodeURIComponent(message)}`;
   const mailHref = `mailto:?subject=${encodeURIComponent(`Follow ${calendarName}`)}&body=${encodeURIComponent(message)}`;
@@ -197,7 +203,7 @@ export default function PromotePrompt({
         </div>
 
         <div className="mt-5 grid grid-cols-3 gap-2 md:gap-2.5">
-          <Tile href={smsHref} onClick={markShared} icon={<MessageCircle className="w-[22px] h-[22px]" />} label="Text a friend" />
+          <Tile href={nativeText ? `leaf://text-friends/${orgId}` : smsHref} onClick={markShared} icon={<MessageCircle className="w-[22px] h-[22px]" />} label={nativeText ? "Text friends" : "Text a friend"} />
           <Tile href={mailHref} onClick={markShared} icon={<Mail className="w-[22px] h-[22px]" />} label="Email your list" />
           <Tile href={`/org/${shareId}/promote?org=${orgId}`} internal onClick={markShared} icon={<QrCode className="w-[22px] h-[22px]" />} label="Print a flyer" />
         </div>
