@@ -24,6 +24,7 @@ import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p
 import { IMAGE_ACCEPT, processImageFile } from "@/lib/image-utils";
 import HostIntroVideoCard, { type IntroVideoInfo } from "@/components/HostIntroVideoCard";
 import HostedNightReport from "./HostedNightReport";
+import HostShareCard, { type HostShareInfo } from "./HostShareCard";
 
 type OfferState =
   | "offered"
@@ -98,6 +99,8 @@ type Offer = {
   addons?: OfferAddon[];
   /** Where guests pay the host for add-ons: saved, or prefilled from payout details. */
   payHandles?: { handles: PayHandles | null; saved: boolean };
+  /** A paid host's network link and its bonus so far; until the night ends. */
+  share?: HostShareInfo | null;
 };
 
 type OfferAddon = {
@@ -691,6 +694,8 @@ export default function HostOfferClient({ token }: { token: string }) {
             onChanged={load}
           />
         )}
+
+        {offer.share && <HostShareCard share={offer.share} />}
 
         {/* After the night: confirm you were there. This is what releases pay. */}
         {offer.planStarted && (

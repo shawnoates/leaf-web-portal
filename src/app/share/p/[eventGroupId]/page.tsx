@@ -13,12 +13,12 @@ import { redirect } from "next/navigation";
 
 type PageProps = {
   params: Promise<{ eventGroupId: string }>;
-  searchParams: Promise<{ copy?: string; rsvp?: string; src?: string; via?: string }>;
+  searchParams: Promise<{ copy?: string; rsvp?: string; src?: string; via?: string; i?: string }>;
 };
 
 export default async function ShareRedirectPage({ params, searchParams }: PageProps) {
   const { eventGroupId } = await params;
-  const { copy, rsvp, src, via } = await searchParams;
+  const { copy, rsvp, src, via, i } = await searchParams;
   const query = new URLSearchParams();
   if (copy) query.set("copy", copy);
   if (rsvp) query.set("rsvp", rsvp);
@@ -28,6 +28,8 @@ export default async function ShareRedirectPage({ params, searchParams }: PagePr
   if (src) query.set("src", src);
   // Cross-promotion: keeps the landing on the calendar the link came from.
   if (via) query.set("via", via);
+  // A paid host's share-bonus invite code: /p/ credits the RSVP to their link.
+  if (i) query.set("i", i);
   const qs = query.toString();
   redirect(`/p/${eventGroupId}${qs ? `?${qs}` : ""}`);
 }
