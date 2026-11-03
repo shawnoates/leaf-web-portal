@@ -33,6 +33,7 @@ import CreateCalendarModal from "@/components/dashboard/CreateCalendarModal";
 import SeriesHostModal, { type SeriesLimit } from "@/components/dashboard/SeriesHostModal";
 import P2pIntroModal from "@/components/dashboard/P2pIntroModal";
 import PromotePrompt, { PROMOTE_GOAL, promotePromptSnoozed } from "@/components/dashboard/PromotePrompt";
+import TextedFriendsCard from "@/components/dashboard/TextedFriendsCard";
 import { seriesCountsTowardLimit, type SeriesSummary } from "@/lib/series";
 import GrowPerformance from "@/components/dashboard/GrowPerformance";
 import SharePlanSheet from "@/components/dashboard/SharePlanSheet";
@@ -1839,6 +1840,11 @@ export default function OrgDashboardPage() {
               analytics={analytics}
               publishBanner={publishBanner}
               topSlot={homeTopSlot}
+              railSlot={
+                dashboard.isOwner || dashboard.isOrgCoHost || dashboard.viewerCalendarRole
+                  ? <TextedFriendsCard calendarId={dashboard.objectId} />
+                  : null
+              }
               onNewPlan={openNewPlan}
               onOpenPlan={(plan) => setSelectedActivePlan(plan)}
               onGoCommunity={goCommunity}

@@ -148,6 +148,7 @@ export default function HomeTab({
   analytics,
   publishBanner,
   topSlot,
+  railSlot,
   onNewPlan,
   onOpenPlan,
   onGoCommunity,
@@ -173,6 +174,8 @@ export default function HomeTab({
   /** Banners and cards the page owns (concierge entry, app-connect nudge,
    *  RSVP-limit warning) — rendered between the header and the counters. */
   topSlot?: React.ReactNode;
+  /** First card in the right rail (Friends you texted). */
+  railSlot?: React.ReactNode;
   onNewPlan: (prefillDate?: string) => void;
   onOpenPlan: (plan: CalActivePlan) => void;
   onGoCommunity: (segment?: "never") => void;
@@ -1073,6 +1076,7 @@ export default function HomeTab({
 
           {/* Right rail */}
           <div className="mt-6 lg:mt-0 space-y-3.5">
+            {railSlot}
             {dashboard.recentPhotos.length > 0 && (
               <div className="border border-zinc-200 rounded-xl p-4">
                 <p className="text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase mb-2.5">
