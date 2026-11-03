@@ -384,17 +384,40 @@ export default function OrgDashboardPage() {
   const [editScopeIds, setEditScopeIds] = useState<string[]>([]);
   const [savingScope, setSavingScope] = useState(false);
 
+  // A signed link (`?u=<userId>&t=<token>`, the pair /me and /org take) lands
+  // signed in: the app's calendar web view opens the dashboard this way
+  // (getCalendarWebLink). A bad or expired pair falls through to the gate.
   useEffect(() => {
-    try {
-      const current = Parse.User.current();
-      if (current) {
-        setUser(current);
-        setLeafAppConnected(current.get("leafAppConnected") === true);
+    let cancelled = false;
+    (async () => {
+      const sp = new URLSearchParams(window.location.search);
+      const uid = sp.get("u");
+      const token = sp.get("t");
+      if (uid && token) {
+        if (Parse.User.current()?.id !== uid) {
+          try {
+            const r = (await Parse.Cloud.run("getDashboardSession", { userId: uid, token })) as { sessionToken?: string } | null;
+            if (r?.sessionToken?.startsWith("r:")) await Parse.User.become(r.sessionToken);
+          } catch { /* expired or bad token — ordinary gate applies */ }
+        }
+        const url = new URL(window.location.href);
+        url.searchParams.delete("u");
+        url.searchParams.delete("t");
+        window.history.replaceState(null, "", url.pathname + url.search + url.hash);
       }
-    } catch {
-      // No session
-    }
-    setAuthChecked(true);
+      if (cancelled) return;
+      try {
+        const current = Parse.User.current();
+        if (current) {
+          setUser(current);
+          setLeafAppConnected(current.get("leafAppConnected") === true);
+        }
+      } catch {
+        // No session
+      }
+      setAuthChecked(true);
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Mirrors a dashboard payload into the Settings tab's form fields.
@@ -1514,8 +1537,16 @@ export default function OrgDashboardPage() {
       <div className="min-h-screen flex flex-col items-center justify-center px-6">
         <div className="max-w-sm w-full text-center">
           <h1 className="text-2xl font-light tracking-tight mb-2">Sign in to continue</h1>
-          <p className="text-sm text-zinc-500 mb-8">You need to sign in to access the dashboard.</p>
-          <GoogleSignInButton onSignIn={(u) => setUser(u)} onError={(err) => console.error(err)} />
+          {/* Google blocks its sign-in inside the app's web view; the app signs
+              this page in through its link, so a miss there means reopening. */}
+          {/LeafApp\//.test(navigator.userAgent) ? (
+            <p className="text-sm text-zinc-500">Go back and open the calendar again.</p>
+          ) : (
+            <>
+              <p className="text-sm text-zinc-500 mb-8">You need to sign in to access the dashboard.</p>
+              <GoogleSignInButton onSignIn={(u) => setUser(u)} onError={(err) => console.error(err)} />
+            </>
+          )}
         </div>
       </div>
     );
