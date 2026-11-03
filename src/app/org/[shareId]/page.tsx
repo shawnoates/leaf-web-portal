@@ -14,6 +14,7 @@ import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
 import { CalendarDrop } from "@/components/DropCard";
 import DropDeal from "@/components/DropDeal";
+import { dropCta } from "@/lib/drops";
 import LeafHostPlanThread from "@/components/LeafHostPlanThread";
 import NamePrompt from "@/components/NamePrompt";
 import ShareKitPrompt, { type ShareKitPayload } from "@/components/ShareKitPrompt";
@@ -6788,7 +6789,7 @@ export default function OrgCalendarPage() {
                         className="flex-1 text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90"
                         style={{ backgroundColor: org.brandColor || "#18181b" }}
                       >
-                        {planIsFull(selectedEvent) ? "Join Waitlist" : selectedEvent.requireApproval ? "Request to Attend" : ticketPriceTotal(selectedEvent) ? `RSVP \u00b7 ${ticketPriceTotal(selectedEvent)}` : "I\u0027m Attending"}
+                        {planIsFull(selectedEvent) ? "Join Waitlist" : selectedEvent.requireApproval ? "Request to Attend" : ticketPriceTotal(selectedEvent) ? `${selectedEvent.drop ? dropCta(selectedEvent.drop.cta) : "RSVP"} \u00b7 ${ticketPriceTotal(selectedEvent)}` : "I\u0027m Attending"}
                       </button>
                     )}
                     <button
