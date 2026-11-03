@@ -23,7 +23,8 @@ import { hostCandidateLabel, isSeriesLimitError, seriesStatusChip, type SeriesHo
 // cards at the wrong hour (and, near midnight, the wrong week).
 import { resolveAIEventDate, FLOATING_EVENT_TZ } from "@/lib/ai-event-date";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
-import { Calendar, Camera, Check, ImagePlus, Link2, Lock, MessageCircle, Pencil, Plus, RefreshCw, Repeat, Settings, Sparkles, UserCheck, Users, X } from "lucide-react";
+import VenueSearch from "@/components/VenueSearch";
+import { Calendar, Camera, Check, ImagePlus, Link2, Lock, MapPin, MessageCircle, Pencil, Plus, RefreshCw, Repeat, Settings, Sparkles, UserCheck, Users, X } from "lucide-react";
 
 // Renders a plan cover image with a Calendar-icon placeholder fallback when
 // the src is missing OR 404s (attendee-uploaded / expired signed URLs go
@@ -776,6 +777,10 @@ export default function PlansManager({
     time: "",
     image: null,
   });
+  // Suggested venue (ideas only). `ideaVenue` is the picked Google place, or the
+  // idea's current venue; typing without picking clears it until one is chosen.
+  const [ideaVenueQuery, setIdeaVenueQuery] = useState("");
+  const [ideaVenue, setIdeaVenue] = useState<{ name: string; address: string; placeId: string | null } | null>(null);
   const [ideaEditBusy, setIdeaEditBusy] = useState(false);
   const [ideaEditError, setIdeaEditError] = useState<string | null>(null);
   // Cover photo for the suggestion editor. `ideaImageBase64` is an upload (wins
@@ -1332,6 +1337,9 @@ export default function PlansManager({
       time: idea.preferredTime ?? "",
       image: idea.image,
     });
+    const loc = idea.location?.name ? idea.location : null;
+    setIdeaVenueQuery(loc?.name || "");
+    setIdeaVenue(loc ? { name: loc.name, address: loc.address || "", placeId: loc.placeId ?? null } : null);
     setEditingStarter(null);
     setEditingIdea(idea);
   }
@@ -1425,10 +1433,22 @@ export default function PlansManager({
       setIdeaEditError("Title is required.");
       return;
     }
+    // Venue: absent = untouched, null = cleared, object = set (server contract).
+    const original = editingIdea.location?.name ? editingIdea.location : null;
+    let venue: { name: string; address: string; placeId: string | null } | null | undefined;
+    if (!ideaVenueQuery.trim()) {
+      venue = original ? null : undefined;
+    } else if (!ideaVenue) {
+      setIdeaEditError("Pick the venue from the suggestions list.");
+      return;
+    } else if (!original || ideaVenue.name !== original.name || (ideaVenue.placeId ?? null) !== (original.placeId ?? null)) {
+      venue = ideaVenue;
+    }
     setIdeaEditBusy(true);
     setIdeaEditError(null);
     try {
       const res = await Parse.Cloud.run("updatePlanIdea", {
+        venue,
         calendarPlanId: editingIdea.objectId,
         title: ideaEditForm.title.trim(),
         description: ideaEditForm.description.trim(),
@@ -1443,7 +1463,7 @@ export default function PlansManager({
           ? ideaEditForm.image || undefined
           : undefined,
       });
-      const updated = res?.idea as { title: string; description: string; image: string | null; date: string | null; datePinned?: boolean; preferredTime?: string | null } | undefined;
+      const updated = res?.idea as { title: string; description: string; image: string | null; date: string | null; datePinned?: boolean; preferredTime?: string | null; location?: PlanIdea["location"] } | undefined;
       if (updated) {
         // Merge server truth (incl. datePinned) so the card immediately shows
         // the edited date instead of the auto-spread one.
@@ -1454,6 +1474,7 @@ export default function PlansManager({
           date: updated.date ?? null,
           datePinned: updated.datePinned === true,
           preferredTime: updated.preferredTime ?? null,
+          location: updated.location ?? null,
         };
         setPlanIdeas((prev) =>
           prev.map((p) =>
@@ -2362,6 +2383,29 @@ export default function PlansManager({
                   className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-900 transition-colors resize-none"
                 />
               </div>
+              {editingIdea && (
+                <div>
+                  <label className="block text-[11px] font-medium text-zinc-500 mb-1">Suggested location <span className="text-zinc-300">(optional)</span></label>
+                  <VenueSearch
+                    key={`idea-venue-${editingIdea.objectId}`}
+                    value={ideaVenueQuery}
+                    onChange={(v) => {
+                      setIdeaVenueQuery(v);
+                      if (ideaVenue && v !== ideaVenue.name) setIdeaVenue(null);
+                    }}
+                    onSelect={(v) => { setIdeaVenue({ name: v.name, address: v.address, placeId: v.placeId }); setIdeaVenueQuery(v.name); }}
+                    placeholder="Search a venue or address"
+                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-900 transition-colors"
+                  />
+                  {ideaVenue?.address ? (
+                    <p className="text-xs text-zinc-400 mt-1 flex items-center gap-1">
+                      <MapPin className="w-3 h-3" /> {ideaVenue.address}
+                    </p>
+                  ) : ideaVenueQuery.trim() && !ideaVenue ? (
+                    <p className="text-xs text-amber-600 mt-1">Pick the venue from the list to save it.</p>
+                  ) : null}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-medium text-zinc-500 mb-1">Preferred date</label>
