@@ -2297,6 +2297,7 @@ async function joinInterestGroup(p: HostPlan): Promise<string | null> {
     return null;
   }
   if (occ?.state === "later") return "Joining closes a day before the night.";
+  if (occ?.state === "closed") return "Saved. That night is off.";
   return "Saved. The group for this one isn’t open right now.";
 }
 

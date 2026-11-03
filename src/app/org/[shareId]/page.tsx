@@ -2753,7 +2753,9 @@ export default function OrgCalendarPage() {
             ideaId: target.ideaId, cookie, ...interestIdentityParams(),
           })) as { occurrence?: InterestOccurrence | null };
         if (!handleOccurrence(result?.occurrence, title, true)) {
-          setToast("The group for this one isn’t open right now.");
+          setToast(result?.occurrence?.state === "closed"
+            ? "This night is off. Not enough people said Going."
+            : "The group for this one isn’t open right now.");
           setTimeout(() => setToast(null), 4000);
         }
       } catch (err) {
