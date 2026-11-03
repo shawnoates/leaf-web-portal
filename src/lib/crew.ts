@@ -518,8 +518,25 @@ export async function fetchCrew(auth: CrewAuth): Promise<CrewPage> {
   return (await Parse.Cloud.run("getCrewForMember", authParams(auth))) as CrewPage;
 }
 
+/**
+ * Crew actions that settle something the iOS app's Home asks of this person
+ * (a vote, the booking, a place for the book, an RSVP). Inside the app's crew
+ * web view, which says so with "LeafCrewSync/1" in its user agent, each one is
+ * reported as leaf://crew-changed/<action> so Home's cards keep up while the
+ * page is still open. The app cancels the navigation; the page stays put.
+ */
+const APP_SYNCED_ACTIONS = new Set(["crewVote", "crewRsvp", "markCrewBooked", "addToCrewBook"]);
+
+function tellApp(name: string) {
+  if (!APP_SYNCED_ACTIONS.has(name) || typeof navigator === "undefined") return;
+  if (!/LeafCrewSync\//.test(navigator.userAgent)) return;
+  window.location.href = `leaf://crew-changed/${name}`;
+}
+
 export async function run<T = unknown>(name: string, auth: CrewAuth, params: Record<string, unknown> = {}): Promise<T> {
-  return (await Parse.Cloud.run(name, { ...authParams(auth), ...params })) as T;
+  const result = (await Parse.Cloud.run(name, { ...authParams(auth), ...params })) as T;
+  tellApp(name);
+  return result;
 }
 
 /** Plain-English status for a cycle, used on the crew page and the /me rail. */
