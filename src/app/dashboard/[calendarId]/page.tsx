@@ -2801,8 +2801,11 @@ export default function OrgDashboardPage() {
                       <p className="text-sm text-zinc-900">Text each new plan</p>
                       <p className="text-xs text-zinc-500 mt-0.5">
                         {isPaid
-                          ? "Followers get a text when you post a plan, as well as the weekly roundup. New followers are told this when they follow."
+                          ? "Followers get a text when you post a plan, as well as the weekly roundup."
                           : "Followers get a text when you post a plan, as well as the weekly roundup. Available on Pro. On Free, new plans go out in the weekly roundup only."}
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-2">
+                        Only people who follow after you turn this on get these texts, because they agree to them when they follow. Your current followers keep getting the weekly roundup. Followers with the Leaf app get a notification for every new plan either way.
                       </p>
                     </div>
                     <SettingsSwitch

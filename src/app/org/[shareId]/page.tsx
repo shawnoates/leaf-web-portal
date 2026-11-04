@@ -1857,6 +1857,9 @@ function FollowModal({
         ...(digits ? { phoneNumber: digits } : {}),
         notify,
         source: followSource(calendarId),
+        // They saw "a text for each new plan" above the button (text follows
+        // only); the server records it, and only they get per-plan texts.
+        ...(planTexts && digits && notify === "text" ? { planTextsConsent: true } : {}),
       })) as { pending?: boolean; userId?: string; buildingIntro?: ShareKitPayload | null };
       if (digits) {
         setFollowerCookie(calendarId, name, phone);
