@@ -1031,6 +1031,24 @@ export default function PlanDetailModal({
                       <FriendInviteCard eventGroupId={plan.objectId} variant="host" limitedSpots={plan.capacity != null} bare />
                     </>
                   )}
+                  {/* The same link as the header's link icon, where hosts look for it. */}
+                  <div className="mt-3 pt-3 border-t border-zinc-100">
+                    <p className="text-xs font-semibold text-zinc-900">Or share the link</p>
+                    <p className="text-xs text-zinc-500">For a group chat, your story, anywhere.</p>
+                    <button
+                      type="button"
+                      onClick={copyPlanLink}
+                      className={`mt-2 w-full flex items-center gap-2 border border-zinc-200 bg-white rounded-lg pl-3 pr-1 py-1 text-left hover:border-zinc-300 ${FOCUS_RING}`}
+                    >
+                      <span className="flex-1 min-w-0 truncate text-xs text-zinc-600">
+                        {typeof window !== "undefined" ? window.location.host : ""}/p/{plan.objectId}
+                      </span>
+                      <span className="shrink-0 inline-flex items-center gap-1 rounded-md bg-zinc-900 text-white text-xs font-medium px-2.5 py-1.5">
+                        {linkCopied ? <Check className="w-3.5 h-3.5" aria-hidden /> : <Copy className="w-3.5 h-3.5" aria-hidden />}
+                        {linkCopied ? "Copied" : "Copy"}
+                      </span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
