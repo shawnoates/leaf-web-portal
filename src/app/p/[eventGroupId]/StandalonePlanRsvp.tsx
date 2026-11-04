@@ -9,7 +9,7 @@ import { textInviteSource } from "@/lib/follow-source";
 import { collectsMoney, p2pPriceLine, type P2pSplitSummary } from "@/lib/p2p";
 import { track } from "@/lib/track";
 import { setVerifiedUserCookie } from "@/lib/verified-user";
-import { ContactStep, usePhoneVerify, type ContactChoice } from "@/components/ContactStep";
+import { ContactStep, SignedInLine, usePhoneVerify, type ContactChoice } from "@/components/ContactStep";
 import PaidRsvp from "@/components/PaidRsvp";
 import {
   Calendar as CalendarIcon,
@@ -509,6 +509,7 @@ function RsvpModal({
             <button onClick={onClose} className="text-sm text-zinc-400 hover:text-zinc-900">
               Close
             </button>
+            <SignedInLine />
           </div>
         )}
       </div>

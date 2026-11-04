@@ -8,7 +8,7 @@ import { APP_LINK_URL, SITE_URL } from "@/lib/site";
 import Link from "next/link";
 import { CrossPromoEyebrow } from "@/components/CrossPromoBadge";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
-import { ContactStep, usePhoneVerify, formatPhoneNumber, type ContactChoice } from "@/components/ContactStep";
+import { ContactStep, SignedInLine, usePhoneVerify, formatPhoneNumber, type ContactChoice } from "@/components/ContactStep";
 import JoinChatPicker from "@/components/JoinChatPicker";
 import PollVoteWidget from "@/components/PollVoteWidget";
 import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
@@ -1441,6 +1441,7 @@ function RsvpModal({
             >
               Done
             </button>
+            <SignedInLine />
           </div>
         )}
       </div>

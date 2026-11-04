@@ -96,6 +96,20 @@ export function usePhoneVerify(options?: { requireSession?: boolean }) {
 
 export type ContactChoice = { name: string; phone: string; notify: "text" | "email" };
 
+// "I don't use the app", remembered per browser so someone who only ever
+// RSVPs by email isn't asked for a phone on every plan.
+const NO_APP_KEY = "leaf_no_app_ack";
+function saidNoApp() {
+  try { return localStorage.getItem(NO_APP_KEY) === "1"; } catch { return false; }
+}
+
+/** Signs this browser out of Leaf (session, phone cookie, remembered phone). */
+export async function signOutOfLeaf() {
+  try { await Parse.User.logOut(); } catch { /* already signed out */ }
+  document.cookie = "leaf_verified_user=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+  try { localStorage.removeItem("leaf_follower_phone"); localStorage.removeItem(NO_APP_KEY); } catch { /* storage off */ }
+}
+
 function readContactSession() {
   const u = Parse.User.current();
   if (!u) return null;
@@ -149,15 +163,30 @@ export function ContactStep({
     allowEmail && Parse.User.current() && !Parse.User.current()?.get("phone") ? "email" : "text");
   const [googleError, setGoogleError] = useState("");
   const [emailName, setEmailName] = useState(() => readContactSession()?.name || "");
+
+  // Signed in by Google or an email code to an account with no phone: they
+  // may already have the app (a phone account), and confirming as this one
+  // would put the RSVP on a second Leaf account for the same person. Ask for
+  // the phone first; verifyOTP links the two and hands back the app account.
+  const [linkFor, setLinkFor] = useState<{ name: string } | null>(null);
+  const confirmEmail = async (name: string, hasPhone: boolean) => {
+    if (!hasPhone && !saidNoApp()) {
+      verify.reset();
+      verify.setPhone("");
+      if (name) verify.setName(name);
+      setLinkFor({ name });
+      return;
+    }
+    await onConfirmed({ name, phone: "", notify: "email" });
+  };
   const emailSignIn = useEmailCodeSignIn(async (who) => {
     setSession(readContactSession());
-    await onConfirmed({ name: who.name || emailName.trim(), phone: "", notify: "email" });
+    await confirmEmail(who.name || emailName.trim(), who.hasPhone);
   });
 
   const notYou = async () => {
-    try { await Parse.User.logOut(); } catch { /* already signed out */ }
-    document.cookie = "leaf_verified_user=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
-    try { localStorage.removeItem("leaf_follower_phone"); } catch { /* storage off */ }
+    await signOutOfLeaf();
+    setLinkFor(null);
     setSession(null);
     verify.reset();
     verify.setName("");
@@ -208,6 +237,65 @@ export function ContactStep({
       </p>
     </div>
   );
+
+  if (linkFor) {
+    const submitLink = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (verify.step !== "code") { await verify.sendOTP(); return; }
+      if (await verify.verifyOTP()) {
+        setSession(readContactSession());
+        setLinkFor(null);
+        setMethod("text");
+        await onConfirmed({ name: verify.name || linkFor.name, phone: verify.phone, notify: "text" });
+      }
+    };
+    return (
+      <form onSubmit={submitLink} className="space-y-4">
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-zinc-900">Already on the Leaf app?</p>
+          <p className="text-sm text-zinc-500">Confirm your phone so this lands on the account you already have.</p>
+        </div>
+        {verify.step === "code"
+          ? codeInput(verify.code, verify.setCode, verify.phone, verify.reset, "number")
+          : (
+            <input
+              type="tel"
+              value={verify.phone}
+              onChange={(e) => verify.setPhone(formatPhoneNumber(e.target.value))}
+              placeholder="Mobile number"
+              autoComplete="tel-national"
+              autoFocus
+              className={inputCls}
+            />
+          )}
+        {verify.error && <p className="text-xs text-red-600">{verify.error}</p>}
+        <button
+          type="submit"
+          disabled={
+            busy || verify.sending ||
+            (verify.step === "code" ? verify.code.length < 6 : verify.phone.replace(/\D/g, "").length < 10)
+          }
+          className={primaryCls}
+          style={primaryStyle}
+        >
+          {busy || verify.sending ? spinner : verify.step === "code" ? actionLabel : "Text me a code"}
+        </button>
+        <button
+          type="button"
+          disabled={busy || verify.sending}
+          onClick={() => {
+            try { localStorage.setItem(NO_APP_KEY, "1"); } catch { /* storage off */ }
+            const name = linkFor.name;
+            setLinkFor(null);
+            void onConfirmed({ name, phone: "", notify: "email" });
+          }}
+          className="w-full text-center text-sm text-zinc-500 underline underline-offset-4 hover:text-zinc-900"
+        >
+          I don&rsquo;t use the app &middot; email me
+        </button>
+      </form>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -290,7 +378,7 @@ export function ContactStep({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => onConfirmed({ name: session.name, phone: "", notify: "email" })}
+                onClick={() => void confirmEmail(session.name, Boolean(session.phone))}
                 className={primaryCls}
                 style={primaryStyle}
               >
@@ -306,7 +394,7 @@ export function ContactStep({
                   const user = u as unknown as Parse.User;
                   setSession(readContactSession());
                   const name = String(user?.get?.("full_name") || user?.get?.("name") || "");
-                  void onConfirmed({ name, phone: "", notify: "email" });
+                  void confirmEmail(name, Boolean(user?.get?.("phone")));
                 }}
                 onError={(msg) => setGoogleError(msg)}
               />
@@ -363,5 +451,31 @@ export function ContactStep({
         </div>
       )}
     </div>
+  );
+}
+
+// "Signed in as … · Sign out" under an RSVP or follow confirmation. Without it
+// the only way out of a web session was "Not you?" inside the sheet, which a
+// finished RSVP no longer shows: signing in the wrong way (Google, when the
+// app account is a phone number) left people stuck as that account.
+export function SignedInLine() {
+  // Only ever rendered after an RSVP or follow in the browser, so reading
+  // the session at first render can't mismatch a server render.
+  const [who] = useState(() => {
+    const s = readContactSession();
+    return s ? s.email || s.phone || s.name || "your Leaf account" : null;
+  });
+  if (!who) return null;
+  return (
+    <p className="text-center text-xs text-zinc-400">
+      Signed in as {who} &middot;{" "}
+      <button
+        type="button"
+        className="underline underline-offset-2 hover:text-zinc-700"
+        onClick={async () => { await signOutOfLeaf(); window.location.reload(); }}
+      >
+        Sign out
+      </button>
+    </p>
   );
 }
