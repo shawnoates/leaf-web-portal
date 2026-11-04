@@ -88,6 +88,7 @@ export default function InviteFriendsSection({
   defaultPlanId = "",
   onCalendarChange,
   embedded = false,
+  hostNotificationId,
 }: {
   calendars: Cal[];
   defaultCalendarId: string;
@@ -98,6 +99,9 @@ export default function InviteFriendsSection({
   /** Inside a plan's Text friends drawer: the drawer names the plan, so no
    *  heading and no calendar / plan pickers. */
   embedded?: boolean;
+  /** The host checklist (/t/<id>): no session, so its link is the
+   *  credential, and the round is for that seat's plan (no calendar). */
+  hostNotificationId?: string;
 }) {
   const [nativeText] = useState(() => typeof navigator !== "undefined" && /LeafText\//.test(navigator.userAgent));
   const [calendarId, setCalendarId] = useState(defaultCalendarId);
@@ -151,12 +155,12 @@ export default function InviteFriendsSection({
   const reset = () => { setRows(null); setTemplate(null); setAlready([]); setError(""); };
 
   const makeLinks = async () => {
-    if (!calendar || parsed.length === 0) return;
+    if ((!calendar && !hostNotificationId) || parsed.length === 0) return;
     setBusy(true);
     setError("");
     try {
       const r = (await Parse.Cloud.run("createTextInvites", {
-        calendarId: calendar.objectId,
+        ...(hostNotificationId ? { hostNotificationId } : { calendarId: calendar!.objectId }),
         ...(planId ? { planId } : {}),
         contacts: parsed.slice(0, 50),
       })) as { template: string; invites: Invite[]; alreadyFollowing: { phone: string; name: string }[] };
@@ -174,12 +178,12 @@ export default function InviteFriendsSection({
   const tapped = (row: Row) => {
     setRows((rs) => rs && rs.map((r) => (r.token === row.token ? { ...r, tapped: true } : r)));
     // A web page can't tell whether the message went; opening it counts.
-    Parse.Cloud.run("markTextInvite", { token: row.token, status: "sent" }).catch(() => {});
+    Parse.Cloud.run("markTextInvite", { token: row.token, status: "sent", ...(hostNotificationId ? { hostNotificationId } : {}) }).catch(() => {});
   };
 
-  if (!calendar) return null;
+  if (!calendar && !hostNotificationId) return null;
   const sentCount = rows?.filter((r) => r.tapped).length ?? 0;
-  const nativeHref = `leaf://text-friends/${calendar.objectId}${planId ? `?plan=${planId}` : ""}`;
+  const nativeHref = calendar ? `leaf://text-friends/${calendar.objectId}${planId ? `?plan=${planId}` : ""}` : null;
 
   return (
     <div className="max-w-2xl space-y-5">
@@ -197,7 +201,7 @@ export default function InviteFriendsSection({
         <label className="block">
           <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Calendar</span>
           <select
-            value={calendar.objectId}
+            value={calendar?.objectId}
             disabled={rows !== null}
             onChange={(e) => { setCalendarId(e.target.value); onCalendarChange?.(e.target.value); setPlanId(""); reset(); }}
             className="mt-1.5 w-full border border-zinc-200 rounded-lg px-3 py-2.5 text-sm bg-white disabled:bg-zinc-50"
@@ -224,7 +228,7 @@ export default function InviteFriendsSection({
       </div>
       </>)}
 
-      {nativeText && rows === null && (
+      {nativeText && nativeHref && rows === null && (
         <a
           href={nativeHref}
           className="flex items-center justify-between gap-3 border border-zinc-200 rounded-xl px-4 py-3 hover:bg-zinc-50"

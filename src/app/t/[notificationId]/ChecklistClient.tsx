@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Check,
   Clock,
+  Link2,
   Lock,
   MapPin,
   MessageSquare,
@@ -16,6 +17,7 @@ import Parse from "@/lib/parse-client";
 import { renderLinkedText } from "@/lib/linkify";
 import HostIntroVideoCard, { type IntroVideoInfo } from "@/components/HostIntroVideoCard";
 import FriendInviteCard from "@/components/FriendInviteCard";
+import InviteFriendsSection from "@/components/dashboard/InviteFriendsSection";
 
 /** The checklist row that opens into the recorder (intro-video.js). */
 const INTRO_TASK_KEY = "record_intro";
@@ -23,6 +25,9 @@ const INTRO_TASK_KEY = "record_intro";
 const MEETING_SPOT_TASK_KEY = "set_meeting_spot";
 // "Invite one more person — it's just you so far" (server: drive_signups).
 const INVITE_TASK_KEY = "drive_signups";
+// "Promote on social media" (server: share_the_plan). Only sent where there's
+// no invite row; it carries the same buttons.
+const SHARE_TASK_KEY = "share_the_plan";
 // "Ask your guests to bring a friend": a draft for the plan chat (server: bring_a_friend).
 const BRING_FRIEND_TASK_KEY = "bring_a_friend";
 
@@ -315,18 +320,40 @@ function Row({
   planId,
   onToggle,
   onSent,
+  kitAllowed,
 }: {
   task: HostTask;
   busy: boolean;
   notificationId: string;
   planId: string;
+  /** The seat's share kit is offered at all (a public calendar plan). */
+  kitAllowed: boolean;
   onToggle: (t: HostTask) => void;
   onSent: (taskId: string, sentAt: string) => void;
 }) {
   const done = task.status === "done";
   // The invite row's personal-text kit opens in place under the row.
   const [textKitOpen, setTextKitOpen] = useState(false);
-  const isInviteRow = task.key === INVITE_TASK_KEY;
+  const isGrowRow = task.key === INVITE_TASK_KEY || task.key === SHARE_TASK_KEY;
+  const [copied, setCopied] = useState(false);
+  // The share sheet where there is one (phones), else the clipboard.
+  const shareLink = async (url: string) => {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ url });
+        return;
+      } catch {
+        /* dismissed, or not allowed here: fall back to copying */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.prompt("Copy this link", url);
+    }
+  };
 
   // The distinction the whole assistant rests on: a task whose booking window
   // hasn't opened is not late, it's not yet possible. Showing it as an overdue
@@ -416,45 +443,49 @@ function Row({
         </div>
       )}
 
-      {/* The kit is its own page: a preview, the caption, and one-tap targets
-          need more room than a row. Nothing posts from Leaf either way. */}
-      {/* The invite row also offers a personal text (cloud/plan-invites.js):
-          one friend, one link, sent from the host's own phone — the row ticks
-          itself off when that friend RSVPs. */}
-      {!done && (task.sharePack?.shareKitUrl || isInviteRow) && (
+      {/* The "get people there" row — the invite row, or the promote row where
+          there's no invite row (the server sends one, never both): Text
+          friends (one friend, one tracked link, from the host's own phone),
+          the plan link, and the share kit on calendar plans. A paid host's
+          links carry their referral code; the server puts it in. */}
+      {!done && isGrowRow && task.sharePack && (
         <div className="pl-12 pr-4 pb-3 -mt-1">
           <div className="flex flex-wrap gap-2">
-            {isInviteRow && (
-              <button
-                type="button"
-                onClick={() => setTextKitOpen((o) => !o)}
-                aria-expanded={textKitOpen}
-                className="inline-flex items-center gap-1.5 mt-2 text-[13px] font-medium text-white bg-zinc-900 rounded-lg px-3 py-1.5 transition-colors"
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                Send invites
-              </button>
-            )}
-            {task.sharePack?.shareKitUrl && (
+            <button
+              type="button"
+              onClick={() => setTextKitOpen((o) => !o)}
+              aria-expanded={textKitOpen}
+              className="inline-flex items-center gap-1.5 mt-2 text-[13px] font-medium text-white bg-zinc-900 rounded-lg px-3 py-1.5 transition-colors"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Text friends
+            </button>
+            <button
+              type="button"
+              onClick={() => shareLink(task.sharePack!.shareUrl)}
+              className="inline-flex items-center gap-1.5 mt-2 text-[13px] font-medium text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-lg px-3 py-1.5 transition-colors"
+            >
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Link2 className="w-3.5 h-3.5" />}
+              {copied ? "Link copied" : "Share link"}
+            </button>
+            {kitAllowed && task.sharePack.shareKitUrl && (
               <a
                 href={task.sharePack.shareKitUrl}
-                className={`inline-flex items-center gap-1.5 mt-2 text-[13px] font-medium rounded-lg px-3 py-1.5 transition-colors ${
-                  isInviteRow ? "text-zinc-900 bg-zinc-100 hover:bg-zinc-200" : "text-white bg-zinc-900"
-                }`}
+                className="inline-flex items-center gap-1.5 mt-2 text-[13px] font-medium text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-lg px-3 py-1.5 transition-colors"
               >
                 <Share2 className="w-3.5 h-3.5" />
-                Open the share kit
+                Share kit
               </a>
             )}
           </div>
-          {isInviteRow && textKitOpen && (
+          {textKitOpen && (
             <div className="mt-3">
-              <FriendInviteCard
-                eventGroupId={planId}
-                variant="host"
+              <InviteFriendsSection
+                embedded
+                calendars={[]}
+                defaultCalendarId=""
+                defaultPlanId={planId}
                 hostNotificationId={notificationId}
-                suggestions={task.suggestedInvites?.map((p) => p.name)}
-                bare
               />
             </div>
           )}
@@ -717,6 +748,7 @@ export default function ChecklistClient({
         planId={data?.planId ?? ""}
         onToggle={toggle}
         onSent={markSent}
+        kitAllowed={Boolean(data?.shareKitUrl)}
       />
     );
 
@@ -904,7 +936,7 @@ export default function ChecklistClient({
             is their credential (no session), as for the rest of this page. */}
         {/* Hidden while the open invite row carries the same kit as a pill. */}
         {!data.cancelled && (!data.dateISO || new Date(data.dateISO).getTime() > Date.now())
-          && !listed.some((t) => t.key === INVITE_TASK_KEY && t.status !== "done") && (
+          && !listed.some((t) => (t.key === INVITE_TASK_KEY || t.key === SHARE_TASK_KEY) && t.status !== "done") && (
           <section className="px-5 pt-5 pb-4 border-b border-zinc-100">
             <FriendInviteCard eventGroupId={data.planId} variant="host" hostNotificationId={notificationId} />
           </section>
