@@ -101,9 +101,15 @@ export default function PointsChip({ className }: { className?: string }) {
         aria-label={`${points.balance} points, open my points`}
         style={{ ...S.chip, animation: bump ? "lp-bump .6s ease-out" : undefined }}
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true" style={{ flex: "none" }}>
-          <circle cx="12" cy="12" r="11" fill="#253a33" />
-          <path d="M12 5.8l1.9 4 4.3.5-3.2 3 .9 4.3-3.9-2.2-3.9 2.2.9-4.3-3.2-3 4.3-.5z" fill="#c8f25a" />
+        {/* Same filled star as the app's Home points chip (SF Symbol star.fill, leafDarkGreen). */}
+        <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true" style={{ flex: "none" }}>
+          <path
+            d="M12 2.8l2.85 5.9 6.45.85-4.72 4.48 1.2 6.42L12 17.3l-5.78 3.15 1.2-6.42L2.7 9.55l6.45-.85z"
+            fill="#253a33"
+            stroke="#253a33"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
         </svg>
         {points.balance} pts
       </button>
