@@ -999,8 +999,8 @@ export default function PlanDetailModal({
               )}
               {canInvite && (
                 <div className="border-t border-zinc-100 bg-zinc-50/60 rounded-b-xl px-3.5 pt-3 pb-3.5">
-                  {(nativeText || canTextFriends) && (
-                    <div className="mb-3 pb-3 border-b border-zinc-100">
+                  {nativeText || canTextFriends ? (
+                    <div>
                       {nativeText ? (
                         <a
                           href={`leaf://text-friends/${calendarId}?plan=${plan.objectId}`}
@@ -1021,13 +1021,16 @@ export default function PlanDetailModal({
                       )}
                       <TextedForPlan key={textedNonce} calendarId={calendarId} planId={plan.objectId} />
                     </div>
+                  ) : (
+                    // No Text friends here (no handler, not the app): the one-off invite.
+                    <>
+                      <p className="flex items-center gap-1.5 text-xs font-semibold text-zinc-700">
+                        <UserPlus className="w-3.5 h-3.5" aria-hidden />
+                        {planRsvps.length > 0 ? "Invite more" : "Send a direct invite"}
+                      </p>
+                      <FriendInviteCard eventGroupId={plan.objectId} variant="host" limitedSpots={plan.capacity != null} bare />
+                    </>
                   )}
-                  <p className="flex items-center gap-1.5 text-xs font-semibold text-zinc-700">
-                    <UserPlus className="w-3.5 h-3.5" aria-hidden />
-                    {nativeText || canTextFriends ? "Or write one text" : planRsvps.length > 0 ? "Invite more" : "Send a direct invite"}
-                  </p>
-                  <p className="text-xs text-zinc-500 mt-0.5">For one friend, or one link for a group chat.</p>
-                  <FriendInviteCard eventGroupId={plan.objectId} variant="host" limitedSpots={plan.capacity != null} bare />
                 </div>
               )}
             </div>
