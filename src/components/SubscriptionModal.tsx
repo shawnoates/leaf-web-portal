@@ -57,6 +57,7 @@ const TIERS: Tier[] = [
       "Analytics dashboard",
       "Co-host management",
       "Follower re-engagement texts (nudges)",
+      "Text followers about each new plan",
     ],
   },
 ];

@@ -1084,6 +1084,28 @@ export default function OrgDashboardPage() {
     [notifPrefs]
   );
 
+  // Follower plan texts (server: follower-plan-texts.js). A Pro setting, off
+  // by default: on a Free calendar the switch opens the upgrade instead, the
+  // way New calendar does at the calendar limit.
+  const [planTextsSaving, setPlanTextsSaving] = useState(false);
+  const [planTextsError, setPlanTextsError] = useState<string | null>(null);
+  const setFollowerPlanTexts = useCallback(
+    async (value: boolean) => {
+      if (value && !isPaidTier) { setShowSubscription(true); return; }
+      setPlanTextsSaving(true);
+      setPlanTextsError(null);
+      try {
+        await Parse.Cloud.run("updateOrganization", { calendarId, followerPlanTexts: value });
+        setDashboard((d) => d ? { ...d, followerPlanTextsSetting: value, followerPlanTexts: value && isPaidTier } : d);
+      } catch (e) {
+        setPlanTextsError(e instanceof Error ? e.message : "Could not save that.");
+      } finally {
+        setPlanTextsSaving(false);
+      }
+    },
+    [calendarId, isPaidTier]
+  );
+
   const handleInviteCoHost = useCallback(
     async (email: string, name: string, scope: { all: boolean; ids: string[] }) => {
       await Parse.Cloud.run("inviteCoHost", {
@@ -2756,6 +2778,44 @@ export default function OrgDashboardPage() {
                 )}
 
                 {/* Notifications — per person, not per calendar */}
+                {dashboard.isOwner && settingsSection === "notifications" && (
+                <section className="border border-zinc-200 rounded-xl p-6 mb-8">
+                  <div className="flex items-center justify-between gap-3 mb-1">
+                    <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                      Texts to followers
+                    </h2>
+                    {!isPaid && (
+                      <button
+                        onClick={() => setShowSubscription(true)}
+                        className="flex items-center gap-1.5 bg-zinc-900 text-white px-3 py-1.5 rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
+                      >
+                        <Lock className="w-3 h-3" /> Upgrade
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-zinc-500 mb-5">
+                    These apply to everyone who follows this calendar.
+                  </p>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm text-zinc-900">Text each new plan</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">
+                        {isPaid
+                          ? "Followers get a text when you post a plan, as well as the weekly roundup. New followers are told this when they follow."
+                          : "Followers get a text when you post a plan, as well as the weekly roundup. Available on Pro. On Free, new plans go out in the weekly roundup only."}
+                      </p>
+                    </div>
+                    <SettingsSwitch
+                      label="Text each new plan"
+                      checked={isPaid && dashboard.followerPlanTextsSetting === true}
+                      disabled={planTextsSaving}
+                      onChange={(v) => setFollowerPlanTexts(v)}
+                    />
+                  </div>
+                  {planTextsError && <p className="text-xs text-red-500 mt-3">{planTextsError}</p>}
+                </section>
+                )}
+
                 {(!dashboard.isOwner || settingsSection === "notifications") && (
                 <section className="border border-zinc-200 rounded-xl p-6">
                   <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 mb-1">

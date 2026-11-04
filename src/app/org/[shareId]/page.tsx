@@ -454,6 +454,8 @@ interface OrgData {
   memberCount: number;
   pastPlanCount: number;
   rsvpLimitReached: boolean;
+  /** New plans are texted to followers (a Pro setting); the follow consent says so. */
+  followerPlanTexts: boolean;
   isOwner: boolean;
   isHost: boolean;
   plans: Plan[];
@@ -1775,11 +1777,14 @@ function FollowModal({
   onFollowed,
   brandColor,
   isPrivate,
+  planTexts = false,
   canAskIntro = true,
   interest,
 }: {
   calendarId: string;
   calendarName: string;
+  /** The calendar texts followers about each new plan, so consent names it. */
+  planTexts?: boolean;
   brandColor?: string;
   onClose: () => void;
   /** `keepOpen` is true when a follow-up step (interest modal and/or share
@@ -1976,7 +1981,12 @@ function FollowModal({
               actionLabel={isPrivate ? "Request to follow" : "Follow"}
               busy={formStep === "submitting"}
               notes={{
-                text: "By following, you agree to get texts from Leaf about this calendar's plans. Up to 2 msgs/wk. Msg & data rates may apply. Reply HELP for help, STOP to opt out.",
+                // Names what following signs them up for: a text for every new
+                // plan when the calendar has that on (Pro), else the capped
+                // weekly texts (server: notifyFollowersOfNewPlan).
+                text: planTexts
+                  ? "By following, you agree to get texts from Leaf for each new plan on this calendar, plus a weekly roundup. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out."
+                  : "By following, you agree to get texts from Leaf about this calendar's plans. Up to 2 msgs/wk. Msg & data rates may apply. Reply HELP for help, STOP to opt out.",
                 email: "At most one email a week. Unsubscribe anytime.",
               }}
               onConfirmed={(who) => follow(who)}
@@ -3638,6 +3648,7 @@ export default function OrgCalendarPage() {
         memberCount: result.memberCount || 0,
         pastPlanCount: result.pastPlanCount || 0,
         rsvpLimitReached: result.rsvpLimitReached || false,
+        followerPlanTexts: result.followerPlanTexts === true,
         isOwner: result.isOwner || false,
         isHost: result.isHost || false,
         plans,
@@ -8007,6 +8018,7 @@ export default function OrgCalendarPage() {
           calendarName={org.name}
           brandColor={org.brandColor || undefined}
           isPrivate={org.isPrivate}
+          planTexts={org.followerPlanTexts}
           canAskIntro={!pendingInterest}
           interest={{
             take: takeInterestPrompt,

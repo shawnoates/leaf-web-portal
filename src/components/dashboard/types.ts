@@ -215,6 +215,10 @@ export interface OrgDashboard {
   hidePlanIdeas: boolean;
   hideCustomPlans: boolean;
   hideDeals: boolean;
+  /** Follower plan texts: the owner's switch, and whether it's live (needs
+   *  Pro). Optional until the server deploy. */
+  followerPlanTextsSetting?: boolean;
+  followerPlanTexts?: boolean;
   memberCount: number;
   totalRsvpCount: number;
   rsvpLimit: number | null;
