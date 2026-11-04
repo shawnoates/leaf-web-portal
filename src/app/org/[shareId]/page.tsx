@@ -793,6 +793,18 @@ function buildIcsHref(opts: {
 const attendingLabel = (plan: Pick<Plan, "attendeeCount" | "businessHosted">) =>
   plan.businessHosted && plan.attendeeCount === 0 ? "Be the first to join" : `${plan.attendeeCount} attending`;
 
+/** "3 spots left" once a capped plan is down to its last few spots (3, or 20%
+ *  of a bigger cap), "Full · waitlist open" at capacity; null otherwise, so
+ *  roomy plans don't carry a permanent nudge nobody reads. Counts rsvpCount
+ *  (host excluded), the same number the server's waitlist gate uses. */
+function spotsLeftLabel(plan: Pick<Plan, "capacity" | "rsvpCount">): string | null {
+  if (plan.capacity == null) return null;
+  if (planIsFull(plan)) return "Full · waitlist open";
+  const left = plan.capacity - plan.rsvpCount;
+  if (left > Math.max(3, Math.ceil(plan.capacity * 0.2))) return null;
+  return `${left} spot${left === 1 ? "" : "s"} left`;
+}
+
 /** All-in ticket price ("$43"), booking fee included so the number matches what checkout charges; null for free plans. */
 function ticketPriceTotal(plan: Pick<Plan, "ticketPriceCents" | "bookingFeeCents">): string | null {
   const price = plan.ticketPriceCents ?? 0;
@@ -5501,8 +5513,13 @@ export default function OrgCalendarPage() {
                       </>
                     ) : (
                       <>
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                           <AvatarStack label={attendingLabel(plan)} />
+                          {spotsLeftLabel(plan) && (
+                            <span className="text-xs font-bold uppercase tracking-widest text-red-600">
+                              <span className="text-zinc-300 mr-3">·</span>{spotsLeftLabel(plan)}
+                            </span>
+                          )}
                           {viewerHostsPlan(plan) ? (
                             <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
                               <Check className="w-3 h-3" /> Hosting
