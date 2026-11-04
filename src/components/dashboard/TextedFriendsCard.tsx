@@ -5,7 +5,8 @@ import { MessageCircle } from "lucide-react";
 import Parse from "@/lib/parse-client";
 
 /**
- * "Friends you texted" — Home's record of Text your friends (the app's
+ * "Friends you texted" — Grow → Invite friends' record of Text your friends,
+ * for the calendar picked there (calendar specific, so not on Home). (The app's
  * one-at-a-time Messages queue, server: text-invites.js). Who was texted,
  * who opened their link, who now follows; in the app, Text friends starts a
  * new round and Text again re-texts anyone who hasn't followed yet.

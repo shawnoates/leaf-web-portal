@@ -174,7 +174,7 @@ export default function HomeTab({
   /** Banners and cards the page owns (concierge entry, app-connect nudge,
    *  RSVP-limit warning) — rendered between the header and the counters. */
   topSlot?: React.ReactNode;
-  /** First card in the right rail (Friends you texted). */
+  /** Optional first card in the right rail. */
   railSlot?: React.ReactNode;
   onNewPlan: (prefillDate?: string) => void;
   onOpenPlan: (plan: CalActivePlan) => void;

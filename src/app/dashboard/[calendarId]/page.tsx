@@ -184,6 +184,8 @@ export default function OrgDashboardPage() {
   const [growSection, setGrowSection] = useState<GrowSection>(
     rawInitialTab === "marketplace" ? "marketplace" : rawInitialTab === "invite" ? "invite" : "performance",
   );
+  // Grow → Invite friends: the calendar picked there ("" = its default).
+  const [inviteCalendarId, setInviteCalendarId] = useState("");
 
   // Publish confirmation banner on Home (set after CreatePlanModal succeeds).
   const [publishBanner, setPublishBanner] = useState<string | null>(null);
@@ -1787,6 +1789,9 @@ export default function OrgDashboardPage() {
     onStartCrew: () => setShowStartCrew(true),
   };
 
+  const inviteDefaultCalendarId =
+    dashboard.calendars.find((c) => c.objectId === dashboard.objectId)?.objectId ?? dashboard.calendars[0]?.objectId ?? dashboard.objectId;
+
   return (
     <div className="min-h-screen bg-white lg:flex">
       {/* Desktop sidebar */}
@@ -1866,11 +1871,6 @@ export default function OrgDashboardPage() {
               analytics={analytics}
               publishBanner={publishBanner}
               topSlot={homeTopSlot}
-              railSlot={
-                dashboard.isOwner || dashboard.isOrgCoHost || dashboard.viewerCalendarRole
-                  ? <TextedFriendsCard calendarId={dashboard.objectId} onInvite={() => { setTab("grow"); setGrowSection("invite"); }} />
-                  : null
-              }
               onNewPlan={openNewPlan}
               onOpenPlan={(plan) => setSelectedActivePlan(plan)}
               onGoCommunity={goCommunity}
@@ -2225,10 +2225,12 @@ export default function OrgDashboardPage() {
                   <div className="space-y-8">
                     <InviteFriendsSection
                       calendars={dashboard.calendars}
-                      defaultCalendarId={dashboard.calendars.find((c) => c.objectId === dashboard.objectId)?.objectId ?? dashboard.calendars[0]?.objectId ?? dashboard.objectId}
+                      defaultCalendarId={inviteDefaultCalendarId}
+                      onCalendarChange={setInviteCalendarId}
                     />
+                    {/* Who was texted for the calendar picked above. */}
                     <div className="max-w-2xl">
-                      <TextedFriendsCard calendarId={dashboard.objectId} />
+                      <TextedFriendsCard key={inviteCalendarId || inviteDefaultCalendarId} calendarId={inviteCalendarId || inviteDefaultCalendarId} />
                     </div>
                   </div>
                 )}

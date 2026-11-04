@@ -59,9 +59,12 @@ function smsHref(phone: string, body: string) {
 export default function InviteFriendsSection({
   calendars,
   defaultCalendarId,
+  onCalendarChange,
 }: {
   calendars: Cal[];
   defaultCalendarId: string;
+  /** The picked calendar, so the page can show who was texted for it. */
+  onCalendarChange?: (calendarId: string) => void;
 }) {
   const [nativeText] = useState(() => typeof navigator !== "undefined" && /LeafText\//.test(navigator.userAgent));
   const [calendarId, setCalendarId] = useState(defaultCalendarId);
@@ -134,7 +137,7 @@ export default function InviteFriendsSection({
           <select
             value={calendar.objectId}
             disabled={rows !== null}
-            onChange={(e) => { setCalendarId(e.target.value); setPlanId(""); reset(); }}
+            onChange={(e) => { setCalendarId(e.target.value); onCalendarChange?.(e.target.value); setPlanId(""); reset(); }}
             className="mt-1.5 w-full border border-zinc-200 rounded-lg px-3 py-2.5 text-sm bg-white disabled:bg-zinc-50"
           >
             {calendars.map((c) => <option key={c.objectId} value={c.objectId}>{c.name}</option>)}
