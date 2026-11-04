@@ -33,3 +33,30 @@ export function followSource(calendarId: string | null | undefined): string | un
     return undefined;
   }
 }
+
+// ---- Text your friends, for one plan ----------------------------------------
+// A host's plan invite opens /p/<id>?src=i-<token> (which usually forwards to
+// /org/<shareId>?plan=<id>&src=i-<token>). The RSVP that follows sends the
+// token as `source`, and rsvpToPlanViaWeb credits it back to the invite.
+
+const TEXT_INVITE = /^i-[a-z0-9]{8}$/;
+const PLAN_KEY = (planId: string) => `leaf_txt_${planId}`;
+
+/** Remember ?src=i-<token> for this plan, for the rest of the visit. */
+export function captureTextInvite(planId: string | null | undefined): void {
+  if (typeof window === "undefined" || !planId) return;
+  const src = new URLSearchParams(window.location.search).get("src");
+  if (!src || !TEXT_INVITE.test(src)) return;
+  try { sessionStorage.setItem(PLAN_KEY(planId), src); } catch { /* private mode */ }
+}
+
+/** The text-invite token to send with an RSVP to this plan, if there is one. */
+export function textInviteSource(planId: string | null | undefined): string | undefined {
+  if (typeof window === "undefined" || !planId) return undefined;
+  try {
+    const v = sessionStorage.getItem(PLAN_KEY(planId));
+    if (v && TEXT_INVITE.test(v)) return v;
+  } catch { /* fall through to the URL */ }
+  const src = new URLSearchParams(window.location.search).get("src");
+  return src && TEXT_INVITE.test(src) ? src : undefined;
+}

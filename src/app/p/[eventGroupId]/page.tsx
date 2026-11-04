@@ -138,8 +138,11 @@ type PageProps = {
 const INVITE_CODE = /^[A-Za-z0-9]{4,16}$/;
 
 /** "&i=CODE" for a well-formed invite code, else "". */
-function inviteSuffix(i: string | undefined): string {
-  return i && INVITE_CODE.test(i) ? `&i=${encodeURIComponent(i)}` : "";
+function inviteSuffix(i: string | undefined, src?: string): string {
+  const own = i && INVITE_CODE.test(i) ? `&i=${encodeURIComponent(i)}` : "";
+  // A host's Text your friends link: the calendar page sends it with the RSVP.
+  const texted = src && /^i-[a-z0-9]{8}$/.test(src) ? `&src=${src}` : "";
+  return own + texted;
 }
 
 /** Who sent a personal invite link, for the unfurl title. Never throws. */
@@ -297,7 +300,7 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
   // send them back there. Only public calendars can receive shares, so the
   // private-calendar scrim never applies on this branch.
   if (mode === "invite" && info.viaShareId) {
-    const destination = `/org/${info.viaShareId}?plan=${eventGroupId}${inviteSuffix(i)}`;
+    const destination = `/org/${info.viaShareId}?plan=${eventGroupId}${inviteSuffix(i, src)}`;
     return (
       <div
         style={{
@@ -326,7 +329,7 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
     );
   }
   if (mode === "invite" && info.shareId && !isPrivateForViewer) {
-    const destination = `/org/${info.shareId}?plan=${eventGroupId}${inviteSuffix(i)}`;
+    const destination = `/org/${info.shareId}?plan=${eventGroupId}${inviteSuffix(i, src)}`;
     return (
       <div
         style={{

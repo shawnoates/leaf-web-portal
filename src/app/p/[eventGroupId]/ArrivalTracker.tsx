@@ -28,6 +28,17 @@ export default function ArrivalTracker({
   useEffect(() => {
     if (!src) return;
     const props = { src: src.slice(0, 40), planId };
+    // A host's Text your friends link: tell them it was opened. Beaconed for
+    // the same reason as below; the calendar page repeats it harmlessly.
+    const invite = /^i-([a-z0-9]{8})$/.exec(src);
+    if (invite && APP_ID) {
+      try {
+        const body = JSON.stringify({ _ApplicationId: APP_ID, _JavaScriptKey: JS_KEY, token: invite[1] });
+        if (!(typeof navigator.sendBeacon === "function" && navigator.sendBeacon(`${SERVER_URL}/functions/textInviteOpened`, body))) {
+          void fetch(`${SERVER_URL}/functions/textInviteOpened`, { method: "POST", body, keepalive: true }).catch(() => {});
+        }
+      } catch { /* not worth failing the page over */ }
+    }
     try {
       if (typeof navigator.sendBeacon === "function" && APP_ID) {
         const body = JSON.stringify({

@@ -26,7 +26,7 @@ import InterestPrompt, {
   type InterestPromptNight,
 } from "@/components/InterestPrompt";
 import { track } from "@/lib/track";
-import { captureFollowSource, followSource } from "@/lib/follow-source";
+import { captureFollowSource, captureTextInvite, followSource, textInviteSource } from "@/lib/follow-source";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import CalendarPromoBanner from "@/components/CalendarPromoBanner";
 import { renderLinkedText } from "@/lib/linkify";
@@ -1056,6 +1056,8 @@ function RsvpModal({
         viaCalendarId: plan.promotedFrom && calendarId ? calendarId : undefined,
         // A friend's personal link (?i=): credits them and claims their hold.
         inviteCode: inviteCodeFor(plan.id),
+        // A host's Text your friends link for this plan (?src=i-…).
+        source: textInviteSource(plan.id),
       }) as { eventNotificationId?: string; alreadyRsvpd?: boolean; pendingApproval?: boolean; waitlisted?: boolean } | null | undefined;
       console.log("[RSVP] result:", result);
       // Closes the watch → RSVP funnel: on its own it is just an RSVP, but
@@ -2068,6 +2070,9 @@ export default function OrgCalendarPage() {
     // A friend's texted invite (Text your friends): tell the host it was opened.
     const invite = src && /^i-([a-z0-9]{8})$/.exec(src);
     if (invite) Parse.Cloud.run("textInviteOpened", { token: invite[1] }).catch(() => {});
+    // A plan's texted invite arrives as ?plan=<id>&src=i-…: keep the token for
+    // that plan's RSVP, even after the page tidies its URL.
+    captureTextInvite(new URLSearchParams(window.location.search).get("plan"));
   }, [orgIdForSource]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

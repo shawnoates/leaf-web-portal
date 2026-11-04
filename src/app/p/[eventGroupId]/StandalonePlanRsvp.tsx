@@ -5,6 +5,7 @@ import Parse from "@/lib/parse-client";
 import P2pPayCard from "@/components/P2pPayCard";
 import FriendInviteCard from "@/components/FriendInviteCard";
 import { inviteCodeFor } from "@/lib/plan-invite";
+import { textInviteSource } from "@/lib/follow-source";
 import { collectsMoney, p2pPriceLine, type P2pSplitSummary } from "@/lib/p2p";
 import { track } from "@/lib/track";
 import { setVerifiedUserCookie } from "@/lib/verified-user";
@@ -275,6 +276,8 @@ function RsvpModal({
         sharePhoneWithHost: sharePhone,
         // A friend's personal link (?i=): credits them and claims their hold.
         inviteCode: inviteCodeFor(eventGroupId),
+        // A host's Text your friends link (?src=i-…): credits the text.
+        source: textInviteSource(eventGroupId),
       })) as
         | {
             eventNotificationId?: string;

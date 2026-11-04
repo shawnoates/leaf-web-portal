@@ -24,7 +24,7 @@ import { hostCandidateLabel, isSeriesLimitError, seriesStatusChip, type SeriesHo
 import { resolveAIEventDate, FLOATING_EVENT_TZ } from "@/lib/ai-event-date";
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import VenueSearch from "@/components/VenueSearch";
-import { Calendar, Camera, Check, ImagePlus, Link2, Lock, MapPin, MessageCircle, Pencil, Plus, RefreshCw, Repeat, Settings, Sparkles, UserCheck, Users, X } from "lucide-react";
+import { Calendar, Camera, Check, ImagePlus, Link2, Lock, MapPin, MessageCircle, MessageSquareText, Pencil, Plus, RefreshCw, Repeat, Settings, Sparkles, UserCheck, Users, X } from "lucide-react";
 
 // Renders a plan cover image with a Calendar-icon placeholder fallback when
 // the src is missing OR 404s (attendee-uploaded / expired signed URLs go
@@ -653,6 +653,9 @@ export default function PlansManager({
   const [selectedPlan, setSelectedPlan] = useState<UpcomingPlan | null>(null);
   // Cross-promotion: "Share with communities" sheet for one plan.
   const [sharePlan, setSharePlan] = useState<{ eventGroupId: string; title: string } | null>(null);
+  // An app build with the Text your friends queue (LeafText/1): each plan
+  // card gets a Text friends icon that opens it for that plan.
+  const [nativeText] = useState(() => typeof navigator !== "undefined" && /LeafText\//.test(navigator.userAgent));
   // Per-plan chat drawer state. Non-null = eventGroupId of the plan
   // whose chat should render as a slide-over. Set from the plan-card
   // hover overlay's "Chat" button so the owner never leaves the
@@ -1943,6 +1946,20 @@ export default function PlansManager({
                         </span>
                         <div className="flex items-center gap-2 shrink-0 ml-2">
                           <span>{plan.rsvpCount} RSVPs</span>
+                          {/* Text friends about this plan, one Messages
+                              composer at a time (the app's queue). Only for
+                              plans this calendar hosts. */}
+                          {nativeText && !plan.promotedFrom && (
+                            <a
+                              href={`leaf://text-friends/${calendarId}?plan=${plan.objectId}`}
+                              onClick={(e) => e.stopPropagation()}
+                              title="Text friends about this plan"
+                              aria-label="Text friends about this plan"
+                              className="p-1 -m-1 rounded text-zinc-300 hover:text-zinc-700 transition-colors"
+                            >
+                              <MessageSquareText className="w-3.5 h-3.5" />
+                            </a>
+                          )}
                           {/* Quiet copy-link icon — grabs the shareable /p/<id>
                               URL without opening the plan or the public
                               calendar. Kept out of the hover overlay so the
