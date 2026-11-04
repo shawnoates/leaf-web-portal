@@ -1976,7 +1976,7 @@ function FollowModal({
               actionLabel={isPrivate ? "Request to follow" : "Follow"}
               busy={formStep === "submitting"}
               notes={{
-                text: "At most one text a week. Reply STOP anytime.",
+                text: "By following, you agree to get texts from Leaf about this calendar's plans. Up to 2 msgs/wk. Msg & data rates may apply. Reply HELP for help, STOP to opt out.",
                 email: "At most one email a week. Unsubscribe anytime.",
               }}
               onConfirmed={(who) => follow(who)}
