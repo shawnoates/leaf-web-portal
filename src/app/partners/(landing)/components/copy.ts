@@ -44,7 +44,7 @@ export const COPY: Record<Kind, PartnerCopy> = {
   bar: {
     tab: "Bars & restaurants",
     cta: "Claim your free Neighbor Hour",
-    heroTitle: ["Neighbors in your", "slowest hours."],
+    heroTitle: ["Turn Neighbors into", "fanatics."],
     heroLead:
       "Tell us your slowest days and hours. We’ll send the residents who live around the corner, from your neighborhood’s Leaf calendar. Your first Neighbor Hour is free: no listing fee, no RSVP fees.",
     floatTitle: "Neighbor Hour at your place",
