@@ -126,7 +126,8 @@ export default function MerchantTermsPage() {
               </li>
               <li>
                 <strong className="font-medium text-zinc-900">We pay you the rest</strong> through Stripe to the bank
-                account you connect, usually the morning after the night. You must connect payouts before a ticketed night
+                account you connect. We usually send it the morning after the night, and your bank usually has it within a few
+                business days after that. You must connect payouts before a ticketed night
                 can be posted, and you agree to Stripe&rsquo;s connected account terms when you do.
               </li>
               <li>

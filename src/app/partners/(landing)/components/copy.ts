@@ -190,7 +190,7 @@ export const COPY: Record<Kind, PartnerCopy> = {
       { q: "Who are these people?", a: "Residents of the buildings around you who use their neighborhood's Leaf calendar to plan their week. They live a short walk away, so they can become regulars." },
       { q: "What should the taster be?", a: "About an hour of your real class: one technique, one small piece to take home, or a beginner flow. Easy for first-timers, and a taste of the full thing." },
       { q: "What if nobody buys a ticket?", a: "Then nothing is charged. You never pay Leaf anything upfront; we only take our part from tickets sold." },
-      { q: "How do I get paid?", a: "Connect your bank once on your dashboard. Ticket money lands the morning after each taster." },
+      { q: "How do I get paid?", a: "Connect your bank once on your dashboard. We send ticket money the morning after each taster, and your bank usually has it within a few business days." },
       SIGN_IN_FAQ,
     ],
     closingTitle: ["Turn neighbors", "into students."],
