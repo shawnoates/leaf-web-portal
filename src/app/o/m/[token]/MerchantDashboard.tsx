@@ -3,7 +3,8 @@
 /**
  * The merchant's home after they say yes: their nights coming up, how past
  * nights went (and what they cost), and their account. Counts only, never
- * guest names. Reached from the same offer link as the sign-up form.
+ * guest names, except who's coming to an upcoming night they run themselves
+ * (first name, last initial). Reached from the same offer link as the sign-up form.
  */
 
 import { type ReactNode, useEffect, useState } from "react";
@@ -28,6 +29,8 @@ type Night = {
   phase: Phase;
   title: string;
   rsvps: number | null;
+  /** Who's coming, on an upcoming night they run (older servers don't send it). */
+  guestList?: { name: string; plus: number }[] | null;
   capacity: number | null;
   // What's left before it's live (upcoming nights; older servers don't send it).
   steps?: Step[] | null;
@@ -420,6 +423,7 @@ function NextUp({ n, perRsvp, campaign, settingUp }: { n: Night | null; perRsvp:
               <div className="h-full rounded-full bg-leaf-600" style={{ width: `${pct}%` }} />
             </div>
           )}
+          <GuestList guests={n.guestList} />
         </div>
       )}
       {n.steps?.find((st) => st.you && st.status === "current") && (
@@ -728,6 +732,17 @@ function HostAddOn({ n, token }: { n: Night; token: string }) {
   return null;
 }
 
+/** "Coming: Nicole K., Sneha B. +1" under a night's count. */
+function GuestList({ guests }: { guests?: { name: string; plus: number }[] | null }) {
+  if (!guests?.length) return null;
+  return (
+    <p className="mt-2 text-[14px] leading-snug text-stone-600">
+      <span className="font-semibold text-stone-900">Coming: </span>
+      {guests.map((g) => (g.plus ? `${g.name} +${g.plus}` : g.name)).join(", ")}
+    </p>
+  );
+}
+
 function UpcomingNight({ n, token }: { n: Night; token: string }) {
   const p = PHASE[n.phase as keyof typeof PHASE];
   const pct = n.rsvps != null && n.capacity ? Math.min(100, Math.round((n.rsvps / n.capacity) * 100)) : null;
@@ -754,6 +769,7 @@ function UpcomingNight({ n, token }: { n: Night; token: string }) {
               <div className="h-full rounded-full bg-leaf-600" style={{ width: `${pct}%` }} />
             </div>
           )}
+          <GuestList guests={n.guestList} />
         </div>
       )}
       {n.makeGood && !n.makeGood.choice && n.resultsToken && <MakeGoodChoice n={n} token={token} />}
