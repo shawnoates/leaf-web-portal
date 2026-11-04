@@ -12,6 +12,7 @@ import CopyHostLinkButton from "@/components/CopyHostLinkButton";
 import PlanChatDrawer from "@/components/PlanChatDrawer";
 import NudgeModal from "@/components/dashboard/NudgeModal";
 import SharePlanSheet from "@/components/dashboard/SharePlanSheet";
+import CrewsNotice from "@/components/dashboard/CrewsNotice";
 import FriendModeCard from "@/components/dashboard/FriendModeCard";
 import { CrossPromoPhotoBadge } from "@/components/CrossPromoBadge";
 import { formatDateInputInTimezone } from "@/lib/date-utils";
@@ -733,6 +734,7 @@ export default function PlansManager({
   // Friend Mode is a per-calendar switch, shown on the calendar's own page
   // (owner only). getOrgDashboard reports it for the org and for each child.
   const [friendMode, setFriendMode] = useState<{ enabled: boolean; memberCount: number; name?: string } | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
 
   // Assign-a-host: members eligible to be assigned as a suggestion's host,
   // plus the idea currently being assigned (null = picker closed) and the
@@ -899,8 +901,10 @@ export default function PlansManager({
   async function fetchOrgInfo() {
     // Don't carry the last calendar's Friend Mode card over while this one loads.
     setFriendMode(null);
+    setIsOwner(false);
     try {
       const result = await Parse.Cloud.run("getOrgDashboard", { calendarId: orgId });
+      setIsOwner(!!result.isOwner);
       type FM = { enabled: boolean; memberCount: number; eligible?: boolean } | undefined;
       // Friend Mode belongs to Friends / Community calendars only — the server
       // decides (category + size) and says so in `eligible`. A calendar that
@@ -1744,6 +1748,9 @@ export default function PlansManager({
 
   return (
     <div className="space-y-10">
+        {/* Once per owner: crew suggestions are on, and where to change them */}
+        {isOwner && <CrewsNotice key={calendarId} orgId={orgId} calendarId={calendarId} />}
+
         {/* Friend Mode — the per-calendar switch (owner only, ≤15 members) */}
         {friendMode && (
           // Keyed by calendar: the card holds its own on/off state seeded from
