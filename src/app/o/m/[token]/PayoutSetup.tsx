@@ -58,7 +58,7 @@ export default function PayoutSetup({ token }: { token: string }) {
       <p className="text-[15px] font-semibold text-leaf-900">Get paid for your night</p>
       {status.payoutsEnabled ? (
         <>
-          <p className="mt-2 text-[15px] text-zinc-700">Payouts are set up. Ticket sales, less our $6 a ticket, go to your bank the morning after each night.</p>
+          <p className="mt-2 text-[15px] text-zinc-700">Payouts are set up. We send ticket sales, less our $6 a ticket, the morning after each night. Your bank usually has it within a few business days.</p>
           <button
             type="button"
             onClick={openStripe}
@@ -71,7 +71,7 @@ export default function PayoutSetup({ token }: { token: string }) {
       ) : (
         <>
           <p className="mt-2 text-[15px] leading-relaxed text-zinc-700">
-            Neighbors pay for tickets through Leaf. After the night we send you the ticket sales, less our $6 a ticket. Connect your bank
+            Neighbors pay for tickets through Leaf. The morning after the night we send you the ticket sales, less our $6 a ticket; your bank usually has it within a few business days. Connect your bank
             account with Stripe so it can land. It takes a few minutes.
             {status.detailsSubmitted ? " Stripe is still checking your details." : ""}
           </p>
