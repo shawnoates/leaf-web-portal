@@ -21,7 +21,7 @@ type Invite = { token: string; phone: string; name: string; first: string; url: 
 
 type Row = Invite & { tapped: boolean };
 
-const CAL_TEMPLATE = "Hey {first}! I'm putting {calendar} on one calendar. Follow it so you see every night: {link}";
+const CAL_TEMPLATE = "Hey {first}! I host nights with {calendar}. Follow along to see what's coming up and join any you like: {link}";
 
 /** "Dana Kim 917-555-0101", "917.555.0101 Dana", "Dana, +1 (917) 555 0101": one per line or comma. */
 export function parseContacts(text: string): { name: string; phone: string }[] {
