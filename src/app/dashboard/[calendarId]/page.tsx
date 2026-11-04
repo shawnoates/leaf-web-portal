@@ -34,6 +34,7 @@ import SeriesHostModal, { type SeriesLimit } from "@/components/dashboard/Series
 import P2pIntroModal from "@/components/dashboard/P2pIntroModal";
 import PromotePrompt, { PROMOTE_GOAL, promotePromptSnoozed } from "@/components/dashboard/PromotePrompt";
 import TextedFriendsCard from "@/components/dashboard/TextedFriendsCard";
+import InviteFriendsSection from "@/components/dashboard/InviteFriendsSection";
 import { seriesCountsTowardLimit, type SeriesSummary } from "@/lib/series";
 import GrowPerformance from "@/components/dashboard/GrowPerformance";
 import SharePlanSheet from "@/components/dashboard/SharePlanSheet";
@@ -130,6 +131,8 @@ const LEGACY_TAB_MAP: Record<string, DashboardTab> = {
   users: "community",
   analytics: "grow",
   marketplace: "grow",
+  // Text your friends on the web (Grow → Invite friends).
+  invite: "grow",
 };
 
 function normalizeTab(raw: string | null): DashboardTab {
@@ -142,6 +145,7 @@ function normalizeTab(raw: string | null): DashboardTab {
 }
 
 const GROW_SECTIONS: { id: GrowSection; label: string }[] = [
+  { id: "invite", label: "Invite friends" },
   { id: "performance", label: "Performance" },
   { id: "marketplace", label: "Marketplace" },
   { id: "collabs", label: "Collabs" },
@@ -178,7 +182,7 @@ export default function OrgDashboardPage() {
   const [selectedCrewId, setSelectedCrewId] = useState<string | null>(searchParams.get("crew"));
   const [showStartCrew, setShowStartCrew] = useState(false);
   const [growSection, setGrowSection] = useState<GrowSection>(
-    rawInitialTab === "marketplace" ? "marketplace" : "performance",
+    rawInitialTab === "marketplace" ? "marketplace" : rawInitialTab === "invite" ? "invite" : "performance",
   );
 
   // Publish confirmation banner on Home (set after CreatePlanModal succeeds).
@@ -1864,7 +1868,7 @@ export default function OrgDashboardPage() {
               topSlot={homeTopSlot}
               railSlot={
                 dashboard.isOwner || dashboard.isOrgCoHost || dashboard.viewerCalendarRole
-                  ? <TextedFriendsCard calendarId={dashboard.objectId} />
+                  ? <TextedFriendsCard calendarId={dashboard.objectId} onInvite={() => { setTab("grow"); setGrowSection("invite"); }} />
                   : null
               }
               onNewPlan={openNewPlan}
@@ -2216,6 +2220,18 @@ export default function OrgDashboardPage() {
                   ) : (
                     lockedPanel("Marketplace")
                   ))}
+
+                {growSection === "invite" && (
+                  <div className="space-y-8">
+                    <InviteFriendsSection
+                      calendars={dashboard.calendars}
+                      defaultCalendarId={dashboard.calendars.find((c) => c.objectId === dashboard.objectId)?.objectId ?? dashboard.calendars[0]?.objectId ?? dashboard.objectId}
+                    />
+                    <div className="max-w-2xl">
+                      <TextedFriendsCard calendarId={dashboard.objectId} />
+                    </div>
+                  </div>
+                )}
 
                 {growSection === "collabs" && (
                   <CollabsSection

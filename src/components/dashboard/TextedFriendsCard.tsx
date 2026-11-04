@@ -10,9 +10,8 @@ import Parse from "@/lib/parse-client";
  * who opened their link, who now follows; in the app, Text friends starts a
  * new round and Text again re-texts anyone who hasn't followed yet.
  *
- * Off the app the queue can't run (a web page can't open Messages one friend
- * at a time), so the card shows the record only, and nothing at all until
- * there is one.
+ * Off the app the queue can't run, so the card points to Grow → Invite
+ * friends (onInvite), where the host pastes numbers and texts each one.
  */
 
 type Friend = {
@@ -40,7 +39,7 @@ function chip(f: Friend) {
   return { label: when ? `Texted ${when}` : "Texted", cls: "bg-zinc-100 text-zinc-600" };
 }
 
-export default function TextedFriendsCard({ calendarId }: { calendarId: string }) {
+export default function TextedFriendsCard({ calendarId, onInvite }: { calendarId: string; onInvite?: () => void }) {
   // Only mounted client-side, after the dashboard loads. An app build with
   // the queue says so in its user agent (LeafText/1).
   const [nativeText] = useState(() => typeof navigator !== "undefined" && /LeafText\//.test(navigator.userAgent));
@@ -77,7 +76,7 @@ export default function TextedFriendsCard({ calendarId }: { calendarId: string }
   }, [load]);
 
   if (friends === null) return null;
-  if (friends.length === 0 && !nativeText) return null;
+  if (friends.length === 0 && !nativeText && !onInvite) return null;
 
   const newHref = `leaf://text-friends/${calendarId}`;
   // Text again goes per calendar: each friend's link is for the calendar they
@@ -100,6 +99,8 @@ export default function TextedFriendsCard({ calendarId }: { calendarId: string }
   }));
   const manyCalendars = new Set(friends.map((f) => f.calendarId || calendarId)).size > 1;
 
+  const ctaCls = "inline-flex items-center gap-1.5 px-4 py-2.5 bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors";
+
   if (friends.length === 0) {
     return (
       <div className="border border-zinc-200 rounded-xl p-4">
@@ -107,12 +108,15 @@ export default function TextedFriendsCard({ calendarId }: { calendarId: string }
         <p className="text-sm text-zinc-600 mb-3">
           Each one gets their own message and link from your iMessage. You tap Send for each.
         </p>
-        <a
-          href={newHref}
-          className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
-        >
-          <MessageCircle className="w-3.5 h-3.5" /> Text friends
-        </a>
+        {nativeText ? (
+          <a href={newHref} className={ctaCls}>
+            <MessageCircle className="w-3.5 h-3.5" /> Text friends
+          </a>
+        ) : (
+          <button onClick={onInvite} className={ctaCls}>
+            <MessageCircle className="w-3.5 h-3.5" /> Invite friends
+          </button>
+        )}
       </div>
     );
   }
@@ -164,7 +168,11 @@ export default function TextedFriendsCard({ calendarId }: { calendarId: string }
           ))}
         </div>
       ) : (
-        <p className="mt-3 text-xs text-zinc-500">Text more friends from the Leaf app.</p>
+        onInvite ? (
+          <button onClick={onInvite} className="mt-3 text-xs font-medium text-zinc-900 underline underline-offset-2">
+            Invite more friends
+          </button>
+        ) : null
       )}
     </div>
   );

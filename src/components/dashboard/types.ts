@@ -345,7 +345,7 @@ export type DashboardTab =
   | "settings"
   | "crew";
 
-export type GrowSection = "performance" | "marketplace" | "collabs" | "concierge";
+export type GrowSection = "invite" | "performance" | "marketplace" | "collabs" | "concierge";
 
 
 /** How a follower-facing text should identify the sender: the specific
