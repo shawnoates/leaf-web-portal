@@ -712,6 +712,9 @@ export default function EditCalendarPage() {
           />
         </Section>
 
+        {/* ─── Crews ─────────────────────────────────────────────── */}
+        {canManageMerchant && <FollowerCrews calendarId={targetId} />}
+
         {/* ─── Concierge ─────────────────────────────────────────── */}
         {isConciergeOrg && (
           <Section title="Concierge">
@@ -898,6 +901,62 @@ function Field({
       </label>
       {children}
     </div>
+  );
+}
+
+/**
+ * Followers' own crews: after an RSVP or on a recap, Leaf offers people who
+ * keep coming to plans together a crew of their own (getCrewNudge). On by
+ * default; owners can turn it off, and see how many crews it started. Saves
+ * on its own, like the business-events switches, not with the form.
+ */
+function FollowerCrews({ calendarId }: { calendarId: string }) {
+  const [state, setState] = useState<{ on: boolean; crewsStarted: number } | null>(null);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    Parse.Cloud.run("getCalendarCrewSuggestions", { calendarId })
+      .then((r: unknown) => setState(r as { on: boolean; crewsStarted: number }))
+      .catch(() => setState(null));
+  }, [calendarId]);
+  if (!state) return null;
+  const set = async (on: boolean) => {
+    setSaving(true);
+    setState({ ...state, on });
+    try {
+      await Parse.Cloud.run("setCalendarCrewSuggestions", { calendarId, on });
+    } catch {
+      setState({ ...state, on: !on });
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <Section title="Crews">
+      <div className="flex items-center justify-between py-2 gap-4">
+        <div>
+          <p className="text-xs font-medium text-zinc-700">
+            Let followers form crews
+          </p>
+          <p className="text-xs text-zinc-400 max-w-md">
+            A crew is a small group of your followers who make their own plans
+            together. When the same people keep coming to your plans, Leaf
+            invites them to start one, beginning with your places.
+            {state.crewsStarted > 0 && (
+              <span className="text-emerald-700">
+                {" "}
+                {state.crewsStarted} {state.crewsStarted === 1 ? "crew has" : "crews have"} started from this calendar.
+              </span>
+            )}
+          </p>
+        </div>
+        <SettingsSwitch
+          checked={state.on}
+          disabled={saving}
+          onChange={set}
+          label="Let followers form crews"
+        />
+      </div>
+    </Section>
   );
 }
 
