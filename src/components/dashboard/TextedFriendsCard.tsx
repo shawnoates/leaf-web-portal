@@ -18,6 +18,10 @@ import Parse from "@/lib/parse-client";
 type Friend = {
   phone: string;
   name: string;
+  /** Which calendar they were texted for: the organization's card covers the
+   *  calendars under it too. Absent on older servers. */
+  calendarId?: string;
+  calendarName?: string;
   status: "sent" | "opened" | "joined";
   sentAt: string | null;
 };
@@ -76,10 +80,25 @@ export default function TextedFriendsCard({ calendarId }: { calendarId: string }
   if (friends.length === 0 && !nativeText) return null;
 
   const newHref = `leaf://text-friends/${calendarId}`;
-  const notYet = friends.filter((f) => f.status !== "joined");
-  // `to=<phone>|<name>` per friend. encodeURIComponent, not URLSearchParams:
-  // iOS's URLComponents reads "%20" as a space but leaves a form-style "+".
-  const againHref = `${newHref}?${notYet.map((f) => `to=${encodeURIComponent(`${f.phone}|${f.name}`)}`).join("&")}`;
+  // Text again goes per calendar: each friend's link is for the calendar they
+  // were texted about. `to=<phone>|<name>` per friend. encodeURIComponent, not
+  // URLSearchParams: iOS's URLComponents reads "%20" as a space but leaves a
+  // form-style "+".
+  const againByCalendar = new Map<string, { name: string; friends: Friend[] }>();
+  for (const f of friends) {
+    if (f.status === "joined") continue;
+    const id = f.calendarId || calendarId;
+    const g = againByCalendar.get(id) || { name: f.calendarName || "", friends: [] };
+    g.friends.push(f);
+    againByCalendar.set(id, g);
+  }
+  const againLinks = [...againByCalendar.entries()].map(([id, g]) => ({
+    id,
+    name: g.name,
+    count: g.friends.length,
+    href: `leaf://text-friends/${id}?${g.friends.map((f) => `to=${encodeURIComponent(`${f.phone}|${f.name}`)}`).join("&")}`,
+  }));
+  const manyCalendars = new Set(friends.map((f) => f.calendarId || calendarId)).size > 1;
 
   if (friends.length === 0) {
     return (
@@ -109,8 +128,13 @@ export default function TextedFriendsCard({ calendarId }: { calendarId: string }
         {shown.map((f) => {
           const c = chip(f);
           return (
-            <li key={f.phone} className="flex items-center gap-2 py-2">
-              <span className="flex-1 min-w-0 truncate text-sm text-zinc-900">{f.name || formatPhone(f.phone)}</span>
+            <li key={`${f.phone}|${f.calendarId || ""}`} className="flex items-center gap-2 py-2">
+              <span className="flex-1 min-w-0">
+                <span className="block truncate text-sm text-zinc-900">{f.name || formatPhone(f.phone)}</span>
+                {manyCalendars && f.calendarName && (
+                  <span className="block truncate text-[11px] text-zinc-500">{f.calendarName}</span>
+                )}
+              </span>
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${c.cls}`}>{c.label}</span>
             </li>
           );
@@ -129,14 +153,15 @@ export default function TextedFriendsCard({ calendarId }: { calendarId: string }
           >
             <MessageCircle className="w-3.5 h-3.5" /> Text friends
           </a>
-          {notYet.length > 0 && (
+          {againLinks.map((a) => (
             <a
-              href={againHref}
+              key={a.id}
+              href={a.href}
               className="inline-flex items-center px-4 py-2.5 border border-zinc-200 rounded-full text-xs font-medium text-zinc-900 hover:bg-zinc-50 transition-colors"
             >
-              Text again · {notYet.length}
+              Text again{againLinks.length > 1 && a.name ? ` · ${a.name}` : ""} · {a.count}
             </a>
-          )}
+          ))}
         </div>
       ) : (
         <p className="mt-3 text-xs text-zinc-500">Text more friends from the Leaf app.</p>
