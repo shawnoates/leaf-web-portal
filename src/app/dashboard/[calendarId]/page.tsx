@@ -184,8 +184,10 @@ export default function OrgDashboardPage() {
   const [growSection, setGrowSection] = useState<GrowSection>(
     rawInitialTab === "marketplace" ? "marketplace" : rawInitialTab === "invite" ? "invite" : "performance",
   );
-  // Grow → Invite friends: the calendar picked there ("" = its default).
-  const [inviteCalendarId, setInviteCalendarId] = useState("");
+  // Grow → Invite friends: the calendar picked there ("" = its default), and a
+  // plan when it was opened from that plan (?tab=invite&cal=&plan= works too).
+  const [inviteCalendarId, setInviteCalendarId] = useState(searchParams.get("cal") || "");
+  const [invitePlan, setInvitePlan] = useState({ id: searchParams.get("plan") || "", nonce: 0 });
 
   // Publish confirmation banner on Home (set after CreatePlanModal succeeds).
   const [publishBanner, setPublishBanner] = useState<string | null>(null);
@@ -234,6 +236,18 @@ export default function OrgDashboardPage() {
       router.replace(`/dashboard/${calendarId}?${next.toString()}`, { scroll: false });
     },
     [router, searchParams, calendarId],
+  );
+
+  // A plan's "Text friends from your contacts" row: Grow → Invite friends with
+  // that calendar and plan picked.
+  const openTextFriends = useCallback(
+    (cal: string, planId: string) => {
+      setInviteCalendarId(cal);
+      setInvitePlan((p) => ({ id: planId, nonce: p.nonce + 1 }));
+      setGrowSection("invite");
+      setTab("grow");
+    },
+    [setTab],
   );
 
   // Edit states (Organization details — lives in Settings now)
@@ -2060,6 +2074,7 @@ export default function OrgDashboardPage() {
                     <PlansManager
                       calendarId={cal.objectId}
                       orgId={calendarId}
+                      onTextFriends={openTextFriends}
                       initialPrefill={managePlansCalId === cal.objectId ? managePlansPrefill : null}
                       returnTo={managePlansCalId === cal.objectId ? managePlansReturnTo : null}
                     />
@@ -2224,8 +2239,10 @@ export default function OrgDashboardPage() {
                 {growSection === "invite" && (
                   <div className="space-y-8">
                     <InviteFriendsSection
+                      key={`${invitePlan.id}-${invitePlan.nonce}`}
                       calendars={dashboard.calendars}
-                      defaultCalendarId={inviteDefaultCalendarId}
+                      defaultCalendarId={inviteCalendarId || inviteDefaultCalendarId}
+                      defaultPlanId={invitePlan.id}
                       onCalendarChange={setInviteCalendarId}
                     />
                     {/* Who was texted for the calendar picked above. */}
@@ -3139,6 +3156,7 @@ export default function OrgDashboardPage() {
           }}
           calendarId={selectedActivePlan.calendarId || calendarId}
           onClose={() => setSelectedActivePlan(null)}
+          onTextFriends={(cal, planId) => { setSelectedActivePlan(null); openTextFriends(cal, planId); }}
           onChanged={fetchDashboard}
           onShare={(p) => setSharePlan({ eventGroupId: p.objectId, title: p.title })}
           leafAppConnected={leafAppConnected}

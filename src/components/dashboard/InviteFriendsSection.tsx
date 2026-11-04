@@ -59,16 +59,19 @@ function smsHref(phone: string, body: string) {
 export default function InviteFriendsSection({
   calendars,
   defaultCalendarId,
+  defaultPlanId = "",
   onCalendarChange,
 }: {
   calendars: Cal[];
   defaultCalendarId: string;
+  /** Opened from a plan's "Text friends" row: that plan, picked. */
+  defaultPlanId?: string;
   /** The picked calendar, so the page can show who was texted for it. */
   onCalendarChange?: (calendarId: string) => void;
 }) {
   const [nativeText] = useState(() => typeof navigator !== "undefined" && /LeafText\//.test(navigator.userAgent));
   const [calendarId, setCalendarId] = useState(defaultCalendarId);
-  const [planId, setPlanId] = useState("");
+  const [planId, setPlanId] = useState(defaultPlanId);
   const [pasted, setPasted] = useState("");
   const [template, setTemplate] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[] | null>(null);

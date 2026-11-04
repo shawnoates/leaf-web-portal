@@ -143,6 +143,10 @@ type Props = {
   /** Cross-promotion: open the "Cross-promote" sheet for this plan.
    *  Hidden for polls and past plans. Absent = no share action. */
   onShare?: (plan: PlanDetailData) => void;
+  /** Text your friends for this plan on the web: opens Grow → Invite friends
+   *  with this calendar and plan picked. In the app (LeafText/1) the row opens
+   *  the native queue instead, so this can be absent there. */
+  onTextFriends?: (calendarId: string, planId: string) => void;
 };
 
 export default function PlanDetailModal({
@@ -157,7 +161,10 @@ export default function PlanDetailModal({
   onConnectApp,
   onPendingRsvpResolved,
   onShare,
+  onTextFriends,
 }: Props) {
+  // An app build with the Text your friends queue says so in its user agent.
+  const [nativeText] = useState(() => typeof navigator !== "undefined" && /LeafText\//.test(navigator.userAgent));
   // Flashes "Copied" on the Copy Link action after the direct /p/<id> URL is
   // written to the clipboard.
   const [linkCopied, setLinkCopied] = useState(false);
@@ -970,7 +977,7 @@ export default function PlanDetailModal({
                 <p className="border-t border-zinc-100 px-3.5 py-4 text-sm text-zinc-500">
                   No one&apos;s RSVP&apos;d yet.{" "}
                   {canInvite ? (
-                    "A text from you gets more yeses than any link. Leaf writes it; you send it to a friend or a group chat."
+                    "A text from you gets more yeses than any link."
                   ) : canShare ? (
                     <>
                       <button
@@ -987,10 +994,33 @@ export default function PlanDetailModal({
               )}
               {canInvite && (
                 <div className="border-t border-zinc-100 bg-zinc-50/60 rounded-b-xl px-3.5 pt-3 pb-3.5">
+                  {(nativeText || onTextFriends) && (
+                    <div className="mb-3 pb-3 border-b border-zinc-100">
+                      {nativeText ? (
+                        <a
+                          href={`leaf://text-friends/${calendarId}?plan=${plan.objectId}`}
+                          className={`flex items-center justify-between gap-3 rounded-lg no-underline ${FOCUS_RING}`}
+                        >
+                          <TextFriendsRowLabel />
+                          <MessageCircle className="w-4 h-4 text-zinc-500 shrink-0" aria-hidden />
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onTextFriends?.(calendarId, plan.objectId)}
+                          className={`w-full flex items-center justify-between gap-3 rounded-lg text-left ${FOCUS_RING}`}
+                        >
+                          <TextFriendsRowLabel />
+                          <MessageCircle className="w-4 h-4 text-zinc-500 shrink-0" aria-hidden />
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-zinc-700">
                     <UserPlus className="w-3.5 h-3.5" aria-hidden />
-                    {planRsvps.length > 0 ? "Invite more" : "Send a direct invite"}
+                    {nativeText || onTextFriends ? "Or write one text" : planRsvps.length > 0 ? "Invite more" : "Send a direct invite"}
                   </p>
+                  <p className="text-xs text-zinc-500 mt-0.5">For one friend, or one link for a group chat.</p>
                   <FriendInviteCard eventGroupId={plan.objectId} variant="host" limitedSpots={plan.capacity != null} bare />
                 </div>
               )}
@@ -1147,5 +1177,15 @@ export default function PlanDetailModal({
         </div>
       )}
     </div>
+  );
+}
+
+/** "Text your friends" for one plan: each friend gets their own link. */
+function TextFriendsRowLabel() {
+  return (
+    <span className="min-w-0">
+      <span className="block text-xs font-semibold text-zinc-900">Text friends from your contacts</span>
+      <span className="block text-xs text-zinc-500">One text each, with their own link. See who opens it and RSVPs.</span>
+    </span>
   );
 }
