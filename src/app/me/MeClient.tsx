@@ -298,6 +298,9 @@ interface Dashboard {
     /** Texted STOP. */
     textsOff?: boolean;
     prefersEmail?: boolean;
+    /** Followed calendars that text each new plan (a Pro setting), and
+     *  whether this person opted in. Optional until the server deploy. */
+    planTexts?: { calendarId: string; name: string; on: boolean }[];
   };
   greeting?: { weather: Weather | null };
   /** Leaf points; absent on older servers or if the lookup failed. */
@@ -2720,6 +2723,76 @@ function TextsCard({
         </div>
       )}
       {err && <p className="otp-err">{err}</p>}
+      {(person.planTexts?.length ?? 0) > 0 && (
+        <PlanTextsRows rows={person.planTexts!} textOk={textOk} onChanged={onChanged} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Calendars that text each new plan (follower-plan-texts.js on the server).
+ * Someone who followed before the owner turned it on only agreed to weekly
+ * texts, so they stay on Weekly until they pick Each plan here, which records
+ * the same consent the follow screen asks for.
+ */
+function PlanTextsRows({
+  rows, textOk, onChanged,
+}: {
+  rows: { calendarId: string; name: string; on: boolean }[];
+  textOk: boolean;
+  onChanged?: () => Promise<void>;
+}) {
+  // Local overrides while a change saves; the server's value otherwise.
+  const [onById, setOnById] = useState<Record<string, boolean>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [err, setErr] = useState("");
+
+  const set = async (calendarId: string, on: boolean) => {
+    setErr("");
+    setBusyId(calendarId);
+    const prev = !on;
+    setOnById((m) => ({ ...m, [calendarId]: on }));
+    try {
+      await Parse.Cloud.run("setPlanTextsOptIn", { calendarId, on });
+      await onChanged?.();
+    } catch (e: unknown) {
+      setOnById((m) => ({ ...m, [calendarId]: prev }));
+      setErr(e instanceof Error ? e.message : "Couldn't change that. Try again.");
+    } finally { setBusyId(null); }
+  };
+
+  return (
+    <div className="texts-plans">
+      {rows.map((r) => {
+        const on = onById[r.calendarId] ?? r.on;
+        return (
+          <div className="texts-row" key={r.calendarId}>
+            <span className="texts-cal">{r.name}</span>
+            <div className="texts-seg" role="tablist" aria-label={`Texts from ${r.name}`}>
+              <button
+                role="tab"
+                aria-selected={!on}
+                className={!on ? "on" : ""}
+                disabled={busyId === r.calendarId || !on}
+                onClick={() => set(r.calendarId, false)}
+              >Weekly</button>
+              <button
+                role="tab"
+                aria-selected={on}
+                className={on ? "on" : ""}
+                disabled={busyId === r.calendarId || on || !textOk}
+                title={textOk ? undefined : "Needs a phone with texts on"}
+                onClick={() => set(r.calendarId, true)}
+              >Each plan</button>
+            </div>
+          </div>
+        );
+      })}
+      <p>
+        {`${rows.length === 1 ? "This calendar can" : "These calendars can"} text you each new plan. Picking Each plan means you agree to a text from Leaf for each new plan there. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out.`}
+      </p>
+      {err && <p className="otp-err">{err}</p>}
     </div>
   );
 }
@@ -3672,6 +3745,8 @@ const CSS = `
 .leafme .texts p{flex:1 1 auto;font-size:11.5px;line-height:1.45;color:var(--body)}
 .leafme .texts.wrap{flex-direction:column;align-items:stretch}
 .leafme .texts-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.leafme .texts-plans{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.leafme .texts-cal{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;font-weight:600;color:var(--ink)}
 .leafme .texts-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .leafme .texts-seg{display:inline-flex;padding:3px;border-radius:9px;background:var(--recessed);border:1px solid var(--line)}
 .leafme .texts-seg button{border:0;background:none;font:inherit;font-size:12px;font-weight:600;color:var(--body);padding:5px 12px;border-radius:7px;cursor:pointer}

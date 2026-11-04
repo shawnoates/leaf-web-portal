@@ -2805,7 +2805,7 @@ export default function OrgDashboardPage() {
                           : "Followers get a text when you post a plan, as well as the weekly roundup. Available on Pro. On Free, new plans go out in the weekly roundup only."}
                       </p>
                       <p className="text-xs text-zinc-500 mt-2">
-                        Only people who follow after you turn this on get these texts, because they agree to them when they follow. Your current followers keep getting the weekly roundup. Followers with the Leaf app get a notification for every new plan either way.
+                        New followers agree to these texts when they follow. Your current followers keep the weekly roundup unless they switch to a text for each plan on their Leaf page (the link in their weekly text). Followers with the Leaf app get a notification for every new plan either way.
                       </p>
                     </div>
                     <SettingsSwitch
