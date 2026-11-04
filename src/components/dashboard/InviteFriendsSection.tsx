@@ -87,6 +87,7 @@ export default function InviteFriendsSection({
   defaultCalendarId,
   defaultPlanId = "",
   onCalendarChange,
+  embedded = false,
 }: {
   calendars: Cal[];
   defaultCalendarId: string;
@@ -94,6 +95,9 @@ export default function InviteFriendsSection({
   defaultPlanId?: string;
   /** The picked calendar, so the page can show who was texted for it. */
   onCalendarChange?: (calendarId: string) => void;
+  /** Inside a plan's Text friends drawer: the drawer names the plan, so no
+   *  heading and no calendar / plan pickers. */
+  embedded?: boolean;
 }) {
   const [nativeText] = useState(() => typeof navigator !== "undefined" && /LeafText\//.test(navigator.userAgent));
   const [calendarId, setCalendarId] = useState(defaultCalendarId);
@@ -179,6 +183,7 @@ export default function InviteFriendsSection({
 
   return (
     <div className="max-w-2xl space-y-5">
+      {!embedded && (<>
       <div>
         <h2 className="text-base font-semibold text-zinc-900">Invite friends</h2>
         <p className="text-sm text-zinc-500 mt-1">
@@ -217,6 +222,7 @@ export default function InviteFriendsSection({
           </select>
         </label>
       </div>
+      </>)}
 
       {nativeText && rows === null && (
         <a

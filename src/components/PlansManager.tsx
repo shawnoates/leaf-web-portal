@@ -635,14 +635,14 @@ export default function PlansManager({
   orgId,
   initialPrefill = null,
   returnTo = null,
-  onTextFriends,
+  canTextFriends = false,
 }: {
   calendarId: string;
   orgId: string;
   initialPrefill?: CreatePlanPrefill | null;
   returnTo?: string | null;
-  /** Grow → Invite friends for one plan (see PlanDetailModal). */
-  onTextFriends?: (calendarId: string, planId: string) => void;
+  /** Show a plan's "Text friends" row (it opens a drawer over the plan). */
+  canTextFriends?: boolean;
 }) {
   const router = useRouter();
 
@@ -2509,7 +2509,7 @@ export default function PlansManager({
           onDuplicate={handleDuplicatePlan}
           onEdit={handleEditPlan}
           onShare={(p) => setSharePlan({ eventGroupId: p.objectId, title: p.title })}
-          onTextFriends={onTextFriends && ((cal, planId) => { setSelectedPlan(null); onTextFriends(cal, planId); })}
+          canTextFriends={canTextFriends}
         />
       )}
 

@@ -28,6 +28,7 @@ import { CrossPromoEyebrow } from "./CrossPromoBadge";
 import PlanIntroSection from "./PlanIntroSection";
 import FittedImage from "./FittedImage";
 import FriendInviteCard from "./FriendInviteCard";
+import TextFriendsDrawer from "./dashboard/TextFriendsDrawer";
 
 const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2";
@@ -144,10 +145,10 @@ type Props = {
   /** Cross-promotion: open the "Cross-promote" sheet for this plan.
    *  Hidden for polls and past plans. Absent = no share action. */
   onShare?: (plan: PlanDetailData) => void;
-  /** Text your friends for this plan on the web: opens Grow → Invite friends
-   *  with this calendar and plan picked. In the app (LeafText/1) the row opens
-   *  the native queue instead, so this can be absent there. */
-  onTextFriends?: (calendarId: string, planId: string) => void;
+  /** Show "Text friends from your contacts". On the web it opens the texting
+   *  tool in a drawer on top of this plan; in the app (LeafText/1) the row
+   *  opens the native queue instead. */
+  canTextFriends?: boolean;
 };
 
 export default function PlanDetailModal({
@@ -162,8 +163,11 @@ export default function PlanDetailModal({
   onConnectApp,
   onPendingRsvpResolved,
   onShare,
-  onTextFriends,
+  canTextFriends = false,
 }: Props) {
+  const [textFriendsOpen, setTextFriendsOpen] = useState(false);
+  // Bumped when the drawer closes so "n texted · n opened" re-reads.
+  const [textedNonce, setTextedNonce] = useState(0);
   // An app build with the Text your friends queue says so in its user agent.
   const [nativeText] = useState(() => typeof navigator !== "undefined" && /LeafText\//.test(navigator.userAgent));
   // Flashes "Copied" on the Copy Link action after the direct /p/<id> URL is
@@ -995,7 +999,7 @@ export default function PlanDetailModal({
               )}
               {canInvite && (
                 <div className="border-t border-zinc-100 bg-zinc-50/60 rounded-b-xl px-3.5 pt-3 pb-3.5">
-                  {(nativeText || onTextFriends) && (
+                  {(nativeText || canTextFriends) && (
                     <div className="mb-3 pb-3 border-b border-zinc-100">
                       {nativeText ? (
                         <a
@@ -1008,19 +1012,19 @@ export default function PlanDetailModal({
                       ) : (
                         <button
                           type="button"
-                          onClick={() => onTextFriends?.(calendarId, plan.objectId)}
+                          onClick={() => setTextFriendsOpen(true)}
                           className={`w-full flex items-center justify-between gap-3 rounded-lg text-left ${FOCUS_RING}`}
                         >
                           <TextFriendsRowLabel />
                           <MessageCircle className="w-4 h-4 text-zinc-500 shrink-0" aria-hidden />
                         </button>
                       )}
-                      <TextedForPlan calendarId={calendarId} planId={plan.objectId} />
+                      <TextedForPlan key={textedNonce} calendarId={calendarId} planId={plan.objectId} />
                     </div>
                   )}
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-zinc-700">
                     <UserPlus className="w-3.5 h-3.5" aria-hidden />
-                    {nativeText || onTextFriends ? "Or write one text" : planRsvps.length > 0 ? "Invite more" : "Send a direct invite"}
+                    {nativeText || canTextFriends ? "Or write one text" : planRsvps.length > 0 ? "Invite more" : "Send a direct invite"}
                   </p>
                   <p className="text-xs text-zinc-500 mt-0.5">For one friend, or one link for a group chat.</p>
                   <FriendInviteCard eventGroupId={plan.objectId} variant="host" limitedSpots={plan.capacity != null} bare />
@@ -1177,6 +1181,14 @@ export default function PlanDetailModal({
             </div>
           </div>
         </div>
+      )}
+      {textFriendsOpen && (
+        <TextFriendsDrawer
+          calendarId={calendarId}
+          planId={plan.objectId}
+          planTitle={plan.title}
+          onClose={() => { setTextFriendsOpen(false); setTextedNonce((n) => n + 1); }}
+        />
       )}
     </div>
   );
