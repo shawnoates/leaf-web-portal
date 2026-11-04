@@ -76,7 +76,9 @@ export function useCrewAuth(slug: string): CrewLoad {
         try {
           const page = await fetchCrew(candidate);
           if (cancelled) return;
-          setAuth(candidate);
+          // Same link as the cached one: keep the object, so pages keyed on
+          // `auth` (the book) don't fetch everything a second time.
+          setAuth((prev) => (prev && JSON.stringify(prev) === JSON.stringify(candidate) ? prev : candidate));
           setData(page);
           writeCache(slug, candidate, page);
           return;

@@ -39,6 +39,8 @@ type Book = {
   places?: BookSpot[]; happenings?: BookSpot[]; discover?: DiscoverItem[];
 };
 
+const BOOK_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
 export default function CrewBookClient({ token }: { token: string }) {
   const load = useCrewAuth(token);
   if (load.status === "loading") return <Spinner label="Opening the book…" />;
@@ -127,7 +129,20 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoFind]);
 
-  const refresh = useCallback(async () => setBook(await run<Book>("getCrewBook", auth)), [auth]);
+  // The last book this device saw shows at once; the fetch below replaces it.
+  const cacheKey = `crewBook:${JSON.stringify(auth)}`;
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(cacheKey);
+      const cached = raw ? (JSON.parse(raw) as { book: Book; at: number }) : null;
+      if (cached?.book && Date.now() - cached.at < BOOK_CACHE_MAX_AGE_MS) setBook((b) => b ?? cached.book);
+    } catch { /* no cache: wait for the fetch */ }
+  }, [cacheKey]);
+  const refresh = useCallback(async () => {
+    const fresh = await run<Book>("getCrewBook", auth);
+    setBook(fresh);
+    try { window.localStorage.setItem(cacheKey, JSON.stringify({ book: fresh, at: Date.now() })); } catch { /* storage full */ }
+  }, [auth, cacheKey]);
   useEffect(() => { refresh().catch((e) => setError(e.message)); }, [refresh]);
 
   const act = async (key: string, fn: () => Promise<unknown>) => {
