@@ -36,30 +36,28 @@ export default function CrewsNotice({ orgId, calendarId }: { orgId: string; cale
 
   const dismiss = () => {
     try { localStorage.setItem(SEEN_KEY, String(Date.now())); } catch { /* ignore */ }
+    setShow(false);
   };
 
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
-      <div className="min-w-0 flex-1 text-xs text-zinc-500">
-        <p className="text-sm font-medium text-zinc-900">Your followers can form crews</p>
-        <p className="mt-0.5 max-w-xl">
-          A crew is a small group of your followers who make their own plans together. When the same
-          people keep coming to your plans, Leaf invites them to start one, beginning with your places.
-          It&apos;s on by default for each of your calendars; you can turn it off per calendar.{" "}
-          <Link
-            href={`/dashboard/${orgId}/calendars/${calendarId}/edit`}
-            onClick={dismiss}
-            className="font-medium text-zinc-900 underline"
-          >
-            Settings for this calendar
-          </Link>
-        </p>
-      </div>
+    <div className="flex items-center gap-2 text-xs text-zinc-500">
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
+      <p className="min-w-0 truncate">
+        <span className="font-medium text-zinc-900">Crews are on.</span>{" "}
+        Regulars at your plans get invited to make their own plans together, starting with your places.
+      </p>
+      <Link
+        href={`/dashboard/${orgId}/calendars/${calendarId}/edit`}
+        onClick={dismiss}
+        className="shrink-0 font-medium text-zinc-900 underline-offset-2 hover:underline"
+      >
+        Settings
+      </Link>
       <button
         type="button"
         onClick={dismiss}
         aria-label="Dismiss"
-        className="shrink-0 rounded-full px-1.5 text-lg leading-none text-zinc-400 hover:text-zinc-900"
+        className="shrink-0 px-1 text-sm leading-none text-zinc-400 hover:text-zinc-900"
       >
         ×
       </button>
