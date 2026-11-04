@@ -1919,7 +1919,7 @@ export default function OrgDashboardPage() {
             return (
               <div>
                 {/* Calendar header */}
-                <div className="px-4 sm:px-6 lg:px-8 py-4 lg:py-5 border-b border-zinc-100 flex flex-wrap items-center gap-3">
+                <div className="px-4 sm:px-6 lg:px-8 py-3 sm:py-4 lg:py-5 border-b border-zinc-100 flex sm:flex-wrap items-center gap-3">
                   {cal.calendarImage ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={cal.calendarImage} alt={cal.name} className="w-9 h-9 rounded-[9px] object-cover shrink-0" />
@@ -1928,50 +1928,55 @@ export default function OrgDashboardPage() {
                       <Calendar className="w-4 h-4 text-zinc-300" />
                     </div>
                   )}
-                  <div className="flex-1 min-w-[180px]">
-                    <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex-1 min-w-0 sm:min-w-[180px]">
+                    <div className="flex items-center gap-2 sm:flex-wrap">
                       <a
                         href={`/org/${cal.shareId}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`text-base lg:text-lg font-semibold tracking-[-0.01em] hover:underline ${inactive ? "text-zinc-400" : "text-zinc-900"}`}
+                        className={`min-w-0 truncate sm:whitespace-normal text-[15px] sm:text-base lg:text-lg font-semibold tracking-[-0.01em] hover:underline ${inactive ? "text-zinc-400" : "text-zinc-900"}`}
                       >
                         {cal.name}
                       </a>
                       {cal.isPrimary && (
-                        <span className="px-2 py-[3px] bg-zinc-100 text-zinc-600 rounded-[5px] text-[9px] font-semibold tracking-[0.1em] uppercase">
+                        <span className="hidden sm:inline px-2 py-[3px] bg-zinc-100 text-zinc-600 rounded-[5px] text-[9px] font-semibold tracking-[0.1em] uppercase">
                           Primary
                         </span>
                       )}
                       {cal.role === "Host" && (
-                        <span className="px-2 py-[3px] bg-emerald-50 text-emerald-700 rounded-[5px] text-[9px] font-semibold tracking-[0.1em] uppercase">
+                        <span className="shrink-0 px-2 py-[3px] bg-emerald-50 text-emerald-700 rounded-[5px] text-[9px] font-semibold tracking-[0.1em] uppercase">
                           Co-host
                         </span>
                       )}
                       {inactive && (
-                        <span className="px-2 py-[3px] bg-amber-100 text-amber-700 rounded-[5px] text-[9px] font-semibold tracking-[0.1em] uppercase">
+                        <span className="shrink-0 px-2 py-[3px] bg-amber-100 text-amber-700 rounded-[5px] text-[9px] font-semibold tracking-[0.1em] uppercase">
                           Inactive
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-zinc-500 mt-0.5">{cal.city || "No city set"}</p>
+                    <p className="text-xs text-zinc-500 mt-0.5 truncate">
+                      {/* Phones: Primary rides on the city line, not as a badge */}
+                      {cal.isPrimary && <span className="sm:hidden">Primary · </span>}
+                      {cal.city || "No city set"}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 shrink-0 sm:flex-wrap">
                     {inactive ? (
                       <button
                         onClick={() => setShowSubscription(true)}
                         className="inline-flex items-center gap-1.5 h-9 px-4 bg-zinc-900 text-white rounded-full text-xs font-medium hover:bg-zinc-800 transition-colors"
                       >
-                        <Lock className="w-3.5 h-3.5" /> Upgrade to reactivate
+                        <Lock className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Upgrade to reactivate</span><span className="sm:hidden">Reactivate</span>
                       </button>
                     ) : (
                       <>
                         {cal.isConciergeServiced && (
                           <button
                             onClick={() => setShowConciergeChat(true)}
-                            className="relative inline-flex items-center gap-1.5 h-9 px-3.5 border border-zinc-200 text-zinc-600 rounded-full text-xs font-medium hover:border-zinc-300 transition-colors"
+                            aria-label="Concierge"
+                            className="relative inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-3.5 border border-zinc-200 text-zinc-600 rounded-full text-xs font-medium hover:border-zinc-300 transition-colors"
                           >
-                            <MessageCircle className="w-3.5 h-3.5" /> Concierge
+                            <MessageCircle className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Concierge</span>
                             {conciergeUnread > 0 && (
                               <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[16px] text-center">
                                 {conciergeUnread}
@@ -1986,9 +1991,10 @@ export default function OrgDashboardPage() {
                             setToast("Link copied!");
                             setTimeout(() => setToast(null), 2000);
                           }}
-                          className="inline-flex items-center gap-1.5 h-9 px-3.5 border border-zinc-200 text-zinc-600 rounded-full text-xs font-medium hover:border-zinc-300 transition-colors"
+                          aria-label="Copy link"
+                          className="inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-3.5 border border-zinc-200 text-zinc-600 rounded-full text-xs font-medium hover:border-zinc-300 transition-colors"
                         >
-                          <Link2 className="w-3.5 h-3.5" /> Copy link
+                          <Link2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Copy link</span>
                         </button>
                         <button
                           onClick={() => setEmbedCalId(embedCalId === cal.objectId ? null : cal.objectId)}
@@ -2006,9 +2012,10 @@ export default function OrgDashboardPage() {
                         </Link>
                         <Link
                           href={`/dashboard/${calendarId}/calendars/${cal.objectId}/edit`}
-                          className="inline-flex items-center gap-1.5 h-9 px-3.5 border border-zinc-200 text-zinc-600 rounded-full text-xs font-medium hover:border-zinc-300 transition-colors"
+                          aria-label="Edit calendar"
+                          className="inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-3.5 border border-zinc-200 text-zinc-600 rounded-full text-xs font-medium hover:border-zinc-300 transition-colors"
                         >
-                          <Pencil className="w-3 h-3" /> Edit
+                          <Pencil className="w-3 h-3" /> <span className="hidden sm:inline">Edit</span>
                         </Link>
                       </>
                     )}
@@ -2017,7 +2024,9 @@ export default function OrgDashboardPage() {
 
                 <div className="px-4 sm:px-6 lg:px-8 py-5 space-y-4">
                   {/* Mobile calendar switcher — the sidebar owns this on
-                      desktop. */}
+                      desktop. With one calendar it would only repeat the
+                      header, so it's left out (New calendar is in the menu). */}
+                  {cals.length > 1 && (
                   <div className="lg:hidden flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4">
                     {cals.map((c) => {
                       const sel = c.objectId === cal.objectId;
@@ -2048,6 +2057,7 @@ export default function OrgDashboardPage() {
                       </button>
                     )}
                   </div>
+                  )}
 
                   {embedCalId === cal.objectId && (
                     <div className="border border-zinc-200 rounded-xl p-4">

@@ -44,7 +44,8 @@ export default function CrewsNotice({ orgId, calendarId }: { orgId: string; cale
       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
       <p className="min-w-0 truncate">
         <span className="font-medium text-zinc-900">Crews are on.</span>{" "}
-        Regulars at your plans get invited to make their own plans together, starting with your places.
+        <span className="hidden sm:inline">Regulars at your plans get invited to make their own plans together, starting with your places.</span>
+        <span className="sm:hidden">Regulars can make plans together.</span>
       </p>
       <Link
         href={`/dashboard/${orgId}/calendars/${calendarId}/edit`}
