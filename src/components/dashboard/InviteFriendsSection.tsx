@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Check, MessageCircle } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { BookUser, Check, MessageCircle } from "lucide-react";
 import Parse from "@/lib/parse-client";
 
 /**
@@ -41,6 +41,32 @@ export function parseContacts(text: string): { name: string; phone: string }[] {
   }
   return out;
 }
+
+/**
+ * Contacts cards (.vcf) → "Name number" lines for the box. On a Mac, people
+ * dragged out of Contacts arrive as one .vcf; File → Export vCard makes the
+ * same. Takes each card's mobile number, else its first number.
+ */
+export function vcardToLines(text: string): string[] {
+  const unfolded = text.replace(/\r?\n[ \t]/g, "");
+  const out: string[] = [];
+  for (const card of unfolded.split(/BEGIN:VCARD/i).slice(1)) {
+    const lines = card.split(/\r?\n/);
+    const val = (l: string) => l.slice(l.indexOf(":") + 1).replace(/\\([,;])/g, "$1").trim();
+    let name = val(lines.find((l) => /^(item\d+\.)?FN[;:]/i.test(l)) || "");
+    if (!name) {
+      const n = lines.find((l) => /^(item\d+\.)?N[;:]/i.test(l));
+      if (n) { const [last = "", first = ""] = val(n).split(";"); name = `${first} ${last}`.trim(); }
+    }
+    const tels = lines.filter((l) => /^(item\d+\.)?TEL[;:]/i.test(l));
+    const tel = tels.find((l) => /CELL|IPHONE|MOBILE/i.test(l.slice(0, l.indexOf(":")))) || tels[0];
+    if (tel) out.push(`${name} ${val(tel).replace(/^tel:/i, "")}`.trim());
+  }
+  return out;
+}
+
+type PickedContact = { name?: string[]; tel?: string[] };
+type ContactsManager = { select: (props: string[], opts: { multiple: boolean }) => Promise<PickedContact[]> };
 
 function fill(template: string, inv: Invite) {
   let text = inv.first
@@ -88,6 +114,34 @@ export default function InviteFriendsSection({
     [calendar],
   );
   const parsed = useMemo(() => parseContacts(pasted), [pasted]);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  // Android Chrome has a real contact picker; desktops don't, so there the
+  // button takes Contacts cards (.vcf) instead.
+  const picker = typeof navigator !== "undefined" ? (navigator as Navigator & { contacts?: ContactsManager }).contacts : undefined;
+
+  const addLines = (lines: string[]) => {
+    if (!lines.length) { setError("No phone numbers in those contacts."); return; }
+    setError("");
+    setPasted((prev) => [prev.trim(), ...lines].filter(Boolean).join("\n"));
+  };
+
+  const addFiles = async (files: FileList | File[] | null) => {
+    const list = Array.from(files || []).filter((f) => /\.vcf$/i.test(f.name) || /vcard/i.test(f.type));
+    if (!list.length) return;
+    const texts = await Promise.all(list.map((f) => f.text()));
+    addLines(texts.flatMap(vcardToLines));
+  };
+
+  const pickContacts = async () => {
+    if (!picker) { fileRef.current?.click(); return; }
+    try {
+      const picked = await picker.select(["name", "tel"], { multiple: true });
+      addLines(picked.filter((c) => c.tel?.[0]).map((c) => `${c.name?.[0] || ""} ${c.tel![0]}`.trim()));
+    } catch {
+      /* closed the picker */
+    }
+  };
   const defaultTemplate = CAL_TEMPLATE.replace("{calendar}", calendar?.name || "my calendar");
 
   const reset = () => { setRows(null); setTemplate(null); setAlready([]); setError(""); };
@@ -179,20 +233,47 @@ export default function InviteFriendsSection({
 
       {rows === null ? (
         <div className="space-y-3">
-          <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-              {nativeText ? "Or paste names and numbers" : "Names and numbers"}
-            </span>
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                {nativeText ? "Or paste names and numbers" : "Names and numbers"}
+              </span>
+              <button
+                type="button"
+                onClick={pickContacts}
+                title={picker ? "Pick from your contacts" : "Add from Contacts: drag people here, or choose a .vcf"}
+                className="inline-flex items-center gap-1.5 h-8 px-3 border border-zinc-200 rounded-full text-xs font-medium text-zinc-600 hover:border-zinc-400 hover:text-zinc-900"
+              >
+                <BookUser className="w-3.5 h-3.5" /> Contacts
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".vcf,text/vcard,text/x-vcard"
+                multiple
+                className="hidden"
+                onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }}
+              />
+            </div>
             <textarea
+              aria-label="Names and numbers"
               value={pasted}
               onChange={(e) => setPasted(e.target.value)}
+              onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragging(true); } }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                if (!e.dataTransfer.files.length) return;
+                e.preventDefault();
+                setDragging(false);
+                addFiles(e.dataTransfer.files);
+              }}
               rows={6}
               placeholder={"Dana Kim 917-555-0101\nSam +1 (646) 555-0199"}
-              className="mt-1.5 w-full border border-zinc-200 rounded-lg p-3 text-sm focus:outline-none focus:border-zinc-900 font-mono"
+              className={`mt-1.5 w-full border rounded-lg p-3 text-sm focus:outline-none focus:border-zinc-900 font-mono ${dragging ? "border-zinc-900 bg-zinc-50" : "border-zinc-200"}`}
             />
-          </label>
+          </div>
           <p className="text-xs text-zinc-500">
-            One person per line. {parsed.length > 0 ? `${parsed.length} ${parsed.length === 1 ? "number" : "numbers"} found.` : ""}
+            One person per line{picker ? "" : ", or drag people in from Contacts"}. {parsed.length > 0 ? `${parsed.length} ${parsed.length === 1 ? "number" : "numbers"} found.` : ""}
             {parsed.length > 50 ? " Up to 50 at a time." : ""}
           </p>
           {error && <p className="text-xs text-red-600">{error}</p>}
