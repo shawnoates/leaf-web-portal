@@ -97,6 +97,17 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
   // A pasted link being imported on the server: lands in the book in a minute.
   const [linkNote, setLinkNote] = useState("");
   const [error, setError] = useState("");
+  // "Added Caffe Reggio to the book" after a search add; hides itself.
+  const [toast, setToast] = useState("");
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(""), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
+  const addedToast = (r: { alreadyInBook?: boolean; name?: string | null } | null, name: string) => {
+    const n = r?.name || name;
+    setToast(r?.alreadyInBook ? `${n} is already in the book. You +1\u2019d it.` : `Added ${n} to the book`);
+  };
   // "What are you in the mood for?" — real places for a vibe (searchCrewPlaces).
   const [vibe, setVibe] = useState("");
   const [found, setFound] = useState<Suggested[] | null>(null);
@@ -194,7 +205,8 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
         </div>
       </div>
       <Button small disabled={busy !== null || !canAdd} onClick={() => act(`p-${p.placeId}`, async () => {
-        await run("addToCrewBook", auth, { placeId: p.placeId, venue: { name: p.name, address: p.address, lat: p.lat, lng: p.lng, placeId: p.placeId } });
+        const r = await run<{ alreadyInBook?: boolean; name?: string | null }>("addToCrewBook", auth, { placeId: p.placeId, venue: { name: p.name, address: p.address, lat: p.lat, lng: p.lng, placeId: p.placeId } });
+        addedToast(r, p.name);
         setFound((f) => f && f.filter((x) => x.placeId !== p.placeId));
       })}>
         <Plus size={14} strokeWidth={2.4} aria-hidden /> Add<span className="sr-only"> {p.name} to {crewName}</span>
@@ -225,7 +237,11 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
               <VenueSearch
                 value={query}
                 onChange={setQuery}
-                onSelect={(v) => act("search", async () => { await run("addToCrewBook", auth, { placeId: v.placeId, venue: v }); setQuery(""); })}
+                onSelect={(v) => act("search", async () => {
+                  const r = await run<{ alreadyInBook?: boolean; name?: string | null }>("addToCrewBook", auth, { placeId: v.placeId, venue: v });
+                  addedToast(r, v.name);
+                  setQuery("");
+                })}
                 placeholder="Add a place, or something to watch for"
                 className="h-14 w-full rounded-full border pl-12 pr-14 text-[15px] outline-none"
                 autoFocus={focusSearch}
@@ -297,6 +313,13 @@ function BookView({ auth, crewName, canAdd, isOwner, hiddenTips }: { auth: CrewA
         )}
       </div>
 
+      {toast && (
+        <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+          <span className="flex max-w-md items-center gap-2 rounded-full bg-fm-ink px-4 py-2.5 text-sm font-semibold text-fm-canvas shadow-lg">
+            <Check size={16} strokeWidth={2.6} aria-hidden /> {toast}
+          </span>
+        </div>
+      )}
       {linkNote && <p role="status" className="mt-4 rounded-2xl bg-fm-surface px-4 py-3 text-sm text-fm-ink-2">{linkNote}</p>}
       {error && <p className="mt-4 rounded-2xl bg-[#3A2321] px-4 py-3 text-sm text-fm-danger">{error}</p>}
 
