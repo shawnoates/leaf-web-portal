@@ -1100,6 +1100,21 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 </div>
               )}
 
+              {me.status === "in" && crew.placeMode !== "fixed" && (
+                <div className="flex items-center gap-3 border-b border-fm-line-dim py-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] font-semibold">Book nudges</div>
+                    <div className="text-[13px] text-fm-muted">What&rsquo;s new in the book each evening, and what&rsquo;s leading two days before Leaf picks the next spot.</div>
+                  </div>
+                  <FriendModeSwitch
+                    label="Book nudges"
+                    checked={me.bookNudges !== false}
+                    disabled={busy !== null}
+                    onChange={(v) => act("booknudges", () => run("setCrewBookNudges", auth, { on: v }))}
+                  />
+                </div>
+              )}
+
               <div className="py-4">
                 <label htmlFor="my-pace" className="block text-[15px] font-semibold">Your pace</label>
                 <select
@@ -1343,6 +1358,7 @@ function CycleCard({
             <Mono className="text-fm-accent">{c.eventWindow.kind === "movie" ? "Movie" : "Event"} · {c.eventWindow.title}</Mono>
           )}
           {c.withCrew && <Mono className="text-fm-accent">With {c.withCrew}</Mono>}
+          {c.pickedBy && <Mono className="text-fm-accent">{c.pickedBy === "you" ? "Your pick" : `${c.pickedBy}\u2019s pick`}</Mono>}
           {c.theme?.label && <Mono className="text-fm-accent">Theme · {c.theme.label}</Mono>}
           {/* A specials theme: the special that made this place fit ("Happy hour, Daily 9 PM–close"). */}
           {c.theme?.special && <p className="m-0 text-sm text-fm-ink-2">{c.theme.special}</p>}

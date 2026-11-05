@@ -96,6 +96,8 @@ export type CycleView = {
   theme?: { label: string; special?: string | null } | null;
   /** A shared night with another crew: its name ("Date Night"). */
   withCrew?: string | null;
+  /** The place came from a member's adds: their first name, or "you". */
+  pickedBy?: string | null;
   /** A set night's date vote ("Let the crew vote instead"): the current date first, then the others. */
   redate?: {
     options: { date: string; time: string; current: boolean; votes: number; free?: number | null; known?: number | null; weather?: { temp: string | null; text: string | null; icon: string | null; rain: number | null } | null }[];
@@ -263,7 +265,7 @@ export type CrewPage = {
     /** A one-time crew after its night: offer "Do it again?". */
     lastOneTime?: { happened: boolean; venue: string | null; at: string | { iso: string } | null } | null;
   };
-  me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null; calendarSynced?: boolean; inviteLink?: string | null; needsSeed?: boolean; needsPace?: boolean; hiddenTips?: string[];
+  me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null; calendarSynced?: boolean; inviteLink?: string | null; needsSeed?: boolean; needsPace?: boolean; hiddenTips?: string[]; bookNudges?: boolean;
     /** Birthdays on: their own "where do you want to go?" (pickBirthdayPlace), and whether Leaf knows their birthday. */
     birthdayAsk?: { date: string } | null; needsBirthday?: boolean;
     /** When we're free is on and Leaf can't see their calendar: ask them to sync. */
