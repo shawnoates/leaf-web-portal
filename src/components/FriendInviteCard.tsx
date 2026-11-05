@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Copy, Loader2, MessageSquare, UserPlus } from "lucide-react";
+import { Check, Copy, Link2, Loader2, MessageSquare, UserPlus } from "lucide-react";
 import { track } from "@/lib/track";
 import {
   createPlanInvite,
@@ -15,20 +15,16 @@ import {
 // ============================================================================
 // Direct invites (server: cloud/plan-invites.js).
 //
-// attendee: on the RSVP success screen, "Bring someone?" The guest gets a
-// personal link plus a prefilled text and sends it from their own Messages
-// app — to one friend or a whole group chat. The name is optional: with one,
-// the text greets that person and, on a plan with limited spots, holds them a
-// seat for 24h (never past 3h before start); without one it's a group text
-// (one link, any number of people, never a held seat).
+// attendee: on the RSVP success screen, "Bring someone?" with two buttons and
+// nothing to fill in (2026-11-05): Text a friend opens the guest's own
+// Messages app with a group text and their personal link; Copy link copies
+// that link. The link is minted as the card appears, so the sms: tap is a real
+// <a> (navigating to sms: after an await is flaky on iOS Safari). No name
+// means no held seat — the server only holds seats for a named friend.
 //
-// host: "Send direct invites" in the host's plan tools. Same flow in the
-// host's voice, plus each link they've sent and who came in through it.
-//
-// Two taps on purpose: the name tap mints the invite, then a real <a href=
-// "sms:"> opens Messages. Navigating to sms: right after an await is flaky on
-// iOS Safari (it loses the tap's activation), and the second step lets the
-// sender edit the note before it goes.
+// host: "Send direct invites" in the host's plan tools. Two taps: an optional
+// name mints the invite, then an editable note and a real <a href="sms:">.
+// Plus each link they've sent and who came in through it.
 // ============================================================================
 
 type Variant = "attendee" | "host";
@@ -71,6 +67,44 @@ export default function FriendInviteCard({
   const [mine, setMine] = useState<MyPlanInvite[]>([]);
 
   const isHost = variant === "host";
+
+  // Guests get no name step (design 2026-11-05): the card mints one group
+  // link as it appears, so "Text a friend" can be a real <a href="sms:">
+  // from the first tap (sms: after an await loses iOS Safari's activation).
+  // Cached per plan in this tab so a remount doesn't mint another; the
+  // server caps each guest at 10 invites a plan.
+  useEffect(() => {
+    if (isHost) return;
+    const key = `leaf_group_invite_${eventGroupId}`;
+    try {
+      const cached = sessionStorage.getItem(key);
+      if (cached) {
+        const parsed = JSON.parse(cached) as CreatedPlanInvite;
+        if (parsed?.url && parsed?.smsBody) {
+          setInvite(parsed);
+          setBody(parsed.smsBody);
+          return;
+        }
+      }
+    } catch {
+      /* private mode or bad JSON: mint a fresh one */
+    }
+    let live = true;
+    setBusy(true);
+    createPlanInvite(eventGroupId, "")
+      .then((created) => {
+        if (!live) return;
+        setInvite(created);
+        setBody(created.smsBody);
+        try { sessionStorage.setItem(key, JSON.stringify(created)); } catch { /* ignore */ }
+        track("plan_invite_created", { planId: eventGroupId, holdsSeat: false, via: variant, group: true });
+      })
+      .catch((err: unknown) => {
+        if (live) setError(err instanceof Error ? err.message : "Couldn't make your link. Try again.");
+      })
+      .finally(() => { if (live) setBusy(false); });
+    return () => { live = false; };
+  }, [isHost, eventGroupId, variant]);
 
   useEffect(() => {
     if (!isHost) return;
@@ -126,10 +160,59 @@ export default function FriendInviteCard({
   const heading = isHost ? "Send direct invites" : "Bring someone?";
   const sub = isHost
     ? "A text from you gets more yeses than any link. Leaf writes it; you send it to a friend or a group chat."
-    : limitedSpots
-      ? "Text your friends or a group chat. Add a name and we'll hold that person a spot for 24 hours."
-      : "Text your friends or a group chat. It's more fun with people you know.";
+    : "Text your friends or a group chat. It's more fun with people you know.";
   const named = friendName.trim();
+
+  if (!isHost) {
+    const copyLink = async () => {
+      if (!invite) return;
+      try {
+        await navigator.clipboard.writeText(invite.url);
+        setCopied(true);
+        markSent("copy");
+        window.setTimeout(() => setCopied(false), 1500);
+      } catch {
+        /* clipboard blocked */
+      }
+    };
+    const btn = "flex-1 flex items-center justify-center gap-2 py-3 text-xs uppercase tracking-wider font-bold rounded-lg";
+    return (
+      <div className={bare ? "text-left space-y-3" : "text-left border border-zinc-200 rounded-xl p-4 space-y-3"}>
+        {!bare && (
+          <div className="flex items-start gap-3">
+            <span className="w-9 h-9 rounded-full bg-zinc-100 flex items-center justify-center flex-shrink-0">
+              <UserPlus className="w-4 h-4 text-zinc-700" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-zinc-900">{heading}</p>
+              <p className="text-xs text-zinc-500 leading-relaxed">{sub}</p>
+            </div>
+          </div>
+        )}
+        <div className="flex gap-2">
+          {invite ? (
+            <a href={smsHref(body)} onClick={() => markSent("sms")} className={`${btn} bg-zinc-900 text-white`} style={accentStyle}>
+              <MessageSquare className="w-4 h-4" /> Text a friend
+            </a>
+          ) : (
+            <span className={`${btn} bg-zinc-900 text-white opacity-60`} style={accentStyle} aria-busy={busy}>
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />} Text a friend
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={copyLink}
+            disabled={!invite}
+            className={`${btn} border border-zinc-200 text-zinc-900 disabled:opacity-60`}
+          >
+            {copied ? <Check className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}
+            {copied ? "Copied" : "Copy link"}
+          </button>
+        </div>
+        {error ? <p className="text-xs text-red-600">{error}</p> : null}
+      </div>
+    );
+  }
 
   return (
     <div className={bare ? "text-left space-y-3" : "text-left border border-zinc-200 rounded-xl p-4 space-y-3"}>

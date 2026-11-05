@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
-import CrewNudgeCard from "@/components/crew/CrewNudgeCard";
 import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import { APP_LINK_URL, SITE_URL } from "@/lib/site";
@@ -997,6 +996,7 @@ function RsvpModal({
   // What a paid ticket cost, for the "Paid" line on the confirmation.
   const [paidCents, setPaidCents] = useState(0);
   const [isWaitlistResult, setIsWaitlistResult] = useState(false);
+  const [showChatPicker, setShowChatPicker] = useState(false);
   const [sharePhone, setSharePhone] = useState(true);
   const [followState, setFollowState] = useState<"idle" | "following" | "done" | "pending">(
     isFollowingCalendar ? "done" : followRequestPendingProp ? "pending" : "idle"
@@ -1131,8 +1131,24 @@ function RsvpModal({
   // Widen the modal once we're past the form so the JoinChatPicker can lay
   // its two options out side-by-side on desktop. Form step stays narrow so
   // the input fields aren't awkwardly stretched.
-  const isJoinPickerStep = formStep === "success" && !isPendingResult && Boolean(notificationId);
+  // A confirmed RSVP shows the ticket, and the ticket carries Group chat and
+  // the calendar icon (design 2026-11-05); the chat picker opens from there.
+  const ticketShown = formStep === "success" && !isPendingResult && !isWaitlistResult && !collectsP2p;
+  const isJoinPickerStep =
+    formStep === "success" && !isPendingResult && Boolean(notificationId) && (!ticketShown || showChatPicker);
   const maxWidthClass = isJoinPickerStep ? "max-w-3xl" : "max-w-md";
+  const planIcsUrl = plan.dateISO
+    ? buildIcsHref({
+        uid: plan.id,
+        title: plan.title,
+        dateISO: plan.dateISO,
+        time: plan.time,
+        description: plan.description,
+        locationName: plan.location?.isPrivate ? null : plan.location?.name,
+        locationAddress: plan.location?.isPrivate ? null : plan.location?.address,
+        url: typeof window !== "undefined" ? `${window.location.origin}/p/${plan.id}${plan.promotedFrom ? `?via=${calendarId}` : ""}` : undefined,
+      })
+    : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm overflow-y-auto">
@@ -1283,7 +1299,7 @@ function RsvpModal({
           </div>
         ) : (
           <div className="py-6 text-center space-y-5">
-            {!isPendingResult && !isWaitlistResult && !collectsP2p ? (
+            {ticketShown ? (
               // Confirmed (free or paid): say so, then the ticket itself (2026-10-18).
               <div className="space-y-4 text-left">
                 <div className="flex items-center gap-2 text-[14px] font-semibold text-emerald-800">
@@ -1294,17 +1310,46 @@ function RsvpModal({
                 </div>
                 <h4 className="font-serif text-[30px] leading-tight text-zinc-900">You&rsquo;re going.</h4>
                 <div className="overflow-hidden rounded-2xl text-white" style={{ backgroundColor: "#253a33" }}>
-                  <div className="px-5 py-4">
+                  <div className="px-5 pt-5 pb-4">
                     <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#9dbeb3]">{paidTicket ? "Your ticket" : "Your plan"}</p>
                     <p className="mt-1.5 font-serif text-[20px] leading-snug">{plan.title}</p>
                     <p className="mt-1 text-[14px] text-[#e0ebe7]">
-                      {[plan.date, plan.time].filter(Boolean).join(" \u00b7 ")}
-                      {!plan.location?.isPrivate && plan.location?.name ? <><br />{plan.location.name}</> : null}
+                      {[plan.date, plan.time, !plan.location?.isPrivate ? plan.location?.name : null].filter(Boolean).join(" \u00b7 ")}
                     </p>
                   </div>
-                  <div className="flex justify-between gap-3 border-t border-dashed border-white/30 px-5 py-3 text-[13px] text-[#e0ebe7]">
-                    <span>{[contact?.name || verify.name, paidTicket ? "1 ticket" : null].filter(Boolean).join(" \u00b7 ")}</span>
-                    <span>We&rsquo;ll {contact?.notify === "email" ? "email" : "text"} you the day before</span>
+                  <div className="border-t border-dashed border-white/30 px-5 pt-4 pb-5 space-y-3">
+                    <p className="text-[13px] text-[#c9d8d2]">
+                      {paidTicket ? "1 ticket \u00b7 " : ""}We&rsquo;ll {contact?.notify === "email" ? "email" : "text"} you the day before.
+                    </p>
+                    <div className="flex gap-2.5">
+                      {notificationId ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowChatPicker((v) => !v)}
+                          aria-expanded={showChatPicker}
+                          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white py-3 text-[15px] font-semibold text-[#253a33] hover:bg-white/90"
+                        >
+                          <MessageCircle className="w-4 h-4" /> Group chat
+                        </button>
+                      ) : (
+                        <Link
+                          href={`/chat/${plan.id}`}
+                          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white py-3 text-[15px] font-semibold text-[#253a33] hover:bg-white/90"
+                        >
+                          <MessageCircle className="w-4 h-4" /> Group chat
+                        </Link>
+                      )}
+                      {planIcsUrl ? (
+                        <a
+                          href={planIcsUrl}
+                          aria-label="Add to calendar"
+                          title="Add to calendar"
+                          className="grid w-12 flex-shrink-0 place-items-center rounded-xl border border-white/35 text-white hover:bg-white/10"
+                        >
+                          <Calendar className="w-5 h-5" />
+                        </a>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1350,13 +1395,6 @@ function RsvpModal({
               <FriendInviteCard eventGroupId={plan.id} limitedSpots={plan.capacity != null} accent={brandColor} />
             )}
 
-            {/* People they keep going to plans with: make it a crew (the
-                server decides: twice in 90 days, monthly at most, the
-                organizer can turn it off). */}
-            {!isPendingResult && !isWaitlistResult && calendarId && (
-              <CrewNudgeCard calendarId={calendarId} calendarName={calendarName || null} notificationId={notificationId || null} source="calendar_prompt" />
-            )}
-
             {!isPendingResult && !isWaitlistResult && (
               <PlanAddonStack
                 eventGroupId={plan.id}
@@ -1366,7 +1404,8 @@ function RsvpModal({
               />
             )}
 
-            {!isPendingResult && notificationId && (
+            {/* With a ticket, the picker opens from its Group chat button. */}
+            {!isPendingResult && notificationId && (!ticketShown || showChatPicker) && (
               <div className="pt-2">
                 <JoinChatPicker
                   eventGroupId={plan.id}
@@ -1377,7 +1416,7 @@ function RsvpModal({
               </div>
             )}
 
-            {!isPendingResult && !notificationId && (
+            {!isPendingResult && !notificationId && !ticketShown && (
               <Link
                 href={`/chat/${plan.id}`}
                 className="flex items-center justify-center gap-2 w-full text-white py-3 text-[15px] font-semibold transition-opacity hover:opacity-90 rounded-xl"
@@ -1387,21 +1426,10 @@ function RsvpModal({
               </Link>
             )}
 
-            {!isPendingResult && plan.dateISO && (() => {
-              const icsUrl = buildIcsHref({
-                uid: plan.id,
-                title: plan.title,
-                dateISO: plan.dateISO,
-                time: plan.time,
-                description: plan.description,
-                locationName: plan.location?.isPrivate ? null : plan.location?.name,
-                locationAddress: plan.location?.isPrivate ? null : plan.location?.address,
-                url: typeof window !== "undefined" ? `${window.location.origin}/p/${plan.id}${plan.promotedFrom ? `?via=${calendarId}` : ""}` : undefined,
-              });
-              if (!icsUrl) return null;
+            {!isPendingResult && !ticketShown && planIcsUrl && (() => {
               return (
                 <a
-                  href={icsUrl}
+                  href={planIcsUrl}
                   className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-[15px] font-semibold hover:bg-zinc-50 transition-colors rounded-xl"
                 >
                   <Calendar className="w-4 h-4" />
