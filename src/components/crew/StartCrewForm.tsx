@@ -15,6 +15,7 @@ import Parse from "@/lib/parse-client";
 import { trackMarketingEvent } from "@/components/marketing/analytics";
 import LeafSignIn, { type SignInMethod } from "@/components/LeafSignIn";
 import VenueSearch from "@/components/VenueSearch";
+import StarterPlaces, { type StarterArea, type StarterPlace } from "@/components/crew/StarterPlaces";
 
 const PACES = [
   { days: 7, label: "Every week" },
@@ -56,9 +57,14 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
   const [step, setStep] = useState<Step>("crew");
   const [crewName, setCrewName] = useState(suggestedName);
   const [pace, setPace] = useState(14);
-  // "Just once" is for one place: ask where up front, so Leaf never picks one.
-  const [placeQuery, setPlaceQuery] = useState("");
+  // On a trigger: the one place it's for.
   const [place, setPlace] = useState<{ placeId?: string | null; name: string } | null>(null);
+  // Every other crew: its kinds of place, where, and the places tapped to start the book.
+  const [starter, setStarter] = useState<StarterPlace[]>([]);
+  const [placeKinds, setPlaceKinds] = useState<string[]>([]);
+  const [area, setArea] = useState<StarterArea | null>(null);
+  // A crew whose book starts from a calendar's places doesn't have to tap one.
+  const needsStarter = pace !== TRIGGER && !(fromCalendar && seedBook);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   // On a trigger: the weather (a place, with its rule).
@@ -91,10 +97,8 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         source,
         ...(fromCalendar ? { fromCalendarId: fromCalendar.id, seedFromCalendar: seedBook } : {}),
+        ...(pace !== TRIGGER ? { placeKinds, area, starterPlaces: starter } : {}),
       })) as Created;
-      if (place && pace !== TRIGGER) {
-        await Parse.Cloud.run("addToCrewBook", { crewId: r.crewId, placeId: place.placeId || null, venue: place }).catch(() => {});
-      }
       setCreated(r);
       setHasPhone(Boolean(Parse.User.current()?.get("phone")));
       setStep("done");
@@ -111,6 +115,7 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
     if (pace === TRIGGER && !weatherOn) { setError("Turn on the weather and pick a place."); return; }
     if (pace === TRIGGER && weatherOn && !place) { setError("Pick the place to go when it's nice."); return; }
     if (pace === TRIGGER && weatherOn && days.length === 0) { setError("Pick at least one day."); return; }
+    if (needsStarter && starter.length === 0) { setError(area ? "Tap at least one place to start the book." : "Say where, then tap at least one place."); return; }
     setError("");
     trackMarketingEvent("friend_mode_cta_click", { surface: "friends_page_form" });
     if (Parse.User.current()) { await create(); return; }
@@ -259,27 +264,19 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
               )}
             </div>
           )}
-          {pace === 0 && (
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-semibold text-fm-ink-2">Where are you going?</span>
-              {place ? (
-                <div className="flex h-12 items-center justify-between gap-2 rounded-2xl border border-fm-line bg-fm-canvas px-4 text-[15px]">
-                  <span className="truncate">{place.name}</span>
-                  <button type="button" className="text-xs text-fm-muted underline" onClick={() => setPlace(null)}>Change</button>
-                </div>
-              ) : (
-                <VenueSearch
-                  value={placeQuery}
-                  onChange={setPlaceQuery}
-                  onSelect={(v) => setPlace(v as { placeId?: string | null; name: string })}
-                  placeholder="The bathhouse, the restaurant…"
-                  className={field}
-                />
-              )}
-              <p className="m-0 text-xs text-fm-muted">Leaf finds the date that works for everyone{place ? "" : ". Add the place now or on the crew page"}.</p>
-            </div>
+          {pace !== TRIGGER && (
+            <StarterPlaces
+              crewName={crewName}
+              picked={starter}
+              onPicked={setStarter}
+              onKinds={setPlaceKinds}
+              onArea={setArea}
+              oneTime={pace === 0}
+            />
           )}
-          <button type="button" className={primary} onClick={next} disabled={busy}>{busy ? "Starting…" : "Start the crew"}</button>
+          <button type="button" className={primary} onClick={next} disabled={busy || (needsStarter && starter.length === 0)}>
+            {busy ? "Starting…" : needsStarter ? (starter.length ? `Start with ${starter.length} place${starter.length === 1 ? "" : "s"}` : "Tap a place to start") : "Start the crew"}
+          </button>
           <p className="m-0 text-xs leading-relaxed text-fm-muted">Your friends don&rsquo;t need the app. They join from a link.</p>
         </>
       )}
