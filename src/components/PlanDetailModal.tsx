@@ -29,6 +29,7 @@ import PlanIntroSection from "./PlanIntroSection";
 import FittedImage from "./FittedImage";
 import FriendInviteCard from "./FriendInviteCard";
 import TextFriendsDrawer from "./dashboard/TextFriendsDrawer";
+import PlanPaymentsProgress, { type P2pRosterSummary } from "./dashboard/PlanPaymentsProgress";
 
 const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2";
@@ -252,6 +253,23 @@ export default function PlanDetailModal({
         );
       })
       .finally(() => setPlanRsvpsLoading(false));
+  }, [plan.objectId, plan.isPoll, isPromoted, planRsvpsRefreshTick]);
+
+  // Peer-to-peer payments: once the plan collects money, a progress card
+  // stands in for "Collect money". `undefined` while loading, so the button
+  // doesn't flash before the card; `null` when not collecting (or on error).
+  const [p2pRoster, setP2pRoster] = useState<P2pRosterSummary | null | undefined>(undefined);
+  useEffect(() => {
+    if (plan.isPoll || isPromoted) {
+      setP2pRoster(null);
+      return;
+    }
+    let cancelled = false;
+    setP2pRoster(undefined);
+    Parse.Cloud.run("getP2pRoster", { eventGroupId: plan.objectId })
+      .then((r: P2pRosterSummary) => { if (!cancelled) setP2pRoster(r?.p2pPayment ? r : null); })
+      .catch(() => { if (!cancelled) setP2pRoster(null); });
+    return () => { cancelled = true; };
   }, [plan.objectId, plan.isPoll, isPromoted, planRsvpsRefreshTick]);
 
   // Load poll detail for poll plans.
@@ -1055,6 +1073,9 @@ export default function PlanDetailModal({
           )}
 
           <div className="pt-4 border-t border-zinc-100 flex flex-col gap-2.5">
+            {p2pRoster && !isPromoted && (
+              <PlanPaymentsProgress planId={plan.objectId} roster={p2pRoster} focusRing={FOCUS_RING} />
+            )}
             {primaryActionCount > 0 && (
               <div className="grid grid-cols-2 gap-2">
                 {!plan.isPoll && (
@@ -1110,9 +1131,9 @@ export default function PlanDetailModal({
                 <Copy className="w-[15px] h-[15px]" />
                 Duplicate
               </button>
-              {/* Peer-to-peer payments: the /pay page sets collecting up, or shows
-                  who has paid once it's on. */}
-              {!plan.isPoll && (
+              {/* Peer-to-peer payments: the /pay page sets collecting up. Once
+                  it's on, the progress card above links there instead. */}
+              {!plan.isPoll && p2pRoster === null && (
                 <Link
                   href={`/pay/${plan.objectId}`}
                   className={`h-9 px-3 rounded-lg text-[13px] font-medium text-zinc-600 hover:bg-zinc-100 inline-flex items-center gap-1.5 no-underline transition-colors ${FOCUS_RING}`}
