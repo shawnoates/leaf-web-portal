@@ -68,6 +68,17 @@ export default function FriendInviteCard({
 
   const isHost = variant === "host";
 
+  // Which device decides whether sms: links work. Read after mount so the
+  // server render (no navigator) and the first client render agree.
+  const [device, setDevice] = useState<"phone" | "mac" | "other">("phone");
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    const touchMac = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1; // iPadOS
+    if (/iPhone|iPad|iPod|Android/i.test(ua) || touchMac) setDevice("phone");
+    else if (/Macintosh|Mac OS X/.test(ua)) setDevice("mac");
+    else setDevice("other");
+  }, []);
+
   // Guests get no name step (design 2026-11-05): the card mints one group
   // link as it appears, so "Text a friend" can be a real <a href="sms:">
   // from the first tap (sms: after an await loses iOS Safari's activation).
@@ -176,6 +187,33 @@ export default function FriendInviteCard({
       }
     };
     const btn = "flex-1 flex items-center justify-center gap-2 py-3 text-xs uppercase tracking-wider font-bold rounded-lg";
+    const solid = `${btn} bg-zinc-900 text-white`;
+    const outline = `${btn} border border-zinc-200 text-zinc-900`;
+    // sms: only works on phones and on Macs with Messages. Phones lead with
+    // Text a friend; a Mac leads with Copy link and keeps Text second;
+    // anywhere else Copy link is the only button (sms: does nothing there).
+    const smsFirst = device === "phone";
+    const textBtn = device === "other" ? null : invite ? (
+      <a href={smsHref(body)} onClick={() => markSent("sms")} className={smsFirst ? solid : outline} style={smsFirst ? accentStyle : undefined}>
+        <MessageSquare className="w-4 h-4" /> Text a friend
+      </a>
+    ) : (
+      <span className={`${smsFirst ? solid : outline} opacity-60`} style={smsFirst ? accentStyle : undefined} aria-busy={busy}>
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />} Text a friend
+      </span>
+    );
+    const copyBtn = (
+      <button
+        type="button"
+        onClick={copyLink}
+        disabled={!invite}
+        className={`${smsFirst ? outline : solid} disabled:opacity-60`}
+        style={smsFirst ? undefined : accentStyle}
+      >
+        {copied ? <Check className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}
+        {copied ? "Copied" : "Copy link"}
+      </button>
+    );
     return (
       <div className={bare ? "text-left space-y-3" : "text-left border border-zinc-200 rounded-xl p-4 space-y-3"}>
         {!bare && (
@@ -190,24 +228,7 @@ export default function FriendInviteCard({
           </div>
         )}
         <div className="flex gap-2">
-          {invite ? (
-            <a href={smsHref(body)} onClick={() => markSent("sms")} className={`${btn} bg-zinc-900 text-white`} style={accentStyle}>
-              <MessageSquare className="w-4 h-4" /> Text a friend
-            </a>
-          ) : (
-            <span className={`${btn} bg-zinc-900 text-white opacity-60`} style={accentStyle} aria-busy={busy}>
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />} Text a friend
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={copyLink}
-            disabled={!invite}
-            className={`${btn} border border-zinc-200 text-zinc-900 disabled:opacity-60`}
-          >
-            {copied ? <Check className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}
-            {copied ? "Copied" : "Copy link"}
-          </button>
+          {smsFirst ? <>{textBtn}{copyBtn}</> : <>{copyBtn}{textBtn}</>}
         </div>
         {error ? <p className="text-xs text-red-600">{error}</p> : null}
       </div>
