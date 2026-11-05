@@ -135,7 +135,7 @@ export default function StarterPlaces({ crewName, picked, onPicked, onKinds, onA
       {center && (
         <div className="flex flex-col gap-2">
           <span className="text-sm font-semibold text-fm-ink-2">
-            {oneTime ? "Tap where you’re going (or a few to vote on)" : "Tap at least one to start the book"}
+            {oneTime ? "Tap one or more places. Pick a few and the crew votes" : "Tap at least one to start the book"}
           </span>
           {!kinds?.length ? (
             <p className="m-0 text-sm text-fm-muted">Pick a kind of place above.</p>
