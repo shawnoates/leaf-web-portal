@@ -1326,10 +1326,14 @@ function CycleCard({
   const going = goingIds.map((id) => names[id] || "Someone");
   const closes = toDate(c.pollClosesAt);
   const settled = c.state === "locked" || c.state === "booked";
+  // Past its start time: it's on now (Leaf closes it out 2–4h later). No more
+  // RSVP, cancel, stops or changes; who's going and the chat stay.
+  const startAt = toDate(c.startsAt);
+  const started = settled && !!startAt && startAt <= new Date();
   // Asked on the page itself: the app's web view has no confirm() dialog.
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmSkip, setConfirmSkip] = useState(false);
-  const stateWord = { picking: "Picking", polling: "Voting", locked: "Locked in", booked: "Booked" }[c.state as string];
+  const stateWord = started ? "Happening now" : { picking: "Picking", polling: "Voting", locked: "Locked in", booked: "Booked" }[c.state as string];
   const who = c.trigger === "member_proposal" ? `${names[c.hostId || ""] || "A member"}'s idea`
     : c.trigger === "weather" ? "Nice day ahead"
     : c.trigger === "birthday" ? `${names[c.birthdayOfId || ""] || "Someone"}'s birthday`
@@ -1576,7 +1580,7 @@ function CycleCard({
             <span className="text-sm text-fm-ink-2">{going.length ? `${going.join(", ")} going` : "Nobody's said IN yet"}</span>
           </div>
 
-          <div role="group" aria-label="Your RSVP" className="grid grid-cols-2 gap-1 rounded-full border border-fm-line-dim bg-fm-canvas p-1">
+          {!started && <div role="group" aria-label="Your RSVP" className="grid grid-cols-2 gap-1 rounded-full border border-fm-line-dim bg-fm-canvas p-1">
             {([["in", "I'm in", true],["out", c.myRsvp === "out" ? "You're out" : "Can't make it", false]] as const).map(([key, label, goingVal]) => {
               const on = c.myRsvp === key;
               return (
@@ -1595,9 +1599,9 @@ function CycleCard({
                 </button>
               );
             })}
-          </div>
+          </div>}
 
-          {c.isHost && c.state === "locked" && !c.venue?.fixed && !c.noBookingNeeded && (
+          {!started && c.isHost && c.state === "locked" && !c.venue?.fixed && !c.noBookingNeeded && (
             <div className="flex flex-col gap-3 rounded-[18px] bg-fm-card px-4 py-3.5">
               <p className="m-0 text-sm leading-snug text-fm-ink-2">You&rsquo;re booking this one. Tap when it&rsquo;s done and Leaf tells everyone.</p>
               <div className="flex flex-wrap gap-2">
@@ -1610,7 +1614,7 @@ function CycleCard({
               </div>
             </div>
           )}
-          {c.isHost && c.state === "locked" && c.noBookingNeeded && (
+          {!started && c.isHost && c.state === "locked" && c.noBookingNeeded && (
             <p className="m-0 text-sm text-fm-muted">No booking needed. Leaf won&rsquo;t remind you about it.</p>
           )}
           {c.state === "booked" && (
@@ -1626,7 +1630,7 @@ function CycleCard({
               <MessageCircle size={17} aria-hidden /> Chat with the group
             </a>
           )}
-          {(c.isHost || isOwner) && (
+          {!started && (c.isHost || isOwner) && (
             confirmCancel ? (
               <div className="flex flex-col gap-2.5 rounded-[18px] border border-fm-line px-4 py-3.5">
                 <p className="m-0 text-sm leading-snug text-fm-ink">
@@ -1652,14 +1656,14 @@ function CycleCard({
         </>
       )}
       {/* A stop after the night's place: suggestions to upvote, the host adds one. */}
-      {["polling", "locked", "booked"].includes(c.state) && c.venueLocationId && !c.venue?.custom && (
+      {!started && ["polling", "locked", "booked"].includes(c.state) && c.venueLocationId && !c.venue?.custom && (
         <SecondStop auth={auth} cycleId={c.cycleId} inApp={inApp} />
       )}
-      {["polling", "locked", "booked"].includes(c.state) && (c.isHost || isOwner) && (!c.venue?.fixed || c.venue?.custom) && (
+      {!started && ["polling", "locked", "booked"].includes(c.state) && (c.isHost || isOwner) && (!c.venue?.fixed || c.venue?.custom) && (
         <ChangePlace cycle={c} auth={auth} busy={busy} onAct={onAct} />
       )}
-      {settled && c.redate && <RedateVote cycle={c} auth={auth} busy={busy} onAct={onAct} canDecide={Boolean(c.isHost || isOwner)} />}
-      {settled && !c.redate && (c.isHost || isOwner) && <ChangeDate cycle={c} auth={auth} busy={busy} onAct={onAct} />}
+      {settled && !started && c.redate && <RedateVote cycle={c} auth={auth} busy={busy} onAct={onAct} canDecide={Boolean(c.isHost || isOwner)} />}
+      {settled && !started && !c.redate && (c.isHost || isOwner) && <ChangeDate cycle={c} auth={auth} busy={busy} onAct={onAct} />}
     </Card>
   );
 }
