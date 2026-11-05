@@ -624,6 +624,9 @@ function Setup({
           {HOLD_CHOICES.map((c) => <option key={c.v} value={c.v}>{c.label}</option>)}
         </select>
       </label>
+      <p className="ph-muted ph-small">
+        An unpaid spot only goes to someone else if the plan is full or has a waitlist. Otherwise they keep it and still owe you.
+      </p>
       <div className="ph-paidto">
         <span>Paid to {describeHandles(handles)}</span>
         <button className="ph-link" onClick={() => setEditingHandles(true)}>Edit</button>
