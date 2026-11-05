@@ -15,6 +15,8 @@ import { run, type CrewAuth } from "@/lib/crew";
 type Suggestion = {
   key: string; name: string; address: string | null; kind: string; kindLabel: string; walkMin: number;
   fromBook: boolean; votes: number; myVote: boolean; locationId: string | null; placeId: string | null;
+  /** Where it came from: the crew's book, a Happening on that night, or nearby (not in the book). */
+  source?: "book" | "happening" | "nearby";
 };
 type Added = { locationId: string; name: string; address: string | null; kindLabel: string | null; walkMin: number | null; addedByName: string | null };
 type Stops = {
@@ -61,7 +63,11 @@ export default function SecondStop({ auth, cycleId, inApp, onChanged }: { auth: 
 
   if (!stops || (!stops.added && stops.suggestions.length === 0)) return null;
   const { canAdd, added, suggestions } = stops;
-  const pillInfo = (s: Suggestion) => [s.kindLabel, `${s.walkMin} min walk`, s.fromBook ? "from the book" : null].filter(Boolean).join(" · ");
+  const sourceLabel = (s: Suggestion) => {
+    const src = s.source || (s.fromBook ? "book" : "nearby");
+    return src === "happening" ? "on that night" : src === "book" ? "from the book" : "nearby, not in the book";
+  };
+  const pillInfo = (s: Suggestion) => [s.kindLabel, `${s.walkMin} min walk`, sourceLabel(s)].filter(Boolean).join(" · ");
 
   const hostPill = (s: Suggestion) => (
     <button
