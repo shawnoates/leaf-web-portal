@@ -1739,21 +1739,24 @@ export function LastNightCard({ night, meId, auth, split, onSplit, nextRoundAt }
       </div>
 
       {night.myInviteId && (
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="m-0 mr-1 text-[15px] text-fm-ink">Did you make it?</p>
-          {([["yes", "I went", true], ["no", "Couldn't make it", false]] as const).map(([value, label, attended]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={attendance === value}
-              onClick={() => void answer(attended)}
-              className={`h-10 rounded-full border px-4 text-sm font-semibold transition ${
-                attendance === value ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink hover:border-fm-ink-2"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex flex-col gap-2.5">
+          <p className="m-0 text-[15px] text-fm-ink">Did you make it?</p>
+          {/* Side by side at any width, like "How was it?" below. */}
+          <div className="flex gap-2">
+            {([["yes", "I went", true], ["no", "Couldn't make it", false]] as const).map(([value, label, attended]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={attendance === value}
+                onClick={() => void answer(attended)}
+                className={`h-11 min-w-0 flex-1 whitespace-nowrap rounded-full border px-3 text-sm font-semibold transition ${
+                  attendance === value ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink hover:border-fm-ink-2"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
