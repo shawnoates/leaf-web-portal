@@ -62,6 +62,8 @@ export async function fetchPlanInvite(code: string, eventGroupId: string): Promi
 export interface CreatedPlanInvite {
   code: string;
   url: string;
+  /** Points the guest earns per friend who RSVPs through this link (server's number). */
+  pointsPerFriend?: number | null;
   holdsSeat: boolean;
   expiresAt: string | null;
   smsBody: string;

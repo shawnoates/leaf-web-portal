@@ -4,7 +4,7 @@
 
 export interface PointsRow {
   id: string;
-  kind: "attend" | "host" | "chat" | "share" | "ticket" | "ticket_reversed";
+  kind: "attend" | "host" | "chat" | "share" | "invite" | "ticket" | "ticket_reversed";
   delta: number;
   planTitle: string | null;
   businessName: string | null;
@@ -39,6 +39,7 @@ export function awardLine(r: PointsRow): string {
   if (r.kind === "host") return `You hosted ${r.planTitle || "a plan"}`;
   if (r.kind === "chat") return `Chatted in ${r.planTitle || "a plan"}`;
   if (r.kind === "share") return `A friend followed ${r.businessName || "the calendar"} from your link`;
+  if (r.kind === "invite") return `A friend RSVP'd to ${r.planTitle || "a plan"} from your link`;
   if (r.kind === "ticket") return `Your spot at ${r.planTitle || "a plan"}`;
   if (r.kind === "ticket_reversed") return `Refunded: ${r.planTitle || "a plan"}`;
   const where = r.businessName || r.planTitle || "this plan";

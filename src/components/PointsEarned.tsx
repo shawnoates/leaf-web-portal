@@ -118,6 +118,7 @@ function Celebration({
   onMakePlans: () => void;
 }) {
   const isHost = award.kind === "host";
+  const isInvite = award.kind === "invite";
   const calm = useMemo(() => prefersReducedMotion(), []);
   const [shown, setShown] = useState(calm ? award.delta : 0);
   const dialog = useRef<HTMLDivElement>(null);
@@ -185,9 +186,9 @@ function Celebration({
               }}
             />
           ))}
-          <span style={S.badge}>{isHost ? "Your plan ran" : "Check-in confirmed"}</span>
-          <div style={S.head}>{isHost ? "Nice hosting!" : "You showed up!"}</div>
-          <div style={S.heroSub}>{award.planTitle || where}{isHost ? "" : award.businessName ? ` · ${award.businessName}` : ""}</div>
+          <span style={S.badge}>{isHost ? "Your plan ran" : isInvite ? "A friend RSVP\u2019d" : "Check-in confirmed"}</span>
+          <div style={S.head}>{isHost ? "Nice hosting!" : isInvite ? "Thanks for the invite!" : "You showed up!"}</div>
+          <div style={S.heroSub}>{award.planTitle || where}{isHost || isInvite ? "" : award.businessName ? ` · ${award.businessName}` : ""}</div>
           <div className={calm ? "lp-num" : "lp-num lp-pop"} style={S.num}>+{shown}</div>
           <div style={S.unit}>Leaf points</div>
         </div>
@@ -195,6 +196,8 @@ function Celebration({
         <div style={S.body}>
           {isHost ? (
             <p style={S.copy}>The more people who show up, the more you earn. Host again to keep stacking.</p>
+          ) : isInvite ? (
+            <p style={S.copy}>{awardLine(award)}. Bring more friends to earn more.</p>
           ) : (
             <p style={S.copy}>
               {awardLine(award)}.{award.nextWorth ? ` Come back and the next one is worth ${award.nextWorth}.` : ""}

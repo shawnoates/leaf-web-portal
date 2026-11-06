@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Copy, Link2, Loader2, MessageSquare, UserPlus } from "lucide-react";
+import { Check, Copy, Link2, Loader2, MessageSquare, Star, UserPlus } from "lucide-react";
 import { track } from "@/lib/track";
 import {
   createPlanInvite,
@@ -230,6 +230,12 @@ export default function FriendInviteCard({
         <div className="flex gap-2">
           {smsFirst ? <>{textBtn}{copyBtn}</> : <>{copyBtn}{textBtn}</>}
         </div>
+        {invite?.pointsPerFriend ? (
+          <p className="flex items-center gap-2 rounded-lg bg-[#eef5f1] px-3 py-2 text-xs text-[#253a33]">
+            <Star className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
+            <span><b className="font-bold">+{invite.pointsPerFriend} pts</b> for each friend who RSVPs through your link</span>
+          </p>
+        ) : null}
         {error ? <p className="text-xs text-red-600">{error}</p> : null}
       </div>
     );
