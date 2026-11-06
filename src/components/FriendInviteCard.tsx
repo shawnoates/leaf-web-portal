@@ -233,7 +233,7 @@ export default function FriendInviteCard({
         {invite?.pointsPerFriend ? (
           <p className="flex items-center gap-2 rounded-lg bg-[#eef5f1] px-3 py-2 text-xs text-[#253a33]">
             <Star className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
-            <span><b className="font-bold">+{invite.pointsPerFriend} pts</b> for each friend who RSVPs through your link</span>
+            <span>{invite.pointsUpTo ? "Up to " : ""}<b className="font-bold">{invite.pointsUpTo ? "" : "+"}{invite.pointsPerFriend} pts</b> for each friend who {invite.pointsUpTo ? "comes" : "RSVPs"} through your link</span>
           </p>
         ) : null}
         {error ? <p className="text-xs text-red-600">{error}</p> : null}

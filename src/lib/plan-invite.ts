@@ -64,6 +64,8 @@ export interface CreatedPlanInvite {
   url: string;
   /** Points the guest earns per friend who RSVPs through this link (server's number). */
   pointsPerFriend?: number | null;
+  /** pointsPerFriend is a most (RSVP plus following the calendar). */
+  pointsUpTo?: boolean;
   holdsSeat: boolean;
   expiresAt: string | null;
   smsBody: string;
