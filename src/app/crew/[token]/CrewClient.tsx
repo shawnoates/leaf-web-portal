@@ -800,8 +800,12 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                   return (
                     <li key={p.cycleId} className="flex items-center gap-4 py-3.5">
                       <Mono className="w-14 shrink-0 text-xs text-fm-muted">{d ? d.toLocaleDateString("en-US", { month: "short", day: "2-digit" }) : ""}</Mono>
-                      <span className="min-w-0 flex-1 truncate text-base font-medium">{p.venue?.name || (eveningAt(p.startsAt) ? "A night out" : "A get-together")}</span>
-                      <span className="text-[13px] text-fm-muted">{p.headcount} went</span>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-base font-medium">{p.venue?.name || (eveningAt(p.startsAt) ? "A night out" : "A get-together")}</span>
+                        {/* More than one place: the rest, in order. */}
+                        {(p.stops?.length ?? 0) > 0 && <span className="truncate text-[13px] text-fm-muted">then {p.stops!.join(" → ")}</span>}
+                      </span>
+                      <span className="shrink-0 text-[13px] text-fm-muted">{p.headcount} went</span>
                     </li>
                   );
                 })}

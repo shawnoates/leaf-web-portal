@@ -275,7 +275,8 @@ export type CrewPage = {
   /** Tell Leaf pills: what the crew has said so far, with counts (never who). */
   prefPills?: PrefPill[];
   open: CycleView[];
-  past: { cycleId: string; venue: Venue | null; startsAt: string | { iso: string } | null; headcount: number; planId: string | null }[];
+  /** `stops`: a night with more than one place, the ones after the first, in order. */
+  past: { cycleId: string; venue: Venue | null; startsAt: string | { iso: string } | null; headcount: number; planId: string | null; stops?: string[] }[];
   /** The newest few in the book (the crew page's row). */
   book: BookSpot[];
   /** The book's rows for the crew page: Places, Happenings, and Discover (one tap adds). */
