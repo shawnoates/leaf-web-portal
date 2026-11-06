@@ -498,6 +498,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 split={split && split.cycleId === data.lastNight.cycleId ? split : null}
                 onSplit={setSplit}
                 nextRoundAt={crew.enabled !== false && !crew.oneTime ? crew.nextRoundAt || null : null}
+                onChanged={reload}
               />
             )}
 
@@ -1666,6 +1667,10 @@ function CycleCard({
       {!started && ["polling", "locked", "booked"].includes(c.state) && (c.isHost || isOwner) && (!c.venue?.fixed || c.venue?.custom) && (
         <ChangePlace cycle={c} auth={auth} busy={busy} onAct={onAct} />
       )}
+      {/* On now: the place can still be put right, quietly. */}
+      {started && (c.isHost || isOwner) && (!c.venue?.fixed || c.venue?.custom) && (
+        <ChangePlace cycle={c} auth={auth} busy={busy} onAct={onAct} actual />
+      )}
       {settled && !started && c.redate && <RedateVote cycle={c} auth={auth} busy={busy} onAct={onAct} canDecide={Boolean(c.isHost || isOwner)} />}
       {settled && !started && !c.redate && (c.isHost || isOwner) && <ChangeDate cycle={c} auth={auth} busy={busy} onAct={onAct} />}
     </Card>
@@ -1682,9 +1687,16 @@ function CycleCard({
  * went, How was it? and the bill. The RSVP, booking, cancel and chat
  * controls are gone; underneath, when the next round starts.
  */
-export function LastNightCard({ night, meId, auth, split, onSplit, nextRoundAt }: {
+export function LastNightCard({ night, meId, auth, split, onSplit, nextRoundAt, onChanged }: {
   night: LastNight; meId: string | null; auth: CrewAuth; split: CrewSplit | null; onSplit: (s: CrewSplit | null) => void; nextRoundAt: string | null;
+  /** After "We ended up somewhere else": reload the page. */
+  onChanged?: () => Promise<unknown> | void;
 }) {
+  const [fixBusy, setFixBusy] = useState<string | null>(null);
+  const fixAct = async (key: string, fn: () => Promise<unknown>) => {
+    setFixBusy(key);
+    try { await fn(); await onChanged?.(); } catch { /* the card stays as it was */ } finally { setFixBusy(null); }
+  };
   const [rating, setRating] = useState<"up" | "down" | null>(night.myRating);
   const [saving, setSaving] = useState(false);
   const [attendance, setAttendance] = useState<"yes" | "no" | null>(night.myAttendance ?? null);
@@ -1741,6 +1753,10 @@ export function LastNightCard({ night, meId, auth, split, onSplit, nextRoundAt }
         <h3 className="m-0 font-fm-serif text-[34px] font-normal leading-[1.05] lg:text-[40px]">{night.venue?.name || "Your night out"}</h3>
         {wentLine && <p className="m-0 text-[15px] text-fm-ink-2">{wentLine}</p>}
       </div>
+
+      {night.canFixPlace && (!night.venue?.fixed || night.venue?.custom) && (
+        <ChangePlace cycle={{ cycleId: night.cycleId, venue: night.venue, state: "done" }} auth={auth} busy={fixBusy} onAct={fixAct} actual />
+      )}
 
       {night.myInviteId && (
         <div className="flex flex-col gap-2.5">
@@ -2024,7 +2040,15 @@ function RedateVote({ cycle: c, auth, busy, onAct, canDecide }: { cycle: CycleVi
   );
 }
 
-function ChangePlace({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: CrewAuth; busy: string | null; onAct: (key: string, fn: () => Promise<unknown>) => Promise<void> }) {
+/**
+ * Change a round's place, or with `actual` (a night that's on now or just
+ * happened): "We ended up somewhere else", which quietly puts the record
+ * right (setCrewNightPlace) instead of telling the crew.
+ */
+function ChangePlace({ cycle: c, auth, busy, onAct, actual = false }: {
+  cycle: Pick<CycleView, "cycleId" | "venue" | "state" | "swapOffer">;
+  auth: CrewAuth; busy: string | null; onAct: (key: string, fn: () => Promise<unknown>) => Promise<void>; actual?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [book, setBook] = useState<BookSpot[] | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
@@ -2042,7 +2066,7 @@ function ChangePlace({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: 
   };
   const change = async (key: string, params: Record<string, unknown>) => {
     setPicked(key);
-    await onAct("changePlace", () => run("changeCrewPlace", auth, { cycleId: c.cycleId, ...params }));
+    await onAct("changePlace", () => run(actual ? "setCrewNightPlace" : "changeCrewPlace", auth, { cycleId: c.cycleId, ...params }));
     done();
   };
   const show = async () => {
@@ -2057,18 +2081,20 @@ function ChangePlace({ cycle: c, auth, busy, onAct }: { cycle: CycleView; auth: 
   const field = "h-11 w-full rounded-xl border border-fm-line bg-fm-canvas px-3 text-[16px] text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none";
   return (
     <div className="flex flex-col gap-2.5">
-      {c.swapOffer && (
+      {!actual && c.swapOffer && (
         <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-fm-line px-4 py-3.5">
           <p className="m-0 min-w-0 flex-1 text-sm text-fm-ink">{c.swapOffer.name} was just added. Nobody has voted yet. Use it instead?</p>
           <Button small disabled={busy !== null} onClick={() => void change(c.swapOffer!.spotId, { spotId: c.swapOffer!.spotId })}>{busy === "changePlace" ? "Switching…" : `Use ${c.swapOffer.name}`}</Button>
         </div>
       )}
       {!open ? (
-        <div><Button small kind="ghost" onClick={() => void show()}>Change the place</Button></div>
+        actual
+          ? <button type="button" onClick={() => void show()} className="min-h-11 w-fit text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink">We ended up somewhere else</button>
+          : <div><Button small kind="ghost" onClick={() => void show()}>Change the place</Button></div>
       ) : (
         <div className="flex flex-col gap-2.5 rounded-[18px] border border-fm-line p-3">
-          <Mono className="px-1 text-fm-muted">{c.state === "polling" ? "Same dates · anywhere you like" : "Same day and time · anywhere you like"}</Mono>
-          {c.state === "booked" && <p className="m-0 px-1 text-sm text-fm-ink-2">You booked {c.venue?.name || "the old place"}. Cancel that booking, then book the new place.</p>}
+          <Mono className="px-1 text-fm-muted">{actual ? "Where you really went · nobody gets a message" : c.state === "polling" ? "Same dates · anywhere you like" : "Same day and time · anywhere you like"}</Mono>
+          {!actual && c.state === "booked" && <p className="m-0 px-1 text-sm text-fm-ink-2">You booked {c.venue?.name || "the old place"}. Cancel that booking, then book the new place.</p>}
           <label className="relative block">
             <span className="sr-only">Search for a place</span>
             <Search size={16} aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-fm-muted" />

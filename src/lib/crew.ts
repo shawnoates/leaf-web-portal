@@ -315,6 +315,8 @@ export type LastNight = {
   iWent: boolean;
   myRating: "up" | "down" | null;
   ratings: { up: number; down: number };
+  /** The organizer or its host can still say where it really was ("We ended up somewhere else"). */
+  canFixPlace?: boolean;
   /** "Did you make it?": their answer, or null before they say. */
   myAttendance?: "yes" | "no" | null;
   /** The night's photos (same store as the recap page), newest first. */
