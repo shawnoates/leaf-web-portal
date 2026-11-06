@@ -12,13 +12,16 @@ import { useState } from "react";
 import { Lightbulb, Share } from "lucide-react";
 import type { CrewPulse } from "@/lib/crew";
 import { pulseRingRows, ringGeometry, trendLine, PULSE_COLORS } from "@/lib/crew-pulse";
-import { Card, Eyebrow, Mono } from "@/components/crew/CrewShell";
+import { Card, Eyebrow } from "@/components/crew/CrewShell";
 import { track } from "@/lib/track";
 
 function Rings({ pulse, size, evening }: { pulse: CrewPulse; size: number; evening: boolean }) {
   const rows = pulseRingRows(pulse, evening);
-  const stroke = size >= 180 ? 18 : 14;
-  const geo = ringGeometry(size, stroke, 4, rows.length);
+  // Thin enough that the middle stays open for the number at phone size.
+  const stroke = size >= 180 ? 13 : 10;
+  const geo = ringGeometry(size, stroke, 3, rows.length);
+  // The open middle inside the innermost ring: the number is sized to fit it.
+  const hole = Math.max(0, (geo[geo.length - 1]?.r ?? size / 2) - stroke / 2 - 2);
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" aria-hidden>
@@ -33,16 +36,18 @@ function Rings({ pulse, size, evening }: { pulse: CrewPulse; size: number; eveni
             )}
           </g>
         ))}
+        {/* A plain dark middle, so the number never sits on a ring's colour. */}
+        <circle cx={size / 2} cy={size / 2} r={hole} fill="var(--color-fm-canvas)" />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
         {pulse.score != null ? (
           <>
-            <span className="font-fm-serif text-[44px] leading-none lg:text-[56px]">{pulse.score}</span>
-            <Mono className="mt-1 text-fm-accent">of 100</Mono>
+            <span className="font-fm-serif leading-none text-fm-ink" style={{ fontSize: Math.round(hole * 0.95) }}>{pulse.score}</span>
+            <span className="mt-0.5 font-fm-mono uppercase tracking-[0.12em] text-fm-muted" style={{ fontSize: Math.max(9, Math.round(hole * 0.24)) }}>of 100</span>
           </>
         ) : (
           <>
-            <span className="font-fm-serif text-[36px] leading-none">{pulse.stats.nights}</span>
+            <span className="font-fm-serif leading-none text-fm-ink" style={{ fontSize: Math.round(hole * 0.85) }}>{pulse.stats.nights}</span>
             <span className="mt-1 text-[11px] text-fm-muted">{pulse.stats.nights === 1 ? (evening ? "night so far" : "time so far") : (evening ? "nights so far" : "times so far")}</span>
           </>
         )}
