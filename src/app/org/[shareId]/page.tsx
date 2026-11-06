@@ -320,10 +320,14 @@ function WeatherChip({ weather }: { weather: PlanWeather }) {
 
 // Joining a night's group closes a day before it (leaflets-server
 // interest-group.js JOIN_CUTOFF_MS); people already in keep their button.
+// Everyone else keeps the card but sees "Joining closed" in its place, so the
+// card never looks like it lost a button.
 const JOIN_CUTOFF_MS = 24 * 60 * 60 * 1000;
 function joinClosed(date: Date | null | undefined) {
   return !!date && date.getTime() - Date.now() < JOIN_CUTOFF_MS;
 }
+const JOIN_CLOSED_LABEL = "Joining closed";
+const JOIN_CLOSED_STATUS = "No longer taking people";
 
 interface PlanIdea {
   id: string;
@@ -4918,7 +4922,11 @@ export default function OrgCalendarPage() {
             )}
           </div>
           <div className="flex-none flex flex-col gap-1.5 whitespace-nowrap">
-            {!idea.isFeatured && (isInterested || !joinClosed(spreadDate)) && (
+            {!idea.isFeatured && !isInterested && joinClosed(spreadDate) ? (
+              <span className="px-4 py-[9px] text-[10px] leading-none font-medium uppercase tracking-[0.16em] text-center border border-[#3a3a3a] text-[#8f8f8a] cursor-default">
+                {JOIN_CLOSED_LABEL}
+              </span>
+            ) : !idea.isFeatured && (
               <button
                 type="button"
                 onClick={() =>
@@ -5743,11 +5751,12 @@ export default function OrgCalendarPage() {
                                     <span
                                       className="w-2 h-2 rounded-full"
                                       style={{
-                                        backgroundColor:
-                                          org.brandColor || "#1B4332",
+                                        backgroundColor: joinClosed(validDate)
+                                          ? "#d4d4d8"
+                                          : org.brandColor || "#1B4332",
                                       }}
                                     />
-                                    Looking for people
+                                    {joinClosed(validDate) ? JOIN_CLOSED_STATUS : "Looking for people"}
                                     {/* Owner / co-host: turn the suggestion into
                                         their own plan. Followers join the group
                                         with I'm interested instead. */}
@@ -5802,7 +5811,11 @@ export default function OrgCalendarPage() {
                                 {/* Interest group: the interested are gathered
                                     into this night's chat and asked if they're
                                     going (leaflets-server interest-group.js). */}
-                                {(isInterested || !joinClosed(validDate)) && (
+                                {!isInterested && joinClosed(validDate) ? (
+                                  <span className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 bg-zinc-100 text-zinc-400 cursor-default">
+                                    {JOIN_CLOSED_LABEL}
+                                  </span>
+                                ) : (
                                 <button
                                   type="button"
                                   onClick={() =>
@@ -5907,6 +5920,8 @@ export default function OrgCalendarPage() {
                 0;
               const isInterested = planIdeaLocallyInterested.has(idea.id);
               const isPending = planIdeaInterestPending.has(idea.id);
+              // Featured suggestions have no group, so no cutoff.
+              const ideaJoinClosed = !idea.isFeatured && joinClosed(spreadDate);
               // Around the city is hoisted above the stream — see
               // renderAroundTheCityBand. Kept here so this function still
               // handles every idea kind if one ever reaches the stream.
@@ -5994,9 +6009,9 @@ export default function OrgCalendarPage() {
                           <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
                             <span
                               className="w-2 h-2 rounded-full"
-                              style={{ backgroundColor: org.brandColor || "#1B4332" }}
+                              style={{ backgroundColor: ideaJoinClosed ? "#d4d4d8" : org.brandColor || "#1B4332" }}
                             />
-                            Looking for people
+                            {ideaJoinClosed ? JOIN_CLOSED_STATUS : "Looking for people"}
                             {/* Owner / co-host: host it as their own plan. */}
                             {(org.isOwner || org.isHost) && !org.rsvpLimitReached && (
                               <>
@@ -6058,7 +6073,11 @@ export default function OrgCalendarPage() {
                       <div className="flex flex-col sm:flex-row gap-4">
                         {/* Interest group, as on the starter cards. Featured
                             suggestions have no plan idea to gather around. */}
-                        {!idea.isFeatured && (isInterested || !joinClosed(spreadIdeaDates.get(idea.id) ?? (idea.date ? new Date(idea.date) : null))) && (
+                        {!isInterested && ideaJoinClosed ? (
+                          <span className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 bg-zinc-100 text-zinc-400 cursor-default">
+                            {JOIN_CLOSED_LABEL}
+                          </span>
+                        ) : !idea.isFeatured && (
                           <button
                             type="button"
                             onClick={() =>
@@ -8415,7 +8434,11 @@ export default function OrgCalendarPage() {
                         Host This Plan
                       </button>
                     )}
-                    {!popupIdea.isFeatured && (interested || !joinClosed(spreadIdeaDates.get(popupIdea.id) ?? (popupIdea.date ? new Date(popupIdea.date) : null))) && (
+                    {!popupIdea.isFeatured && !interested && joinClosed(spreadIdeaDates.get(popupIdea.id) ?? (popupIdea.date ? new Date(popupIdea.date) : null)) ? (
+                      <p className="w-full py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg border border-zinc-100 bg-zinc-50 text-zinc-400 text-center">
+                        {JOIN_CLOSED_LABEL}
+                      </p>
+                    ) : !popupIdea.isFeatured && (
                       <button
                         type="button"
                         onClick={() =>
@@ -8512,7 +8535,11 @@ export default function OrgCalendarPage() {
                       Host This Plan
                     </button>
                   )}
-                  {(interested || !joinClosed(resolvedDate)) && (
+                  {!interested && joinClosed(resolvedDate) ? (
+                    <p className="w-full py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg border border-zinc-100 bg-zinc-50 text-zinc-400 text-center">
+                      {JOIN_CLOSED_LABEL}
+                    </p>
+                  ) : (
                   <button
                     type="button"
                     onClick={() =>
