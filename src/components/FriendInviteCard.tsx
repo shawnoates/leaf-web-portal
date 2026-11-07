@@ -230,6 +230,11 @@ export default function FriendInviteCard({
         <div className="flex gap-2">
           {smsFirst ? <>{textBtn}{copyBtn}</> : <>{copyBtn}{textBtn}</>}
         </div>
+        {invite?.pointsPerFriend ? (
+          <p className="rounded-lg bg-[#eef5f1] px-3 py-2 text-xs text-[#253a33]">
+            <span>{invite.pointsUpTo ? "Up to " : ""}<b className="font-bold">{invite.pointsUpTo ? "" : "+"}{invite.pointsPerFriend} pts</b> for each friend who {invite.pointsUpTo ? "comes" : "RSVPs"} through your link</span>
+          </p>
+        ) : null}
         {error ? <p className="text-xs text-red-600">{error}</p> : null}
       </div>
     );

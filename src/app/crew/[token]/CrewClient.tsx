@@ -1332,7 +1332,7 @@ function CycleCard({
   const closes = toDate(c.pollClosesAt);
   const settled = c.state === "locked" || c.state === "booked";
   // Past its start time: it's on now (Leaf closes it out 2–4h later). No more
-  // RSVP, cancel, stops or changes; who's going and the chat stay.
+  // RSVP, cancel, stops or date changes (the place can still move); who's going and the chat stay.
   const startAt = toDate(c.startsAt);
   const started = settled && !!startAt && startAt <= new Date();
   // Asked on the page itself: the app's web view has no confirm() dialog.
@@ -1664,7 +1664,8 @@ function CycleCard({
       {!started && ["polling", "locked", "booked"].includes(c.state) && c.venueLocationId && !c.venue?.custom && (
         <SecondStop auth={auth} cycleId={c.cycleId} inApp={inApp} />
       )}
-      {!started && ["polling", "locked", "booked"].includes(c.state) && (c.isHost || isOwner) && (!c.venue?.fixed || c.venue?.custom) && (
+      {/* Still offered once it's on: a crew that moves mid-night can say so (until Leaf closes it out). */}
+      {["polling", "locked", "booked"].includes(c.state) && (c.isHost || isOwner) && (!c.venue?.fixed || c.venue?.custom) && (
         <ChangePlace cycle={c} auth={auth} busy={busy} onAct={onAct} />
       )}
       {/* On now: the place can still be put right, quietly. */}

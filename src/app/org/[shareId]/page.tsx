@@ -5278,8 +5278,9 @@ export default function OrgCalendarPage() {
           // the calendar reads chronologically instead of "all confirmed,
           // then all suggested." Confirmed plans always render; suggestions
           // (AI source events OR plan ideas — mutually exclusive) are capped
-          // in-line with a show-more toggle so they never bury real plans.
-          const IDEA_INLINE_CAP = 4;
+          // so the stream shows at least MIN_VISIBLE_PLANS rows in all before
+          // the show-more toggle appears.
+          const MIN_VISIBLE_PLANS = 10;
           const spreadOf = (i: PlanIdea) =>
             spreadIdeaDates.get(i.id) ?? (i.date ? new Date(i.date) : null);
 
@@ -5634,6 +5635,8 @@ export default function OrgCalendarPage() {
               render: (index) => renderConfirmedPlanCard(plan, index),
             });
           });
+          // Suggestions fill the stream up to MIN_VISIBLE_PLANS rows.
+          const IDEA_INLINE_CAP = Math.max(0, MIN_VISIBLE_PLANS - streamItems.length);
 
           // --- Suggested: AI-adopted source events ---
           const renderAiEventCard = (
@@ -6166,11 +6169,8 @@ export default function OrgCalendarPage() {
                 </div>
               )}
               {!org.rsvpLimitReached && !org.hideCustomPlans && (
-                <div className="pt-32">
-              <article
-                className={`group flex flex-col md:flex-row gap-12 md:items-center ${streamItems.length % 2 !== 0 ? "md:flex-row-reverse" : ""}`}
-              >
-                <button
+                <div className="pt-16">
+              <button
                   type="button"
                   onClick={() => {
                     setCreatingCustomPlan(true);
@@ -6186,33 +6186,23 @@ export default function OrgCalendarPage() {
                     setCustomSubmitting(false);
                     setCustomSuccess(false);
                   }}
-                  className="w-full md:w-3/5 aspect-[16/5] md:aspect-[16/5] overflow-hidden shadow-sm relative rounded-none border-2 border-dashed border-emerald-300 bg-gradient-to-br from-emerald-50/80 to-white hover:from-emerald-50 transition-colors flex items-center justify-center"
+                  className="group w-full max-w-xl mx-auto flex items-center gap-4 border border-zinc-200 bg-white px-5 py-4 text-left transition-all hover:border-emerald-300 hover:shadow-sm"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-sm">
-                      <Plus className="w-5 h-5" />
-                    </div>
-                    <span className="text-xs font-bold uppercase tracking-widest text-emerald-700">
-                      {org.isOwner || org.isHost ? "Add a Plan" : "Suggest a Plan"}
-                    </span>
+                  <div className="w-9 h-9 shrink-0 rounded-full bg-emerald-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Plus className="w-4 h-4" />
                   </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-base font-medium tracking-tight text-zinc-900">
+                      Host something
+                    </p>
+                    <p className="text-xs text-zinc-500 font-light truncate">
+                      {org.isOwner || org.isHost
+                        ? "Pick a date, venue, and details — goes live on your calendar."
+                        : "Pitch a date, venue, and details — the organizer approves it."}
+                    </p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 shrink-0 text-zinc-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
                 </button>
-                <div className="w-full md:w-2/5 space-y-3">
-                  <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
-                    {org.isOwner || org.isHost ? "New plan" : "Your idea"}
-                  </p>
-                  <h3 className="text-2xl font-light tracking-tight">
-                    {org.isOwner || org.isHost
-                      ? "Have one in mind? Add it."
-                      : "Have one we missed? Pitch it."}
-                  </h3>
-                  <p className="text-zinc-500 leading-relaxed font-light text-sm">
-                    {org.isOwner || org.isHost
-                      ? "Pick a date, venue, and details — goes live on your calendar."
-                      : "Pitch a date, venue, and details — pending organizer approval."}
-                  </p>
-                </div>
-              </article>
                 </div>
               )}
             </>
