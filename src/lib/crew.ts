@@ -241,9 +241,6 @@ export type CrewPage = {
     triggerOnly?: boolean;
     /** Birthdays (BETA): the round nearest a member's birthday is theirs. */
     birthdays?: boolean;
-    /** When we're free (BETA): a night when enough of the crew (a share) are free the same day. */
-    freeTrigger?: FreeRule | null;
-    freeTriggerLabel?: string | null;
     /** When the crew meets before a round sets it ("09:00" for a morning crew). */
     usualTime?: string | null;
     placeMode?: "book" | "fixed";
@@ -267,9 +264,7 @@ export type CrewPage = {
   };
   me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null; calendarSynced?: boolean; inviteLink?: string | null; needsSeed?: boolean; needsPace?: boolean; hiddenTips?: string[]; bookNudges?: boolean;
     /** Birthdays on: their own "where do you want to go?" (pickBirthdayPlace), and whether Leaf knows their birthday. */
-    birthdayAsk?: { date: string } | null; needsBirthday?: boolean;
-    /** When we're free is on and Leaf can't see their calendar: ask them to sync. */
-    needsCalendarForFree?: boolean };
+    birthdayAsk?: { date: string } | null; needsBirthday?: boolean };
   members: Member[];
   names: Record<string, string>;
   /** Tell Leaf pills: what the crew has said so far, with counts (never who). */
@@ -434,9 +429,9 @@ export function rhythmLabel(days: number) {
   return RHYTHM_LABELS[days] || `Every ${days} days`;
 }
 
-/** "Just once" for a one-time crew, "When 3+ are free" / "On a trigger" for a trigger-only one, else its rhythm ("Every month"). */
-export function cadenceLabel(crew: { rhythmDays: number; oneTime?: boolean; triggerOnly?: boolean; freeTrigger?: Pick<FreeRule, "minPct" | "minFree"> | null }) {
-  if (crew.triggerOnly) return crew.freeTrigger ? `When ${freeShareWords(crew.freeTrigger)} are free` : "On a trigger";
+/** "Just once" for a one-time crew, "On a trigger" for a trigger-only one, else its rhythm ("Every month"). */
+export function cadenceLabel(crew: { rhythmDays: number; oneTime?: boolean; triggerOnly?: boolean }) {
+  if (crew.triggerOnly) return "On a trigger";
   return crew.oneTime ? "Just once" : rhythmLabel(crew.rhythmDays);
 }
 
@@ -583,21 +578,6 @@ export type TellLeafResult = {
   watch?: { query: string; title: string; venueName: string | null; date: string | null } | null;
 };
 
-/** When we're free (BETA): days 0–6, Sunday first; time "HH:mm". */
-/** When we're free: `minPct` of the crew (a share, so it keeps up as the crew grows), or an older rule's head count `minFree`. */
-export type FreeRule = { kind: "free"; minPct?: number; minFree?: number; days: number[]; time: string; everyDays: number };
-
-/** "half", "all", "60%", or "3+" for an older head-count rule: "when half of you are free". */
-export function freeShareWords(rule: Pick<FreeRule, "minPct" | "minFree"> | null | undefined): string {
-  if (!rule) return "";
-  if (rule.minPct) return rule.minPct === 50 ? "half" : rule.minPct === 100 ? "all" : `${rule.minPct}%`;
-  return `${rule.minFree ?? 3}+`;
-}
-
-/** A share of the crew as a stepper shows it: "Half", "Everyone", "60%". */
-export function pctLabel(pct: number): string {
-  return pct === 50 ? "Half" : pct === 100 ? "Everyone" : `${pct}%`;
-}
 
 /** An event the crew watches for (BETA): the book's "Watching for" list. */
 export type WatchItem = {

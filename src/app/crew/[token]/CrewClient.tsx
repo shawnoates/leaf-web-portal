@@ -38,7 +38,7 @@ import { FriendModeSwitch } from "@/components/crew/FriendModeGlyphs";
 import {
   type EventMatch,
   type MeetupOffer,
-  type ThemeVote, RHYTHM_LABELS, crewHref, freeShareWords, crewIsEvening, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
+  type ThemeVote, RHYTHM_LABELS, crewHref, crewIsEvening, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
   type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult,
   type CrewAddOn, type CrewSplit, type LastNight,
 } from "@/lib/crew";
@@ -221,9 +221,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
     setCalHidden(true);
     try { window.localStorage.setItem(calKey, "1"); } catch { /* private mode */ }
   };
-  // When we're free counts only synced calendars: that ask stays until they sync.
-  const freeAsk = Boolean(me.needsCalendarForFree);
-  const showCalNudge = me.status === "in" && !me.calendarSynced && (freeAsk || (!calHidden && !open.some((c) => c.state === "polling")));
+  const showCalNudge = me.status === "in" && !me.calendarSynced && !calHidden && !open.some((c) => c.state === "polling");
 
   const joined = members.filter((m) => m.status === "in");
   const invited = members.filter((m) => m.status === "invited");
@@ -508,9 +506,9 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 <p className="mt-3 text-[15px] leading-relaxed text-fm-ink-2">
                   {crew.enabled === false ? "Friend Mode is off, so Leaf isn't planning anything for this crew."
                     : crew.triggerOnly
-                      ? `${crew.freeTrigger ? `Leaf plans a ${night} when ${freeShareWords(crew.freeTrigger)} of you are free the same day${crew.freeTriggerLabel ? ` (${crew.freeTriggerLabel.replace(/^When [^·]+ are free · /, "")})` : ""}.` : `Leaf plans a ${night} when one of this crew's triggers comes true.`}${crew.birthdays ? " Birthdays count too." : ""} Got a place and a date in mind? Say so below.`
+                      ? `Leaf plans a ${night} when one of this crew's triggers comes true.${crew.birthdays ? " Birthdays count too." : ""} Got a place and a date in mind? Say so below.`
                     : crew.oneTime ? `Leaf starts planning the ${night} as soon as enough people are in.`
-                    : `Leaf starts the next ${night} on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()})${crew.freeTrigger ? `, or sooner when ${freeShareWords(crew.freeTrigger)} of you are free` : ""}.${crew.nextTheme ? ` Next theme: ${crew.nextTheme.label}.` : ""} Got a place and a date in mind? Say so below.`}
+                    : `Leaf starts the next ${night} on its own (${rhythmLabel(crew.rhythmDays).toLowerCase()}).${crew.nextTheme ? ` Next theme: ${crew.nextTheme.label}.` : ""} Got a place and a date in mind? Say so below.`}
                 </p>
                 {me.isOwner && crew.enabled !== false && !crew.oneTime && !crew.triggerOnly && crew.nextRoundAt && (
                   <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -574,18 +572,16 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               </span>
               <div className="flex min-w-0 flex-1 flex-col gap-3">
                 <div>
-                  <p className="m-0 text-[16px] font-semibold text-fm-ink">{freeAsk ? "Sync your calendar so Leaf counts you" : "Connect your calendar"}</p>
+                  <p className="m-0 text-[16px] font-semibold text-fm-ink">Connect your calendar</p>
                   <p className="m-0 mt-1 text-[14px] leading-relaxed text-fm-ink-2">
-                    {freeAsk
-                      ? `This crew meets when ${freeShareWords(crew.freeTrigger) || "half"} of you are free the same day. Leaf can only count you if it can see when you're free.`
-                      : `Leaf finds ${ev ? "nights" : "days"} that work for you and skips the ones you're busy.`}{" "}
+                    {`Leaf finds ${ev ? "nights" : "days"} that work for you and skips the ones you're busy.`}{" "}
                     Your crew never sees your calendar, just which dates work.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <Button small disabled={busy !== null} onClick={() => connectCalendar("google")}>{busy === "gcal" ? "Opening…" : "Connect Google Calendar"}</Button>
                   <Button small kind="ghost" disabled={busy !== null} onClick={() => connectCalendar("outlook")}>Connect Outlook</Button>
-                  {!freeAsk && <button type="button" className="text-sm text-fm-muted underline underline-offset-4" onClick={hideCal}>Not now</button>}
+                  <button type="button" className="text-sm text-fm-muted underline underline-offset-4" onClick={hideCal}>Not now</button>
                 </div>
               </div>
             </section>
