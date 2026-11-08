@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { run, type CrewAuth } from "@/lib/crew";
+import VenueSearch from "@/components/VenueSearch";
 
 type Suggestion = {
   key: string; name: string; address: string | null; kind: string; kindLabel: string; walkMin: number;
@@ -36,6 +37,7 @@ export default function SecondStop({ auth, cycleId, inApp, onChanged }: { auth: 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [showOthers, setShowOthers] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -61,12 +63,28 @@ export default function SecondStop({ auth, cycleId, inApp, onChanged }: { auth: 
     }
   };
 
-  if (!stops || (!stops.added && stops.suggestions.length === 0)) return null;
+  if (!stops || (!stops.added && stops.suggestions.length === 0 && !stops.canAdd)) return null;
   const { canAdd, added, suggestions } = stops;
   const sourceLabel = (s: Suggestion) => {
     const src = s.source || (s.fromBook ? "book" : "nearby");
     return src === "happening" ? "on that night" : src === "book" ? "from the book" : "nearby, not in the book";
   };
+  // Somewhere Leaf didn't suggest, in the book or not: any place, by search.
+  const search = (
+    <div className="flex flex-col gap-1">
+      <VenueSearch
+        value={searchText}
+        onChange={setSearchText}
+        onSelect={(v) => {
+          if (!v.placeId || v.kind === "address") { setError("Pick a place, not a street address."); return; }
+          setSearchText("");
+          void act("search", "addCrewStop", { placeId: v.placeId, name: v.name, address: v.address || null });
+        }}
+        placeholder={busy === "search" ? "Adding…" : "Somewhere else? Search any place"}
+        className="h-11 w-full rounded-full border border-fm-line bg-fm-card px-4 text-[15px] text-fm-ink placeholder:text-fm-muted"
+      />
+    </div>
+  );
   const pillInfo = (s: Suggestion) => [s.kindLabel, `${s.walkMin} min walk`, sourceLabel(s)].filter(Boolean).join(" · ");
 
   const hostPill = (s: Suggestion) => (
@@ -135,6 +153,11 @@ export default function SecondStop({ auth, cycleId, inApp, onChanged }: { auth: 
                 Other stops nearby · {suggestions.length}
               </button>
             )}
+            {canAdd && suggestions.length === 0 && (
+              <button type="button" aria-expanded={showOthers} onClick={() => setShowOthers((v) => !v)} className="min-h-11 text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink">
+                Swap for another place
+              </button>
+            )}
             {canAdd && (
               <button type="button" disabled={busy !== null} onClick={() => void act("remove", "removeCrewStop", {})} className="min-h-11 text-sm text-fm-muted underline underline-offset-4 hover:text-fm-danger">
                 {busy === "remove" ? "Removing…" : "Remove this stop"}
@@ -144,7 +167,8 @@ export default function SecondStop({ auth, cycleId, inApp, onChanged }: { auth: 
           {showOthers && (
             <div className="flex flex-col gap-2">
               {suggestions.map((s) => (canAdd ? hostPill(s) : memberPill(s, false)))}
-              {canAdd && <p className="m-0 px-1 text-xs text-fm-muted">Tap one to swap it in.</p>}
+              {canAdd && <p className="m-0 px-1 text-xs text-fm-muted">Tap one to swap it in, or search for another.</p>}
+              {canAdd && search}
             </div>
           )}
         </>
@@ -155,6 +179,7 @@ export default function SecondStop({ auth, cycleId, inApp, onChanged }: { auth: 
           </span>
           <div className="flex flex-col gap-2">
             {suggestions.map((s) => (canAdd ? hostPill(s) : memberPill(s, true)))}
+            {canAdd && search}
           </div>
         </>
       )}
