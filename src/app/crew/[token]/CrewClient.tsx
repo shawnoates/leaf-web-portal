@@ -1039,7 +1039,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                   </select>
                   <p className="mb-0 mt-2 text-xs text-fm-muted">
                     {crew.triggerOnly
-                      ? `Only the crew's triggers start a ${night}: When we're free, Birthdays and anything the book watches for.`
+                      ? `Only the crew's triggers start a ${night}: nice weather at its place, and anything the book watches for.`
                       : `Leaf starts each ${night} on this rhythm. Members can set a slower pace of their own below.`}
                   </p>
                 </div>
