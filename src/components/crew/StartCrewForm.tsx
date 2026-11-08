@@ -310,7 +310,7 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
             <p className="m-0 text-[15px] leading-relaxed text-fm-ink-2">
               {pace === TRIGGER && weatherOn && place
                 ? `Send the link to the group. Leaf watches the forecast at ${place.name} and invites everyone when a good day comes up.`
-                : "Send the link to the group. Leaf starts planning the first night once 3 of you are in."}
+                : "Send the link to the group. Leaf starts planning the first night as soon as one of them joins."}
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-2xl border border-fm-line bg-fm-canvas p-2 pl-4">
