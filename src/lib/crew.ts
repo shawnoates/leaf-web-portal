@@ -574,6 +574,9 @@ export type TellLeafResult = {
   /** When a start can fall, "HH:mm" each end; either may be missing. */
   timeWindow?: { earliest: string | null; latest: string | null } | null;
   dislikedAdded?: number;
+  /** A stretch of dates they want ("early December, before the 23rd"), and how Leaf reads it back ("Dec 1–22"). */
+  dateWindow?: { from: string; to: string } | null;
+  dateWindowLabel?: string | null;
   /** What happened to this round's open poll: new dates, or left alone because people already voted. */
   pollDates?: "refreshed" | "others_voted" | "unchanged" | null;
   /** "Let us know when the Nets play the Rockets": a watch Leaf added to the book. */
@@ -648,7 +651,10 @@ export function tellLeafReceipt(r: TellLeafResult): string {
     : at ? `I'll aim for ${isEvening(r.preferTime || w?.earliest || w?.latest || null) ? "nights" : "plans"} ${at}` : "";
   const avoid = r.avoidDays?.length ? `I'll steer clear of ${listDays(r.avoidDays)}` : "";
   const sky = r.weather === "nice" ? "I'll check the forecast and go for a dry, nice day" : "";
-  const both = [prefer, avoid, sky].filter(Boolean).join(", and ");
+  // "Early December" reads "I'll aim for early December"; "Dec 1–22" as is.
+  const label = r.dateWindowLabel ? r.dateWindowLabel.replace(/^(Early |Late |Mid-)/, (w) => w.toLowerCase()) : "";
+  const dates = label ? `${prefer ? "in" : "I'll aim for"} ${label}` : "";
+  const both = [prefer && dates ? `${prefer} ${dates}` : prefer || dates, avoid, sky].filter(Boolean).join(", and ");
   const round = r.pollDates === "refreshed"
     ? " New dates are up for this round."
     : r.pollDates === "others_voted"
