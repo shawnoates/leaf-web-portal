@@ -19,6 +19,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
+import { openPayApp } from "@/lib/p2p";
 
 type Method = "venmo" | "cashapp" | "paypal" | "zelle";
 
@@ -27,6 +28,8 @@ type PayOption = {
   label: string;
   handle: string;
   url: string | null;
+  /** Venmo's own app scheme: on venmo.com links the app shows "+" for spaces. */
+  appUrl?: string | null;
   notePrefilled: boolean;
   hint?: string;
   recipientName?: string | null;
@@ -394,8 +397,9 @@ export default function P2pPayCard({
             href={o.url!}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => {
+            onClick={(e) => {
               setLastMethod(o.method);
+              openPayApp(e, o);
               // No note field in the link: put it on the clipboard on the way out.
               if (!o.notePrefilled) {
                 void copy(note).then((ok) => ok && setToast("Note copied — paste it in “For”"));

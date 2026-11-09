@@ -11,9 +11,10 @@
  */
 
 import { useState } from "react";
+import { openPayApp } from "@/lib/p2p";
 import { Camera, Check, ExternalLink, Receipt as ReceiptIcon } from "lucide-react";
 import { eveningAt, run, type CrewAuth, type CrewSplit } from "@/lib/crew";
-import { Button, Eyebrow, Mono } from "@/components/crew/CrewShell";
+import { Button, Eyebrow, Mono, useInApp } from "@/components/crew/CrewShell";
 
 const money = (n: number) => `$${(Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, "")}`;
 const field = "h-11 w-full rounded-xl border border-fm-line bg-fm-canvas px-3 text-[16px] text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none";
@@ -78,6 +79,7 @@ export default function CrewMoneyCard({
   kind: "after" | "cost";
 }) {
   const r = split.receipt;
+  const inApp = useInApp();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [typing, setTyping] = useState(false);
@@ -207,7 +209,10 @@ export default function CrewMoneyCard({
           </p>
         </div>
         <div className="flex items-center gap-4">
-          {r.photo && <a href={r.photo} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-fm-muted underline">Receipt <ExternalLink size={12} aria-hidden /></a>}
+          {inApp && split.planId && !isCost ? (
+            // In the app the plan's own Split the Bill has the receipt and the split.
+            <a href={`leaf://split-bill/${split.planId}`} className="flex items-center gap-1 text-xs font-semibold text-fm-ink underline">Open the bill</a>
+          ) : r.photo && <a href={r.photo} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-fm-muted underline">Receipt <ExternalLink size={12} aria-hidden /></a>}
           {!isCost && hideButton}
         </div>
       </div>
@@ -266,7 +271,7 @@ export default function CrewMoneyCard({
               {r.payOptions.length > 0 ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {r.payOptions.map((o) => o.url ? (
-                    <a key={o.method} href={o.url} target="_blank" rel="noreferrer" className="flex h-10 items-center rounded-full border border-fm-line px-4 text-sm font-semibold text-fm-ink hover:bg-fm-card">{o.label}</a>
+                    <a key={o.method} href={o.url} target="_blank" rel="noreferrer" onClick={(e) => openPayApp(e, o)} className="flex h-10 items-center rounded-full border border-fm-line px-4 text-sm font-semibold text-fm-ink hover:bg-fm-card">{o.label}</a>
                   ) : (
                     <span key={o.method} className="flex h-10 items-center rounded-full border border-fm-line px-4 text-sm text-fm-ink-2">{o.label}: {o.handle}</span>
                   ))}

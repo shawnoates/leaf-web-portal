@@ -17,6 +17,23 @@ export function p2pMoney(cents: number): string {
   return `$${Number.isInteger(d) ? d : d.toFixed(2)}`;
 }
 
+/**
+ * A pay link's click: on a phone, open the payment app's own scheme (Venmo
+ * shows "+" for spaces when its venmo.com link hands off to the app), and
+ * fall back to the web link if the app isn't installed and the page stays up.
+ * Elsewhere the anchor's own href (the web link) opens as usual.
+ */
+export function openPayApp(e: { preventDefault: () => void }, link: { url?: string | null; appUrl?: string | null }): void {
+  if (!link.appUrl || !link.url || typeof navigator === "undefined") return;
+  if (!/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) return;
+  e.preventDefault();
+  const fallback = link.url;
+  window.location.href = link.appUrl;
+  window.setTimeout(() => {
+    if (document.visibilityState === "visible") window.location.href = fallback;
+  }, 1500);
+}
+
 /** Does this plan ask guests to pay the host? */
 export function collectsMoney(amountCents: number | null | undefined, split: P2pSplitSummary | null | undefined): boolean {
   return (amountCents ?? 0) > 0 || Boolean(split);

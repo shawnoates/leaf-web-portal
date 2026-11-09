@@ -355,11 +355,13 @@ export type CrewAddOn = {
   settled?: boolean;
 };
 
-export type PayOption = { method: string; label: string; handle: string; url: string | null; hint?: string; recipientName?: string | null };
+export type PayOption = { method: string; label: string; handle: string; url: string | null; appUrl?: string | null; hint?: string; recipientName?: string | null };
 
 /** A night's bill (server: crewSplitView in friend-mode-functions.js). Dollars, not cents. */
 export type CrewSplit = {
   cycleId: string;
+  /** The night's plan (EventGroup); the app opens its Split the Bill from it. */
+  planId?: string;
   venue: string;
   startsAt: string | { iso: string } | null;
   went: boolean;

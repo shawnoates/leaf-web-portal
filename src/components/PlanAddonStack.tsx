@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
+import { openPayApp } from "@/lib/p2p";
 
 interface Addon {
   objectId: string;
@@ -35,6 +36,7 @@ interface PayOption {
   label: string;
   handle: string;
   url: string | null;
+  appUrl?: string | null;
   notePrefilled: boolean;
   hint?: string;
   recipientName?: string | null;
@@ -274,7 +276,7 @@ function OrderCard({ order, host, busy, onPaid, onCancel, onCopied }: {
       <div className="grid grid-cols-2 gap-2">
         {order.options.map((o) => o.url ? (
           <a key={o.method} href={o.url} target="_blank" rel="noopener noreferrer"
-            onClick={() => { setLast(o.method); if (!o.notePrefilled) void copy(order.note).then((ok) => ok && onCopied("Note copied — paste it in “For”")); }}
+            onClick={(e) => { setLast(o.method); openPayApp(e, o); if (!o.notePrefilled) void copy(order.note).then((ok) => ok && onCopied("Note copied — paste it in “For”")); }}
             className="rounded-lg border border-zinc-200 px-3 py-2 text-left hover:border-zinc-900">
             <span className="block text-sm font-semibold text-zinc-900">{o.label}</span>
             <span className="block text-[11px] text-zinc-500 truncate">{o.handle}</span>

@@ -11,6 +11,7 @@
  */
 
 import { useState } from "react";
+import { openPayApp } from "@/lib/p2p";
 import { Check } from "lucide-react";
 import { eveningAt, run, type CrewAddOn, type CrewAuth } from "@/lib/crew";
 import { Button, Eyebrow, Mono } from "@/components/crew/CrewShell";
@@ -210,7 +211,7 @@ export default function CrewAddOnCard({
               {(a.payOptions || []).length > 0 ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {a.payOptions!.map((o) => o.url ? (
-                    <a key={o.method} href={o.url} target="_blank" rel="noreferrer" className="flex h-10 items-center rounded-full border border-fm-line px-4 text-sm font-semibold text-fm-ink hover:bg-fm-card">{o.label}</a>
+                    <a key={o.method} href={o.url} target="_blank" rel="noreferrer" onClick={(e) => openPayApp(e, o)} className="flex h-10 items-center rounded-full border border-fm-line px-4 text-sm font-semibold text-fm-ink hover:bg-fm-card">{o.label}</a>
                   ) : (
                     <span key={o.method} className="flex h-10 items-center rounded-full border border-fm-line px-4 text-sm text-fm-ink-2">{o.label}: {o.handle}</span>
                   ))}
