@@ -2212,7 +2212,7 @@ function PlaceVote({ c, auth }: { c: CycleView; auth: CrewAuth }) {
                     <span className="truncate text-[15px] font-semibold text-fm-ink">{o.name}</span>
                     <span className="truncate text-xs text-fm-muted">{[i === 0 ? "Leaf's pick" : null, o.neighborhood || o.category].filter(Boolean).join(" · ")}</span>
                   </span>
-                  {count > 0 && <span className="shrink-0 text-xs text-fm-ink-2">{count}</span>}
+                  {count > 0 && <span className="shrink-0 text-xs text-fm-ink-2">{count} {count === 1 ? "vote" : "votes"}</span>}
                   <span aria-hidden className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${on ? "border-fm-accent bg-fm-accent text-fm-canvas" : "border-fm-line"}`}>{on && <Check size={14} strokeWidth={3} />}</span>
                 </button>
               </div>
@@ -2220,7 +2220,7 @@ function PlaceVote({ c, auth }: { c: CycleView; auth: CrewAuth }) {
           );
         })}
       </ul>
-      <p className="m-0 text-xs text-fm-muted">{mine === null ? "Tap where you'd go. If you don't, Leaf's pick counts for you. " : ""}The most votes wins when the vote closes.</p>
+      <p className="m-0 text-xs text-fm-muted">{mine === null ? "Tap where you'd go. " : ""}The most votes wins when the vote closes; a tie or no votes keeps Leaf&rsquo;s pick.</p>
       {error && <p className="m-0 text-xs text-fm-danger">{error}</p>}
       <Eyebrow>When?</Eyebrow>
     </div>
