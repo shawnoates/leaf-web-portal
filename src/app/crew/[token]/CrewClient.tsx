@@ -1649,6 +1649,10 @@ function CycleCard({
       {started && (c.isHost || isOwner) && (!c.venue?.fixed || c.venue?.custom) && (
         <ChangePlace cycle={c} auth={auth} busy={busy} onAct={onAct} actual />
       )}
+      {/* Everyone else: "go here instead" lands in the group chat, where the host can swap it in. */}
+      {!started && ["locked", "booked"].includes(c.state) && !(c.isHost || isOwner) && c.venueLocationId && !c.venue?.custom && (
+        <ChangePlace cycle={c} auth={auth} busy={busy} onAct={onAct} suggest />
+      )}
       {settled && !started && c.redate && <RedateVote cycle={c} auth={auth} busy={busy} onAct={onAct} canDecide={Boolean(c.isHost || isOwner)} />}
       {settled && !started && !c.redate && (c.isHost || isOwner) && <ChangeDate cycle={c} auth={auth} busy={busy} onAct={onAct} />}
     </Card>
@@ -2021,11 +2025,12 @@ function RedateVote({ cycle: c, auth, busy, onAct, canDecide }: { cycle: CycleVi
 /**
  * Change a round's place, or with `actual` (a night that's on now or just
  * happened): "We ended up somewhere else", which quietly puts the record
- * right (setCrewNightPlace) instead of telling the crew.
+ * right (setCrewNightPlace) instead of telling the crew. With `suggest` (not
+ * the host): the pick is only posted to the group chat (suggestCrewPlaceSwap).
  */
-function ChangePlace({ cycle: c, auth, busy, onAct, actual = false }: {
+function ChangePlace({ cycle: c, auth, busy, onAct, actual = false, suggest = false }: {
   cycle: Pick<CycleView, "cycleId" | "venue" | "state" | "swapOffer">;
-  auth: CrewAuth; busy: string | null; onAct: (key: string, fn: () => Promise<unknown>) => Promise<void>; actual?: boolean;
+  auth: CrewAuth; busy: string | null; onAct: (key: string, fn: () => Promise<unknown>) => Promise<void>; actual?: boolean; suggest?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [book, setBook] = useState<BookSpot[] | null>(null);
@@ -2033,6 +2038,9 @@ function ChangePlace({ cycle: c, auth, busy, onAct, actual = false }: {
   const [query, setQuery] = useState("");
   const [elsewhere, setElsewhere] = useState(false);
   const [custom, setCustom] = useState({ name: "", address: "" });
+  const [sent, setSent] = useState<string | null>(null);
+  const fn = suggest ? "suggestCrewPlaceSwap" : actual ? "setCrewNightPlace" : "changeCrewPlace";
+  const pending = suggest ? "Sending…" : "Switching…";
   const done = () => {
     // The card reloads with the new place; start fresh next time.
     setPicked(null);
@@ -2042,9 +2050,12 @@ function ChangePlace({ cycle: c, auth, busy, onAct, actual = false }: {
     setElsewhere(false);
     setCustom({ name: "", address: "" });
   };
-  const change = async (key: string, params: Record<string, unknown>) => {
+  const change = async (key: string, params: Record<string, unknown>, name?: string) => {
     setPicked(key);
-    await onAct("changePlace", () => run(actual ? "setCrewNightPlace" : "changeCrewPlace", auth, { cycleId: c.cycleId, ...params }));
+    await onAct("changePlace", async () => {
+      await run(fn, auth, { cycleId: c.cycleId, ...params });
+      if (suggest) setSent(name || "your pick");
+    });
     done();
   };
   const show = async () => {
@@ -2059,32 +2070,33 @@ function ChangePlace({ cycle: c, auth, busy, onAct, actual = false }: {
   const field = "h-11 w-full rounded-xl border border-fm-line bg-fm-canvas px-3 text-[16px] text-fm-ink placeholder:text-fm-muted focus:border-fm-accent focus:outline-none";
   return (
     <div className="flex flex-col gap-2.5">
-      {!actual && c.swapOffer && (
+      {sent && <p className="m-0 text-sm text-fm-ink-2">Sent {sent} to the group chat. The host decides.</p>}
+      {!actual && !suggest && c.swapOffer && (
         <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-fm-line px-4 py-3.5">
           <p className="m-0 min-w-0 flex-1 text-sm text-fm-ink">{c.swapOffer.name} was just added. Nobody has voted yet. Use it instead?</p>
           <Button small disabled={busy !== null} onClick={() => void change(c.swapOffer!.spotId, { spotId: c.swapOffer!.spotId })}>{busy === "changePlace" ? "Switching…" : `Use ${c.swapOffer.name}`}</Button>
         </div>
       )}
       {!open ? (
-        actual
-          ? <button type="button" onClick={() => void show()} className="min-h-11 w-fit text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink">We ended up somewhere else</button>
+        actual || suggest
+          ? <button type="button" onClick={() => { setSent(null); void show(); }} className="min-h-11 w-fit text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink">{suggest ? "Suggest another spot" : "We ended up somewhere else"}</button>
           : <div><Button small kind="ghost" onClick={() => void show()}>Change the place</Button></div>
       ) : (
         <div className="flex flex-col gap-2.5 rounded-[18px] border border-fm-line p-3">
-          <Mono className="px-1 text-fm-muted">{actual ? "Where you really went · nobody gets a message" : c.state === "polling" ? "Same dates · anywhere you like" : "Same day and time · anywhere you like"}</Mono>
-          {!actual && c.state === "booked" && <p className="m-0 px-1 text-sm text-fm-ink-2">You booked {c.venue?.name || "the old place"}. Cancel that booking, then book the new place.</p>}
+          <Mono className="px-1 text-fm-muted">{suggest ? "Leaf posts it in the group chat · the host decides" : actual ? "Where you really went · nobody gets a message" : c.state === "polling" ? "Same dates · anywhere you like" : "Same day and time · anywhere you like"}</Mono>
+          {!actual && !suggest && c.state === "booked" && <p className="m-0 px-1 text-sm text-fm-ink-2">You booked {c.venue?.name || "the old place"}. Cancel that booking, then book the new place.</p>}
           <label className="relative block">
             <span className="sr-only">Search for a place</span>
             <Search size={16} aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-fm-muted" />
             <VenueSearch
               value={query}
               onChange={setQuery}
-              onSelect={(v) => void change(`search:${v.placeId || v.name}`, { venue: v })}
+              onSelect={(v) => void change(`search:${v.placeId || v.name}`, { venue: v }, v.name)}
               placeholder="Search any restaurant, bar, park…"
               className="h-11 w-full rounded-xl border pl-10 pr-3 text-[16px] outline-none"
             />
           </label>
-          {picked?.startsWith("search:") && <p className="m-0 px-1 text-sm text-fm-muted">Switching…</p>}
+          {picked?.startsWith("search:") && <p className="m-0 px-1 text-sm text-fm-muted">{pending}</p>}
 
           {!book ? (
             <p className="m-0 px-1 text-sm text-fm-muted">Loading the book…</p>
@@ -2098,8 +2110,8 @@ function ChangePlace({ cycle: c, auth, busy, onAct, actual = false }: {
                       <span className="truncate text-[15px] text-fm-ink">{b.name}</span>
                       {(b.neighborhood || b.category) && <span className="truncate text-xs text-fm-muted">{b.neighborhood || b.category}</span>}
                     </span>
-                    <Button small disabled={busy !== null} onClick={() => void change(b.spotId, { spotId: b.spotId })}>
-                      {picked === b.spotId ? "Switching…" : "Use this"}
+                    <Button small disabled={busy !== null} onClick={() => void change(b.spotId, { spotId: b.spotId }, b.name)}>
+                      {picked === b.spotId ? pending : suggest ? "Suggest this" : "Use this"}
                     </Button>
                   </li>
                 ))}
@@ -2107,7 +2119,7 @@ function ChangePlace({ cycle: c, auth, busy, onAct, actual = false }: {
             </>
           )}
 
-          {!elsewhere ? (
+          {suggest ? null : !elsewhere ? (
             <button type="button" onClick={() => setElsewhere(true)} className="flex min-h-11 items-center gap-2 rounded-xl border border-dashed border-fm-line px-3 text-left text-[15px] text-fm-ink hover:border-fm-ink-2">
               <MapPin size={16} aria-hidden className="text-fm-muted" /> Somewhere else, like someone&rsquo;s place
             </button>
