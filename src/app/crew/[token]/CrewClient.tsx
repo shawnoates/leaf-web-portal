@@ -2197,7 +2197,9 @@ function PlaceVote({ c, auth }: { c: CycleView; auth: CrewAuth }) {
       <Eyebrow>Where?</Eyebrow>
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {opts.map((o, i) => {
-          const on = (mine ?? 0) === i;
+          // Only a place you tapped is ticked: Leaf's pick counting for you
+          // when you don't vote is said below, not shown as your choice.
+          const on = mine === i;
           const count = o.votes - (c.myPlaceVote === i ? 1 : 0) + (mine === i ? 1 : 0);
           return (
             <li key={o.locationId}>
@@ -2218,7 +2220,7 @@ function PlaceVote({ c, auth }: { c: CycleView; auth: CrewAuth }) {
           );
         })}
       </ul>
-      <p className="m-0 text-xs text-fm-muted">{mine === null ? "Leaf's pick unless you choose another. " : ""}The most votes wins when the vote closes.</p>
+      <p className="m-0 text-xs text-fm-muted">{mine === null ? "Tap where you'd go. If you don't, Leaf's pick counts for you. " : ""}The most votes wins when the vote closes.</p>
       {error && <p className="m-0 text-xs text-fm-danger">{error}</p>}
       <Eyebrow>When?</Eyebrow>
     </div>
