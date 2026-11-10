@@ -129,7 +129,15 @@ export default function ChatShell({
   }, []);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const currentUserIdRef = useRef<string | null>(null);
-  const composerRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  // The composer grows with the message (up to ~6 lines, then scrolls) and
+  // shrinks back once it's sent.
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [composeText]);
 
   // A tap-to-mention affordance lived here: the persona only replied when
   // tagged by name, so the composer offered "Ask @Marcus". Removed 2026-09-02 —
@@ -916,22 +924,24 @@ export default function ChatShell({
               Enter handling removes the form context entirely; the name/type
               and the password-manager opt-outs below stop the field from
               looking anonymous to the remaining heuristics. */}
-          <div className="flex items-center gap-2">
-            <input
+          <div className="flex items-end gap-2">
+            <textarea
               ref={composerRef}
+              rows={1}
               value={composeText}
               onChange={(e) => setComposeText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                // Enter sends; Shift+Enter is a new line. Not while an IME
+                // (e.g. Japanese input) is still composing.
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   handleSend();
                 }
               }}
-              type="text"
               name="chat-message"
               id="chat-message"
               placeholder="Message"
-              className="flex-1 border border-zinc-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-zinc-400"
+              className="flex-1 resize-none overflow-y-auto border border-zinc-200 rounded-lg px-4 py-2.5 text-sm leading-5 focus:outline-none focus:border-zinc-400"
               maxLength={2000}
               autoComplete="off"
               data-lpignore="true"
