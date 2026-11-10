@@ -262,7 +262,7 @@ export type CrewPage = {
     /** A one-time crew after its night: offer "Do it again?". */
     lastOneTime?: { happened: boolean; venue: string | null; at: string | { iso: string } | null } | null;
   };
-  me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null; calendarSynced?: boolean; inviteLink?: string | null; needsSeed?: boolean; needsPace?: boolean; hiddenTips?: string[]; bookNudges?: boolean;
+  me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null; calendarSynced?: boolean; inviteLink?: string | null; needsSeed?: boolean; needsPace?: boolean; tellLeafAsk?: "member" | "organizer" | null; hiddenTips?: string[]; bookNudges?: boolean;
     /** Birthdays on: their own "where do you want to go?" (pickBirthdayPlace), and whether Leaf knows their birthday. */
     birthdayAsk?: { date: string } | null; needsBirthday?: boolean };
   members: Member[];

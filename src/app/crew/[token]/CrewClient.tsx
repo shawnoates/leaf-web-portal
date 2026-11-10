@@ -209,6 +209,41 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
     }
   };
 
+  // The place a Tell Leaf note named: change this round's place, suggest
+  // it, or add it to the book (TellLeafPlaceCard).
+  const goNotePlace = () => {
+    const p = notePlace;
+    if (!p) return;
+    const where = p.spotId ? { spotId: p.spotId } : p.locationId ? { locationId: p.locationId } : { venue: p.venue };
+    if (p.action === "change") {
+      void act("notePlace", async () => { await run("changeCrewPlace", auth, { cycleId: p.cycleId, ...where }); setPlaceDone(`${p.name} is the place now. Everyone going hears about it.`); });
+    } else if (p.action === "suggest") {
+      void act("notePlace", async () => { await run("suggestCrewPlaceSwap", auth, { cycleId: p.cycleId, ...where }); setPlaceDone("Suggested in the plan chat. The host can swap it in."); });
+    } else if (p.action === "book") {
+      void act("notePlace", async () => { await run("addToCrewBook", auth, p.venue ? { placeId: p.venue.placeId, venue: p.venue } : { locationId: p.locationId }); setPlaceDone(`${p.name} is in the book. Leaf plans nights from it first.`); });
+    }
+  };
+
+  // Tell Leaf at onboarding (once): what was picked and typed goes through
+  // the same pills and Tell Leaf as the box further down.
+  const [askDone, setAskDone] = useState(false);
+  const [askReceipt, setAskReceipt] = useState<string | null>(null);
+  const finishAsk = (picked: { pillIds: string[]; text: string } | null) => act("tellAsk", async () => {
+    if (picked) {
+      for (const pillId of picked.pillIds) await run("toggleCrewPrefPill", auth, { pillId, on: true });
+      if (picked.text) {
+        const r = await run<TellLeafResult>("crewTellLeaf", auth, { text: picked.text });
+        setAskReceipt(tellLeafReceipt(r));
+        setNotePlace(r.place && (r.place.action || r.place.alreadyThere) ? r.place : null);
+        setPlaceDone(null);
+      } else if (picked.pillIds.length) {
+        setAskReceipt("Got it. Thanks.");
+      }
+    }
+    await run("crewTellLeafAskDone", auth);
+    setAskDone(true);
+  });
+
   // "Connect your calendar": for members who haven't, when no vote is open
   // (the vote has its own prompt). Not now hides it for this crew on this device.
   const calKey = `crew-cal-nudge:${crew.id}`;
@@ -641,6 +676,16 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             </section>
           )}
 
+          {me.tellLeafAsk && !askDone && !(me.needsPace && !paceDone && !crew.oneTime) && (
+            <TellLeafAsk kind={me.tellLeafAsk} pills={pills} busy={busy} onDone={(picked) => void finishAsk(picked)} />
+          )}
+          {askDone && askReceipt && (
+            <section className="flex flex-col gap-1 rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
+              <p className="m-0 flex items-start gap-1.5 text-sm text-fm-ink"><Check size={16} aria-hidden className="mt-0.5 shrink-0" /> {askReceipt}</p>
+              {notePlace && <TellLeafPlaceCard place={notePlace} done={placeDone} busy={busy} onGo={goNotePlace} />}
+            </section>
+          )}
+
           {fixedPlace ? (
             <section className="flex flex-col gap-2 rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
               <Eyebrow>Where</Eyebrow>
@@ -756,17 +801,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     place={notePlace}
                     done={placeDone}
                     busy={busy}
-                    onGo={() => {
-                      const p = notePlace;
-                      const where = p.spotId ? { spotId: p.spotId } : p.locationId ? { locationId: p.locationId } : { venue: p.venue };
-                      if (p.action === "change") {
-                        void act("notePlace", async () => { await run("changeCrewPlace", auth, { cycleId: p.cycleId, ...where }); setPlaceDone(`${p.name} is the place now. Everyone going hears about it.`); });
-                      } else if (p.action === "suggest") {
-                        void act("notePlace", async () => { await run("suggestCrewPlaceSwap", auth, { cycleId: p.cycleId, ...where }); setPlaceDone("Suggested in the plan chat. The host can swap it in."); });
-                      } else if (p.action === "book") {
-                        void act("notePlace", async () => { await run("addToCrewBook", auth, p.venue ? { placeId: p.venue.placeId, venue: p.venue } : { locationId: p.locationId }); setPlaceDone(`${p.name} is in the book. Leaf plans nights from it first.`); });
-                      }
-                    }}
+                    onGo={goNotePlace}
                   />
                 )}
               </>
@@ -1239,6 +1274,79 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
         </section>
       )}
     </CrewShell>
+  );
+}
+
+const ASK_STARTERS = ["Weekends", "Weeknights", "Not Mondays", "Daytime", "Evenings", "Kid-friendly places", "Cheap eats"];
+
+/**
+ * Tell Leaf, once, right after joining (or starting) a crew. A member taps
+ * the crew's pills (agree) and starter chips, or types; the organizer is
+ * asked about particular places. Done or Skip, it isn't shown again.
+ */
+function TellLeafAsk({ kind, pills, busy, onDone }: {
+  kind: "member" | "organizer";
+  pills: { id: string; label: string; count: number; mine: boolean }[];
+  busy: string | null;
+  onDone: (picked: { pillIds: string[]; text: string } | null) => void;
+}) {
+  const [pillIds, setPillIds] = useState<string[]>([]);
+  const [starters, setStarters] = useState<string[]>([]);
+  const [text, setText] = useState("");
+  const crewPills = pills.filter((p) => !p.mine).slice(0, 6);
+  const taken = new Set(pills.map((p) => p.label.toLowerCase()));
+  const own = kind === "member" ? ASK_STARTERS.filter((l) => !taken.has(l.toLowerCase())) : [];
+  const flip = (list: string[], set: (v: string[]) => void, v: string) => set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+  const chip = (key: string, label: string, on: boolean, onClick: () => void, count?: number) => (
+    <button
+      key={key}
+      type="button"
+      aria-pressed={on}
+      onClick={onClick}
+      className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-3.5 text-sm transition ${on ? "bg-fm-ink font-semibold text-fm-canvas" : "border border-fm-line text-fm-ink hover:border-fm-ink-2"}`}
+    >
+      {on && <Check size={14} strokeWidth={2.4} aria-hidden />}
+      <span>{label}</span>
+      {count != null && <span className={on ? "font-semibold" : "text-fm-muted"}>{count}</span>}
+    </button>
+  );
+  const typed = [...starters, text.trim()].filter(Boolean).join(". ");
+  const any = pillIds.length > 0 || typed.length > 0;
+  return (
+    <section className="flex flex-col gap-4 rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
+      <div className="flex flex-col gap-2">
+        <Eyebrow>{kind === "organizer" ? "New crew · one last thing" : "You're in · one last thing"}</Eyebrow>
+        <h2 className="m-0 font-fm-serif text-[28px] font-normal leading-tight">{kind === "organizer" ? "Anywhere in particular?" : "Anything Leaf should know?"}</h2>
+        <p className="m-0 text-[14px] leading-relaxed text-fm-ink-2">
+          {kind === "organizer"
+            ? "Name a spot or two and Leaf adds them to the book, where it plans the first night from. Only Leaf reads what you write."
+            : "So the first dates Leaf offers work for you. Only Leaf reads what you write."}
+        </p>
+      </div>
+      {crewPills.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <Mono className="text-fm-muted">The crew so far · tap to agree</Mono>
+          <div className="flex flex-wrap gap-2">{crewPills.map((p) => chip(p.id, p.label, pillIds.includes(p.id), () => flip(pillIds, setPillIds, p.id), p.count))}</div>
+        </div>
+      )}
+      {own.length > 0 && (
+        <div className="flex flex-wrap gap-2">{own.map((l) => chip(l, l, starters.includes(l), () => flip(starters, setStarters, l)))}</div>
+      )}
+      <div className="flex h-12 items-center rounded-full border border-fm-line bg-fm-canvas px-[18px]">
+        <label htmlFor="tell-leaf-ask" className="sr-only">{kind === "organizer" ? "Places for the crew" : "Anything else for Leaf"}</label>
+        <input
+          id="tell-leaf-ask"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={kind === "organizer" ? "e.g. Tara Mór, and somewhere with a patio" : "Anything else? e.g. Sundays after naps"}
+          className="min-w-0 flex-1 border-0 !bg-transparent text-[15px] text-fm-ink outline-none"
+        />
+      </div>
+      <div className="flex gap-2">
+        <Button small disabled={busy !== null || !any} onClick={() => onDone({ pillIds, text: typed })}>{busy === "tellAsk" ? "Saving…" : "Done"}</Button>
+        <Button small kind="ghost" disabled={busy !== null} onClick={() => onDone(null)}>Skip</Button>
+      </div>
+    </section>
   );
 }
 
