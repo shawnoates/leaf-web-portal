@@ -352,6 +352,19 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
     );
   }
 
+  const membersButton = (
+    <button type="button" onClick={() => setMembersOpen(true)} aria-label={`See who's in ${crew.name}`} className="flex items-center gap-3 text-left lg:pointer-events-none">
+      <span className="flex lg:hidden">
+        {[...joined, ...invited].slice(0, 5).map((m, i) => (
+          <span key={m.membershipId} className={i ? "-ml-2.5" : ""}>
+            <Avatar name={m.name} src={m.avatar} invited={m.status === "invited"} ring="ring-2 ring-fm-canvas" />
+          </span>
+        ))}
+      </span>
+      <span className="text-sm text-fm-ink-2 underline decoration-fm-line underline-offset-4 lg:text-[15px] lg:no-underline">{summary}</span>
+    </button>
+  );
+
   return (
     <CrewShell wide topBar={<CrewTopBar auth={auth} active="crew" />}>
       {verifyForCalendar && (
@@ -376,9 +389,10 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
         <div className="flex flex-col gap-4 lg:col-start-1 lg:row-start-1 lg:gap-8">
           <div className="flex flex-col gap-4">
             {/* Invite and Settings sit top right, beside the crew's name. */}
-            <div className="flex items-start justify-between gap-3">
-              <DisplayTitle italic={second && <span className="block">{second}</span>}>{first}</DisplayTitle>
-              <div className="flex shrink-0 items-center gap-2 pt-1 lg:pt-3">
+            <div className={`flex justify-between gap-3 ${inApp ? "items-center" : "items-start"}`}>
+              {/* In the app the screen's own top bar already names the crew. */}
+              {inApp ? membersButton : <DisplayTitle italic={second && <span className="block">{second}</span>}>{first}</DisplayTitle>}
+              <div className={`flex shrink-0 items-center gap-2 ${inApp ? "" : "pt-1 lg:pt-3"}`}>
                 {me.inviteLink && (
                   <button
                     type="button"
@@ -401,16 +415,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                 </button>
               </div>
             </div>
-            <button type="button" onClick={() => setMembersOpen(true)} aria-label={`See who's in ${crew.name}`} className="flex items-center gap-3 text-left lg:pointer-events-none">
-              <span className="flex lg:hidden">
-                {[...joined, ...invited].slice(0, 5).map((m, i) => (
-                  <span key={m.membershipId} className={i ? "-ml-2.5" : ""}>
-                    <Avatar name={m.name} src={m.avatar} invited={m.status === "invited"} ring="ring-2 ring-fm-canvas" />
-                  </span>
-                ))}
-              </span>
-              <span className="text-sm text-fm-ink-2 underline decoration-fm-line underline-offset-4 lg:text-[15px] lg:no-underline">{summary}</span>
-            </button>
+            {!inApp && membersButton}
           </div>
 
           {me.isOwner && (
