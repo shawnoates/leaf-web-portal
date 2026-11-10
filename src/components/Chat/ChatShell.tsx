@@ -928,12 +928,15 @@ export default function ChatShell({
             <textarea
               ref={composerRef}
               rows={1}
+              enterKeyHint="enter"
               value={composeText}
               onChange={(e) => setComposeText(e.target.value)}
               onKeyDown={(e) => {
-                // Enter sends; Shift+Enter is a new line. Not while an IME
-                // (e.g. Japanese input) is still composing.
-                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                // On a computer Enter sends and Shift+Enter is a new line. On a
+                // phone or tablet (no Shift key) Return is a new line and the
+                // send button sends. Never while an IME is still composing.
+                const touch = window.matchMedia("(pointer: coarse)").matches;
+                if (e.key === "Enter" && !e.shiftKey && !touch && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   handleSend();
                 }
