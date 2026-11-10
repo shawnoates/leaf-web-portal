@@ -39,7 +39,7 @@ import {
   type EventMatch,
   type MeetupOffer,
   type ThemeVote, RHYTHM_LABELS, crewHref, crewIsEvening, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
-  type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult,
+  type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult, type TellLeafPlace,
   type CrewAddOn, type CrewSplit, type LastNight,
 } from "@/lib/crew";
 
@@ -116,6 +116,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const [eventNote, setEventNote] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [noteSent, setNoteSent] = useState<string | null>(null);
+  const [notePlace, setNotePlace] = useState<TellLeafPlace | null>(null);
+  const [placeDone, setPlaceDone] = useState<string | null>(null);
   const [error, setError] = useState("");
   // "Text me about this crew's plans": never pre-ticked (10DLC).
   const [smsBox, setSmsBox] = useState(false);
@@ -747,7 +749,27 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               </div>
             )}
             {noteSent ? (
-              <p className="m-0 flex items-center gap-1.5 text-sm text-fm-ink-2"><Check size={16} aria-hidden /> {noteSent}</p>
+              <>
+                <p className="m-0 flex items-center gap-1.5 text-sm text-fm-ink-2"><Check size={16} aria-hidden /> {noteSent}</p>
+                {notePlace && (
+                  <TellLeafPlaceCard
+                    place={notePlace}
+                    done={placeDone}
+                    busy={busy}
+                    onGo={() => {
+                      const p = notePlace;
+                      const where = p.spotId ? { spotId: p.spotId } : p.locationId ? { locationId: p.locationId } : { venue: p.venue };
+                      if (p.action === "change") {
+                        void act("notePlace", async () => { await run("changeCrewPlace", auth, { cycleId: p.cycleId, ...where }); setPlaceDone(`${p.name} is the place now. Everyone going hears about it.`); });
+                      } else if (p.action === "suggest") {
+                        void act("notePlace", async () => { await run("suggestCrewPlaceSwap", auth, { cycleId: p.cycleId, ...where }); setPlaceDone("Suggested in the plan chat. The host can swap it in."); });
+                      } else if (p.action === "book") {
+                        void act("notePlace", async () => { await run("addToCrewBook", auth, p.venue ? { placeId: p.venue.placeId, venue: p.venue } : { locationId: p.locationId }); setPlaceDone(`${p.name} is in the book. Leaf plans nights from it first.`); });
+                      }
+                    }}
+                  />
+                )}
+              </>
             ) : (
               <form
                 className="flex h-14 items-center gap-2 rounded-full border border-fm-line bg-fm-surface pl-[18px] pr-1.5"
@@ -759,6 +781,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     // Read the days back: it's the only way someone catches
                     // Leaf reading "Thursdays mostly" the wrong way round.
                     setNoteSent(tellLeafReceipt(r));
+                    setNotePlace(r.place && (r.place.action || r.place.alreadyThere) ? r.place : null);
+                    setPlaceDone(null);
                   });
                 }}
               >
@@ -1215,6 +1239,35 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
         </section>
       )}
     </CrewShell>
+  );
+}
+
+/** After Tell Leaf: the place the note named, and one tap to use it. */
+function TellLeafPlaceCard({ place: p, done, busy, onGo }: { place: TellLeafPlace; done: string | null; busy: string | null; onGo: () => void }) {
+  const ask = p.alreadyThere
+    ? "That's already this round's place."
+    : p.action === "change"
+      ? `Make it the place${p.current ? ` instead of ${p.current}` : ""}?`
+      : p.action === "suggest"
+        ? `Suggest it to the crew${p.current ? ` instead of ${p.current}` : ""}?`
+        : "Add it to the book? Leaf plans nights from there first.";
+  const label = p.action === "change" ? "Make it the place" : p.action === "suggest" ? "Suggest it" : "Add to the book";
+  return (
+    <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-fm-line bg-fm-surface p-4">
+      <div className="flex items-start gap-3">
+        <MapPin size={18} aria-hidden className="mt-0.5 shrink-0 text-fm-muted" />
+        <div className="min-w-0">
+          <div className="text-[15px] font-semibold">{p.name}</div>
+          {p.address && <div className="truncate text-[13px] text-fm-muted">{p.address}</div>}
+          <div className="mt-1 text-sm text-fm-ink-2">{done || ask}</div>
+        </div>
+      </div>
+      {!done && p.action && !p.alreadyThere && (
+        <div className="self-start">
+          <Button small onClick={onGo} disabled={busy !== null}>{busy === "notePlace" ? "One sec…" : label}</Button>
+        </div>
+      )}
+    </div>
   );
 }
 

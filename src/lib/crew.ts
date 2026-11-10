@@ -578,6 +578,26 @@ export type TellLeafResult = {
   pollDates?: "refreshed" | "others_voted" | "unchanged" | null;
   /** "Let us know when the Nets play the Rockets": a watch Leaf added to the book. */
   watch?: { query: string; title: string; venueName: string | null; date: string | null } | null;
+  /**
+   * A place the note named ("let's do Lightscape"), found in the book or near
+   * the crew, and what the page may offer: make it this round's place
+   * (organizer or host), suggest it to the crew (a member, set night), or put
+   * it in the book. Nothing has changed yet.
+   */
+  place?: TellLeafPlace | null;
+};
+
+export type TellLeafPlace = {
+  name: string;
+  address: string | null;
+  spotId?: string;
+  locationId?: string;
+  venue?: { placeId: string; name: string; address: string | null };
+  action: "change" | "suggest" | "book" | null;
+  cycleId: string | null;
+  /** This round's place now, if it has one. */
+  current: string | null;
+  alreadyThere?: boolean;
 };
 
 
