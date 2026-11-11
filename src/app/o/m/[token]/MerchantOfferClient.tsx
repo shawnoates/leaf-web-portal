@@ -38,7 +38,7 @@ type DateOption = { dateKey: string; label: string };
 
 type Form = {
   /** A Leaf rep is setting this business up in person: payment info goes to the owner by email, not here. */
-  repWalkthrough?: { cardStatus: string | null; cardEmail: string; cardDueAt: string | null; cardDays: number };
+  repWalkthrough?: { cardStatus: string | null; cardEmail: string; cardDueAt: string | null; cardDays: number; byLeaf?: boolean };
   /** What a Leaf host costs for a night (Hosted night). */
   leafHostFeeCents?: number;
   state: "drafted" | "sent" | "accepted" | "declined" | "expired" | "unavailable";
@@ -650,7 +650,7 @@ export default function MerchantOfferClient({ token }: { token: string }) {
       <Closed
         neighborhood={form.neighborhood}
         title={`Almost done. We emailed ${sentTo}.`}
-        body={`${form.merchantName} is set up. The last step is theirs: ${perRsvp ? "adding a card" : "connecting payouts"}${free ? " to claim their free first Neighbor Hour" : ""}. They have ${days} days, and we'll remind them. Your rep can see when it's done and resend the email.`}
+        body={`${form.merchantName} is set up. The last step is theirs: ${perRsvp ? "adding a card" : "connecting payouts"}${free ? " to claim their free first Neighbor Hour" : ""}. They have ${days} days, and we'll remind them. ${form.repWalkthrough?.byLeaf ? "You'll see it on the Merchants board, and can resend the email there." : "Your rep can see when it's done and resend the email."}`}
       />
     );
   }
