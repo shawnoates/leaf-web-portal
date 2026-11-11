@@ -4,7 +4,7 @@
 // hourly after (time moves, cancellations).
 
 export interface ExternalEvent {
-  source: "ticketmaster" | "seatgeek" | "eventbrite" | "luma" | "web";
+  source: "ticketmaster" | "seatgeek" | "eventbrite" | "luma" | "partiful" | "web";
   sourceLabel: string;
   externalId: string;
   title: string;
@@ -73,5 +73,5 @@ function to12h(hhmm: string): string {
 
 /** Ticket and event sites a pasted link is read from (resolveExternalEventFromUrl). */
 export function isEventLink(text: string): boolean {
-  return /^(https?:\/\/)?([a-z0-9-]+\.)*(ticketmaster\.[a-z.]+|livenation\.com|ticketweb\.[a-z.]+|seatgeek\.com|eventbrite\.[a-z.]+|lu\.ma|luma\.com)(\/|$)/i.test(text.trim());
+  return /^(https?:\/\/)?([a-z0-9-]+\.)*(ticketmaster\.[a-z.]+|livenation\.com|ticketweb\.[a-z.]+|seatgeek\.com|eventbrite\.[a-z.]+|lu\.ma|luma\.com|partiful\.com)(\/|$)/i.test(text.trim());
 }

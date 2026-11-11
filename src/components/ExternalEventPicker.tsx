@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { detectCity } from "@/lib/detectCity";
-import { priceLine, whenLine, type ExternalEvent } from "@/lib/externalEvents";
+import { isEventLink, priceLine, whenLine, type ExternalEvent } from "@/lib/externalEvents";
 import { ArrowLeft, CalendarDays, ExternalLink, MapPin, Search, Ticket, User } from "lucide-react";
 
 type Suggestion = {
@@ -74,6 +74,31 @@ export default function ExternalEventPicker({
     return () => { cancelled = true; };
   }, []);
 
+  /** A pasted Luma, Partiful, Eventbrite, Ticketmaster or SeatGeek link: read that one event. */
+  async function readLink(url: string) {
+    committed.current = url;
+    setSuggestions([]);
+    setSuggestOpen(false);
+    setLoading(true);
+    setError(null);
+    try {
+      const res = (await Parse.Cloud.run("resolveExternalEventFromUrl", { url })) as { found: boolean; event?: ExternalEvent };
+      if (res.found && res.event) {
+        setEvents([res.event]);
+        setSelected(res.event);
+        setSearchedFor(url);
+      } else {
+        setEvents([]);
+        setSelected(null);
+        setError("Couldn't read an event from that page. Try the event's own page, or close this and fill in the plan yourself.");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Couldn't read that link.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function runSearch(q: string) {
     committed.current = q;
     setLoading(true);
@@ -98,7 +123,7 @@ export default function ExternalEventPicker({
   // Suggestions: quick, from two letters.
   useEffect(() => {
     const q = query.trim();
-    if (q.length < 2 || q === committed.current) {
+    if (q.length < 2 || q === committed.current || isEventLink(q) || /^https?:\/\//i.test(q)) {
       setSuggestions([]);
       return;
     }
@@ -127,7 +152,8 @@ export default function ExternalEventPicker({
       return;
     }
     if (q === committed.current) return;
-    const timer = setTimeout(() => runSearch(q), 600);
+    const link = isEventLink(q) || /^https?:\/\/\S+\.\S+/i.test(q);
+    const timer = setTimeout(() => (link ? readLink(q) : runSearch(q)), link ? 150 : 600);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
@@ -155,7 +181,11 @@ export default function ExternalEventPicker({
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (open && activeIdx >= 0) pickSuggestion(suggestions[activeIdx]);
-      else if (query.trim().length >= 2) { setSuggestOpen(false); runSearch(query.trim()); }
+      else if (query.trim().length >= 2) {
+        setSuggestOpen(false);
+        const q = query.trim();
+        if (isEventLink(q) || /^https?:\/\//i.test(q)) readLink(q); else runSearch(q);
+      }
     } else if (e.key === "Escape" && open) {
       e.preventDefault();
       setSuggestOpen(false);
@@ -194,7 +224,7 @@ export default function ExternalEventPicker({
             onKeyDown={onKeyDown}
             onFocus={() => setSuggestOpen(true)}
             onBlur={() => setTimeout(() => setSuggestOpen(false), 120)}
-            placeholder="An artist, team or show"
+            placeholder="An artist, team or show, or paste an event link"
             aria-label="Search ticketed events"
             role="combobox"
             aria-expanded={suggestOpen && suggestions.length > 0}
@@ -238,7 +268,14 @@ export default function ExternalEventPicker({
       </div>
 
       {error && <p className="text-xs text-red-600">{error}</p>}
-      {loading && <p className="text-xs text-zinc-500">Searching Ticketmaster and SeatGeek…</p>}
+      {loading && (
+        <p className="text-xs text-zinc-500">
+          {isEventLink(typed) || /^https?:\/\//i.test(typed) ? "Reading the event…" : "Searching Ticketmaster and SeatGeek…"}
+        </p>
+      )}
+      {!typed && (
+        <p className="text-xs text-zinc-500">Have a Luma, Partiful or Eventbrite link? Paste it above.</p>
+      )}
       {!loading && searchedFor && events.length === 0 && !error && (
         <p className="text-xs text-zinc-500">
           Nothing near you for &ldquo;{searchedFor}&rdquo;. Have a link? Close this and paste it into the box above the form.
