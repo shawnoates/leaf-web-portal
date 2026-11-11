@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
-import { priceLine, whenLine, type ExternalEvent, type PlanExternal } from "@/lib/externalEvents";
+import { isEventLink, priceLine, whenLine, type ExternalEvent, type PlanExternal } from "@/lib/externalEvents";
 import PlanTicketToggle from "@/components/PlanTicketToggle";
 import ExternalEventPicker from "@/components/ExternalEventPicker";
 import { APP_LINK_URL, SITE_URL } from "@/lib/site";
@@ -2220,6 +2220,8 @@ export default function OrgCalendarPage() {
   // the server takes date, venue and ticket link from the event.
   const [customExternal, setCustomExternal] = useState<ExternalEvent | null>(null);
   const [customFindingEvent, setCustomFindingEvent] = useState(false);
+  const [customLinkReading, setCustomLinkReading] = useState(false);
+  const [customLinkError, setCustomLinkError] = useState<string | null>(null);
   // True when the custom-plan modal was opened by tapping a deal card. Hides
   // the "Or host one of these ideas" carousel since the user has already
   // committed to a specific venue and intent.
@@ -4431,6 +4433,32 @@ export default function OrgCalendarPage() {
           : "Couldn't send that. Try again in a moment.",
       );
       setHostSubmitting(false);
+    }
+  };
+
+  /** Fill Propose a plan from a ticketed event (search pick or pasted link). */
+  const applyCustomExternal = (ev: ExternalEvent) => {
+    setCustomExternal(ev);
+    setCustomFindingEvent(false);
+    setCustomLinkError(null);
+    setCustomTitle(ev.title);
+    if (!customDescription.trim() && ev.description) setCustomDescription(ev.description);
+    if (ev.imageUrl) setSelectedImageUrl(ev.imageUrl);
+    setSelectedVenue(null);
+  };
+
+  /** A link typed or pasted into "What are you planning?": read it as an event. */
+  const readCustomLink = async (url: string) => {
+    setCustomLinkReading(true);
+    setCustomLinkError(null);
+    try {
+      const res = (await Parse.Cloud.run("resolveExternalEventFromUrl", { url })) as { found: boolean; event?: ExternalEvent };
+      if (res.found && res.event) applyCustomExternal(res.event);
+      else setCustomLinkError("Couldn't read an event from that page. Type a title instead, or try the event's own page.");
+    } catch (err) {
+      setCustomLinkError(err instanceof Error && err.message ? err.message : "Couldn't read that link.");
+    } finally {
+      setCustomLinkReading(false);
     }
   };
 
@@ -7634,11 +7662,13 @@ export default function OrgCalendarPage() {
                   </div>
 
                   {!org.hidePlanIdeas && !customFromDeal && !customFindingEvent && !customExternal && org.planIdeas.length > 0 && (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <p className="text-xs tracking-wider uppercase font-bold text-zinc-500">
                         Or host one of these ideas
                       </p>
-                      <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory -mx-8 md:-mx-16 px-8 md:px-16 pb-2">
+                      {/* One compact row: the ideas are a side door, not the
+                          main way in, so they don't push the form down. */}
+                      <div className="flex gap-2 overflow-x-auto snap-x -mx-8 md:-mx-16 px-8 md:px-16 pb-1">
                         {org.planIdeas.filter((idea) => idea.image).map((idea) => (
                           <button
                             type="button"
@@ -7652,9 +7682,9 @@ export default function OrgCalendarPage() {
                               setHostNote("");
                               setSelectedVenue(null);
                             }}
-                            className="text-left min-w-[140px] max-w-[140px] snap-start group"
+                            className="text-left shrink-0 snap-start group flex items-center gap-2 border border-zinc-200 rounded-full pl-1 pr-3.5 py-1 hover:border-zinc-400 max-w-[240px]"
                           >
-                            <div className="aspect-square overflow-hidden bg-zinc-100 mb-2 relative rounded-md">
+                            <div className="w-8 h-8 shrink-0 overflow-hidden bg-zinc-100 relative rounded-full">
                               {idea.image ? (
                                 <img
                                   src={idea.image}
@@ -7664,13 +7694,13 @@ export default function OrgCalendarPage() {
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
-                                  <Sparkles className="w-7 h-7 text-zinc-300" />
+                                  <Sparkles className="w-4 h-4 text-zinc-300" />
                                 </div>
                               )}
                             </div>
-                            <h5 className="text-xs font-medium tracking-tight line-clamp-2 group-hover:italic leading-snug">
+                            <span className="text-xs font-medium tracking-tight truncate">
                               {idea.title}
-                            </h5>
+                            </span>
                           </button>
                         ))}
                       </div>
@@ -7680,14 +7710,7 @@ export default function OrgCalendarPage() {
                   {customFindingEvent ? (
                     <ExternalEventPicker
                       onBack={() => setCustomFindingEvent(false)}
-                      onPick={(ev) => {
-                        setCustomExternal(ev);
-                        setCustomFindingEvent(false);
-                        setCustomTitle(ev.title);
-                        if (!customDescription.trim() && ev.description) setCustomDescription(ev.description);
-                        if (ev.imageUrl) setSelectedImageUrl(ev.imageUrl);
-                        setSelectedVenue(null);
-                      }}
+                      onPick={applyCustomExternal}
                     />
                   ) : !customFromDeal && (customExternal ? (
                     <div className="border border-zinc-200 rounded-xl p-4 flex gap-4">
@@ -7726,20 +7749,49 @@ export default function OrgCalendarPage() {
                   ))}
 
                   <form onSubmit={handleCustomPlanSubmit} className={customFindingEvent ? "hidden" : "space-y-8"}>
-                    <div className="space-y-2">
-                      <label className="text-xs tracking-wider uppercase font-bold">
-                        Plan Title
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        maxLength={200}
-                        value={customTitle}
-                        onChange={(e) => setCustomTitle(e.target.value)}
-                        placeholder="e.g. Saturday Morning Trail Run"
-                        className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
-                      />
-                    </div>
+                    {/* "What are you planning?" is the title, and takes an event
+                        link too (Luma, Partiful, Eventbrite, Ticketmaster,
+                        SeatGeek): Import event reads it and fills the plan. */}
+                    {(() => {
+                      const typed = customTitle.trim();
+                      const isLink = !customExternal && (isEventLink(typed) || /^https?:\/\/\S+\.\S+$/i.test(typed));
+                      return (
+                        <div className="space-y-2">
+                          <label htmlFor="custom-plan-title" className="text-xs tracking-wider uppercase font-bold">
+                            What are you planning?
+                          </label>
+                          <div className="flex items-end gap-3 border-b border-zinc-300 focus-within:border-zinc-900 transition-colors">
+                            <input
+                              id="custom-plan-title"
+                              type="text"
+                              required
+                              maxLength={isLink ? 2000 : 200}
+                              value={customTitle}
+                              onChange={(e) => { setCustomTitle(e.target.value); setCustomLinkError(null); }}
+                              onKeyDown={(e) => { if (e.key === "Enter" && isLink) { e.preventDefault(); readCustomLink(typed); } }}
+                              placeholder="e.g. Saturday morning trail run, or paste an event link"
+                              className="flex-1 min-w-0 py-4 text-xl font-light focus:outline-none bg-transparent"
+                            />
+                            {isLink && (
+                              <button
+                                type="button"
+                                onClick={() => readCustomLink(typed)}
+                                disabled={customLinkReading}
+                                className="mb-3 shrink-0 h-9 px-3.5 rounded-full bg-zinc-900 text-white text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap disabled:opacity-60"
+                              >
+                                <Ticket className="w-3.5 h-3.5" aria-hidden />
+                                {customLinkReading ? "Reading…" : "Import event"}
+                              </button>
+                            )}
+                          </div>
+                          {customLinkError ? (
+                            <p className="text-xs text-red-600">{customLinkError}</p>
+                          ) : isLink ? (
+                            <p className="text-xs text-zinc-600">That&rsquo;s a link. Import reads the event&rsquo;s name, date, place and photo.</p>
+                          ) : null}
+                        </div>
+                      );
+                    })()}
 
                     <div className="space-y-2">
                       <label className="text-xs tracking-wider uppercase font-bold">
