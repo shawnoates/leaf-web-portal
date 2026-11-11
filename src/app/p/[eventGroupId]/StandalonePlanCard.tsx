@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Lock, MapPin, Ticket, Wallet } from "lucide-react";
 import { priceLine, type PlanExternal } from "@/lib/externalEvents";
+import PlanTicketToggle from "@/components/PlanTicketToggle";
 import PlanHeroMedia from "./PlanHeroMedia";
 import { OnlyOnLeafLine, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
 import HlsVideo from "@/components/HlsVideo";
@@ -328,6 +329,8 @@ export default function StandalonePlanCard({
                       ? `${external.sourceLabel} lists this event as ${external.status}.`
                       : "Buy your ticket there, then RSVP here so the group knows you're going."}
                   </p>
+                  {/* Shows itself once the viewer is signed in and going. */}
+                  <PlanTicketToggle eventGroupId={eventGroupId} />
                 </div>
               )}
               <StandalonePlanRsvp

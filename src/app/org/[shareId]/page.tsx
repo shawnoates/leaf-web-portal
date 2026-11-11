@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "rea
 import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import { priceLine, type PlanExternal } from "@/lib/externalEvents";
+import PlanTicketToggle from "@/components/PlanTicketToggle";
 import { APP_LINK_URL, SITE_URL } from "@/lib/site";
 import Link from "next/link";
 import { CrossPromoEyebrow } from "@/components/CrossPromoBadge";
@@ -6713,7 +6714,11 @@ export default function OrgCalendarPage() {
                         <ArrowUpRight className="w-4 h-4" />
                       </a>
                     )}
-                    <p className="text-xs text-zinc-500 text-center">Buy your ticket there, then RSVP here so the group knows you&rsquo;re going.</p>
+                    {rsvpedPlanIds.has(selectedEvent.id) ? (
+                      <PlanTicketToggle eventGroupId={selectedEvent.id} refreshKey={rsvpedPlanIds.has(selectedEvent.id)} />
+                    ) : (
+                      <p className="text-xs text-zinc-500 text-center">Buy your ticket there, then RSVP here so the group knows you&rsquo;re going.</p>
+                    )}
                   </div>
                 )}
                 {selectedEvent.isPoll ? (
