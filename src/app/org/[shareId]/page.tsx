@@ -3,8 +3,9 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
-import { priceLine, type PlanExternal } from "@/lib/externalEvents";
+import { priceLine, whenLine, type ExternalEvent, type PlanExternal } from "@/lib/externalEvents";
 import PlanTicketToggle from "@/components/PlanTicketToggle";
+import ExternalEventPicker from "@/components/ExternalEventPicker";
 import { APP_LINK_URL, SITE_URL } from "@/lib/site";
 import Link from "next/link";
 import { CrossPromoEyebrow } from "@/components/CrossPromoBadge";
@@ -2215,6 +2216,10 @@ export default function OrgCalendarPage() {
   // Custom plan creation state
   const [creatingCustomPlan, setCreatingCustomPlan] = useState(false);
   const [customTitle, setCustomTitle] = useState("");
+  // Propose a plan from a ticketed event (Find an event / a pasted link):
+  // the server takes date, venue and ticket link from the event.
+  const [customExternal, setCustomExternal] = useState<ExternalEvent | null>(null);
+  const [customFindingEvent, setCustomFindingEvent] = useState(false);
   // True when the custom-plan modal was opened by tapping a deal card. Hides
   // the "Or host one of these ideas" carousel since the user has already
   // committed to a specific venue and intent.
@@ -4434,7 +4439,7 @@ export default function OrgCalendarPage() {
     if (!org) return;
     const isOwnerOrHost = org.isOwner || org.isHost;
     if (!isOwnerOrHost && !customVerify.isVerified) return;
-    if (!selectedVenue) return;
+    if (!selectedVenue && !customExternal) return;
     if (!customTitle.trim() || !customDescription.trim()) return;
     const collectAsk = collectAskPayload(customCollect);
     if (collectAsk.error) { setCustomCollectError(collectAsk.error); return; }
@@ -4453,7 +4458,10 @@ export default function OrgCalendarPage() {
     const sign = offset <= 0 ? "+" : "-";
     const absH = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
     const absM = String(Math.abs(offset) % 60).padStart(2, "0");
-    const dateTime = `${dateInput.value}T${timeInput.value || "18:00"}${sign}${absH}:${absM}`;
+    // An event's own date wins on the server; this is only a placeholder.
+    const dateTime = customExternal
+      ? `${customExternal.localDate}T${customExternal.localTime || "19:00"}`
+      : `${dateInput.value}T${timeInput.value || "18:00"}${sign}${absH}:${absM}`;
 
     try {
       const result = await Parse.Cloud.run("requestCustomPlanViaWeb", {
@@ -4465,13 +4473,14 @@ export default function OrgCalendarPage() {
         title: customTitle.trim(),
         description: customDescription.trim(),
         date: dateTime,
-        venue: {
+        venue: selectedVenue ? {
           placeId: selectedVenue.placeId,
           name: selectedVenue.name,
           address: selectedVenue.address,
           photoUrl: selectedVenue.photoUrl,
           rating: selectedVenue.rating,
-        },
+        } : undefined,
+        external: customExternal ? { source: customExternal.source, id: customExternal.externalId } : undefined,
         capacity: !collectAsk.p2p && customCapacity ? parseInt(customCapacity, 10) : undefined,
         hostNote: hostNote.trim() || undefined,
         p2p: collectAsk.p2p || undefined,
@@ -4493,6 +4502,7 @@ export default function OrgCalendarPage() {
       setHostNote("");
       setCustomEmail("");
       setSelectedVenue(null);
+      setCustomExternal(null);
       setSelectedImageUrl(null);
       setUnsplashPhotos([]);
       // Auto-follow visual update for non-owners/hosts
@@ -7623,7 +7633,7 @@ export default function OrgCalendarPage() {
                     </p>
                   </div>
 
-                  {!org.hidePlanIdeas && !customFromDeal && org.planIdeas.length > 0 && (
+                  {!org.hidePlanIdeas && !customFromDeal && !customFindingEvent && !customExternal && org.planIdeas.length > 0 && (
                     <div className="space-y-3">
                       <p className="text-xs tracking-wider uppercase font-bold text-zinc-500">
                         Or host one of these ideas
@@ -7667,7 +7677,55 @@ export default function OrgCalendarPage() {
                     </div>
                   )}
 
-                  <form onSubmit={handleCustomPlanSubmit} className="space-y-8">
+                  {customFindingEvent ? (
+                    <ExternalEventPicker
+                      onBack={() => setCustomFindingEvent(false)}
+                      onPick={(ev) => {
+                        setCustomExternal(ev);
+                        setCustomFindingEvent(false);
+                        setCustomTitle(ev.title);
+                        if (!customDescription.trim() && ev.description) setCustomDescription(ev.description);
+                        if (ev.imageUrl) setSelectedImageUrl(ev.imageUrl);
+                        setSelectedVenue(null);
+                      }}
+                    />
+                  ) : !customFromDeal && (customExternal ? (
+                    <div className="border border-zinc-200 rounded-xl p-4 flex gap-4">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1.5">
+                          <Ticket className="w-3.5 h-3.5" aria-hidden /> Tickets on {customExternal.sourceLabel}
+                        </p>
+                        <p className="text-sm font-semibold text-zinc-900 truncate">{customExternal.title}</p>
+                        <p className="text-xs text-zinc-600">
+                          {[whenLine(customExternal), customExternal.venue?.name, priceLine(customExternal)].filter(Boolean).join(" · ")}
+                        </p>
+                        <p className="text-xs text-zinc-500">Date, time and venue follow {customExternal.sourceLabel}. Guests buy their own tickets there.</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <button type="button" onClick={() => setCustomFindingEvent(true)} className="text-xs font-semibold text-zinc-900 hover:underline">Change</button>
+                        <button type="button" onClick={() => setCustomExternal(null)} className="text-xs text-zinc-500 hover:underline">Remove</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setCustomFindingEvent(true)}
+                      className="w-full flex items-center gap-4 border border-zinc-900 rounded-xl px-4 py-3.5 text-left hover:bg-zinc-50"
+                    >
+                      <span className="w-10 h-10 rounded-lg bg-zinc-900 text-white grid place-items-center shrink-0">
+                        <Ticket className="w-5 h-5" aria-hidden />
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm font-semibold text-zinc-900">Going to a ticketed event?</span>
+                        <span className="block text-xs text-zinc-600">Find a concert, game or show, or paste a Luma, Partiful or Eventbrite link, and invite the group.</span>
+                      </span>
+                      <span className="text-xs font-semibold text-zinc-900 whitespace-nowrap flex items-center gap-1">
+                        Find an event <ArrowRight className="w-4 h-4" aria-hidden />
+                      </span>
+                    </button>
+                  ))}
+
+                  <form onSubmit={handleCustomPlanSubmit} className={customFindingEvent ? "hidden" : "space-y-8"}>
                     <div className="space-y-2">
                       <label className="text-xs tracking-wider uppercase font-bold">
                         Plan Title
@@ -7698,14 +7756,14 @@ export default function OrgCalendarPage() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className={customExternal ? "hidden" : "grid grid-cols-1 md:grid-cols-2 gap-6"}>
                       <div className="space-y-2">
                         <label className="text-xs tracking-wider uppercase font-bold">
                           Date
                         </label>
                         <input
                           type="date"
-                          required
+                          required={!customExternal}
                           // Uncontrolled — keyed so a prefill from a suggestion
                           // remounts the input instead of being ignored.
                           key={`custom-date-${customPrefillDate}`}
@@ -7721,7 +7779,7 @@ export default function OrgCalendarPage() {
                         </label>
                         <input
                           type="time"
-                          required
+                          required={!customExternal}
                           key={`custom-time-${customPrefillTime}`}
                           defaultValue={customPrefillTime || "18:00"}
                           className="w-full border-b border-zinc-300 py-4 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors"
@@ -7729,7 +7787,15 @@ export default function OrgCalendarPage() {
                       </div>
                     </div>
 
-                    {customFromDeal && selectedVenue ? (
+                    {customExternal ? (
+                      <div className="space-y-2">
+                        <label className="text-xs tracking-wider uppercase font-bold">
+                          Venue <span className="text-zinc-400">(from {customExternal.sourceLabel})</span>
+                        </label>
+                        <p className="text-sm text-zinc-900">{customExternal.venue?.name || "Venue to be announced"}</p>
+                        {customExternal.venue?.address && <p className="text-xs text-zinc-500">{customExternal.venue.address}</p>}
+                      </div>
+                    ) : customFromDeal && selectedVenue ? (
                       <div className="space-y-3">
                         <label className="text-xs tracking-wider uppercase font-bold">
                           Venue <span className="text-zinc-400">(from this deal)</span>
@@ -7942,7 +8008,7 @@ export default function OrgCalendarPage() {
                       </div>
                     )}
 
-                    {!customCollect.on && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {!customCollect.on && !customExternal && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <label className="text-xs tracking-wider uppercase font-bold">
                           Capacity <span className="text-zinc-400 normal-case">(optional)</span>
@@ -8056,7 +8122,7 @@ export default function OrgCalendarPage() {
                         disabled={
                           customSubmitting ||
                           (!(org.isOwner || org.isHost) && !customVerify.isVerified) ||
-                          !selectedVenue ||
+                          (!selectedVenue && !customExternal) ||
                           !customTitle.trim() ||
                           !customDescription.trim()
                         }
