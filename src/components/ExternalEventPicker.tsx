@@ -303,11 +303,12 @@ export default function ExternalEventPicker({
                 <p className="text-xs text-zinc-500">
                   Guests buy tickets on {selected.sourceLabel}. The plan keeps the group and the chat, and moves if the show moves.
                 </p>
-                <div className="flex items-center gap-3 pt-1">
+                {/* Stacked, so neither wraps to two lines in the narrow column. */}
+                <div className="flex flex-col items-stretch gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => onPick(selected)}
-                    className="h-10 px-4 rounded-full bg-zinc-900 text-white text-sm font-semibold hover:bg-zinc-800"
+                    className="h-10 w-full px-4 rounded-full bg-zinc-900 text-white text-sm font-semibold whitespace-nowrap hover:bg-zinc-800"
                   >
                     Use this event
                   </button>
@@ -316,9 +317,9 @@ export default function ExternalEventPicker({
                       href={selected.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-zinc-700 inline-flex items-center gap-1 hover:text-zinc-900"
+                      className="self-center text-sm text-zinc-700 inline-flex items-center gap-1 whitespace-nowrap hover:text-zinc-900"
                     >
-                      See it on {selected.sourceLabel} <ExternalLink className="w-3.5 h-3.5" aria-hidden />
+                      See it on {selected.sourceLabel} <ExternalLink className="w-3.5 h-3.5 shrink-0" aria-hidden />
                     </a>
                   )}
                 </div>
