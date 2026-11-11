@@ -174,6 +174,8 @@ export default function PlanDetailModal({
   // Flashes "Copied" on the Copy Link action after the direct /p/<id> URL is
   // written to the clipboard.
   const [linkCopied, setLinkCopied] = useState(false);
+  // A cover URL that failed to load (stale hotlink) shows the placeholder.
+  const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
 
   const [pollDetail, setPollDetail] = useState<{
     options: PollOptionDetail[];
@@ -585,8 +587,8 @@ export default function PlanDetailModal({
         </div>
 
         <div className="hidden md:block w-1/2 h-full bg-zinc-100">
-          {plan.image ? (
-            <FittedImage src={plan.image} />
+          {plan.image && failedImageSrc !== plan.image ? (
+            <FittedImage src={plan.image} onError={() => setFailedImageSrc(plan.image)} />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Calendar className="w-20 h-20 text-zinc-300" />

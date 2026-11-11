@@ -1,7 +1,7 @@
 "use client";
 
 import { collectAskLine } from "@/components/p2p/CollectAskFields";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Calendar, Lock, Plus, Send } from "lucide-react";
 import type { OrgAnalytics } from "@/components/analytics/types";
 import { formatWallClockTime12h } from "@/lib/date-utils";
@@ -133,9 +133,18 @@ function PlanCover({
   plan: CalActivePlan;
   className: string;
 }) {
-  return plan.image ? (
+  // Fall back to the placeholder when the URL 404s (hotlinked images go
+  // stale), not just when it's missing. Keyed on the src so a new image retries.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  return plan.image && failedSrc !== plan.image ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={plan.image} alt="" className={`${className} object-cover`} />
+    <img
+      src={plan.image}
+      alt=""
+      referrerPolicy="no-referrer"
+      className={`${className} object-cover`}
+      onError={() => setFailedSrc(plan.image)}
+    />
   ) : (
     <div className={`${className} bg-zinc-100 flex items-center justify-center`}>
       <Calendar className="w-4 h-4 text-zinc-300" />
