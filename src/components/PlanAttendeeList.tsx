@@ -12,6 +12,8 @@ export type Attendee = {
   waitlisted?: boolean;
   /** Tapped "I'm still coming" on a reminder. Absent on older servers. */
   reconfirmed?: boolean;
+  /** A plan from a ticketed event: they said they bought theirs. */
+  hasTicket?: boolean;
   rsvpNote: string | null;
 };
 
@@ -255,6 +257,9 @@ function AttendeeRow({
           </button>
         ) : (
           <p className="text-[15px] font-medium text-zinc-900 leading-snug">{a.name}</p>
+        )}
+        {a.hasTicket && (
+          <p className="text-xs font-medium text-emerald-700">Has a ticket</p>
         )}
         {a.phone ? (
           <a

@@ -120,6 +120,7 @@ type Rsvp = {
   waitlisted?: boolean;
   /** Tapped "I'm still coming" on a reminder. */
   reconfirmed?: boolean;
+  hasTicket?: boolean;
   rsvpNote: string | null;
 };
 
@@ -685,6 +686,15 @@ export default function PlanDetailModal({
                 ) : (
                   <p className="text-sm text-zinc-700">
                     Date, time and venue follow {plan.external.sourceLabel}. If the show moves, the plan moves and guests are told.
+                  </p>
+                )}
+                {goingCount > 0 && (
+                  <p className="text-sm text-zinc-700">
+                    {(() => {
+                      const going = planRsvps.filter((r) => r.status === "Accepted");
+                      const have = going.filter((r) => r.hasTicket).length;
+                      return have === going.length ? "Everyone going has a ticket." : `${have} of ${going.length} going have a ticket.`;
+                    })()}
                   </p>
                 )}
                 <p className="text-xs text-zinc-500">
