@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { SITE_URL } from "@/lib/site";
 
 // "Get tickets" on a plan made from a ticketed event: os.joinleaf.com/tickets/<plan>.
 // Records the click (trackTicketClick) and sends the person on to the
@@ -19,7 +20,11 @@ export async function GET(
 ) {
   const { eventGroupId } = await params;
   const surface = request.nextUrl.searchParams.get("s") || "other";
-  const fallback = new URL(`/p/${encodeURIComponent(eventGroupId)}`, request.nextUrl.origin);
+  // The public host the person asked for. Behind the host (Amplify) the
+  // request's own origin is the internal server (localhost:3000).
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
+  const origin = host && !/^(localhost|127\.|\[::1\])/.test(host) ? `https://${host.split(",")[0].trim()}` : SITE_URL;
+  const fallback = new URL(`/p/${encodeURIComponent(eventGroupId)}`, origin);
   if (!/^[A-Za-z0-9]{6,20}$/.test(eventGroupId) || !PARSE_APP_ID) {
     return NextResponse.redirect(fallback, 302);
   }
