@@ -103,6 +103,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   const addOnFor = (cycleId: string) => addOns.find((x) => x.cycleId === cycleId) || null;
   const pastAddOns = addOns.filter((x) => !open.some((c) => c.cycleId === x.cycleId));
   const pills = data.prefPills || [];
+  // What they told Leaf in their other crews: one tap each to say it here too.
+  const carryPills = data.pillsFromOtherCrews || [];
   const [allPills, setAllPills] = useState(false);
   const [pace, setPace] = useState<string>(me.rhythmDays ? String(me.rhythmDays) : "");
   const [proposing, setProposing] = useState(false);
@@ -739,6 +741,26 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
                     +{pills.length - 6}
                   </button>
                 )}
+              </div>
+            )}
+            {carryPills.length > 0 && me.status === "in" && (
+              <div className="flex flex-col gap-2">
+                <span className="font-fm-mono text-[11px] uppercase tracking-[0.12em] text-fm-muted">From your other crews</span>
+                <div className="flex flex-wrap gap-2" aria-label="What you told Leaf in your other crews">
+                  {carryPills.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      disabled={busy !== null}
+                      title={`You said this in ${p.from}. Tap to add it here.`}
+                      onClick={() => act("pill", () => run("toggleCrewPrefPill", auth, { pillId: p.id, label: p.label, fromOtherCrew: true }))}
+                      className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-dashed border-fm-line px-3.5 text-sm text-fm-ink transition hover:border-fm-ink-2 disabled:opacity-60"
+                    >
+                      <Plus size={14} strokeWidth={2.4} aria-hidden />
+                      <span>{p.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             {noteSent ? (
