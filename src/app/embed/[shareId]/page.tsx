@@ -24,6 +24,8 @@ interface Plan {
   pollOptionCount?: number;
   pollVoteCount?: number;
   pollClosesAt?: string | null;
+  /** "Ticketmaster" when the plan follows an outside event. */
+  ticketsOn?: string | null;
 }
 
 interface EmbedData {
@@ -81,6 +83,7 @@ export default function EmbedCalendarPage() {
         id: p.objectId,
         title: p.title || "Untitled Plan",
         date: p.expiryDate ? formatDate(p.expiryDate) : "",
+        ticketsOn: p.external?.sourceLabel || null,
         time: p.expiryDate ? formatTime(p.expiryDate) : "",
         description: p.description || "",
         image: p.image || "",
@@ -213,7 +216,7 @@ export default function EmbedCalendarPage() {
                         })()}
                       </>
                     ) : (
-                      <>{plan.date} &bull; {plan.time}</>
+                      <>{plan.date} &bull; {plan.time}{plan.ticketsOn && <> &bull; Tickets on {plan.ticketsOn}</>}</>
                     )}
                   </p>
                   <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">

@@ -96,6 +96,10 @@ export type PlanDetailData = {
     description?: string | null;
     followerCount?: number | null;
   } | null;
+  /** Follows a Ticketmaster/SeatGeek/Eventbrite/Luma event: date and venue
+   *  come from it, guests buy tickets there, and an hourly sync moves the
+   *  plan (and tells guests) when the show moves. */
+  external?: import("@/lib/externalEvents").PlanExternal | null;
 };
 
 type PollOptionDetail = { date: string; time: string | null; count: number };
@@ -668,6 +672,31 @@ export default function PlanDetailModal({
                 </button>
               )}
             </div>
+
+            {plan.external && (
+              <div className="border border-zinc-200 rounded-lg p-4 space-y-1.5">
+                <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">
+                  Tickets on {plan.external.sourceLabel}
+                </p>
+                {(plan.external.status === "cancelled" || plan.external.status === "postponed") ? (
+                  <p className="text-sm text-amber-700">
+                    {plan.external.sourceLabel} lists this event as {plan.external.status}. Let your guests know, or cancel the plan.
+                  </p>
+                ) : (
+                  <p className="text-sm text-zinc-700">
+                    Date, time and venue follow {plan.external.sourceLabel}. If the show moves, the plan moves and guests are told.
+                  </p>
+                )}
+                <p className="text-xs text-zinc-500">
+                  {plan.external.lastSyncedAt
+                    ? `Checked ${new Date(plan.external.lastSyncedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+                    : "Checked when created"}
+                  {plan.external.ticketUrl && (
+                    <> &middot; <a href={plan.external.ticketUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-900">Event page</a></>
+                  )}
+                </p>
+              </div>
+            )}
 
             {/* The host's 30-second hello. The recorder when the viewer IS
                 the host; the take plus a "remove" when someone else hosts

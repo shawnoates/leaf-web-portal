@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Lock, MapPin, Wallet } from "lucide-react";
+import { ArrowUpRight, Lock, MapPin, Ticket, Wallet } from "lucide-react";
+import { priceLine, type PlanExternal } from "@/lib/externalEvents";
 import PlanHeroMedia from "./PlanHeroMedia";
 import { OnlyOnLeafLine, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
 import HlsVideo from "@/components/HlsVideo";
@@ -70,6 +71,8 @@ type Props = {
   /** Paid night: RSVP is a ticket purchase, and the app can't sell one yet. */
   ticketPriceCents?: number | null;
   bookingFeeCents?: number | null;
+  /** Made from a Ticketmaster/SeatGeek/Eventbrite/Luma event. */
+  external?: PlanExternal | null;
   // RSVP closes at start time; replaces the button with a disabled state.
   rsvpClosed: boolean;
   // Set when /p/<id>?rsvp=1 — the visitor was bounced back from
@@ -102,6 +105,7 @@ export default function StandalonePlanCard({
   p2pSplit = null,
   ticketPriceCents = null,
   bookingFeeCents = null,
+  external = null,
   rsvpClosed,
   autoOpenRsvp,
 }: Props) {
@@ -306,6 +310,26 @@ export default function StandalonePlanCard({
 
           {variant === "standalone" ? (
             <>
+              {external?.ticketUrl && (
+                <div className="space-y-1.5">
+                  <a
+                    href={external.ticketUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full border border-zinc-900 rounded-full py-3 flex items-center justify-center gap-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+                  >
+                    <Ticket className="w-4 h-4" aria-hidden />
+                    Get tickets on {external.sourceLabel}
+                    {priceLine(external) ? <span className="text-zinc-500">· {priceLine(external)}</span> : null}
+                    <ArrowUpRight className="w-4 h-4" aria-hidden />
+                  </a>
+                  <p className="text-xs text-center text-zinc-500">
+                    {external.status === "cancelled" || external.status === "postponed"
+                      ? `${external.sourceLabel} lists this event as ${external.status}.`
+                      : "Buy your ticket there, then RSVP here so the group knows you're going."}
+                  </p>
+                </div>
+              )}
               <StandalonePlanRsvp
                 eventGroupId={eventGroupId}
                 hadIntroVideo={Boolean(rosterHost?.introVideo || hostIntro?.introVideo)}

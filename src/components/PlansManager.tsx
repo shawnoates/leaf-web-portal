@@ -269,6 +269,8 @@ interface UpcomingPlan {
   capacity?: number | null;
   hostNote?: string | null;
   planSeriesId?: string | null;
+  /** Follows a Ticketmaster/SeatGeek/Eventbrite/Luma event. */
+  external?: import("@/lib/externalEvents").PlanExternal | null;
   /** Cross-promoted onto this calendar from another one — read-only here. */
   promotedFrom?: {
     promotionId: string;
@@ -979,6 +981,7 @@ export default function PlansManager({
         hostNote?: string | null;
         planSeriesId?: string | null;
         promotedFrom?: UpcomingPlan["promotedFrom"];
+        external?: UpcomingPlan["external"];
       }[];
       const realPlans: UpcomingPlan[] = activePlans.map((p) => ({
         objectId: p.objectId,
@@ -1004,6 +1007,7 @@ export default function PlansManager({
         hostNote: p.hostNote ?? null,
         planSeriesId: p.planSeriesId,
         promotedFrom: p.promotedFrom ?? null,
+        external: p.external ?? null,
       }));
       setUpcomingPlans(realPlans);
       Parse.Cloud.run("getCalendarPlanSeries", { calendarId })
@@ -2479,6 +2483,7 @@ export default function PlansManager({
             hostNote: selectedPlan.hostNote ?? null,
             planSeriesId: selectedPlan.planSeriesId,
             promotedFrom: selectedPlan.promotedFrom ?? null,
+            external: selectedPlan.external ?? null,
           }}
           calendarId={calendarId}
           onClose={() => setSelectedPlan(null)}

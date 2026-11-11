@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
+import { priceLine, type PlanExternal } from "@/lib/externalEvents";
 import { APP_LINK_URL, SITE_URL } from "@/lib/site";
 import Link from "next/link";
 import { CrossPromoEyebrow } from "@/components/CrossPromoBadge";
@@ -86,6 +87,7 @@ import {
   Cloud,
   CloudRain,
   Wallet,
+  Ticket,
 } from "lucide-react";
 import { OnlyOnLeafLine, OnlyOnLeafPill, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
 import { PhotoCredit } from "@/components/PhotoCredit";
@@ -191,6 +193,9 @@ interface Plan {
   /** The host's exact meeting spot; the server nulls it with the address. */
   meetingSpot?: string | null;
   requireApproval?: boolean;
+  /** Made from a Ticketmaster/SeatGeek/Eventbrite/Luma event: tickets are
+   *  bought there; RSVP here just says "I'm going". */
+  external?: PlanExternal | null;
   isPoll?: boolean;
   pollOptionCount?: number;
   pollVoteCount?: number;
@@ -3594,6 +3599,7 @@ export default function OrgCalendarPage() {
         hostNote: p.hostNote as string || null,
         meetingSpot: (p.meetingSpot as string | null) || null,
         requireApproval: p.requireApproval as boolean || false,
+        external: (p.external as PlanExternal | null) || null,
         ticketPriceCents: typeof p.ticketPriceCents === "number" ? p.ticketPriceCents : null,
         drop: (p.drop as Plan["drop"]) || null,
         bookingFeeCents: typeof p.bookingFeeCents === "number" ? p.bookingFeeCents : null,
@@ -5383,7 +5389,10 @@ export default function OrgCalendarPage() {
                         </span>
                       ) : (
                         <>
-                          <span>{plan.date}{plan.time ? <> &bull; {plan.time}</> : ""}</span>
+                          <span>
+                            {plan.date}{plan.time ? <> &bull; {plan.time}</> : ""}
+                            {plan.external && <> &bull; Tickets on {plan.external.sourceLabel}</>}
+                          </span>
                           {/* Absent on most rows — the forecast only reaches 14
                               days out and only covers outdoor venues. */}
                           {planWeather[plan.id] && (
@@ -6466,6 +6475,12 @@ export default function OrgCalendarPage() {
                     </>
                   ) : (
                     <>
+                      {selectedEvent.external && (
+                        <span className="flex items-center gap-2 whitespace-nowrap">
+                          <Ticket className="w-4 h-4 flex-shrink-0" />
+                          {[priceLine(selectedEvent.external), `Tickets on ${selectedEvent.external.sourceLabel}`].filter(Boolean).join(" · ")}
+                        </span>
+                      )}
                       <span className="flex items-center gap-2 whitespace-nowrap">
                         <Clock className="w-4 h-4 flex-shrink-0" />
                         {/* Phones get "Wed, Sep 30 · 6:00 PM" — the long
@@ -6677,6 +6692,30 @@ export default function OrgCalendarPage() {
                 {/* The RSVP / attending actions stay pinned to the bottom of the
                     popup while the details scroll behind them. */}
                 <div className="sticky bottom-0 z-10 -mx-8 md:-mx-16 px-8 md:px-16 pt-4 pb-6 md:pb-10 bg-white border-t border-zinc-100">
+                {/* An outside event: tickets are bought on its own site.
+                    The RSVP below still says "I'm going" to the group. */}
+                {selectedEvent.external && !selectedEvent.isPoll && (
+                  <div className="mb-3 space-y-2">
+                    {(selectedEvent.external.status === "cancelled" || selectedEvent.external.status === "postponed") && (
+                      <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2">
+                        {selectedEvent.external.sourceLabel} lists this event as {selectedEvent.external.status}. Check with the host before buying.
+                      </p>
+                    )}
+                    {selectedEvent.external.ticketUrl && (
+                      <a
+                        href={selectedEvent.external.ticketUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full border border-zinc-900 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2 text-zinc-900 no-underline"
+                      >
+                        <Ticket className="w-4 h-4" />
+                        <span className="text-xs font-bold uppercase tracking-widest">Get tickets on {selectedEvent.external.sourceLabel}</span>
+                        <ArrowUpRight className="w-4 h-4" />
+                      </a>
+                    )}
+                    <p className="text-xs text-zinc-500 text-center">Buy your ticket there, then RSVP here so the group knows you&rsquo;re going.</p>
+                  </div>
+                )}
                 {selectedEvent.isPoll ? (
                   <div className="space-y-4">
                     <PollVoteWidget

@@ -8,6 +8,8 @@ import { everyOtherMonth, hostCandidateNote, monthlyRuleOptionsForDate, NTH_LABE
 import { processImageFile, IMAGE_ACCEPT } from "@/lib/image-utils";
 import { getDefaultCoverForSeed } from "@/lib/default-covers";
 import VenueSearch from "@/components/VenueSearch";
+import ExternalEventPicker from "@/components/ExternalEventPicker";
+import { isEventLink, priceLine, whenLine, type ExternalEvent } from "@/lib/externalEvents";
 import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
 import CollectAskFields, { collectAskFrom, collectAskPayload, type CollectAsk, type RequestedP2p } from "@/components/p2p/CollectAskFields";
 import { detectCity, primeGeoCity } from "@/lib/detectCity";
@@ -23,6 +25,7 @@ import {
   Plus,
   Repeat,
   Sparkles,
+  Ticket,
   TrendingUp,
   Vote,
   X,
@@ -141,6 +144,9 @@ export interface CreatePlanPrefill {
   /** Reviewing a host request that asked to collect money (paid to them). */
   requestedP2p?: RequestedP2p | null;
   requesterName?: string;
+  /** Open on a ticketed event (Ticketmaster/SeatGeek/Eventbrite/Luma), e.g.
+   *  from the marketplace's Events tab. Same as picking it in Find an event. */
+  external?: ExternalEvent | null;
 }
 
 interface CreatePlanModalProps {
@@ -449,6 +455,37 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   // The prompt bar is a create-mode affordance, but flows that hand us a
   // ready-made subject (marketplace) opt out — see prefill.hidePromptBar.
   const showPromptBar = isCreateMode && !prefill?.hidePromptBar;
+  // A plan made from a ticketed event: when and where come from the event
+  // (the server re-reads it on create and keeps the plan in step), tickets
+  // are bought there, so the Leaf-side gates (cap, approval, hidden venue)
+  // don't apply. `findingEvent` swaps the form for the event search.
+  const [externalEvent, setExternalEvent] = useState<ExternalEvent | null>(prefill?.external ?? null);
+  const [findingEvent, setFindingEvent] = useState(false);
+  function applyExternalEvent(ev: ExternalEvent) {
+    setExternalEvent(ev);
+    setFindingEvent(false);
+    setMode("plan");
+    setTitle(ev.title);
+    if (ev.description && !userTouched.has("description")) setDescription(ev.description);
+    if (ev.localDate) setDate(ev.localDate);
+    setTime(ev.localTime || "");
+    // The venue comes from the event server-side; the Google picker would
+    // only ask the manager to confirm what the event already says.
+    setVenueQuery("");
+    setSelectedVenue(null);
+    setHideVenue(false);
+    setRequireApproval(false);
+    setCapacity("");
+    if (ev.imageUrl && !imageBase64) {
+      setSelectedImageUrl(ev.imageUrl);
+      setCoverExpanded(true);
+    }
+    setPromptInput("");
+    setPromptError(null);
+  }
+  function clearExternalEvent() {
+    setExternalEvent(null);
+  }
   const [promptInput, setPromptInput] = useState("");
   const [promptLoading, setPromptLoading] = useState(false);
   const [promptError, setPromptError] = useState<string | null>(null);
@@ -822,6 +859,21 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
     if (!trimmed || promptLoading) return;
     setPromptError(null);
     setPromptLoading(true);
+    // A pasted ticket link: read the event itself rather than drafting from
+    // the URL's words.
+    if (isEventLink(trimmed)) {
+      try {
+        const res = (await Parse.Cloud.run("resolveExternalEventFromUrl", { url: trimmed })) as
+          { found: boolean; event?: ExternalEvent };
+        if (res.found && res.event) applyExternalEvent(res.event);
+        else setPromptError("Couldn't read the event from that page. Fill in the plan, or try the event's own page.");
+      } catch (err: unknown) {
+        setPromptError(err instanceof Error ? err.message : "Couldn't read that link.");
+      } finally {
+        setPromptLoading(false);
+      }
+      return;
+    }
     try {
       // Anchor grounded venue/showtime search to a real place. The calendar's
       // own area wins when we have it — a chip that says "a nearby taproom"
@@ -1049,7 +1101,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
 
     // A venue name without a Google Places match means we'd save a Location with
     // no placeId/coords, breaking maps and dedupe downstream. Require selection.
-    if (venueQuery.trim() && !selectedVenue) {
+    if (!externalEvent && venueQuery.trim() && !selectedVenue) {
       alert("Please select the venue from the suggestions list so we can save its location details.");
       return;
     }
@@ -1352,6 +1404,9 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           // when hosted, dismissed when this saves as a suggestion instead.
           aiSourceEventUid: prefill?.aiSourceEventUid || undefined,
           aiSourceEventIndex: prefill?.aiSourceEventIndex,
+          // The server re-reads the event and takes date, venue and ticket
+          // link from it.
+          external: externalEvent ? { source: externalEvent.source, id: externalEvent.externalId } : undefined,
         })) as { success?: boolean; type?: string; eventGroupId?: string };
         // Trust the server's `type` over local `isHosted` — it's what got written.
         // "pending": a follower on an admin neighborhood calendar — the plan
@@ -1484,10 +1539,58 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
             </button>
           </div>
         )}
-        <div className={helloPlanId ? "hidden" : "flex-1 overflow-y-auto px-6 py-5 space-y-5"}>
+        {findingEvent && !helloPlanId && (
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            <ExternalEventPicker onPick={applyExternalEvent} onBack={() => setFindingEvent(false)} />
+          </div>
+        )}
+        <div className={helloPlanId || findingEvent ? "hidden" : "flex-1 overflow-y-auto px-6 py-5 space-y-5"}>
           {success && (
             <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg text-sm">
               <Check className="w-4 h-4" /> {pollConvertMode ? "Poll converted — voters notified" : hostRequestMode ? "Approved — requester notified" : editMode ? (isPoll ? "Poll updated!" : "Plan updated!") : isPoll ? "Poll created — followers notified" : sentForApproval ? "Sent to the organizer — it goes live once they approve it" : "Plan created successfully!"}
+            </div>
+          )}
+
+          {/* Ticketed events: find one on Ticketmaster/SeatGeek, or (once
+              picked or pasted) the event the plan follows. */}
+          {isCreateMode && !externalEvent && (
+            <button
+              type="button"
+              onClick={() => setFindingEvent(true)}
+              className="w-full flex items-center gap-4 border border-zinc-900 rounded-xl px-4 py-3.5 text-left hover:bg-zinc-50"
+            >
+              <span className="w-10 h-10 rounded-lg bg-zinc-900 text-white grid place-items-center shrink-0">
+                <Ticket className="w-5 h-5" aria-hidden />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-semibold text-zinc-900">Going to a ticketed event?</span>
+                <span className="block text-xs text-zinc-600">Find a concert, game or show on Ticketmaster or SeatGeek and make it a plan.</span>
+              </span>
+              <span className="text-xs font-semibold text-zinc-900 whitespace-nowrap flex items-center gap-1">
+                Find an event <ArrowRight className="w-4 h-4" aria-hidden />
+              </span>
+            </button>
+          )}
+          {externalEvent && (
+            <div className="border border-zinc-200 rounded-xl p-4 flex gap-4">
+              <div className="flex-1 min-w-0 space-y-1">
+                <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1.5">
+                  <Ticket className="w-3.5 h-3.5" aria-hidden /> Tickets on {externalEvent.sourceLabel}
+                </p>
+                <p className="text-sm font-semibold text-zinc-900 truncate">{externalEvent.title}</p>
+                <p className="text-xs text-zinc-600">
+                  {[whenLine(externalEvent), externalEvent.venue?.name, priceLine(externalEvent)].filter(Boolean).join(" · ")}
+                </p>
+                <p className="text-xs text-zinc-500">
+                  Date, time and venue follow {externalEvent.sourceLabel}; if the show moves, the plan moves and guests are told.
+                </p>
+              </div>
+              {isCreateMode && (
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <button type="button" onClick={() => setFindingEvent(true)} className="text-xs font-semibold text-zinc-900 hover:underline">Change</button>
+                  <button type="button" onClick={clearExternalEvent} className="text-xs text-zinc-500 hover:underline">Remove</button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1495,7 +1598,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
               into a plan draft. Only surfaced in create mode; edit /
               host-request / poll-convert flows already have their subject
               locked, so the prompt would be misleading. */}
-          {showPromptBar && (
+          {showPromptBar && !externalEvent && (
             <div className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-3 space-y-2">
               <label htmlFor="new-plan-prompt" className="flex items-center gap-1.5 text-xs font-medium text-emerald-900/80">
                 <Sparkles className="w-3.5 h-3.5" />
@@ -1554,7 +1657,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
               above (where it can be read and edited), the second sends it
               through the drafter — same path as typing it. Hidden once a draft
               has landed — the fields below are the subject at that point. */}
-          {showPromptBar && aiFilled.size === 0 && (pillsLoading || promptPills.length > 0) && (
+          {showPromptBar && !externalEvent && aiFilled.size === 0 && (pillsLoading || promptPills.length > 0) && (
             // Horizontal carousel. Short titles usually fit the row now, but
             // the scroller stays: a long-ish label or a narrow drawer would
             // otherwise wrap the chips into stacked rows and push the actual
@@ -1636,7 +1739,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           )}
 
           {/* Plan type toggle (hidden in edit, host-request, and poll-convert modes) */}
-          {!editMode && !hostRequestMode && !pollConvertMode && <div>
+          {!editMode && !hostRequestMode && !pollConvertMode && !externalEvent && <div>
             <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-3">Plan Type</label>
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -1844,6 +1947,14 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
 
           <div>
             <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Venue</label>
+            {externalEvent ? (
+              <div className="py-2 border-b border-zinc-200">
+                <p className="text-sm text-zinc-900">{externalEvent.venue?.name || "Venue to be announced"}</p>
+                {externalEvent.venue?.address && (
+                  <p className="text-xs text-zinc-400 mt-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> {externalEvent.venue.address}</p>
+                )}
+              </div>
+            ) : (<>
             <VenueSearch
               key={`venue-${venueResolveKey}`}
               value={venueQuery}
@@ -1875,6 +1986,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
                 <MapPin className="w-3 h-3" /> Pick a venue so voters know where to go
               </p>
             ) : null}
+            </>)}
 
             {/* Multi-stop itinerary — one row per additional stop with its
                 own VenueSearch + optional per-stop time. Polls and
@@ -1962,11 +2074,14 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
                   value={date}
                   onChange={(e) => { setDate(e.target.value); markTouched("date"); }}
                   min={today}
-                  disabled={pollConvertMode}
+                  disabled={pollConvertMode || !!externalEvent}
                   className={`w-full border-b py-2 text-sm font-light focus:outline-none focus:border-zinc-900 disabled:text-zinc-500 disabled:bg-transparent ${aiFilled.has("date") && !userTouched.has("date") ? "border-emerald-300 bg-emerald-50/40" : "border-zinc-300"}`}
                 />
                 {pollConvertMode && (
                   <p className="text-xs text-zinc-400 mt-1">Locked to the winning vote</p>
+                )}
+                {externalEvent && (
+                  <p className="text-xs text-zinc-400 mt-1">Set by {externalEvent.sourceLabel}</p>
                 )}
               </div>
               <div>
@@ -1975,14 +2090,14 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
                   type="time"
                   value={time}
                   onChange={(e) => { setTime(e.target.value); markTouched("time"); }}
-                  disabled={pollConvertMode}
+                  disabled={pollConvertMode || !!externalEvent}
                   className={`w-full border-b py-2 text-sm font-light focus:outline-none focus:border-zinc-900 disabled:text-zinc-500 disabled:bg-transparent ${aiFilled.has("time") && !userTouched.has("time") ? "border-emerald-300 bg-emerald-50/40" : "border-zinc-300"}`}
                 />
               </div>
             </div>
             {/* Timing hints — what actually draws RSVPs, from this calendar's
                 own history when it has enough, otherwise platform-wide. */}
-            {timingHints && (() => {
+            {timingHints && !externalEvent && (() => {
               const parts: string[] = [];
               if (timingHints.bestDay) {
                 parts.push(`${timingHints.bestDay.day}s draw ${timingHints.bestDay.sharePct}% of RSVPs`);
@@ -2241,7 +2356,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
             </>
           )}
 
-          {!isPoll && !collecting && (
+          {!isPoll && !collecting && !externalEvent && (
             <div>
               <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Capacity (optional)</label>
               <input
@@ -2439,7 +2554,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
               For ideas, each instance is a CalendarGeneratedPlan that members
               can claim — counts against orgPlanIdeasPerWeek per instance, so
               series self-throttle when the quota is full. */}
-          {(isHosted || mode === "idea") && !editMode && !hostRequestMode && (
+          {(isHosted || mode === "idea") && !editMode && !hostRequestMode && !externalEvent && (
             <div>
               <div className="flex items-center justify-between py-1">
                 <div className="flex items-start gap-2">
@@ -2608,7 +2723,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           )}
 
           {/* Venue privacy toggle (not relevant for polls — venue isn't being voted on) */}
-          {!isPoll && (
+          {!isPoll && !externalEvent && (
             <div className="flex items-center justify-between py-1">
               <div>
                 <p className="text-xs font-medium text-zinc-700">Hide venue until RSVP</p>
@@ -2625,7 +2740,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           )}
 
           {/* Require approval toggle */}
-          {isHosted && (
+          {isHosted && !externalEvent && (
             <div className="flex items-center justify-between py-1">
               <div>
                 <p className="text-xs font-medium text-zinc-700">Require approval to attend</p>
@@ -2667,7 +2782,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
 
         {/* Sticky footer — always in view so the Create action never scrolls
             off-screen (mobile keyboard covers the bottom of the drawer). */}
-        <div className={helloPlanId ? "hidden" : "border-t border-zinc-100 px-6 py-3 flex items-center justify-end gap-2 bg-white shrink-0"}>
+        <div className={helloPlanId || findingEvent ? "hidden" : "border-t border-zinc-100 px-6 py-3 flex items-center justify-end gap-2 bg-white shrink-0"}>
           <button
             type="button"
             onClick={requestDismiss}

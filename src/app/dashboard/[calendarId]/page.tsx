@@ -2226,6 +2226,29 @@ export default function OrgDashboardPage() {
                           // prompt bar would only offer to overwrite what was
                           // just picked.
                           hidePromptBar: true,
+                          // A Ticketmaster listing: make it a plan that follows
+                          // the event (createManualPlan re-reads it by id and
+                          // takes the real date, venue and ticket link).
+                          external: event.source === "ticketmaster_direct" && event.id.startsWith("tm-")
+                            ? {
+                                source: "ticketmaster",
+                                sourceLabel: "Ticketmaster",
+                                externalId: event.id.slice(3),
+                                title,
+                                description: description || null,
+                                url: event.url,
+                                imageUrl: event.image,
+                                localDate: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null,
+                                localTime: null,
+                                timezone: null,
+                                startUtc: null,
+                                venue: event.venue ? { ...event.venue, city: null, lat: null, lng: null } : null,
+                                priceMin: null,
+                                priceMax: null,
+                                isFree: false,
+                                status: "scheduled",
+                              }
+                            : null,
                         });
                         setShowCreatePlanModal(true);
                       }}

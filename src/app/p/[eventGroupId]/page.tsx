@@ -68,6 +68,8 @@ type PlanShareInfo = {
   /** Offer Pipeline paid night: RSVPing means buying a ticket. */
   ticketPriceCents?: number | null;
   bookingFeeCents?: number | null;
+  /** Made from a Ticketmaster/SeatGeek/Eventbrite/Luma event. */
+  external?: import("@/lib/externalEvents").PlanExternal | null;
   // Cross-promotion (only when the link carried a valid ?via=): the shared-
   // with calendar to bounce into, and its id for RSVP attribution.
   viaShareId?: string | null;
@@ -407,6 +409,7 @@ export default async function PlanSharePage({ params, searchParams }: PageProps)
       p2pSplit={info.p2pSplit ?? null}
       ticketPriceCents={info.ticketPriceCents ?? null}
       bookingFeeCents={info.bookingFeeCents ?? null}
+      external={info.external ?? null}
       rsvpClosed={rsvpClosed}
       autoOpenRsvp={autoOpenRsvp && !rsvpClosed}
     />
