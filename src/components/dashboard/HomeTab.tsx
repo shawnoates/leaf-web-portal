@@ -1,5 +1,6 @@
 "use client";
 
+import { priceLine } from "@/lib/externalEvents";
 import { collectAskLine } from "@/components/p2p/CollectAskFields";
 import { useMemo } from "react";
 import { Calendar, Lock, Plus, Send } from "lucide-react";
@@ -559,7 +560,7 @@ export default function HomeTab({
       >
         <div className="flex-1 min-w-[180px]">
           <p className="text-[13px] font-medium text-zinc-900">
-            {req.title} — <span className="text-amber-700">host request</span>
+            {req.title} — <span className="text-amber-700">{req.external ? "event plan request" : "host request"}</span>
           </p>
           <p className="text-[11px] text-zinc-500 mt-0.5">
             {req.requesterName}
@@ -576,6 +577,20 @@ export default function HomeTab({
           {/* A swapped venue is the part of a request most worth a second look,
               and it used to be invisible until the owner opened Edit. Keeping
               the suggested venue is the quiet case, so it stays unemphasized. */}
+          {/* Proposed from a ticketed event: where it's sold and the event
+              page, so the organizer can check it before approving. Date and
+              venue follow the event once it's a plan. */}
+          {req.external && (
+            <p className="text-[11px] text-zinc-700 mt-0.5 flex items-center gap-1 flex-wrap">
+              <span className="font-medium">🎟 Tickets on {req.external.sourceLabel}</span>
+              {priceLine(req.external) && <span className="text-zinc-500">· {priceLine(req.external)}</span>}
+              {req.external.ticketUrl && (
+                <a href={req.external.ticketUrl} target="_blank" rel="noopener noreferrer" className="text-zinc-900 underline underline-offset-2">
+                  · See the event ↗
+                </a>
+              )}
+            </p>
+          )}
           {req.requestedVenue?.name && (
             <p className="text-[11px] text-zinc-500 mt-0.5">
               {req.requestedVenue.name}
@@ -586,7 +601,9 @@ export default function HomeTab({
                   request "your suggested venue", including the swaps this is
                   meant to surface. Undefined means "don't know", so say
                   nothing rather than something wrong. */}
-              {req.requesterChoseVenue === true && (
+              {req.external ? (
+                <span className="text-zinc-400"> · from {req.external.sourceLabel}</span>
+              ) : req.requesterChoseVenue === true && (
                 <span className="text-amber-700"> · their venue</span>
               )}
               {req.requesterChoseVenue === false && (

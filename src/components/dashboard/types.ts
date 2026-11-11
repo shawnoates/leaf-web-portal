@@ -308,6 +308,8 @@ export interface OrgDashboard {
     requestedCapacity: number | null;
     requestedRequireApproval: boolean;
     requestedAt: string | null;
+    /** Proposed from a ticketed event (Ticketmaster, SeatGeek, Eventbrite, Luma, Partiful). */
+    external?: import("@/lib/externalEvents").PlanExternal | null;
     /** What the requester asked to collect from guests (paid to them), if anything. */
     requestedP2p?: RequestedP2p | null;
   }[];
