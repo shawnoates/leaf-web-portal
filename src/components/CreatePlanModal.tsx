@@ -27,7 +27,6 @@ import {
   Sparkles,
   Ticket,
   TrendingUp,
-  Vote,
   X,
 } from "lucide-react";
 
@@ -491,14 +490,11 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   const [promptError, setPromptError] = useState<string | null>(null);
   // Recommendation pills under the prompt bar. Each `text` is a ready-to-send
   // sentence for draftPlanFromPrompt. The chip itself shows only `label` (a
-  // short title) — the full sentence lands in the prompt input on first tap,
-  // so the manager reads and can edit it before it's drafted. `reason` is the
-  // data justification, shown on hover.
+  // short title); a tap puts the full sentence in "What are you planning?"
+  // for the manager to read, edit and draft. `reason` is the data
+  // justification, shown on hover.
   const [promptPills, setPromptPills] = useState<{ text: string; reason: string | null; label?: string | null }[]>([]);
   const [pillsLoading, setPillsLoading] = useState(false);
-  // Which chip is loaded into the prompt input. Tapping it a second time is
-  // what sends it — first tap is "show me", second is "go".
-  const [selectedPill, setSelectedPill] = useState<string | null>(null);
   const promptInputRef = useRef<HTMLInputElement>(null);
   // Where this CALENDAR is, resolved server-side (its own city, else its
   // parent org's, else the browser's). Used as the drafter's location hint so
@@ -654,7 +650,6 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
     let cancelled = false;
     setPillsLoading(true);
     setPromptPills([]);
-    setSelectedPill(null);
     // Warm the edge-geo cache so the draft handler below (and a reopen of
     // this modal) resolves off physical location rather than the device
     // clock. Fire-and-forget: detectCity() falls back to the timezone
@@ -854,7 +849,9 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   // `overrideText` is how a recommendation pill fires immediately — setState
   // is async, so reading promptInput back on the same tick would submit the
   // previous value (or empty on the first tap).
-  async function handlePromptSubmit(overrideText?: string) {
+  /** `fromTitle`: drafted from "What are you planning?" itself, so the draft
+   *  may shorten the title the manager typed (the sentence was the prompt). */
+  async function handlePromptSubmit(overrideText?: string, opts?: { fromTitle?: boolean }) {
     const trimmed = (overrideText ?? promptInput).trim();
     if (!trimmed || promptLoading) return;
     setPromptError(null);
@@ -905,7 +902,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
         // Skip empty payloads.
         if (value == null || value === "") return;
         // Never clobber a field the manager typed into.
-        if (userTouched.has(field)) return;
+        if (userTouched.has(field) && !(opts?.fromTitle && field === "title")) return;
         setter();
         nextAI.add(field);
       };
@@ -1594,126 +1591,97 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
             </div>
           )}
 
-          {/* Prompt bar — accent-tinted composer that turns a single sentence
-              into a plan draft. Only surfaced in create mode; edit /
-              host-request / poll-convert flows already have their subject
-              locked, so the prompt would be misleading. */}
-          {showPromptBar && !externalEvent && (
-            <div className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-3 space-y-2">
-              <label htmlFor="new-plan-prompt" className="flex items-center gap-1.5 text-xs font-medium text-emerald-900/80">
-                <Sparkles className="w-3.5 h-3.5" />
-                Describe it, I&rsquo;ll draft the plan.
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  id="new-plan-prompt"
-                  ref={promptInputRef}
-                  type="text"
-                  value={promptInput}
-                  onChange={(e) => { setPromptInput(e.target.value); setPromptError(null); setSelectedPill(null); }}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handlePromptSubmit(); } }}
-                  placeholder="Paint & sip next Thursday at 7pm on the rooftop"
-                  disabled={promptLoading || creating}
-                  className="flex-1 bg-white border border-emerald-200/70 rounded-lg px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:border-emerald-500 disabled:opacity-60"
-                  autoComplete="off"
-                  data-1p-ignore
-                  data-lpignore="true"
-                />
-                <button
-                  type="button"
-                  onClick={() => handlePromptSubmit()}
-                  disabled={!promptInput.trim() || promptLoading || creating}
-                  className="shrink-0 bg-emerald-600 text-white rounded-lg h-9 w-9 flex items-center justify-center hover:bg-emerald-700 transition-colors disabled:opacity-40"
-                  aria-label="Draft plan from prompt"
-                >
-                  {promptLoading ? (
-                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <ArrowRight className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-              {promptError && (
-                <p className="text-xs text-red-600">{promptError}</p>
-              )}
-              {/* Only shown while a chip's sentence is sitting unsent in the
-                  box — the chip row is a two-step now, and this is the step. */}
-              {selectedPill && !promptError && aiFilled.size === 0 && (
-                <p className="text-xs text-emerald-800/70">Edit it, or hit send to draft it.</p>
-              )}
-              {aiFilled.size > 0 && !promptError && (
-                <p className="text-xs text-emerald-800/70">
-                  Drafted {aiFilled.size} field{aiFilled.size === 1 ? "" : "s"} — review before creating.
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Recommendation pills — each one is a ready-to-send sentence built
-              from THIS calendar's history (best weekday by RSVP share, typical
-              start time, over-performing category, top plans) and filtered
-              against what's already scheduled. The chip shows only a short
-              title; the first tap loads the full sentence into the prompt bar
-              above (where it can be read and edited), the second sends it
-              through the drafter — same path as typing it. Hidden once a draft
-              has landed — the fields below are the subject at that point. */}
-          {showPromptBar && !externalEvent && aiFilled.size === 0 && (pillsLoading || promptPills.length > 0) && (
-            // Horizontal carousel. Short titles usually fit the row now, but
-            // the scroller stays: a long-ish label or a narrow drawer would
-            // otherwise wrap the chips into stacked rows and push the actual
-            // form off-screen. Snap points make a partially-visible next chip
-            // an affordance rather than a cut-off accident.
-            <div className="no-scrollbar -mt-2 -mx-6 px-6 overflow-x-auto snap-x snap-mandatory">
-              <div className="flex gap-1.5 w-max">
-                {pillsLoading && [0, 1, 2, 3].map((i) => (
-                  <div
-                    key={`pill-skel-${i}`}
-                    className="h-[26px] rounded-full bg-zinc-100 animate-pulse shrink-0"
-                    style={{ width: `${[124, 96, 148, 108][i]}px` }}
+          {/* "What are you planning?" — the title and the drafter in one
+              field. Typed as a title it stays a title; typed as a sentence
+              ("Paint & sip next Thursday at 7pm on the rooftop") a Draft
+              button fills the rest of the form and shortens the title; a
+              pasted ticket link offers Import. Create mode only; edit and
+              review flows keep the plain Title field below. */}
+          {showPromptBar && !externalEvent && (() => {
+            const typed = title.trim();
+            const looksLikeLink = isEventLink(typed);
+            const looksLikeSentence = !looksLikeLink && typed.split(/\s+/).filter(Boolean).length >= 3 && aiFilled.size === 0;
+            const submit = () => handlePromptSubmit(typed, { fromTitle: true });
+            return (
+              <div className="space-y-2">
+                <label htmlFor="new-plan-title" className="block text-[15px] font-semibold text-zinc-900">What are you planning?</label>
+                <div className={`flex items-end gap-3 border-b pb-2 ${typed ? "border-zinc-900" : "border-zinc-300"} focus-within:border-zinc-900`}>
+                  <input
+                    id="new-plan-title"
+                    ref={promptInputRef}
+                    value={title}
+                    onChange={(e) => { setTitle(e.target.value); setPromptError(null); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && (looksLikeLink || looksLikeSentence)) { e.preventDefault(); submit(); }
+                    }}
+                    placeholder="Paint & sip next Thursday at 7pm on the rooftop"
+                    disabled={promptLoading || creating}
+                    className="flex-1 min-w-0 text-2xl font-light tracking-tight placeholder:text-zinc-300 focus:outline-none bg-transparent disabled:opacity-60"
+                    autoComplete="off"
+                    data-1p-ignore
+                    data-lpignore="true"
                   />
-                ))}
-                {!pillsLoading && promptPills.map((pill) => {
-                  const selected = selectedPill === pill.text;
-                  return (
+                  {(looksLikeSentence || looksLikeLink) && (
                     <button
-                      key={pill.text}
                       type="button"
-                      // Native tooltip carries the whole sentence for anyone
-                      // hovering, plus the data justification behind it.
-                      title={pill.reason ? `${pill.text} — ${pill.reason}` : pill.text}
-                      aria-label={pill.text}
-                      onClick={() => {
-                        setPromptError(null);
-                        if (selected) {
-                          handlePromptSubmit(pill.text);
-                          setSelectedPill(null);
-                          return;
-                        }
-                        setPromptInput(pill.text);
-                        setSelectedPill(pill.text);
-                        // Caret to the end so an edit starts where the
-                        // sentence does, not by replacing it.
-                        requestAnimationFrame(() => {
-                          const el = promptInputRef.current;
-                          if (!el) return;
-                          el.focus();
-                          el.setSelectionRange(pill.text.length, pill.text.length);
-                        });
-                      }}
+                      onClick={submit}
                       disabled={promptLoading || creating}
-                      className={`shrink-0 snap-start whitespace-nowrap rounded-full border px-3 py-1 text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                        selected
-                          ? "border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-800"
-                          : "border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 hover:border-zinc-300"
-                      }`}
+                      className={`shrink-0 h-9 px-3.5 rounded-full text-white text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap disabled:opacity-60 ${looksLikeLink ? "bg-zinc-900 hover:bg-zinc-800" : "bg-emerald-600 hover:bg-emerald-700"}`}
                     >
-                      {pillLabel(pill)}
+                      {promptLoading ? (
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : looksLikeLink ? (
+                        <Ticket className="w-3.5 h-3.5" aria-hidden />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5" aria-hidden />
+                      )}
+                      {looksLikeLink ? "Import event" : "Draft the rest"}
                     </button>
-                  );
-                })}
+                  )}
+                </div>
+                {promptError ? (
+                  <p className="text-xs text-red-600">{promptError}</p>
+                ) : looksLikeLink ? (
+                  <p className="text-xs text-zinc-600">That&rsquo;s a ticket link. Import reads the event&rsquo;s name, date, place and photo.</p>
+                ) : looksLikeSentence ? (
+                  <p className="text-xs text-zinc-600">
+                    Sounds like a full plan. Draft fills in the date, time, place and photo, then shortens the title.{" "}
+                    <span className="text-zinc-400">Or keep it as typed.</span>
+                  </p>
+                ) : aiFilled.size > 0 ? (
+                  <p className="text-xs text-emerald-800/80">Drafted {aiFilled.size} field{aiFilled.size === 1 ? "" : "s"}. Review before creating.</p>
+                ) : !typed && (pillsLoading || promptPills.length > 0) ? (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-xs text-zinc-500">Try</span>
+                    {pillsLoading && [0, 1, 2].map((i) => (
+                      <span key={`pill-skel-${i}`} className="h-[26px] rounded-full bg-zinc-100 animate-pulse" style={{ width: `${[124, 96, 148][i]}px` }} />
+                    ))}
+                    {!pillsLoading && promptPills.slice(0, 3).map((pill) => (
+                      <button
+                        key={pill.text}
+                        type="button"
+                        title={pill.reason ? `${pill.text} — ${pill.reason}` : pill.text}
+                        onClick={() => {
+                          setTitle(pill.text);
+                          setPromptError(null);
+                          requestAnimationFrame(() => {
+                            const el = promptInputRef.current;
+                            if (!el) return;
+                            el.focus();
+                            el.setSelectionRange(pill.text.length, pill.text.length);
+                          });
+                        }}
+                        className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs text-zinc-700 hover:bg-zinc-100 hover:border-zinc-300"
+                      >
+                        {pillLabel(pill)}
+                      </button>
+                    ))}
+                    <span className="text-xs text-zinc-500">· or paste a ticket link</span>
+                  </div>
+                ) : null}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {prefill?.justification && !editMode && (
             <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-lg text-xs leading-snug">
@@ -1738,69 +1706,50 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
             </div>
           )}
 
-          {/* Plan type toggle (hidden in edit, host-request, and poll-convert modes) */}
-          {!editMode && !hostRequestMode && !pollConvertMode && !externalEvent && <div>
-            <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-3">Plan Type</label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={() => { setMode("plan"); markTouched("mode"); }}
-                className={`border rounded-lg p-2.5 text-left transition-all ${
-                  mode === "plan" ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
-                }`}
-              >
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span className="text-xs font-medium">Plan</span>
-                </div>
-                <p className="text-xs text-zinc-500 leading-tight">You host, members RSVP</p>
-              </button>
-              <button
-                onClick={() => { setMode("idea"); markTouched("mode"); }}
-                className={`border rounded-lg p-2.5 text-left transition-all ${
-                  mode === "idea" ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
-                }`}
-              >
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span className="text-xs font-medium">Suggestion</span>
-                </div>
-                <p className="text-xs text-zinc-500 leading-tight">Members can host</p>
-              </button>
-              <button
-                onClick={() => {
-                  if (pollAllowed) { setMode("poll"); markTouched("mode"); return; }
-                  if (onUpgrade) onUpgrade();
-                }}
-                title={pollAllowed ? "" : "Date polls require the Pro plan"}
-                className={`group border rounded-lg p-2.5 text-left transition-all ${
-                  mode === "poll" ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
-                } ${pollAllowed ? "" : "opacity-50 hover:opacity-100 hover:border-zinc-400"}`}
-              >
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  {pollAllowed ? (
-                    <Vote className="w-3.5 h-3.5" />
-                  ) : (
-                    <Lock className="w-3.5 h-3.5" />
-                  )}
-                  <span className="text-xs font-medium">Date Poll</span>
-                </div>
-                <p className="text-xs text-zinc-500 leading-tight">
-                  {pollAllowed ? (
-                    "Followers vote on a date"
-                  ) : (
-                    <>
-                      <span className="group-hover:hidden">Pro plan only</span>
-                      <span className="hidden group-hover:inline-flex items-center gap-1 font-bold uppercase tracking-widest text-zinc-700">
-                        <Lock className="w-2.5 h-2.5" /> Upgrade
-                      </span>
-                    </>
-                  )}
-                </p>
-              </button>
+          {/* Plan type — one compact row: the three kinds as a segmented
+              control, with what the picked one means beside it. Hidden in
+              edit, host-request and poll-convert modes, and for a ticketed
+              event (always a hosted plan). */}
+          {!editMode && !hostRequestMode && !pollConvertMode && !externalEvent && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">Type</span>
+              <div role="radiogroup" aria-label="Plan type" className="inline-flex bg-zinc-100 rounded-lg p-[3px]">
+                {([
+                  { key: "plan", label: "Plan" },
+                  { key: "idea", label: "Suggestion" },
+                  { key: "poll", label: "Date Poll" },
+                ] as const).map((opt) => {
+                  const active = mode === opt.key;
+                  const locked = opt.key === "poll" && !pollAllowed;
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      title={locked ? "Date polls require the Pro plan" : undefined}
+                      onClick={() => {
+                        if (locked) { if (onUpgrade) onUpgrade(); return; }
+                        setMode(opt.key);
+                        markTouched("mode");
+                      }}
+                      className={`h-[30px] px-3 rounded-md text-xs flex items-center gap-1 transition-colors ${
+                        active ? "bg-white shadow-sm font-semibold text-zinc-900" : "font-medium text-zinc-600 hover:text-zinc-900"
+                      } ${locked ? "opacity-60" : ""}`}
+                    >
+                      {locked && <Lock className="w-3 h-3" aria-hidden />}
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="text-xs text-zinc-500">
+                {mode === "plan" ? "You host, members RSVP" : mode === "idea" ? "Members can host" : "Followers vote on a date"}
+              </span>
             </div>
-          </div>}
+          )}
 
-          <div>
+          {(!showPromptBar || externalEvent) && <div>
             <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Title</label>
             <input
               value={title}
@@ -1808,7 +1757,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
               className={`w-full border-b py-2 text-lg font-light focus:outline-none focus:border-zinc-900 ${aiFilled.has("title") && !userTouched.has("title") ? "border-emerald-300 bg-emerald-50/40" : "border-zinc-300"}`}
               placeholder="Plan title"
             />
-          </div>
+          </div>}
 
           <div>
             <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
