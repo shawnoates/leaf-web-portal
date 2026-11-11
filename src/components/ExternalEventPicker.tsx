@@ -4,12 +4,29 @@ import { useEffect, useRef, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { detectCity } from "@/lib/detectCity";
 import { priceLine, whenLine, type ExternalEvent } from "@/lib/externalEvents";
-import { ArrowLeft, ExternalLink, Search, Ticket } from "lucide-react";
+import { ArrowLeft, CalendarDays, ExternalLink, MapPin, Search, Ticket, User } from "lucide-react";
+
+type Suggestion = {
+  type: "attraction" | "venue" | "event";
+  name: string;
+  detail: string | null;
+  imageUrl: string | null;
+  event?: ExternalEvent;
+};
+
+function nearHere(): { lat: number; lng: number } | null {
+  const here = detectCity();
+  return here.lat != null && here.lng != null ? { lat: here.lat, lng: here.lng } : null;
+}
 
 /**
  * "Find an event" inside the new-plan drawer: Ticketmaster and SeatGeek near
  * the manager (searchExternalEvents), a list on the left, the picked event's
  * details on the right, and "Use this event" to fill the plan from it.
+ *
+ * Before typing it shows the week's big draws nearby; from two letters it
+ * suggests artists, teams, venues and events (suggestExternalEvents) under
+ * the box, and picking one searches for it.
  */
 export default function ExternalEventPicker({
   onPick,
@@ -24,38 +41,134 @@ export default function ExternalEventPicker({
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ExternalEvent | null>(null);
   const [searchedFor, setSearchedFor] = useState("");
+  // This week near you, shown while the box is empty.
+  const [nearby, setNearby] = useState<ExternalEvent[] | null>(null);
+  // Typeahead under the box.
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1);
+  // A picked suggestion searches at once; this keeps the typing debounce
+  // from searching the same text again a moment later.
+  const committed = useRef<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
   useEffect(() => {
+    const here = nearHere();
+    if (!here) { setNearby([]); return; }
+    let cancelled = false;
+    Parse.Cloud.run("searchExternalEvents", {
+      q: "",
+      ...here,
+      radiusMiles: 15,
+      dateTo: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      limit: 12,
+    })
+      .then((res: { events: ExternalEvent[] }) => {
+        if (cancelled) return;
+        setNearby(res.events || []);
+        setSelected((cur) => cur ?? (res.events || [])[0] ?? null);
+      })
+      .catch(() => { if (!cancelled) setNearby([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  async function runSearch(q: string) {
+    committed.current = q;
+    setLoading(true);
+    setError(null);
+    try {
+      const here = nearHere();
+      const res = (await Parse.Cloud.run("searchExternalEvents", {
+        q,
+        ...(here ? { ...here, radiusMiles: 60 } : {}),
+        limit: 24,
+      })) as { events: ExternalEvent[] };
+      setEvents(res.events || []);
+      setSelected((res.events || [])[0] || null);
+      setSearchedFor(q);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Search didn't work. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Suggestions: quick, from two letters.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2 || q === committed.current) {
+      setSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      const here = nearHere();
+      Parse.Cloud.run("suggestExternalEvents", { q, ...(here ?? {}) })
+        .then((res: { suggestions: Suggestion[] }) => {
+          if (cancelled) return;
+          setSuggestions(res.suggestions || []);
+          setActiveIdx(-1);
+          setSuggestOpen(true);
+        })
+        .catch(() => { if (!cancelled) setSuggestions([]); });
+    }, 180);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [query]);
+
+  // Full results: after a pause, from three letters.
+  useEffect(() => {
     const q = query.trim();
     if (q.length < 3) {
       setEvents([]);
       setSearchedFor("");
+      if (!q) setSelected(nearby?.[0] ?? null);
       return;
     }
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const here = detectCity();
-        const res = (await Parse.Cloud.run("searchExternalEvents", {
-          q,
-          ...(here.lat != null && here.lng != null ? { lat: here.lat, lng: here.lng, radiusMiles: 60 } : {}),
-          limit: 24,
-        })) as { events: ExternalEvent[] };
-        setEvents(res.events || []);
-        setSelected((res.events || [])[0] || null);
-        setSearchedFor(q);
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Search didn't work. Try again.");
-      } finally {
-        setLoading(false);
-      }
-    }, 450);
+    if (q === committed.current) return;
+    const timer = setTimeout(() => runSearch(q), 600);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
+
+  function pickSuggestion(sg: Suggestion) {
+    setSuggestOpen(false);
+    setSuggestions([]);
+    setQuery(sg.name);
+    if (sg.event) {
+      // An event: show it right away; the search fills in the rest of its run.
+      setEvents([sg.event]);
+      setSelected(sg.event);
+    }
+    runSearch(sg.name);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    const open = suggestOpen && suggestions.length > 0;
+    if (e.key === "ArrowDown" && open) {
+      e.preventDefault();
+      setActiveIdx((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp" && open) {
+      e.preventDefault();
+      setActiveIdx((i) => Math.max(i - 1, -1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (open && activeIdx >= 0) pickSuggestion(suggestions[activeIdx]);
+      else if (query.trim().length >= 2) { setSuggestOpen(false); runSearch(query.trim()); }
+    } else if (e.key === "Escape" && open) {
+      e.preventDefault();
+      setSuggestOpen(false);
+    }
+  }
+
+  const typed = query.trim();
+  const showingNearby = !typed && (nearby?.length ?? 0) > 0;
+  const list = typed ? events : (nearby ?? []);
+  const suggestIcon = (t: Suggestion["type"]) =>
+    t === "venue" ? <MapPin className="w-4 h-4 text-zinc-400" aria-hidden />
+      : t === "event" ? <CalendarDays className="w-4 h-4 text-zinc-400" aria-hidden />
+        : <User className="w-4 h-4 text-zinc-400" aria-hidden />;
 
   return (
     <div className="space-y-4">
@@ -71,17 +184,58 @@ export default function ExternalEventPicker({
         <h3 className="text-sm font-semibold text-zinc-900">Find an event</h3>
       </div>
 
-      <label className="flex items-center gap-2 border border-zinc-300 rounded-lg px-3 h-11 focus-within:border-zinc-900">
-        <Search className="w-4 h-4 text-zinc-400 shrink-0" aria-hidden />
-        <input
-          ref={inputRef}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="An artist, team or show"
-          aria-label="Search ticketed events"
-          className="flex-1 min-w-0 text-sm focus:outline-none bg-transparent"
-        />
-      </label>
+      <div className="relative">
+        <label className="flex items-center gap-2 border border-zinc-300 rounded-lg px-3 h-11 focus-within:border-zinc-900">
+          <Search className="w-4 h-4 text-zinc-400 shrink-0" aria-hidden />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setSuggestOpen(true); }}
+            onKeyDown={onKeyDown}
+            onFocus={() => setSuggestOpen(true)}
+            onBlur={() => setTimeout(() => setSuggestOpen(false), 120)}
+            placeholder="An artist, team or show"
+            aria-label="Search ticketed events"
+            role="combobox"
+            aria-expanded={suggestOpen && suggestions.length > 0}
+            aria-controls="event-suggestions"
+            aria-autocomplete="list"
+            aria-activedescendant={activeIdx >= 0 ? `event-suggestion-${activeIdx}` : undefined}
+            className="flex-1 min-w-0 text-sm focus:outline-none bg-transparent"
+            autoComplete="off"
+          />
+        </label>
+        {suggestOpen && suggestions.length > 0 && (
+          <ul
+            id="event-suggestions"
+            role="listbox"
+            className="absolute z-20 left-0 right-0 mt-1 bg-white border border-zinc-200 rounded-lg shadow-lg py-1 max-h-80 overflow-y-auto"
+          >
+            {suggestions.map((sg, i) => (
+              <li
+                key={`${sg.type}:${sg.name}:${i}`}
+                id={`event-suggestion-${i}`}
+                role="option"
+                aria-selected={i === activeIdx}
+                onMouseDown={(e) => { e.preventDefault(); pickSuggestion(sg); }}
+                onMouseEnter={() => setActiveIdx(i)}
+                className={`flex items-center gap-3 px-3 py-2 cursor-pointer ${i === activeIdx ? "bg-zinc-100" : ""}`}
+              >
+                {sg.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={sg.imageUrl} alt="" className="w-8 h-8 rounded object-cover shrink-0" />
+                ) : (
+                  <span className="w-8 h-8 rounded bg-zinc-100 grid place-items-center shrink-0">{suggestIcon(sg.type)}</span>
+                )}
+                <span className="min-w-0">
+                  <span className="block text-sm text-zinc-900 truncate">{sg.name}</span>
+                  {sg.detail && <span className="block text-xs text-zinc-500 truncate">{sg.detail}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       {error && <p className="text-xs text-red-600">{error}</p>}
       {loading && <p className="text-xs text-zinc-500">Searching Ticketmaster and SeatGeek…</p>}
@@ -91,10 +245,15 @@ export default function ExternalEventPicker({
         </p>
       )}
 
-      {events.length > 0 && (
+      {showingNearby && (
+        <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">This week near you</p>
+      )}
+      {!typed && nearby === null && <p className="text-xs text-zinc-500">Finding what&rsquo;s on near you…</p>}
+
+      {list.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
           <ul className="space-y-1 max-h-[440px] overflow-y-auto -mx-1 px-1" aria-label="Events">
-            {events.map((ev) => {
+            {list.map((ev) => {
               const active = selected?.externalId === ev.externalId && selected?.source === ev.source;
               return (
                 <li key={`${ev.source}:${ev.externalId}`}>
