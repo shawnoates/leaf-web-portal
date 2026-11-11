@@ -81,6 +81,8 @@ type Props = {
   // (Accepted/Owned) RSVP. Parent uses this to swap the redacted location
   // line for the real name/address inline, and to populate the ICS
   // download. Either field may be null if the host didn't set one.
+  /** The button's words when not the usual Count me in (a ticketed event: "I'm going"). */
+  ctaLabel?: string;
   onLocationRevealed?: (loc: { name: string | null; address: string | null; meetingSpot?: string | null }) => void;
 };
 
@@ -125,6 +127,7 @@ export default function StandalonePlanRsvp({
   rsvpClosed,
   autoOpenRsvp,
   onLocationRevealed,
+  ctaLabel,
 }: Props) {
   const [open, setOpen] = useState(autoOpenRsvp);
   const paidTicket = (ticketPriceCents ?? 0) > 0;
@@ -174,7 +177,7 @@ export default function StandalonePlanRsvp({
           href={`/open/p/${eventGroupId}?rsvp=1`}
           className="block w-full text-center bg-zinc-900 text-white rounded-full py-3 text-sm font-medium hover:bg-zinc-800 transition"
         >
-          {isFull ? "Join the Waitlist" : requireApproval ? "Request to Attend" : "Count me in"}
+          {isFull ? "Join the Waitlist" : requireApproval ? "Request to Attend" : ctaLabel ?? "Count me in"}
         </a>
       )}
       {open && !rsvpClosed ? (

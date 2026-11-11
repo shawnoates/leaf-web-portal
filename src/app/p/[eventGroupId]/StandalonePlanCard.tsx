@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Parse from "@/lib/parse-client";
 import Link from "next/link";
 import { ArrowUpRight, Lock, MapPin, Ticket, Wallet } from "lucide-react";
 import { priceLine, type PlanExternal } from "@/lib/externalEvents";
@@ -118,6 +119,21 @@ export default function StandalonePlanCard({
 
   // Server returns null for non-attendees; revealed once the RSVP child
   // reports a successful Accepted RSVP and hands us the location pair.
+  // A ticketed event: Get tickets and "I have my ticket" come once you're
+  // going (the order the calendar page's popup uses). Known from the ticket
+  // roster for a signed-in viewer, or from RSVPing here.
+  const [going, setGoing] = useState(false);
+  useEffect(() => {
+    if (!external) return;
+    let cancelled = false;
+    try {
+      if (!Parse.User.current()) return;
+    } catch { return; }
+    Parse.Cloud.run("getPlanTickets", { eventGroupId })
+      .then((r: { mine: boolean | null }) => { if (!cancelled && r?.mine !== null && r?.mine !== undefined) setGoing(true); })
+      .catch(() => { /* not going, or signed out */ });
+    return () => { cancelled = true; };
+  }, [external, eventGroupId]);
   const [revealedName, setRevealedName] = useState<string | null>(
     location?.name ?? null
   );
@@ -188,8 +204,19 @@ export default function StandalonePlanCard({
             </div>
           ) : null}
 
-          {hostName ? (
+          {external ? (
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-zinc-900">
+              <Ticket className="w-3.5 h-3.5" aria-hidden /> Tickets on {external.sourceLabel}
+            </div>
+          ) : hostName ? (
             <div className="text-sm text-zinc-500">Hosted by {hostName}</div>
+          ) : null}
+
+          {external && priceLine(external) ? (
+            <div className="flex items-center gap-1.5 text-sm text-zinc-900">
+              <Ticket className="w-3.5 h-3.5" aria-hidden />
+              <span>{priceLine(external)}{external.isFree ? "" : " a ticket"} on {external.sourceLabel}</span>
+            </div>
           ) : null}
 
           {variant !== "copy" && p2pPriceShort(p2pAmountCents, p2pSplit) ? (
@@ -214,6 +241,20 @@ export default function StandalonePlanCard({
             <p className="text-sm text-zinc-600 whitespace-pre-wrap">
               {description}
             </p>
+          ) : null}
+
+          {external ? (
+            <div className="rounded-lg bg-zinc-50 p-4 space-y-2">
+              <p className="text-sm font-semibold text-zinc-900">Going with {calendarName ?? "the group"}</p>
+              <p className="text-sm text-zinc-600">
+                {external.status === "cancelled" || external.status === "postponed"
+                  ? `${external.sourceLabel} lists this event as ${external.status}. Check with the host before buying.`
+                  : going
+                    ? `Leaf doesn't sell these tickets. Buy yours on ${external.sourceLabel}, then mark it here so the group knows.`
+                    : `Tap I'm going so the group knows you'll be there. Then get your ticket on ${external.sourceLabel}; Leaf doesn't sell them.`}
+              </p>
+              {going && <PlanTicketToggle eventGroupId={eventGroupId} refreshKey={going} />}
+            </div>
           ) : null}
 
 
@@ -311,27 +352,19 @@ export default function StandalonePlanCard({
 
           {variant === "standalone" ? (
             <>
-              {external?.ticketUrl && (
-                <div className="space-y-1.5">
-                  <a
-                    href={`/tickets/${eventGroupId}?s=share`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full border border-zinc-900 rounded-full py-3 flex items-center justify-center gap-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
-                  >
-                    <Ticket className="w-4 h-4" aria-hidden />
-                    Get tickets on {external.sourceLabel}
-                    {priceLine(external) ? <span className="text-zinc-500">· {priceLine(external)}</span> : null}
-                    <ArrowUpRight className="w-4 h-4" aria-hidden />
-                  </a>
-                  <p className="text-xs text-center text-zinc-500">
-                    {external.status === "cancelled" || external.status === "postponed"
-                      ? `${external.sourceLabel} lists this event as ${external.status}.`
-                      : "Buy your ticket there, then RSVP here so the group knows you're going."}
-                  </p>
-                  {/* Shows itself once the viewer is signed in and going. */}
-                  <PlanTicketToggle eventGroupId={eventGroupId} />
-                </div>
+              {/* A ticketed event: once you're going, Get tickets is the
+                  main action; before that, I'm going (the RSVP below). */}
+              {external?.ticketUrl && going && (
+                <a
+                  href={`/tickets/${eventGroupId}?s=share`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full bg-zinc-900 text-white rounded-full py-3 flex items-center justify-center gap-2 text-sm font-medium hover:bg-zinc-800"
+                >
+                  <Ticket className="w-4 h-4" aria-hidden />
+                  Get tickets on {external.sourceLabel}
+                  <ArrowUpRight className="w-4 h-4" aria-hidden />
+                </a>
               )}
               <StandalonePlanRsvp
                 eventGroupId={eventGroupId}
@@ -358,7 +391,9 @@ export default function StandalonePlanCard({
                 limitedSpots={capacity != null}
                 rsvpClosed={rsvpClosed}
                 autoOpenRsvp={autoOpenRsvp}
+                ctaLabel={external ? "I'm going" : undefined}
                 onLocationRevealed={(loc) => {
+                  setGoing(true);
                   if (loc.name) setRevealedName(loc.name);
                   if (loc.address) setRevealedAddress(loc.address);
                   if (loc.meetingSpot) setRevealedSpot(loc.meetingSpot);
