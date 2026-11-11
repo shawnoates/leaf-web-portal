@@ -193,6 +193,19 @@ export default function PlanDetailModal({
   const [planRsvpsLoading, setPlanRsvpsLoading] = useState(false);
   const [planRsvpsError, setPlanRsvpsError] = useState<string | null>(null);
   const [planRsvpsRefreshTick, setPlanRsvpsRefreshTick] = useState(0);
+  // How often the plan's "Get tickets" link was opened (trackTicketClick),
+  // for a plan made from a ticketed event. Host-only on the server.
+  const [ticketClicks, setTicketClicks] = useState<{ clicks: number; people: number } | null>(null);
+  useEffect(() => {
+    if (!plan.external) return;
+    let cancelled = false;
+    Parse.Cloud.run("getPlanTickets", { eventGroupId: plan.objectId })
+      .then((r: { clicks?: number; people?: number }) => {
+        if (!cancelled && typeof r?.clicks === "number") setTicketClicks({ clicks: r.clicks, people: r.people ?? 0 });
+      })
+      .catch(() => { /* not the host, or no clicks yet */ });
+    return () => { cancelled = true; };
+  }, [plan.objectId, plan.external]);
 
   // Change-host picker (owner/co-host reassigns this plan's host to a
   // follower/member, or themselves). Candidates load on open; the override
@@ -686,6 +699,12 @@ export default function PlanDetailModal({
                 ) : (
                   <p className="text-sm text-zinc-700">
                     Date, time and venue follow {plan.external.sourceLabel}. If the show moves, the plan moves and guests are told.
+                  </p>
+                )}
+                {ticketClicks && ticketClicks.clicks > 0 && (
+                  <p className="text-sm text-zinc-700">
+                    Get tickets opened {ticketClicks.clicks} time{ticketClicks.clicks === 1 ? "" : "s"}
+                    {ticketClicks.people > 0 ? ` by ${ticketClicks.people} ${ticketClicks.people === 1 ? "person" : "people"} signed in` : ""}.
                   </p>
                 )}
                 {goingCount > 0 && (

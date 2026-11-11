@@ -6704,7 +6704,7 @@ export default function OrgCalendarPage() {
                     )}
                     {selectedEvent.external.ticketUrl && (
                       <a
-                        href={selectedEvent.external.ticketUrl}
+                        href={`/tickets/${selectedEvent.id}?s=org`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="w-full border border-zinc-900 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2 text-zinc-900 no-underline"

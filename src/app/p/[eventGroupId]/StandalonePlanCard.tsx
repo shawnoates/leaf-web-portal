@@ -314,7 +314,7 @@ export default function StandalonePlanCard({
               {external?.ticketUrl && (
                 <div className="space-y-1.5">
                   <a
-                    href={external.ticketUrl}
+                    href={`/tickets/${eventGroupId}?s=share`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full border border-zinc-900 rounded-full py-3 flex items-center justify-center gap-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
