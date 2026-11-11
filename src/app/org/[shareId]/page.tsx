@@ -6417,7 +6417,12 @@ export default function OrgCalendarPage() {
                     hostName. Without this the modal showed the underlying
                     EventGroup owner (e.g. "Shawn Oates") for a plan the card
                     correctly attributes to its virtual host ("Marcus"). */}
-                {selectedEvent.leafHostState === "leaf_hosted" ? (
+                {selectedEvent.external && !selectedEvent.isPoll ? (
+                  // An outside event: where it's sold is the headline, not a host.
+                  <p className="text-sm font-bold uppercase tracking-widest text-zinc-900 flex items-center gap-2">
+                    <Ticket className="w-4 h-4" aria-hidden /> Tickets on {selectedEvent.external.sourceLabel}
+                  </p>
+                ) : selectedEvent.leafHostState === "leaf_hosted" ? (
                   <div className="flex items-center gap-2">
                     {selectedEvent.leafHostPersona?.avatarUrl && (
                       /* eslint-disable-next-line @next/next/no-img-element */
@@ -6476,12 +6481,6 @@ export default function OrgCalendarPage() {
                     </>
                   ) : (
                     <>
-                      {selectedEvent.external && (
-                        <span className="flex items-center gap-2 whitespace-nowrap">
-                          <Ticket className="w-4 h-4 flex-shrink-0" />
-                          {[priceLine(selectedEvent.external), `Tickets on ${selectedEvent.external.sourceLabel}`].filter(Boolean).join(" · ")}
-                        </span>
-                      )}
                       <span className="flex items-center gap-2 whitespace-nowrap">
                         <Clock className="w-4 h-4 flex-shrink-0" />
                         {/* Phones get "Wed, Sep 30 · 6:00 PM" — the long
@@ -6504,6 +6503,12 @@ export default function OrgCalendarPage() {
                         </span>
                       )}
                     </>
+                  )}
+                  {selectedEvent.external && !selectedEvent.isPoll && priceLine(selectedEvent.external) && (
+                    <span className="flex items-center gap-2 whitespace-nowrap text-zinc-900 font-normal">
+                      <Ticket className="w-4 h-4 flex-shrink-0" />
+                      {priceLine(selectedEvent.external)}{selectedEvent.external.isFree ? "" : " a ticket"} on {selectedEvent.external.sourceLabel}
+                    </span>
                   )}
                   {!selectedEvent.drop && ticketPriceTotal(selectedEvent) && (
                     <span className="flex items-center gap-2 whitespace-nowrap text-zinc-900 font-normal">
@@ -6551,6 +6556,32 @@ export default function OrgCalendarPage() {
                 <p className="text-xl font-light leading-relaxed text-zinc-600 whitespace-pre-wrap">
                   {renderLinkedText(selectedEvent.description)}
                 </p>
+                {/* An outside event: who's going together, and that tickets
+                    are bought on the source, not here. */}
+                {selectedEvent.external && !selectedEvent.isPoll && (
+                  <div className="rounded-lg bg-zinc-50 p-4 space-y-2">
+                    <p className="text-sm font-semibold text-zinc-900">Going with {org.name}</p>
+                    {(selectedEvent.external.status === "cancelled" || selectedEvent.external.status === "postponed") ? (
+                      <p className="text-sm text-amber-700">
+                        {selectedEvent.external.sourceLabel} lists this event as {selectedEvent.external.status}. Check with the host before buying.
+                      </p>
+                    ) : (
+                      <p className="text-sm text-zinc-600">
+                        {rsvpedPlanIds.has(selectedEvent.id)
+                          ? <>Leaf doesn&rsquo;t sell these tickets. Buy yours on {selectedEvent.external.sourceLabel}, then mark it here so the group knows.</>
+                          : <>Tap I&rsquo;m going so the group knows you&rsquo;ll be there. Then get your ticket on {selectedEvent.external.sourceLabel}; Leaf doesn&rsquo;t sell them.</>}
+                      </p>
+                    )}
+                    <p className="text-xs text-zinc-500 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5" aria-hidden /> {attendingLabel(selectedEvent)}
+                    </p>
+                    {rsvpedPlanIds.has(selectedEvent.id) && (
+                      <div className="pt-1 flex justify-start">
+                        <PlanTicketToggle eventGroupId={selectedEvent.id} refreshKey={rsvpedPlanIds.has(selectedEvent.id)} />
+                      </div>
+                    )}
+                  </div>
+                )}
                 {/* The assigned roster host, introduced in their own words —
                     the same block /p/<id> renders (StandalonePlanCard), and
                     the promise /hosts/apply makes: photo + description shown
@@ -6693,34 +6724,6 @@ export default function OrgCalendarPage() {
                 {/* The RSVP / attending actions stay pinned to the bottom of the
                     popup while the details scroll behind them. */}
                 <div className="sticky bottom-0 z-10 -mx-8 md:-mx-16 px-8 md:px-16 pt-4 pb-6 md:pb-10 bg-white border-t border-zinc-100">
-                {/* An outside event: tickets are bought on its own site.
-                    The RSVP below still says "I'm going" to the group. */}
-                {selectedEvent.external && !selectedEvent.isPoll && (
-                  <div className="mb-3 space-y-2">
-                    {(selectedEvent.external.status === "cancelled" || selectedEvent.external.status === "postponed") && (
-                      <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2">
-                        {selectedEvent.external.sourceLabel} lists this event as {selectedEvent.external.status}. Check with the host before buying.
-                      </p>
-                    )}
-                    {selectedEvent.external.ticketUrl && (
-                      <a
-                        href={`/tickets/${selectedEvent.id}?s=org`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full border border-zinc-900 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2 text-zinc-900 no-underline"
-                      >
-                        <Ticket className="w-4 h-4" />
-                        <span className="text-xs font-bold uppercase tracking-widest">Get tickets on {selectedEvent.external.sourceLabel}</span>
-                        <ArrowUpRight className="w-4 h-4" />
-                      </a>
-                    )}
-                    {rsvpedPlanIds.has(selectedEvent.id) ? (
-                      <PlanTicketToggle eventGroupId={selectedEvent.id} refreshKey={rsvpedPlanIds.has(selectedEvent.id)} />
-                    ) : (
-                      <p className="text-xs text-zinc-500 text-center">Buy your ticket there, then RSVP here so the group knows you&rsquo;re going.</p>
-                    )}
-                  </div>
-                )}
                 {selectedEvent.isPoll ? (
                   <div className="space-y-4">
                     <PollVoteWidget
@@ -6827,6 +6830,18 @@ export default function OrgCalendarPage() {
                       <Check className="w-4 h-4 text-emerald-600" />
                       <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">You&apos;re Attending</span>
                     </div>
+                    {/* An outside event: now that you're going, buy your ticket. */}
+                    {selectedEvent.external?.ticketUrl && (
+                      <a
+                        href={`/tickets/${selectedEvent.id}?s=org`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 rounded-lg no-underline"
+                        style={{ backgroundColor: org.brandColor || "#18181b" }}
+                      >
+                        <Ticket className="w-4 h-4" aria-hidden /> Get tickets on {selectedEvent.external.sourceLabel} <ArrowUpRight className="w-4 h-4" aria-hidden />
+                      </a>
+                    )}
                     <div className="flex justify-center">
                       <CheckInPill
                         planId={selectedEvent.id}
@@ -6904,6 +6919,20 @@ export default function OrgCalendarPage() {
                         No Longer Accepting RSVPs
                       </div>
                     ) : (
+                      selectedEvent.external ? (
+                        // An outside event: say you're going first; Get
+                        // tickets comes once you're in (below).
+                        <button
+                          onClick={() => {
+                            setRsvpPlan(selectedEvent);
+                            setSelectedEvent(null);
+                          }}
+                          className="flex-1 text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90"
+                          style={{ backgroundColor: org.brandColor || "#18181b" }}
+                        >
+                          I&rsquo;m going
+                        </button>
+                      ) : (
                       <button
                         onClick={() => {
                           setRsvpPlan(selectedEvent);
@@ -6914,13 +6943,15 @@ export default function OrgCalendarPage() {
                       >
                         {planIsFull(selectedEvent) ? "Join Waitlist" : selectedEvent.requireApproval ? "Request to Attend" : ticketPriceTotal(selectedEvent) ? `${selectedEvent.drop ? dropCta(selectedEvent.drop.cta) : "RSVP"} \u00b7 ${ticketPriceTotal(selectedEvent)}` : "I\u0027m Attending"}
                       </button>
+                      )
                     )}
                     <button
                       onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title, selectedEvent.promotedFrom ? org.objectId : null)}
-                      className="border border-zinc-200 px-5 hover:bg-zinc-50 transition-colors flex items-center gap-2"
+                      aria-label="Share"
+                      className={`border border-zinc-200 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2 ${selectedEvent.external ? "px-3.5" : "px-5"}`}
                     >
                       {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
-                      <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                      {!selectedEvent.external && <span className="text-xs font-bold uppercase tracking-widest">Share</span>}
                     </button>
                   </div>
                   {planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "upcoming"
