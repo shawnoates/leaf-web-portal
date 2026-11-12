@@ -46,6 +46,21 @@ export type CreatePlanResult = {
   eventGroupId?: string;
 };
 
+// One suggested add-on framework, as getAddonFrameworkSuggestions returns it.
+// `priceMinCents`/`priceMaxCents` are a BAND, not a price: the real number is
+// picked from the source venue's cost when the plan gets a host, so the composer
+// can only ever show a range.
+type AddonSuggestion = {
+  slug: string;
+  title: string;
+  description: string;
+  priceMinCents: number;
+  priceMaxCents: number;
+  imageUrl: string | null;
+  score: number;
+  domainAxis: string;
+};
+
 type PollOptionDraft = { date: string; time: string };
 
 type SeriesFreq = "weekly" | "biweekly" | "monthly" | "bimonthly";
@@ -316,6 +331,15 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(prefill?.imageUrl || null);
   const [hostNote, setHostNote] = useState(prefill?.hostNote || "");
+  // Plan add-ons. Who may attach one is a server-side join across Groups,
+  // GroupMembership, RosterHost and EventNotification — the client never guesses.
+  // In particular we do NOT read `is_admin` off the current user: protectedFields
+  // can strip it from the client's own payload, so a local check would hide the
+  // section from people who are in fact allowed. A 403 from the suggestions call
+  // is the signal instead.
+  const [addonSuggestions, setAddonSuggestions] = useState<AddonSuggestion[]>([]);
+  const [addonsAllowed, setAddonsAllowed] = useState(false);
+  const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
   const [mode, setMode] = useState<PlanMode>(prefill?.mode || "plan");
   const isHosted = mode === "plan";
   const isPoll = mode === "poll";
@@ -548,6 +572,52 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   // switching targets in the dropdown swaps the guidance too. Skipped in
   // edit/host-request/poll-convert modes where the schedule is already set
   // (or locked).
+  // Suggestions for the add-on picker, refreshed as the draft takes shape. Debounced
+  // because `title` changes on every keystroke and each change is a round trip.
+  //
+  // The venue is passed as a Google `placeId`, not a Parse id — the composer's venue
+  // is a raw Places result and only becomes a Location at save. The server looks the
+  // placeId up (read-only) so an already-known venue still contributes its category;
+  // an unknown one is simply unknown, and matching falls back to title and hour.
+  useEffect(() => {
+    if (isPoll || !date) {
+      setAddonSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      Parse.Cloud.run("getAddonFrameworkSuggestions", {
+        draft: {
+          placeId: selectedVenue?.placeId || undefined,
+          startsAtIso: `${date}T${time || "12:00"}`,
+          title: title || "",
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        },
+      })
+        .then((r: { matched?: AddonSuggestion[] }) => {
+          if (cancelled) return;
+          setAddonsAllowed(true);
+          setAddonSuggestions(r?.matched || []);
+        })
+        .catch(() => {
+          // A 403 here means this user may not attach add-ons, which is the normal
+          // case for everyone outside the v1 test — hide the section entirely
+          // rather than showing an empty or broken one.
+          if (cancelled) return;
+          setAddonsAllowed(false);
+          setAddonSuggestions([]);
+        });
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [isPoll, date, time, title, selectedVenue?.placeId]);
+
+  // Drop any picked add-on that stops being suggested — changing the venue or time
+  // can make a framework ineligible, and attaching one the server would now reject
+  // fails at save with nothing on screen to explain why.
+  useEffect(() => {
+    setSelectedAddons((prev) => prev.filter((s) => addonSuggestions.some((a) => a.slug === s)));
+  }, [addonSuggestions]);
+
   const [timingHints, setTimingHints] = useState<TimingHints | null>(null);
   useEffect(() => {
     if (pollConvertMode || editMode || hostRequestMode) {
@@ -1431,6 +1501,25 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
             alert(`Plan created, but collecting money didn't turn on: ${msg} Turn it on from the plan's Payments page.`);
           }
         }
+        // Attach the picked add-ons. Sequential and awaited, not fire-and-forget:
+        // the host is about to see the plan and should see what they chose on it.
+        // Each is caught individually — the plan already exists, so one framework
+        // the server now rejects must not lose the rest or surface as a create
+        // failure. They land UNRESOLVED (no price, invisible to guests) until the
+        // plan gets a host.
+        if (created?.eventGroupId && selectedAddons.length) {
+          for (const slug of selectedAddons) {
+            try {
+              await Parse.Cloud.run("attachPlanAddon", {
+                eventGroupId: created.eventGroupId,
+                frameworkSlug: slug,
+              });
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : String(err);
+              console.warn("[attachPlanAddon] failed:", slug, msg);
+            }
+          }
+        }
         // Only sync HOSTED plans — ideas don't have a fixed schedule to
         // put on the manager's calendar. Fire-and-forget: a 403 from
         // Google (token granted only freebusy pre-scope-upgrade) is
@@ -2303,6 +2392,41 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
                 <p className="text-xs text-zinc-400 mt-1">Defaults to 7 days from now.</p>
               </div>
             </>
+          )}
+
+          {!isPoll && addonsAllowed && addonSuggestions.length > 0 && (
+            <div>
+              <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Add-ons (optional)</label>
+              <p className="text-xs text-zinc-400 mb-3">
+                Guests can add these when they RSVP. The price is set when this plan gets a host.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {addonSuggestions.map((s) => {
+                  const on = selectedAddons.includes(s.slug);
+                  return (
+                    <button
+                      key={s.slug}
+                      type="button"
+                      onClick={() => setSelectedAddons((p) => (on ? p.filter((x) => x !== s.slug) : [...p, s.slug]))}
+                      className={`border rounded-lg p-2.5 text-left transition-all flex gap-2.5 items-center ${
+                        on ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"
+                      }`}
+                    >
+                      {s.imageUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={s.imageUrl} alt="" className="w-9 h-9 rounded-md object-cover bg-zinc-100 flex-none" />
+                      )}
+                      <span className="min-w-0">
+                        <span className="text-xs font-medium block truncate">{s.title}</span>
+                        <span className="text-xs text-zinc-500">
+                          ${s.priceMinCents / 100}&ndash;${s.priceMaxCents / 100}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           {!isPoll && !collecting && !externalEvent && (
