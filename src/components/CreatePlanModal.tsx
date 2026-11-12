@@ -392,6 +392,9 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   const [genericWeekday, setGenericWeekday] = useState(2);
   const hostIsOther = isHosted && recurring && seriesHostId !== "me";
 
+  // The outside event this plan follows (Ticketmaster, SeatGeek, Eventbrite…).
+  const [externalEvent, setExternalEvent] = useState<ExternalEvent | null>(prefill?.external ?? null);
+
   // ---- Collect money (peer to peer: guests pay the host back directly) ----
   // Only for a new single hosted plan: edits, polls, series and host-request
   // approvals turn it on from the plan's /pay page instead. While on, spots
@@ -403,13 +406,29 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   const [spotIsMine, setSpotIsMine] = useState(true);
   const [payHandles, setPayHandles] = useState<PayHandles | null | undefined>(undefined);
   const [editingHandles, setEditingHandles] = useState(false);
-  const collecting = canCollect && collect;
+  // ---- Seats for a Ticketmaster (or other ticketed) event ----
+  // In place of the generic Collect money: Sit together (set the section,
+  // price per seat and seats now, or later from the plan) or Each buys their
+  // own. Set up right after the plan is created (setupTicketSeats).
+  const [seatMode, setSeatMode] = useState<"together" | "own">("together");
+  const [seatSection, setSeatSection] = useState("");
+  const [seatPrice, setSeatPrice] = useState("");
+  const [seatCount, setSeatCount] = useState("");
+  const [seatMine, setSeatMine] = useState(true);
+  const seatCents = Math.round(parseFloat(seatPrice || "0") * 100);
+  const seatN = parseInt(seatCount || "0", 10);
+  const seatGuestN = seatN - (seatMine ? 1 : 0);
+  const collecting = canCollect && collect && !externalEvent;
   useEffect(() => {
-    if (!collecting || payHandles !== undefined) return;
+    const ticketed = canCollect && !!externalEvent && !externalEvent.isFree && seatMode === "together";
+    if (!(collecting || ticketed) || payHandles !== undefined) return;
     Parse.Cloud.run("getMyPayHandles", {})
       .then((r: { handles: PayHandles | null }) => setPayHandles(r.handles))
       .catch(() => setPayHandles(null));
-  }, [collecting, payHandles]);
+  }, [collecting, payHandles, canCollect, externalEvent, seatMode]);
+  const ticketSeats = canCollect && !!externalEvent && !externalEvent.isFree;
+  // Filled in now (rather than left for later from the plan).
+  const seatsNow = ticketSeats && seatMode === "together" && Boolean(seatPrice || seatCount);
   const collectCents = Math.round(parseFloat(collectPrice || "0") * 100);
   const collectCount = parseInt(collectSpots || "0", 10);
   const collectGuestSpots = collectCount - (spotIsMine ? 1 : 0);
@@ -484,7 +503,6 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   // (the server re-reads it on create and keeps the plan in step), tickets
   // are bought there, so the Leaf-side gates (cap, approval, hidden venue)
   // don't apply. `findingEvent` swaps the form for the event search.
-  const [externalEvent, setExternalEvent] = useState<ExternalEvent | null>(prefill?.external ?? null);
   const [findingEvent, setFindingEvent] = useState(false);
   function applyExternalEvent(ev: ExternalEvent) {
     setExternalEvent(ev);
@@ -1272,6 +1290,13 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
         : !payHandles ? "Add how guests should pay you."
         : null;
       if (problem) { alert(problem); return; }
+    } else if (seatsNow) {
+      const problem = !(seatCents >= 100) ? "Price per seat must be at least $1."
+        : !(seatN >= 1) ? "How many seats?"
+        : seatGuestN < 1 ? "With one seat for you, there are none left for guests."
+        : !payHandles ? "Add how guests should pay you."
+        : null;
+      if (problem) { alert(problem); return; }
     } else if (collecting) {
       const problem = !(collectCents >= 100) ? "Price per spot must be at least $1."
         : !(collectCount >= 1) ? "How many tickets or spots do you have?"
@@ -1510,6 +1535,25 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
           } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : "Collecting money didn't turn on.";
             alert(`Plan created, but collecting money didn't turn on: ${msg} Turn it on from the plan's Payments page.`);
+          }
+        }
+        // A ticketed event: seat the group the way the host chose.
+        if (ticketSeats && created?.type !== "idea" && created?.eventGroupId) {
+          try {
+            if (seatMode === "own") {
+              await Parse.Cloud.run("setTicketSeating", { eventGroupId: created.eventGroupId, seating: "own" });
+            } else if (seatsNow) {
+              await Parse.Cloud.run("setupTicketSeats", {
+                eventGroupId: created.eventGroupId,
+                amountCents: seatCents,
+                seats: seatN,
+                section: seatSection.trim(),
+                hostGoing: seatMine,
+              });
+            }
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "The seats didn't save.";
+            alert(`Plan created, but the seats didn't save: ${msg} Set them up from the plan's Tickets card.`);
           }
         }
         // Attach the picked add-ons. Sequential and awaited, not fire-and-forget:
@@ -2491,7 +2535,99 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
             </a>
           )}
 
-          {canCollect && (
+          {ticketSeats && externalEvent && (
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-medium text-zinc-700">Seats</p>
+                <p className="text-xs text-zinc-400">How the group gets tickets for {externalEvent.title}</p>
+              </div>
+              <div className="flex w-full rounded-xl bg-zinc-100 p-0.5" role="radiogroup" aria-label="Seating">
+                {(["together", "own"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    role="radio"
+                    aria-checked={seatMode === v}
+                    onClick={() => setSeatMode(v)}
+                    className={`flex-1 rounded-[10px] py-1.5 text-sm font-semibold transition-colors ${seatMode === v ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
+                  >
+                    {v === "together" ? "Sit together" : "Each buys their own"}
+                  </button>
+                ))}
+              </div>
+              {seatMode === "own" ? (
+                <p className="text-xs text-zinc-500">Everyone buys their own ticket on {externalEvent.sourceLabel} and taps I&rsquo;m covered.</p>
+              ) : (
+                <>
+                  <p className="text-xs text-zinc-500">
+                    You set the section and price per seat; guests pay you to hold one, then you buy them in one order.
+                    {priceLine(externalEvent) ? ` ${externalEvent.sourceLabel} lists ${priceLine(externalEvent)} before fees.` : ""}
+                    {externalEvent.url && (
+                      <> <a href={externalEvent.url} target="_blank" rel="noopener noreferrer" className="underline text-zinc-900">See seats ↗</a></>
+                    )}
+                  </p>
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Section</label>
+                      <input
+                        value={seatSection}
+                        onChange={(e) => setSeatSection(e.target.value.slice(0, 40))}
+                        className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                        placeholder="112"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Per seat, with fees</label>
+                      <input
+                        inputMode="decimal"
+                        value={seatPrice}
+                        onChange={(e) => setSeatPrice(e.target.value.replace(/[^\d.]/g, "").slice(0, 7))}
+                        className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                        placeholder="$85"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Seats</label>
+                      <input
+                        inputMode="numeric"
+                        value={seatCount}
+                        onChange={(e) => setSeatCount(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                        className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                        placeholder="4"
+                      />
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 text-xs text-zinc-600 cursor-pointer select-none">
+                    <input type="checkbox" checked={seatMine} onChange={(e) => setSeatMine(e.target.checked)} className="w-4 h-4 accent-zinc-900" />
+                    One of the seats is mine
+                  </label>
+                  {seatCents >= 100 && seatGuestN >= 1 ? (
+                    <p className="text-xs text-emerald-900 bg-emerald-50 rounded-lg px-3 py-2">
+                      {seatGuestN} {seatGuestN === 1 ? "seat" : "seats"} for guests at ${(seatCents / 100).toFixed(seatCents % 100 ? 2 : 0)}. Taking one means paying you to hold it; if the seats cost more or less, Leaf works out the difference.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-zinc-400">Not sure yet? Leave these blank and set them up from the plan&rsquo;s Tickets card.</p>
+                  )}
+                  {seatsNow && (payHandles === undefined ? null : !payHandles || editingHandles ? (
+                    <div className="border border-zinc-200 rounded-xl p-3">
+                      <PayHandlesForm
+                        initial={payHandles}
+                        onCancel={payHandles ? () => setEditingHandles(false) : undefined}
+                        onSaved={(h) => { setPayHandles(h); setEditingHandles(false); }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-3 text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2">
+                      <span>Paid to {describeHandles(payHandles)}</span>
+                      <button type="button" onClick={() => setEditingHandles(true)} className="underline text-zinc-400 hover:text-zinc-900">Edit</button>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+
+          {canCollect && !externalEvent && (
             <div className="space-y-3">
               <div className="flex items-center justify-between py-1">
                 <div>
