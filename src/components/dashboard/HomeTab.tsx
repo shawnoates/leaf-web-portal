@@ -583,6 +583,11 @@ export default function HomeTab({
               {collectAskLine(req.requestedP2p)}, paid to {req.requesterName}
             </p>
           )}
+          {req.requestedTicketSeating?.mode === "own" && (
+            <p className="text-[11px] text-zinc-600 mt-0.5">
+              Each buys their own{req.requestedTicketSeating.section ? `, near Section ${req.requestedTicketSeating.section}` : ""}
+            </p>
+          )}
           {/* A swapped venue is the part of a request most worth a second look,
               and it used to be invisible until the owner opened Edit. Keeping
               the suggested venue is the quiet case, so it stays unemphasized. */}

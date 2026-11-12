@@ -324,6 +324,8 @@ export interface OrgDashboard {
     external?: import("@/lib/externalEvents").PlanExternal | null;
     /** What the requester asked to collect from guests (paid to them), if anything. */
     requestedP2p?: RequestedP2p | null;
+    /** A ticketed event, each buying their own (and where to buy near). */
+    requestedTicketSeating?: { mode: "own"; section: string | null } | null;
   }[];
   pendingRsvpRequests: {
     notificationId: string;

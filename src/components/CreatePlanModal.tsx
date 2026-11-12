@@ -24,6 +24,7 @@ import {
   MapPin,
   Plus,
   Repeat,
+  Search,
   Sparkles,
   Ticket,
   TrendingUp,
@@ -486,6 +487,10 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   // clicking an alternative photo triggered a title-based refetch that
   // collapsed the carousel down to one weaker match.
   const [unsplashPhotosFromPrompt, setUnsplashPhotosFromPrompt] = useState(false);
+  // Manager-typed Unsplash query. Empty = search by title. Long event titles
+  // ("Brooklyn Nets v. Houston Rockets (90s Night)") often return nothing,
+  // so the cover section always offers a search box, in create and edit.
+  const [photoQuery, setPhotoQuery] = useState("");
   // We trigger VenueSearch's auto-resolve when prefill gives us a venue name
   // but no placeId. The lookup is fast (~500ms); show a neutral "confirming"
   // hint during that window so the amber warning doesn't flash unnecessarily.
@@ -880,7 +885,9 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
 
   // Fetch Unsplash photo suggestions when title changes
   useEffect(() => {
-    if (!title.trim()) {
+    const typedQuery = photoQuery.trim();
+    const query = typedQuery || title.trim();
+    if (!query) {
       setUnsplashPhotos([]);
       setUnsplashLoading(false);
       return;
@@ -892,7 +899,8 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
     // -> true) previously re-triggered a title-based refetch and
     // collapsed the carousel. Stay locked until the manager explicitly
     // clears the cover.
-    if (unsplashPhotosFromPrompt) {
+    // A typed search always wins over the prompt lock.
+    if (unsplashPhotosFromPrompt && !typedQuery) {
       setUnsplashLoading(false);
       return;
     }
@@ -900,7 +908,8 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
     const timer = setTimeout(async () => {
       try {
         const results = await Parse.Cloud.run("searchUnsplashPhotos", {
-          query: title.trim(),
+          query,
+          perPage: 8,
         });
         setUnsplashPhotos(results || []);
       } catch {
@@ -910,7 +919,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [title, unsplashPhotosFromPrompt]);
+  }, [title, photoQuery, unsplashPhotosFromPrompt]);
 
   async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -1541,7 +1550,7 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
         if (ticketSeats && created?.type !== "idea" && created?.eventGroupId) {
           try {
             if (seatMode === "own") {
-              await Parse.Cloud.run("setTicketSeating", { eventGroupId: created.eventGroupId, seating: "own" });
+              await Parse.Cloud.run("setTicketSeating", { eventGroupId: created.eventGroupId, seating: "own", section: seatSection.trim() });
             } else if (seatsNow) {
               await Parse.Cloud.run("setupTicketSeats", {
                 eventGroupId: created.eventGroupId,
@@ -1986,9 +1995,36 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
             )}
 
             {/* Photo suggestions from Unsplash */}
-            {(unsplashLoading || unsplashPhotos.length > 0) && (
               <div className="mt-3 space-y-2">
-                <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">Photo suggestions</p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 shrink-0">Photo suggestions</p>
+                  <div className="relative flex-1 max-w-[240px]">
+                    <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={photoQuery}
+                      onChange={(e) => setPhotoQuery(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+                      placeholder="Search Unsplash"
+                      className="w-full border border-zinc-200 rounded-md pl-7 pr-7 py-1.5 text-xs font-light focus:outline-none focus:border-zinc-400"
+                    />
+                    {photoQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setPhotoQuery("")}
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                        aria-label="Clear photo search"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {!unsplashLoading && unsplashPhotos.length === 0 && (
+                  <p className="text-xs text-zinc-400">
+                    {photoQuery.trim() || title.trim() ? "No photos found. Try a simpler search, like “basketball”." : "Type a search to find a photo."}
+                  </p>
+                )}
                 <div className="flex gap-2 overflow-x-auto pb-1">
                   {unsplashLoading && [0, 1, 2, 3].map((i) => (
                     <div key={`skel-${i}`} className="min-w-[120px] h-[80px] bg-zinc-100 rounded-lg animate-pulse shrink-0" />
@@ -2035,7 +2071,6 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
                   );
                 })()}
               </div>
-            )}
           </div>}
 
           <div>
@@ -2556,7 +2591,18 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
                 ))}
               </div>
               {seatMode === "own" ? (
-                <p className="text-xs text-zinc-500">Everyone buys their own ticket on {externalEvent.sourceLabel} and taps I&rsquo;m covered.</p>
+                <>
+                  <p className="text-xs text-zinc-500">Everyone buys their own ticket on {externalEvent.sourceLabel} and taps I&rsquo;m covered.</p>
+                  <div className="max-w-[200px]">
+                    <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Section to buy near (optional)</label>
+                    <input
+                      value={seatSection}
+                      onChange={(e) => setSeatSection(e.target.value.slice(0, 40))}
+                      className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                      placeholder="112"
+                    />
+                  </div>
+                </>
               ) : (
                 <>
                   <p className="text-xs text-zinc-500">

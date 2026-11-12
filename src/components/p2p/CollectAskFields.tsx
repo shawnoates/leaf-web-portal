@@ -35,6 +35,9 @@ export type RequestedP2p = {
   minHeadcount?: number;
   maxHeadcount?: number;
   hostInSplit?: boolean;
+  /** A ticketed event's seats: the price is per seat and the asker buys them
+   *  together once guests have paid to hold one. */
+  ticketSeats?: { section: string | null } | null;
 };
 
 const dollarsField = (cents?: number) => (cents ? String(cents / 100) : "");
@@ -75,6 +78,10 @@ export function collectAskLine(p2p: RequestedP2p | null | undefined): string | n
     const low = Math.ceil(p2p.totalCents / p2p.maxHeadcount);
     const high = Math.ceil(p2p.totalCents / p2p.minHeadcount);
     return `Guests split ${money(p2p.totalCents)} (${money(low)}–${money(high)} each)`;
+  }
+  if (p2p.ticketSeats && p2p.amountCents) {
+    const where = p2p.ticketSeats.section ? ` in Section ${p2p.ticketSeats.section}` : "";
+    return `Sit together: ${p2p.ticketCount ?? "?"} seats${where} at ${money(p2p.amountCents)}, guests pay to hold one`;
   }
   return p2p.amountCents ? `Guests pay ${money(p2p.amountCents)} a spot` : null;
 }

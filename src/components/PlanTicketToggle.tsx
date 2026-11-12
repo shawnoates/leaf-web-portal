@@ -50,6 +50,8 @@ type SeatSetup = {
   seats: number | null;
   payByAt: string | null;
   otherCollect: boolean;
+  /** A follower host on a calendar: the calendar sets the price. */
+  calendarSetsPrice?: boolean;
 };
 
 type PayOption = { method: string; label: string; handle?: string; url: string | null; appUrl?: string };
@@ -467,7 +469,13 @@ export default function PlanTicketToggle({
         </div>
       );
     }
-    return <p className="text-sm text-zinc-600">Someone going can offer to buy every seat in one order.</p>;
+    return (
+      <p className="text-sm text-zinc-600">
+        {t.seatSetup?.calendarSetsPrice
+          ? "On this calendar, the calendar sets prices. Ask them to set up seats, or anyone going can offer to buy every seat in one order."
+          : "Someone going can offer to buy every seat in one order."}
+      </p>
+    );
   }
 
   // ── Everyone buys (or registers) their own ──────────────────────────────

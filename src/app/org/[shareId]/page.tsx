@@ -2269,6 +2269,39 @@ export default function OrgCalendarPage() {
       .then((r: { handles: PayHandles | null }) => setCustomHandles(r.handles))
       .catch(() => setCustomHandles(null));
   }, [customCollect.on, customSession, customHandles]);
+  // A ticketed event (Ticketmaster…): Seats instead of the generic Collect
+  // money ask. Sit together rides on the ask (price per seat, seats, section);
+  // Each buys their own is sent as ticketSeating with an optional section.
+  const [customSeatMode, setCustomSeatMode] = useState<"together" | "own">("together");
+  const [customSeatSection, setCustomSeatSection] = useState("");
+  const customTicketed = Boolean(customExternal && !customExternal.isFree);
+  const renderCustomHandles = () => (
+    <>
+                      {!customSession ? (
+                        <div className="text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+                          <span>Confirm your phone by text to collect money.</span>
+                          {customVerify.isVerified && (
+                            <button type="button" onClick={customVerify.reset} className="underline text-zinc-900 shrink-0">Text me a code</button>
+                          )}
+                        </div>
+                      ) : customHandles === undefined ? null : !customHandles || customEditingHandles ? (
+                        <div className="border border-zinc-200 rounded-xl p-3">
+                          <PayHandlesForm
+                            initial={customHandles}
+                            saveLabel="Use these"
+                            onCancel={customHandles ? () => setCustomEditingHandles(false) : undefined}
+                            onSaved={() => {}}
+                            onSubmit={(h) => { setCustomHandles(h); setCustomHandlesTouched(true); setCustomEditingHandles(false); }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-3 text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2">
+                          <span>Paid to {describeHandles(customHandles)}</span>
+                          <button type="button" onClick={() => setCustomEditingHandles(true)} className="underline text-zinc-400 hover:text-zinc-900">Edit</button>
+                        </div>
+                      )}
+    </>
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const ctaSectionRef = useRef<HTMLDivElement>(null);
   const [showFollowModal, setShowFollowModal] = useState(false);
@@ -4478,8 +4511,12 @@ export default function OrgCalendarPage() {
     if (!isOwnerOrHost && !customVerify.isVerified) return;
     if (!selectedVenue && !customExternal) return;
     if (!customTitle.trim() || !customDescription.trim()) return;
-    const collectAsk = collectAskPayload(customCollect);
+    const seatsOwn = customTicketed && customSeatMode === "own";
+    const collectAsk = seatsOwn ? { p2p: null, error: null } : collectAskPayload(customCollect);
     if (collectAsk.error) { setCustomCollectError(collectAsk.error); return; }
+    if (customTicketed && collectAsk.p2p) {
+      collectAsk.p2p = { ...collectAsk.p2p, ticketSeats: { section: customSeatSection.trim() || null } };
+    }
     if (collectAsk.p2p && !customSession) { setCustomCollectError("Confirm your phone by text to collect money."); return; }
     if (collectAsk.p2p && !customHandles) { setCustomCollectError("Add how you get paid (Venmo, Cash App, PayPal or Zelle)."); return; }
     setCustomCollectError(null);
@@ -4521,6 +4558,8 @@ export default function OrgCalendarPage() {
         capacity: !collectAsk.p2p && customCapacity ? parseInt(customCapacity, 10) : undefined,
         hostNote: hostNote.trim() || undefined,
         p2p: collectAsk.p2p || undefined,
+        ticketSeating: seatsOwn ? "own" : undefined,
+        ticketSection: seatsOwn && customSeatSection.trim() ? customSeatSection.trim() : undefined,
         payHandles: collectAsk.p2p && customHandlesTouched ? customHandles : undefined,
         imageUrl: selectedImageUrl || undefined,
         // Link back to the starter card this was opened from, so the server
@@ -4540,6 +4579,8 @@ export default function OrgCalendarPage() {
       setCustomEmail("");
       setSelectedVenue(null);
       setCustomExternal(null);
+      setCustomSeatMode("together");
+      setCustomSeatSection("");
       setSelectedImageUrl(null);
       setUnsplashPhotos([]);
       // Auto-follow visual update for non-owners/hosts
@@ -8137,6 +8178,77 @@ export default function OrgCalendarPage() {
                       </>
                     )}
 
+                    {customTicketed && customExternal ? (
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs tracking-wider uppercase font-bold">Seats</p>
+                          <p className="text-xs text-zinc-400 font-light">How the group gets tickets for {customExternal.title}</p>
+                        </div>
+                        <div className="flex w-full rounded-xl bg-zinc-100 p-0.5" role="radiogroup" aria-label="Seating">
+                          {(["together", "own"] as const).map((v) => (
+                            <button
+                              key={v}
+                              type="button"
+                              role="radio"
+                              aria-checked={customSeatMode === v}
+                              onClick={() => { setCustomSeatMode(v); setCustomCollectError(null); }}
+                              className={`flex-1 rounded-[10px] py-1.5 text-sm font-semibold transition-colors ${customSeatMode === v ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
+                            >
+                              {v === "together" ? "Sit together" : "Each buys their own"}
+                            </button>
+                          ))}
+                        </div>
+                        {customSeatMode === "own" ? (
+                          <>
+                            <p className="text-xs text-zinc-500">Everyone buys their own ticket on {customExternal.sourceLabel} and taps I&rsquo;m covered.</p>
+                            <div className="max-w-[200px]">
+                              <label className="text-xs tracking-wider uppercase font-bold text-zinc-400 block mb-1">Section to buy near (optional)</label>
+                              <input
+                                value={customSeatSection}
+                                onChange={(e) => setCustomSeatSection(e.target.value.slice(0, 40))}
+                                placeholder="112"
+                                className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-xs text-zinc-500">
+                              You set the section and price per seat; guests pay you to hold one, then you buy them in one order. {org.name || "The calendar"} approves the price with your plan.
+                              {customExternal.url && (
+                                <> <a href={customExternal.url} target="_blank" rel="noopener noreferrer" className="underline text-zinc-900">See seats ↗</a></>
+                              )}
+                            </p>
+                            <div className="flex gap-4">
+                              <div className="flex-1">
+                                <label className="text-xs tracking-wider uppercase font-bold text-zinc-400 block mb-1">Section</label>
+                                <input value={customSeatSection} onChange={(e) => setCustomSeatSection(e.target.value.slice(0, 40))} placeholder="112"
+                                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900" />
+                              </div>
+                              <div className="flex-1">
+                                <label className="text-xs tracking-wider uppercase font-bold text-zinc-400 block mb-1">Per seat, with fees</label>
+                                <input inputMode="decimal" value={customCollect.price} placeholder="$85"
+                                  onChange={(e) => { const price = e.target.value.replace(/[^\d.]/g, "").slice(0, 7); setCustomCollect({ ...customCollect, mode: "fixed", price, on: Boolean(price || customCollect.spots) }); setCustomCollectError(null); }}
+                                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900" />
+                              </div>
+                              <div className="flex-1">
+                                <label className="text-xs tracking-wider uppercase font-bold text-zinc-400 block mb-1">Seats</label>
+                                <input inputMode="numeric" value={customCollect.spots} placeholder="4"
+                                  onChange={(e) => { const spots = e.target.value.replace(/\D/g, "").slice(0, 2); setCustomCollect({ ...customCollect, mode: "fixed", spots, on: Boolean(spots || customCollect.price) }); setCustomCollectError(null); }}
+                                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900" />
+                              </div>
+                            </div>
+                            <label className="flex items-center gap-2 text-xs text-zinc-600 cursor-pointer select-none">
+                              <input type="checkbox" checked={customCollect.mine} onChange={(e) => setCustomCollect({ ...customCollect, mine: e.target.checked })} className="w-4 h-4 accent-zinc-900" />
+                              One of the seats is mine
+                            </label>
+                            {customCollect.on ? renderCustomHandles() : (
+                              <p className="text-xs text-zinc-400">Not sure yet? Leave these blank; guests can still buy on {customExternal.sourceLabel}.</p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ) : (
                     <CollectAskFields
                       value={customCollect}
                       onChange={(v) => { setCustomCollect(v); setCustomCollectError(null); }}
@@ -8144,30 +8256,9 @@ export default function OrgCalendarPage() {
                         ? "Guests pay you back directly on Venmo, Cash App, PayPal or Zelle. No fees."
                         : `Guests pay you back directly on Venmo, Cash App, PayPal or Zelle. ${org.name || "The calendar"} approves the price with your plan.`}
                     >
-                      {!customSession ? (
-                        <div className="text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
-                          <span>Confirm your phone by text to collect money.</span>
-                          {customVerify.isVerified && (
-                            <button type="button" onClick={customVerify.reset} className="underline text-zinc-900 shrink-0">Text me a code</button>
-                          )}
-                        </div>
-                      ) : customHandles === undefined ? null : !customHandles || customEditingHandles ? (
-                        <div className="border border-zinc-200 rounded-xl p-3">
-                          <PayHandlesForm
-                            initial={customHandles}
-                            saveLabel="Use these"
-                            onCancel={customHandles ? () => setCustomEditingHandles(false) : undefined}
-                            onSaved={() => {}}
-                            onSubmit={(h) => { setCustomHandles(h); setCustomHandlesTouched(true); setCustomEditingHandles(false); }}
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between gap-3 text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2">
-                          <span>Paid to {describeHandles(customHandles)}</span>
-                          <button type="button" onClick={() => setCustomEditingHandles(true)} className="underline text-zinc-400 hover:text-zinc-900">Edit</button>
-                        </div>
-                      )}
+                      {renderCustomHandles()}
                     </CollectAskFields>
+                    )}
                     {customCollectError && <p className="text-xs text-red-600 -mt-3">{customCollectError}</p>}
 
                     <div className="flex items-center justify-between py-1">
