@@ -33,6 +33,63 @@ export interface PlanExternal {
   priceMax: number | null;
   isFree: boolean;
   lastSyncedAt: string | null;
+  /** What a guest does on the source: pay, sign up, or nothing. */
+  admission?: Admission;
+  /** Ticketed events: one buyer for the group, or each their own. */
+  seating?: "together" | "own" | null;
+  /** Friend plans only; on a calendar's plans everyone buys their own. */
+  groupBuyAllowed?: boolean;
+  /** "Buy near the group: Section 112". */
+  section?: string | null;
+  groupBuy?: PlanGroupBuyPublic | null;
+}
+
+export type Admission = "ticket" | "registration" | "open";
+
+/** The group buy as the plan page shows it before you RSVP (no money). */
+export interface PlanGroupBuyPublic {
+  buyerFirstName: string;
+  lockBy: string | null;
+  estimateEachCents: number | null;
+  bought: boolean;
+  seats: number | null;
+  section: string | null;
+  row: string | null;
+}
+
+export function admissionOf(e: Pick<PlanExternal, "admission" | "isFree">): Admission {
+  return e.admission ?? (e.isFree ? "registration" : "ticket");
+}
+
+/** The words a plan uses for its source, by admission. */
+export function admissionWords(e: Pick<PlanExternal, "admission" | "isFree" | "sourceLabel">) {
+  const s = e.sourceLabel;
+  switch (admissionOf(e)) {
+    case "registration":
+      return { eyebrow: `Register on ${s}`, action: `Register on ${s}`, covered: "I'm registered", priceSuffix: "" };
+    case "open":
+      return { eyebrow: `On ${s}`, action: `See it on ${s}`, covered: null, priceSuffix: "" };
+    default:
+      return { eyebrow: `Tickets on ${s}`, action: `Get tickets on ${s}`, covered: "I'm covered", priceSuffix: " a ticket" };
+  }
+}
+
+/** One person buys every seat for the group (friend plans, seated venues). */
+export function sitsTogether(e: Pick<PlanExternal, "admission" | "isFree" | "seating" | "groupBuyAllowed">): boolean {
+  return admissionOf(e) === "ticket" && e.seating === "together" && e.groupBuyAllowed === true;
+}
+
+export function dollarsFromCents(cents: number | null | undefined): string {
+  const d = (Number(cents) || 0) / 100;
+  return Number.isInteger(d) ? `$${d}` : `$${d.toFixed(2)}`;
+}
+
+/** "Thu 6 PM" for a lock-in time. */
+export function lockByLine(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }).replace(":00", "");
 }
 
 function money(v: number): string {

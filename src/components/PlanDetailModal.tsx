@@ -1,5 +1,6 @@
 "use client";
 
+import { admissionOf, admissionWords } from "@/lib/externalEvents";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
@@ -200,12 +201,26 @@ export default function PlanDetailModal({
     if (!plan.external) return;
     let cancelled = false;
     Parse.Cloud.run("getPlanTickets", { eventGroupId: plan.objectId })
-      .then((r: { clicks?: number; people?: number }) => {
-        if (!cancelled && typeof r?.clicks === "number") setTicketClicks({ clicks: r.clicks, people: r.people ?? 0 });
+      .then((r: { clicks?: number; clickPeople?: number }) => {
+        if (!cancelled && typeof r?.clicks === "number") setTicketClicks({ clicks: r.clicks, people: r.clickPeople ?? 0 });
       })
       .catch(() => { /* not the host, or no clicks yet */ });
     return () => { cancelled = true; };
   }, [plan.objectId, plan.external]);
+
+  // Where the group sits, so guests buying their own can buy near it.
+  const [ticketSection, setTicketSection] = useState(plan.external?.section ?? "");
+  const [sectionSaved, setSectionSaved] = useState<string | null>(plan.external?.section ?? null);
+  const [sectionError, setSectionError] = useState<string | null>(null);
+  async function saveTicketSection() {
+    setSectionError(null);
+    try {
+      const r = (await Parse.Cloud.run("setTicketSeating", { eventGroupId: plan.objectId, section: ticketSection.trim() })) as { section: string | null };
+      setSectionSaved(r.section ?? null);
+    } catch (err: unknown) {
+      setSectionError(err instanceof Error ? err.message : "That didn't save.");
+    }
+  }
 
   // Change-host picker (owner/co-host reassigns this plan's host to a
   // follower/member, or themselves). Candidates load on open; the override
@@ -690,7 +705,7 @@ export default function PlanDetailModal({
             {plan.external && (
               <div className="border border-zinc-200 rounded-lg p-4 space-y-1.5">
                 <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">
-                  Tickets on {plan.external.sourceLabel}
+                  {admissionWords(plan.external).eyebrow}
                 </p>
                 {(plan.external.status === "cancelled" || plan.external.status === "postponed") ? (
                   <p className="text-sm text-amber-700">
@@ -712,9 +727,33 @@ export default function PlanDetailModal({
                     {(() => {
                       const going = planRsvps.filter((r) => r.status === "Accepted");
                       const have = going.filter((r) => r.hasTicket).length;
-                      return have === going.length ? "Everyone going has a ticket." : `${have} of ${going.length} going have a ticket.`;
+                      const word = admissionOf(plan.external!) === "registration" ? "registered" : "covered";
+                      return have === going.length ? `Everyone going is ${word}.` : `${have} of ${going.length} going are ${word}.`;
                     })()}
                   </p>
+                )}
+                {admissionOf(plan.external) === "ticket" && (
+                  <form
+                    className="flex flex-wrap items-center gap-2 pt-1"
+                    onSubmit={(e) => { e.preventDefault(); void saveTicketSection(); }}
+                  >
+                    <label htmlFor="ticket-section" className="text-sm text-zinc-700">Where the group sits</label>
+                    <input
+                      id="ticket-section"
+                      value={ticketSection}
+                      onChange={(e) => setTicketSection(e.target.value)}
+                      placeholder="Section 112"
+                      maxLength={40}
+                      className="w-32 rounded-md border border-zinc-300 px-2 py-1 text-sm"
+                    />
+                    <button type="submit" disabled={ticketSection.trim() === (sectionSaved ?? "")}
+                      className="text-sm font-semibold text-zinc-900 underline disabled:no-underline disabled:text-zinc-400">
+                      Save
+                    </button>
+                    <span className="basis-full text-xs text-zinc-500">
+                      {sectionError ?? "Guests see \u201cBuy near the group\u201d with this section."}
+                    </span>
+                  </form>
                 )}
                 <p className="text-xs text-zinc-500">
                   {plan.external.lastSyncedAt

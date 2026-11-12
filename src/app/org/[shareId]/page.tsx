@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
-import { isEventLink, priceLine, whenLine, type ExternalEvent, type PlanExternal } from "@/lib/externalEvents";
+import { admissionOf, admissionWords, isEventLink, priceLine, whenLine, type ExternalEvent, type PlanExternal } from "@/lib/externalEvents";
 import PlanTicketToggle from "@/components/PlanTicketToggle";
 import ExternalEventPicker from "@/components/ExternalEventPicker";
 import { APP_LINK_URL, SITE_URL } from "@/lib/site";
@@ -5430,7 +5430,7 @@ export default function OrgCalendarPage() {
                         <>
                           <span>
                             {plan.date}{plan.time ? <> &bull; {plan.time}</> : ""}
-                            {plan.external && <> &bull; Tickets on {plan.external.sourceLabel}</>}
+                            {plan.external && <> &bull; {admissionWords(plan.external).eyebrow}</>}
                           </span>
                           {/* Absent on most rows — the forecast only reaches 14
                               days out and only covers outdoor venues. */}
@@ -6458,7 +6458,7 @@ export default function OrgCalendarPage() {
                 {selectedEvent.external && !selectedEvent.isPoll ? (
                   // An outside event: where it's sold is the headline, not a host.
                   <p className="text-sm font-bold uppercase tracking-widest text-zinc-900 flex items-center gap-2">
-                    <Ticket className="w-4 h-4" aria-hidden /> Tickets on {selectedEvent.external.sourceLabel}
+                    <Ticket className="w-4 h-4" aria-hidden /> {admissionWords(selectedEvent.external).eyebrow}
                   </p>
                 ) : selectedEvent.leafHostState === "leaf_hosted" ? (
                   <div className="flex items-center gap-2">
@@ -6545,7 +6545,7 @@ export default function OrgCalendarPage() {
                   {selectedEvent.external && !selectedEvent.isPoll && priceLine(selectedEvent.external) && (
                     <span className="flex items-center gap-2 whitespace-nowrap text-zinc-900 font-normal">
                       <Ticket className="w-4 h-4 flex-shrink-0" />
-                      {priceLine(selectedEvent.external)}{selectedEvent.external.isFree ? "" : " a ticket"} on {selectedEvent.external.sourceLabel}
+                      {priceLine(selectedEvent.external)}{admissionWords(selectedEvent.external).priceSuffix} on {selectedEvent.external.sourceLabel}
                     </span>
                   )}
                   {!selectedEvent.drop && ticketPriceTotal(selectedEvent) && (
@@ -6605,9 +6605,15 @@ export default function OrgCalendarPage() {
                       </p>
                     ) : (
                       <p className="text-sm text-zinc-600">
-                        {rsvpedPlanIds.has(selectedEvent.id)
-                          ? <>Leaf doesn&rsquo;t sell these tickets. Buy yours on {selectedEvent.external.sourceLabel}, then mark it here so the group knows.</>
-                          : <>Tap I&rsquo;m going so the group knows you&rsquo;ll be there. Then get your ticket on {selectedEvent.external.sourceLabel}; Leaf doesn&rsquo;t sell them.</>}
+                        {admissionOf(selectedEvent.external) === "open"
+                          ? <>Details and updates are on {selectedEvent.external.sourceLabel}.</>
+                          : admissionOf(selectedEvent.external) === "registration"
+                            ? rsvpedPlanIds.has(selectedEvent.id)
+                              ? <>It&rsquo;s free, but you sign up on {selectedEvent.external.sourceLabel}. Register there, then mark it here so the group knows.</>
+                              : <>Tap I&rsquo;m going so the group knows you&rsquo;ll be there. Then register on {selectedEvent.external.sourceLabel}; it&rsquo;s free.</>
+                            : rsvpedPlanIds.has(selectedEvent.id)
+                              ? <>Leaf doesn&rsquo;t sell these tickets. Buy yours on {selectedEvent.external.sourceLabel}{selectedEvent.external.section ? <>, near the group in <b className="font-semibold text-zinc-900">Section {selectedEvent.external.section}</b></> : null}, then mark it here so the group knows.</>
+                              : <>Tap I&rsquo;m going so the group knows you&rsquo;ll be there. Then get your ticket on {selectedEvent.external.sourceLabel}{selectedEvent.external.section ? <> (the group sits in Section {selectedEvent.external.section})</> : null}; Leaf doesn&rsquo;t sell them.</>}
                       </p>
                     )}
                     <p className="text-xs text-zinc-500 flex items-center gap-1.5">
@@ -6615,7 +6621,7 @@ export default function OrgCalendarPage() {
                     </p>
                     {rsvpedPlanIds.has(selectedEvent.id) && (
                       <div className="pt-1 flex justify-start">
-                        <PlanTicketToggle eventGroupId={selectedEvent.id} refreshKey={rsvpedPlanIds.has(selectedEvent.id)} />
+                        <PlanTicketToggle eventGroupId={selectedEvent.id} refreshKey={rsvpedPlanIds.has(selectedEvent.id)} sourceLabel={selectedEvent.external.sourceLabel} />
                       </div>
                     )}
                   </div>
@@ -6877,7 +6883,7 @@ export default function OrgCalendarPage() {
                         className="text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 rounded-lg no-underline"
                         style={{ backgroundColor: org.brandColor || "#18181b" }}
                       >
-                        <Ticket className="w-4 h-4" aria-hidden /> Get tickets on {selectedEvent.external.sourceLabel} <ArrowUpRight className="w-4 h-4" aria-hidden />
+                        <Ticket className="w-4 h-4" aria-hidden /> {admissionWords(selectedEvent.external).action} <ArrowUpRight className="w-4 h-4" aria-hidden />
                       </a>
                     )}
                     <div className="flex justify-center">

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import Link from "next/link";
 import { ArrowUpRight, Lock, MapPin, Ticket, Wallet } from "lucide-react";
-import { priceLine, type PlanExternal } from "@/lib/externalEvents";
+import { admissionOf, admissionWords, lockByLine, priceLine, sitsTogether, type PlanExternal } from "@/lib/externalEvents";
 import PlanTicketToggle from "@/components/PlanTicketToggle";
 import PlanHeroMedia from "./PlanHeroMedia";
 import { OnlyOnLeafLine, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
@@ -206,7 +206,7 @@ export default function StandalonePlanCard({
 
           {external ? (
             <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-zinc-900">
-              <Ticket className="w-3.5 h-3.5" aria-hidden /> Tickets on {external.sourceLabel}
+              <Ticket className="w-3.5 h-3.5" aria-hidden /> {admissionWords(external).eyebrow}
             </div>
           ) : hostName ? (
             <div className="text-sm text-zinc-500">Hosted by {hostName}</div>
@@ -215,7 +215,14 @@ export default function StandalonePlanCard({
           {external && priceLine(external) ? (
             <div className="flex items-center gap-1.5 text-sm text-zinc-900">
               <Ticket className="w-3.5 h-3.5" aria-hidden />
-              <span>{priceLine(external)}{external.isFree ? "" : " a ticket"} on {external.sourceLabel}</span>
+              <span>{priceLine(external)}{admissionWords(external).priceSuffix} on {external.sourceLabel}</span>
+            </div>
+          ) : null}
+
+          {external && sitsTogether(external) && external.groupBuy && !external.groupBuy.bought ? (
+            <div className="text-sm text-zinc-900">
+              {external.groupBuy.buyerFirstName} is buying seats together
+              {lockByLine(external.groupBuy.lockBy) ? ` · lock in by ${lockByLine(external.groupBuy.lockBy)}` : ""}
             </div>
           ) : null}
 
@@ -249,11 +256,28 @@ export default function StandalonePlanCard({
               <p className="text-sm text-zinc-600">
                 {external.status === "cancelled" || external.status === "postponed"
                   ? `${external.sourceLabel} lists this event as ${external.status}. Check with the host before buying.`
-                  : going
-                    ? `Leaf doesn't sell these tickets. Buy yours on ${external.sourceLabel}, then mark it here so the group knows.`
-                    : `Tap I'm going so the group knows you'll be there. Then get your ticket on ${external.sourceLabel}; Leaf doesn't sell them.`}
+                  : admissionOf(external) === "open"
+                    ? `Details and updates are on ${external.sourceLabel}.`
+                    : admissionOf(external) === "registration"
+                      ? going
+                        ? `It's free, but you sign up on ${external.sourceLabel}. Register there, then mark it here so the group knows.`
+                        : `Tap I'm going so the group knows you'll be there. Then register on ${external.sourceLabel}; it's free.`
+                      : sitsTogether(external) && external.groupBuy
+                        ? external.groupBuy.bought
+                          ? `${external.groupBuy.buyerFirstName} bought ${external.groupBuy.seats} seats together.`
+                          : `${external.groupBuy.buyerFirstName} buys every seat in one order so you sit together. Lock in, then pay ${external.groupBuy.buyerFirstName} back.`
+                        : going
+                          ? `Leaf doesn't sell these tickets. Buy yours on ${external.sourceLabel}, then mark it here so the group knows.`
+                          : `Tap I'm going so the group knows you'll be there. Then get your ticket on ${external.sourceLabel}; Leaf doesn't sell them.`}
               </p>
-              {going && <PlanTicketToggle eventGroupId={eventGroupId} refreshKey={going} />}
+              {going && (
+                <PlanTicketToggle
+                  eventGroupId={eventGroupId}
+                  refreshKey={going}
+                  sourceLabel={external.sourceLabel}
+                  ticketHref={external.ticketUrl ? `/tickets/${eventGroupId}?s=share` : null}
+                />
+              )}
             </div>
           ) : null}
 
@@ -354,7 +378,7 @@ export default function StandalonePlanCard({
             <>
               {/* A ticketed event: once you're going, Get tickets is the
                   main action; before that, I'm going (the RSVP below). */}
-              {external?.ticketUrl && going && (
+              {external?.ticketUrl && (going || admissionOf(external) === "open") && !(sitsTogether(external) && external.groupBuy) && (
                 <a
                   href={`/tickets/${eventGroupId}?s=share`}
                   target="_blank"
@@ -362,7 +386,7 @@ export default function StandalonePlanCard({
                   className="w-full bg-zinc-900 text-white rounded-full py-3 flex items-center justify-center gap-2 text-sm font-medium hover:bg-zinc-800"
                 >
                   <Ticket className="w-4 h-4" aria-hidden />
-                  Get tickets on {external.sourceLabel}
+                  {admissionWords(external).action}
                   <ArrowUpRight className="w-4 h-4" aria-hidden />
                 </a>
               )}
@@ -391,7 +415,7 @@ export default function StandalonePlanCard({
                 limitedSpots={capacity != null}
                 rsvpClosed={rsvpClosed}
                 autoOpenRsvp={autoOpenRsvp}
-                ctaLabel={external ? "I'm going" : undefined}
+                ctaLabel={external ? (sitsTogether(external) && external.groupBuy && !external.groupBuy.bought ? "Lock me in" : "I'm going") : undefined}
                 onLocationRevealed={(loc) => {
                   setGoing(true);
                   if (loc.name) setRevealedName(loc.name);
