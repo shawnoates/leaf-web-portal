@@ -87,7 +87,7 @@ export default function EditCalendarPage() {
   const [hideVenue, setHideVenue] = useState(true);
   const [requireApprovalDefault, setRequireApprovalDefault] = useState(false);
   const [allowFollowersToHost, setAllowFollowersToHost] = useState(true);
-  const [includeTicketedEvents, setIncludeTicketedEvents] = useState(false);
+  const [includeTicketedEvents, setIncludeTicketedEvents] = useState(true);
   const [isPrivate, setIsPrivate] = useState(false);
   const [hidePlanIdeas, setHidePlanIdeas] = useState(false);
   const [hideCustomPlans, setHideCustomPlans] = useState(false);
@@ -172,7 +172,7 @@ export default function EditCalendarPage() {
     setHideVenue(cal.hideVenueUntilRsvp !== false);
     setRequireApprovalDefault(cal.requireApprovalDefault === true);
     setAllowFollowersToHost(cal.allowFollowersToHost !== false);
-    setIncludeTicketedEvents(cal.includeTicketedEvents === true);
+    setIncludeTicketedEvents(cal.includeTicketedEvents !== false);
     setIsPrivate(cal.isPrivate || false);
     setHidePlanIdeas(cal.hidePlanIdeas || false);
     setHideCustomPlans(cal.hideCustomPlans || false);
