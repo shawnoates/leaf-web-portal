@@ -263,6 +263,10 @@ export interface OrgDashboard {
     /** Latest host nudge actually sent to this person (any of their linked
      *  accounts). Nudge stays off for 7 days after it. */
     lastNudgedAt?: string | null;
+    /** Why a nudge can't reach them right now (no push reach, and a text is
+     *  out): "weekly-limit" | "opted-out" | "no-phone"; null when one can.
+     *  Undefined from an older server — fall back to the phone check. */
+    nudgeBlockedReason?: "weekly-limit" | "opted-out" | "no-phone" | null;
   }[];
   rsvps: {
     objectId: string;

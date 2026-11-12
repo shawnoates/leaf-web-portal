@@ -76,6 +76,17 @@ function nudgeCooldown(lastIso?: string | null): { ago: string; again: string } 
   };
 }
 
+/** Why Nudge is off for this follower, or null when it can go. Uses the
+ *  server's nudgeBlockedReason (push reach + text limits); an older server
+ *  doesn't send it, so fall back to "has a phone". */
+function nudgeBlockHint(f: OrgDashboard["followers"][number]): string | null {
+  const reason = f.nudgeBlockedReason === undefined ? (f.phone ? null : "no-phone") : f.nudgeBlockedReason;
+  if (reason === "weekly-limit") return "Weekly text limit reached · resets Monday";
+  if (reason === "opted-out") return "Opted out of texts";
+  if (reason === "no-phone") return "No phone on file";
+  return null;
+}
+
 function daysAgo(iso: string): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
   if (days <= 0) return "today";
@@ -410,7 +421,8 @@ export default function CommunityTab({
             .filter(
               (p) =>
                 !p.pending &&
-                p.follower?.phone &&
+                p.follower &&
+                !nudgeBlockHint(p.follower) &&
                 !p.follower.nudgeScheduledFor &&
                 !nudgeCooldown(p.follower.lastNudgedAt) &&
                 !nudgedIds?.has(p.follower.membershipId),
@@ -427,6 +439,7 @@ export default function CommunityTab({
       const nudged = nudgedIds?.has(f.membershipId);
       const scheduledFor = f.nudgeScheduledFor;
       const cooldown = nudgeCooldown(f.lastNudgedAt);
+      const blocked = nudgeBlockHint(f);
       items.push({
         key: "nudge",
         label: scheduledFor
@@ -440,13 +453,13 @@ export default function CommunityTab({
         pro: true,
         // onNudge opens the upgrade modal on free tiers; the server enforces
         // the same gate, and the 7-day cooldown, in nudgeFollower.
-        onSelect: f.phone && !nudged && !scheduledFor && !cooldown ? () => onNudge(f) : undefined,
+        onSelect: !blocked && !nudged && !scheduledFor && !cooldown ? () => onNudge(f) : undefined,
         disabledHint: scheduledFor
           ? `Goes out ${nudgeSendLabel(scheduledFor)}`
           : cooldown
             ? `One nudge a week · again ${cooldown.again}`
-            : !f.phone
-              ? "No phone on file"
+            : blocked
+              ? blocked
               : nudged
                 ? "Sent this session"
                 : undefined,
