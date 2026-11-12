@@ -455,11 +455,11 @@ export default function PlanTicketToggle({
     if (t.canSetUpSeats && t.seatSetup && !t.seatSetup.otherCollect) {
       return (
         <div className="space-y-3">
-          <p className="text-sm text-zinc-600">
-            Pick a section and a price per seat. Guests pay you to hold one, then you buy them in a single order.
+          <p className="text-xs text-zinc-500">
+            You set the section and price per seat; guests pay you to hold one, then you buy them in one order.
           </p>
           <button type="button" onClick={() => setSettingUp(true)}
-            className="rounded-full bg-zinc-900 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800">
+            className="w-full rounded-full border border-zinc-900 py-2.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-50">
             Set up seats
           </button>
           {errorLine}
