@@ -148,6 +148,32 @@ export default function InviteFriendsSection({
     addLines(texts.flatMap(vcardToLines));
   };
 
+  // A drag out of Mac Contacts can arrive as a .vcf file, as vCard text, or
+  // (in Chrome, which drops Contacts' "file promise") as nothing usable. Read
+  // every form; say what to do instead of failing silently.
+  const onDrop = async (dt: DataTransfer) => {
+    // Strings must be read before the first await; the drop data goes away after.
+    const strings = ["text/vcard", "text/x-vcard", "text/directory", "text/plain"]
+      .map((t) => { try { return dt.getData(t); } catch { return ""; } })
+      .filter(Boolean);
+    const files = [
+      ...Array.from(dt.files),
+      ...Array.from(dt.items).filter((i) => i.kind === "file").map((i) => i.getAsFile()).filter((f): f is File => !!f),
+    ].filter((f) => f.size < 5_000_000);
+    const fileTexts = await Promise.all(files.map((f) => f.text().catch(() => "")));
+    const cards = [...fileTexts, ...strings].filter((t) => /BEGIN:VCARD/i.test(t));
+    if (cards.length) {
+      // The same card can come through as both a file and text; keep one copy.
+      addLines([...new Set(cards.flatMap(vcardToLines))]);
+      return;
+    }
+    const text = strings.find((t) => parseContacts(t).length > 0);
+    if (text) { addLines(text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)); return; }
+    setError(
+      "Your browser didn't pass those contacts along. Try Safari, or in Contacts choose File → Export → Export vCard and pick that file below.",
+    );
+  };
+
   const pickContacts = async () => {
     if (!picker && isMac) { window.location.href = "addressbook://"; setContactsOpened(true); return; }
     if (!picker) { fileRef.current?.click(); return; }
@@ -277,13 +303,12 @@ export default function InviteFriendsSection({
               aria-label="Names and numbers"
               value={pasted}
               onChange={(e) => setPasted(e.target.value)}
-              onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragging(true); } }}
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
               onDragLeave={() => setDragging(false)}
               onDrop={(e) => {
-                if (!e.dataTransfer.files.length) return;
                 e.preventDefault();
                 setDragging(false);
-                addFiles(e.dataTransfer.files);
+                onDrop(e.dataTransfer);
               }}
               rows={6}
               placeholder={"Dana Kim 917-555-0101\nSam +1 (646) 555-0199"}

@@ -35,7 +35,7 @@ export default function TextFriendsDrawer({
         <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-zinc-100">
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-zinc-900">Text friends</h2>
-            <p className="text-sm text-zinc-500 mt-0.5 truncate">
+            <p className="text-sm text-zinc-500 mt-0.5">
               Each gets their own link to {planTitle}. Leaf tells you who opens it and who RSVPs.
             </p>
           </div>
