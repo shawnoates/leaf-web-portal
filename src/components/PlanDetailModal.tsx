@@ -733,17 +733,11 @@ export default function PlanDetailModal({
                     {plan.external.sourceLabel} lists this event as {plan.external.status}. Let your guests know, or cancel the plan.
                   </p>
                 ) : (
-                  <p className="text-sm text-zinc-700">
-                    Date, time and venue follow {plan.external.sourceLabel}. If the show moves, the plan moves and guests are told.
+                  <p className="text-xs text-zinc-500">
+                    Date, time and venue follow {plan.external.sourceLabel}; if the show moves, guests are told.
                   </p>
                 )}
-                {ticketClicks && ticketClicks.clicks > 0 && (
-                  <p className="text-sm text-zinc-700">
-                    Get tickets opened {ticketClicks.clicks} time{ticketClicks.clicks === 1 ? "" : "s"}
-                    {ticketClicks.people > 0 ? ` by ${ticketClicks.people} ${ticketClicks.people === 1 ? "person" : "people"} signed in` : ""}.
-                  </p>
-                )}
-                {goingCount > 0 && (
+                {goingCount > 0 && !(admissionOf(plan.external) === "ticket" && seating === "together") && (
                   <p className="text-sm text-zinc-700">
                     {(() => {
                       const going = planRsvps.filter((r) => r.status === "Accepted");
@@ -754,7 +748,7 @@ export default function PlanDetailModal({
                   </p>
                 )}
                 {admissionOf(plan.external) === "ticket" && (
-                  <div className="pt-1 space-y-1">
+                  <div className="pt-2 space-y-1">
                     <div className="inline-flex rounded-full border border-zinc-300 p-0.5" role="radiogroup" aria-label="Seating">
                       {(["together", "own"] as const).map((v) => (
                         <button
@@ -770,20 +764,19 @@ export default function PlanDetailModal({
                         </button>
                       ))}
                     </div>
-                    <p className="text-xs text-zinc-500">
-                      {seating === "together"
-                        ? "You set the section and price per seat; guests pay you to hold one, then you buy them in one order."
-                        : "Everyone buys their own ticket and taps I’m covered."}
-                    </p>
+                    {seating === "own" && (
+                      <p className="text-xs text-zinc-500">Everyone buys their own ticket and taps I&rsquo;m covered.</p>
+                    )}
                   </div>
                 )}
                 {admissionOf(plan.external) === "ticket" && seating === "together" && (
-                  <div className="pt-1">
+                  <div className="pt-2">
                     <PlanTicketToggle
                       eventGroupId={plan.objectId}
                       refreshKey={seating}
                       sourceLabel={plan.external.sourceLabel}
                       ticketHref={plan.external.ticketUrl ? `/tickets/${plan.objectId}?s=dashboard` : null}
+                      variant="host"
                     />
                   </div>
                 )}
@@ -810,7 +803,10 @@ export default function PlanDetailModal({
                     </span>
                   </form>
                 )}
-                <p className="text-xs text-zinc-500">
+                <p className="pt-2 text-xs text-zinc-500">
+                  {ticketClicks && ticketClicks.clicks > 0 && (
+                    <>Get tickets opened {ticketClicks.clicks}&times;{ticketClicks.people > 0 ? ` by ${ticketClicks.people}` : ""} &middot; </>
+                  )}
                   {plan.external.lastSyncedAt
                     ? `Checked ${new Date(plan.external.lastSyncedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
                     : "Checked when created"}

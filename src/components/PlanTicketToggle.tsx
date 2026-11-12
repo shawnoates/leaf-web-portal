@@ -111,11 +111,15 @@ export default function PlanTicketToggle({
   refreshKey,
   sourceLabel = "the ticket site",
   ticketHref,
+  variant = "guest",
 }: {
   eventGroupId: string;
   refreshKey?: string | number | boolean;
   sourceLabel?: string;
   ticketHref?: string | null;
+  /** "host": the dashboard plan view. Before anyone buys it shows only the
+   *  host's next step (Set up seats), not a guest's "I'm covered". */
+  variant?: "guest" | "host";
 }) {
   const [t, setT] = useState<PlanTickets | null>(null);
   const [saving, setSaving] = useState(false);
@@ -443,6 +447,26 @@ export default function PlanTicketToggle({
         {errorLine}
       </div>
     );
+  }
+
+  // ── Host view, nobody buying yet: one next step ────────────────────────
+  if (variant === "host" && together) {
+    if (settingUp && setupForm) return setupForm;
+    if (t.canSetUpSeats && t.seatSetup && !t.seatSetup.otherCollect) {
+      return (
+        <div className="space-y-3">
+          <p className="text-sm text-zinc-600">
+            Pick a section and a price per seat. Guests pay you to hold one, then you buy them in a single order.
+          </p>
+          <button type="button" onClick={() => setSettingUp(true)}
+            className="rounded-full bg-zinc-900 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800">
+            Set up seats
+          </button>
+          {errorLine}
+        </div>
+      );
+    }
+    return <p className="text-sm text-zinc-600">Someone going can offer to buy every seat in one order.</p>;
   }
 
   // ── Everyone buys (or registers) their own ──────────────────────────────
